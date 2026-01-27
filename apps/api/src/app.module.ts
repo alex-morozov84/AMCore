@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
 
 import { AppController } from './app.controller';
+import { HealthModule } from './health';
 import { PrismaModule } from './prisma';
 
 @Module({
@@ -12,6 +14,26 @@ import { PrismaModule } from './prisma';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '../../.env',
+    }),
+
+    // Logging
+    LoggerModule.forRoot({
+      pinoHttp: {
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? {
+                target: 'pino-pretty',
+                options: {
+                  colorize: true,
+                  singleLine: true,
+                  ignore: 'pid,hostname',
+                },
+              }
+            : undefined,
+        level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
+        autoLogging: true,
+        quietReqLogger: true,
+      },
     }),
 
     // Rate limiting
@@ -30,6 +52,9 @@ import { PrismaModule } from './prisma';
 
     // Database
     PrismaModule,
+
+    // Health check
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
