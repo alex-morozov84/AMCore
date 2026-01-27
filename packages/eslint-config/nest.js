@@ -6,15 +6,54 @@ export default [
   {
     files: ['**/*.ts'],
     rules: {
-      // NestJS specific
-      '@typescript-eslint/interface-name-prefix': 'off',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-explicit-any': 'warn',
-
-      // Allow empty constructors (DI)
+      // === NestJS specific ===
+      // Allow empty constructors (Dependency Injection)
       'no-useless-constructor': 'off',
       '@typescript-eslint/no-useless-constructor': 'off',
+
+      // Allow parameter properties in constructors
+      'no-empty-function': 'off',
+      '@typescript-eslint/no-empty-function': [
+        'error',
+        { allow: ['constructors'] },
+      ],
+
+      // === Stricter TypeScript for backend ===
+      '@typescript-eslint/no-explicit-any': 'error', // Stricter than base (warn)
+      '@typescript-eslint/explicit-function-return-type': [
+        'warn',
+        {
+          allowExpressions: true,
+          allowTypedFunctionExpressions: true,
+          allowHigherOrderFunctions: true,
+        },
+      ],
+      '@typescript-eslint/explicit-member-accessibility': [
+        'error',
+        { accessibility: 'no-public' }, // Don't require 'public' keyword
+      ],
+      '@typescript-eslint/no-floating-promises': 'off', // Enable if using project-aware parsing
+      '@typescript-eslint/await-thenable': 'off', // Enable if using project-aware parsing
+
+      // === Code quality ===
+      'no-return-await': 'off',
+      '@typescript-eslint/return-await': ['error', 'in-try-catch'],
+      '@typescript-eslint/no-unnecessary-condition': 'off', // Enable if using project-aware parsing
+      '@typescript-eslint/prefer-nullish-coalescing': 'off', // Enable if using project-aware parsing
+
+      // === Security ===
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+    },
+  },
+  {
+    // Test files - relaxed rules
+    files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      'no-console': 'off',
     },
   },
 ];
