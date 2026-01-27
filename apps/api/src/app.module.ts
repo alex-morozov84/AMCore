@@ -1,7 +1,9 @@
+import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { createKeyv } from '@keyv/redis';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AppController } from './app.controller';
@@ -34,6 +36,17 @@ import { PrismaModule } from './prisma';
         autoLogging: true,
         quietReqLogger: true,
       },
+    }),
+
+    // Cache (Redis)
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        stores: [createKeyv(configService.get('REDIS_URL', 'redis://localhost:6379'))],
+        ttl: 60 * 1000, // 60 seconds default
+      }),
     }),
 
     // Rate limiting
