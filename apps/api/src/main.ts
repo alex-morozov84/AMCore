@@ -32,7 +32,7 @@ async function bootstrap(): Promise<void> {
     SwaggerModule.setup('docs', app, document);
   }
 
-  const port = process.env.API_PORT || 3001;
+  const port = process.env.API_PORT || 5002;
   await app.listen(port);
 
   console.log(`🚀 API running on http://localhost:${port}`);

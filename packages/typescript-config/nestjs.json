@@ -8,6 +8,7 @@
     "outDir": "./dist",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "strictNullChecks": true,
     "strictBindCallApply": true,
     "noFallthroughCasesInSwitch": true
