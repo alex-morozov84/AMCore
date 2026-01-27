@@ -5,6 +5,26 @@ export default [
   ...baseConfig,
   {
     files: ['**/*.ts'],
+    languageOptions: {
+      globals: {
+        // Node.js globals
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        module: 'readonly',
+        require: 'readonly',
+        exports: 'readonly',
+        global: 'readonly',
+        setTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearTimeout: 'readonly',
+        clearInterval: 'readonly',
+        setImmediate: 'readonly',
+        clearImmediate: 'readonly',
+      },
+    },
     rules: {
       // === NestJS specific ===
       // Allow empty constructors (Dependency Injection)
@@ -34,7 +54,7 @@ export default [
 
       // === Code quality ===
       'no-return-await': 'off',
-      '@typescript-eslint/return-await': ['error', 'in-try-catch'],
+      '@typescript-eslint/return-await': 'off', // Requires type-aware parsing
       '@typescript-eslint/no-unnecessary-condition': 'off', // Enable if using project-aware parsing
       '@typescript-eslint/prefer-nullish-coalescing': 'off', // Enable if using project-aware parsing
 
