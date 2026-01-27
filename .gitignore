@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+.turbo/
+out/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Generated files
+*.tsbuildinfo
+.eslintcache
+
+# Docker
+docker-compose.override.yml
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# PWA
+public/sw.js
+public/workbox-*.js
+public/sw.js.map
+public/workbox-*.js.map
+
+# AI documentation (internal planning, not for public repo)
+ai/
+CLAUDE.md
+
+# Local Prisma generated client (will be in node_modules)
+generated/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
