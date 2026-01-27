@@ -53,8 +53,10 @@ export default [
       '@typescript-eslint/await-thenable': 'off', // Enable if using project-aware parsing
 
       // === Code quality ===
+      // TODO: Enable these rules when type-aware parsing is configured
+      // See: https://typescript-eslint.io/getting-started/typed-linting
       'no-return-await': 'off',
-      '@typescript-eslint/return-await': 'off', // Requires type-aware parsing
+      '@typescript-eslint/return-await': 'off', // Useful for try-catch, needs parserOptions.project
       '@typescript-eslint/no-unnecessary-condition': 'off', // Enable if using project-aware parsing
       '@typescript-eslint/prefer-nullish-coalescing': 'off', // Enable if using project-aware parsing
 
