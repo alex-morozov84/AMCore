@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AppController } from './app.controller';
+import { PrismaModule } from './prisma';
 
 @Module({
   imports: [
@@ -26,6 +27,9 @@ import { AppController } from './app.controller';
         limit: 100, // 100 requests per minute
       },
     ]),
+
+    // Database
+    PrismaModule,
   ],
   controllers: [AppController],
   providers: [
