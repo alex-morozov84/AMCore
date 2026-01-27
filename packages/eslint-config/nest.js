@@ -13,10 +13,7 @@ export default [
 
       // Allow parameter properties in constructors
       'no-empty-function': 'off',
-      '@typescript-eslint/no-empty-function': [
-        'error',
-        { allow: ['constructors'] },
-      ],
+      '@typescript-eslint/no-empty-function': ['error', { allow: ['constructors'] }],
 
       // === Stricter TypeScript for backend ===
       '@typescript-eslint/no-explicit-any': 'error', // Stricter than base (warn)

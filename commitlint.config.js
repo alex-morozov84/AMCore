@@ -23,18 +23,7 @@ export default {
     'scope-enum': [
       1, // Warning, not error
       'always',
-      [
-        'api',
-        'web',
-        'shared',
-        'auth',
-        'fitness',
-        'finance',
-        'subscriptions',
-        'ci',
-        'docs',
-        'deps',
-      ],
+      ['api', 'web', 'shared', 'auth', 'fitness', 'finance', 'subscriptions', 'ci', 'docs', 'deps'],
     ],
     // Subject (description) rules
     'subject-case': [2, 'always', 'lower-case'],

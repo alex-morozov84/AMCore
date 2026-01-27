@@ -11,16 +11,16 @@ AMCore is a modular web application for personal productivity, built with modern
 ### Planned Modules
 
 - **Fitness** — Workout tracking, exercise library, progress charts
-- **Finance** — Wallet management, transaction tracking *(planned)*
-- **Subscriptions** — Subscription monitoring, reminders *(planned)*
+- **Finance** — Wallet management, transaction tracking _(planned)_
+- **Subscriptions** — Subscription monitoring, reminders _(planned)_
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Backend** | NestJS, PostgreSQL, Prisma, Redis, BullMQ |
+| Layer        | Technology                                    |
+| ------------ | --------------------------------------------- |
+| **Backend**  | NestJS, PostgreSQL, Prisma, Redis, BullMQ     |
 | **Frontend** | Next.js 15, React 19, Tailwind CSS, shadcn/ui |
-| **Monorepo** | pnpm, Turborepo |
+| **Monorepo** | pnpm, Turborepo                               |
 
 ## Project Status
 
