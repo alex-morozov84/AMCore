@@ -4,8 +4,10 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 import nextPlugin from '@next/eslint-plugin-next';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
 
-export default tseslint.config(
+/** @type {import('typescript-eslint').ConfigArray} */
+export default [
   // Global ignores
   {
     name: 'project/ignores',
@@ -19,13 +21,47 @@ export default tseslint.config(
   },
 
   // TypeScript rules
-  {
-    name: 'project/typescript',
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
     files: ['**/*.{ts,tsx}'],
-    extends: [...tseslint.configs.recommended],
+  })),
+  {
+    name: 'project/typescript-custom',
+    files: ['**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': 'error',
+    },
+  },
+
+  // Import sorting
+  {
+    name: 'project/import-sort',
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    plugins: {
+      'simple-import-sort': simpleImportSort,
+    },
+    rules: {
+      'simple-import-sort/imports': [
+        'error',
+        {
+          groups: [
+            // Node.js builtins
+            ['^node:'],
+            // External packages
+            ['^react', '^next', '^@?\\w'],
+            // Internal packages (@/)
+            ['^@/'],
+            // Parent imports
+            ['^\\.\\.'],
+            // Sibling imports
+            ['^\\.'],
+            // Style imports
+            ['^.+\\.css$'],
+          ],
+        },
+      ],
+      'simple-import-sort/exports': 'error',
     },
   },
 
@@ -52,8 +88,8 @@ export default tseslint.config(
     rules: {
       ...reactPlugin.configs.recommended.rules,
       ...reactHooksPlugin.configs.recommended.rules,
-      'react/react-in-jsx-scope': 'off', // Not needed in Next.js
-      'react/prop-types': 'off', // Using TypeScript
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
     },
   },
 
@@ -81,4 +117,4 @@ export default tseslint.config(
       ...nextPlugin.configs['core-web-vitals'].rules,
     },
   },
-);
+];
