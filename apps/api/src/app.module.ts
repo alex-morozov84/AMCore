@@ -1,9 +1,9 @@
+import { createKeyv } from '@keyv/redis';
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { createKeyv } from '@keyv/redis';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AppController } from './app.controller';
