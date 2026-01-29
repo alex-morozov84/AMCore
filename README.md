@@ -38,7 +38,7 @@ AMCore is a modular web application for personal productivity, built with modern
 | Backend bootstrap (NestJS, Prisma, Redis)      | ✅     |
 | CI/CD pipeline (lint, typecheck, test, build)  | ✅     |
 | Frontend bootstrap (Next.js 16, Tailwind, FSD) | ✅     |
-| Shared packages                                | ⏳     |
+| Shared packages                                | ✅     |
 | Docker & deployment                            | ⏳     |
 
 ### Coming Next
