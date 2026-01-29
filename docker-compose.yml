@@ -1,6 +1,26 @@
 services:
   # ===========================================
-  # Redis - Required for sessions, cache, queues
+  # PostgreSQL - Database
+  # ===========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: amcore-postgres
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: amcore
+      POSTGRES_PASSWORD: amcore
+      POSTGRES_DB: amcore
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U amcore -d amcore']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Redis - Cache, Sessions, Queues
   # ===========================================
   redis:
     image: redis:7-alpine
@@ -17,25 +37,49 @@ services:
       retries: 5
 
   # ===========================================
-  # PostgreSQL - Optional (uncomment if needed locally)
+  # API - NestJS Backend
   # ===========================================
-  # postgres:
-  #   image: postgres:16-alpine
-  #   container_name: amcore-postgres
-  #   ports:
-  #     - '5432:5432'
-  #   environment:
-  #     POSTGRES_USER: amcore
-  #     POSTGRES_PASSWORD: amcore
-  #     POSTGRES_DB: amcore_dev
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ['CMD-SHELL', 'pg_isready -U amcore -d amcore_dev']
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: amcore-api
+    ports:
+      - '5002:5002'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://amcore:amcore@postgres:5432/amcore
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:5002/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================
+  # Web - Next.js Frontend
+  # ===========================================
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: amcore-web
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      API_URL: http://api:5002
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
+  postgres_data:
   redis_data:
-  # postgres_data:

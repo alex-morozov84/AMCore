@@ -4,6 +4,9 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
+  // Standalone output for Docker
+  output: 'standalone',
+
   // React Compiler (stable in Next.js 16)
   reactCompiler: true,
 
