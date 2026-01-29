@@ -11,7 +11,7 @@ export default [
   // Global ignores
   {
     name: 'project/ignores',
-    ignores: ['.next/**', 'out/**', 'build/**', 'node_modules/**'],
+    ignores: ['.next/**', 'out/**', 'build/**', 'node_modules/**', 'public/sw.js'],
   },
 
   // Base JavaScript rules

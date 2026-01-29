@@ -1,2 +1,2 @@
 // Shared hooks public API
-// Export hooks here as they are created
+export { useServiceWorker } from './useServiceWorker';
