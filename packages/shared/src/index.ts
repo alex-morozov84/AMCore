@@ -1,4 +1,4 @@
 // Shared package public API
-export * from './schemas/index.js';
-export * from './types/index.js';
-export * from './constants/index.js';
+export * from './schemas';
+export * from './types';
+export * from './constants';

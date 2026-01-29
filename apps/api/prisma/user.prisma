@@ -2,40 +2,102 @@
 // Core Module: Users & Authentication
 // ===========================================
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  avatarUrl String?
+// -----------------------------
+// Enums
+// -----------------------------
 
-  // Auth
-  passwordHash String?
-  googleId     String?  @unique
+enum OAuthProvider {
+  GOOGLE
+  GITHUB
+  APPLE
+
+  @@schema("core")
+}
+
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
+
+  @@schema("core")
+}
+
+// -----------------------------
+// Models
+// -----------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  passwordHash  String?
+  name          String?
+  avatarUrl     String?
+  locale        String    @default("ru")
+  timezone      String    @default("Europe/Moscow")
 
   // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
 
   // Relations
+  accounts OAuthAccount[]
   sessions Session[]
+  settings UserSettings?
 
   @@map("users")
+  @@schema("core")
+}
+
+model OAuthAccount {
+  id                String        @id @default(cuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
   @@schema("core")
 }
 
 model Session {
   id           String   @id @default(cuid())
   userId       String
-  refreshToken String   @unique
+  refreshToken String   @unique // Hashed
   userAgent    String?
   ipAddress    String?
   expiresAt    DateTime
-  createdAt    DateTime @default(now())
+
+  createdAt DateTime @default(now())
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
   @@map("sessions")
+  @@schema("core")
+}
+
+model UserSettings {
+  id                   String  @id @default(cuid())
+  userId               String  @unique
+  theme                Theme   @default(SYSTEM)
+  notificationsEnabled Boolean @default(true)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
   @@schema("core")
 }

@@ -1,7 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
+import { cleanupOpenApiDoc } from 'nestjs-zod';
 
 import { AppModule } from './app.module';
 
@@ -10,6 +12,9 @@ async function bootstrap(): Promise<void> {
 
   // Use Pino logger
   app.useLogger(app.get(Logger));
+
+  // Cookie parser for refresh tokens
+  app.use(cookieParser());
 
   // Security: HTTP headers
   app.use(helmet());
@@ -30,10 +35,11 @@ async function bootstrap(): Promise<void> {
       .setDescription('AMCore API documentation')
       .setVersion('0.0.1')
       .addBearerAuth()
+      .addCookieAuth('refresh_token')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, document);
+    SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document));
   }
 
   const port = process.env.API_PORT || 5002;

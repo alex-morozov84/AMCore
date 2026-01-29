@@ -1,2 +1,2 @@
 // Types public API
-export type { ApiError, ApiResponse, PaginatedResponse, PaginationParams } from './api.js';
+export type { ApiError, ApiResponse, PaginatedResponse, PaginationParams } from './api';
