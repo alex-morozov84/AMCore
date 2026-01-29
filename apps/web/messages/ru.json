@@ -1,0 +1,41 @@
+{
+  "common": {
+    "loading": "Загрузка...",
+    "error": "Произошла ошибка",
+    "retry": "Повторить",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "create": "Создать",
+    "search": "Поиск",
+    "noResults": "Ничего не найдено"
+  },
+  "auth": {
+    "login": "Войти",
+    "logout": "Выйти",
+    "register": "Регистрация",
+    "email": "Email",
+    "password": "Пароль",
+    "forgotPassword": "Забыли пароль?"
+  },
+  "navigation": {
+    "home": "Главная",
+    "fitness": "Фитнес",
+    "finance": "Финансы",
+    "subscriptions": "Подписки",
+    "settings": "Настройки",
+    "profile": "Профиль"
+  },
+  "fitness": {
+    "workouts": "Тренировки",
+    "exercises": "Упражнения",
+    "progress": "Прогресс",
+    "newWorkout": "Новая тренировка",
+    "startWorkout": "Начать тренировку"
+  },
+  "meta": {
+    "title": "AMCore — Персональная продуктивность",
+    "description": "Платформа для фитнеса, финансов и управления подписками"
+  }
+}
