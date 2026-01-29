@@ -1,10 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { Strategy } from 'passport-jwt';
 
-import { SessionService } from '../session.service';
-import { TokenService } from '../token.service';
+import type { SessionService } from '../session.service';
+import type { TokenService } from '../token.service';
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {

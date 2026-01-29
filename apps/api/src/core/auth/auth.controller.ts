@@ -10,15 +10,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Request, Response } from 'express';
 import type { User } from '@prisma/client';
+import type { Request, Response } from 'express';
 
-import { AuthService } from './auth.service';
-import { SessionService } from './session.service';
-import { TokenService } from './token.service';
+import type { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
-import { LoginDto, RegisterDto } from './dto';
+import type { LoginDto, RegisterDto } from './dto';
 import { JwtAuthGuard, JwtRefreshGuard } from './guards';
+import type { SessionService } from './session.service';
+import type { TokenService } from './token.service';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,

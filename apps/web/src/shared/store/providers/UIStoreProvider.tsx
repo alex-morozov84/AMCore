@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, type ReactNode, useContext, useRef } from 'react';
+import { createContext, type ReactNode, useContext, useState } from 'react';
 import { useStore } from 'zustand';
 
 import { createUIStore, defaultUIState, type UIState, type UIStore } from '../stores/ui';
@@ -15,16 +15,14 @@ export interface UIStoreProviderProps {
 }
 
 export function UIStoreProvider({ children, initialState }: UIStoreProviderProps) {
-  const storeRef = useRef<UIStoreApi | null>(null);
-
-  if (storeRef.current === null) {
-    storeRef.current = createUIStore({
+  const [store] = useState(() =>
+    createUIStore({
       ...defaultUIState,
       ...initialState,
-    });
-  }
+    })
+  );
 
-  return <UIStoreContext.Provider value={storeRef.current}>{children}</UIStoreContext.Provider>;
+  return <UIStoreContext.Provider value={store}>{children}</UIStoreContext.Provider>;
 }
 
 export function useUIStore<T>(selector: (state: UIStore) => T): T {

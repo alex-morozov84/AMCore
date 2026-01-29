@@ -1,10 +1,12 @@
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import type { RegisterInput, LoginInput, UserResponse } from '@amcore/shared';
 
-import { PrismaService } from '../../prisma';
-import { SessionService } from './session.service';
-import { TokenService } from './token.service';
+import type { LoginInput, RegisterInput, UserResponse } from '@amcore/shared';
+
+import type { PrismaService } from '../../prisma';
+
+import type { SessionService } from './session.service';
+import type { TokenService } from './token.service';
 
 interface AuthResult {
   user: UserResponse;

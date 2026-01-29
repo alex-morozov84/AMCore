@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
-import { PrismaService } from '../../prisma';
-import { TokenService } from './token.service';
+import type { PrismaService } from '../../prisma';
+
+import type { TokenService } from './token.service';
 
 interface CreateSessionParams {
   userId: string;

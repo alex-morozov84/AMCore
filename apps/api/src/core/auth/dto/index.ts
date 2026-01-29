@@ -1,9 +1,10 @@
 import { createZodDto } from 'nestjs-zod';
+
 import {
-  registerSchema,
-  loginSchema,
-  updateProfileSchema,
   changePasswordSchema,
+  loginSchema,
+  registerSchema,
+  updateProfileSchema,
 } from '@amcore/shared';
 
 // Request DTOs
