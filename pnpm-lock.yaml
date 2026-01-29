@@ -302,6 +302,19 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
+  packages/shared:
+    dependencies:
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@amcore/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   packages/typescript-config: {}
 
 packages:
