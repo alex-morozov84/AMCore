@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["NEXT_PUBLIC_*"],
   "tasks": {
     "dev": {
       "cache": false,

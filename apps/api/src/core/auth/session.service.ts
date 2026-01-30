@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import type { Session, User } from '@prisma/client';
 
-import type { PrismaService } from '../../prisma';
+import { PrismaService } from '../../prisma';
 
-import type { TokenService } from './token.service';
+import { TokenService } from './token.service';
 
 interface CreateSessionParams {
   userId: string;
@@ -45,7 +46,7 @@ export class SessionService {
   }
 
   /** Find session by refresh token hash */
-  async findByRefreshToken(hashedToken: string) {
+  async findByRefreshToken(hashedToken: string): Promise<(Session & { user: User }) | null> {
     return this.prisma.session.findUnique({
       where: { refreshToken: hashedToken },
       include: { user: true },

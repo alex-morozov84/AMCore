@@ -27,6 +27,10 @@ export default [
     },
     rules: {
       // === NestJS specific ===
+      // Disable consistent-type-imports for NestJS (DI uses classes at runtime via reflection)
+      '@typescript-eslint/consistent-type-imports': 'off',
+      '@typescript-eslint/no-import-type-side-effects': 'off',
+
       // Allow empty constructors (Dependency Injection)
       'no-useless-constructor': 'off',
       '@typescript-eslint/no-useless-constructor': 'off',

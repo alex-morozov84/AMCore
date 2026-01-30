@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Req,
   Res,
@@ -13,12 +15,35 @@ import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swa
 import type { User } from '@prisma/client';
 import type { Request, Response } from 'express';
 
-import type { AuthService } from './auth.service';
+import type { UserResponse as SharedUserResponse } from '@amcore/shared';
+
+import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
-import type { LoginDto, RegisterDto } from './dto';
+import { LoginDto, RegisterDto } from './dto';
 import { JwtAuthGuard, JwtRefreshGuard } from './guards';
-import type { SessionService } from './session.service';
-import type { TokenService } from './token.service';
+import { type SessionInfo, SessionService } from './session.service';
+import { TokenService } from './token.service';
+
+interface AuthResponse {
+  user: SharedUserResponse;
+  accessToken: string;
+}
+
+interface MessageResponse {
+  message: string;
+}
+
+interface TokenResponse {
+  accessToken: string;
+}
+
+interface ProfileResponse {
+  user: SharedUserResponse | null;
+}
+
+interface SessionsResponse {
+  sessions: SessionInfo[];
+}
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -43,7 +68,7 @@ export class AuthController {
     @Body() dto: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
-  ) {
+  ): Promise<AuthResponse> {
     const result = await this.authService.register(dto, {
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
@@ -64,7 +89,7 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
-  ) {
+  ): Promise<AuthResponse> {
     const result = await this.authService.login(dto, {
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
@@ -82,7 +107,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Logout user' })
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<MessageResponse> {
     const refreshToken = req.cookies?.refresh_token;
 
     if (refreshToken) {
@@ -103,7 +131,7 @@ export class AuthController {
   async refresh(
     @Req() req: Request & { user: { user: User; refreshTokenHash: string } },
     @Res({ passthrough: true }) res: Response
-  ) {
+  ): Promise<TokenResponse> {
     const { user, refreshTokenHash } = req.user;
 
     // Rotate refresh token
@@ -128,7 +156,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
-  async me(@CurrentUser() user: User) {
+  async me(@CurrentUser() user: User): Promise<ProfileResponse> {
     const profile = await this.authService.getUserById(user.id);
     return { user: profile };
   }
@@ -137,12 +165,49 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all active sessions' })
-  async sessions(@CurrentUser('id') userId: string, @Req() req: Request) {
+  async sessions(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request
+  ): Promise<SessionsResponse> {
     const refreshToken = req.cookies?.refresh_token;
     const currentHash = refreshToken ? this.tokenService.hashRefreshToken(refreshToken) : undefined;
 
     const sessions = await this.sessionService.getUserSessions(userId, currentHash);
 
     return { sessions };
+  }
+
+  @Delete('sessions/:sessionId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Revoke specific session' })
+  async revokeSession(
+    @CurrentUser('id') userId: string,
+    @Param('sessionId') sessionId: string
+  ): Promise<MessageResponse> {
+    await this.sessionService.deleteSession(sessionId, userId);
+    return { message: 'Сессия отозвана' };
+  }
+
+  @Delete('sessions')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Revoke all sessions except current' })
+  async revokeOtherSessions(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request
+  ): Promise<MessageResponse> {
+    const refreshToken = req.cookies?.refresh_token;
+
+    if (!refreshToken) {
+      return { message: 'Нет активной сессии' };
+    }
+
+    const currentHash = this.tokenService.hashRefreshToken(refreshToken);
+    await this.sessionService.deleteOtherSessions(userId, currentHash);
+
+    return { message: 'Все остальные сессии отозваны' };
   }
 }

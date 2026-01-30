@@ -1,2 +1,2 @@
 // Entities public API
-// Export entities here as they are created
+export { useCurrentUser, UserAvatar, userKeys, useSessions } from './user';

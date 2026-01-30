@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import { QueryProvider } from '@/shared/api';
 import { PWAProvider } from '@/shared/pwa';
-import { UIStoreProvider } from '@/shared/store';
+import { AuthStoreProvider, UIStoreProvider } from '@/shared/store';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -13,9 +13,11 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <QueryProvider>
-      <UIStoreProvider>
-        <PWAProvider>{children}</PWAProvider>
-      </UIStoreProvider>
+      <AuthStoreProvider>
+        <UIStoreProvider>
+          <PWAProvider>{children}</PWAProvider>
+        </UIStoreProvider>
+      </AuthStoreProvider>
     </QueryProvider>
   );
 }

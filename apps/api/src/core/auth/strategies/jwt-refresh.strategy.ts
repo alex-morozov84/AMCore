@@ -1,10 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import type { User } from '@prisma/client';
 import type { Request } from 'express';
 import { Strategy } from 'passport-jwt';
 
-import type { SessionService } from '../session.service';
-import type { TokenService } from '../token.service';
+import { SessionService } from '../session.service';
+import { TokenService } from '../token.service';
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
@@ -20,7 +21,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
     });
   }
 
-  async validate(req: Request) {
+  async validate(req: Request): Promise<{ user: User; refreshTokenHash: string }> {
     const refreshToken = req.cookies?.refresh_token;
 
     if (!refreshToken) {

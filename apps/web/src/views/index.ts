@@ -1,2 +1,2 @@
 // Views public API
-// Export page views here as they are created
+export { LoginPage, RegisterPage } from './auth';

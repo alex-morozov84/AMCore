@@ -3,10 +3,10 @@ import * as argon2 from 'argon2';
 
 import type { LoginInput, RegisterInput, UserResponse } from '@amcore/shared';
 
-import type { PrismaService } from '../../prisma';
+import { PrismaService } from '../../prisma';
 
-import type { SessionService } from './session.service';
-import type { TokenService } from './token.service';
+import { SessionService } from './session.service';
+import { TokenService } from './token.service';
 
 interface AuthResult {
   user: UserResponse;

@@ -1,2 +1,2 @@
 // Features public API
-// Export features here as they are created
+export { LoginForm, LogoutButton, RegisterForm, useLogin, useLogout, useRegister } from './auth';

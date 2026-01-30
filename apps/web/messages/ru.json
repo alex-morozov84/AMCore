@@ -17,7 +17,14 @@
     "register": "Регистрация",
     "email": "Email",
     "password": "Пароль",
-    "forgotPassword": "Забыли пароль?"
+    "name": "Имя",
+    "forgotPassword": "Забыли пароль?",
+    "noAccount": "Нет аккаунта?",
+    "hasAccount": "Уже есть аккаунт?",
+    "loginError": "Неверный email или пароль",
+    "registerError": "Ошибка регистрации",
+    "loggingIn": "Вход...",
+    "registering": "Регистрация..."
   },
   "navigation": {
     "home": "Главная",

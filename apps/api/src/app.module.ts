@@ -1,6 +1,6 @@
 import { createKeyv } from '@keyv/redis';
 import { CacheModule } from '@nestjs/cache-manager';
-import { Module } from '@nestjs/common';
+import { Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -38,6 +38,8 @@ import { PrismaModule } from './prisma';
         autoLogging: true,
         quietReqLogger: true,
       },
+      forRoutes: [{ path: '{*path}', method: RequestMethod.ALL }],
+      exclude: [],
     }),
 
     // Cache (Redis)
