@@ -7,4 +7,4 @@ export {
   type RegisterInput,
   type LoginInput,
   type UserResponse as User,
-} from './auth';
+} from './auth'

@@ -1,7 +1,7 @@
-import type { NextConfig } from 'next';
-import createNextIntlPlugin from 'next-intl/plugin';
+import type { NextConfig } from 'next'
+import createNextIntlPlugin from 'next-intl/plugin'
 
-const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
 const nextConfig: NextConfig = {
   // Standalone output for Docker
@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
         source: '/api/:path*',
         destination: `${process.env.API_URL || 'http://localhost:5002'}/api/:path*`,
       },
-    ];
+    ]
   },
 
   // Headers for PWA service worker
@@ -40,8 +40,8 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-    ];
+    ]
   },
-};
+}
 
-export default withNextIntl(nextConfig);
+export default withNextIntl(nextConfig)

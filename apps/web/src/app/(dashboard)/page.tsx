@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import { useAuthStore } from '@/shared/store';
+import { useAuthStore } from '@/shared/store'
 
 export default function DashboardPage() {
-  const user = useAuthStore((state) => state.user);
+  const user = useAuthStore((state) => state.user)
 
   return (
     <div className="space-y-4">
@@ -28,5 +28,5 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }

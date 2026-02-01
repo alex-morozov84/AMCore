@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import { useForm } from 'react-hook-form';
-import { useTranslations } from 'next-intl';
-import { type RegisterInput, registerSchema } from '@amcore/shared';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form'
+import { useTranslations } from 'next-intl'
+import { type RegisterInput, registerSchema } from '@amcore/shared'
+import { zodResolver } from '@hookform/resolvers/zod'
 
 import {
   Alert,
@@ -16,13 +16,13 @@ import {
   FormLabel,
   FormMessage,
   Input,
-} from '@/shared/ui';
+} from '@/shared/ui'
 
-import { useRegister } from '../model/use-register';
+import { useRegister } from '../model/use-register'
 
 export function RegisterForm() {
-  const t = useTranslations('auth');
-  const { mutate, isPending, error } = useRegister();
+  const t = useTranslations('auth')
+  const { mutate, isPending, error } = useRegister()
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -31,11 +31,11 @@ export function RegisterForm() {
       password: '',
       name: '',
     },
-  });
+  })
 
   const onSubmit = (data: RegisterInput) => {
-    mutate(data);
-  };
+    mutate(data)
+  }
 
   return (
     <Form {...form}>
@@ -93,5 +93,5 @@ export function RegisterForm() {
         </Button>
       </form>
     </Form>
-  );
+  )
 }

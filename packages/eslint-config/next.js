@@ -1,10 +1,10 @@
-import nextPlugin from '@next/eslint-plugin-next';
-import jsxA11y from 'eslint-plugin-jsx-a11y';
-import react from 'eslint-plugin-react';
-import reactCompiler from 'eslint-plugin-react-compiler';
-import reactHooks from 'eslint-plugin-react-hooks';
+import nextPlugin from '@next/eslint-plugin-next'
+import jsxA11y from 'eslint-plugin-jsx-a11y'
+import react from 'eslint-plugin-react'
+import reactCompiler from 'eslint-plugin-react-compiler'
+import reactHooks from 'eslint-plugin-react-hooks'
 
-import baseConfig from './base.js';
+import baseConfig from './base.js'
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
@@ -68,4 +68,4 @@ export default [
       'jsx-a11y/role-has-required-aria-props': 'error',
     },
   },
-];
+]

@@ -1,1 +1,1 @@
-export { HealthModule } from './health.module';
+export { HealthModule } from './health.module'

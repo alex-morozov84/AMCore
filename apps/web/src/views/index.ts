@@ -1,2 +1,2 @@
 // Views public API
-export { LoginPage, RegisterPage } from './auth';
+export { LoginPage, RegisterPage } from './auth'

@@ -1,12 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query'
 
-import { authApi } from '@/shared/api';
+import { authApi } from '@/shared/api'
 
 export const userKeys = {
   all: ['user'] as const,
   me: () => [...userKeys.all, 'me'] as const,
   sessions: () => [...userKeys.all, 'sessions'] as const,
-};
+}
 
 export function useCurrentUser() {
   return useQuery({
@@ -14,7 +14,7 @@ export function useCurrentUser() {
     queryFn: () => authApi.getMe(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false,
-  });
+  })
 }
 
 export function useSessions() {
@@ -22,5 +22,5 @@ export function useSessions() {
     queryKey: userKeys.sessions(),
     queryFn: () => authApi.getSessions(),
     staleTime: 60 * 1000, // 1 minute
-  });
+  })
 }

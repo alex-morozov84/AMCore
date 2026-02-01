@@ -1,17 +1,17 @@
-'use client';
+'use client'
 
-import { createContext, type ReactNode, useContext, useState } from 'react';
-import { useStore } from 'zustand';
+import { createContext, type ReactNode, useContext, useState } from 'react'
+import { useStore } from 'zustand'
 
-import { createUIStore, defaultUIState, type UIState, type UIStore } from '../stores/ui';
+import { createUIStore, defaultUIState, type UIState, type UIStore } from '../stores/ui'
 
-type UIStoreApi = ReturnType<typeof createUIStore>;
+type UIStoreApi = ReturnType<typeof createUIStore>
 
-const UIStoreContext = createContext<UIStoreApi | undefined>(undefined);
+const UIStoreContext = createContext<UIStoreApi | undefined>(undefined)
 
 export interface UIStoreProviderProps {
-  children: ReactNode;
-  initialState?: Partial<UIState>;
+  children: ReactNode
+  initialState?: Partial<UIState>
 }
 
 export function UIStoreProvider({ children, initialState }: UIStoreProviderProps) {
@@ -20,17 +20,17 @@ export function UIStoreProvider({ children, initialState }: UIStoreProviderProps
       ...defaultUIState,
       ...initialState,
     })
-  );
+  )
 
-  return <UIStoreContext.Provider value={store}>{children}</UIStoreContext.Provider>;
+  return <UIStoreContext.Provider value={store}>{children}</UIStoreContext.Provider>
 }
 
 export function useUIStore<T>(selector: (state: UIStore) => T): T {
-  const store = useContext(UIStoreContext);
+  const store = useContext(UIStoreContext)
 
   if (!store) {
-    throw new Error('useUIStore must be used within UIStoreProvider');
+    throw new Error('useUIStore must be used within UIStoreProvider')
   }
 
-  return useStore(store, selector);
+  return useStore(store, selector)
 }

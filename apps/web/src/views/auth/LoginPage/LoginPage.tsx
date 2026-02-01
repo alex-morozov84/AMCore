@@ -1,11 +1,11 @@
-import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 
-import { LoginForm } from '@/features/auth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui';
+import { LoginForm } from '@/features/auth'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui'
 
 export function LoginPage() {
-  const t = useTranslations('auth');
+  const t = useTranslations('auth')
 
   return (
     <Card className="w-full max-w-md">
@@ -23,5 +23,5 @@ export function LoginPage() {
         </p>
       </CardContent>
     </Card>
-  );
+  )
 }

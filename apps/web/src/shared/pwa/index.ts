@@ -1,2 +1,2 @@
 // PWA public API
-export { PWAProvider } from './PWAProvider';
+export { PWAProvider } from './PWAProvider'

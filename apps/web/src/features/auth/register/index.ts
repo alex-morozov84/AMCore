@@ -1,2 +1,2 @@
-export { useRegister } from './model/use-register';
-export { RegisterForm } from './ui/RegisterForm';
+export { useRegister } from './model/use-register'
+export { RegisterForm } from './ui/RegisterForm'

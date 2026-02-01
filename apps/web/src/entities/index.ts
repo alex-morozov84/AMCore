@@ -1,2 +1,2 @@
 // Entities public API
-export { useCurrentUser, UserAvatar, userKeys, useSessions } from './user';
+export { useCurrentUser, UserAvatar, userKeys, useSessions } from './user'

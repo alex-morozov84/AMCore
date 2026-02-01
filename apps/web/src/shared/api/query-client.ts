@@ -1,4 +1,4 @@
-import { isServer, QueryClient } from '@tanstack/react-query';
+import { isServer, QueryClient } from '@tanstack/react-query'
 
 function makeQueryClient() {
   return new QueryClient({
@@ -10,21 +10,21 @@ function makeQueryClient() {
         refetchOnWindowFocus: process.env.NODE_ENV === 'production',
       },
     },
-  });
+  })
 }
 
-let browserQueryClient: QueryClient | undefined = undefined;
+let browserQueryClient: QueryClient | undefined = undefined
 
 export function getQueryClient() {
   if (isServer) {
     // Server: always create a new query client
-    return makeQueryClient();
+    return makeQueryClient()
   }
 
   // Browser: reuse existing client or create new one
   if (!browserQueryClient) {
-    browserQueryClient = makeQueryClient();
+    browserQueryClient = makeQueryClient()
   }
 
-  return browserQueryClient;
+  return browserQueryClient
 }

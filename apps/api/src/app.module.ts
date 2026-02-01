@@ -1,16 +1,16 @@
-import { createKeyv } from '@keyv/redis';
-import { CacheModule } from '@nestjs/cache-manager';
-import { Module, RequestMethod } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { LoggerModule } from 'nestjs-pino';
-import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import { createKeyv } from '@keyv/redis'
+import { CacheModule } from '@nestjs/cache-manager'
+import { Module, RequestMethod } from '@nestjs/common'
+import { ConfigModule, ConfigService } from '@nestjs/config'
+import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
+import { LoggerModule } from 'nestjs-pino'
+import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod'
 
-import { AppController } from './app.controller';
-import { AuthModule } from './core/auth/auth.module';
-import { HealthModule } from './health';
-import { PrismaModule } from './prisma';
+import { AppController } from './app.controller'
+import { AuthModule } from './core/auth/auth.module'
+import { HealthModule } from './health'
+import { PrismaModule } from './prisma'
 
 @Module({
   imports: [

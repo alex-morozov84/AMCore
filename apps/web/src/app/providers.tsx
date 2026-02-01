@@ -1,13 +1,13 @@
-'use client';
+'use client'
 
-import type { ReactNode } from 'react';
+import type { ReactNode } from 'react'
 
-import { QueryProvider } from '@/shared/api';
-import { PWAProvider } from '@/shared/pwa';
-import { AuthStoreProvider, UIStoreProvider } from '@/shared/store';
+import { QueryProvider } from '@/shared/api'
+import { PWAProvider } from '@/shared/pwa'
+import { AuthStoreProvider, UIStoreProvider } from '@/shared/store'
 
 interface ProvidersProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
 export function Providers({ children }: ProvidersProps) {
@@ -19,5 +19,5 @@ export function Providers({ children }: ProvidersProps) {
         </UIStoreProvider>
       </AuthStoreProvider>
     </QueryProvider>
-  );
+  )
 }

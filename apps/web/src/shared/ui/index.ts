@@ -1,6 +1,6 @@
 // UI components public API
-export { Alert, AlertDescription, AlertTitle } from './alert';
-export { Button, buttonVariants } from './button';
+export { Alert, AlertDescription, AlertTitle } from './alert'
+export { Button, buttonVariants } from './button'
 export {
   Card,
   CardAction,
@@ -9,7 +9,7 @@ export {
   CardFooter,
   CardHeader,
   CardTitle,
-} from './card';
+} from './card'
 export {
   Form,
   FormControl,
@@ -18,7 +18,7 @@ export {
   FormItem,
   FormLabel,
   FormMessage,
-} from './form';
-export { Input } from './input';
-export { Label } from './label';
-export { Spinner } from './spinner';
+} from './form'
+export { Input } from './input'
+export { Label } from './label'
+export { Spinner } from './spinner'

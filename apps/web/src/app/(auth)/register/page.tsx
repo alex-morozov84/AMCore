@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
-import { RegisterPage } from '@/views/auth';
+import { RegisterPage } from '@/views/auth'
 
 export default function Register() {
-  return <RegisterPage />;
+  return <RegisterPage />
 }

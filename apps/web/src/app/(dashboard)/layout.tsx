@@ -1,38 +1,38 @@
-'use client';
+'use client'
 
-import type { ReactNode } from 'react';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import type { ReactNode } from 'react'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
-import { LogoutButton } from '@/features/auth';
-import { useAuthStore } from '@/shared/store';
-import { Spinner } from '@/shared/ui';
+import { LogoutButton } from '@/features/auth'
+import { useAuthStore } from '@/shared/store'
+import { Spinner } from '@/shared/ui'
 
 interface DashboardLayoutProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const router = useRouter();
-  const status = useAuthStore((state) => state.status);
-  const user = useAuthStore((state) => state.user);
+  const router = useRouter()
+  const status = useAuthStore((state) => state.status)
+  const user = useAuthStore((state) => state.user)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.replace('/login');
+      router.replace('/login')
     }
-  }, [status, router]);
+  }, [status, router])
 
   if (status === 'loading' || status === 'idle') {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner size="lg" />
       </div>
-    );
+    )
   }
 
   if (status === 'unauthenticated') {
-    return null;
+    return null
   }
 
   return (
@@ -48,5 +48,5 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </header>
       <main className="mx-auto max-w-7xl p-4">{children}</main>
     </div>
-  );
+  )
 }

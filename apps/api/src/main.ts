@@ -1,32 +1,32 @@
-import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import cookieParser from 'cookie-parser';
-import helmet from 'helmet';
-import { Logger } from 'nestjs-pino';
-import { cleanupOpenApiDoc } from 'nestjs-zod';
+import { NestFactory } from '@nestjs/core'
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
+import { Logger } from 'nestjs-pino'
+import { cleanupOpenApiDoc } from 'nestjs-zod'
 
-import { AppModule } from './app.module';
+import { AppModule } from './app.module'
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true })
 
   // Use Pino logger
-  app.useLogger(app.get(Logger));
+  app.useLogger(app.get(Logger))
 
   // Cookie parser for refresh tokens
-  app.use(cookieParser());
+  app.use(cookieParser())
 
   // Security: HTTP headers
-  app.use(helmet());
+  app.use(helmet())
 
   // Security: CORS
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3002'],
     credentials: true,
-  });
+  })
 
   // Global prefix
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1')
 
   // Swagger - only in development
   if (process.env.NODE_ENV !== 'production') {
@@ -36,18 +36,18 @@ async function bootstrap(): Promise<void> {
       .setVersion('0.0.1')
       .addBearerAuth()
       .addCookieAuth('refresh_token')
-      .build();
+      .build()
 
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document));
+    const document = SwaggerModule.createDocument(app, config)
+    SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document))
   }
 
-  const port = process.env.API_PORT || 5002;
-  await app.listen(port);
+  const port = process.env.API_PORT || 5002
+  await app.listen(port)
 
-  const logger = app.get(Logger);
-  logger.log(`API running on http://localhost:${port}`);
-  logger.log(`Swagger docs: http://localhost:${port}/docs`);
+  const logger = app.get(Logger)
+  logger.log(`API running on http://localhost:${port}`)
+  logger.log(`Swagger docs: http://localhost:${port}/docs`)
 }
 
-bootstrap();
+bootstrap()

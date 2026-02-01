@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import { useForm } from 'react-hook-form';
-import { useTranslations } from 'next-intl';
-import { type LoginInput, loginSchema } from '@amcore/shared';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form'
+import { useTranslations } from 'next-intl'
+import { type LoginInput, loginSchema } from '@amcore/shared'
+import { zodResolver } from '@hookform/resolvers/zod'
 
 import {
   Alert,
@@ -16,13 +16,13 @@ import {
   FormLabel,
   FormMessage,
   Input,
-} from '@/shared/ui';
+} from '@/shared/ui'
 
-import { useLogin } from '../model/use-login';
+import { useLogin } from '../model/use-login'
 
 export function LoginForm() {
-  const t = useTranslations('auth');
-  const { mutate, isPending, error } = useLogin();
+  const t = useTranslations('auth')
+  const { mutate, isPending, error } = useLogin()
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -30,11 +30,11 @@ export function LoginForm() {
       email: '',
       password: '',
     },
-  });
+  })
 
   const onSubmit = (data: LoginInput) => {
-    mutate(data);
-  };
+    mutate(data)
+  }
 
   return (
     <Form {...form}>
@@ -78,5 +78,5 @@ export function LoginForm() {
         </Button>
       </form>
     </Form>
-  );
+  )
 }

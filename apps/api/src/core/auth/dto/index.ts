@@ -1,11 +1,11 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from 'nestjs-zod'
 
 import {
   changePasswordSchema,
   loginSchema,
   registerSchema,
   updateProfileSchema,
-} from '@amcore/shared';
+} from '@amcore/shared'
 
 // Request DTOs
 export class RegisterDto extends createZodDto(registerSchema) {}

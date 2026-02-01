@@ -1,22 +1,22 @@
-import { Injectable } from '@nestjs/common';
-import type { Session, User } from '@prisma/client';
+import { Injectable } from '@nestjs/common'
+import type { Session, User } from '@prisma/client'
 
-import { PrismaService } from '../../prisma';
+import { PrismaService } from '../../prisma'
 
-import { TokenService } from './token.service';
+import { TokenService } from './token.service'
 
 interface CreateSessionParams {
-  userId: string;
-  userAgent?: string;
-  ipAddress?: string;
+  userId: string
+  userAgent?: string
+  ipAddress?: string
 }
 
 export interface SessionInfo {
-  id: string;
-  userAgent: string | null;
-  ipAddress: string | null;
-  createdAt: Date;
-  current: boolean;
+  id: string
+  userAgent: string | null
+  ipAddress: string | null
+  createdAt: Date
+  current: boolean
 }
 
 @Injectable()
@@ -28,9 +28,9 @@ export class SessionService {
 
   /** Create new session, return raw refresh token */
   async createSession(params: CreateSessionParams): Promise<string> {
-    const refreshToken = this.tokenService.generateRefreshToken();
-    const hashedToken = this.tokenService.hashRefreshToken(refreshToken);
-    const expiresAt = this.tokenService.getRefreshTokenExpiration();
+    const refreshToken = this.tokenService.generateRefreshToken()
+    const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
+    const expiresAt = this.tokenService.getRefreshTokenExpiration()
 
     await this.prisma.session.create({
       data: {
@@ -40,9 +40,9 @@ export class SessionService {
         ipAddress: params.ipAddress,
         expiresAt,
       },
-    });
+    })
 
-    return refreshToken;
+    return refreshToken
   }
 
   /** Find session by refresh token hash */
@@ -50,7 +50,7 @@ export class SessionService {
     return this.prisma.session.findUnique({
       where: { refreshToken: hashedToken },
       include: { user: true },
-    });
+    })
   }
 
   /** Rotate refresh token (invalidate old, create new) */
@@ -58,17 +58,17 @@ export class SessionService {
     // Delete old session
     await this.prisma.session.delete({
       where: { refreshToken: oldHashedToken },
-    });
+    })
 
     // Create new session
-    return this.createSession(params);
+    return this.createSession(params)
   }
 
   /** Delete session by refresh token hash */
   async deleteByRefreshToken(hashedToken: string): Promise<void> {
     await this.prisma.session.deleteMany({
       where: { refreshToken: hashedToken },
-    });
+    })
   }
 
   /** Get all sessions for user */
@@ -76,7 +76,7 @@ export class SessionService {
     const sessions = await this.prisma.session.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-    });
+    })
 
     return sessions.map((s) => ({
       id: s.id,
@@ -84,14 +84,14 @@ export class SessionService {
       ipAddress: s.ipAddress,
       createdAt: s.createdAt,
       current: s.refreshToken === currentTokenHash,
-    }));
+    }))
   }
 
   /** Delete specific session */
   async deleteSession(sessionId: string, userId: string): Promise<void> {
     await this.prisma.session.deleteMany({
       where: { id: sessionId, userId },
-    });
+    })
   }
 
   /** Delete all sessions except current */
@@ -101,13 +101,13 @@ export class SessionService {
         userId,
         NOT: { refreshToken: currentTokenHash },
       },
-    });
+    })
   }
 
   /** Clean up expired sessions */
   async cleanupExpired(): Promise<void> {
     await this.prisma.session.deleteMany({
       where: { expiresAt: { lt: new Date() } },
-    });
+    })
   }
 }

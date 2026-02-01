@@ -25,7 +25,7 @@ export {
   type SessionsResponse,
   type RefreshResponse,
   type MessageResponse,
-} from './auth';
+} from './auth'
 
 // Backwards compatibility
-export { userSchema, type User } from './user';
+export { userSchema, type User } from './user'

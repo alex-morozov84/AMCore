@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
-import { LoginPage } from '@/views/auth';
+import { LoginPage } from '@/views/auth'
 
 export default function Login() {
-  return <LoginPage />;
+  return <LoginPage />
 }
