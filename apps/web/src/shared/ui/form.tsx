@@ -12,6 +12,7 @@ import {
 } from 'react-hook-form'
 import type * as LabelPrimitive from '@radix-ui/react-label'
 import { Slot } from '@radix-ui/react-slot'
+import { AlertCircle } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'
 import { Label } from '@/shared/ui/label'
@@ -132,10 +133,14 @@ function FormMessage({ className, ...props }: React.ComponentProps<'p'>) {
     <p
       data-slot="form-message"
       id={formMessageId}
-      className={cn('text-destructive text-sm', className)}
+      className={cn(
+        'text-destructive text-sm font-medium flex items-start gap-1.5 animate-in fade-in-0 slide-in-from-top-1 duration-200',
+        className
+      )}
       {...props}
     >
-      {body}
+      <AlertCircle className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
+      <span>{body}</span>
     </p>
   )
 }

@@ -38,7 +38,7 @@ export function LoginForm() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error.message || 'Ошибка входа'}</AlertDescription>
