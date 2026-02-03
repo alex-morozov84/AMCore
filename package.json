@@ -8,7 +8,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/alex-morozov84/amcore.git"
+    "url": "git+https://github.com/alex-morozov84/AMCore.git"
   },
   "engines": {
     "node": ">=20.0.0",

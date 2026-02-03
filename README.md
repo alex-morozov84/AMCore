@@ -3,7 +3,7 @@
 > Modular personal productivity platform — fitness, finance, subscriptions.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](LICENSE)
-[![CI](https://github.com/aleksandr-morozov/amcore/actions/workflows/ci.yml/badge.svg)](https://github.com/aleksandr-morozov/amcore/actions/workflows/ci.yml)
+[![CI](https://github.com/alex-morozov84/AMCore/actions/workflows/ci.yml/badge.svg)](https://github.com/alex-morozov84/AMCore/actions/workflows/ci.yml)
 
 ## Overview
 
@@ -53,8 +53,8 @@ AMCore is a modular web application for personal productivity, built with modern
 # Prerequisites: Node.js 20+, pnpm 9+, Docker
 
 # Clone and install
-git clone https://github.com/aleksandr-morozov/amcore.git
-cd amcore
+git clone https://github.com/alex-morozov84/AMCore.git
+cd AMCore
 pnpm install
 
 # Start infrastructure (PostgreSQL, Redis)
