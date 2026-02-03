@@ -64,7 +64,7 @@ docker compose up -d
 cp .env.example .env
 
 # Run database migrations
-pnpm --filter api prisma:migrate
+pnpm --filter api db:migrate
 
 # Start development servers
 pnpm dev
