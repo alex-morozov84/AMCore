@@ -18,6 +18,7 @@ import type { Request, Response } from 'express'
 import type { UserResponse as SharedUserResponse } from '@amcore/shared'
 
 import { EnvService } from '../../env/env.service'
+
 import { AuthService } from './auth.service'
 import { CurrentUser } from './decorators/current-user.decorator'
 import { LoginDto, RegisterDto } from './dto'
