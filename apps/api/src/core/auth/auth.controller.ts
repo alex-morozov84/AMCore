@@ -56,11 +56,17 @@ export class AuthController {
     private readonly env: EnvService
   ) {}
 
-  private get cookieOptions() {
+  private get cookieOptions(): {
+    httpOnly: boolean
+    secure: boolean
+    sameSite: 'strict'
+    path: string
+    maxAge: number
+  } {
     return {
       httpOnly: true,
       secure: this.env.get('NODE_ENV') === 'production',
-      sameSite: 'strict' as const,
+      sameSite: 'strict',
       path: '/api',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     }

@@ -9,11 +9,11 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod'
 
 import { AppController } from './app.controller'
 import { AuthModule } from './core/auth/auth.module'
-import { HealthModule } from './health'
-import { PrismaModule } from './prisma'
 import { validate } from './env'
 import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
+import { HealthModule } from './health'
+import { PrismaModule } from './prisma'
 
 @Module({
   imports: [
