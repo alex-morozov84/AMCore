@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import { createHash, randomBytes } from 'crypto'
+
+import { EnvService } from '../../env/env.service'
 
 export interface AccessTokenPayload {
   sub: string
@@ -12,7 +13,7 @@ export interface AccessTokenPayload {
 export class TokenService {
   constructor(
     private readonly jwtService: JwtService,
-    private readonly config: ConfigService
+    private readonly env: EnvService
   ) {}
 
   /** Generate access token (15 min) */
@@ -37,7 +38,7 @@ export class TokenService {
 
   /** Get refresh token expiration date */
   getRefreshTokenExpiration(): Date {
-    const days = parseInt(this.config.get('JWT_REFRESH_DAYS', '7'), 10)
+    const days = this.env.get('JWT_REFRESH_DAYS')
     const expiration = new Date()
     expiration.setDate(expiration.getDate() + days)
     return expiration

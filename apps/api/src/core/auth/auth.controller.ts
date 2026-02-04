@@ -17,6 +17,7 @@ import type { Request, Response } from 'express'
 
 import type { UserResponse as SharedUserResponse } from '@amcore/shared'
 
+import { EnvService } from '../../env/env.service'
 import { AuthService } from './auth.service'
 import { CurrentUser } from './decorators/current-user.decorator'
 import { LoginDto, RegisterDto } from './dto'
@@ -45,22 +46,25 @@ interface SessionsResponse {
   sessions: SessionInfo[]
 }
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
-  path: '/api',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-}
-
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly sessionService: SessionService,
-    private readonly tokenService: TokenService
+    private readonly tokenService: TokenService,
+    private readonly env: EnvService
   ) {}
+
+  private get cookieOptions() {
+    return {
+      httpOnly: true,
+      secure: this.env.get('NODE_ENV') === 'production',
+      sameSite: 'strict' as const,
+      path: '/api',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    }
+  }
 
   @Post('register')
   @ApiOperation({ summary: 'Register new user' })
@@ -74,7 +78,7 @@ export class AuthController {
       ipAddress: req.ip,
     })
 
-    res.cookie('refresh_token', result.refreshToken, COOKIE_OPTIONS)
+    res.cookie('refresh_token', result.refreshToken, this.cookieOptions)
 
     return {
       user: result.user,
@@ -95,7 +99,7 @@ export class AuthController {
       ipAddress: req.ip,
     })
 
-    res.cookie('refresh_token', result.refreshToken, COOKIE_OPTIONS)
+    res.cookie('refresh_token', result.refreshToken, this.cookieOptions)
 
     return {
       user: result.user,
@@ -147,7 +151,7 @@ export class AuthController {
       email: user.email,
     })
 
-    res.cookie('refresh_token', newRefreshToken, COOKIE_OPTIONS)
+    res.cookie('refresh_token', newRefreshToken, this.cookieOptions)
 
     return { accessToken }
   }

@@ -6,9 +6,11 @@ import { Logger } from 'nestjs-pino'
 import { cleanupOpenApiDoc } from 'nestjs-zod'
 
 import { AppModule } from './app.module'
+import { EnvService } from './env/env.service'
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true })
+  const env = app.get(EnvService)
 
   // Use Pino logger
   app.useLogger(app.get(Logger))
@@ -19,9 +21,9 @@ async function bootstrap(): Promise<void> {
   // Security: HTTP headers
   app.use(helmet())
 
-  // Security: CORS
+  // Security: CORS (origin from validated env, already string[])
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3002'],
+    origin: env.get('CORS_ORIGIN'),
     credentials: true,
   })
 
@@ -29,7 +31,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api/v1')
 
   // Swagger - only in development
-  if (process.env.NODE_ENV !== 'production') {
+  if (env.get('NODE_ENV') !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('AMCore API')
       .setDescription('AMCore API documentation')
@@ -42,7 +44,7 @@ async function bootstrap(): Promise<void> {
     SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document))
   }
 
-  const port = process.env.API_PORT || 5002
+  const port = env.get('API_PORT')
   await app.listen(port)
 
   const logger = app.get(Logger)

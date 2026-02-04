@@ -1,7 +1,7 @@
 import { createKeyv } from '@keyv/redis'
 import { CacheModule } from '@nestjs/cache-manager'
 import { Module, RequestMethod } from '@nestjs/common'
-import { ConfigModule, ConfigService } from '@nestjs/config'
+import { ConfigModule } from '@nestjs/config'
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { LoggerModule } from 'nestjs-pino'
@@ -11,14 +11,20 @@ import { AppController } from './app.controller'
 import { AuthModule } from './core/auth/auth.module'
 import { HealthModule } from './health'
 import { PrismaModule } from './prisma'
+import { validate } from './env'
+import { EnvModule } from './env/env.module'
+import { EnvService } from './env/env.service'
 
 @Module({
   imports: [
-    // Environment variables
+    // Environment variables (validated via Zod, typed Env)
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '../../.env',
+      validate,
     }),
+
+    EnvModule,
 
     // Logging
     LoggerModule.forRoot({
@@ -45,10 +51,10 @@ import { PrismaModule } from './prisma'
     // Cache (Redis)
     CacheModule.registerAsync({
       isGlobal: true,
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        stores: [createKeyv(configService.get('REDIS_URL', 'redis://localhost:6379'))],
+      imports: [EnvModule],
+      inject: [EnvService],
+      useFactory: (env: EnvService) => ({
+        stores: [createKeyv(env.get('REDIS_URL'))],
         ttl: 60 * 1000, // 60 seconds default
       }),
     }),

@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common'
-import { ConfigModule, ConfigService } from '@nestjs/config'
-import { JwtModule } from '@nestjs/jwt'
+import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt'
 import { PassportModule } from '@nestjs/passport'
 
+import { EnvModule } from '../../env/env.module'
+import { EnvService } from '../../env/env.service'
 import { PrismaModule } from '../../prisma'
 
 import { AuthController } from './auth.controller'
@@ -17,13 +18,13 @@ import { TokenService } from './token.service'
     PrismaModule,
     PassportModule,
     JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow('JWT_SECRET'),
+      imports: [EnvModule],
+      inject: [EnvService],
+      useFactory: (env: EnvService): JwtModuleOptions => ({
+        secret: env.get('JWT_SECRET'),
         signOptions: {
-          expiresIn: config.get('JWT_ACCESS_EXPIRATION', '15m'),
-        },
+          expiresIn: env.get('JWT_ACCESS_EXPIRATION'),
+        } as JwtModuleOptions['signOptions'],
       }),
     }),
   ],
