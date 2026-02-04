@@ -26,6 +26,20 @@ AMCore is a modular web application for personal productivity, built with modern
 | **Architecture** | Feature-Sliced Design (FSD)                       |
 | **Monorepo**     | pnpm, Turborepo                                   |
 
+## Project Structure
+
+```
+amcore/
+├── apps/
+│   ├── api/          # NestJS backend (auth, health, Prisma)
+│   └── web/          # Next.js frontend (FSD: app, views, features, entities, shared)
+├── packages/
+│   ├── shared/       # Zod schemas, types, constants (used by api + web)
+│   ├── eslint-config/# Shared ESLint configs
+│   └── typescript-config/
+└── .github/          # CI, Dependabot, issue/PR templates
+```
+
 ## Development Progress
 
 ### Phase 0: Foundation
