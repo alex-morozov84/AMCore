@@ -62,6 +62,7 @@ docker compose up -d
 
 # Copy environment variables
 cp .env.example .env
+cp apps/web/.env.example apps/web/.env.local
 
 # Run database migrations
 pnpm --filter api db:migrate
@@ -69,6 +70,8 @@ pnpm --filter api db:migrate
 # Start development servers
 pnpm dev
 ```
+
+Before contributing, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Author
 
