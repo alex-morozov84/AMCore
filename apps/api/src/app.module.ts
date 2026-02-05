@@ -2,12 +2,17 @@ import { createKeyv } from '@keyv/redis'
 import { CacheModule } from '@nestjs/cache-manager'
 import { Module, RequestMethod } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
-import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { LoggerModule } from 'nestjs-pino'
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod'
 
 import { AppController } from './app.controller'
+import {
+  AllExceptionsFilter,
+  HttpExceptionFilter,
+  PrismaClientExceptionFilter,
+} from './common/exceptions/filters'
 import { AuthModule } from './core/auth/auth.module'
 import { validate } from './env'
 import { EnvModule } from './env/env.module'
@@ -84,6 +89,20 @@ import { PrismaModule } from './prisma'
   ],
   controllers: [AppController],
   providers: [
+    // Exception filters (order matters - registered first = applied last)
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter, // Catch-all (last resort)
+    },
+    {
+      provide: APP_FILTER,
+      useClass: PrismaClientExceptionFilter, // Prisma-specific errors
+    },
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter, // Standard HTTP exceptions
+    },
+
     // Zod validation pipe (auto-validates DTOs)
     {
       provide: APP_PIPE,
