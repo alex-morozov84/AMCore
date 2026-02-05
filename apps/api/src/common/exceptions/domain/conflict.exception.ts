@@ -7,7 +7,7 @@ import { AppException } from './app.exception'
  * Used when resource already exists or conflicts with current state
  */
 export class ConflictException extends AppException {
-  constructor(message: string, details?: Record<string, any>) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super(message, HttpStatus.CONFLICT, 'CONFLICT', details)
   }
 }

@@ -40,7 +40,8 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
-      "eslint --fix",
+      "eslint --fix --no-warn-ignored",
+      "eslint --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
     "*.{json,md,yml,yaml}": [

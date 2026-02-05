@@ -1,3 +1,5 @@
+import jestPlugin from 'eslint-plugin-jest'
+
 import baseConfig from './base.js'
 
 /** @type {import('eslint').Linter.Config[]} */
@@ -71,9 +73,11 @@ export default [
     },
   },
   {
-    // Test files - relaxed rules
+    // Test files - use Jest plugin recommended config
     files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],
+    ...jestPlugin.configs['flat/recommended'],
     rules: {
+      ...jestPlugin.configs['flat/recommended'].rules,
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       'no-console': 'off',

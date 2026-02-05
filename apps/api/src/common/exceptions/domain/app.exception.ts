@@ -8,8 +8,8 @@ export class AppException extends HttpException {
   constructor(
     message: string,
     statusCode: HttpStatus,
-    public readonly errorCode?: string,
-    public readonly details?: Record<string, any>
+    readonly errorCode?: string,
+    readonly details?: Record<string, unknown>
   ) {
     super(
       {
