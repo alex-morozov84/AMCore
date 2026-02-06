@@ -1,6 +1,6 @@
 import { RequestMethod } from '@nestjs/common'
-import type { Params } from 'nestjs-pino'
 import type { ClsService } from 'nestjs-cls'
+import type { Params } from 'nestjs-pino'
 import { hostname } from 'os'
 
 /**
