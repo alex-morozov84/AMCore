@@ -98,7 +98,12 @@ import { PrismaModule } from './prisma'
           }),
         },
         forRoutes: [{ path: '{*path}', method: RequestMethod.ALL }],
-        exclude: [],
+        exclude: [
+          // Exclude health check endpoints from logs to reduce noise
+          { path: 'api/v1/health', method: RequestMethod.GET },
+          { path: 'api/v1/health/ready', method: RequestMethod.GET },
+          { path: 'api/v1/health/live', method: RequestMethod.GET },
+        ],
       }),
     }),
 
