@@ -11,6 +11,7 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod'
 import { v4 as uuidv4 } from 'uuid'
 
 import { AppController } from './app.controller'
+import { createLoggingConfig } from './common/config'
 import {
   AllExceptionsFilter,
   HttpExceptionFilter,
@@ -72,39 +73,7 @@ import { PrismaModule } from './prisma'
     // Logging (with correlation ID from CLS)
     LoggerModule.forRootAsync({
       inject: [ClsService],
-      useFactory: (cls: ClsService) => ({
-        pinoHttp: {
-          transport:
-            process.env.NODE_ENV !== 'production'
-              ? {
-                  target: 'pino-pretty',
-                  options: {
-                    colorize: true,
-                    singleLine: true,
-                    ignore: 'pid,hostname',
-                  },
-                }
-              : undefined,
-          level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
-          autoLogging: true,
-          quietReqLogger: true,
-
-          // Add correlation ID, userId, anonymized IP, and user agent to every log
-          customProps: () => ({
-            correlationId: cls.getId(),
-            userId: cls.get('userId'),
-            ip: cls.get('ip'), // Anonymized for GDPR
-            userAgent: cls.get('userAgent'),
-          }),
-        },
-        forRoutes: [{ path: '{*path}', method: RequestMethod.ALL }],
-        exclude: [
-          // Exclude health check endpoints from logs to reduce noise
-          { path: 'api/v1/health', method: RequestMethod.GET },
-          { path: 'api/v1/health/ready', method: RequestMethod.GET },
-          { path: 'api/v1/health/live', method: RequestMethod.GET },
-        ],
-      }),
+      useFactory: createLoggingConfig,
     }),
 
     // Cache (Redis)
