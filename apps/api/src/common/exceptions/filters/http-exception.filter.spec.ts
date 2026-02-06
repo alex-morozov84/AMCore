@@ -6,6 +6,7 @@ import { HttpExceptionFilter } from './http-exception.filter'
 describe('HttpExceptionFilter', () => {
   let filter: HttpExceptionFilter
   let mockLogger: jest.Mocked<PinoLogger>
+  let mockCls: any
   let mockResponse: any
   let mockRequest: any
   let mockHost: jest.Mocked<ArgumentsHost>
@@ -17,6 +18,12 @@ describe('HttpExceptionFilter', () => {
       error: jest.fn(),
       warn: jest.fn(),
     } as any
+
+    // Mock CLS
+    mockCls = {
+      getId: jest.fn().mockReturnValue('test-correlation-id'),
+      get: jest.fn(),
+    }
 
     // Mock response
     mockResponse = {
@@ -38,7 +45,7 @@ describe('HttpExceptionFilter', () => {
       }),
     } as any
 
-    filter = new HttpExceptionFilter(mockLogger)
+    filter = new HttpExceptionFilter(mockLogger, mockCls)
   })
 
   it('should handle standard HttpException', () => {

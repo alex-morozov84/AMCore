@@ -7,6 +7,7 @@ import { PrismaClientExceptionFilter } from './prisma-exception.filter'
 describe('PrismaClientExceptionFilter', () => {
   let filter: PrismaClientExceptionFilter
   let mockLogger: jest.Mocked<PinoLogger>
+  let mockCls: any
   let mockResponse: any
   let mockRequest: any
   let mockHost: jest.Mocked<ArgumentsHost>
@@ -16,6 +17,11 @@ describe('PrismaClientExceptionFilter', () => {
       setContext: jest.fn(),
       error: jest.fn(),
     } as any
+
+    mockCls = {
+      getId: jest.fn().mockReturnValue('test-correlation-id'),
+      get: jest.fn(),
+    }
 
     mockResponse = {
       status: jest.fn().mockReturnThis(),
@@ -34,7 +40,7 @@ describe('PrismaClientExceptionFilter', () => {
       }),
     } as any
 
-    filter = new PrismaClientExceptionFilter(mockLogger)
+    filter = new PrismaClientExceptionFilter(mockLogger, mockCls)
   })
 
   it('should map P2002 to 409 CONFLICT (unique constraint)', () => {

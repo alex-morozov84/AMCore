@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException } from '@nestjs/common'
 import { Response } from 'express'
+import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
 interface ErrorResponse {
@@ -9,6 +10,7 @@ interface ErrorResponse {
   timestamp: string
   path: string
   method: string
+  correlationId?: string
   stack?: string
 }
 
@@ -18,7 +20,10 @@ interface ErrorResponse {
  */
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
-  constructor(private readonly logger: PinoLogger) {
+  constructor(
+    private readonly logger: PinoLogger,
+    private readonly cls: ClsService
+  ) {
     this.logger.setContext(HttpExceptionFilter.name)
   }
 
@@ -42,6 +47,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
+      correlationId: this.cls.getId(),
     }
 
     // Add stack trace in development

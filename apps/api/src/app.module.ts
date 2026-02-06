@@ -4,8 +4,11 @@ import { Module, RequestMethod } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
+import { Request } from 'express'
+import { ClsModule, ClsService } from 'nestjs-cls'
 import { LoggerModule } from 'nestjs-pino'
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod'
+import { v4 as uuidv4 } from 'uuid'
 
 import { AppController } from './app.controller'
 import {
@@ -13,6 +16,7 @@ import {
   HttpExceptionFilter,
   PrismaClientExceptionFilter,
 } from './common/exceptions/filters'
+import { anonymizeIp, getClientIp } from './common/utils'
 import { AuthModule } from './core/auth/auth.module'
 import { validate } from './env'
 import { EnvModule } from './env/env.module'
@@ -31,26 +35,71 @@ import { PrismaModule } from './prisma'
 
     EnvModule,
 
-    // Logging
-    LoggerModule.forRoot({
-      pinoHttp: {
-        transport:
-          process.env.NODE_ENV !== 'production'
-            ? {
-                target: 'pino-pretty',
-                options: {
-                  colorize: true,
-                  singleLine: true,
-                  ignore: 'pid,hostname',
-                },
-              }
-            : undefined,
-        level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
-        autoLogging: true,
-        quietReqLogger: true,
+    // Correlation ID (CLS - Continuation Local Storage)
+    ClsModule.forRoot({
+      global: true,
+      middleware: {
+        mount: true,
+        generateId: true,
+        idGenerator: (req: Request) => {
+          // Priority: load balancer → upstream → generate new
+          return (req.headers['x-request-id'] ||
+            req.headers['x-correlation-id'] ||
+            uuidv4()) as string
+        },
+        setup: (cls, req: Request & { user?: { id: string } }) => {
+          // Auto-inject userId from JWT (if authenticated)
+          if (req.user?.id) {
+            cls.set('userId', req.user.id)
+          }
+
+          // Store anonymized IP (GDPR compliant)
+          const clientIp = getClientIp(req)
+          const anonymizedIp = anonymizeIp(clientIp)
+          if (anonymizedIp) {
+            cls.set('ip', anonymizedIp)
+          }
+
+          // Store user agent for debugging/analytics
+          const userAgent = req.headers['user-agent']
+          if (userAgent) {
+            cls.set('userAgent', userAgent)
+          }
+        },
       },
-      forRoutes: [{ path: '{*path}', method: RequestMethod.ALL }],
-      exclude: [],
+    }),
+
+    // Logging (with correlation ID from CLS)
+    LoggerModule.forRootAsync({
+      inject: [ClsService],
+      useFactory: (cls: ClsService) => ({
+        pinoHttp: {
+          transport:
+            process.env.NODE_ENV !== 'production'
+              ? {
+                  target: 'pino-pretty',
+                  options: {
+                    colorize: true,
+                    singleLine: true,
+                    ignore: 'pid,hostname',
+                  },
+                }
+              : undefined,
+          level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
+          autoLogging: true,
+          quietReqLogger: true,
+
+          // Add correlation ID, userId, anonymized IP, and user agent to every log
+          customProps: () => ({
+            correlationId: cls.getId(),
+            userId: cls.get('userId'),
+            ip: cls.get('ip'), // Anonymized for GDPR
+            userAgent: cls.get('userAgent'),
+          }),
+        },
+        forRoutes: [{ path: '{*path}', method: RequestMethod.ALL }],
+        exclude: [],
+      }),
     }),
 
     // Cache (Redis)

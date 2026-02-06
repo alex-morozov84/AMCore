@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { Response } from 'express'
+import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
 interface PrismaErrorMapping {
@@ -15,6 +16,7 @@ interface ErrorResponse {
   timestamp: string
   path: string
   method: string
+  correlationId?: string
   details?: Record<string, unknown>
 }
 
@@ -51,7 +53,10 @@ export class PrismaClientExceptionFilter implements ExceptionFilter {
     },
   }
 
-  constructor(private readonly logger: PinoLogger) {
+  constructor(
+    private readonly logger: PinoLogger,
+    private readonly cls: ClsService
+  ) {
     this.logger.setContext(PrismaClientExceptionFilter.name)
   }
 
@@ -73,6 +78,7 @@ export class PrismaClientExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
+      correlationId: this.cls.getId(),
     }
 
     // Add Prisma metadata in development

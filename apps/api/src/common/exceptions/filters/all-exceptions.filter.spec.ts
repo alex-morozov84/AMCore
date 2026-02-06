@@ -7,6 +7,7 @@ import { AllExceptionsFilter } from './all-exceptions.filter'
 describe('AllExceptionsFilter', () => {
   let filter: AllExceptionsFilter
   let mockLogger: jest.Mocked<PinoLogger>
+  let mockCls: any
   let mockHttpAdapter: any
   let mockResponse: any
   let mockRequest: any
@@ -19,6 +20,11 @@ describe('AllExceptionsFilter', () => {
       error: jest.fn(),
       warn: jest.fn(),
     } as any
+
+    mockCls = {
+      getId: jest.fn().mockReturnValue('test-correlation-id'),
+      get: jest.fn(),
+    }
 
     mockHttpAdapter = {
       reply: jest.fn(),
@@ -42,7 +48,7 @@ describe('AllExceptionsFilter', () => {
       httpAdapter: mockHttpAdapter,
     } as any
 
-    filter = new AllExceptionsFilter(mockHttpAdapterHost, mockLogger)
+    filter = new AllExceptionsFilter(mockHttpAdapterHost, mockLogger, mockCls)
   })
 
   it('should handle HttpException', () => {
