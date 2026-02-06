@@ -31,7 +31,7 @@ AMCore is a modular web application for personal productivity, built with modern
 ```
 amcore/
 ├── apps/
-│   ├── api/          # NestJS backend (auth, health, Prisma)
+│   ├── api/          # NestJS backend → See apps/api/README.md for architecture details
 │   └── web/          # Next.js frontend (FSD: app, views, features, entities, shared)
 ├── packages/
 │   ├── shared/       # Zod schemas, types, constants (used by api + web)
@@ -40,20 +40,33 @@ amcore/
 └── .github/          # CI, Dependabot, issue/PR templates
 ```
 
+**Documentation:**
+
+- [API Architecture](apps/api/README.md) — Backend design, error handling, logging
+- [Changelog](CHANGELOG.md) — Version history and release notes
+- [Contributing](CONTRIBUTING.md) — Development workflow and guidelines
+
 ## Development Progress
 
 ### Phase 0: Foundation
 
-| Task                                           | Status |
-| ---------------------------------------------- | ------ |
-| Repository & GitHub setup                      | ✅     |
-| Monorepo structure (pnpm + Turborepo)          | ✅     |
-| Tooling (ESLint, Prettier, Husky, commitlint)  | ✅     |
-| Backend bootstrap (NestJS, Prisma, Redis)      | ✅     |
-| CI/CD pipeline (lint, typecheck, test, build)  | ✅     |
-| Frontend bootstrap (Next.js 16, Tailwind, FSD) | ✅     |
-| Shared packages                                | ✅     |
-| Docker & deployment                            | ✅     |
+| Task                                            | Status |
+| ----------------------------------------------- | ------ |
+| Repository & GitHub setup                       | ✅     |
+| Monorepo structure (pnpm + Turborepo)           | ✅     |
+| Tooling (ESLint, Prettier, Husky, commitlint)   | ✅     |
+| Backend bootstrap (NestJS, Prisma, Redis)       | ✅     |
+| Error handling & logging (Pino, correlation ID) | ✅     |
+| CI/CD pipeline (lint, typecheck, test, build)   | ✅     |
+| Frontend bootstrap (Next.js 16, Tailwind, FSD)  | ✅     |
+| Shared packages                                 | ✅     |
+| Docker & deployment                             | ✅     |
+
+**Highlights:**
+
+- Production-ready error handling with hierarchical exception filters
+- Structured logging with correlation ID tracking (GDPR-compliant)
+- 45 unit tests with comprehensive coverage
 
 ### Coming Next
 
