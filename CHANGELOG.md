@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prisma error mapping to HTTP status codes (P2002→409, P2025→404, etc.)
 - Domain exception classes (NotFoundException, BusinessRuleException, ConflictException)
 - Sensitive data redaction in logs (passwords, tokens, API keys)
+- Enhanced health checks with @nestjs/terminus integration:
+  - `/health` endpoint with database, Redis, disk, and memory checks
+  - `/health/ready` readiness probe for Kubernetes (external dependencies)
+  - `/health/live` liveness probe for Kubernetes (self-check)
+  - Custom PrismaHealthIndicator and RedisHealthIndicator
+  - Built-in DiskHealthIndicator (90% threshold) and MemoryHealthIndicator
+  - 7 comprehensive unit tests for health indicators
 
 ### Changed
 

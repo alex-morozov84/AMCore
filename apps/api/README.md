@@ -211,17 +211,56 @@ Auto-generated from:
 
 ## Health Checks
 
-| Endpoint        | Purpose               | Status Codes                     |
-| --------------- | --------------------- | -------------------------------- |
-| `/health`       | General health check  | 200 OK / 503 Service Unavailable |
-| `/health/db`    | Database connectivity | 200 OK / 503 Service Unavailable |
-| `/health/redis` | Redis connectivity    | 200 OK / 503 Service Unavailable |
+Powered by [@nestjs/terminus](https://github.com/nestjs/terminus) with custom health indicators.
 
-**Used for:**
+### Endpoints
 
-- Docker health checks
-- Load balancer health probes
-- Monitoring alerts
+| Endpoint        | Purpose                      | Checks                                      | Status Codes |
+| --------------- | ---------------------------- | ------------------------------------------- | ------------ |
+| `/health`       | General health check         | Database, Redis, Disk (90%), Memory (300MB) | 200 / 503    |
+| `/health/ready` | Readiness probe (Kubernetes) | Database, Redis (external dependencies)     | 200 / 503    |
+| `/health/live`  | Liveness probe (Kubernetes)  | Memory heap (500MB threshold)               | 200 / 503    |
+
+### Response Format
+
+**Healthy (200 OK):**
+
+```json
+{
+  "status": "ok",
+  "info": {
+    "database": { "status": "up" },
+    "redis": { "status": "up" },
+    "disk": { "status": "up" },
+    "memory_heap": { "status": "up" }
+  }
+}
+```
+
+**Unhealthy (503 Service Unavailable):**
+
+```json
+{
+  "status": "error",
+  "error": {
+    "database": { "status": "down", "message": "Connection refused" }
+  }
+}
+```
+
+### Custom Health Indicators
+
+- **PrismaHealthIndicator** — PostgreSQL connectivity (`SELECT 1`)
+- **RedisHealthIndicator** — Redis connectivity (set/get test value)
+
+Built-in indicators: DiskHealthIndicator, MemoryHealthIndicator, HttpHealthIndicator
+
+### Use Cases
+
+- **Load Balancer:** Routes traffic only to healthy nodes
+- **Kubernetes:** Readiness/liveness probes for automatic recovery
+- **Monitoring:** Prometheus/Grafana scraping for alerts
+- **CI/CD:** Verify deployment success before switching traffic
 
 ## Development
 
