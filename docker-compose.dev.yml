@@ -2,22 +2,22 @@
 # Usage: docker compose -f docker-compose.dev.yml up -d
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: amcore-postgres-dev
-    ports:
-      - '5432:5432'
-    environment:
-      POSTGRES_USER: amcore
-      POSTGRES_PASSWORD: amcore
-      POSTGRES_DB: amcore
-    volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U amcore -d amcore']
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: amcore-postgres-dev
+  #   ports:
+  #     - '5432:5432'
+  #   environment:
+  #     POSTGRES_USER: amcore
+  #     POSTGRES_PASSWORD: amcore
+  #     POSTGRES_DB: amcore
+  #   volumes:
+  #     - postgres_dev_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ['CMD-SHELL', 'pg_isready -U amcore -d amcore']
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   redis:
     image: redis:7-alpine
@@ -34,5 +34,5 @@ services:
       retries: 5
 
 volumes:
-  postgres_dev_data:
+  # postgres_dev_data:
   redis_dev_data:
