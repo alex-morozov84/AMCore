@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Custom PrismaHealthIndicator and RedisHealthIndicator
   - Built-in DiskHealthIndicator (90% threshold) and MemoryHealthIndicator
   - 7 comprehensive unit tests for health indicators
+- Graceful shutdown implementation:
+  - Built-in NestJS `enableShutdownHooks()` for zero-dependency solution
+  - SIGTERM and SIGINT signal handlers
+  - Automatic log flushing before exit
+  - Clean resource cleanup (database, Redis connections)
+  - Test script for local verification
+  - Kubernetes-ready with proper termination handling
 
 ### Changed
 

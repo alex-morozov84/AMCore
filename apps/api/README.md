@@ -352,6 +352,76 @@ src/
 
 **Target:** 80% coverage for business logic
 
+## Graceful Shutdown
+
+The API implements graceful shutdown to ensure zero data loss and smooth deployments.
+
+### How It Works
+
+1. **Signal Reception:** Process receives SIGTERM (Kubernetes/Docker) or SIGINT (Ctrl+C)
+2. **Stop Accepting Connections:** Server stops accepting new requests
+3. **Finish Current Requests:** Waits for in-flight requests to complete
+4. **Close Resources:** Database connections, Redis, etc.
+5. **Flush Logs:** Ensures all buffered logs are written to disk
+6. **Exit Cleanly:** Process exits with code 0
+
+### Implementation
+
+Built using NestJS native `enableShutdownHooks()` without external dependencies:
+
+```typescript
+// Automatic handling via lifecycle hooks
+app.enableShutdownHooks()
+
+// Manual signal handlers for log flushing
+process.on('SIGTERM', async () => {
+  await app.close()
+  app.flushLogs()
+  process.exit(0)
+})
+```
+
+### Testing
+
+Test graceful shutdown locally:
+
+```bash
+# Terminal 1: Start the app
+pnpm dev
+
+# Terminal 2: Send SIGTERM
+kill -TERM <PID>
+
+# Or use the test script
+./test-graceful-shutdown.sh
+```
+
+**Expected behavior:**
+
+- Logs show "SIGTERM received, starting graceful shutdown..."
+- Current requests finish processing
+- Logs are flushed to disk
+- Process exits cleanly with code 0
+
+### Kubernetes Configuration
+
+```yaml
+spec:
+  containers:
+    - name: api
+      lifecycle:
+        preStop:
+          exec:
+            command: ['/bin/sh', '-c', 'sleep 5']
+      terminationGracePeriodSeconds: 30
+```
+
+This ensures:
+
+- Load balancer removes pod from rotation before SIGTERM
+- Application has 30 seconds to finish gracefully
+- No 502 errors for users during deployment
+
 ## Deployment
 
 ### Docker
