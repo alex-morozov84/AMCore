@@ -65,7 +65,7 @@ describe('HttpExceptionFilter', () => {
     )
   })
 
-  it('should handle BadRequestException with validation errors', () => {
+  it('should handle BadRequestException with validation errors (legacy array format)', () => {
     const exception = new BadRequestException([
       'email is required',
       'password must be at least 8 characters',
@@ -77,8 +77,75 @@ describe('HttpExceptionFilter', () => {
     expect(mockResponse.json).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: 400,
-        message: 'email is required, password must be at least 8 characters',
+        message: 'email is required', // Only first message (details lost without 'errors' field)
       })
+    )
+  })
+
+  it('should handle ZodValidationException with structured errors', () => {
+    // Simulate ZodValidationException response format
+    const exception = new HttpException(
+      {
+        message: 'Validation failed',
+        errors: [
+          {
+            code: 'invalid_type',
+            path: ['email'],
+            message: 'Некорректный email',
+          },
+          {
+            code: 'too_small',
+            path: ['password'],
+            message: 'Минимум 8 символов',
+          },
+          {
+            code: 'custom',
+            path: ['profile', 'name'],
+            message: 'Name is required',
+          },
+        ],
+      },
+      HttpStatus.BAD_REQUEST
+    )
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.status).toHaveBeenCalledWith(400)
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 400,
+        message: 'Validation failed',
+        errors: [
+          {
+            field: 'email',
+            message: 'Некорректный email',
+            code: 'invalid_type',
+          },
+          {
+            field: 'password',
+            message: 'Минимум 8 символов',
+            code: 'too_small',
+          },
+          {
+            field: 'profile.name',
+            message: 'Name is required',
+            code: 'custom',
+          },
+        ],
+      })
+    )
+
+    // Verify validation errors are logged
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        validationErrors: expect.arrayContaining([
+          expect.objectContaining({
+            field: 'email',
+            message: 'Некорректный email',
+          }),
+        ]),
+      }),
+      expect.stringContaining('Client error')
     )
   })
 

@@ -91,7 +91,7 @@ The API uses a hierarchical exception filter system for consistent error respons
 
 ### Error Response Format
 
-**Development:**
+**Standard Error (Development):**
 
 ```json
 {
@@ -106,7 +106,7 @@ The API uses a hierarchical exception filter system for consistent error respons
 }
 ```
 
-**Production:**
+**Standard Error (Production):**
 
 ```json
 {
@@ -118,6 +118,38 @@ The API uses a hierarchical exception filter system for consistent error respons
   "correlationId": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
+
+**Validation Error (400 Bad Request):**
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "timestamp": "2026-02-06T15:30:00.000Z",
+  "path": "/api/v1/auth/register",
+  "method": "POST",
+  "correlationId": "550e8400-e29b-41d4-a716-446655440000",
+  "errors": [
+    {
+      "field": "email",
+      "message": "Некорректный email",
+      "code": "invalid_email"
+    },
+    {
+      "field": "password",
+      "message": "Минимум 8 символов",
+      "code": "too_small"
+    }
+  ]
+}
+```
+
+**Key improvements:**
+
+- **Field-level errors** — Frontend can map validation errors to specific input fields
+- **Nested paths** — Supports `profile.name` for complex objects
+- **Error codes** — Programmatic handling (e.g., `too_small`, `invalid_email`)
+- **Structured logging** — Validation errors visible in logs with `validationErrors` field
 
 ### Prisma Error Mapping
 

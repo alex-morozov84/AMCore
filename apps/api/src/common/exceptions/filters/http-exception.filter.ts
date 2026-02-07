@@ -3,7 +3,7 @@ import { Response } from 'express'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { ErrorResponse } from '../types'
+import type { ErrorResponse, ValidationError } from '../types'
 
 /**
  * Filter for handling standard NestJS HttpException
@@ -29,6 +29,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // Extract message and errorCode from response
     const message = this.extractMessage(exceptionResponse)
     const errorCode = this.extractErrorCode(exceptionResponse)
+    const validationErrors = this.extractValidationErrors(exceptionResponse)
 
     // Build error response
     const errorResponse: ErrorResponse = {
@@ -41,6 +42,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       correlationId: this.cls.getId(),
     }
 
+    // Add validation errors if present (from ZodValidationException)
+    if (validationErrors.length > 0) {
+      errorResponse.errors = validationErrors
+    }
+
     // Add stack trace in development
     if (process.env.NODE_ENV === 'development') {
       errorResponse.stack = exception.stack
@@ -50,7 +56,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (statusCode >= 500) {
       this.logger.error({ err: exception, req: request }, `Server error: ${message}`)
     } else if (statusCode >= 400) {
-      this.logger.warn({ statusCode, path: request.url }, `Client error: ${message}`)
+      // Log validation errors for debugging
+      const logContext: Record<string, unknown> = {
+        statusCode,
+        path: request.url,
+      }
+      if (validationErrors.length > 0) {
+        logContext.validationErrors = validationErrors
+      }
+      this.logger.warn(logContext, `Client error: ${message}`)
     }
 
     response.status(statusCode).json(errorResponse)
@@ -66,9 +80,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (typeof exceptionResponse === 'object' && 'message' in exceptionResponse) {
       const message = exceptionResponse.message
-      // Handle array of messages (validation errors)
+      // For validation errors, return the main message (detailed errors in 'errors' field)
       if (Array.isArray(message)) {
-        return message.join(', ')
+        // ZodValidationException returns array - use first message or generic
+        return message[0] || 'Validation failed'
       }
       return String(message)
     }
@@ -84,5 +99,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return String(exceptionResponse['errorCode'])
     }
     return undefined
+  }
+
+  /**
+   * Extract validation errors from ZodValidationException response
+   */
+  private extractValidationErrors(exceptionResponse: string | object): ValidationError[] {
+    if (typeof exceptionResponse !== 'object' || !('errors' in exceptionResponse)) {
+      return []
+    }
+
+    const errors = exceptionResponse['errors']
+    if (!Array.isArray(errors)) {
+      return []
+    }
+
+    // Transform Zod errors to our ValidationError format
+    return errors.map((err) => ({
+      field: Array.isArray(err.path) ? err.path.join('.') : String(err.path || 'unknown'),
+      message: String(err.message || 'Validation error'),
+      code: err.code ? String(err.code) : undefined,
+    }))
   }
 }
