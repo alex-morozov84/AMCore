@@ -66,7 +66,11 @@ amcore/
 
 - Production-ready error handling with hierarchical exception filters
 - Structured logging with correlation ID tracking (GDPR-compliant)
-- 45 unit tests with comprehensive coverage
+- Business event logging in services (AuthService, SessionService)
+- Graceful shutdown with native NestJS lifecycle hooks
+- Enhanced Prisma error mapping (8 error codes)
+- Health checks with @SkipThrottle decorator
+- 51 unit tests with comprehensive coverage
 
 ### Coming Next
 

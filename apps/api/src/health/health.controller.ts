@@ -8,12 +8,14 @@ import {
   HttpHealthIndicator,
   MemoryHealthIndicator,
 } from '@nestjs/terminus'
+import { SkipThrottle } from '@nestjs/throttler'
 
 import { PrismaHealthIndicator } from './indicators/prisma.health'
 import { RedisHealthIndicator } from './indicators/redis.health'
 
 @ApiTags('health')
 @Controller('health')
+@SkipThrottle()
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,

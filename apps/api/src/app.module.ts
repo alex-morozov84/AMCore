@@ -24,6 +24,7 @@ import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
 import { PrismaModule } from './prisma'
+import { ShutdownService } from './shutdown.service'
 
 @Module({
   imports: [
@@ -141,6 +142,7 @@ import { PrismaModule } from './prisma'
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    ShutdownService,
   ],
 })
 export class AppModule {}

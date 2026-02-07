@@ -3,16 +3,7 @@ import { HttpAdapterHost } from '@nestjs/core'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
-interface ErrorResponse {
-  statusCode: number
-  message: string
-  errorCode?: string
-  timestamp: string
-  path: string
-  method: string
-  correlationId?: string
-  stack?: string
-}
+import type { ErrorResponse } from '../types'
 
 /**
  * Catch-all exception filter (last resort)

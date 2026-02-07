@@ -7,6 +7,7 @@ import { cleanupOpenApiDoc } from 'nestjs-zod'
 
 import { AppModule } from './app.module'
 import { EnvService } from './env/env.service'
+import { ShutdownService } from './shutdown.service'
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true })
@@ -48,38 +49,15 @@ async function bootstrap(): Promise<void> {
     SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document))
   }
 
-  // Enable graceful shutdown hooks
+  // Native shutdown: Nest listens for SIGTERM/SIGINT, runs lifecycle hooks, then our ShutdownService exits process
   app.enableShutdownHooks()
+  app.get(ShutdownService).setApp(app)
 
   const port = env.get('API_PORT')
   await app.listen(port)
 
   logger.log(`🚀 API running on http://localhost:${port}`)
   logger.log(`📚 Swagger docs: http://localhost:${port}/docs`)
-
-  // Graceful shutdown handlers
-  const signals = ['SIGTERM', 'SIGINT'] as const
-
-  for (const signal of signals) {
-    process.on(signal, async () => {
-      logger.log(`${signal} received, starting graceful shutdown...`)
-
-      try {
-        // Stop accepting new connections
-        await app.close()
-        logger.log('✅ Application closed successfully')
-
-        // Flush remaining logs to disk
-        app.flushLogs()
-        logger.log('✅ Logs flushed')
-
-        process.exit(0)
-      } catch (error) {
-        logger.error('❌ Error during shutdown:', error)
-        process.exit(1)
-      }
-    })
-  }
 }
 
 bootstrap().catch((error) => {

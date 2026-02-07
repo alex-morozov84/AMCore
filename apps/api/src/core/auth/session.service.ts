@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import type { Session, User } from '@prisma/client'
 
 import { PrismaService } from '../../prisma'
@@ -21,6 +21,8 @@ export interface SessionInfo {
 
 @Injectable()
 export class SessionService {
+  private readonly logger = new Logger(SessionService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService
@@ -32,7 +34,7 @@ export class SessionService {
     const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
     const expiresAt = this.tokenService.getRefreshTokenExpiration()
 
-    await this.prisma.session.create({
+    const session = await this.prisma.session.create({
       data: {
         userId: params.userId,
         refreshToken: hashedToken,
@@ -40,6 +42,11 @@ export class SessionService {
         ipAddress: params.ipAddress,
         expiresAt,
       },
+    })
+
+    this.logger.log('Session created', {
+      sessionId: session.id,
+      userId: params.userId,
     })
 
     return refreshToken
@@ -59,6 +66,8 @@ export class SessionService {
     await this.prisma.session.delete({
       where: { refreshToken: oldHashedToken },
     })
+
+    this.logger.log('Refresh token rotated', { userId: params.userId })
 
     // Create new session
     return this.createSession(params)
@@ -89,25 +98,40 @@ export class SessionService {
 
   /** Delete specific session */
   async deleteSession(sessionId: string, userId: string): Promise<void> {
-    await this.prisma.session.deleteMany({
+    const result = await this.prisma.session.deleteMany({
       where: { id: sessionId, userId },
     })
+
+    if (result.count > 0) {
+      this.logger.log('Session deleted', { sessionId, userId })
+    }
   }
 
   /** Delete all sessions except current */
   async deleteOtherSessions(userId: string, currentTokenHash: string): Promise<void> {
-    await this.prisma.session.deleteMany({
+    const result = await this.prisma.session.deleteMany({
       where: {
         userId,
         NOT: { refreshToken: currentTokenHash },
       },
     })
+
+    if (result.count > 0) {
+      this.logger.log('Other sessions deleted', {
+        userId,
+        count: result.count,
+      })
+    }
   }
 
   /** Clean up expired sessions */
   async cleanupExpired(): Promise<void> {
-    await this.prisma.session.deleteMany({
+    const result = await this.prisma.session.deleteMany({
       where: { expiresAt: { lt: new Date() } },
     })
+
+    if (result.count > 0) {
+      this.logger.log('Expired sessions cleaned up', { count: result.count })
+    }
   }
 }

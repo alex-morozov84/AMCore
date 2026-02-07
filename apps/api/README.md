@@ -30,11 +30,16 @@ apps/api/src/
 ├── common/                 # Shared utilities
 │   ├── exceptions/         # Exception filters & domain exceptions
 │   │   ├── filters/        # AllExceptionsFilter, PrismaExceptionFilter, HttpExceptionFilter
-│   │   └── domain/         # AppException, NotFoundException, BusinessRuleException
+│   │   ├── domain/         # AppException, NotFoundException, BusinessRuleException
+│   │   ├── types.ts        # ErrorResponse interface (unified error shape)
+│   │   └── index.ts        # Public API
+│   ├── config/             # Configuration files
+│   │   └── logging.config.ts # Pino logging configuration
 │   └── utils/              # Utilities (IP anonymization, etc.)
 ├── env/                    # Environment validation (Zod)
 ├── health/                 # Health check endpoints
 ├── prisma/                 # Prisma service
+├── shutdown.service.ts     # Graceful shutdown handler
 └── app.module.ts           # Root module
 ```
 
@@ -116,12 +121,16 @@ The API uses a hierarchical exception filter system for consistent error respons
 
 ### Prisma Error Mapping
 
-| Prisma Code | HTTP Status     | Meaning                       |
-| ----------- | --------------- | ----------------------------- |
-| P2000       | 400 BAD_REQUEST | Value too long for column     |
-| P2002       | 409 CONFLICT    | Unique constraint violation   |
-| P2025       | 404 NOT_FOUND   | Record not found              |
-| P2003       | 400 BAD_REQUEST | Foreign key constraint failed |
+| Prisma Code | HTTP Status     | Meaning                          |
+| ----------- | --------------- | -------------------------------- |
+| P2000       | 400 BAD_REQUEST | Value too long for column        |
+| P2002       | 409 CONFLICT    | Unique constraint violation      |
+| P2003       | 400 BAD_REQUEST | Foreign key constraint failed    |
+| P2011       | 400 BAD_REQUEST | Null constraint violation        |
+| P2014       | 400 BAD_REQUEST | Invalid relation                 |
+| P2020       | 400 BAD_REQUEST | Value out of range for type      |
+| P2025       | 404 NOT_FOUND   | Record not found                 |
+| P2034       | 409 CONFLICT    | Transaction conflict or deadlock |
 
 ## Logging System
 
@@ -170,6 +179,37 @@ Every log entry includes:
 | Development | `debug`  | Console | pino-pretty (colorized)             |
 | Test        | `silent` | None    | N/A                                 |
 | Production  | `info`   | JSON    | Structured (ready for Graylog/Loki) |
+
+### Service Logging
+
+All services implement structured business event logging:
+
+```typescript
+@Injectable()
+export class AuthService {
+  private readonly logger = new Logger(AuthService.name)
+
+  async register(input: RegisterInput) {
+    // ... business logic ...
+
+    this.logger.log('User registered successfully', {
+      userId: user.id,
+      email: user.email,
+    })
+  }
+}
+```
+
+**What we log:**
+
+- ✅ Business events (user registered, session created, workout completed)
+- ✅ State changes (token rotated, subscription activated)
+- ❌ Internal steps (checking user, hashing password)
+
+**Current implementations:**
+
+- `AuthService` — register, login, logout
+- `SessionService` — session created, rotated, deleted, cleanup
 
 ## Authentication
 
@@ -254,6 +294,12 @@ Powered by [@nestjs/terminus](https://github.com/nestjs/terminus) with custom he
 - **RedisHealthIndicator** — Redis connectivity (set/get test value)
 
 Built-in indicators: DiskHealthIndicator, MemoryHealthIndicator, HttpHealthIndicator
+
+### Important Features
+
+- **@SkipThrottle()** — Health checks bypass rate limiting (critical for load balancers)
+- **Excluded from logs** — Prevents log pollution from frequent health check polling
+- **Fast responses** — All checks complete in <100ms under normal conditions
 
 ### Use Cases
 
@@ -346,7 +392,10 @@ src/
 
 ### Coverage
 
-- Exception filters: 100%
+Current test count: **51 unit tests**
+
+- Exception filters: 100% (AllExceptionsFilter, PrismaExceptionFilter, HttpExceptionFilter)
+- Health indicators: 100% (PrismaHealthIndicator, RedisHealthIndicator)
 - IP anonymization utility: 100%
 - Auth module: ~80% (in progress)
 
@@ -367,19 +416,36 @@ The API implements graceful shutdown to ensure zero data loss and smooth deploym
 
 ### Implementation
 
-Built using NestJS native `enableShutdownHooks()` without external dependencies:
+Built using NestJS native lifecycle hooks via `ShutdownService`:
 
 ```typescript
-// Automatic handling via lifecycle hooks
-app.enableShutdownHooks()
+// shutdown.service.ts
+@Injectable()
+export class ShutdownService implements OnApplicationShutdown {
+  onApplicationShutdown(signal?: string) {
+    this.logger.info(`Application shutdown (${signal}), flushing logs...`)
+    this.app?.flushLogs()
+    this.logger.info('✅ Application closed successfully')
+    process.exit(0)
+  }
+}
 
-// Manual signal handlers for log flushing
-process.on('SIGTERM', async () => {
-  await app.close()
-  app.flushLogs()
-  process.exit(0)
-})
+// main.ts
+app.enableShutdownHooks()
+app.get(ShutdownService).setApp(app)
 ```
+
+**How it works:**
+
+1. `enableShutdownHooks()` — Nest listens for SIGTERM/SIGINT
+2. Lifecycle hooks run → connections closed
+3. `onApplicationShutdown()` — ShutdownService flushes logs and exits
+
+**Benefits:**
+
+- ✅ No external dependencies
+- ✅ Integrates with NestJS lifecycle
+- ✅ Cleaner separation of concerns
 
 ### Testing
 

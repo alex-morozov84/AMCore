@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common'
+import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import * as argon2 from 'argon2'
 
 import type { LoginInput, RegisterInput, UserResponse } from '@amcore/shared'
@@ -21,6 +21,8 @@ interface RequestInfo {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
@@ -61,6 +63,11 @@ export class AuthService {
       userId: user.id,
       userAgent: requestInfo.userAgent,
       ipAddress: requestInfo.ipAddress,
+    })
+
+    this.logger.log('User registered successfully', {
+      userId: user.id,
+      email: user.email,
     })
 
     return {
@@ -105,6 +112,11 @@ export class AuthService {
       ipAddress: requestInfo.ipAddress,
     })
 
+    this.logger.log('User logged in successfully', {
+      userId: user.id,
+      email: user.email,
+    })
+
     return {
       user: this.mapUserToResponse(user),
       accessToken,
@@ -115,6 +127,7 @@ export class AuthService {
   /** Logout (invalidate refresh token) */
   async logout(refreshTokenHash: string): Promise<void> {
     await this.sessionService.deleteByRefreshToken(refreshTokenHash)
+    this.logger.log('User logged out successfully')
   }
 
   /** Get user by ID */
