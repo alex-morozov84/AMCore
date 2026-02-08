@@ -6,28 +6,24 @@ import { z } from 'zod'
 
 /** Registration request */
 export const registerSchema = z.object({
-  email: z.string().email('Некорректный email'),
-  password: z
-    .string()
-    .min(8, 'Минимум 8 символов')
-    .regex(/[A-Z]/, 'Минимум одна заглавная буква')
-    .regex(/[0-9]/, 'Минимум одна цифра'),
-  name: z.string().min(2, 'Минимум 2 символа').optional(),
+  email: z.string().email(),
+  password: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/),
+  name: z.string().min(2).optional(),
 })
 
 export type RegisterInput = z.infer<typeof registerSchema>
 
 /** Login request */
 export const loginSchema = z.object({
-  email: z.string().email('Некорректный email'),
-  password: z.string().min(1, 'Введите пароль'),
+  email: z.string().email(),
+  password: z.string().min(1),
 })
 
 export type LoginInput = z.infer<typeof loginSchema>
 
 /** Profile update request */
 export const updateProfileSchema = z.object({
-  name: z.string().min(2, 'Минимум 2 символа').optional(),
+  name: z.string().min(2).optional(),
   locale: z.enum(['ru', 'en']).optional(),
   timezone: z.string().optional(),
 })
@@ -36,12 +32,8 @@ export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
 
 /** Change password request */
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Введите текущий пароль'),
-  newPassword: z
-    .string()
-    .min(8, 'Минимум 8 символов')
-    .regex(/[A-Z]/, 'Минимум одна заглавная буква')
-    .regex(/[0-9]/, 'Минимум одна цифра'),
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/),
 })
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>

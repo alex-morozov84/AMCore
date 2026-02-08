@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { type RegisterInput, registerSchema } from '@amcore/shared'
 import { zodResolver } from '@hookform/resolvers/zod'
 
+import { getErrorMessage } from '@/shared/api'
 import {
   Alert,
   AlertDescription,
@@ -22,7 +23,6 @@ import { useRegister } from '../model/use-register'
 
 export function RegisterForm() {
   const t = useTranslations('auth')
-  const { mutate, isPending, error } = useRegister()
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -33,16 +33,21 @@ export function RegisterForm() {
     },
   })
 
+  // Pass setError to hook for automatic field-level error handling
+  const { mutate, isPending, error } = useRegister(form.setError)
+
   const onSubmit = (data: RegisterInput) => {
     mutate(data)
   }
 
+  const errorMessage = error ? getErrorMessage(error, 'Ошибка регистрации') : null
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
-        {error && (
+        {errorMessage && (
           <Alert variant="destructive">
-            <AlertDescription>{error.message || 'Ошибка регистрации'}</AlertDescription>
+            <AlertDescription>{errorMessage}</AlertDescription>
           </Alert>
         )}
 

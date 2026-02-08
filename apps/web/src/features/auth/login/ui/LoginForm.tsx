@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { type LoginInput, loginSchema } from '@amcore/shared'
 import { zodResolver } from '@hookform/resolvers/zod'
 
+import { getErrorMessage } from '@/shared/api'
 import {
   Alert,
   AlertDescription,
@@ -22,7 +23,6 @@ import { useLogin } from '../model/use-login'
 
 export function LoginForm() {
   const t = useTranslations('auth')
-  const { mutate, isPending, error } = useLogin()
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -32,16 +32,21 @@ export function LoginForm() {
     },
   })
 
+  // Pass setError to hook for automatic field-level error handling
+  const { mutate, isPending, error } = useLogin(form.setError)
+
   const onSubmit = (data: LoginInput) => {
     mutate(data)
   }
 
+  const errorMessage = error ? getErrorMessage(error, 'Ошибка входа') : null
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
-        {error && (
+        {errorMessage && (
           <Alert variant="destructive">
-            <AlertDescription>{error.message || 'Ошибка входа'}</AlertDescription>
+            <AlertDescription>{errorMessage}</AlertDescription>
           </Alert>
         )}
 
