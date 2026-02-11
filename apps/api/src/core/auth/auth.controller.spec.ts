@@ -11,7 +11,7 @@ import { EnvService } from '../../env/env.service'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import type { LoginDto, RegisterDto } from './dto'
-import { JwtAuthGuard, JwtRefreshGuard } from './guards'
+import { JwtAuthGuard, RefreshTokenGuard } from './guards'
 import type { SessionInfo } from './session.service'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
@@ -111,7 +111,7 @@ describe('AuthController', () => {
           return true
         },
       })
-      .overrideGuard(JwtRefreshGuard)
+      .overrideGuard(RefreshTokenGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
           const request = context.switchToHttp().getRequest()
