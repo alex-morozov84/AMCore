@@ -25,8 +25,15 @@ export class ShutdownService implements OnApplicationShutdown {
       this.logger.info('✅ Application closed successfully')
     } catch (error) {
       this.logger.error({ err: error }, 'Error flushing logs during shutdown')
-      process.exit(1)
+      // In tests, don't call process.exit() as it prevents Jest from printing test summary
+      if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+        process.exit(1)
+      }
+      return
     }
-    process.exit(0)
+    // In tests, don't call process.exit() as it prevents Jest from printing test summary
+    if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+      process.exit(0)
+    }
   }
 }

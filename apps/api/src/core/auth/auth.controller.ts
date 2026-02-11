@@ -22,7 +22,7 @@ import { EnvService } from '../../env/env.service'
 import { AuthService } from './auth.service'
 import { CurrentUser } from './decorators/current-user.decorator'
 import { LoginDto, RegisterDto } from './dto'
-import { JwtAuthGuard, JwtRefreshGuard } from './guards'
+import { JwtAuthGuard, RefreshTokenGuard } from './guards'
 import { type SessionInfo, SessionService } from './session.service'
 import { TokenService } from './token.service'
 
@@ -68,7 +68,7 @@ export class AuthController {
       httpOnly: true,
       secure: this.env.get('NODE_ENV') === 'production',
       sameSite: 'strict',
-      path: '/api',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     }
   }
@@ -129,14 +129,14 @@ export class AuthController {
       await this.authService.logout(hashedToken)
     }
 
-    res.clearCookie('refresh_token', { path: '/api' })
+    res.clearCookie('refresh_token', { path: '/' })
 
     return { message: 'Вы успешно вышли из системы' }
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtRefreshGuard)
+  @UseGuards(RefreshTokenGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Refresh access token' })
   async refresh(

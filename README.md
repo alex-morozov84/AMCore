@@ -61,17 +61,22 @@ amcore/
 | Frontend bootstrap (Next.js 16, Tailwind, FSD)  | ✅     |
 | Shared packages                                 | ✅     |
 | Docker & deployment                             | ✅     |
+| **Authentication** (JWT + refresh tokens)       | ✅     |
+| E2E testing infrastructure (TestContainers)     | ✅     |
 
 **Highlights:**
 
-- Production-ready error handling with hierarchical exception filters
-- Field-level validation errors (Zod) with structured error responses
-- Structured logging with correlation ID tracking (GDPR-compliant)
-- Business event logging in services (AuthService, SessionService)
-- Graceful shutdown with native NestJS lifecycle hooks
-- Enhanced Prisma error mapping (8 error codes)
-- Health checks with @SkipThrottle decorator
-- 53 unit tests with comprehensive coverage
+- **Authentication System:** JWT + refresh tokens, session management, cookie-based auth
+- **Production-ready error handling** with hierarchical exception filters
+- **Field-level validation errors** (Zod) with structured error responses
+- **Structured logging** with correlation ID tracking (GDPR-compliant)
+- **Business event logging** in services (AuthService, SessionService)
+- **Graceful shutdown** with native NestJS lifecycle hooks
+- **Enhanced Prisma error mapping** (8 error codes)
+- **Comprehensive testing:**
+  - 100% coverage for auth services (unit tests)
+  - 27 E2E tests with TestContainers (real PostgreSQL + Redis)
+  - Integration tests for controllers
 
 ### Coming Next
 

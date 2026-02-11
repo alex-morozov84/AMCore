@@ -8,9 +8,9 @@ import { PrismaModule } from '../../prisma'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
+import { RefreshTokenGuard } from './guards'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
-import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy'
 import { TokenService } from './token.service'
 
 @Module({
@@ -29,7 +29,7 @@ import { TokenService } from './token.service'
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, TokenService, SessionService, JwtStrategy, JwtRefreshStrategy],
+  providers: [AuthService, TokenService, SessionService, JwtStrategy, RefreshTokenGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

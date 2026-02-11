@@ -157,7 +157,7 @@ describe('AuthController', () => {
         httpOnly: true,
         secure: false, // test env
         sameSite: 'strict',
-        path: '/api',
+        path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
       expect(result).toEqual({
@@ -237,7 +237,7 @@ describe('AuthController', () => {
         httpOnly: true,
         secure: false,
         sameSite: 'strict',
-        path: '/api',
+        path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
       expect(result).toEqual({
@@ -269,7 +269,7 @@ describe('AuthController', () => {
 
       expect(tokenService.hashRefreshToken).toHaveBeenCalledWith(mockRefreshToken)
       expect(authService.logout).toHaveBeenCalledWith('hashed-token')
-      expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token', { path: '/api' })
+      expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token', { path: '/' })
       expect(result).toEqual({ message: 'Вы успешно вышли из системы' })
     })
 
@@ -280,7 +280,7 @@ describe('AuthController', () => {
 
       expect(tokenService.hashRefreshToken).not.toHaveBeenCalled()
       expect(authService.logout).not.toHaveBeenCalled()
-      expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token', { path: '/api' })
+      expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token', { path: '/' })
       expect(result).toEqual({ message: 'Вы успешно вышли из системы' })
     })
 
@@ -331,7 +331,7 @@ describe('AuthController', () => {
         httpOnly: true,
         secure: false,
         sameSite: 'strict',
-        path: '/api',
+        path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
       expect(result).toEqual({ accessToken: newAccessToken })

@@ -1,2 +1,2 @@
 export { JwtAuthGuard } from './jwt-auth.guard'
-export { JwtRefreshGuard } from './jwt-refresh.guard'
+export { RefreshTokenGuard } from './refresh-token.guard'

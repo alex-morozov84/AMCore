@@ -1,28 +1,23 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
-import { PassportStrategy } from '@nestjs/passport'
-import type { User } from '@prisma/client'
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
 import type { Request } from 'express'
-import { Strategy } from 'passport-jwt'
 
 import { SessionService } from '../session.service'
 import { TokenService } from '../token.service'
 
+/**
+ * Guard для валидации refresh token из cookie
+ * Используется только для /auth/refresh эндпоинта
+ */
 @Injectable()
-export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
+export class RefreshTokenGuard implements CanActivate {
   constructor(
     private readonly sessionService: SessionService,
     private readonly tokenService: TokenService
-  ) {
-    super({
-      jwtFromRequest: () => 'dummy', // We use cookies, not JWT
-      ignoreExpiration: true,
-      secretOrKey: 'dummy', // Not used
-      passReqToCallback: true,
-    })
-  }
+  ) {}
 
-  async validate(req: Request): Promise<{ user: User; refreshTokenHash: string }> {
-    const refreshToken = req.cookies?.refresh_token
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<Request>()
+    const refreshToken = request.cookies?.refresh_token
 
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token отсутствует')
@@ -40,9 +35,12 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       throw new UnauthorizedException('Refresh token истёк')
     }
 
-    return {
+    // Присваиваем user и refreshTokenHash к request для использования в контроллере
+    request.user = {
       user: session.user,
       refreshTokenHash: hashedToken,
     }
+
+    return true
   }
 }

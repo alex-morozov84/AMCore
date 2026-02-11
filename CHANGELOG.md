@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **E2E Testing Infrastructure:**
+  - TestContainers integration for E2E tests (PostgreSQL 16 + Redis 7)
+  - 27 comprehensive E2E tests for authentication module
+  - Real infrastructure testing (not mocks) for high confidence
+  - Jest ESM mode configuration for modern packages (uuid@13)
+  - Complete authentication flow coverage (register, login, logout, refresh, sessions)
+- **100% Test Coverage for Authentication Module:**
+  - TokenService: 20 unit tests (JWT generation, refresh token hashing)
+  - SessionService: 28 unit tests (CRUD, rotation, cleanup)
+  - AuthService: 14 unit tests (register, login, validation)
+  - AuthController: 23 integration tests (HTTP endpoints, cookies)
+  - Total: 112+ tests across unit, integration, and E2E levels
 - Production-ready error handling system with hierarchical exception filters
 - Correlation ID tracking across all requests and logs (via nestjs-cls)
 - GDPR-compliant logging with IP anonymization (IPv4/IPv6)
@@ -36,9 +48,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Authentication Architecture:**
+  - Replaced Passport JWT strategy with custom `RefreshTokenGuard` for refresh tokens
+  - Refresh tokens are opaque strings (not JWTs), validated against PostgreSQL database
+  - Access tokens remain JWT-based with `JwtAuthGuard` (Passport)
+  - Clearer separation: JWT for stateless access, database lookup for stateful refresh
 - Enhanced LoggerModule configuration with environment-specific log levels
 - Updated exception filters to include correlation ID in all responses
 - Improved error response format with consistent structure
+
+### Fixed
+
+- Session deletion now returns 404 for non-existent sessions (was 200)
+- Added `NotFoundException` in `SessionService.deleteSession` when session not found
 
 ## [0.1.0] - 2026-02-05
 

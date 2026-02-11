@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import type { Session, User } from '@prisma/client'
 
 import { PrismaService } from '../../prisma'
@@ -102,9 +102,11 @@ export class SessionService {
       where: { id: sessionId, userId },
     })
 
-    if (result.count > 0) {
-      this.logger.log('Session deleted', { sessionId, userId })
+    if (result.count === 0) {
+      throw new NotFoundException('Сессия не найдена')
     }
+
+    this.logger.log('Session deleted', { sessionId, userId })
   }
 
   /** Delete all sessions except current */

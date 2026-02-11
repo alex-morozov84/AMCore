@@ -373,9 +373,10 @@ pnpm --filter api dev
 | ----------------- | -------------------------------- |
 | `pnpm dev`        | Start dev server with hot reload |
 | `pnpm build`      | Build for production             |
-| `pnpm test`       | Run unit tests                   |
+| `pnpm test`       | Run unit & integration tests     |
 | `pnpm test:watch` | Run tests in watch mode          |
 | `pnpm test:cov`   | Run tests with coverage          |
+| `pnpm test:e2e`   | Run E2E tests (TestContainers)   |
 | `pnpm lint`       | Run ESLint                       |
 | `pnpm typecheck`  | TypeScript type checking         |
 | `pnpm db:migrate` | Run Prisma migrations            |
@@ -411,27 +412,50 @@ See `.env.example` for full list.
 ### Test Structure
 
 ```
-src/
-├── core/auth/
-│   ├── auth.service.spec.ts      # Unit tests
-│   ├── auth.controller.spec.ts
-│   └── auth.integration.spec.ts  # Integration tests
-└── common/exceptions/
-    └── filters/
-        ├── http-exception.filter.spec.ts
-        └── prisma-exception.filter.spec.ts
+src/core/auth/
+├── token.service.spec.ts           # Unit tests
+├── session.service.spec.ts         # Unit tests
+├── auth.service.spec.ts            # Unit tests
+├── auth.controller.spec.ts         # Integration tests
+└── test-context.ts                 # Shared test utilities
+
+test/
+├── auth.e2e-spec.ts                # E2E tests (27 tests)
+└── helpers.ts                      # TestContainers setup
 ```
+
+### Test Types
+
+**Unit Tests** — Mock all dependencies, test in isolation
+
+- TokenService: 20 tests (JWT generation, refresh token hashing)
+- SessionService: 28 tests (CRUD, rotation, cleanup)
+- AuthService: 14 tests (register, login, validation)
+- Exception filters: 100% coverage
+- Health indicators: 100% coverage
+
+**Integration Tests** — Mock database, test component interactions
+
+- AuthController: 23 tests (HTTP endpoints, cookies, validation)
+
+**E2E Tests** — Real infrastructure via TestContainers
+
+- 27 comprehensive tests covering full authentication flows
+- Real PostgreSQL + Redis containers
+- Tests: register, login, logout, refresh, session management
+- Cookie-based authentication validation
 
 ### Coverage
 
-Current test count: **51 unit tests**
+**Total:** 112+ tests across all levels
 
-- Exception filters: 100% (AllExceptionsFilter, PrismaExceptionFilter, HttpExceptionFilter)
-- Health indicators: 100% (PrismaHealthIndicator, RedisHealthIndicator)
-- IP anonymization utility: 100%
-- Auth module: ~80% (in progress)
+- ✅ Auth module (core): **100%** (TokenService, SessionService, AuthService)
+- ✅ Auth controller: **100%** (all endpoints tested)
+- ✅ Exception filters: **100%**
+- ✅ Health indicators: **100%**
+- ✅ E2E flows: **100%** (registration → login → refresh → logout)
 
-**Target:** 80% coverage for business logic
+**Target:** 80%+ coverage for business logic, 100% for critical paths (auth)
 
 ## Graceful Shutdown
 

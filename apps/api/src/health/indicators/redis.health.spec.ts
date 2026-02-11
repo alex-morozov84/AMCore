@@ -1,5 +1,5 @@
 import { HealthIndicatorService } from '@nestjs/terminus'
-import { Cache } from 'cache-manager'
+import type { Cache } from 'cache-manager'
 
 import { RedisHealthIndicator } from './redis.health'
 

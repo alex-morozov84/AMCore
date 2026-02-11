@@ -1,4 +1,4 @@
-import { createKeyv } from '@keyv/redis'
+import KeyvRedis from '@keyv/redis'
 import { CacheModule } from '@nestjs/cache-manager'
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
@@ -83,7 +83,7 @@ import { ShutdownService } from './shutdown.service'
       imports: [EnvModule],
       inject: [EnvService],
       useFactory: (env: EnvService) => ({
-        stores: [createKeyv(env.get('REDIS_URL'))],
+        stores: [new KeyvRedis(env.get('REDIS_URL'))],
         ttl: 60 * 1000, // 60 seconds default
       }),
     }),
