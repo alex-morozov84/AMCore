@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common'
 import type { Session, User } from '@prisma/client'
 
 import { SessionService } from './session.service'
@@ -361,18 +362,22 @@ describe('SessionService', () => {
       })
     })
 
-    it('should not delete session if userId mismatch', async () => {
+    it('should throw NotFoundException if userId mismatch', async () => {
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 0 })
 
-      await sessionService.deleteSession('session-123', 'wrong-user')
+      await expect(sessionService.deleteSession('session-123', 'wrong-user')).rejects.toThrow(
+        NotFoundException
+      )
 
       expect(mockCtx.prisma.session.deleteMany).toHaveBeenCalled()
     })
 
-    it('should handle non-existent session gracefully', async () => {
+    it('should throw NotFoundException for non-existent session', async () => {
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 0 })
 
-      await expect(sessionService.deleteSession('non-existent', 'user-123')).resolves.not.toThrow()
+      await expect(sessionService.deleteSession('non-existent', 'user-123')).rejects.toThrow(
+        NotFoundException
+      )
     })
   })
 
