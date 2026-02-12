@@ -1,0 +1,5 @@
+export { JobName, QueueName } from './constants/queues.constant'
+export type { JobOptions } from './interfaces/job-options.interface'
+export type { IQueueService } from './interfaces/queue.interface'
+export { QueueModule } from './queue.module'
+export { QueueService } from './queue.service'

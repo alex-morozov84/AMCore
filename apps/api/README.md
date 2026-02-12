@@ -24,6 +24,11 @@ apps/api/src/
 ├── core/                    # Core infrastructure
 │   ├── auth/               # Authentication & authorization
 │   └── users/              # User management (future)
+├── infrastructure/         # Infrastructure services (global)
+│   ├── queue/              # BullMQ job queue system
+│   ├── email/              # Email service (Phase 0.5)
+│   ├── cache/              # Enhanced caching (Phase 0.5)
+│   └── scheduler/          # Scheduled jobs (Phase 0.5)
 ├── fitness/                # Fitness module (Phase 1)
 ├── finance/                # Finance module (Phase 2)
 ├── subscriptions/          # Subscriptions module (Phase 3)
@@ -266,6 +271,56 @@ export class AuthService {
 
 **Planned:** Google OAuth integration
 
+## Queue Infrastructure
+
+### BullMQ Job Queue System
+
+Production-ready async job queue for background processing and scheduled tasks.
+
+**Features:**
+
+- ✅ Multiple queues (email, default, notifications)
+- ✅ Job priorities (0-10)
+- ✅ Retry logic with exponential backoff
+- ✅ Delayed/scheduled jobs
+- ✅ Job monitoring via Bull Board dashboard
+- ✅ Full TypeScript support
+
+**Access Bull Board Dashboard:**
+
+- **Development:** `http://localhost:3001/admin/queues`
+- **Authentication:** Protected by JWT (requires login)
+
+**Usage Example:**
+
+```typescript
+import { QueueService, QueueName, JobName } from '@/infrastructure/queue'
+
+@Injectable()
+export class MyService {
+  constructor(private readonly queueService: QueueService) {}
+
+  async sendWelcomeEmail(user: User) {
+    // Add job to email queue
+    await this.queueService.add(
+      QueueName.EMAIL,
+      JobName.SEND_EMAIL,
+      {
+        to: user.email,
+        template: 'welcome',
+        data: { name: user.name },
+      },
+      {
+        priority: 10, // High priority
+        attempts: 3, // Retry up to 3 times
+      }
+    )
+  }
+}
+```
+
+**Documentation:** See [`src/infrastructure/queue/README.md`](./src/infrastructure/queue/README.md)
+
 ## API Documentation
 
 ### Swagger UI
@@ -431,6 +486,7 @@ test/
 - TokenService: 20 tests (JWT generation, refresh token hashing)
 - SessionService: 28 tests (CRUD, rotation, cleanup)
 - AuthService: 14 tests (register, login, validation)
+- QueueService: 23 tests (job management, queue operations)
 - Exception filters: 100% coverage
 - Health indicators: 100% coverage
 
@@ -447,10 +503,11 @@ test/
 
 ### Coverage
 
-**Total:** 112+ tests across all levels
+**Total:** 167+ tests across all levels
 
 - ✅ Auth module (core): **100%** (TokenService, SessionService, AuthService)
 - ✅ Auth controller: **100%** (all endpoints tested)
+- ✅ Queue infrastructure: **100%** (QueueService with BullMQ)
 - ✅ Exception filters: **100%**
 - ✅ Health indicators: **100%**
 - ✅ E2E flows: **100%** (registration → login → refresh → logout)

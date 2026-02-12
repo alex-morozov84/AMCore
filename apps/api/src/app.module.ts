@@ -23,6 +23,7 @@ import { validate } from './env'
 import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
+import { QueueModule } from './infrastructure/queue'
 import { PrismaModule } from './prisma'
 import { ShutdownService } from './shutdown.service'
 
@@ -107,6 +108,9 @@ import { ShutdownService } from './shutdown.service'
 
     // Health check
     HealthModule,
+
+    // Queue infrastructure
+    QueueModule,
 
     // Auth module
     AuthModule,

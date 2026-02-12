@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Queue Infrastructure (BullMQ):**
+  - Production-ready job queue system for async operations
+  - Multiple queues support (email, default) with easy extensibility
+  - Job priorities (0-10), retry logic with exponential backoff
+  - Delayed/scheduled jobs for future execution
+  - Bull Board dashboard at `/admin/queues` for job monitoring
+  - Full TypeScript support with type-safe job definitions
+  - QueueService with comprehensive API (add, remove, retry, pause, resume, clean)
+  - HelloWorldProcessor as example implementation
+  - 23 unit tests covering all QueueService operations
+  - Complete documentation in `src/infrastructure/queue/README.md`
+  - Dependencies: @nestjs/bullmq, bullmq, @bull-board/api, @bull-board/nestjs
 - **E2E Testing Infrastructure:**
   - TestContainers integration for E2E tests (PostgreSQL 16 + Redis 7)
   - 27 comprehensive E2E tests for authentication module
@@ -20,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - SessionService: 28 unit tests (CRUD, rotation, cleanup)
   - AuthService: 14 unit tests (register, login, validation)
   - AuthController: 23 integration tests (HTTP endpoints, cookies)
-  - Total: 112+ tests across unit, integration, and E2E levels
+  - QueueService: 23 unit tests (job management, queue operations)
+  - Total: 167+ tests across unit, integration, and E2E levels
 - Production-ready error handling system with hierarchical exception filters
 - Correlation ID tracking across all requests and logs (via nestjs-cls)
 - GDPR-compliant logging with IP anonymization (IPv4/IPv6)
