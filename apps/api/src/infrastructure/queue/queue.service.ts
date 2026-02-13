@@ -13,8 +13,8 @@ export class QueueService implements IQueueService {
   private readonly queues = new Map<string, Queue>()
 
   constructor(
-    @InjectQueue(QueueName.DEFAULT) private readonly defaultQueue: Queue,
-    @InjectQueue(QueueName.EMAIL) private readonly emailQueue: Queue
+    @InjectQueue(QueueName.DEFAULT) defaultQueue: Queue,
+    @InjectQueue(QueueName.EMAIL) emailQueue: Queue
   ) {
     // Register all queues for easy access
     this.queues.set(QueueName.DEFAULT, defaultQueue)
