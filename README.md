@@ -62,11 +62,22 @@ amcore/
 | Shared packages                                 | ✅     |
 | Docker & deployment                             | ✅     |
 | **Authentication** (JWT + refresh tokens)       | ✅     |
+| **Redis Caching** (production-ready patterns)   | ✅     |
+| **Queue Infrastructure** (BullMQ)               | ✅     |
 | E2E testing infrastructure (TestContainers)     | ✅     |
 
 **Highlights:**
 
 - **Authentication System:** JWT + refresh tokens, session management, cookie-based auth
+- **Redis Caching:** Production-ready user caching (50-100x faster auth)
+  - Cache-aside pattern with distributed locking (stampede protection)
+  - Tag-based invalidation (Redis Sets, not KEYS \*)
+  - Hybrid TTL (10 min) + explicit invalidation
+  - Comprehensive metrics tracking (hit/miss rate)
+- **Queue Infrastructure:** BullMQ for background jobs
+  - Default and Email queues with retry logic
+  - Bull Board dashboard at `/admin/queues`
+  - Exponential backoff and automatic cleanup
 - **Production-ready error handling** with hierarchical exception filters
 - **Field-level validation errors** (Zod) with structured error responses
 - **Structured logging** with correlation ID tracking (GDPR-compliant)
@@ -75,6 +86,7 @@ amcore/
 - **Enhanced Prisma error mapping** (8 error codes)
 - **Comprehensive testing:**
   - 100% coverage for auth services (unit tests)
+  - 11 cache service unit tests
   - 27 E2E tests with TestContainers (real PostgreSQL + Redis)
   - Integration tests for controllers
 
