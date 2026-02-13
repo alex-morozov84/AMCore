@@ -12,6 +12,7 @@ import { RefreshTokenGuard } from './guards'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
 import { TokenService } from './token.service'
+import { UserCacheService } from './user-cache.service'
 
 @Module({
   imports: [
@@ -29,7 +30,14 @@ import { TokenService } from './token.service'
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, TokenService, SessionService, JwtStrategy, RefreshTokenGuard],
-  exports: [AuthService],
+  providers: [
+    AuthService,
+    TokenService,
+    SessionService,
+    JwtStrategy,
+    RefreshTokenGuard,
+    UserCacheService,
+  ],
+  exports: [AuthService, UserCacheService],
 })
 export class AuthModule {}
