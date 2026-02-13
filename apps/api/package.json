@@ -70,7 +70,7 @@
     "@amcore/eslint-config": "workspace:*",
     "@amcore/typescript-config": "workspace:*",
     "@nestjs/cli": "^11.0.16",
-    "@nestjs/testing": "^11.1.12",
+    "@nestjs/testing": "^11.1.13",
     "@swc/cli": "^0.8.0",
     "@swc/core": "^1.15.11",
     "@testcontainers/postgresql": "^11.11.0",
