@@ -19,12 +19,14 @@ AMCore is a modular web application for personal productivity, built with modern
 
 ## Tech Stack
 
-| Layer            | Technology                                        |
-| ---------------- | ------------------------------------------------- |
-| **Backend**      | NestJS 10, PostgreSQL 16, Prisma 7, Redis, BullMQ |
-| **Frontend**     | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui   |
-| **Architecture** | Feature-Sliced Design (FSD)                       |
-| **Monorepo**     | pnpm, Turborepo                                   |
+| Layer            | Technology                                                 |
+| ---------------- | ---------------------------------------------------------- |
+| **Backend**      | NestJS 10, PostgreSQL 16, Prisma 7, Redis, BullMQ          |
+| **Email**        | Resend, React Email 5, FormatJS (i18n)                     |
+| **Frontend**     | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui            |
+| **Architecture** | Feature-Sliced Design (FSD)                                |
+| **Monorepo**     | pnpm, Turborepo                                            |
+| **Testing**      | Jest 30 (backend), Vitest 4 (frontend + email integration) |
 
 ## Project Structure
 
@@ -64,6 +66,7 @@ amcore/
 | **Authentication** (JWT + refresh tokens)       | ✅     |
 | **Redis Caching** (production-ready patterns)   | ✅     |
 | **Queue Infrastructure** (BullMQ)               | ✅     |
+| **Email Service** (Resend + React Email + i18n) | ✅     |
 | E2E testing infrastructure (TestContainers)     | ✅     |
 
 **Highlights:**
@@ -78,6 +81,12 @@ amcore/
   - Default and Email queues with retry logic
   - Bull Board dashboard at `/admin/queues`
   - Exponential backoff and automatic cleanup
+- **Email Service:** Production-ready with multilingual support
+  - Resend (prod) / Mock (dev) provider pattern
+  - React Email templates (TypeScript + Tailwind)
+  - FormatJS i18n (RU/EN) - official React Email approach
+  - Templates: welcome, password reset, email verification
+  - Async delivery via BullMQ (3 retries, exponential backoff)
 - **Production-ready error handling** with hierarchical exception filters
 - **Field-level validation errors** (Zod) with structured error responses
 - **Structured logging** with correlation ID tracking (GDPR-compliant)
@@ -87,8 +96,9 @@ amcore/
 - **Comprehensive testing:**
   - 100% coverage for auth services (unit tests)
   - 11 cache service unit tests
+  - 32 email service tests (27 Jest unit + 5 Vitest integration)
   - 27 E2E tests with TestContainers (real PostgreSQL + Redis)
-  - Integration tests for controllers
+  - Two-framework approach: Jest for logic, Vitest for React Email rendering
 
 ### Coming Next
 

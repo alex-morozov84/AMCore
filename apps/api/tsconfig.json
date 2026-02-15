@@ -6,7 +6,9 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "jsx": "react-jsx",
+    "skipLibCheck": true
   },
   "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]

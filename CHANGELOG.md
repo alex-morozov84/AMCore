@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 23 unit tests covering all QueueService operations
   - Complete documentation in `src/infrastructure/queue/README.md`
   - Dependencies: @nestjs/bullmq, bullmq, @bull-board/api, @bull-board/nestjs
+- **Email Service (Resend + React Email + FormatJS i18n):**
+  - Production-ready email delivery with Resend provider
+  - Provider pattern architecture (Resend for production, Mock for dev/test)
+  - React Email 5 templates with TypeScript + Tailwind styling
+  - Three production templates: Welcome, Password Reset, Email Verification
+  - Multilingual support (RU/EN) using FormatJS (@formatjs/intl) - official React Email approach
+  - ICU Message Format for translations with variable interpolation
+  - Async email delivery via BullMQ (3 retries, exponential backoff)
+  - Two-framework testing approach: Jest for service logic, Vitest for template rendering
+  - 32 comprehensive tests (27 Jest unit + 5 Vitest integration)
+  - Template rendering tests verify HTML structure and i18n in real DOM environment
+  - Environment-specific configuration (RESEND_API_KEY for production)
+  - Dependencies: resend, @react-email/components, @formatjs/intl, vitest, happy-dom
 - **E2E Testing Infrastructure:**
   - TestContainers integration for E2E tests (PostgreSQL 16 + Redis 7)
   - 27 comprehensive E2E tests for authentication module
