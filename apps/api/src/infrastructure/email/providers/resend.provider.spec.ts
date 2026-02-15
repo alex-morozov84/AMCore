@@ -11,15 +11,19 @@ jest.mock('resend')
 describe('ResendEmailProvider', () => {
   let provider: ResendEmailProvider
   let envService: jest.Mocked<EnvService>
-  let mockResendInstance: jest.Mocked<Resend>
+  let mockResendInstance: any
+  let mockSend: jest.Mock
 
   beforeEach(async () => {
+    // Create mock send function
+    mockSend = jest.fn()
+
     // Create mock Resend instance
     mockResendInstance = {
       emails: {
-        send: jest.fn(),
+        send: mockSend,
       },
-    } as any
+    }
 
     // Mock Resend constructor
     ;(Resend as jest.MockedClass<typeof Resend>).mockImplementation(() => mockResendInstance)
@@ -64,7 +68,7 @@ describe('ResendEmailProvider', () => {
     it('should send email successfully', async () => {
       const mockEmailId = 'email_abc123'
 
-      mockResendInstance.emails.send.mockResolvedValue({
+      mockSend.mockResolvedValue({
         data: { id: mockEmailId },
         error: null,
       } as any)
@@ -80,7 +84,7 @@ describe('ResendEmailProvider', () => {
         success: true,
       })
 
-      expect(mockResendInstance.emails.send).toHaveBeenCalledWith({
+      expect(mockSend).toHaveBeenCalledWith({
         from: 'noreply@amcore.com',
         to: ['test@example.com'],
         subject: 'Test Subject',
@@ -91,7 +95,7 @@ describe('ResendEmailProvider', () => {
     })
 
     it('should use custom from address', async () => {
-      mockResendInstance.emails.send.mockResolvedValue({
+      mockSend.mockResolvedValue({
         data: { id: 'email_123' },
         error: null,
       } as any)
@@ -103,7 +107,7 @@ describe('ResendEmailProvider', () => {
         html: '<p>Test</p>',
       })
 
-      expect(mockResendInstance.emails.send).toHaveBeenCalledWith(
+      expect(mockSend).toHaveBeenCalledWith(
         expect.objectContaining({
           from: 'custom@example.com',
         })
@@ -111,7 +115,7 @@ describe('ResendEmailProvider', () => {
     })
 
     it('should handle Resend API error', async () => {
-      mockResendInstance.emails.send.mockResolvedValue({
+      mockSend.mockResolvedValue({
         data: null,
         error: { message: 'Invalid API key' },
       } as any)
@@ -130,7 +134,7 @@ describe('ResendEmailProvider', () => {
     })
 
     it('should handle exception during send', async () => {
-      mockResendInstance.emails.send.mockRejectedValue(new Error('Network error'))
+      mockSend.mockRejectedValue(new Error('Network error'))
 
       const result = await provider.send({
         to: 'test@example.com',
@@ -146,7 +150,7 @@ describe('ResendEmailProvider', () => {
     })
 
     it('should include text and replyTo when provided', async () => {
-      mockResendInstance.emails.send.mockResolvedValue({
+      mockSend.mockResolvedValue({
         data: { id: 'email_123' },
         error: null,
       } as any)
@@ -159,7 +163,7 @@ describe('ResendEmailProvider', () => {
         replyTo: 'reply@example.com',
       })
 
-      expect(mockResendInstance.emails.send).toHaveBeenCalledWith({
+      expect(mockSend).toHaveBeenCalledWith({
         from: 'noreply@amcore.com',
         to: ['test@example.com'],
         subject: 'Test',
