@@ -42,9 +42,11 @@ model User {
   lastLoginAt DateTime?
 
   // Relations
-  accounts OAuthAccount[]
-  sessions Session[]
-  settings UserSettings?
+  accounts                 OAuthAccount[]
+  sessions                 Session[]
+  settings                 UserSettings?
+  passwordResetTokens      PasswordResetToken[]
+  emailVerificationTokens  EmailVerificationToken[]
 
   @@map("users")
   @@schema("core")
@@ -99,5 +101,49 @@ model UserSettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
+  @@schema("core")
+}
+
+// -----------------------------
+// Password Reset & Email Verification Tokens
+// -----------------------------
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique // bcrypt hash of 64-char token
+  expiresAt DateTime // createdAt + 15 minutes
+  used      Boolean  @default(false)
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes for performance
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+  @@schema("core")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique // bcrypt hash of 64-char token
+  expiresAt DateTime // createdAt + 48 hours
+  used      Boolean  @default(false)
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes for performance
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
   @@schema("core")
 }

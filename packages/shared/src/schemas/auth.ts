@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 /** Registration request */
 export const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/),
   name: z.string().min(2).optional(),
 })
@@ -15,7 +15,7 @@ export type RegisterInput = z.infer<typeof registerSchema>
 
 /** Login request */
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1),
 })
 
@@ -38,6 +38,35 @@ export const changePasswordSchema = z.object({
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
 
+/** Forgot password request */
+export const forgotPasswordSchema = z.object({
+  email: z.email(),
+})
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
+
+/** Reset password request */
+export const resetPasswordSchema = z.object({
+  token: z.string().length(64), // 64-char crypto token
+  password: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/),
+})
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
+
+/** Verify email request */
+export const verifyEmailSchema = z.object({
+  token: z.string().length(64), // 64-char crypto token
+})
+
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>
+
+/** Resend verification email request */
+export const resendVerificationSchema = z.object({
+  email: z.email(),
+})
+
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>
+
 // ===========================================
 // Response Schemas
 // ===========================================
@@ -45,14 +74,14 @@ export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
 /** User response (safe, without password) */
 export const userResponseSchema = z.object({
   id: z.string(),
-  email: z.string().email(),
+  email: z.email(),
   emailVerified: z.boolean(),
   name: z.string().nullable(),
   avatarUrl: z.string().nullable(),
   locale: z.string(),
   timezone: z.string(),
-  createdAt: z.string().datetime(),
-  lastLoginAt: z.string().datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  lastLoginAt: z.iso.datetime().nullable(),
 })
 
 export type UserResponse = z.infer<typeof userResponseSchema>
@@ -70,7 +99,7 @@ export const sessionSchema = z.object({
   id: z.string(),
   userAgent: z.string().nullable(),
   ipAddress: z.string().nullable(),
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
   current: z.boolean(),
 })
 
