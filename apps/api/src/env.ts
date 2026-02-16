@@ -20,6 +20,7 @@ const envSchema = z.object({
   EMAIL_PROVIDER: z.enum(['resend', 'mock']).default('mock'),
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().default('noreply@amcore.com'),
+  SUPPORT_EMAIL: z.string().email().default('support@amcore.com'),
 })
 
 export type Env = z.infer<typeof envSchema>
