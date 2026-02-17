@@ -12,6 +12,7 @@ import { RefreshTokenGuard } from './guards'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
 import { TokenService } from './token.service'
+import { TokenManagerService } from './token-manager.service'
 import { UserCacheService } from './user-cache.service'
 
 @Module({
@@ -33,6 +34,7 @@ import { UserCacheService } from './user-cache.service'
   providers: [
     AuthService,
     TokenService,
+    TokenManagerService,
     SessionService,
     JwtStrategy,
     RefreshTokenGuard,

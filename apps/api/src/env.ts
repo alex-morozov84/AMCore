@@ -21,6 +21,11 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().default('noreply@amcore.com'),
   SUPPORT_EMAIL: z.string().email().default('support@amcore.com'),
+  // Frontend URLs (for email links)
+  FRONTEND_URL: z.string().url().default('http://localhost:3002'),
+  // Auth token expiration
+  PASSWORD_RESET_EXPIRY_MINUTES: z.coerce.number().int().min(1).default(15),
+  EMAIL_VERIFICATION_EXPIRY_HOURS: z.coerce.number().int().min(1).default(48),
 })
 
 export type Env = z.infer<typeof envSchema>
