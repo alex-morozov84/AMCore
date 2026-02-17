@@ -62,6 +62,14 @@ export interface EmailVerificationData {
   locale?: Locale
 }
 
+export interface PasswordChangedEmailData {
+  name: string
+  changedAt: string
+  loginUrl: string
+  supportEmail: string
+  locale?: Locale
+}
+
 /**
  * Template name enum
  */
@@ -69,6 +77,7 @@ export enum EmailTemplate {
   WELCOME = 'welcome',
   PASSWORD_RESET = 'password-reset',
   EMAIL_VERIFICATION = 'email-verification',
+  PASSWORD_CHANGED = 'password-changed',
 }
 
 /**
@@ -77,5 +86,5 @@ export enum EmailTemplate {
 export interface SendEmailJobData {
   template: EmailTemplate
   to: string
-  data: WelcomeEmailData | PasswordResetEmailData | EmailVerificationData
+  data: WelcomeEmailData | PasswordResetEmailData | EmailVerificationData | PasswordChangedEmailData
 }

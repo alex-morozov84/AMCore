@@ -87,12 +87,13 @@ describe('TokenManagerService', () => {
   })
 
   describe('verifyPasswordResetToken()', () => {
-    it('should return userId for a valid token', async () => {
+    it('should return userId and tokenHash for a valid token', async () => {
       mockCtx.prisma.passwordResetToken.findUnique.mockResolvedValue(mockResetToken)
 
       const result = await service.verifyPasswordResetToken('a'.repeat(64))
 
-      expect(result).toBe(userId)
+      expect(result.userId).toBe(userId)
+      expect(result.tokenHash).toHaveLength(64) // SHA-256 hex
     })
 
     it('should throw if token not found', async () => {
@@ -174,12 +175,13 @@ describe('TokenManagerService', () => {
   })
 
   describe('verifyEmailVerificationToken()', () => {
-    it('should return userId for a valid token', async () => {
+    it('should return userId and tokenHash for a valid token', async () => {
       mockCtx.prisma.emailVerificationToken.findUnique.mockResolvedValue(mockVerificationToken)
 
       const result = await service.verifyEmailVerificationToken('a'.repeat(64))
 
-      expect(result).toBe(userId)
+      expect(result.userId).toBe(userId)
+      expect(result.tokenHash).toHaveLength(64) // SHA-256 hex
     })
 
     it('should throw if token not found', async () => {

@@ -4,6 +4,7 @@ import { render } from '@react-email/render'
 import type {
   EmailProvider,
   EmailVerificationData,
+  PasswordChangedEmailData,
   PasswordResetEmailData,
   SendEmailJobData,
   SendEmailParams,
@@ -13,6 +14,7 @@ import type {
 import { EmailTemplate } from './email.types'
 import type { Locale } from './messages'
 import { EmailVerificationEmail, getEmailVerificationSubject } from './templates/email-verification'
+import { getPasswordChangedSubject, PasswordChangedEmail } from './templates/password-changed'
 import { getPasswordResetSubject, PasswordResetEmail } from './templates/password-reset'
 import { getWelcomeSubject, WelcomeEmail } from './templates/welcome'
 
@@ -98,6 +100,17 @@ export class EmailService {
   }
 
   /**
+   * Send password changed notification email
+   */
+  async sendPasswordChangedEmail(email: string, data: PasswordChangedEmailData): Promise<void> {
+    await this.queue({
+      template: EmailTemplate.PASSWORD_CHANGED,
+      to: email,
+      data,
+    })
+  }
+
+  /**
    * Render email template to HTML
    *
    * @param template - Template to render
@@ -106,7 +119,11 @@ export class EmailService {
    */
   async renderTemplate(
     template: EmailTemplate,
-    data: WelcomeEmailData | PasswordResetEmailData | EmailVerificationData
+    data:
+      | WelcomeEmailData
+      | PasswordResetEmailData
+      | EmailVerificationData
+      | PasswordChangedEmailData
   ): Promise<{ html: string; subject: string }> {
     const locale: Locale = data.locale || 'ru'
     let html: string
@@ -126,6 +143,11 @@ export class EmailService {
       case EmailTemplate.EMAIL_VERIFICATION:
         html = await render(EmailVerificationEmail(data as EmailVerificationData))
         subject = getEmailVerificationSubject(locale)
+        break
+
+      case EmailTemplate.PASSWORD_CHANGED:
+        html = await render(PasswordChangedEmail(data as PasswordChangedEmailData))
+        subject = getPasswordChangedSubject(locale)
         break
 
       default:

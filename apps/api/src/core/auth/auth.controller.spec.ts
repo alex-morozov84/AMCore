@@ -6,6 +6,11 @@ import type { Request, Response } from 'express'
 
 import type { UserResponse } from '@amcore/shared'
 
+// Mock email module to prevent TSX/ESM import issues
+jest.mock('../../infrastructure/email', () => ({
+  EmailService: jest.fn(),
+}))
+
 import { EnvService } from '../../env/env.service'
 
 import { AuthController } from './auth.controller'

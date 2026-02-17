@@ -38,8 +38,8 @@ export class TokenManagerService {
     return { token, expiresAt }
   }
 
-  /** Verify password reset token, return userId on success */
-  async verifyPasswordResetToken(token: string): Promise<string> {
+  /** Verify password reset token, return userId and tokenHash on success */
+  async verifyPasswordResetToken(token: string): Promise<{ userId: string; tokenHash: string }> {
     const tokenHash = this.hashToken(token)
 
     const record = await this.prisma.passwordResetToken.findUnique({
@@ -51,7 +51,7 @@ export class TokenManagerService {
       throw new UnauthorizedException('Invalid or expired token')
     }
 
-    return record.userId
+    return { userId: record.userId, tokenHash }
   }
 
   /** Mark password reset token as used */
@@ -82,8 +82,10 @@ export class TokenManagerService {
     return { token, expiresAt }
   }
 
-  /** Verify email verification token, return userId on success */
-  async verifyEmailVerificationToken(token: string): Promise<string> {
+  /** Verify email verification token, return userId and tokenHash on success */
+  async verifyEmailVerificationToken(
+    token: string
+  ): Promise<{ userId: string; tokenHash: string }> {
     const tokenHash = this.hashToken(token)
 
     const record = await this.prisma.emailVerificationToken.findUnique({
@@ -95,7 +97,7 @@ export class TokenManagerService {
       throw new UnauthorizedException('Invalid or expired token')
     }
 
-    return record.userId
+    return { userId: record.userId, tokenHash }
   }
 
   /** Mark email verification token as used */

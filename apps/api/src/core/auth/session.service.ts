@@ -109,6 +109,15 @@ export class SessionService {
     this.logger.log('Session deleted', { sessionId, userId })
   }
 
+  /** Delete all sessions for user (e.g. after password reset) */
+  async deleteAllByUserId(userId: string): Promise<void> {
+    const result = await this.prisma.session.deleteMany({ where: { userId } })
+
+    if (result.count > 0) {
+      this.logger.log('All sessions deleted', { userId, count: result.count })
+    }
+  }
+
   /** Delete all sessions except current */
   async deleteOtherSessions(userId: string, currentTokenHash: string): Promise<void> {
     const result = await this.prisma.session.deleteMany({
