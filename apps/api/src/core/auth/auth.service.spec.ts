@@ -4,19 +4,15 @@ import * as argon2 from 'argon2'
 
 import type { LoginInput, RegisterInput } from '@amcore/shared'
 
-// Mock email module to prevent TSX/ESM import issues
-jest.mock('../../infrastructure/email', () => ({
-  EmailService: jest.fn(),
-}))
-
 import { AuthService } from './auth.service'
 import { SessionService } from './session.service'
 import { createMockContext, type MockContext, mockContextToPrisma } from './test-context'
-import { TokenManagerService } from './token-manager.service'
 import { TokenService } from './token.service'
+import { TokenManagerService } from './token-manager.service'
 import { UserCacheService } from './user-cache.service'
 
-// Mock argon2
+// Mock email module to prevent TSX/ESM import issues (jest.mock is hoisted automatically)
+jest.mock('../../infrastructure/email', () => ({ EmailService: jest.fn() }))
 jest.mock('argon2')
 
 describe('AuthService', () => {
@@ -337,7 +333,9 @@ describe('AuthService', () => {
         tokenHash,
       })
       ;(argon2.hash as jest.Mock).mockResolvedValue('new-hashed-password')
-      mockCtx.prisma.$transaction.mockImplementation(async (fn) => fn(mockCtx.prisma as never))
+      ;(mockCtx.prisma.$transaction as jest.Mock).mockImplementation(
+        (fn: (tx: typeof mockCtx.prisma) => Promise<unknown>) => fn(mockCtx.prisma)
+      )
       mockCtx.prisma.passwordResetToken.update.mockResolvedValue({} as never)
       mockCtx.prisma.user.update.mockResolvedValue(mockUser)
       mockSessionService.deleteAllByUserId.mockResolvedValue(undefined)
@@ -359,7 +357,9 @@ describe('AuthService', () => {
         userId: mockUser.id,
         tokenHash,
       })
-      mockCtx.prisma.$transaction.mockImplementation(async (fn) => fn(mockCtx.prisma as never))
+      ;(mockCtx.prisma.$transaction as jest.Mock).mockImplementation(
+        (fn: (tx: typeof mockCtx.prisma) => Promise<unknown>) => fn(mockCtx.prisma)
+      )
       mockCtx.prisma.emailVerificationToken.update.mockResolvedValue({} as never)
       mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, emailVerified: true })
 
