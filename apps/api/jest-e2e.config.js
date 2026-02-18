@@ -3,10 +3,10 @@ module.exports = {
   testEnvironment: 'node',
   rootDir: '.',
   testMatch: ['**/test/**/*.e2e-spec.ts'],
-  moduleFileExtensions: ['js', 'json', 'ts'],
-  extensionsToTreatAsEsm: ['.ts'],
+  moduleFileExtensions: ['js', 'json', 'ts', 'tsx'],
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
   transform: {
-    '^.+\\.ts$': [
+    '^.+\\.tsx?$': [
       'ts-jest',
       {
         useESM: true,

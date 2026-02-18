@@ -4,7 +4,9 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import type { User } from '@prisma/client'
 import type { Request, Response } from 'express'
 
-import type { UserResponse } from '@amcore/shared'
+import { AuthErrorCode, type UserResponse } from '@amcore/shared'
+
+import { AppException } from '../../common/exceptions'
 
 // Mock email module to prevent TSX/ESM import issues
 jest.mock('../../infrastructure/email', () => ({
@@ -15,7 +17,14 @@ import { EnvService } from '../../env/env.service'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
-import type { LoginDto, RegisterDto } from './dto'
+import type {
+  ForgotPasswordDto,
+  LoginDto,
+  RegisterDto,
+  ResendVerificationDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+} from './dto'
 import { JwtAuthGuard, RefreshTokenGuard } from './guards'
 import type { SessionInfo } from './session.service'
 import { SessionService } from './session.service'
@@ -79,6 +88,10 @@ describe('AuthController', () => {
             login: jest.fn(),
             logout: jest.fn(),
             getUserById: jest.fn(),
+            forgotPassword: jest.fn(),
+            resetPassword: jest.fn(),
+            verifyEmail: jest.fn(),
+            resendVerificationEmail: jest.fn(),
           },
         },
         {
@@ -463,6 +476,108 @@ describe('AuthController', () => {
 
       expect(tokenService.hashRefreshToken).not.toHaveBeenCalled()
       expect(sessionService.deleteOtherSessions).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('forgotPassword', () => {
+    it('should call service and return accepted message', async () => {
+      authService.forgotPassword.mockResolvedValue(undefined)
+      const dto: ForgotPasswordDto = { email: 'test@example.com' }
+
+      const result = await controller.forgotPassword(dto)
+
+      expect(authService.forgotPassword).toHaveBeenCalledWith('test@example.com')
+      expect(result.message).toContain('If an account')
+    })
+
+    it('should return same response regardless of email existence (no enumeration)', async () => {
+      authService.forgotPassword.mockResolvedValue(undefined)
+
+      const result1 = await controller.forgotPassword({ email: 'exists@example.com' })
+      const result2 = await controller.forgotPassword({ email: 'unknown@example.com' })
+
+      expect(result1.message).toBe(result2.message)
+    })
+
+    it('should propagate rate limit error from service', async () => {
+      authService.forgotPassword.mockRejectedValue(
+        new AppException('Rate limit exceeded', 429, AuthErrorCode.RATE_LIMIT_EXCEEDED)
+      )
+
+      await expect(controller.forgotPassword({ email: 'test@example.com' })).rejects.toThrow(
+        AppException
+      )
+    })
+  })
+
+  describe('resetPassword', () => {
+    it('should call service with token and new password', async () => {
+      authService.resetPassword.mockResolvedValue(undefined)
+      const dto: ResetPasswordDto = { token: 'a'.repeat(64), password: 'NewPass123' }
+
+      await controller.resetPassword(dto)
+
+      expect(authService.resetPassword).toHaveBeenCalledWith('a'.repeat(64), 'NewPass123')
+    })
+
+    it('should propagate error for invalid token', async () => {
+      authService.resetPassword.mockRejectedValue(
+        new AppException('Invalid or expired token', 401, AuthErrorCode.TOKEN_INVALID)
+      )
+
+      await expect(
+        controller.resetPassword({ token: 'invalid', password: 'NewPass123' })
+      ).rejects.toThrow(AppException)
+    })
+  })
+
+  describe('verifyEmail', () => {
+    it('should call service with token', async () => {
+      authService.verifyEmail.mockResolvedValue(undefined)
+      const dto: VerifyEmailDto = { token: 'a'.repeat(64) }
+
+      await controller.verifyEmail(dto)
+
+      expect(authService.verifyEmail).toHaveBeenCalledWith('a'.repeat(64))
+    })
+
+    it('should propagate error for invalid token', async () => {
+      authService.verifyEmail.mockRejectedValue(
+        new AppException('Invalid or expired token', 401, AuthErrorCode.TOKEN_INVALID)
+      )
+
+      await expect(controller.verifyEmail({ token: 'invalid' })).rejects.toThrow(AppException)
+    })
+  })
+
+  describe('resendVerification', () => {
+    it('should call service and return accepted message', async () => {
+      authService.resendVerificationEmail.mockResolvedValue(undefined)
+      const dto: ResendVerificationDto = { email: 'test@example.com' }
+
+      const result = await controller.resendVerification(dto)
+
+      expect(authService.resendVerificationEmail).toHaveBeenCalledWith('test@example.com')
+      expect(result.message).toContain('If the account')
+    })
+
+    it('should return same response regardless of email or verification status', async () => {
+      authService.resendVerificationEmail.mockResolvedValue(undefined)
+
+      const result1 = await controller.resendVerification({ email: 'verified@example.com' })
+      const result2 = await controller.resendVerification({ email: 'unverified@example.com' })
+
+      expect(result1.message).toBe(result2.message)
+    })
+
+    it('should propagate rate limit error from service', async () => {
+      authService.resendVerificationEmail.mockRejectedValue(
+        new AppException('Rate limit exceeded', 429, AuthErrorCode.RATE_LIMIT_EXCEEDED)
+      )
+
+      await expect(controller.resendVerification({ email: 'test@example.com' })).rejects.toThrow(
+        AppException
+      )
     })
   })
 

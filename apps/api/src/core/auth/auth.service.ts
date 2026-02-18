@@ -82,13 +82,17 @@ export class AuthService {
       ipAddress: requestInfo.ipAddress,
     })
 
-    // Queue welcome + verification emails (non-blocking)
-    void this.emailService.sendWelcomeEmail({
-      name: user.name ?? user.email,
-      email: user.email,
-      locale: user.locale as 'ru' | 'en',
-    })
-    void this.resendVerificationEmail(user.email)
+    // Queue welcome + verification emails (non-blocking, silent fail)
+    void this.emailService
+      .sendWelcomeEmail({
+        name: user.name ?? user.email,
+        email: user.email,
+        locale: user.locale as 'ru' | 'en',
+      })
+      .catch((err: unknown) => this.logger.warn('Failed to send welcome email', { error: err }))
+    void this.resendVerificationEmail(user.email).catch((err: unknown) =>
+      this.logger.warn('Failed to send verification email', { error: err })
+    )
 
     this.logger.log('User registered successfully', {
       userId: user.id,

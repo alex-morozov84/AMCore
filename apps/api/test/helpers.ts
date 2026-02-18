@@ -1,8 +1,10 @@
+import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { INestApplication } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
+import type { Cache } from 'cache-manager'
 import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
 import { ZodValidationPipe } from 'nestjs-zod'
@@ -16,6 +18,7 @@ import { PrismaService } from '../src/prisma'
 export interface E2ETestContext {
   app: INestApplication
   prisma: PrismaService
+  cache: Cache
   postgresContainer: StartedPostgreSqlContainer
   redisContainer: StartedRedisContainer
 }
@@ -62,8 +65,9 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
 
   await app.init()
 
-  // Get Prisma service
+  // Get Prisma service and cache
   const prisma = app.get(PrismaService)
+  const cache = app.get<Cache>(CACHE_MANAGER)
 
   // Run migrations
   await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS core')
@@ -74,7 +78,7 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
   // Deploy migrations
   execSync('pnpm prisma migrate deploy', { stdio: 'inherit' })
 
-  return { app, prisma, postgresContainer, redisContainer }
+  return { app, prisma, cache, postgresContainer, redisContainer }
 }
 
 /**
@@ -91,12 +95,17 @@ export async function teardownE2ETest(context: E2ETestContext): Promise<void> {
 }
 
 /**
- * Clean all tables in test database
+ * Clean all tables in test database and reset Redis cache
  */
-export async function cleanDatabase(prisma: PrismaService): Promise<void> {
+export async function cleanDatabase(prisma: PrismaService, cache: Cache): Promise<void> {
   // Delete in correct order (respecting foreign keys)
+  await prisma.passwordResetToken.deleteMany()
+  await prisma.emailVerificationToken.deleteMany()
   await prisma.session.deleteMany()
   await prisma.oAuthAccount.deleteMany()
   await prisma.userSettings.deleteMany()
   await prisma.user.deleteMany()
+
+  // Reset Redis to clear rate limit counters between tests
+  await cache.clear()
 }

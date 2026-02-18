@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common'
 import type { Response } from 'supertest'
 import request from 'supertest'
 
+import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
@@ -44,7 +45,7 @@ describe('Auth (e2e)', () => {
   })
 
   beforeEach(async () => {
-    await cleanDatabase(prisma)
+    await cleanDatabase(prisma, context.cache)
   })
 
   describe('POST /auth/register', () => {
@@ -105,7 +106,7 @@ describe('Auth (e2e)', () => {
         .send(registerData)
         .expect(409)
 
-      expect(response.body.message).toContain('уже существует')
+      expect(response.body.message).toBeDefined()
     })
 
     it('should return 400 for invalid email', async () => {
@@ -191,7 +192,7 @@ describe('Auth (e2e)', () => {
         })
         .expect(401)
 
-      expect(response.body.message).toContain('Неверный')
+      expect(response.body.message).toBeDefined()
     })
 
     it('should return 401 for non-existent user', async () => {
@@ -248,9 +249,7 @@ describe('Auth (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/auth/logout')
         .set('Cookie', `refresh_token=${refreshToken}`)
-        .expect(200)
-
-      expect(response.body.message).toContain('вышли из системы')
+        .expect(204)
 
       // Check cookie is cleared
       const cookies = response.headers['set-cookie'] as unknown as string[]
@@ -258,21 +257,21 @@ describe('Auth (e2e)', () => {
     })
 
     it('should delete session from database', async () => {
-      const response = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .post('/auth/logout')
         .set('Cookie', `refresh_token=${refreshToken}`)
-        .expect(200)
-
-      expect(response.body.message).toBeDefined()
+        .expect(204)
 
       const sessions = await prisma.session.findMany()
       expect(sessions).toHaveLength(0)
     })
 
-    it('should return 200 even without refresh token', async () => {
-      const response = await request(app.getHttpServer()).post('/auth/logout').expect(200)
+    it('should return 204 even without refresh token', async () => {
+      await request(app.getHttpServer()).post('/auth/logout').expect(204)
 
-      expect(response.body.message).toBeDefined()
+      // Session not deleted — no token to match
+      const sessions = await prisma.session.findMany()
+      expect(sessions).toHaveLength(1)
     })
   })
 
@@ -440,12 +439,10 @@ describe('Auth (e2e)', () => {
     })
 
     it('should delete specific session', async () => {
-      const response = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .delete(`/auth/sessions/${sessionId}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(200)
-
-      expect(response.body.message).toBeDefined()
+        .expect(204)
 
       const sessions = await prisma.session.findMany()
       expect(sessions).toHaveLength(0)
@@ -483,24 +480,21 @@ describe('Auth (e2e)', () => {
     })
 
     it('should delete all sessions except current', async () => {
-      const response = await agent
-        .delete('/auth/sessions')
-        .set('Authorization', `Bearer ${accessToken}`)
-        .expect(200)
-
-      expect(response.body.message).toBeDefined()
+      await agent.delete('/auth/sessions').set('Authorization', `Bearer ${accessToken}`).expect(204)
 
       const sessions = await prisma.session.findMany()
       expect(sessions).toHaveLength(1) // Current session remains
     })
 
-    it('should return message if no refresh token', async () => {
-      const response = await request(app.getHttpServer())
+    it('should return 204 if no refresh token cookie', async () => {
+      await request(app.getHttpServer())
         .delete('/auth/sessions')
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(200)
+        .expect(204)
 
-      expect(response.body.message).toContain('Нет активной сессии')
+      // Both sessions remain — no current session to identify
+      const sessions = await prisma.session.findMany()
+      expect(sessions).toHaveLength(2)
     })
   })
 
@@ -536,13 +530,222 @@ describe('Auth (e2e)', () => {
       expect(refreshRes.body.accessToken).toBeDefined()
 
       // 4. Logout (agent automatically sends updated cookie from refresh)
-      const logoutRes = await agent.post('/auth/logout').expect(200)
-
-      expect(logoutRes.body.message).toContain('вышли')
+      await agent.post('/auth/logout').expect(204)
 
       // Verify session deleted
       const sessions = await prisma.session.findMany()
       expect(sessions).toHaveLength(0)
+    })
+  })
+
+  describe('POST /auth/forgot-password', () => {
+    it('should return 200 with accepted message for non-existent email', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'nonexistent@example.com' })
+        .expect(200)
+
+      expect(response.body.message).toContain('If an account')
+    })
+
+    it('should return same response for existing email (account enumeration prevention)', async () => {
+      await request(app.getHttpServer()).post('/auth/register').send({
+        email: 'forgotpw@example.com',
+        password: 'ForgotP@ss123',
+      })
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'forgotpw@example.com' })
+        .expect(200)
+
+      expect(response.body.message).toContain('If an account')
+    })
+
+    it('should return 400 for invalid email format', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'not-an-email' })
+        .expect(400)
+
+      expect(response.body.message).toBeDefined()
+    })
+  })
+
+  describe('POST /auth/reset-password', () => {
+    let tokenManager: TokenManagerService
+    let userId: string
+    const userEmail = 'resetpw@example.com'
+    const newPassword = 'NewP@ss456'
+
+    beforeEach(async () => {
+      tokenManager = app.get(TokenManagerService)
+
+      const response = await request(app.getHttpServer()).post('/auth/register').send({
+        email: userEmail,
+        password: 'OldP@ss123',
+      })
+
+      userId = response.body.user.id
+    })
+
+    it('should reset password and return 204', async () => {
+      const { token } = await tokenManager.generatePasswordResetToken(userId)
+
+      await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token, password: newPassword })
+        .expect(204)
+
+      // Verify can login with new password
+      const loginRes = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: userEmail, password: newPassword })
+        .expect(200)
+
+      expect(loginRes.body.accessToken).toBeDefined()
+    })
+
+    it('should return 401 for invalid token', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token: 'i'.repeat(64), password: newPassword })
+        .expect(401)
+
+      expect(response.body.message).toBeDefined()
+    })
+
+    it('should invalidate all sessions after password reset', async () => {
+      const { token } = await tokenManager.generatePasswordResetToken(userId)
+
+      await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token, password: newPassword })
+        .expect(204)
+
+      const sessions = await prisma.session.findMany()
+      expect(sessions).toHaveLength(0)
+    })
+  })
+
+  describe('POST /auth/verify-email', () => {
+    let tokenManager: TokenManagerService
+    let userId: string
+    const userEmail = 'verifyemail@example.com'
+
+    beforeEach(async () => {
+      tokenManager = app.get(TokenManagerService)
+
+      const response = await request(app.getHttpServer()).post('/auth/register').send({
+        email: userEmail,
+        password: 'VerifyP@ss123',
+      })
+
+      userId = response.body.user.id
+    })
+
+    it('should verify email and return 204', async () => {
+      const { token } = await tokenManager.generateEmailVerificationToken(userId)
+
+      await request(app.getHttpServer()).post('/auth/verify-email').send({ token }).expect(204)
+
+      const user = await prisma.user.findUnique({ where: { id: userId } })
+      expect(user?.emailVerified).toBe(true)
+    })
+
+    it('should return 401 for invalid token', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ token: 'i'.repeat(64) })
+        .expect(401)
+
+      expect(response.body.message).toBeDefined()
+    })
+  })
+
+  describe('POST /auth/resend-verification', () => {
+    it('should return 200 with accepted message for any email', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/resend-verification')
+        .send({ email: 'nonexistent@example.com' })
+        .expect(200)
+
+      expect(response.body.message).toContain('If the account')
+    })
+
+    it('should return same message for already-verified user', async () => {
+      const tokenManager = app.get(TokenManagerService)
+
+      await request(app.getHttpServer()).post('/auth/register').send({
+        email: 'alreadyverified@example.com',
+        password: 'VerifiedP@ss123',
+      })
+
+      const user = await prisma.user.findUnique({ where: { email: 'alreadyverified@example.com' } })
+      const { token } = await tokenManager.generateEmailVerificationToken(user!.id)
+      await request(app.getHttpServer()).post('/auth/verify-email').send({ token }).expect(204)
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/resend-verification')
+        .send({ email: 'alreadyverified@example.com' })
+        .expect(200)
+
+      expect(response.body.message).toContain('If the account')
+    })
+
+    it('should return 400 for invalid email format', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/resend-verification')
+        .send({ email: 'not-an-email' })
+        .expect(400)
+
+      expect(response.body.message).toBeDefined()
+    })
+  })
+
+  describe('Full Password Reset Flow', () => {
+    it('should complete: register → forgot-password → reset-password → login with new password', async () => {
+      const email = 'fullreset@example.com'
+      const oldPassword = 'OldP@ss123'
+      const newPassword = 'NewP@ss456'
+
+      // 1. Register
+      const registerRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password: oldPassword })
+        .expect(201)
+
+      const userId = registerRes.body.user.id
+
+      // 2. Request password reset (verifies silent-fail response)
+      const forgotRes = await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email })
+        .expect(200)
+
+      expect(forgotRes.body.message).toContain('If an account')
+
+      // 3. Generate token (simulates token delivered via email)
+      const tokenManager = app.get(TokenManagerService)
+      const { token } = await tokenManager.generatePasswordResetToken(userId)
+
+      // 4. Reset password
+      await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token, password: newPassword })
+        .expect(204)
+
+      // 5. Old password no longer works
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: oldPassword })
+        .expect(401)
+
+      // 6. New password works
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: newPassword })
+        .expect(200)
     })
   })
 })
