@@ -52,26 +52,33 @@ amcore/
 
 ### Phase 0: Foundation
 
-| Task                                            | Status |
-| ----------------------------------------------- | ------ |
-| Repository & GitHub setup                       | ✅     |
-| Monorepo structure (pnpm + Turborepo)           | ✅     |
-| Tooling (ESLint, Prettier, Husky, commitlint)   | ✅     |
-| Backend bootstrap (NestJS, Prisma, Redis)       | ✅     |
-| Error handling & logging (Pino, correlation ID) | ✅     |
-| CI/CD pipeline (lint, typecheck, test, build)   | ✅     |
-| Frontend bootstrap (Next.js 16, Tailwind, FSD)  | ✅     |
-| Shared packages                                 | ✅     |
-| Docker & deployment                             | ✅     |
-| **Authentication** (JWT + refresh tokens)       | ✅     |
-| **Redis Caching** (production-ready patterns)   | ✅     |
-| **Queue Infrastructure** (BullMQ)               | ✅     |
-| **Email Service** (Resend + React Email + i18n) | ✅     |
-| E2E testing infrastructure (TestContainers)     | ✅     |
+| Task                                                | Status |
+| --------------------------------------------------- | ------ |
+| Repository & GitHub setup                           | ✅     |
+| Monorepo structure (pnpm + Turborepo)               | ✅     |
+| Tooling (ESLint, Prettier, Husky, commitlint)       | ✅     |
+| Backend bootstrap (NestJS, Prisma, Redis)           | ✅     |
+| Error handling & logging (Pino, correlation ID)     | ✅     |
+| CI/CD pipeline (lint, typecheck, test, build)       | ✅     |
+| Frontend bootstrap (Next.js 16, Tailwind, FSD)      | ✅     |
+| Shared packages                                     | ✅     |
+| Docker & deployment                                 | ✅     |
+| **Authentication** (JWT + refresh tokens)           | ✅     |
+| **Password Reset & Email Verification** (full flow) | ✅     |
+| **Redis Caching** (production-ready patterns)       | ✅     |
+| **Queue Infrastructure** (BullMQ)                   | ✅     |
+| **Email Service** (Resend + React Email + i18n)     | ✅     |
+| E2E testing infrastructure (TestContainers)         | ✅     |
 
 **Highlights:**
 
 - **Authentication System:** JWT + refresh tokens, session management, cookie-based auth
+  - Password reset flow (forgot-password → reset-password)
+  - Email verification flow (verify-email → resend-verification)
+  - Rate limiting (3 req/hour per email via Redis)
+  - Account enumeration prevention, single-use tokens (SHA-256 hashed)
+  - All sessions invalidated on password reset
+  - Machine-readable error codes (`AuthErrorCode` enum in `packages/shared`)
 - **Redis Caching:** Production-ready user caching (50-100x faster auth)
   - Cache-aside pattern with distributed locking (stampede protection)
   - Tag-based invalidation (Redis Sets, not KEYS \*)
@@ -85,7 +92,7 @@ amcore/
   - Resend (prod) / Mock (dev) provider pattern
   - React Email templates (TypeScript + Tailwind)
   - FormatJS i18n (RU/EN) - official React Email approach
-  - Templates: welcome, password reset, email verification
+  - Templates: welcome, password-reset, email-verification, password-changed
   - Async delivery via BullMQ (3 retries, exponential backoff)
 - **Production-ready error handling** with hierarchical exception filters
 - **Field-level validation errors** (Zod) with structured error responses
@@ -94,10 +101,8 @@ amcore/
 - **Graceful shutdown** with native NestJS lifecycle hooks
 - **Enhanced Prisma error mapping** (8 error codes)
 - **Comprehensive testing:**
-  - 100% coverage for auth services (unit tests)
-  - 11 cache service unit tests
-  - 32 email service tests (27 Jest unit + 5 Vitest integration)
-  - 27 E2E tests with TestContainers (real PostgreSQL + Redis)
+  - 231 unit/integration tests (22 test suites)
+  - 39 E2E tests with TestContainers (real PostgreSQL + Redis)
   - Two-framework approach: Jest for logic, Vitest for React Email rendering
 
 ### Coming Next
