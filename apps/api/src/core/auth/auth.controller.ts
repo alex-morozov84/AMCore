@@ -21,7 +21,14 @@ import { EnvService } from '../../env/env.service'
 
 import { AuthService } from './auth.service'
 import { CurrentUser } from './decorators/current-user.decorator'
-import { LoginDto, RegisterDto } from './dto'
+import {
+  ForgotPasswordDto,
+  LoginDto,
+  RegisterDto,
+  ResendVerificationDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+} from './dto'
 import { JwtAuthGuard, RefreshTokenGuard } from './guards'
 import { type SessionInfo, SessionService } from './session.service'
 import { TokenService } from './token.service'
@@ -31,7 +38,7 @@ interface AuthResponse {
   accessToken: string
 }
 
-interface MessageResponse {
+interface AcceptedResponse {
   message: string
 }
 
@@ -115,13 +122,10 @@ export class AuthController {
   }
 
   @Post('logout')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Logout user' })
-  async logout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response
-  ): Promise<MessageResponse> {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     const refreshToken = req.cookies?.refresh_token
 
     if (refreshToken) {
@@ -130,8 +134,6 @@ export class AuthController {
     }
 
     res.clearCookie('refresh_token', { path: '/' })
-
-    return { message: 'Вы успешно вышли из системы' }
   }
 
   @Post('refresh')
@@ -189,36 +191,62 @@ export class AuthController {
   }
 
   @Delete('sessions/:sessionId')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke specific session' })
   async revokeSession(
     @CurrentUser('id') userId: string,
     @Param('sessionId') sessionId: string
-  ): Promise<MessageResponse> {
+  ): Promise<void> {
     await this.sessionService.deleteSession(sessionId, userId)
-    return { message: 'Сессия отозвана' }
   }
 
   @Delete('sessions')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke all sessions except current' })
-  async revokeOtherSessions(
-    @CurrentUser('id') userId: string,
-    @Req() req: Request
-  ): Promise<MessageResponse> {
+  async revokeOtherSessions(@CurrentUser('id') userId: string, @Req() req: Request): Promise<void> {
     const refreshToken = req.cookies?.refresh_token
 
-    if (!refreshToken) {
-      return { message: 'Нет активной сессии' }
-    }
+    if (!refreshToken) return
 
     const currentHash = this.tokenService.hashRefreshToken(refreshToken)
     await this.sessionService.deleteOtherSessions(userId, currentHash)
+  }
 
-    return { message: 'Все остальные сессии отозваны' }
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request password reset email' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<AcceptedResponse> {
+    await this.authService.forgotPassword(dto.email)
+    // Always return the same message to prevent account enumeration
+    return { message: 'If an account with that email exists, a password reset link has been sent.' }
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Reset password using token from email' })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
+    await this.authService.resetPassword(dto.token, dto.password)
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Verify email address using token from email' })
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
+    await this.authService.verifyEmail(dto.token)
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend email verification link' })
+  async resendVerification(@Body() dto: ResendVerificationDto): Promise<AcceptedResponse> {
+    await this.authService.resendVerificationEmail(dto.email)
+    // Always return the same message to prevent account enumeration
+    return {
+      message: 'If the account exists and is unverified, a verification link has been sent.',
+    }
   }
 }

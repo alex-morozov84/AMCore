@@ -1,8 +1,9 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common'
 import type { User } from '@prisma/client'
 import * as argon2 from 'argon2'
 
 import type { LoginInput, RegisterInput } from '@amcore/shared'
+
+import { AppException } from '../../common/exceptions'
 
 import { AuthService } from './auth.service'
 import { SessionService } from './session.service'
@@ -22,6 +23,7 @@ describe('AuthService', () => {
   let mockTokenManager: jest.Mocked<TokenManagerService>
   let mockSessionService: jest.Mocked<SessionService>
   let mockEmailService: {
+    sendWelcomeEmail: jest.Mock
     sendPasswordResetEmail: jest.Mock
     sendPasswordChangedEmail: jest.Mock
     sendEmailVerificationEmail: jest.Mock
@@ -78,6 +80,7 @@ describe('AuthService', () => {
     } as unknown as jest.Mocked<SessionService>
 
     mockEmailService = {
+      sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
       sendPasswordChangedEmail: jest.fn().mockResolvedValue(undefined),
       sendEmailVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -173,12 +176,10 @@ describe('AuthService', () => {
       expect(result.user.name).toBeNull()
     })
 
-    it('should throw ConflictException if user already exists', async () => {
+    it('should throw AppException if user already exists', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
 
-      await expect(authService.register(registerInput, requestInfo)).rejects.toThrow(
-        ConflictException
-      )
+      await expect(authService.register(registerInput, requestInfo)).rejects.toThrow(AppException)
       expect(argon2.hash).not.toHaveBeenCalled()
     })
 
@@ -223,22 +224,18 @@ describe('AuthService', () => {
       expect(result.refreshToken).toBe('refresh-token-456')
     })
 
-    it('should throw UnauthorizedException if user not found', async () => {
+    it('should throw AppException if user not found', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(null)
 
-      await expect(authService.login(loginInput, requestInfo)).rejects.toThrow(
-        UnauthorizedException
-      )
+      await expect(authService.login(loginInput, requestInfo)).rejects.toThrow(AppException)
       expect(argon2.verify).not.toHaveBeenCalled()
     })
 
-    it('should throw UnauthorizedException if password is invalid', async () => {
+    it('should throw AppException if password is invalid', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
       ;(argon2.verify as jest.Mock).mockResolvedValue(false)
 
-      await expect(authService.login(loginInput, requestInfo)).rejects.toThrow(
-        UnauthorizedException
-      )
+      await expect(authService.login(loginInput, requestInfo)).rejects.toThrow(AppException)
     })
   })
 
@@ -319,9 +316,7 @@ describe('AuthService', () => {
     it('should throw if rate limit exceeded', async () => {
       mockCache.get.mockResolvedValue(3)
 
-      await expect(authService.forgotPassword(mockUser.email)).rejects.toThrow(
-        UnauthorizedException
-      )
+      await expect(authService.forgotPassword(mockUser.email)).rejects.toThrow(AppException)
     })
   })
 

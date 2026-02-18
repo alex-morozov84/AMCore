@@ -1,5 +1,15 @@
 // Constants public API
 
+// Auth error codes (machine-readable, frontend translates via next-intl)
+export enum AuthErrorCode {
+  EMAIL_ALREADY_EXISTS = 'EMAIL_ALREADY_EXISTS',
+  INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
+  TOKEN_INVALID = 'TOKEN_INVALID',
+  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
+  SESSION_NOT_FOUND = 'SESSION_NOT_FOUND',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+}
+
 // HTTP Status codes
 export const HTTP_STATUS = {
   OK: 200,

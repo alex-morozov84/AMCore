@@ -1,6 +1,6 @@
-import { UnauthorizedException } from '@nestjs/common'
 import type { EmailVerificationToken, PasswordResetToken } from '@prisma/client'
 
+import { AppException } from '../../common/exceptions'
 import type { EnvService } from '../../env/env.service'
 
 import { createMockContext, type MockContext, mockContextToPrisma } from './test-context'
@@ -99,9 +99,7 @@ describe('TokenManagerService', () => {
     it('should throw if token not found', async () => {
       mockCtx.prisma.passwordResetToken.findUnique.mockResolvedValue(null)
 
-      await expect(service.verifyPasswordResetToken('invalid')).rejects.toThrow(
-        UnauthorizedException
-      )
+      await expect(service.verifyPasswordResetToken('invalid')).rejects.toThrow(AppException)
     })
 
     it('should throw if token is already used', async () => {
@@ -110,9 +108,7 @@ describe('TokenManagerService', () => {
         used: true,
       })
 
-      await expect(service.verifyPasswordResetToken('a'.repeat(64))).rejects.toThrow(
-        UnauthorizedException
-      )
+      await expect(service.verifyPasswordResetToken('a'.repeat(64))).rejects.toThrow(AppException)
     })
 
     it('should throw if token is expired', async () => {
@@ -121,9 +117,7 @@ describe('TokenManagerService', () => {
         expiresAt: new Date(Date.now() - 1000), // 1 second in the past
       })
 
-      await expect(service.verifyPasswordResetToken('a'.repeat(64))).rejects.toThrow(
-        UnauthorizedException
-      )
+      await expect(service.verifyPasswordResetToken('a'.repeat(64))).rejects.toThrow(AppException)
     })
   })
 
@@ -187,9 +181,7 @@ describe('TokenManagerService', () => {
     it('should throw if token not found', async () => {
       mockCtx.prisma.emailVerificationToken.findUnique.mockResolvedValue(null)
 
-      await expect(service.verifyEmailVerificationToken('invalid')).rejects.toThrow(
-        UnauthorizedException
-      )
+      await expect(service.verifyEmailVerificationToken('invalid')).rejects.toThrow(AppException)
     })
 
     it('should throw if token is used', async () => {
@@ -199,7 +191,7 @@ describe('TokenManagerService', () => {
       })
 
       await expect(service.verifyEmailVerificationToken('a'.repeat(64))).rejects.toThrow(
-        UnauthorizedException
+        AppException
       )
     })
 
@@ -210,7 +202,7 @@ describe('TokenManagerService', () => {
       })
 
       await expect(service.verifyEmailVerificationToken('a'.repeat(64))).rejects.toThrow(
-        UnauthorizedException
+        AppException
       )
     })
   })

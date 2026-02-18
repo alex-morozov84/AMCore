@@ -270,23 +270,21 @@ describe('AuthController', () => {
       tokenService.hashRefreshToken.mockReturnValue('hashed-token')
       authService.logout.mockResolvedValue()
 
-      const result = await controller.logout(requestWithCookie, mockResponse)
+      await controller.logout(requestWithCookie, mockResponse)
 
       expect(tokenService.hashRefreshToken).toHaveBeenCalledWith(mockRefreshToken)
       expect(authService.logout).toHaveBeenCalledWith('hashed-token')
       expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token', { path: '/' })
-      expect(result).toEqual({ message: 'Вы успешно вышли из системы' })
     })
 
     it('should clear cookie even if no refresh token provided', async () => {
       authService.logout.mockResolvedValue()
 
-      const result = await controller.logout(mockRequest, mockResponse)
+      await controller.logout(mockRequest, mockResponse)
 
       expect(tokenService.hashRefreshToken).not.toHaveBeenCalled()
       expect(authService.logout).not.toHaveBeenCalled()
       expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token', { path: '/' })
-      expect(result).toEqual({ message: 'Вы успешно вышли из системы' })
     })
 
     it('should handle logout errors gracefully', async () => {
@@ -426,10 +424,9 @@ describe('AuthController', () => {
       const sessionId = 'session-123'
       sessionService.deleteSession.mockResolvedValue()
 
-      const result = await controller.revokeSession(mockUser.id, sessionId)
+      await controller.revokeSession(mockUser.id, sessionId)
 
       expect(sessionService.deleteSession).toHaveBeenCalledWith(sessionId, mockUser.id)
-      expect(result).toEqual({ message: 'Сессия отозвана' })
     })
 
     it('should throw error if session not found', async () => {
@@ -452,24 +449,20 @@ describe('AuthController', () => {
       tokenService.hashRefreshToken.mockReturnValue('current-hashed-token')
       sessionService.deleteOtherSessions.mockResolvedValue()
 
-      const result = await controller.revokeOtherSessions(mockUser.id, requestWithCookie)
+      await controller.revokeOtherSessions(mockUser.id, requestWithCookie)
 
       expect(tokenService.hashRefreshToken).toHaveBeenCalledWith(mockRefreshToken)
       expect(sessionService.deleteOtherSessions).toHaveBeenCalledWith(
         mockUser.id,
         'current-hashed-token'
       )
-      expect(result).toEqual({ message: 'Все остальные сессии отозваны' })
     })
 
-    it('should return message if no active session', async () => {
-      sessionService.deleteOtherSessions.mockResolvedValue()
-
-      const result = await controller.revokeOtherSessions(mockUser.id, mockRequest)
+    it('should return early if no active session cookie', async () => {
+      await controller.revokeOtherSessions(mockUser.id, mockRequest)
 
       expect(tokenService.hashRefreshToken).not.toHaveBeenCalled()
       expect(sessionService.deleteOtherSessions).not.toHaveBeenCalled()
-      expect(result).toEqual({ message: 'Нет активной сессии' })
     })
   })
 
@@ -527,8 +520,8 @@ describe('AuthController', () => {
       tokenService.hashRefreshToken.mockReturnValue('hashed-rotated-token')
       authService.logout.mockResolvedValue()
 
-      const logoutResult = await controller.logout(logoutRequest, mockResponse)
-      expect(logoutResult.message).toBe('Вы успешно вышли из системы')
+      await controller.logout(logoutRequest, mockResponse)
+      expect(authService.logout).toHaveBeenCalled()
     })
   })
 })

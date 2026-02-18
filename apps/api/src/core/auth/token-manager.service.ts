@@ -1,6 +1,9 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
+import { HttpStatus, Injectable, Logger } from '@nestjs/common'
 import { createHash, randomBytes } from 'crypto'
 
+import { AuthErrorCode } from '@amcore/shared'
+
+import { AppException } from '../../common/exceptions'
 import { EnvService } from '../../env/env.service'
 import { PrismaService } from '../../prisma'
 
@@ -48,7 +51,11 @@ export class TokenManagerService {
 
     if (!record || record.used || record.expiresAt < new Date()) {
       this.logger.warn('Invalid or expired password reset token attempted')
-      throw new UnauthorizedException('Invalid or expired token')
+      throw new AppException(
+        'Invalid or expired token',
+        HttpStatus.UNAUTHORIZED,
+        AuthErrorCode.TOKEN_INVALID
+      )
     }
 
     return { userId: record.userId, tokenHash }
@@ -94,7 +101,11 @@ export class TokenManagerService {
 
     if (!record || record.used || record.expiresAt < new Date()) {
       this.logger.warn('Invalid or expired email verification token attempted')
-      throw new UnauthorizedException('Invalid or expired token')
+      throw new AppException(
+        'Invalid or expired token',
+        HttpStatus.UNAUTHORIZED,
+        AuthErrorCode.TOKEN_INVALID
+      )
     }
 
     return { userId: record.userId, tokenHash }

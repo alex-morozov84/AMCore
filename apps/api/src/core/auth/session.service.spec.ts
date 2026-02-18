@@ -1,5 +1,6 @@
-import { NotFoundException } from '@nestjs/common'
 import type { Session, User } from '@prisma/client'
+
+import { NotFoundException } from '../../common/exceptions'
 
 import { SessionService } from './session.service'
 import { createMockContext, type MockContext, mockContextToPrisma } from './test-context'

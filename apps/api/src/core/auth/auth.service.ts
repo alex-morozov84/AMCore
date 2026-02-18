@@ -1,16 +1,12 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common'
 import * as argon2 from 'argon2'
 import type { Cache } from 'cache-manager'
 
 import type { LoginInput, RegisterInput, UserResponse } from '@amcore/shared'
+import { AuthErrorCode } from '@amcore/shared'
 
+import { AppException } from '../../common/exceptions'
 import { EnvService } from '../../env/env.service'
 import { EmailService } from '../../infrastructure/email'
 import { PrismaService } from '../../prisma'
@@ -54,7 +50,11 @@ export class AuthService {
     })
 
     if (existing) {
-      throw new ConflictException('Пользователь с таким email уже существует')
+      throw new AppException(
+        'Email already exists',
+        HttpStatus.CONFLICT,
+        AuthErrorCode.EMAIL_ALREADY_EXISTS
+      )
     }
 
     // Hash password
@@ -82,6 +82,14 @@ export class AuthService {
       ipAddress: requestInfo.ipAddress,
     })
 
+    // Queue welcome + verification emails (non-blocking)
+    void this.emailService.sendWelcomeEmail({
+      name: user.name ?? user.email,
+      email: user.email,
+      locale: user.locale as 'ru' | 'en',
+    })
+    void this.resendVerificationEmail(user.email)
+
     this.logger.log('User registered successfully', {
       userId: user.id,
       email: user.email,
@@ -102,13 +110,21 @@ export class AuthService {
     })
 
     if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Неверный email или пароль')
+      throw new AppException(
+        'Invalid email or password',
+        HttpStatus.UNAUTHORIZED,
+        AuthErrorCode.INVALID_CREDENTIALS
+      )
     }
 
     // Verify password
     const valid = await argon2.verify(user.passwordHash, input.password)
     if (!valid) {
-      throw new UnauthorizedException('Неверный email или пароль')
+      throw new AppException(
+        'Invalid email or password',
+        HttpStatus.UNAUTHORIZED,
+        AuthErrorCode.INVALID_CREDENTIALS
+      )
     }
 
     // Update last login
@@ -259,7 +275,11 @@ export class AuthService {
     const count = ((await this.cache.get<number>(cacheKey)) ?? 0) + 1
 
     if (count > max) {
-      throw new UnauthorizedException('Too many requests. Please try again later.')
+      throw new AppException(
+        'Too many requests. Please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+        AuthErrorCode.RATE_LIMIT_EXCEEDED
+      )
     }
 
     await this.cache.set(cacheKey, count, 3600 * 1000) // 1 hour TTL in ms
