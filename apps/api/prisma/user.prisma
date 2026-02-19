@@ -22,6 +22,13 @@ enum Theme {
   @@schema("core")
 }
 
+enum SystemRole {
+  USER
+  SUPER_ADMIN
+
+  @@schema("core")
+}
+
 // -----------------------------
 // Models
 // -----------------------------
@@ -41,12 +48,16 @@ model User {
   updatedAt   DateTime  @updatedAt
   lastLoginAt DateTime?
 
+  // RBAC
+  systemRole  SystemRole @default(USER)
+
   // Relations
   accounts                 OAuthAccount[]
   sessions                 Session[]
   settings                 UserSettings?
   passwordResetTokens      PasswordResetToken[]
   emailVerificationTokens  EmailVerificationToken[]
+  memberships              OrgMember[]
 
   @@map("users")
   @@schema("core")
@@ -145,5 +156,100 @@ model EmailVerificationToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("email_verification_tokens")
+  @@schema("core")
+}
+
+// ===========================================
+// RBAC: Organizations, Roles & Permissions
+// ===========================================
+
+model Organization {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  aclVersion Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  members     OrgMember[]
+  roles       Role[]
+  permissions Permission[]
+
+  @@map("organizations")
+  @@schema("core")
+}
+
+model OrgMember {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roles        MemberRole[]
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@map("org_members")
+  @@schema("core")
+}
+
+model MemberRole {
+  id       String @id @default(cuid())
+  memberId String
+  roleId   String
+
+  member OrgMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role   Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, roleId])
+  @@map("member_roles")
+  @@schema("core")
+}
+
+model Role {
+  id             String  @id @default(cuid())
+  name           String
+  description    String?
+  isSystem       Boolean @default(false) // system roles cannot be deleted
+  organizationId String? // null = system template; non-null = org-specific
+
+  organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  permissions  RolePermission[]
+  members      MemberRole[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("roles")
+  @@schema("core")
+}
+
+model Permission {
+  id             String   @id @default(cuid())
+  action         String   // 'create' | 'read' | 'update' | 'delete' | 'manage'
+  subject        String   // 'Contact' | 'User' | 'Organization' | 'all'
+  conditions     Json?    // CASL conditions: { "assignedToId": "${user.id}" }
+  fields         String[] @default([]) // field-level: [] = all fields
+  inverted       Boolean  @default(false) // explicit DENY (use sparingly)
+  organizationId String?  // null = system permission
+
+  organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roles        RolePermission[]
+
+  @@index([organizationId, subject, action])
+  @@map("permissions")
+  @@schema("core")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
   @@schema("core")
 }
