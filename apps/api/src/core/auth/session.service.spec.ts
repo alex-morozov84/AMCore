@@ -1,4 +1,4 @@
-import type { Session, User } from '@prisma/client'
+import { SystemRole, type Session, type User } from '@prisma/client'
 
 import { NotFoundException } from '../../common/exceptions'
 
@@ -23,6 +23,7 @@ describe('SessionService', () => {
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     lastLoginAt: new Date('2024-01-01'),
+    systemRole: SystemRole.USER,
   }
 
   const mockSession: Session = {

@@ -1,4 +1,4 @@
-import type { User } from '@prisma/client'
+import { SystemRole, type User } from '@prisma/client'
 import * as argon2 from 'argon2'
 
 import type { LoginInput, RegisterInput } from '@amcore/shared'
@@ -44,6 +44,7 @@ describe('AuthService', () => {
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     lastLoginAt: new Date('2024-01-01'),
+    systemRole: SystemRole.USER,
   }
 
   beforeEach(() => {

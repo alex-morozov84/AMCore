@@ -1,7 +1,7 @@
 import type { ExecutionContext } from '@nestjs/common'
 import { ConflictException, UnauthorizedException } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
-import type { User } from '@prisma/client'
+import { SystemRole, type User } from '@prisma/client'
 import type { Request, Response } from 'express'
 
 import { AuthErrorCode, type UserResponse } from '@amcore/shared'
@@ -49,6 +49,7 @@ describe('AuthController', () => {
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     lastLoginAt: new Date('2025-01-27'),
+    systemRole: SystemRole.USER,
   }
 
   const mockUserResponse: UserResponse = {

@@ -1,6 +1,6 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { Test, TestingModule } from '@nestjs/testing'
-import type { User } from '@prisma/client'
+import { SystemRole, type User } from '@prisma/client'
 import type { Cache } from 'cache-manager'
 
 import { UserCacheService } from './user-cache.service'
@@ -24,6 +24,7 @@ describe('UserCacheService', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     lastLoginAt: new Date(),
+    systemRole: SystemRole.USER,
   }
 
   beforeEach(async () => {
