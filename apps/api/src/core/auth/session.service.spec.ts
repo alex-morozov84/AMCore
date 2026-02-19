@@ -1,4 +1,4 @@
-import { SystemRole, type Session, type User } from '@prisma/client'
+import { type Session, SystemRole, type User } from '@prisma/client'
 
 import { NotFoundException } from '../../common/exceptions'
 
