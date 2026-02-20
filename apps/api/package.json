@@ -35,6 +35,8 @@
     "@bull-board/api": "^6.17.0",
     "@bull-board/express": "^6.17.0",
     "@bull-board/nestjs": "^6.17.0",
+    "@casl/ability": "^6.8.0",
+    "@casl/prisma": "^1.6.1",
     "@formatjs/intl": "^4.1.2",
     "@keyv/redis": "^5.1.6",
     "@nestjs/axios": "^4.0.1",
