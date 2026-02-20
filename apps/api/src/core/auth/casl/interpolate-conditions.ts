@@ -40,6 +40,11 @@ export function interpolateConditions(
  * @param path - Dot-separated path (e.g., "user.sub")
  * @returns Value at path or undefined
  */
-function getNestedValue(obj: Record<string, any>, path: string): unknown {
-  return path.split('.').reduce((current, key) => current?.[key], obj)
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  return path.split('.').reduce<unknown>((current, key) => {
+    if (current && typeof current === 'object') {
+      return (current as Record<string, unknown>)[key]
+    }
+    return undefined
+  }, obj)
 }
