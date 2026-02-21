@@ -2,11 +2,16 @@ import { Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { createHash, randomBytes } from 'crypto'
 
+import { type SystemRole } from '@amcore/shared'
+
 import { EnvService } from '../../env/env.service'
 
 export interface AccessTokenPayload {
   sub: string
   email: string
+  systemRole: SystemRole
+  organizationId?: string
+  aclVersion?: number
 }
 
 @Injectable()

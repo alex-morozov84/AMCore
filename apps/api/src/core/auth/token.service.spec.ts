@@ -1,6 +1,8 @@
 import { JwtService } from '@nestjs/jwt'
 import { randomBytes } from 'crypto'
 
+import { SystemRole } from '@amcore/shared'
+
 import { EnvService } from '../../env/env.service'
 
 import { type AccessTokenPayload, TokenService } from './token.service'
@@ -35,6 +37,7 @@ describe('TokenService', () => {
       const payload: AccessTokenPayload = {
         sub: 'user-123',
         email: 'test@example.com',
+        systemRole: SystemRole.User,
       }
 
       jwtService.sign.mockReturnValue('mocked-jwt-token')
@@ -51,11 +54,13 @@ describe('TokenService', () => {
       const token1 = tokenService.generateAccessToken({
         sub: 'user-1',
         email: 'user1@example.com',
+        systemRole: SystemRole.User,
       })
 
       const token2 = tokenService.generateAccessToken({
         sub: 'user-2',
         email: 'user2@example.com',
+        systemRole: SystemRole.User,
       })
 
       expect(token1).toBe('token-user-1')
@@ -69,6 +74,7 @@ describe('TokenService', () => {
       const payload: AccessTokenPayload = {
         sub: 'user-123',
         email: 'test@example.com',
+        systemRole: SystemRole.User,
       }
 
       jwtService.verify.mockReturnValue(payload)

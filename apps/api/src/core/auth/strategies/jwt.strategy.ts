@@ -1,10 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
-import type { User } from '@prisma/client'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 
+import { type JwtPayload, type RequestPrincipal } from '@amcore/shared'
+
 import { EnvService } from '../../../env/env.service'
-import type { AccessTokenPayload } from '../token.service'
 import { UserCacheService } from '../user-cache.service'
 
 @Injectable()
@@ -20,14 +20,24 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     })
   }
 
-  async validate(payload: AccessTokenPayload): Promise<User> {
-    // Use cache-first approach instead of direct DB query
+  /**
+   * Called after JWT signature is verified.
+   * Checks user still exists (security), then returns RequestPrincipal.
+   * Does NOT load full user from DB — only existence check via cache.
+   */
+  async validate(payload: JwtPayload): Promise<RequestPrincipal> {
     const user = await this.userCache.getUser(payload.sub)
 
     if (!user) {
       throw new UnauthorizedException('Пользователь не найден')
     }
 
-    return user
+    return {
+      type: 'jwt',
+      sub: payload.sub,
+      systemRole: payload.systemRole,
+      organizationId: payload.organizationId,
+      aclVersion: payload.aclVersion,
+    }
   }
 }

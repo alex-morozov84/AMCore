@@ -74,6 +74,7 @@ export class AuthService {
     const accessToken = this.tokenService.generateAccessToken({
       sub: user.id,
       email: user.email,
+      systemRole: user.systemRole,
     })
 
     const refreshToken = await this.sessionService.createSession({
@@ -141,6 +142,7 @@ export class AuthService {
     const accessToken = this.tokenService.generateAccessToken({
       sub: user.id,
       email: user.email,
+      systemRole: user.systemRole,
     })
 
     const refreshToken = await this.sessionService.createSession({

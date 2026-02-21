@@ -1,10 +1,10 @@
 import type { ExecutionContext } from '@nestjs/common'
 import { ConflictException, UnauthorizedException } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
-import { SystemRole, type User } from '@prisma/client'
+import { SystemRole as PrismaSystemRole, type User } from '@prisma/client'
 import type { Request, Response } from 'express'
 
-import { AuthErrorCode, type UserResponse } from '@amcore/shared'
+import { AuthErrorCode, type RequestPrincipal, SystemRole, type UserResponse } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
 
@@ -49,7 +49,13 @@ describe('AuthController', () => {
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     lastLoginAt: new Date('2025-01-27'),
-    systemRole: SystemRole.USER,
+    systemRole: PrismaSystemRole.USER,
+  }
+
+  const mockPrincipal: RequestPrincipal = {
+    type: 'jwt',
+    sub: 'user-123',
+    systemRole: SystemRole.User,
   }
 
   const mockUserResponse: UserResponse = {
@@ -343,6 +349,7 @@ describe('AuthController', () => {
       expect(tokenService.generateAccessToken).toHaveBeenCalledWith({
         sub: mockUser.id,
         email: mockUser.email,
+        systemRole: mockUser.systemRole,
       })
       expect(mockResponse.cookie).toHaveBeenCalledWith('refresh_token', newRefreshToken, {
         httpOnly: true,
@@ -370,16 +377,16 @@ describe('AuthController', () => {
     it('should return current user profile', async () => {
       authService.getUserById.mockResolvedValue(mockUserResponse)
 
-      const result = await controller.me(mockUser)
+      const result = await controller.me(mockPrincipal)
 
-      expect(authService.getUserById).toHaveBeenCalledWith(mockUser.id)
+      expect(authService.getUserById).toHaveBeenCalledWith(mockPrincipal.sub)
       expect(result).toEqual({ user: mockUserResponse })
     })
 
     it('should return null if user not found', async () => {
       authService.getUserById.mockResolvedValue(null)
 
-      const result = await controller.me(mockUser)
+      const result = await controller.me(mockPrincipal)
 
       expect(result).toEqual({ user: null })
     })

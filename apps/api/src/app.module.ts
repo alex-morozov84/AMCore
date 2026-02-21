@@ -51,10 +51,10 @@ import { ShutdownService } from './shutdown.service'
             req.headers['x-correlation-id'] ||
             uuidv4()) as string
         },
-        setup: (cls, req: Request & { user?: { id: string } }) => {
-          // Auto-inject userId from JWT (if authenticated)
-          if (req.user?.id) {
-            cls.set('userId', req.user.id)
+        setup: (cls, req: Request & { user?: { sub: string } }) => {
+          // Auto-inject userId from JWT (if authenticated). user.sub = userId (RequestPrincipal)
+          if (req.user?.sub) {
+            cls.set('userId', req.user.sub)
           }
 
           // Store anonymized IP (GDPR compliant)

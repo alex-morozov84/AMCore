@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt'
 import { PassportModule } from '@nestjs/passport'
+import { APP_GUARD } from '@nestjs/core'
 
 import { EnvModule } from '../../env/env.module'
 import { EnvService } from '../../env/env.service'
@@ -9,7 +10,9 @@ import { PrismaModule } from '../../prisma'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
-import { RefreshTokenGuard } from './guards'
+import { AbilityFactory } from './casl/ability.factory'
+import { AuthenticationGuard, PoliciesGuard, RefreshTokenGuard, SystemRolesGuard } from './guards'
+import { PermissionsCacheService } from './permissions-cache.service'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
 import { TokenService } from './token.service'
@@ -41,7 +44,16 @@ import { UserCacheService } from './user-cache.service'
     JwtStrategy,
     RefreshTokenGuard,
     UserCacheService,
+    // RBAC
+    AbilityFactory,
+    PermissionsCacheService,
+    PoliciesGuard,
+    SystemRolesGuard,
+    AuthenticationGuard,
+    // Single global guard: authenticate → build ability → authorize
+    // Registered in AuthModule so it runs AFTER ThrottlerGuard (AppModule)
+    { provide: APP_GUARD, useClass: AuthenticationGuard },
   ],
-  exports: [AuthService, UserCacheService],
+  exports: [AuthService, UserCacheService, AbilityFactory],
 })
 export class AuthModule {}

@@ -15,11 +15,16 @@ import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swa
 import type { User } from '@prisma/client'
 import type { Request, Response } from 'express'
 
-import type { UserResponse as SharedUserResponse } from '@amcore/shared'
+import {
+  AuthType,
+  type RequestPrincipal,
+  type UserResponse as SharedUserResponse,
+} from '@amcore/shared'
 
 import { EnvService } from '../../env/env.service'
 
 import { AuthService } from './auth.service'
+import { Auth } from './decorators/auth.decorator'
 import { CurrentUser } from './decorators/current-user.decorator'
 import {
   ForgotPasswordDto,
@@ -29,7 +34,7 @@ import {
   ResetPasswordDto,
   VerifyEmailDto,
 } from './dto'
-import { JwtAuthGuard, RefreshTokenGuard } from './guards'
+import { RefreshTokenGuard } from './guards'
 import { type SessionInfo, SessionService } from './session.service'
 import { TokenService } from './token.service'
 
@@ -81,6 +86,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @Auth(AuthType.None)
   @ApiOperation({ summary: 'Register new user' })
   async register(
     @Body() dto: RegisterDto,
@@ -102,6 +108,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Auth(AuthType.None)
   @ApiOperation({ summary: 'Login user' })
   async login(
     @Body() dto: LoginDto,
@@ -123,6 +130,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Auth(AuthType.None)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Logout user' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
@@ -138,14 +146,18 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Auth(AuthType.None)
   @UseGuards(RefreshTokenGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Refresh access token' })
   async refresh(
-    @Req() req: Request & { user: { user: User; refreshTokenHash: string } },
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response
   ): Promise<TokenResponse> {
-    const { user, refreshTokenHash } = req.user
+    const { user, refreshTokenHash } = req.user as unknown as {
+      user: User
+      refreshTokenHash: string
+    }
 
     // Rotate refresh token
     const newRefreshToken = await this.sessionService.rotateRefreshToken(refreshTokenHash, {
@@ -154,10 +166,11 @@ export class AuthController {
       ipAddress: req.ip,
     })
 
-    // Generate new access token
+    // Generate new access token with current system role (org context not preserved — use /switch)
     const accessToken = this.tokenService.generateAccessToken({
       sub: user.id,
       email: user.email,
+      systemRole: user.systemRole,
     })
 
     res.cookie('refresh_token', newRefreshToken, this.cookieOptions)
@@ -166,20 +179,18 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
-  async me(@CurrentUser() user: User): Promise<ProfileResponse> {
-    const profile = await this.authService.getUserById(user.id)
+  async me(@CurrentUser() user: RequestPrincipal): Promise<ProfileResponse> {
+    const profile = await this.authService.getUserById(user.sub)
     return { user: profile }
   }
 
   @Get('sessions')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all active sessions' })
   async sessions(
-    @CurrentUser('id') userId: string,
+    @CurrentUser('sub') userId: string,
     @Req() req: Request
   ): Promise<SessionsResponse> {
     const refreshToken = req.cookies?.refresh_token
@@ -192,11 +203,10 @@ export class AuthController {
 
   @Delete('sessions/:sessionId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke specific session' })
   async revokeSession(
-    @CurrentUser('id') userId: string,
+    @CurrentUser('sub') userId: string,
     @Param('sessionId') sessionId: string
   ): Promise<void> {
     await this.sessionService.deleteSession(sessionId, userId)
@@ -204,10 +214,12 @@ export class AuthController {
 
   @Delete('sessions')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke all sessions except current' })
-  async revokeOtherSessions(@CurrentUser('id') userId: string, @Req() req: Request): Promise<void> {
+  async revokeOtherSessions(
+    @CurrentUser('sub') userId: string,
+    @Req() req: Request
+  ): Promise<void> {
     const refreshToken = req.cookies?.refresh_token
 
     if (!refreshToken) return
@@ -218,6 +230,7 @@ export class AuthController {
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
+  @Auth(AuthType.None)
   @ApiOperation({ summary: 'Request password reset email' })
   async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<AcceptedResponse> {
     await this.authService.forgotPassword(dto.email)
@@ -227,6 +240,7 @@ export class AuthController {
 
   @Post('reset-password')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Auth(AuthType.None)
   @ApiOperation({ summary: 'Reset password using token from email' })
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
     await this.authService.resetPassword(dto.token, dto.password)
@@ -234,6 +248,7 @@ export class AuthController {
 
   @Post('verify-email')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Auth(AuthType.None)
   @ApiOperation({ summary: 'Verify email address using token from email' })
   async verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
     await this.authService.verifyEmail(dto.token)
@@ -241,6 +256,7 @@ export class AuthController {
 
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
+  @Auth(AuthType.None)
   @ApiOperation({ summary: 'Resend email verification link' })
   async resendVerification(@Body() dto: ResendVerificationDto): Promise<AcceptedResponse> {
     await this.authService.resendVerificationEmail(dto.email)
