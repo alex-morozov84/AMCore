@@ -1,0 +1,6 @@
+export { AssignPermissionDto } from './assign-permission.dto'
+export { CreateOrganizationDto } from './create-organization.dto'
+export { CreateRoleDto } from './create-role.dto'
+export { InviteMemberDto } from './invite-member.dto'
+export { UpdateOrganizationDto } from './update-organization.dto'
+export { UpdateRoleDto } from './update-role.dto'

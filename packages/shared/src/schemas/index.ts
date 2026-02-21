@@ -35,5 +35,29 @@ export {
   type MessageResponse,
 } from './auth'
 
+// Organization schemas
+export {
+  createOrganizationSchema,
+  updateOrganizationSchema,
+  inviteMemberSchema,
+  createRoleSchema,
+  updateRoleSchema,
+  assignPermissionSchema,
+  orgResponseSchema,
+  permissionResponseSchema,
+  orgRoleResponseSchema,
+  switchOrgResponseSchema,
+  type CreateOrganizationInput,
+  type UpdateOrganizationInput,
+  type InviteMemberInput,
+  type CreateRoleInput,
+  type UpdateRoleInput,
+  type AssignPermissionInput,
+  type OrgResponse,
+  type PermissionResponse,
+  type OrgRoleResponse,
+  type SwitchOrgResponse,
+} from './organization'
+
 // Backwards compatibility
 export { userSchema, type User } from './user'

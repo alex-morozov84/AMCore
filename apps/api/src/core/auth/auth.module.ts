@@ -54,6 +54,6 @@ import { UserCacheService } from './user-cache.service'
     // Registered in AuthModule so it runs AFTER ThrottlerGuard (AppModule)
     { provide: APP_GUARD, useClass: AuthenticationGuard },
   ],
-  exports: [AuthService, UserCacheService, AbilityFactory],
+  exports: [AuthService, UserCacheService, AbilityFactory, TokenService],
 })
 export class AuthModule {}

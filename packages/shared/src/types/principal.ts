@@ -5,6 +5,7 @@ import { SystemRole } from '../enums/roles'
 export interface RequestPrincipal {
   type: 'jwt' | 'api_key'
   sub: string // userId
+  email?: string // always present for JWT; undefined for API keys
   systemRole: SystemRole
   organizationId?: string
   aclVersion?: number

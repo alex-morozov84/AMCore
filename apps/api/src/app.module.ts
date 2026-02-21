@@ -19,6 +19,7 @@ import {
 } from './common/exceptions/filters'
 import { anonymizeIp, getClientIp } from './common/utils'
 import { AuthModule } from './core/auth/auth.module'
+import { OrganizationsModule } from './core/organizations/organizations.module'
 import { validate } from './env'
 import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
@@ -118,6 +119,9 @@ import { ShutdownService } from './shutdown.service'
 
     // Auth module
     AuthModule,
+
+    // Core: Organizations, Roles & Permissions
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [
