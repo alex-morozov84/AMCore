@@ -18,6 +18,7 @@ import {
   PrismaClientExceptionFilter,
 } from './common/exceptions/filters'
 import { anonymizeIp, getClientIp } from './common/utils'
+import { AdminModule } from './core/admin/admin.module'
 import { AuthModule } from './core/auth/auth.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
 import { validate } from './env'
@@ -122,6 +123,9 @@ import { ShutdownService } from './shutdown.service'
 
     // Core: Organizations, Roles & Permissions
     OrganizationsModule,
+
+    // Core: Admin (SUPER_ADMIN only)
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

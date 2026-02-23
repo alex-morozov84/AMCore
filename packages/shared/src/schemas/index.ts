@@ -61,3 +61,6 @@ export {
 
 // Backwards compatibility
 export { userSchema, type User } from './user'
+
+// Admin schemas
+export { updateUserSystemRoleSchema, type UpdateUserSystemRoleInput } from './admin'
