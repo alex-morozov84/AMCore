@@ -58,6 +58,7 @@ model User {
   passwordResetTokens      PasswordResetToken[]
   emailVerificationTokens  EmailVerificationToken[]
   memberships              OrgMember[]
+  apiKeys                  ApiKey[]
 
   @@map("users")
   @@schema("core")
@@ -156,6 +157,30 @@ model EmailVerificationToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("email_verification_tokens")
+  @@schema("core")
+}
+
+// ===========================================
+// API Keys
+// ===========================================
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  shortToken String    @unique
+  keyHash    String
+  salt       String
+  scopes     String[]  @default([])
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  userId     String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("api_keys")
   @@schema("core")
 }
 
