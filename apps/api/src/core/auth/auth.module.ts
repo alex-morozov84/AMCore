@@ -11,7 +11,13 @@ import { PrismaModule } from '../../prisma'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { AbilityFactory } from './casl/ability.factory'
-import { AuthenticationGuard, PoliciesGuard, RefreshTokenGuard, SystemRolesGuard } from './guards'
+import {
+  AuthenticationGuard,
+  JwtAuthGuard,
+  PoliciesGuard,
+  RefreshTokenGuard,
+  SystemRolesGuard,
+} from './guards'
 import { PermissionsCacheService } from './permissions-cache.service'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
@@ -47,6 +53,7 @@ import { UserCacheService } from './user-cache.service'
     // RBAC
     AbilityFactory,
     PermissionsCacheService,
+    JwtAuthGuard,
     PoliciesGuard,
     SystemRolesGuard,
     AuthenticationGuard,

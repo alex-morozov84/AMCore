@@ -85,6 +85,21 @@ describe('AbilityFactory', () => {
       expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
     })
 
+    it('should load permissions from cache when aclVersion is 0 (fresh org)', async () => {
+      const principal: RequestPrincipal = {
+        type: 'jwt',
+        sub: 'user-1',
+        systemRole: SystemRole.User,
+        organizationId: 'org-1',
+        aclVersion: 0,
+      }
+      permissionsCache.getPermissions.mockResolvedValue([])
+
+      await factory.createForUser(principal)
+
+      expect(permissionsCache.getPermissions).toHaveBeenCalledWith('user-1', 'org-1', 0)
+    })
+
     it('should load permissions from cache for org user', async () => {
       const principal: RequestPrincipal = {
         type: 'jwt',

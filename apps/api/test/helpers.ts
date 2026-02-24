@@ -2,6 +2,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { INestApplication } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
+import type { Role } from '@prisma/client'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import type { Cache } from 'cache-manager'
@@ -108,4 +109,64 @@ export async function cleanDatabase(prisma: PrismaService, cache: Cache): Promis
 
   // Reset Redis to clear rate limit counters between tests
   await cache.clear()
+}
+
+/**
+ * Clean org-related data between tests.
+ * Preserves system roles/permissions (organizationId = null).
+ * Call before cleanDatabase to respect foreign key order.
+ */
+export async function cleanOrgData(prisma: PrismaService): Promise<void> {
+  await prisma.permission.deleteMany({ where: { organizationId: { not: null } } })
+  await prisma.role.deleteMany({ where: { organizationId: { not: null } } })
+  await prisma.organization.deleteMany()
+}
+
+/**
+ * Seed system roles and permissions required for RBAC tests.
+ * Idempotent — safe to call multiple times.
+ */
+export async function seedSystemRoles(prisma: PrismaService): Promise<void> {
+  const findOrCreate = async (name: string, description: string): Promise<Role> => {
+    const existing = await prisma.role.findFirst({
+      where: { name, organizationId: null, isSystem: true },
+    })
+    if (existing) return existing
+    return prisma.role.create({ data: { name, description, isSystem: true } })
+  }
+
+  const [adminRole, memberRole, viewerRole] = await Promise.all([
+    findOrCreate('ADMIN', 'Full organization management'),
+    findOrCreate('MEMBER', 'Standard member access'),
+    findOrCreate('VIEWER', 'Read-only access'),
+  ])
+
+  const alreadySeeded = await prisma.rolePermission.count({ where: { roleId: adminRole.id } })
+  if (alreadySeeded > 0) return
+
+  const [manageOrg, manageRole, managePerm, manageUser, updateOwnUser, createAll, readAll] =
+    await Promise.all([
+      prisma.permission.create({ data: { action: 'manage', subject: 'Organization' } }),
+      prisma.permission.create({ data: { action: 'manage', subject: 'Role' } }),
+      prisma.permission.create({ data: { action: 'manage', subject: 'Permission' } }),
+      prisma.permission.create({ data: { action: 'manage', subject: 'User' } }),
+      prisma.permission.create({
+        data: { action: 'update', subject: 'User', conditions: { id: '${user.sub}' } },
+      }),
+      prisma.permission.create({ data: { action: 'create', subject: 'all' } }),
+      prisma.permission.create({ data: { action: 'read', subject: 'all' } }),
+    ])
+
+  await prisma.rolePermission.createMany({
+    data: [
+      { roleId: adminRole.id, permissionId: manageOrg.id },
+      { roleId: adminRole.id, permissionId: manageRole.id },
+      { roleId: adminRole.id, permissionId: managePerm.id },
+      { roleId: adminRole.id, permissionId: manageUser.id },
+      { roleId: memberRole.id, permissionId: createAll.id },
+      { roleId: memberRole.id, permissionId: readAll.id },
+      { roleId: memberRole.id, permissionId: updateOwnUser.id },
+      { roleId: viewerRole.id, permissionId: readAll.id },
+    ],
+  })
 }

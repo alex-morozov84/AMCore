@@ -32,7 +32,10 @@ export class SystemRolesGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     // Get required system roles from @SystemRoles decorator
-    const requiredRoles = this.reflector.get<SystemRole[]>(SYSTEM_ROLES_KEY, context.getHandler())
+    const requiredRoles = this.reflector.getAllAndOverride<SystemRole[]>(SYSTEM_ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ])
 
     // If no roles specified, allow access
     if (!requiredRoles || requiredRoles.length === 0) {

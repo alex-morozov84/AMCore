@@ -81,6 +81,7 @@ export default [
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       'no-console': 'off',
+      'jest/expect-expect': ['warn', { assertFunctionNames: ['expect', 'request.**.expect'] }],
     },
   },
 ]

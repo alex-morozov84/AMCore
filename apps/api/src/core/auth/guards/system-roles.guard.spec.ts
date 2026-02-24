@@ -36,7 +36,7 @@ describe('SystemRolesGuard', () => {
   })
 
   it('should allow access when no roles are required', () => {
-    jest.spyOn(reflector, 'get').mockReturnValueOnce(undefined)
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValueOnce(undefined)
 
     const user: RequestPrincipal = {
       type: 'jwt',
@@ -51,7 +51,7 @@ describe('SystemRolesGuard', () => {
   })
 
   it('should allow access when user has required system role', () => {
-    jest.spyOn(reflector, 'get').mockReturnValueOnce([SystemRole.SuperAdmin])
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValueOnce([SystemRole.SuperAdmin])
 
     const user: RequestPrincipal = {
       type: 'jwt',
@@ -66,7 +66,7 @@ describe('SystemRolesGuard', () => {
   })
 
   it('should deny access when user does not have required system role', () => {
-    jest.spyOn(reflector, 'get').mockReturnValueOnce([SystemRole.SuperAdmin])
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValueOnce([SystemRole.SuperAdmin])
 
     const user: RequestPrincipal = {
       type: 'jwt',

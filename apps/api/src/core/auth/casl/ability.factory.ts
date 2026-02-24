@@ -57,7 +57,7 @@ export class AbilityFactory {
     }
 
     // If no organization context, grant minimal personal permissions
-    if (!principal.organizationId || !principal.aclVersion) {
+    if (!principal.organizationId || principal.aclVersion == null) {
       // User can read and update their own profile
       rules.push({
         action: Action.Read,
