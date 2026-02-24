@@ -104,7 +104,7 @@ describe('ApiKeysService', () => {
 
   describe('verifyByShortToken', () => {
     it('should return apiKey for valid token', async () => {
-      jest.spyOn(service as never, 'verifyLongToken').mockReturnValue(true)
+      jest.spyOn(service as any, 'verifyLongToken').mockReturnValue(true)
       mockCtx.prisma.apiKey.findUnique.mockResolvedValue(mockApiKeyWithUser)
 
       const result = await service.verifyByShortToken('abc12345', 'anyToken')
@@ -130,7 +130,7 @@ describe('ApiKeysService', () => {
     })
 
     it('should return null if longToken hash does not match', async () => {
-      jest.spyOn(service as never, 'verifyLongToken').mockReturnValue(false)
+      jest.spyOn(service as any, 'verifyLongToken').mockReturnValue(false)
       mockCtx.prisma.apiKey.findUnique.mockResolvedValue(mockApiKeyWithUser)
 
       const result = await service.verifyByShortToken('abc12345', 'wrong-token')
