@@ -27,6 +27,7 @@ import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
 import { EmailModule } from './infrastructure/email'
 import { QueueModule } from './infrastructure/queue'
+import { ScheduleModule } from './infrastructure/schedule/schedule.module'
 import { PrismaModule } from './prisma'
 import { ShutdownService } from './shutdown.service'
 
@@ -117,6 +118,9 @@ import { ShutdownService } from './shutdown.service'
 
     // Email infrastructure
     EmailModule,
+
+    // Scheduled tasks (nightly cleanup of expired sessions/tokens)
+    ScheduleModule,
 
     // Auth module
     AuthModule,

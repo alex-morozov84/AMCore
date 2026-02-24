@@ -5,6 +5,7 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { SystemRole } from '@amcore/shared'
 
 import { NotFoundException } from '../../common/exceptions'
+import type { CleanupService } from '../../infrastructure/schedule/cleanup.service'
 import type { PrismaService } from '../../prisma'
 
 import { AdminService } from './admin.service'
@@ -12,6 +13,7 @@ import { AdminService } from './admin.service'
 describe('AdminService', () => {
   let service: AdminService
   let prisma: DeepMockProxy<PrismaClient>
+  let cleanupService: jest.Mocked<Pick<CleanupService, 'runCleanup'>>
 
   const mockUser: User = {
     id: 'user-1',
@@ -39,7 +41,11 @@ describe('AdminService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
-    service = new AdminService(prisma as unknown as PrismaService)
+    cleanupService = { runCleanup: jest.fn() }
+    service = new AdminService(
+      prisma as unknown as PrismaService,
+      cleanupService as unknown as CleanupService
+    )
   })
 
   describe('findAllUsers', () => {
@@ -97,6 +103,22 @@ describe('AdminService', () => {
       await expect(
         service.updateUserSystemRole('nonexistent', SystemRole.SuperAdmin)
       ).rejects.toThrow(NotFoundException)
+    })
+  })
+
+  describe('runCleanup', () => {
+    it('delegates to CleanupService and returns result', async () => {
+      const mockResult = {
+        expiredSessions: 5,
+        expiredPasswordResetTokens: 3,
+        expiredEmailVerificationTokens: 7,
+      }
+      cleanupService.runCleanup.mockResolvedValue(mockResult)
+
+      const result = await service.runCleanup()
+
+      expect(result).toEqual(mockResult)
+      expect(cleanupService.runCleanup).toHaveBeenCalled()
     })
   })
 

@@ -4,6 +4,8 @@ import type { Organization, User } from '@prisma/client'
 import { type SystemRole } from '@amcore/shared'
 
 import { NotFoundException } from '../../common/exceptions'
+import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
+import { CleanupService } from '../../infrastructure/schedule/cleanup.service'
 import { PrismaService } from '../../prisma'
 
 const DEFAULT_LIMIT = 20
@@ -11,7 +13,10 @@ const MAX_LIMIT = 100
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cleanupService: CleanupService
+  ) {}
 
   async findAllUsers(page = 1, limit = DEFAULT_LIMIT): Promise<{ data: User[]; total: number }> {
     const take = Math.min(limit, MAX_LIMIT)
@@ -27,6 +32,10 @@ export class AdminService {
     const user = await this.prisma.user.findUnique({ where: { id } })
     if (!user) throw new NotFoundException('User', id)
     return this.prisma.user.update({ where: { id }, data: { systemRole } })
+  }
+
+  runCleanup(): Promise<CleanupResult> {
+    return this.cleanupService.runCleanup()
   }
 
   async findAllOrganizations(

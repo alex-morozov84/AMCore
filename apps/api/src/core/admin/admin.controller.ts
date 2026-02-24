@@ -1,9 +1,20 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import type { Organization, User } from '@prisma/client'
 
 import { SystemRole } from '@amcore/shared'
 
+import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
@@ -31,6 +42,13 @@ export class AdminController {
   @ApiOperation({ summary: 'Update user system role — SUPER_ADMIN only' })
   updateUserSystemRole(@Param('id') id: string, @Body() dto: UpdateSystemRoleDto): Promise<User> {
     return this.adminService.updateUserSystemRole(id, dto.systemRole)
+  }
+
+  @Post('cleanup')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Manually trigger expired records cleanup — SUPER_ADMIN only' })
+  runCleanup(): Promise<CleanupResult> {
+    return this.adminService.runCleanup()
   }
 
   @Get('organizations')
