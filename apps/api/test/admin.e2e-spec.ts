@@ -114,6 +114,33 @@ describe('Admin (e2e)', () => {
     })
   })
 
+  describe('POST /admin/cleanup', () => {
+    it('returns cleanup counts for SUPER_ADMIN', async () => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      const res = await request(app.getHttpServer())
+        .post('/admin/cleanup')
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(200)
+
+      expect(res.body).toMatchObject({
+        expiredSessions: expect.any(Number),
+        expiredPasswordResetTokens: expect.any(Number),
+        expiredEmailVerificationTokens: expect.any(Number),
+      })
+    })
+
+    it('returns 403 for regular USER', async () => {
+      const { token } = await registerAndGetToken('user@example.com')
+
+      await request(app.getHttpServer())
+        .post('/admin/cleanup')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403)
+    })
+  })
+
   describe('GET /admin/organizations', () => {
     it('returns all organizations for SUPER_ADMIN', async () => {
       const { userId, token: userToken } = await registerAndGetToken('superadmin@example.com')
