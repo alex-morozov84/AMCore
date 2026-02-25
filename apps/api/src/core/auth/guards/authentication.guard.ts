@@ -1,4 +1,9 @@
-import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common'
+import {
+  type CanActivate,
+  type ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
 import { AuthType } from '@amcore/shared'
@@ -56,7 +61,7 @@ export class AuthenticationGuard implements CanActivate {
     const authTypes = this.reflector.getAllAndOverride<AuthType[]>(AUTH_TYPE_KEY, [
       context.getHandler(),
       context.getClass(),
-    ]) ?? [AuthType.Bearer]
+    ]) ?? [AuthType.Bearer, AuthType.ApiKey]
 
     // 2. If public route (AuthType.None), skip all checks
     if (authTypes.includes(AuthType.None)) {
@@ -67,10 +72,14 @@ export class AuthenticationGuard implements CanActivate {
     let authenticated = false
     for (const type of authTypes) {
       if (type === AuthType.Bearer) {
-        const result = await this.jwtAuthGuard.canActivate(context)
-        if (result) {
-          authenticated = true
-          break
+        try {
+          const result = await this.jwtAuthGuard.canActivate(context)
+          if (result) {
+            authenticated = true
+            break
+          }
+        } catch {
+          // JWT auth failed — try next auth type
         }
       }
 
@@ -84,7 +93,7 @@ export class AuthenticationGuard implements CanActivate {
     }
 
     if (!authenticated) {
-      return false
+      throw new UnauthorizedException()
     }
 
     // 4. Create ability and attach to request

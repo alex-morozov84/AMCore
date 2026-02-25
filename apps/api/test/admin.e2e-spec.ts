@@ -128,6 +128,7 @@ describe('Admin (e2e)', () => {
         expiredSessions: expect.any(Number),
         expiredPasswordResetTokens: expect.any(Number),
         expiredEmailVerificationTokens: expect.any(Number),
+        expiredApiKeys: expect.any(Number),
       })
     })
 
