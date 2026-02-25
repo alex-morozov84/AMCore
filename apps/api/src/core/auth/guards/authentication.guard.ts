@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core'
 
 import { AuthType } from '@amcore/shared'
 
+import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
 import { AbilityFactory } from '../casl/ability.factory'
 import { AUTH_TYPE_KEY } from '../decorators/auth.decorator'
 
@@ -44,6 +45,7 @@ export class AuthenticationGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly jwtAuthGuard: JwtAuthGuard,
+    private readonly apiKeyGuard: ApiKeyGuard,
     private readonly abilityFactory: AbilityFactory,
     private readonly systemRolesGuard: SystemRolesGuard,
     private readonly policiesGuard: PoliciesGuard
@@ -71,7 +73,14 @@ export class AuthenticationGuard implements CanActivate {
           break
         }
       }
-      // TODO: Add AuthType.ApiKey when implementing Phase 3
+
+      if (type === AuthType.ApiKey) {
+        const result = await this.apiKeyGuard.canActivate(context)
+        if (result) {
+          authenticated = true
+          break
+        }
+      }
     }
 
     if (!authenticated) {

@@ -15,10 +15,11 @@ describe('CleanupService', () => {
   })
 
   describe('runCleanup', () => {
-    it('deletes all three types of expired records and returns counts', async () => {
+    it('deletes all four types of expired records and returns counts', async () => {
       prisma.session.deleteMany.mockResolvedValue({ count: 5 })
       prisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 3 })
       prisma.emailVerificationToken.deleteMany.mockResolvedValue({ count: 7 })
+      prisma.apiKey.deleteMany.mockResolvedValue({ count: 2 })
 
       const result = await service.runCleanup()
 
@@ -26,13 +27,15 @@ describe('CleanupService', () => {
         expiredSessions: 5,
         expiredPasswordResetTokens: 3,
         expiredEmailVerificationTokens: 7,
+        expiredApiKeys: 2,
       })
     })
 
-    it('runs all three deletions in parallel', async () => {
+    it('runs all four deletions in parallel', async () => {
       prisma.session.deleteMany.mockResolvedValue({ count: 0 })
       prisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 })
       prisma.emailVerificationToken.deleteMany.mockResolvedValue({ count: 0 })
+      prisma.apiKey.deleteMany.mockResolvedValue({ count: 0 })
 
       await service.runCleanup()
 
@@ -45,12 +48,16 @@ describe('CleanupService', () => {
       expect(prisma.emailVerificationToken.deleteMany).toHaveBeenCalledWith({
         where: { expiresAt: { lt: expect.any(Date) } },
       })
+      expect(prisma.apiKey.deleteMany).toHaveBeenCalledWith({
+        where: { expiresAt: { lt: expect.any(Date) } },
+      })
     })
 
     it('returns zero counts when nothing to clean up', async () => {
       prisma.session.deleteMany.mockResolvedValue({ count: 0 })
       prisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 })
       prisma.emailVerificationToken.deleteMany.mockResolvedValue({ count: 0 })
+      prisma.apiKey.deleteMany.mockResolvedValue({ count: 0 })
 
       const result = await service.runCleanup()
 
@@ -58,6 +65,7 @@ describe('CleanupService', () => {
         expiredSessions: 0,
         expiredPasswordResetTokens: 0,
         expiredEmailVerificationTokens: 0,
+        expiredApiKeys: 0,
       })
     })
   })

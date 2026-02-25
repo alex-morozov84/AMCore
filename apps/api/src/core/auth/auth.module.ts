@@ -7,6 +7,7 @@ import { EnvModule } from '../../env/env.module'
 import { EnvService } from '../../env/env.service'
 import { EmailModule } from '../../infrastructure/email'
 import { PrismaModule } from '../../prisma'
+import { ApiKeysModule } from '../api-keys/api-keys.module'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
@@ -30,6 +31,7 @@ import { UserCacheService } from './user-cache.service'
     PrismaModule,
     PassportModule,
     EmailModule,
+    ApiKeysModule,
     JwtModule.registerAsync({
       imports: [EnvModule],
       inject: [EnvService],

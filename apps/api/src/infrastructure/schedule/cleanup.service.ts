@@ -7,6 +7,7 @@ export interface CleanupResult {
   expiredSessions: number
   expiredPasswordResetTokens: number
   expiredEmailVerificationTokens: number
+  expiredApiKeys: number
 }
 
 /**
@@ -35,16 +36,18 @@ export class CleanupService {
   async runCleanup(): Promise<CleanupResult> {
     const now = new Date()
 
-    const [sessions, passwordResetTokens, emailVerificationTokens] = await Promise.all([
+    const [sessions, passwordResetTokens, emailVerificationTokens, apiKeys] = await Promise.all([
       this.prisma.session.deleteMany({ where: { expiresAt: { lt: now } } }),
       this.prisma.passwordResetToken.deleteMany({ where: { expiresAt: { lt: now } } }),
       this.prisma.emailVerificationToken.deleteMany({ where: { expiresAt: { lt: now } } }),
+      this.prisma.apiKey.deleteMany({ where: { expiresAt: { lt: now } } }),
     ])
 
     return {
       expiredSessions: sessions.count,
       expiredPasswordResetTokens: passwordResetTokens.count,
       expiredEmailVerificationTokens: emailVerificationTokens.count,
+      expiredApiKeys: apiKeys.count,
     }
   }
 }
