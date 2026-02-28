@@ -11,7 +11,6 @@ import { ApiKeysModule } from '../api-keys/api-keys.module'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
-import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { AbilityFactory } from './casl/ability.factory'
 import {
   AuthenticationGuard,
@@ -20,6 +19,7 @@ import {
   RefreshTokenGuard,
   SystemRolesGuard,
 } from './guards'
+import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { PermissionsCacheService } from './permissions-cache.service'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
