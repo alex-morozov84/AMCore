@@ -107,8 +107,18 @@ export async function cleanDatabase(prisma: PrismaService, cache: Cache): Promis
   await prisma.userSettings.deleteMany()
   await prisma.user.deleteMany()
 
-  // Reset Redis to clear rate limit counters between tests
-  await cache.clear()
+  // Flush Redis directly — cache.clear() with @keyv/redis filters keys by '::' and
+  // misses rate limiter keys like `rate:login_ip:...` that lack a namespace separator.
+  const stores = (cache as any).stores as any[]
+  for (const keyv of stores) {
+    const adapter = (keyv._store ?? keyv.opts?.store) as {
+      getClient?: () => Promise<{ flushDb: () => Promise<void> }>
+    }
+    if (adapter && typeof adapter.getClient === 'function') {
+      const client = await adapter.getClient()
+      await client.flushDb()
+    }
+  }
 }
 
 /**

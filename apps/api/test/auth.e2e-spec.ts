@@ -703,6 +703,81 @@ describe('Auth (e2e)', () => {
     })
   })
 
+  describe('Login brute-force protection', () => {
+    const password = 'BruteP@ss123'
+    const wrongPassword = 'WrongPassword123'
+
+    // Each test uses a unique email to avoid cross-test cache key collisions
+    // (per-email+IP keys are independent; per-IP counter accumulates but limit is 100)
+
+    it('should return 429 after 5 failed login attempts', async () => {
+      const email = 'brute-block@example.com'
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password })
+        .expect(201)
+
+      for (let i = 0; i < 5; i++) {
+        await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email, password: wrongPassword })
+          .expect(401)
+      }
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: wrongPassword })
+        .expect(429)
+
+      expect(response.body.message).toContain('Too many failed login attempts')
+      expect(response.body.details?.retryAfterSeconds).toBe(900)
+    })
+
+    it('should reset counter after successful login', async () => {
+      const email = 'brute-reset@example.com'
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password })
+        .expect(201)
+
+      // Fail 4 times — not yet blocked
+      for (let i = 0; i < 4; i++) {
+        await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email, password: wrongPassword })
+          .expect(401)
+      }
+
+      // Login successfully — resets counter
+      await request(app.getHttpServer()).post('/auth/login').send({ email, password }).expect(200)
+
+      // Should get 401, not 429 — counter was reset
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: wrongPassword })
+        .expect(401)
+    })
+
+    it('should block even correct password after 5 failures', async () => {
+      const email = 'brute-correct@example.com'
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password })
+        .expect(201)
+
+      // Trigger block with 5 failures
+      for (let i = 0; i < 5; i++) {
+        await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email, password: wrongPassword })
+          .expect(401)
+      }
+
+      // check() runs before DB lookup — correct password is still blocked
+      await request(app.getHttpServer()).post('/auth/login').send({ email, password }).expect(429)
+    })
+  })
+
   describe('Full Password Reset Flow', () => {
     it('should complete: register → forgot-password → reset-password → login with new password', async () => {
       const email = 'fullreset@example.com'

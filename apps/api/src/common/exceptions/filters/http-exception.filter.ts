@@ -29,6 +29,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // Extract message and errorCode from response
     const message = this.extractMessage(exceptionResponse)
     const errorCode = this.extractErrorCode(exceptionResponse)
+    const details = this.extractDetails(exceptionResponse)
     const validationErrors = this.extractValidationErrors(exceptionResponse)
 
     // Build error response
@@ -40,6 +41,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url,
       method: request.method,
       correlationId: this.cls.getId(),
+      ...(details && { details }),
     }
 
     // Add validation errors if present (from ZodValidationException)
@@ -97,6 +99,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
   private extractErrorCode(exceptionResponse: string | object): string | undefined {
     if (typeof exceptionResponse === 'object' && 'errorCode' in exceptionResponse) {
       return String(exceptionResponse['errorCode'])
+    }
+    return undefined
+  }
+
+  /**
+   * Extract details from AppException response
+   */
+  private extractDetails(exceptionResponse: string | object): Record<string, unknown> | undefined {
+    if (typeof exceptionResponse === 'object' && 'details' in exceptionResponse) {
+      const details = exceptionResponse['details']
+      if (details && typeof details === 'object' && !Array.isArray(details)) {
+        return details as Record<string, unknown>
+      }
     }
     return undefined
   }
