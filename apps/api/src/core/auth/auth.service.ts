@@ -11,6 +11,7 @@ import { EnvService } from '../../env/env.service'
 import { EmailService } from '../../infrastructure/email'
 import { PrismaService } from '../../prisma'
 
+import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 import { TokenManagerService } from './token-manager.service'
@@ -39,7 +40,8 @@ export class AuthService {
     private readonly emailService: EmailService,
     private readonly userCacheService: UserCacheService,
     private readonly env: EnvService,
-    @Inject(CACHE_MANAGER) private readonly cache: Cache
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+    private readonly loginRateLimiter: LoginRateLimiterService
   ) {}
 
   /** Register new user */
@@ -109,12 +111,18 @@ export class AuthService {
 
   /** Login user */
   async login(input: LoginInput, requestInfo: RequestInfo): Promise<AuthResult> {
+    const ip = requestInfo.ipAddress ?? ''
+
+    // Check brute-force limits before hitting DB
+    await this.loginRateLimiter.check(input.email, ip)
+
     // Find user
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },
     })
 
     if (!user || !user.passwordHash) {
+      await this.loginRateLimiter.consume(input.email, ip)
       throw new AppException(
         'Invalid email or password',
         HttpStatus.UNAUTHORIZED,
@@ -125,12 +133,16 @@ export class AuthService {
     // Verify password
     const valid = await argon2.verify(user.passwordHash, input.password)
     if (!valid) {
+      await this.loginRateLimiter.consume(input.email, ip)
       throw new AppException(
         'Invalid email or password',
         HttpStatus.UNAUTHORIZED,
         AuthErrorCode.INVALID_CREDENTIALS
       )
     }
+
+    // Reset rate limit counters on successful login
+    await this.loginRateLimiter.reset(input.email, ip)
 
     // Update last login
     await this.prisma.user.update({

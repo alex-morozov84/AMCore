@@ -6,6 +6,7 @@ import type { LoginInput, RegisterInput } from '@amcore/shared'
 import { AppException } from '../../common/exceptions'
 
 import { AuthService } from './auth.service'
+import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { SessionService } from './session.service'
 import { createMockContext, type MockContext, mockContextToPrisma } from './test-context'
 import { TokenService } from './token.service'
@@ -31,6 +32,7 @@ describe('AuthService', () => {
   let mockUserCacheService: jest.Mocked<Pick<UserCacheService, 'invalidateUser'>>
   let mockEnvService: { get: jest.Mock }
   let mockCache: { get: jest.Mock; set: jest.Mock }
+  let mockLoginRateLimiter: jest.Mocked<LoginRateLimiterService>
 
   const mockUser: User = {
     id: 'user-123',
@@ -108,6 +110,12 @@ describe('AuthService', () => {
       set: jest.fn().mockResolvedValue(undefined),
     }
 
+    mockLoginRateLimiter = {
+      check: jest.fn().mockResolvedValue(undefined),
+      consume: jest.fn().mockResolvedValue(undefined),
+      reset: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<LoginRateLimiterService>
+
     const prisma = mockContextToPrisma(mockCtx)
     authService = new AuthService(
       prisma,
@@ -117,7 +125,8 @@ describe('AuthService', () => {
       mockEmailService as never,
       mockUserCacheService as never,
       mockEnvService as never,
-      mockCache as never
+      mockCache as never,
+      mockLoginRateLimiter
     )
 
     jest.clearAllMocks()
@@ -237,6 +246,42 @@ describe('AuthService', () => {
       ;(argon2.verify as jest.Mock).mockResolvedValue(false)
 
       await expect(authService.login(loginInput, requestInfo)).rejects.toThrow(AppException)
+    })
+
+    it('should consume rate limit on failed login', async () => {
+      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+      ;(argon2.verify as jest.Mock).mockResolvedValue(false)
+
+      await authService.login(loginInput, requestInfo).catch(() => undefined)
+
+      expect(mockLoginRateLimiter.consume).toHaveBeenCalledWith(
+        loginInput.email,
+        requestInfo.ipAddress
+      )
+    })
+
+    it('should reset rate limit on successful login', async () => {
+      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+      ;(argon2.verify as jest.Mock).mockResolvedValue(true)
+      mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, lastLoginAt: new Date() })
+      mockTokenService.generateAccessToken.mockReturnValue('token')
+      mockSessionService.createSession.mockResolvedValue('refresh')
+
+      await authService.login(loginInput, requestInfo)
+
+      expect(mockLoginRateLimiter.reset).toHaveBeenCalledWith(
+        loginInput.email,
+        requestInfo.ipAddress
+      )
+    })
+
+    it('should throw 429 when rate limit is exceeded', async () => {
+      mockLoginRateLimiter.check.mockRejectedValue(
+        new AppException('Too many failed login attempts', 429)
+      )
+
+      await expect(authService.login(loginInput, requestInfo)).rejects.toThrow(AppException)
+      expect(mockCtx.prisma.user.findUnique).not.toHaveBeenCalled()
     })
   })
 

@@ -11,6 +11,7 @@ import { ApiKeysModule } from '../api-keys/api-keys.module'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
+import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { AbilityFactory } from './casl/ability.factory'
 import {
   AuthenticationGuard,
@@ -46,6 +47,7 @@ import { UserCacheService } from './user-cache.service'
   controllers: [AuthController],
   providers: [
     AuthService,
+    LoginRateLimiterService,
     TokenService,
     TokenManagerService,
     SessionService,
