@@ -16,11 +16,19 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.url().optional(),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CALLBACK_URL: z.url().optional(),
+  APPLE_CLIENT_ID: z.string().optional(),
+  APPLE_TEAM_ID: z.string().optional(),
+  APPLE_KEY_ID: z.string().optional(),
+  APPLE_PRIVATE_KEY: z.string().optional(),
+  APPLE_CALLBACK_URL: z.url().optional(),
   // Email Service
   EMAIL_PROVIDER: z.enum(['resend', 'mock']).default('mock'),
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().email().default('noreply@amcore.com'),
-  SUPPORT_EMAIL: z.string().email().default('support@amcore.com'),
+  EMAIL_FROM: z.email().default('noreply@amcore.com'),
+  SUPPORT_EMAIL: z.email().default('support@amcore.com'),
   // Frontend URLs (for email links)
   FRONTEND_URL: z.string().url().default('http://localhost:3002'),
   // Auth token expiration

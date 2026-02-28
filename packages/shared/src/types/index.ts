@@ -3,3 +3,4 @@ export type { ApiError, ApiResponse, PaginatedResponse, PaginationParams } from 
 export type { ApiErrorResponse, ValidationError } from './api-errors'
 export type { JwtPayload } from './jwt'
 export type { RequestPrincipal } from './principal'
+export type { OAuthUserProfile, OAuthTokens } from './oauth'
