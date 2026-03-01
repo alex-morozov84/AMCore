@@ -4,7 +4,7 @@ module.exports = {
   rootDir: '.',
   testMatch: ['**/*.spec.ts'],
   testPathIgnorePatterns: ['\\.integration\\.spec\\.ts$'],
-  transformIgnorePatterns: ['node_modules/(?!(@formatjs)/)'],
+  transformIgnorePatterns: ['node_modules/(?!(@formatjs|openid-client|oauth4webapi)/)'],
   moduleFileExtensions: ['js', 'json', 'ts', 'tsx', 'mts', 'cts'],
   collectCoverageFrom: [
     'src/**/*.{js,ts}',

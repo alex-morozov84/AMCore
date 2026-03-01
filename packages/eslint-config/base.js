@@ -58,6 +58,7 @@ export default [
       // === General ===
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-unused-vars': 'off', // Use @typescript-eslint version
+      'no-undef': 'off', // TypeScript handles undefined references via its type checker
       'prefer-const': 'error',
       'no-var': 'error',
       eqeqeq: ['error', 'always', { null: 'ignore' }],
