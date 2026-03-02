@@ -45,14 +45,14 @@ importers:
         specifier: workspace:^
         version: link:../../packages/shared
       '@bull-board/api':
-        specifier: ^6.17.0
-        version: 6.17.0(@bull-board/ui@6.20.3)
+        specifier: ^6.20.3
+        version: 6.20.3(@bull-board/ui@6.20.3)
       '@bull-board/express':
         specifier: ^6.20.3
         version: 6.20.3
       '@bull-board/nestjs':
-        specifier: ^6.17.0
-        version: 6.17.0(@bull-board/api@6.17.0(@bull-board/ui@6.20.3))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14))(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        specifier: ^6.20.3
+        version: 6.20.3(@bull-board/api@6.20.3(@bull-board/ui@6.20.3))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14))(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@casl/ability':
         specifier: ^6.8.0
         version: 6.8.0
@@ -776,11 +776,6 @@ packages:
   '@borewit/text-codec@0.2.1':
     resolution: {integrity: sha512-k7vvKPbf7J2fZ5klGRD9AeKfUvojuZIQ3BT5u7Jfv+puwXkUBUT5PVyMDfJZpy30CBDXGMgw7fguK/lpOMBvgw==}
 
-  '@bull-board/api@6.17.0':
-    resolution: {integrity: sha512-nnYzOu74KRimG+WmZ8j4r3+i3FpwbXrSekrMyNsne9I7bj5XqpkacFg7HA8+IwG9ysPqrWdy/KEl2XG1vCR4Fw==}
-    peerDependencies:
-      '@bull-board/ui': 6.17.0
-
   '@bull-board/api@6.20.3':
     resolution: {integrity: sha512-cDrsJJsmF4DbbY8/5oHxO4qFtyFjxexsWQKHowsud/8H4mtZN7MZg4fCmNzfaxc9Ov7V6r9Y9F5G2Mq6t7ZEJg==}
     peerDependencies:
@@ -789,10 +784,10 @@ packages:
   '@bull-board/express@6.20.3':
     resolution: {integrity: sha512-S6BGeSf/PLwjx5W1IrKxoV8G6iiMmLqT/pldZ6BiC1IDldedisTtAdL1z117swXPv1H7/3hy0vr03dUr8bUCPg==}
 
-  '@bull-board/nestjs@6.17.0':
-    resolution: {integrity: sha512-aLOiFx2+Km98X39rE63e6vAVF7cz/NA8/kMANe9oz6OrFSFu+v7CAHeIa7k48jsHyyllfOPi4ubC+mKgMdYAYQ==}
+  '@bull-board/nestjs@6.20.3':
+    resolution: {integrity: sha512-VFi96Z2M8k3G26H1ivzQnpjKszxh90vrUm78VtMZH/sh8wjm88mJFDXcOgFutOaddx7cc9VNXlKsTTcu6okPFQ==}
     peerDependencies:
-      '@bull-board/api': ^6.17.0
+      '@bull-board/api': ^6.20.3
       '@nestjs/bull-shared': ^10.0.0 || ^11.0.0
       '@nestjs/common': ^9.0.0 || ^10.0.0 || ^11.0.0
       '@nestjs/core': ^9.0.0 || ^10.0.0 || ^11.0.0
@@ -8399,11 +8394,6 @@ snapshots:
 
   '@borewit/text-codec@0.2.1': {}
 
-  '@bull-board/api@6.17.0(@bull-board/ui@6.20.3)':
-    dependencies:
-      '@bull-board/ui': 6.20.3
-      redis-info: 3.1.0
-
   '@bull-board/api@6.20.3(@bull-board/ui@6.20.3)':
     dependencies:
       '@bull-board/ui': 6.20.3
@@ -8418,9 +8408,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@bull-board/nestjs@6.17.0(@bull-board/api@6.17.0(@bull-board/ui@6.20.3))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14))(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@bull-board/nestjs@6.20.3(@bull-board/api@6.20.3(@bull-board/ui@6.20.3))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14))(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
-      '@bull-board/api': 6.17.0(@bull-board/ui@6.20.3)
+      '@bull-board/api': 6.20.3(@bull-board/ui@6.20.3)
       '@nestjs/bull-shared': 11.0.4(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14)
       '@nestjs/common': 11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.14(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)
