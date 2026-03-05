@@ -20,6 +20,8 @@ import {
   SystemRolesGuard,
 } from './guards'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
+import { OAuthClientService } from './oauth/oauth-client.service'
+import { OAuthProviderFactory } from './oauth/providers/oauth-provider.factory'
 import { PermissionsCacheService } from './permissions-cache.service'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
@@ -48,6 +50,8 @@ import { UserCacheService } from './user-cache.service'
   providers: [
     AuthService,
     LoginRateLimiterService,
+    OAuthClientService,
+    OAuthProviderFactory,
     TokenService,
     TokenManagerService,
     SessionService,

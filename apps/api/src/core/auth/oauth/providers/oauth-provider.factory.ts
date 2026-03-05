@@ -1,0 +1,97 @@
+import { HttpStatus, Injectable } from '@nestjs/common'
+
+import { AuthErrorCode } from '@amcore/shared'
+
+import { AppException } from '../../../../common/exceptions'
+import { EnvService } from '../../../../env/env.service'
+import { OAuthClientService } from '../oauth-client.service'
+
+import { AppleProvider } from './apple.provider'
+import { GitHubProvider } from './github.provider'
+import { GoogleProvider } from './google.provider'
+import type { OAuthProvider } from './oauth-provider.interface'
+
+@Injectable()
+export class OAuthProviderFactory {
+  private readonly providers = new Map<string, OAuthProvider>()
+
+  constructor(
+    private readonly env: EnvService,
+    private readonly oauthClient: OAuthClientService
+  ) {
+    this.registerProviders()
+  }
+
+  get(name: string): OAuthProvider {
+    const provider = this.providers.get(name)
+    if (!provider) {
+      throw new AppException(
+        `OAuth provider "${name}" is not configured`,
+        HttpStatus.BAD_REQUEST,
+        AuthErrorCode.OAUTH_PROVIDER_NOT_CONFIGURED
+      )
+    }
+    return provider
+  }
+
+  getAvailableProviders(): string[] {
+    return Array.from(this.providers.keys())
+  }
+
+  private registerProviders(): void {
+    this.tryRegisterGoogle()
+    this.tryRegisterGitHub()
+    this.tryRegisterApple()
+  }
+
+  private tryRegisterGoogle(): void {
+    const clientId = this.env.get('GOOGLE_CLIENT_ID')
+    if (!clientId) return
+
+    this.providers.set(
+      'google',
+      new GoogleProvider(
+        {
+          clientId,
+          clientSecret: this.env.get('GOOGLE_CLIENT_SECRET')!,
+          redirectUri: this.env.get('GOOGLE_CALLBACK_URL')!,
+        },
+        this.oauthClient
+      )
+    )
+  }
+
+  private tryRegisterGitHub(): void {
+    const clientId = this.env.get('GITHUB_CLIENT_ID')
+    if (!clientId) return
+
+    this.providers.set(
+      'github',
+      new GitHubProvider({
+        clientId,
+        clientSecret: this.env.get('GITHUB_CLIENT_SECRET')!,
+        redirectUri: this.env.get('GITHUB_CALLBACK_URL')!,
+      })
+    )
+  }
+
+  private tryRegisterApple(): void {
+    const clientId = this.env.get('APPLE_CLIENT_ID')
+    if (!clientId) return
+
+    this.providers.set(
+      'apple',
+      new AppleProvider(
+        {
+          clientId,
+          clientSecret: '', // Apple uses dynamic JWT — generated from P8 key
+          redirectUri: this.env.get('APPLE_CALLBACK_URL')!,
+          teamId: this.env.get('APPLE_TEAM_ID')!,
+          keyId: this.env.get('APPLE_KEY_ID')!,
+          privateKey: this.env.get('APPLE_PRIVATE_KEY')!,
+        },
+        this.oauthClient
+      )
+    )
+  }
+}
