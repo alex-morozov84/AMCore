@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@amcore/typescript-config": "workspace:*",
-    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/eslintrc": "^3.3.4",
     "@eslint/js": "^9.39.2",
     "@next/eslint-plugin-next": "^16.1.6",
     "@tailwindcss/postcss": "^4.2.1",
