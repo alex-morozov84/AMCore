@@ -58,7 +58,7 @@
     "@react-email/components": "^1.0.8",
     "@react-email/render": "^2.0.4",
     "argon2": "^0.44.0",
-    "axios": "^1.13.4",
+    "axios": "^1.13.6",
     "bullmq": "^5.68.0",
     "cache-manager": "^7.2.8",
     "cookie-parser": "^1.4.7",
