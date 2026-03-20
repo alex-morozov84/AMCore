@@ -20,8 +20,10 @@ import {
   SystemRolesGuard,
 } from './guards'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
+import { OAuthController } from './oauth/oauth.controller'
 import { OAuthService } from './oauth/oauth.service'
 import { OAuthClientService } from './oauth/oauth-client.service'
+import { OAuthStateService } from './oauth/oauth-state.service'
 import { OAuthProviderFactory } from './oauth/providers/oauth-provider.factory'
 import { PermissionsCacheService } from './permissions-cache.service'
 import { SessionService } from './session.service'
@@ -47,13 +49,14 @@ import { UserCacheService } from './user-cache.service'
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, OAuthController],
   providers: [
     AuthService,
     LoginRateLimiterService,
     OAuthClientService,
     OAuthProviderFactory,
     OAuthService,
+    OAuthStateService,
     TokenService,
     TokenManagerService,
     SessionService,
