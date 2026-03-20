@@ -3,9 +3,9 @@ import request from 'supertest'
 
 import type { OAuthTokens, OAuthUserProfile } from '@amcore/shared'
 
-import type { OAuthProvider } from '../src/core/auth/oauth/providers/oauth-provider.interface'
-import { OAuthProviderFactory } from '../src/core/auth/oauth/providers/oauth-provider.factory'
 import { OAuthStateService } from '../src/core/auth/oauth/oauth-state.service'
+import { OAuthProviderFactory } from '../src/core/auth/oauth/providers/oauth-provider.factory'
+import type { OAuthProvider } from '../src/core/auth/oauth/providers/oauth-provider.interface'
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
