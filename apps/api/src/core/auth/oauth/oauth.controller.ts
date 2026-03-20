@@ -1,9 +1,10 @@
-import { Controller, Get, Param, Query, Req, Res } from '@nestjs/common'
+import { Controller, Get, HttpStatus, Param, Query, Req, Res } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
 
-import { AuthType } from '@amcore/shared'
+import { AuthErrorCode, AuthType } from '@amcore/shared'
 
+import { AppException } from '../../../common/exceptions'
 import { EnvService } from '../../../env/env.service'
 import { Auth } from '../decorators/auth.decorator'
 
@@ -48,6 +49,14 @@ export class OAuthController {
     @Req() req: Request,
     @Res() res: Response
   ): Promise<void> {
+    if (!code || !state) {
+      throw new AppException(
+        'Missing code or state parameter',
+        HttpStatus.BAD_REQUEST,
+        AuthErrorCode.OAUTH_STATE_INVALID
+      )
+    }
+
     const result = await this.oauthService.handleCallback(provider, code, state, {
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
