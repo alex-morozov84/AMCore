@@ -19,6 +19,7 @@ const mockUser = (overrides: Partial<User> = {}): User =>
     passwordHash: null,
     name: 'Test User',
     avatarUrl: null,
+    phone: null,
     locale: 'ru',
     timezone: 'Europe/Moscow',
     systemRole: 'USER' as never,
@@ -35,6 +36,7 @@ const mockProfile = {
   emailVerified: true,
   displayName: 'Test User',
   avatarUrl: null,
+  phone: null,
 }
 
 describe('OAuthService', () => {

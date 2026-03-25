@@ -310,6 +310,7 @@ export class AuthService {
     emailVerified: boolean
     name: string | null
     avatarUrl: string | null
+    phone: string | null
     locale: string
     timezone: string
     createdAt: Date
@@ -321,6 +322,7 @@ export class AuthService {
       emailVerified: user.emailVerified,
       name: user.name,
       avatarUrl: user.avatarUrl,
+      phone: user.phone,
       locale: user.locale,
       timezone: user.timezone,
       createdAt: user.createdAt.toISOString(),

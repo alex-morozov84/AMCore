@@ -78,6 +78,7 @@ export const userResponseSchema = z.object({
   emailVerified: z.boolean(),
   name: z.string().nullable(),
   avatarUrl: z.string().nullable(),
+  phone: z.string().nullable(),
   locale: z.string(),
   timezone: z.string(),
   createdAt: z.iso.datetime(),

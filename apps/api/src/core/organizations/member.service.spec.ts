@@ -29,6 +29,7 @@ describe('MemberService', () => {
     passwordHash: null,
     name: null,
     avatarUrl: null,
+    phone: null,
     locale: 'ru',
     timezone: 'Europe/Moscow',
     systemRole: 'USER',

@@ -10,6 +10,7 @@ enum OAuthProvider {
   GOOGLE
   GITHUB
   APPLE
+  TELEGRAM
 
   @@schema("core")
 }
@@ -40,6 +41,7 @@ model User {
   passwordHash  String?
   name          String?
   avatarUrl     String?
+  phone         String?   @unique
   locale        String    @default("ru")
   timezone      String    @default("Europe/Moscow")
 

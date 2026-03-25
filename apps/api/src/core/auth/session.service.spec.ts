@@ -18,6 +18,7 @@ describe('SessionService', () => {
     passwordHash: 'hashed-password',
     name: 'Test User',
     avatarUrl: null,
+    phone: null,
     locale: 'ru',
     timezone: 'Europe/Moscow',
     createdAt: new Date('2024-01-01'),

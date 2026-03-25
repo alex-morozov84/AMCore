@@ -19,6 +19,7 @@ describe('UserCacheService', () => {
     passwordHash: 'hashedPassword',
     name: 'Test User',
     avatarUrl: null,
+    phone: null,
     locale: 'ru',
     timezone: 'Europe/Moscow',
     createdAt: new Date(),

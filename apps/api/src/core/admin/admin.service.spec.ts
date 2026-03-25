@@ -22,6 +22,7 @@ describe('AdminService', () => {
     passwordHash: null,
     name: 'Test User',
     avatarUrl: null,
+    phone: null,
     locale: 'ru',
     timezone: 'Europe/Moscow',
     systemRole: 'USER',

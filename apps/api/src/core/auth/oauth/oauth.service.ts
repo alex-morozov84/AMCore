@@ -158,6 +158,7 @@ export class OAuthService {
       emailVerified: user.emailVerified,
       name: user.name,
       avatarUrl: user.avatarUrl,
+      phone: user.phone,
       locale: user.locale,
       timezone: user.timezone,
       createdAt: user.createdAt.toISOString(),
