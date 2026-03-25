@@ -93,13 +93,11 @@ describe('OAuthService', () => {
 
     stateService = {
       store: jest.fn().mockResolvedValue(undefined),
-      consume: jest
-        .fn()
-        .mockResolvedValue({
-          provider: 'google',
-          codeVerifier: 'verifier',
-          mode: 'login',
-        } as OAuthStateData),
+      consume: jest.fn().mockResolvedValue({
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+      } as OAuthStateData),
     }
 
     service = new OAuthService(
