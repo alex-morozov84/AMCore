@@ -24,6 +24,8 @@ const envSchema = z.object({
   APPLE_KEY_ID: z.string().optional(),
   APPLE_PRIVATE_KEY: z.string().optional(),
   APPLE_CALLBACK_URL: z.url().optional(),
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_CALLBACK_URL: z.url().optional(),
   // Email Service
   EMAIL_PROVIDER: z.enum(['resend', 'mock']).default('mock'),
   RESEND_API_KEY: z.string().optional(),

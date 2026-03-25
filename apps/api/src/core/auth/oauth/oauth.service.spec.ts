@@ -95,7 +95,11 @@ describe('OAuthService', () => {
       store: jest.fn().mockResolvedValue(undefined),
       consume: jest
         .fn()
-        .mockResolvedValue({ provider: 'google', codeVerifier: 'verifier' } as OAuthStateData),
+        .mockResolvedValue({
+          provider: 'google',
+          codeVerifier: 'verifier',
+          mode: 'login',
+        } as OAuthStateData),
     }
 
     service = new OAuthService(
@@ -115,7 +119,11 @@ describe('OAuthService', () => {
       expect(providerFactory.get).toHaveBeenCalledWith('google')
       expect(stateService.store).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ provider: 'google', codeVerifier: expect.any(String) })
+        expect.objectContaining({
+          provider: 'google',
+          codeVerifier: expect.any(String),
+          mode: 'login',
+        })
       )
       expect(result.url).toContain('accounts.google.com')
     })
@@ -139,6 +147,7 @@ describe('OAuthService', () => {
 
       const result = await service.handleCallback('google', 'code', 'state', requestInfo)
 
+      if (result.mode !== 'login') throw new Error('Expected login result')
       expect(result.accessToken).toBe('jwt-access-token')
       expect(result.refreshToken).toBe('refresh-token-raw')
       expect(result.user.email).toBe('user@example.com')
@@ -158,6 +167,7 @@ describe('OAuthService', () => {
       stateService.consume.mockResolvedValue({
         provider: 'github',
         codeVerifier: 'v',
+        mode: 'login',
       } as OAuthStateData)
 
       await expect(
@@ -243,6 +253,70 @@ describe('OAuthService', () => {
           data: expect.objectContaining({ lastLoginAt: expect.any(Date) }),
         })
       )
+    })
+  })
+
+  describe('getLinkAuthorizationURL', () => {
+    it('should store state with mode=link and userId', async () => {
+      const result = await service.getLinkAuthorizationURL('telegram', 'user-42')
+
+      expect(stateService.store).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ provider: 'telegram', mode: 'link', userId: 'user-42' })
+      )
+      expect(result.url).toBeDefined()
+    })
+  })
+
+  describe('handleCallback (link mode)', () => {
+    const linkStateData: OAuthStateData = {
+      provider: 'telegram',
+      codeVerifier: 'verifier',
+      mode: 'link',
+      userId: 'user-42',
+    }
+
+    beforeEach(() => {
+      stateService.consume.mockResolvedValue(linkStateData)
+      mockProvider.getUserProfile.mockResolvedValue({
+        ...mockProfile,
+        provider: 'telegram',
+        email: null,
+        phone: '+79001234567',
+      })
+    })
+
+    it('should attach provider to user and return mode=link result', async () => {
+      const user = mockUser()
+      prisma.user.findUniqueOrThrow.mockResolvedValue(user)
+
+      const result = await service.handleCallback('telegram', 'code', 'state', requestInfo)
+
+      expect(result.mode).toBe('link')
+      expect(result.user.id).toBe(user.id)
+      expect(prisma.oAuthAccount.create).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ provider: 'GOOGLE' }) })
+      )
+      expect(userCacheService.invalidateUser).toHaveBeenCalledWith('user-42')
+    })
+
+    it('should throw OAUTH_ACCOUNT_ALREADY_LINKED if provider already linked to another user', async () => {
+      prisma.oAuthAccount.findUnique.mockResolvedValue({
+        userId: 'other-user',
+        provider: 'TELEGRAM',
+      })
+
+      await expect(
+        service.handleCallback('telegram', 'code', 'state', requestInfo)
+      ).rejects.toMatchObject({
+        errorCode: AuthErrorCode.OAUTH_ACCOUNT_ALREADY_LINKED,
+      })
+    })
+
+    it('should update phone on user when Telegram provides phone number', async () => {
+      await service.handleCallback('telegram', 'code', 'state', requestInfo)
+
+      expect(prisma.$transaction).toHaveBeenCalled()
     })
   })
 })

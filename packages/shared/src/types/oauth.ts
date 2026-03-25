@@ -6,6 +6,7 @@ export interface OAuthUserProfile {
   emailVerified: boolean
   displayName: string | null
   avatarUrl: string | null
+  phone?: string | null
 }
 
 /** Tokens received from OAuth provider */

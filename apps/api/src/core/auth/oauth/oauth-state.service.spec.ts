@@ -6,7 +6,7 @@ describe('OAuthStateService', () => {
   let mockCache: { get: jest.Mock; set: jest.Mock; del: jest.Mock }
 
   const state = 'random-state-abc123'
-  const data: OAuthStateData = { provider: 'google', codeVerifier: 'verifier-xyz' }
+  const data: OAuthStateData = { provider: 'google', codeVerifier: 'verifier-xyz', mode: 'login' }
 
   beforeEach(() => {
     mockCache = {

@@ -10,6 +10,7 @@ import { AppleProvider } from './apple.provider'
 import { GitHubProvider } from './github.provider'
 import { GoogleProvider } from './google.provider'
 import type { OAuthProvider } from './oauth-provider.interface'
+import { TelegramProvider } from './telegram.provider'
 
 @Injectable()
 export class OAuthProviderFactory {
@@ -42,6 +43,7 @@ export class OAuthProviderFactory {
     this.tryRegisterGoogle()
     this.tryRegisterGitHub()
     this.tryRegisterApple()
+    this.tryRegisterTelegram()
   }
 
   private tryRegisterGoogle(): void {
@@ -72,6 +74,22 @@ export class OAuthProviderFactory {
         clientSecret: this.env.get('GITHUB_CLIENT_SECRET')!,
         redirectUri: this.env.get('GITHUB_CALLBACK_URL')!,
       })
+    )
+  }
+
+  private tryRegisterTelegram(): void {
+    const botToken = this.env.get('TELEGRAM_BOT_TOKEN')
+    if (!botToken) return
+
+    this.providers.set(
+      'telegram',
+      new TelegramProvider(
+        {
+          botToken,
+          redirectUri: this.env.get('TELEGRAM_CALLBACK_URL')!,
+        },
+        this.oauthClient
+      )
     )
   }
 

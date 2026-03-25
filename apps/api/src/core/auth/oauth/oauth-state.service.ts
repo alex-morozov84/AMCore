@@ -7,6 +7,8 @@ const STATE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 export interface OAuthStateData {
   provider: string
   codeVerifier: string
+  mode: 'login' | 'link'
+  userId?: string
 }
 
 /**

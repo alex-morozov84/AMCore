@@ -14,11 +14,19 @@ import { UserCacheService } from '../user-cache.service'
 import { OAuthStateService } from './oauth-state.service'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory'
 
-interface AuthResult {
+interface LoginCallbackResult {
+  mode: 'login'
   user: UserResponse
   accessToken: string
   refreshToken: string
 }
+
+interface LinkCallbackResult {
+  mode: 'link'
+  user: UserResponse
+}
+
+type CallbackResult = LoginCallbackResult | LinkCallbackResult
 
 interface RequestInfo {
   userAgent?: string
@@ -43,7 +51,23 @@ export class OAuthService {
     const state = randomBytes(32).toString('base64url')
     const codeVerifier = randomBytes(32).toString('base64url')
 
-    await this.stateService.store(state, { provider: providerName, codeVerifier })
+    await this.stateService.store(state, { provider: providerName, codeVerifier, mode: 'login' })
+
+    const url = await provider.getAuthorizationURL(state, codeVerifier)
+    return { url: url.toString() }
+  }
+
+  async getLinkAuthorizationURL(providerName: string, userId: string): Promise<{ url: string }> {
+    const provider = this.providerFactory.get(providerName)
+    const state = randomBytes(32).toString('base64url')
+    const codeVerifier = randomBytes(32).toString('base64url')
+
+    await this.stateService.store(state, {
+      provider: providerName,
+      codeVerifier,
+      mode: 'link',
+      userId,
+    })
 
     const url = await provider.getAuthorizationURL(state, codeVerifier)
     return { url: url.toString() }
@@ -54,7 +78,7 @@ export class OAuthService {
     code: string,
     state: string,
     requestInfo: RequestInfo
-  ): Promise<AuthResult> {
+  ): Promise<CallbackResult> {
     const stateData = await this.stateService.consume(state)
     if (!stateData || stateData.provider !== providerName) {
       throw new AppException(
@@ -67,6 +91,12 @@ export class OAuthService {
     const provider = this.providerFactory.get(providerName)
     const tokens = await provider.exchangeCode(code, stateData.codeVerifier)
     const profile = await provider.getUserProfile(tokens)
+
+    if (stateData.mode === 'link') {
+      const user = await this.attachProviderToUser(stateData.userId!, profile, providerName)
+      this.logger.log({ msg: 'oauth link', userId: stateData.userId, provider: providerName })
+      return { mode: 'link', user: this.mapUserToResponse(user) }
+    }
 
     if (!profile.email) {
       throw new AppException(
@@ -91,7 +121,39 @@ export class OAuthService {
 
     this.logger.log({ msg: 'oauth login', userId: user.id, provider: providerName })
 
-    return { user: this.mapUserToResponse(user), accessToken, refreshToken }
+    return { mode: 'login', user: this.mapUserToResponse(user), accessToken, refreshToken }
+  }
+
+  private async attachProviderToUser(
+    userId: string,
+    profile: OAuthUserProfile,
+    providerName: string
+  ): Promise<User> {
+    const provider = providerName.toUpperCase() as OAuthProvider
+
+    const existing = await this.prisma.oAuthAccount.findUnique({
+      where: { provider_providerAccountId: { provider, providerAccountId: profile.providerId } },
+    })
+    if (existing) {
+      throw new AppException(
+        'This account is already linked to another user',
+        HttpStatus.CONFLICT,
+        AuthErrorCode.OAUTH_ACCOUNT_ALREADY_LINKED
+      )
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.oAuthAccount.create({
+        data: { userId, provider, providerAccountId: profile.providerId },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { ...(profile.phone ? { phone: profile.phone } : {}) },
+      }),
+    ])
+
+    await this.userCacheService.invalidateUser(userId)
+    return this.prisma.user.findUniqueOrThrow({ where: { id: userId } })
   }
 
   private async findOrCreateUser(profile: OAuthUserProfile, providerName: string): Promise<User> {

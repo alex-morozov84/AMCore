@@ -104,7 +104,11 @@ describe('OAuth (e2e)', () => {
 
     it('should create new user and redirect on valid callback', async () => {
       const state = 'valid-state-new-user'
-      await stateService.store(state, { provider: 'google', codeVerifier: 'test-verifier' })
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
 
       const res = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
@@ -128,7 +132,11 @@ describe('OAuth (e2e)', () => {
 
     it('should set refresh_token cookie on successful callback', async () => {
       const state = 'valid-state-cookie'
-      await stateService.store(state, { provider: 'google', codeVerifier: 'test-verifier' })
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
 
       const res = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
@@ -144,14 +152,22 @@ describe('OAuth (e2e)', () => {
     it('should login existing OAuth user without creating duplicate', async () => {
       // First login — creates user
       const state1 = 'valid-state-first'
-      await stateService.store(state1, { provider: 'google', codeVerifier: 'verifier-1' })
+      await stateService.store(state1, {
+        provider: 'google',
+        codeVerifier: 'verifier-1',
+        mode: 'login',
+      })
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state1}`)
         .expect(302)
 
       // Second login — same OAuth account
       const state2 = 'valid-state-second'
-      await stateService.store(state2, { provider: 'google', codeVerifier: 'verifier-2' })
+      await stateService.store(state2, {
+        provider: 'google',
+        codeVerifier: 'verifier-2',
+        mode: 'login',
+      })
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state2}`)
         .expect(302)
@@ -173,7 +189,11 @@ describe('OAuth (e2e)', () => {
 
       // OAuth login with same email — should link, not create new user
       const state = 'valid-state-link'
-      await stateService.store(state, { provider: 'google', codeVerifier: 'verifier' })
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+      })
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
         .expect(302)
@@ -200,7 +220,11 @@ describe('OAuth (e2e)', () => {
 
       // OAuth login with emailVerified: true — should update user
       const state = 'valid-state-verify'
-      await stateService.store(state, { provider: 'google', codeVerifier: 'verifier' })
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+      })
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
         .expect(302)
@@ -218,7 +242,11 @@ describe('OAuth (e2e)', () => {
       )
 
       const state = 'valid-state-no-email'
-      await stateService.store(state, { provider: 'google', codeVerifier: 'verifier' })
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+      })
 
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
@@ -228,7 +256,11 @@ describe('OAuth (e2e)', () => {
     it('should return 400 when state provider does not match URL', async () => {
       // Store state for 'github' but call callback for 'google'
       const state = 'valid-state-mismatch'
-      await stateService.store(state, { provider: 'github', codeVerifier: 'verifier' })
+      await stateService.store(state, {
+        provider: 'github',
+        codeVerifier: 'verifier',
+        mode: 'login',
+      })
 
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
@@ -237,7 +269,11 @@ describe('OAuth (e2e)', () => {
 
     it('should prevent state replay (one-time use)', async () => {
       const state = 'valid-state-replay'
-      await stateService.store(state, { provider: 'google', codeVerifier: 'verifier' })
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+      })
 
       // First use — success
       await request(app.getHttpServer())

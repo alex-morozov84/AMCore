@@ -7,6 +7,7 @@ import { AuthErrorCode, AuthType } from '@amcore/shared'
 import { AppException } from '../../../common/exceptions'
 import { EnvService } from '../../../env/env.service'
 import { Auth } from '../decorators/auth.decorator'
+import { CurrentUser } from '../decorators/current-user.decorator'
 
 import { OAuthService } from './oauth.service'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory'
@@ -33,9 +34,21 @@ export class OAuthController {
 
   @Get(':provider')
   @Auth(AuthType.None)
-  @ApiOperation({ summary: 'Redirect to OAuth provider' })
+  @ApiOperation({ summary: 'Redirect to OAuth provider for login' })
   async authorize(@Param('provider') provider: string, @Res() res: Response): Promise<void> {
     const { url } = await this.oauthService.getAuthorizationURL(provider)
+    res.redirect(url)
+  }
+
+  @Get(':provider/link')
+  @Auth(AuthType.Bearer)
+  @ApiOperation({ summary: 'Redirect to OAuth provider to link account' })
+  async link(
+    @Param('provider') provider: string,
+    @CurrentUser('sub') userId: string,
+    @Res() res: Response
+  ): Promise<void> {
+    const { url } = await this.oauthService.getLinkAuthorizationURL(provider, userId)
     res.redirect(url)
   }
 
@@ -62,15 +75,19 @@ export class OAuthController {
       ipAddress: req.ip,
     })
 
-    res.cookie('refresh_token', result.refreshToken, {
-      httpOnly: true,
-      secure: this.env.get('NODE_ENV') === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
-
     const frontendUrl = this.env.get('FRONTEND_URL')
-    res.redirect(`${frontendUrl}/auth/callback?token=${result.accessToken}`)
+
+    if (result.mode === 'login') {
+      res.cookie('refresh_token', result.refreshToken, {
+        httpOnly: true,
+        secure: this.env.get('NODE_ENV') === 'production',
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      })
+      res.redirect(`${frontendUrl}/auth/callback?token=${result.accessToken}`)
+    } else {
+      res.redirect(`${frontendUrl}/settings/linked-accounts?linked=${provider}`)
+    }
   }
 }
