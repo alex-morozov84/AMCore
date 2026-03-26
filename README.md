@@ -1,141 +1,153 @@
 # AMCore
 
 > Modular personal productivity platform — fitness, finance, subscriptions.
+> Built on a production-ready NestJS API starter.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](LICENSE)
 [![CI](https://github.com/alex-morozov84/AMCore/actions/workflows/ci.yml/badge.svg)](https://github.com/alex-morozov84/AMCore/actions/workflows/ci.yml)
 
 ## Overview
 
-AMCore is a modular web application for personal productivity, built with modern technologies and clean architecture. Currently in active development.
+AMCore is a modular web application for personal productivity. The backend is designed as an exemplary open-source NestJS starter — production-ready, well-tested, and easy to fork.
 
-### Modules
+### Application Modules
 
 | Module            | Status     | Description                                         |
 | ----------------- | ---------- | --------------------------------------------------- |
-| **Fitness**       | 🚧 Phase 1 | Workout tracking, exercise library, progress charts |
+| **Fitness**       | 🚧 Next    | Workout tracking, exercise library, progress charts |
 | **Finance**       | 📋 Planned | Wallet management, transaction tracking             |
 | **Subscriptions** | 📋 Planned | Subscription monitoring, reminders                  |
 
 ## Tech Stack
 
-| Layer            | Technology                                                 |
-| ---------------- | ---------------------------------------------------------- |
-| **Backend**      | NestJS 10, PostgreSQL 16, Prisma 7, Redis, BullMQ          |
-| **Email**        | Resend, React Email 5, FormatJS (i18n)                     |
-| **Frontend**     | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui            |
-| **Architecture** | Feature-Sliced Design (FSD)                                |
-| **Monorepo**     | pnpm, Turborepo                                            |
-| **Testing**      | Jest 30 (backend), Vitest 4 (frontend + email integration) |
+| Layer            | Technology                                                          |
+| ---------------- | ------------------------------------------------------------------- |
+| **Backend**      | NestJS 10, PostgreSQL 16, Prisma 6, Redis, BullMQ                   |
+| **Auth**         | JWT + Refresh Tokens, OAuth 2.0 / OIDC, API Keys                    |
+| **Email**        | Resend, React Email 5, FormatJS i18n                                |
+| **Frontend**     | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui                     |
+| **Architecture** | Feature-Sliced Design (FSD)                                         |
+| **Monorepo**     | pnpm workspaces + Turborepo                                         |
+| **Testing**      | Jest 30 (backend), Vitest 4 (email templates), Testcontainers (E2E) |
 
 ## Project Structure
 
 ```
 amcore/
 ├── apps/
-│   ├── api/          # NestJS backend → See apps/api/README.md for architecture details
-│   └── web/          # Next.js frontend (FSD: app, views, features, entities, shared)
+│   ├── api/        # NestJS backend — see apps/api/README.md
+│   └── web/        # Next.js frontend (FSD)
 ├── packages/
-│   ├── shared/       # Zod schemas, types, constants (used by api + web)
-│   ├── eslint-config/# Shared ESLint configs
+│   ├── shared/     # Zod schemas, types, constants (used by api + web)
+│   ├── eslint-config/
 │   └── typescript-config/
-└── .github/          # CI, Dependabot, issue/PR templates
+├── docs/
+│   └── auth/       # Authentication & authorization documentation
+└── .github/        # CI, Dependabot, issue/PR templates
 ```
 
-**Documentation:**
+## API Starter — What's Built
 
-- [API Architecture](apps/api/README.md) — Backend design, error handling, logging
-- [Changelog](CHANGELOG.md) — Version history and release notes
-- [Contributing](CONTRIBUTING.md) — Development workflow and guidelines
+The backend is a fully-featured NestJS starter. Everything below is production-ready with tests.
 
-## Development Progress
+### Foundation
 
-### Phase 0: Foundation
+- Monorepo setup (pnpm + Turborepo), multi-schema PostgreSQL, Redis
+- Environment validation (Zod, fails fast on startup)
+- 3-layer exception filters (domain → Prisma → HTTP → catch-all)
+- Structured logging with Pino: correlation ID, GDPR IP anonymization, sensitive data redaction
+- Graceful shutdown (SIGTERM/SIGINT, log flush)
+- Global rate limiting (10 req/s + 100 req/min via `@nestjs/throttler`)
+- Helmet, CORS, cookie parser
+- Swagger/OpenAPI at `/docs` (dev only)
+- CI/CD: lint, typecheck, test, build (4 parallel jobs), Dependabot
 
-| Task                                                | Status |
-| --------------------------------------------------- | ------ |
-| Repository & GitHub setup                           | ✅     |
-| Monorepo structure (pnpm + Turborepo)               | ✅     |
-| Tooling (ESLint, Prettier, Husky, commitlint)       | ✅     |
-| Backend bootstrap (NestJS, Prisma, Redis)           | ✅     |
-| Error handling & logging (Pino, correlation ID)     | ✅     |
-| CI/CD pipeline (lint, typecheck, test, build)       | ✅     |
-| Frontend bootstrap (Next.js 16, Tailwind, FSD)      | ✅     |
-| Shared packages                                     | ✅     |
-| Docker & deployment                                 | ✅     |
-| **Authentication** (JWT + refresh tokens)           | ✅     |
-| **Password Reset & Email Verification** (full flow) | ✅     |
-| **Redis Caching** (production-ready patterns)       | ✅     |
-| **Queue Infrastructure** (BullMQ)                   | ✅     |
-| **Email Service** (Resend + React Email + i18n)     | ✅     |
-| E2E testing infrastructure (TestContainers)         | ✅     |
+### Authentication
 
-**Highlights:**
+- Registration + login (Argon2id hashing)
+- JWT access tokens (15 min) + opaque refresh tokens (7 days, SHA-256 hashed in DB)
+- Refresh token rotation — old token destroyed on every use
+- `httpOnly` + `secure` + `sameSite=strict` cookie for refresh token
+- Session management: list, revoke one, revoke all, revoke others
+- Password reset flow: single-use token, 15 min expiry, invalidates all sessions
+- Email verification flow: single-use token, 48 h expiry
+- Account enumeration prevention on forgot-password and resend-verification
+- Login brute-force protection: per-IP (100/24 h) + per-email+IP (5/1 h → 15-min block)
+- Redis-based rate limiting for sensitive operations (3/hour per email)
 
-- **Authentication System:** JWT + refresh tokens, session management, cookie-based auth
-  - Password reset flow (forgot-password → reset-password)
-  - Email verification flow (verify-email → resend-verification)
-  - Rate limiting (3 req/hour per email via Redis)
-  - Account enumeration prevention, single-use tokens (SHA-256 hashed)
-  - All sessions invalidated on password reset
-  - Machine-readable error codes (`AuthErrorCode` enum in `packages/shared`)
-- **Redis Caching:** Production-ready user caching (50-100x faster auth)
-  - Cache-aside pattern with distributed locking (stampede protection)
-  - Tag-based invalidation (Redis Sets, not KEYS \*)
-  - Hybrid TTL (10 min) + explicit invalidation
-  - Comprehensive metrics tracking (hit/miss rate)
-- **Queue Infrastructure:** BullMQ for background jobs
-  - Default and Email queues with retry logic
-  - Bull Board dashboard at `/admin/queues`
-  - Exponential backoff and automatic cleanup
-- **Email Service:** Production-ready with multilingual support
-  - Resend (prod) / Mock (dev) provider pattern
-  - React Email templates (TypeScript + Tailwind)
-  - FormatJS i18n (RU/EN) - official React Email approach
-  - Templates: welcome, password-reset, email-verification, password-changed
-  - Async delivery via BullMQ (3 retries, exponential backoff)
-- **Production-ready error handling** with hierarchical exception filters
-- **Field-level validation errors** (Zod) with structured error responses
-- **Structured logging** with correlation ID tracking (GDPR-compliant)
-- **Business event logging** in services (AuthService, SessionService)
-- **Graceful shutdown** with native NestJS lifecycle hooks
-- **Enhanced Prisma error mapping** (8 error codes)
-- **Comprehensive testing:**
-  - 231 unit/integration tests (22 test suites)
-  - 39 E2E tests with TestContainers (real PostgreSQL + Redis)
-  - Two-framework approach: Jest for logic, Vitest for React Email rendering
+### OAuth 2.0 / OIDC
 
-### Coming Next
+- **Google** — OIDC via discovery, PKCE (S256)
+- **GitHub** — OAuth 2.0, verified primary email via `/user/emails`
+- **Apple** — Sign In with Apple, dynamic JWT client secret (P8 key)
+- **Telegram** — OIDC, link-only (no email), phone from ID token
+- Account linking: authenticated users can connect additional providers
+- State + PKCE stored in Redis (TTL 5 min, one-time use, CSRF protection)
+- Provider factory pattern — providers disabled automatically if env vars missing
 
-- Phase 1: Fitness Module MVP
-- Phase 2: Finance Module
-- Phase 3: Subscriptions Module
+### RBAC (Role-Based Access Control)
+
+- System roles: `USER` / `SUPER_ADMIN`
+- Organization-scoped permissions via CASL + DB-backed roles
+- `PermissionsCacheService` — Redis cache with `aclVersion` invalidation
+- `AbilityFactory` — builds CASL abilities with condition interpolation (`${user.id}`)
+- Decorators: `@Auth()`, `@CheckPolicies()`, `@SystemRoles()`, `@CurrentUser()`
+- Organizations module: create, invite members, assign roles, switch context
+- Admin module: user/org management, promote to SUPER_ADMIN
+
+### API Keys
+
+- Long-lived scoped tokens for server-to-server access
+- Dual-token format: `amk_{shortToken}_{longToken}` (shortToken plain for O(1) lookup, longToken SHA-256 hashed)
+- Scopes: `action:subject` format, intersected with user's org permissions
+- Lazy `lastUsedAt` update via Redis gate (no hot row contention)
+- Nightly cleanup of expired keys
+
+### Infrastructure
+
+- **Email** — Resend (prod) / Mock (dev), React Email templates, FormatJS i18n (RU/EN), BullMQ delivery
+- **Queue** — BullMQ, multiple queues, Bull Board at `/admin/queues` (SUPER_ADMIN only)
+- **Cache** — Cache-aside with distributed locking (stampede protection), tag-based invalidation
+- **Health Checks** — `/health`, `/health/startup`, `/health/ready`, `/health/live` (Kubernetes-ready)
+- **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys)
+
+### Tests
+
+- **462 total:** 382 unit (40 suites) + 80 E2E (5 suites via Testcontainers)
+- E2E suites: auth, organizations, admin, api-keys, oauth
+- Email templates: Vitest integration tests (real rendering, RU/EN)
+
+### Documentation
+
+- [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
+- [`docs/authorization.md`](docs/authorization.md) — Authorization guide
+- [`apps/api/README.md`](apps/api/README.md) — Backend architecture
 
 ## Quick Start
 
 ```bash
 # Prerequisites: Node.js 20+, pnpm 9+, Docker
 
-# Clone and install
 git clone https://github.com/alex-morozov84/AMCore.git
 cd AMCore
 pnpm install
 
-# Start infrastructure (PostgreSQL, Redis)
+# Start PostgreSQL + Redis
 docker compose up -d
 
-# Copy environment variables
+# Configure environment
 cp .env.example .env
-cp apps/web/.env.example apps/web/.env.local
 
-# Run database migrations
+# Run migrations
 pnpm --filter api db:migrate
 
-# Start development servers
+# Start development
 pnpm dev
 ```
 
-Before contributing, see [CONTRIBUTING.md](CONTRIBUTING.md).
+API runs at `http://localhost:3001`, Swagger UI at `http://localhost:3001/docs`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
 ## Author
 

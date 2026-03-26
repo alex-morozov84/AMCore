@@ -16,11 +16,23 @@ Thanks for your interest in contributing. This document explains how to set up t
 | `pnpm build`        | Build all apps             |
 | `pnpm lint`         | Run ESLint                 |
 | `pnpm typecheck`    | Run TypeScript check       |
-| `pnpm test`         | Run all tests              |
+| `pnpm test`         | Run all unit tests         |
 | `pnpm format:check` | Check Prettier formatting  |
 | `pnpm format`       | Format code with Prettier  |
 
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
+
+### API-specific test commands
+
+| Command                                           | Description                                      |
+| ------------------------------------------------- | ------------------------------------------------ |
+| `pnpm --filter api test`                          | All unit tests                                   |
+| `pnpm --filter api test -- path/to/file.spec.ts`  | Single test file                                 |
+| `pnpm --filter api test:e2e`                      | All E2E tests (requires Docker — Testcontainers) |
+| `pnpm --filter api test:e2e -- oauth.e2e-spec.ts` | Single E2E suite                                 |
+| `pnpm --filter api test:email`                    | Email template integration tests (Vitest)        |
+
+> **Note:** Never use `npx jest` directly for E2E tests — the `test:e2e` script sets `NODE_OPTIONS='--experimental-vm-modules'` required for ESM packages.
 
 ## Commit Messages
 
