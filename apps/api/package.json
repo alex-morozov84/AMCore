@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@amcore/shared": "workspace:^",
-    "@bull-board/api": "^6.20.3",
+    "@bull-board/api": "^6.20.6",
     "@bull-board/express": "^6.20.3",
     "@bull-board/nestjs": "^6.20.3",
     "@casl/ability": "^6.8.0",
