@@ -1,10 +1,9 @@
-import {
-  DiskHealthIndicator,
-  HealthCheckService,
-  HttpHealthIndicator,
-  MemoryHealthIndicator,
-} from '@nestjs/terminus'
+import { DiskHealthIndicator, HealthCheckService, MemoryHealthIndicator } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
+
+import { AuthType } from '@amcore/shared'
+
+import { AUTH_TYPE_KEY } from '@/core/auth/decorators/auth.decorator'
 
 import { HealthController } from './health.controller'
 import { PrismaHealthIndicator } from './indicators/prisma.health'
@@ -52,12 +51,6 @@ describe('HealthController', () => {
             checkHeap: jest.fn(),
           },
         },
-        {
-          provide: HttpHealthIndicator,
-          useValue: {
-            pingCheck: jest.fn(),
-          },
-        },
       ],
     }).compile()
 
@@ -71,6 +64,12 @@ describe('HealthController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined()
+  })
+
+  it('should be public for all health endpoints', () => {
+    const authTypes = Reflect.getMetadata(AUTH_TYPE_KEY, HealthController) as AuthType[]
+
+    expect(authTypes).toEqual([AuthType.None])
   })
 
   describe('startup', () => {
@@ -177,7 +176,7 @@ describe('HealthController', () => {
   })
 
   describe('check', () => {
-    it('should perform general health check', async () => {
+    it('should perform the same checks as readiness', async () => {
       const mockResult = {
         status: 'ok',
         info: {
@@ -209,7 +208,7 @@ describe('HealthController', () => {
         thresholdPercent: 0.9,
         path: '/',
       })
-      expect(memoryIndicator.checkHeap).toHaveBeenCalledWith('memory_heap', 300 * 1024 * 1024)
+      expect(memoryIndicator.checkHeap).toHaveBeenCalledWith('memory_heap', 1024 * 1024 * 1024)
     })
   })
 })

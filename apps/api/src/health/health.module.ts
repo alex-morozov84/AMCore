@@ -1,4 +1,3 @@
-import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
 import { TerminusModule } from '@nestjs/terminus'
 
@@ -11,7 +10,6 @@ import { PrismaModule } from '@/prisma/prisma.module'
 @Module({
   imports: [
     TerminusModule, // Provides HealthCheckService and built-in indicators
-    HttpModule, // Required for HttpHealthIndicator
     PrismaModule, // For database health checks
   ],
   controllers: [HealthController],

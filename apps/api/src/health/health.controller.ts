@@ -5,21 +5,24 @@ import {
   HealthCheck,
   HealthCheckResult,
   HealthCheckService,
-  HttpHealthIndicator,
   MemoryHealthIndicator,
 } from '@nestjs/terminus'
 import { SkipThrottle } from '@nestjs/throttler'
+
+import { AuthType } from '@amcore/shared'
+
+import { Auth } from '@/core/auth/decorators/auth.decorator'
 
 import { PrismaHealthIndicator } from './indicators/prisma.health'
 import { RedisHealthIndicator } from './indicators/redis.health'
 
 @ApiTags('health')
 @Controller('health')
+@Auth(AuthType.None)
 @SkipThrottle()
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
-    private readonly http: HttpHealthIndicator,
     private readonly prisma: PrismaHealthIndicator,
     private readonly redis: RedisHealthIndicator,
     private readonly disk: DiskHealthIndicator,
@@ -28,26 +31,15 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
-  @ApiOperation({ summary: 'General health check' })
-  @ApiResponse({ status: 200, description: 'Service is healthy' })
-  @ApiResponse({ status: 503, description: 'Service is unhealthy' })
+  @ApiOperation({ summary: 'General health summary (alias of readiness)' })
+  @ApiResponse({ status: 200, description: 'Service is healthy and ready to accept traffic' })
+  @ApiResponse({ status: 503, description: 'Service is not ready to accept traffic' })
   check(): Promise<HealthCheckResult> {
-    return this.health.check([
-      () => this.prisma.isHealthy('database'),
-      () => this.redis.isHealthy('redis'),
-      () =>
-        this.disk.checkStorage('disk', {
-          // 90% of disk space used is unhealthy
-          thresholdPercent: 0.9,
-          path: '/',
-        }),
-      // 300MB heap size is unhealthy
-      () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
-    ])
+    return this.health.check(this.getReadinessChecks())
   }
 
   /**
-   * STARTUP PROBE (NEW in 2025!)
+   * STARTUP PROBE
    *
    * Used by Kubernetes to detect when the application has successfully started.
    * Until this succeeds, liveness probe is disabled.
@@ -58,8 +50,8 @@ export class HealthController {
    * ```yaml
    * startupProbe:
    *   httpGet:
-   *     path: /health/startup
-   *     port: 3001
+   *     path: /api/v1/health/startup
+   *     port: 5002
    *   failureThreshold: 30      # 30 attempts
    *   periodSeconds: 10         # every 10 seconds
    *   # Max 300 seconds (5 minutes) to start
@@ -90,8 +82,8 @@ export class HealthController {
    * ```yaml
    * readinessProbe:
    *   httpGet:
-   *     path: /health/ready
-   *     port: 3001
+   *     path: /api/v1/health/ready
+   *     port: 5002
    *   initialDelaySeconds: 5
    *   periodSeconds: 5
    *   timeoutSeconds: 10        # Longer timeout for DB checks
@@ -103,18 +95,7 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Service is ready to accept traffic' })
   @ApiResponse({ status: 503, description: 'Service is not ready' })
   ready(): Promise<HealthCheckResult> {
-    // Full dependency check - ready for traffic?
-    return this.health.check([
-      () => this.prisma.isHealthy('database'),
-      () => this.redis.isHealthy('redis'),
-      () =>
-        this.disk.checkStorage('disk', {
-          thresholdPercent: 0.9,
-          path: '/',
-        }),
-      // 1GB heap size threshold (production-ready)
-      () => this.memory.checkHeap('memory_heap', 1024 * 1024 * 1024),
-    ])
+    return this.health.check(this.getReadinessChecks())
   }
 
   /**
@@ -130,8 +111,8 @@ export class HealthController {
    * ```yaml
    * livenessProbe:
    *   httpGet:
-   *     path: /health/live
-   *     port: 3001
+   *     path: /api/v1/health/live
+   *     port: 5002
    *   initialDelaySeconds: 0    # startupProbe protects this
    *   periodSeconds: 10
    *   timeoutSeconds: 1         # Fast timeout
@@ -149,5 +130,18 @@ export class HealthController {
       // Just check memory isn't completely exhausted
       () => this.memory.checkHeap('memory_heap', 1536 * 1024 * 1024), // 1.5GB (high threshold)
     ])
+  }
+
+  private getReadinessChecks(): Array<() => Promise<unknown>> {
+    return [
+      () => this.prisma.isHealthy('database'),
+      () => this.redis.isHealthy('redis'),
+      () =>
+        this.disk.checkStorage('disk', {
+          thresholdPercent: 0.9,
+          path: '/',
+        }),
+      () => this.memory.checkHeap('memory_heap', 1024 * 1024 * 1024),
+    ]
   }
 }

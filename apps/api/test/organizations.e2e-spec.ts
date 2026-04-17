@@ -30,7 +30,7 @@ describe('Organizations (e2e)', () => {
 
   beforeEach(async () => {
     await cleanOrgData(prisma)
-    await cleanDatabase(prisma, context.cache)
+    await cleanDatabase(prisma, context.cache, context.throttlerStorage)
   })
 
   /** Register a user and return their access token */

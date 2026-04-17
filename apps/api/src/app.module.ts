@@ -10,7 +10,6 @@ import { LoggerModule } from 'nestjs-pino'
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod'
 import { v4 as uuidv4 } from 'uuid'
 
-import { AppController } from './app.controller'
 import { createLoggingConfig } from './common/config'
 import {
   AllExceptionsFilter,
@@ -131,7 +130,7 @@ import { ShutdownService } from './shutdown.service'
     // Core: Admin (SUPER_ADMIN only)
     AdminModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [
     // Exception filters (order matters - registered first = applied last)
     {

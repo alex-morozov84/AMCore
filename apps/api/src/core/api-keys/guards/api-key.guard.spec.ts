@@ -57,6 +57,19 @@ describe('ApiKeyGuard', () => {
     })
   })
 
+  it('should allow api keys whose long token contains underscores', async () => {
+    apiKeysService.verifyByShortToken.mockResolvedValue(mockApiKey as never)
+
+    const context = createMockContext('Bearer amcore_live_abc12345_long_token_with_underscores')
+    const result = await guard.canActivate(context)
+
+    expect(result).toBe(true)
+    expect(apiKeysService.verifyByShortToken).toHaveBeenCalledWith(
+      'abc12345',
+      'long_token_with_underscores'
+    )
+  })
+
   it('should deny when no authorization header', async () => {
     const context = createMockContext()
     const result = await guard.canActivate(context)
@@ -72,7 +85,7 @@ describe('ApiKeyGuard', () => {
     expect(result).toBe(false)
   })
 
-  it('should deny when key has wrong number of parts', async () => {
+  it('should deny when key does not match expected format', async () => {
     const context = createMockContext('Bearer amcore_live_onlythreeparts')
     const result = await guard.canActivate(context)
 

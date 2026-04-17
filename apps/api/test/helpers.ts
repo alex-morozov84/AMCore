@@ -8,6 +8,7 @@ import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redi
 import type { Cache } from 'cache-manager'
 import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
+import { ThrottlerStorage } from '@nestjs/throttler'
 import { ZodValidationPipe } from 'nestjs-zod'
 
 import { AppModule } from '../src/app.module'
@@ -20,8 +21,14 @@ export interface E2ETestContext {
   app: INestApplication
   prisma: PrismaService
   cache: Cache
+  throttlerStorage: ThrottlerStorageState
   postgresContainer: StartedPostgreSqlContainer
   redisContainer: StartedRedisContainer
+}
+
+interface ThrottlerStorageState {
+  storage: Map<string, unknown>
+  timeoutIds: Map<string, NodeJS.Timeout[]>
 }
 
 /**
@@ -69,6 +76,7 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
   // Get Prisma service and cache
   const prisma = app.get(PrismaService)
   const cache = app.get<Cache>(CACHE_MANAGER)
+  const throttlerStorage = app.get<ThrottlerStorageState>(ThrottlerStorage as never)
 
   // Run migrations
   await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS core')
@@ -79,7 +87,7 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
   // Deploy migrations
   execSync('pnpm prisma migrate deploy', { stdio: 'inherit' })
 
-  return { app, prisma, cache, postgresContainer, redisContainer }
+  return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
 }
 
 /**
@@ -90,15 +98,52 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
  */
 export async function teardownE2ETest(context: E2ETestContext): Promise<void> {
   await context.app.close()
+  await closeCacheConnections(context.cache)
+  resetThrottlerStorage(context.throttlerStorage)
   await context.prisma.$disconnect()
-  await context.postgresContainer.stop()
-  await context.redisContainer.stop()
+  await Promise.all([
+    context.postgresContainer.stop({ timeout: 10_000 }),
+    context.redisContainer.stop({ timeout: 10_000 }),
+  ])
+  // Give underlying Docker/client sockets a moment to settle before Jest exits.
+  await new Promise((resolve) => setTimeout(resolve, 1_000))
+}
+
+async function closeCacheConnections(cache: Cache): Promise<void> {
+  type RedisClient = {
+    disconnect?: () => Promise<void> | void
+    quit?: () => Promise<void> | void
+  }
+  type KeyvStore = { _store?: KeyvAdapter; opts?: { store?: KeyvAdapter } }
+  type KeyvAdapter = { getClient?: () => Promise<RedisClient> }
+
+  const stores = (cache as unknown as { stores?: KeyvStore[] }).stores ?? []
+
+  for (const keyv of stores) {
+    const adapter = keyv._store ?? keyv.opts?.store
+    if (!adapter || typeof adapter.getClient !== 'function') continue
+
+    const client = await adapter.getClient()
+
+    if (typeof client.quit === 'function') {
+      await client.quit()
+      continue
+    }
+
+    if (typeof client.disconnect === 'function') {
+      await client.disconnect()
+    }
+  }
 }
 
 /**
  * Clean all tables in test database and reset Redis cache
  */
-export async function cleanDatabase(prisma: PrismaService, cache: Cache): Promise<void> {
+export async function cleanDatabase(
+  prisma: PrismaService,
+  cache: Cache,
+  throttlerStorage?: ThrottlerStorageState
+): Promise<void> {
   // Delete in correct order (respecting foreign keys)
   await prisma.passwordResetToken.deleteMany()
   await prisma.emailVerificationToken.deleteMany()
@@ -119,6 +164,21 @@ export async function cleanDatabase(prisma: PrismaService, cache: Cache): Promis
       await client.flushDb()
     }
   }
+
+  if (throttlerStorage) {
+    resetThrottlerStorage(throttlerStorage)
+  }
+}
+
+function resetThrottlerStorage(throttlerStorage: ThrottlerStorageState): void {
+  throttlerStorage.timeoutIds.forEach((timeouts) => {
+    for (const timeoutId of timeouts) {
+      clearTimeout(timeoutId)
+    }
+  })
+
+  throttlerStorage.timeoutIds.clear()
+  throttlerStorage.storage.clear()
 }
 
 /**

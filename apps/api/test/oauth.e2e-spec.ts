@@ -54,7 +54,7 @@ describe('OAuth (e2e)', () => {
   })
 
   beforeEach(async () => {
-    await cleanDatabase(prisma, context.cache)
+    await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     // Inject mock provider under 'google' name
     ;(providerFactory as unknown as { providers: Map<string, OAuthProvider> }).providers.set(
       'google',

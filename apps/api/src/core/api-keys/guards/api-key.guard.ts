@@ -39,11 +39,10 @@ export class ApiKeyGuard implements CanActivate {
     if (!authHeader?.startsWith('Bearer amcore_')) return null
 
     const fullKey = authHeader.slice(7) // remove "Bearer "
-    const parts = fullKey.split('_')
+    const match = /^amcore_(live|test)_([^_]+)_(.+)$/.exec(fullKey)
 
-    // expected: ['amcore', 'live', shortToken, longToken]
-    if (parts.length !== 4) return null
+    if (!match) return null
 
-    return { shortToken: parts[2]!, longToken: parts[3]! }
+    return { shortToken: match[2], longToken: match[3] }
   }
 }

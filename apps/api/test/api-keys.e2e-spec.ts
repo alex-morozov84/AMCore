@@ -30,7 +30,7 @@ describe('API Keys (e2e)', () => {
 
   beforeEach(async () => {
     await cleanOrgData(prisma)
-    await cleanDatabase(prisma, context.cache)
+    await cleanDatabase(prisma, context.cache, context.throttlerStorage)
   })
 
   async function registerAndGetToken(email: string, password = 'StrongP@ss123') {

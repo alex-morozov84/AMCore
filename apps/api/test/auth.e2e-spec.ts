@@ -45,7 +45,7 @@ describe('Auth (e2e)', () => {
   })
 
   beforeEach(async () => {
-    await cleanDatabase(prisma, context.cache)
+    await cleanDatabase(prisma, context.cache, context.throttlerStorage)
   })
 
   describe('POST /auth/register', () => {
