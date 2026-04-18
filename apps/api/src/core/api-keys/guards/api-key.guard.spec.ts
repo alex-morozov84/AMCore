@@ -42,11 +42,16 @@ describe('ApiKeyGuard', () => {
   it('should allow request with valid api key and populate request.user', async () => {
     apiKeysService.verifyByShortToken.mockResolvedValue(mockApiKey as never)
 
-    const context = createMockContext('Bearer amcore_live_abc12345_longTokenXYZ')
+    const context = createMockContext(
+      'Bearer amcore_live_abc12345xyz_12345678901234567890123456789012'
+    )
     const result = await guard.canActivate(context)
 
     expect(result).toBe(true)
-    expect(apiKeysService.verifyByShortToken).toHaveBeenCalledWith('abc12345', 'longTokenXYZ')
+    expect(apiKeysService.verifyByShortToken).toHaveBeenCalledWith(
+      'abc12345xyz',
+      '12345678901234567890123456789012'
+    )
 
     const request = context.switchToHttp().getRequest()
     expect(request.user).toEqual({
@@ -60,13 +65,15 @@ describe('ApiKeyGuard', () => {
   it('should allow api keys whose long token contains underscores', async () => {
     apiKeysService.verifyByShortToken.mockResolvedValue(mockApiKey as never)
 
-    const context = createMockContext('Bearer amcore_live_abc12345_long_token_with_underscores')
+    const context = createMockContext(
+      'Bearer amcore_live_abc_1234567_long_token_with_under_scores____'
+    )
     const result = await guard.canActivate(context)
 
     expect(result).toBe(true)
     expect(apiKeysService.verifyByShortToken).toHaveBeenCalledWith(
-      'abc12345',
-      'long_token_with_underscores'
+      'abc_1234567',
+      'long_token_with_under_scores____'
     )
   })
 
@@ -95,7 +102,9 @@ describe('ApiKeyGuard', () => {
   it('should deny when verification fails', async () => {
     apiKeysService.verifyByShortToken.mockResolvedValue(null)
 
-    const context = createMockContext('Bearer amcore_live_abc12345_badLongToken')
+    const context = createMockContext(
+      'Bearer amcore_live_abc12345xyz_12345678901234567890123456789012'
+    )
     const result = await guard.canActivate(context)
 
     expect(result).toBe(false)

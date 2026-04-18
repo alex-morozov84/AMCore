@@ -130,9 +130,8 @@ export class ApiKeysService {
     shortToken: string
     longToken: string
   } {
-    // Use hex so the persisted key format stays unambiguous when parsed from Authorization.
-    const shortToken = randomBytes(8).toString('hex')
-    const longToken = randomBytes(24).toString('hex')
+    const shortToken = randomBytes(8).toString('base64url')
+    const longToken = randomBytes(24).toString('base64url')
     const key = `amcore_${env}_${shortToken}_${longToken}`
     return { key, shortToken, longToken }
   }
