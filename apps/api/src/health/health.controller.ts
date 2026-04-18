@@ -5,16 +5,17 @@ import {
   HealthCheck,
   HealthCheckResult,
   HealthCheckService,
+  type HealthIndicatorFunction,
   MemoryHealthIndicator,
 } from '@nestjs/terminus'
 import { SkipThrottle } from '@nestjs/throttler'
 
 import { AuthType } from '@amcore/shared'
 
-import { Auth } from '@/core/auth/decorators/auth.decorator'
-
 import { PrismaHealthIndicator } from './indicators/prisma.health'
 import { RedisHealthIndicator } from './indicators/redis.health'
+
+import { Auth } from '@/core/auth/decorators/auth.decorator'
 
 @ApiTags('health')
 @Controller('health')
@@ -132,7 +133,7 @@ export class HealthController {
     ])
   }
 
-  private getReadinessChecks(): Array<() => Promise<unknown>> {
+  private getReadinessChecks(): HealthIndicatorFunction[] {
     return [
       () => this.prisma.isHealthy('database'),
       () => this.redis.isHealthy('redis'),

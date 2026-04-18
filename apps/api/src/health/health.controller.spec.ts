@@ -3,11 +3,11 @@ import { Test, TestingModule } from '@nestjs/testing'
 
 import { AuthType } from '@amcore/shared'
 
-import { AUTH_TYPE_KEY } from '@/core/auth/decorators/auth.decorator'
-
 import { HealthController } from './health.controller'
 import { PrismaHealthIndicator } from './indicators/prisma.health'
 import { RedisHealthIndicator } from './indicators/redis.health'
+
+import { AUTH_TYPE_KEY } from '@/core/auth/decorators/auth.decorator'
 
 describe('HealthController', () => {
   let controller: HealthController

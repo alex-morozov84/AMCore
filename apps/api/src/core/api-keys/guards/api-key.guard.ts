@@ -46,6 +46,9 @@ export class ApiKeyGuard implements CanActivate {
 
     if (!match) return null
 
-    return { shortToken: match[2], longToken: match[3] }
+    const shortToken = match[2]!
+    const longToken = match[3]!
+
+    return { shortToken, longToken }
   }
 }
