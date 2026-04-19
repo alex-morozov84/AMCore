@@ -328,8 +328,35 @@ describe('Auth (e2e)', () => {
       await agent.post('/auth/refresh').expect(200)
 
       const sessionsAfter = await prisma.session.findMany()
-      expect(sessionsAfter).toHaveLength(1)
-      expect(sessionsAfter[0]!.refreshToken).not.toBe(oldTokenHash)
+      expect(sessionsAfter).toHaveLength(2)
+
+      const activeSessions = sessionsAfter.filter((session) => session.revokedAt === null)
+      const revokedSessions = sessionsAfter.filter((session) => session.revokedAt !== null)
+
+      expect(activeSessions).toHaveLength(1)
+      expect(revokedSessions).toHaveLength(1)
+      expect(activeSessions[0]!.refreshToken).not.toBe(oldTokenHash)
+      expect(revokedSessions[0]!.refreshToken).toBe(oldTokenHash)
+      expect(revokedSessions[0]!.revocationReason).toBe('rotated')
+    })
+
+    it('should revoke the entire token family when an old rotated token is reused', async () => {
+      const firstRefresh = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Cookie', `refresh_token=${refreshToken}`)
+        .expect(200)
+
+      const rotatedRefreshToken = extractRefreshToken(firstRefresh)
+
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Cookie', `refresh_token=${refreshToken}`)
+        .expect(401)
+
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Cookie', `refresh_token=${rotatedRefreshToken}`)
+        .expect(401)
     })
   })
 
@@ -532,9 +559,9 @@ describe('Auth (e2e)', () => {
       // 4. Logout (agent automatically sends updated cookie from refresh)
       await agent.post('/auth/logout').expect(204)
 
-      // Verify session deleted
+      // Verify the current session is gone; rotated ancestors may remain for reuse detection
       const sessions = await prisma.session.findMany()
-      expect(sessions).toHaveLength(0)
+      expect(sessions.filter((session) => session.revokedAt === null)).toHaveLength(0)
     })
   })
 

@@ -89,10 +89,13 @@ model OAuthAccount {
 model Session {
   id           String   @id @default(cuid())
   userId       String
+  familyId     String
   refreshToken String   @unique // Hashed
   userAgent    String?
   ipAddress    String?
   expiresAt    DateTime
+  revokedAt    DateTime?
+  revocationReason String?
 
   createdAt DateTime @default(now())
 
@@ -100,6 +103,7 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([familyId])
   @@index([expiresAt])
   @@map("sessions")
   @@schema("core")

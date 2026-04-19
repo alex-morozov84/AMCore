@@ -28,17 +28,17 @@ One user can have many sessions (one per device). They're fully independent.
 
 ## Token rotation
 
-Every time you call `POST /auth/refresh`, the old refresh token is **immediately destroyed** and a new one is issued:
+Every time you call `POST /auth/refresh`, the old refresh token is **immediately revoked** and a new one is issued:
 
 ```
 Day 1:  Login → refresh_token = "abc123..."
-Day 3:  Refresh → old "abc123..." deleted → refresh_token = "xyz789..."
-Day 5:  Refresh → old "xyz789..." deleted → refresh_token = "qrs456..."
+Day 3:  Refresh → old "abc123..." revoked → refresh_token = "xyz789..."
+Day 5:  Refresh → old "xyz789..." revoked → refresh_token = "qrs456..."
 ```
 
 **Why this matters:** If someone intercepts your refresh token (from a log, a compromised network, etc.), they have a very short window to use it. The moment the real client refreshes, the stolen token becomes worthless.
 
-If a stolen token is used first, your next refresh attempt will fail — which is a signal that the token was stolen. The session gets invalidated.
+Revoked refresh tokens are kept briefly in the session family so the backend can detect replay. If a rotated token is used again, the whole token family is invalidated and the current session is signed out.
 
 ---
 
@@ -103,7 +103,7 @@ curl https://api.amcore.dev/api/v1/auth/sessions \
 }
 ```
 
-The `current: true` flag marks the session being used for this request.
+The `current: true` flag marks the session being used for this request. Revoked or expired refresh tokens are not listed here.
 
 ---
 

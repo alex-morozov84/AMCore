@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import type { Session, User } from '@prisma/client'
+import { randomBytes } from 'crypto'
 
 import { NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
@@ -10,6 +11,7 @@ interface CreateSessionParams {
   userId: string
   userAgent?: string
   ipAddress?: string
+  familyId?: string
 }
 
 export interface SessionInfo {
@@ -38,6 +40,7 @@ export class SessionService {
     const session = await this.prisma.session.create({
       data: {
         userId: params.userId,
+        familyId: params.familyId ?? this.generateSessionFamilyId(),
         refreshToken: hashedToken,
         userAgent: params.userAgent,
         ipAddress: params.ipAddress,
@@ -61,17 +64,110 @@ export class SessionService {
     })
   }
 
+  /** Validate refresh token and detect replay/reuse attempts. */
+  async validateRefreshToken(hashedToken: string): Promise<Session & { user: User }> {
+    const session = await this.findByRefreshToken(hashedToken)
+
+    if (!session) {
+      throw new UnauthorizedException('Invalid refresh token')
+    }
+
+    if (session.expiresAt < new Date()) {
+      await this.deleteByRefreshToken(hashedToken)
+      throw new UnauthorizedException('Refresh token expired')
+    }
+
+    if (session.revokedAt) {
+      if (session.revocationReason === 'rotated') {
+        await this.revokeTokenFamily(session.familyId, 'reuse-detected')
+      }
+
+      throw new UnauthorizedException('Refresh token is no longer valid')
+    }
+
+    return session
+  }
+
   /** Rotate refresh token (invalidate old, create new) */
   async rotateRefreshToken(oldHashedToken: string, params: CreateSessionParams): Promise<string> {
-    // Delete old session
-    await this.prisma.session.delete({
-      where: { refreshToken: oldHashedToken },
+    const refreshToken = this.tokenService.generateRefreshToken()
+    const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
+    const expiresAt = this.tokenService.getRefreshTokenExpiration()
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.session.findUnique({
+        where: { refreshToken: oldHashedToken },
+      })
+
+      if (!existing) {
+        throw new UnauthorizedException('Invalid refresh token')
+      }
+
+      if (existing.expiresAt < new Date()) {
+        await tx.session.deleteMany({
+          where: { refreshToken: oldHashedToken },
+        })
+        throw new UnauthorizedException('Refresh token expired')
+      }
+
+      if (existing.revokedAt) {
+        if (existing.revocationReason === 'rotated') {
+          await tx.session.updateMany({
+            where: {
+              familyId: existing.familyId,
+              revokedAt: null,
+            },
+            data: {
+              revokedAt: new Date(),
+              revocationReason: 'reuse-detected',
+            },
+          })
+        }
+
+        throw new UnauthorizedException('Refresh token is no longer valid')
+      }
+
+      const revokeResult = await tx.session.updateMany({
+        where: {
+          refreshToken: oldHashedToken,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+          revocationReason: 'rotated',
+        },
+      })
+
+      if (revokeResult.count === 0) {
+        await tx.session.updateMany({
+          where: {
+            familyId: existing.familyId,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: new Date(),
+            revocationReason: 'reuse-detected',
+          },
+        })
+
+        throw new UnauthorizedException('Refresh token is no longer valid')
+      }
+
+      await tx.session.create({
+        data: {
+          userId: params.userId,
+          familyId: existing.familyId,
+          refreshToken: hashedToken,
+          userAgent: params.userAgent,
+          ipAddress: params.ipAddress,
+          expiresAt,
+        },
+      })
     })
 
     this.logger.log('Refresh token rotated', { userId: params.userId })
 
-    // Create new session
-    return this.createSession(params)
+    return refreshToken
   }
 
   /** Delete session by refresh token hash */
@@ -84,7 +180,11 @@ export class SessionService {
   /** Get all sessions for user */
   async getUserSessions(userId: string, currentTokenHash?: string): Promise<SessionInfo[]> {
     const sessions = await this.prisma.session.findMany({
-      where: { userId },
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -145,5 +245,30 @@ export class SessionService {
     if (result.count > 0) {
       this.logger.log('Expired sessions cleaned up', { count: result.count })
     }
+  }
+
+  private async revokeTokenFamily(familyId: string, reason: string): Promise<void> {
+    const result = await this.prisma.session.updateMany({
+      where: {
+        familyId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        revocationReason: reason,
+      },
+    })
+
+    if (result.count > 0) {
+      this.logger.warn('Refresh token family revoked', {
+        familyId,
+        count: result.count,
+        reason,
+      })
+    }
+  }
+
+  private generateSessionFamilyId(): string {
+    return randomBytes(16).toString('hex')
   }
 }

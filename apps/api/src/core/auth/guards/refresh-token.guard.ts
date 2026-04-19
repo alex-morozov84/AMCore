@@ -20,20 +20,11 @@ export class RefreshTokenGuard implements CanActivate {
     const refreshToken = request.cookies?.refresh_token
 
     if (!refreshToken) {
-      throw new UnauthorizedException('Refresh token отсутствует')
+      throw new UnauthorizedException('Refresh token is missing')
     }
 
     const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
-    const session = await this.sessionService.findByRefreshToken(hashedToken)
-
-    if (!session) {
-      throw new UnauthorizedException('Сессия не найдена или истекла')
-    }
-
-    if (session.expiresAt < new Date()) {
-      await this.sessionService.deleteByRefreshToken(hashedToken)
-      throw new UnauthorizedException('Refresh token истёк')
-    }
+    const session = await this.sessionService.validateRefreshToken(hashedToken)
 
     // Присваиваем user и refreshTokenHash к request для использования в контроллере
     request.user = {

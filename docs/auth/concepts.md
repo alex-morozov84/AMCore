@@ -36,7 +36,7 @@ The server trusts this token if the signature is valid — no database lookup. T
 
 Think of it as a **membership card**. It's long-lived (7 days), stored in an `httpOnly` cookie (invisible to JavaScript), and the only thing it can do is get you a new access token.
 
-When you use it, the old one is immediately destroyed and a new one is issued. This is called **token rotation** — if someone steals an old refresh token, it's already worthless.
+When you use it, the old one is immediately revoked and a new one is issued. This is called **token rotation** — if someone steals an old refresh token, it's already worthless.
 
 The server stores a SHA-256 hash of your refresh token in the database. The raw token never touches disk.
 
@@ -80,7 +80,7 @@ POST /auth/refresh  (cookie sent automatically)
   ▼
 Backend:
   ├── validates refresh token against DB
-  ├── destroys old refresh token
+  ├── revokes old refresh token
   └── issues new access token + new refresh token (rotation)
 
   After 7 days → must log in again
