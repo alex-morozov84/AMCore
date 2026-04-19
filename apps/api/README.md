@@ -223,7 +223,7 @@ See `.env.example` in the repo root for the full list with descriptions.
 
 Required: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `FRONTEND_URL`
 
-OAuth (all optional, provider enabled only when set):
+OAuth (all optional, provider enabled only when fully configured; partial config fails at startup):
 
 - Google: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
 - GitHub: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`

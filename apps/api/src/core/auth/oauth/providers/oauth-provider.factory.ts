@@ -48,15 +48,17 @@ export class OAuthProviderFactory {
 
   private tryRegisterGoogle(): void {
     const clientId = this.env.get('GOOGLE_CLIENT_ID')
-    if (!clientId) return
+    const clientSecret = this.env.get('GOOGLE_CLIENT_SECRET')
+    const redirectUri = this.env.get('GOOGLE_CALLBACK_URL')
+    if (!clientId || !clientSecret || !redirectUri) return
 
     this.providers.set(
       'google',
       new GoogleProvider(
         {
           clientId,
-          clientSecret: this.env.get('GOOGLE_CLIENT_SECRET')!,
-          redirectUri: this.env.get('GOOGLE_CALLBACK_URL')!,
+          clientSecret,
+          redirectUri,
         },
         this.oauthClient
       )
@@ -65,28 +67,31 @@ export class OAuthProviderFactory {
 
   private tryRegisterGitHub(): void {
     const clientId = this.env.get('GITHUB_CLIENT_ID')
-    if (!clientId) return
+    const clientSecret = this.env.get('GITHUB_CLIENT_SECRET')
+    const redirectUri = this.env.get('GITHUB_CALLBACK_URL')
+    if (!clientId || !clientSecret || !redirectUri) return
 
     this.providers.set(
       'github',
       new GitHubProvider({
         clientId,
-        clientSecret: this.env.get('GITHUB_CLIENT_SECRET')!,
-        redirectUri: this.env.get('GITHUB_CALLBACK_URL')!,
+        clientSecret,
+        redirectUri,
       })
     )
   }
 
   private tryRegisterTelegram(): void {
     const botToken = this.env.get('TELEGRAM_BOT_TOKEN')
-    if (!botToken) return
+    const redirectUri = this.env.get('TELEGRAM_CALLBACK_URL')
+    if (!botToken || !redirectUri) return
 
     this.providers.set(
       'telegram',
       new TelegramProvider(
         {
           botToken,
-          redirectUri: this.env.get('TELEGRAM_CALLBACK_URL')!,
+          redirectUri,
         },
         this.oauthClient
       )
@@ -95,7 +100,11 @@ export class OAuthProviderFactory {
 
   private tryRegisterApple(): void {
     const clientId = this.env.get('APPLE_CLIENT_ID')
-    if (!clientId) return
+    const redirectUri = this.env.get('APPLE_CALLBACK_URL')
+    const teamId = this.env.get('APPLE_TEAM_ID')
+    const keyId = this.env.get('APPLE_KEY_ID')
+    const privateKey = this.env.get('APPLE_PRIVATE_KEY')
+    if (!clientId || !redirectUri || !teamId || !keyId || !privateKey) return
 
     this.providers.set(
       'apple',
@@ -103,10 +112,10 @@ export class OAuthProviderFactory {
         {
           clientId,
           clientSecret: '', // Apple uses dynamic JWT — generated from P8 key
-          redirectUri: this.env.get('APPLE_CALLBACK_URL')!,
-          teamId: this.env.get('APPLE_TEAM_ID')!,
-          keyId: this.env.get('APPLE_KEY_ID')!,
-          privateKey: this.env.get('APPLE_PRIVATE_KEY')!,
+          redirectUri,
+          teamId,
+          keyId,
+          privateKey,
         },
         this.oauthClient
       )
