@@ -12,6 +12,7 @@ import { ShutdownService } from './shutdown.service'
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true })
   const env = app.get(EnvService)
+  const isProduction = env.get('NODE_ENV') === 'production'
 
   // Use Pino logger
   const logger = app.get(Logger)
@@ -36,7 +37,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api/v1')
 
   // Swagger - only in development
-  if (env.get('NODE_ENV') !== 'production') {
+  if (!isProduction) {
     const config = new DocumentBuilder()
       .setTitle('AMCore API')
       .setDescription('AMCore API documentation')
@@ -57,7 +58,11 @@ async function bootstrap(): Promise<void> {
   await app.listen(port)
 
   logger.log(`🚀 API running on http://localhost:${port}`)
-  logger.log(`📚 Swagger docs: http://localhost:${port}/docs`)
+  if (!isProduction) {
+    logger.log(`📚 Swagger docs: http://localhost:${port}/docs`)
+  } else {
+    logger.log('📚 Swagger docs disabled in production')
+  }
 }
 
 bootstrap().catch((error) => {
