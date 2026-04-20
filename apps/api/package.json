@@ -62,7 +62,7 @@
     "bullmq": "^5.68.0",
     "cache-manager": "^7.2.8",
     "cookie-parser": "^1.4.7",
-    "dotenv": "^17.4.0",
+    "dotenv": "^17.4.2",
     "helmet": "^8.1.0",
     "jose": "^6.2.2",
     "nestjs-cls": "^6.2.0",
