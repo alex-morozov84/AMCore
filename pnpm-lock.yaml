@@ -132,8 +132,8 @@ importers:
         specifier: ^1.4.7
         version: 1.4.7
       dotenv:
-        specifier: ^17.4.0
-        version: 17.4.0
+        specifier: ^17.4.2
+        version: 17.4.2
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
@@ -4551,8 +4551,8 @@ packages:
     resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
     engines: {node: '>=12'}
 
-  dotenv@17.4.0:
-    resolution: {integrity: sha512-kCKF62fwtzwYm0IGBNjRUjtJgMfGapII+FslMHIjMR5KTnwEmBmWLDRSnc3XSNP8bNy34tekgQyDT0hr7pERRQ==}
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
@@ -12276,7 +12276,7 @@ snapshots:
 
   dotenv@17.2.3: {}
 
-  dotenv@17.4.0: {}
+  dotenv@17.4.2: {}
 
   dunder-proto@1.0.1:
     dependencies:
