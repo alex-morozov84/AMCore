@@ -15,6 +15,7 @@ describe('UserCacheService', () => {
   const mockUser: User = {
     id: 'user-123',
     email: 'test@example.com',
+    emailCanonical: 'test@example.com',
     emailVerified: true,
     passwordHash: 'hashedPassword',
     name: 'Test User',

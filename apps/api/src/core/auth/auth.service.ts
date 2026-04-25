@@ -11,6 +11,7 @@ import { EnvService } from '../../env/env.service'
 import { EmailService } from '../../infrastructure/email'
 import { PrismaService } from '../../prisma'
 
+import { EmailIdentityService } from './email-identity.service'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
@@ -40,15 +41,19 @@ export class AuthService {
     private readonly emailService: EmailService,
     private readonly userCacheService: UserCacheService,
     private readonly env: EnvService,
+    private readonly emailIdentity: EmailIdentityService,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly loginRateLimiter: LoginRateLimiterService
   ) {}
 
   /** Register new user */
   async register(input: RegisterInput, requestInfo: RequestInfo): Promise<AuthResult> {
+    const email = this.emailIdentity.normalizeForStorage(input.email)
+    const emailCanonical = this.emailIdentity.canonicalize(input.email)
+
     // Check if user exists
     const existing = await this.prisma.user.findUnique({
-      where: { email: input.email },
+      where: { emailCanonical },
     })
 
     if (existing) {
@@ -65,7 +70,8 @@ export class AuthService {
     // Create user
     const user = await this.prisma.user.create({
       data: {
-        email: input.email,
+        email,
+        emailCanonical,
         passwordHash,
         name: input.name,
         lastLoginAt: new Date(),
@@ -112,17 +118,18 @@ export class AuthService {
   /** Login user */
   async login(input: LoginInput, requestInfo: RequestInfo): Promise<AuthResult> {
     const ip = requestInfo.ipAddress ?? ''
+    const emailCanonical = this.emailIdentity.canonicalize(input.email)
 
     // Check brute-force limits before hitting DB
-    await this.loginRateLimiter.check(input.email, ip)
+    await this.loginRateLimiter.check(emailCanonical, ip)
 
     // Find user
     const user = await this.prisma.user.findUnique({
-      where: { email: input.email },
+      where: { emailCanonical },
     })
 
     if (!user || !user.passwordHash) {
-      await this.loginRateLimiter.consume(input.email, ip)
+      await this.loginRateLimiter.consume(emailCanonical, ip)
       throw new AppException(
         'Invalid email or password',
         HttpStatus.UNAUTHORIZED,
@@ -133,7 +140,7 @@ export class AuthService {
     // Verify password
     const valid = await argon2.verify(user.passwordHash, input.password)
     if (!valid) {
-      await this.loginRateLimiter.consume(input.email, ip)
+      await this.loginRateLimiter.consume(emailCanonical, ip)
       throw new AppException(
         'Invalid email or password',
         HttpStatus.UNAUTHORIZED,
@@ -142,7 +149,7 @@ export class AuthService {
     }
 
     // Reset rate limit counters on successful login
-    await this.loginRateLimiter.reset(input.email, ip)
+    await this.loginRateLimiter.reset(emailCanonical, ip)
 
     // Update last login
     await this.prisma.user.update({
@@ -189,9 +196,10 @@ export class AuthService {
 
   /** Send password reset email (silent fail for unknown emails) */
   async forgotPassword(email: string): Promise<void> {
-    await this.checkRateLimit(`forgot:${email}`, 3)
+    const emailCanonical = this.emailIdentity.canonicalize(email)
+    await this.checkRateLimit(`forgot:${emailCanonical}`, 3)
 
-    const user = await this.prisma.user.findUnique({ where: { email } })
+    const user = await this.prisma.user.findUnique({ where: { emailCanonical } })
     if (!user) return // Silent fail — prevent email enumeration
 
     const { token } = await this.tokenManager.generatePasswordResetToken(user.id)
@@ -199,8 +207,8 @@ export class AuthService {
     const resetUrl = `${this.env.get('FRONTEND_URL')}/reset-password?token=${token}`
     const expiresIn = `${this.env.get('PASSWORD_RESET_EXPIRY_MINUTES')} минут`
 
-    await this.emailService.sendPasswordResetEmail(email, {
-      name: user.name ?? email,
+    await this.emailService.sendPasswordResetEmail(user.email, {
+      name: user.name ?? user.email,
       resetUrl,
       expiresIn,
       locale: user.locale as 'ru' | 'en',
@@ -267,9 +275,10 @@ export class AuthService {
 
   /** Resend verification email (silent fail if already verified) */
   async resendVerificationEmail(email: string): Promise<void> {
-    await this.checkRateLimit(`resend-verification:${email}`, 3)
+    const emailCanonical = this.emailIdentity.canonicalize(email)
+    await this.checkRateLimit(`resend-verification:${emailCanonical}`, 3)
 
-    const user = await this.prisma.user.findUnique({ where: { email } })
+    const user = await this.prisma.user.findUnique({ where: { emailCanonical } })
     if (!user || user.emailVerified) return // Silent fail
 
     const { token } = await this.tokenManager.generateEmailVerificationToken(user.id)
@@ -277,8 +286,8 @@ export class AuthService {
     const verificationUrl = `${this.env.get('FRONTEND_URL')}/verify-email?token=${token}`
     const expiresIn = `${this.env.get('EMAIL_VERIFICATION_EXPIRY_HOURS')} часов`
 
-    await this.emailService.sendEmailVerificationEmail(email, {
-      name: user.name ?? email,
+    await this.emailService.sendEmailVerificationEmail(user.email, {
+      name: user.name ?? user.email,
       verificationUrl,
       expiresIn,
       locale: user.locale as 'ru' | 'en',

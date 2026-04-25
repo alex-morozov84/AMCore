@@ -35,15 +35,16 @@ enum SystemRole {
 // -----------------------------
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  passwordHash  String?
-  name          String?
-  avatarUrl     String?
-  phone         String?   @unique
-  locale        String    @default("ru")
-  timezone      String    @default("Europe/Moscow")
+  id             String    @id @default(cuid())
+  email          String
+  emailCanonical String    @unique
+  emailVerified  Boolean   @default(false)
+  passwordHash   String?
+  name           String?
+  avatarUrl      String?
+  phone          String?   @unique
+  locale         String    @default("ru")
+  timezone       String    @default("Europe/Moscow")
 
   // Timestamps
   createdAt   DateTime  @default(now())

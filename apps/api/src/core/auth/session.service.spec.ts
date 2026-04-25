@@ -14,6 +14,7 @@ describe('SessionService', () => {
   const mockUser: User = {
     id: 'user-123',
     email: 'test@example.com',
+    emailCanonical: 'test@example.com',
     emailVerified: false,
     passwordHash: 'hashed-password',
     name: 'Test User',

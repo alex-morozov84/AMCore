@@ -7,6 +7,7 @@ import type { OAuthProvider, User } from '@prisma/client'
 import { AuthErrorCode } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions'
+import { EmailIdentityService } from '../email-identity.service'
 
 import { OAuthService } from './oauth.service'
 import type { OAuthStateData } from './oauth-state.service'
@@ -15,6 +16,7 @@ const mockUser = (overrides: Partial<User> = {}): User =>
   ({
     id: 'user-1',
     email: 'user@example.com',
+    emailCanonical: 'user@example.com',
     emailVerified: true,
     passwordHash: null,
     name: 'Test User',
@@ -103,7 +105,8 @@ describe('OAuthService', () => {
       sessionService,
       userCacheService,
       providerFactory,
-      stateService
+      stateService,
+      new EmailIdentityService()
     )
   })
 
@@ -207,8 +210,26 @@ describe('OAuthService', () => {
 
       await service.handleCallback('google', 'code', 'state', requestInfo)
 
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { emailCanonical: 'user@example.com' },
+      })
       expect(prisma.$transaction).toHaveBeenCalled()
       expect(userCacheService.invalidateUser).toHaveBeenCalledWith(user.id)
+    })
+
+    it('should link OAuth account when provider returns mixed-case email', async () => {
+      const user = mockUser({ email: 'user@example.com' })
+      mockProvider.getUserProfile.mockResolvedValue({ ...mockProfile, email: 'User@Example.COM' })
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(user)
+      prisma.user.findUniqueOrThrow.mockResolvedValue(user)
+
+      await service.handleCallback('google', 'code', 'state', requestInfo)
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { emailCanonical: 'user@example.com' },
+      })
+      expect(prisma.user.create).not.toHaveBeenCalled()
     })
 
     it('should mark email as verified when provider confirms it', async () => {
@@ -233,6 +254,7 @@ describe('OAuthService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             email: mockProfile.email,
+            emailCanonical: mockProfile.email,
             emailVerified: true,
             accounts: expect.objectContaining({
               create: expect.objectContaining({ provider: 'GOOGLE' as OAuthProvider }),

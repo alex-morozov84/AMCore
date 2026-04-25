@@ -7,6 +7,7 @@ import { AuthErrorCode } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions'
 import { PrismaService } from '../../../prisma'
+import { EmailIdentityService } from '../email-identity.service'
 import { SessionService } from '../session.service'
 import type { AccessTokenPayload } from '../token.service'
 import { UserCacheService } from '../user-cache.service'
@@ -43,7 +44,8 @@ export class OAuthService {
     private readonly sessionService: SessionService,
     private readonly userCacheService: UserCacheService,
     private readonly providerFactory: OAuthProviderFactory,
-    private readonly stateService: OAuthStateService
+    private readonly stateService: OAuthStateService,
+    private readonly emailIdentity: EmailIdentityService
   ) {}
 
   async getAuthorizationURL(providerName: string): Promise<{ url: string }> {
@@ -177,7 +179,8 @@ export class OAuthService {
       return existing.user
     }
 
-    const userByEmail = await this.prisma.user.findUnique({ where: { email: profile.email! } })
+    const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
+    const userByEmail = await this.prisma.user.findUnique({ where: { emailCanonical } })
     if (userByEmail) {
       return this.linkAndReturnUser(userByEmail, profile, provider)
     }
@@ -207,9 +210,13 @@ export class OAuthService {
   }
 
   private createOAuthUser(profile: OAuthUserProfile, provider: OAuthProvider): Promise<User> {
+    const email = this.emailIdentity.normalizeForStorage(profile.email!)
+    const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
+
     return this.prisma.user.create({
       data: {
-        email: profile.email!,
+        email,
+        emailCanonical,
         emailVerified: profile.emailVerified,
         name: profile.displayName,
         avatarUrl: profile.avatarUrl,

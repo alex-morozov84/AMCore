@@ -12,6 +12,7 @@ import { ApiKeysModule } from '../api-keys/api-keys.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { AbilityFactory } from './casl/ability.factory'
+import { EmailIdentityService } from './email-identity.service'
 import {
   AuthenticationGuard,
   JwtAuthGuard,
@@ -53,6 +54,7 @@ import { UserCacheService } from './user-cache.service'
   controllers: [AuthController, OAuthController],
   providers: [
     AuthService,
+    EmailIdentityService,
     LoginRateLimiterService,
     OAuthClientService,
     OAuthLoginTicketService,
@@ -76,6 +78,6 @@ import { UserCacheService } from './user-cache.service'
     // Registered in AuthModule so it runs AFTER ThrottlerGuard (AppModule)
     { provide: APP_GUARD, useClass: AuthenticationGuard },
   ],
-  exports: [AuthService, UserCacheService, AbilityFactory, TokenService],
+  exports: [AuthService, UserCacheService, AbilityFactory, TokenService, EmailIdentityService],
 })
 export class AuthModule {}

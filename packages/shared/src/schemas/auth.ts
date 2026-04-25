@@ -1,12 +1,14 @@
 import { z } from 'zod'
 
+export const emailInputSchema = z.string().trim().pipe(z.email())
+
 // ===========================================
 // Request Schemas
 // ===========================================
 
 /** Registration request */
 export const registerSchema = z.object({
-  email: z.email(),
+  email: emailInputSchema,
   password: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/),
   name: z.string().min(2).optional(),
 })
@@ -15,7 +17,7 @@ export type RegisterInput = z.infer<typeof registerSchema>
 
 /** Login request */
 export const loginSchema = z.object({
-  email: z.email(),
+  email: emailInputSchema,
   password: z.string().min(1),
 })
 
@@ -40,7 +42,7 @@ export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
 
 /** Forgot password request */
 export const forgotPasswordSchema = z.object({
-  email: z.email(),
+  email: emailInputSchema,
 })
 
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
@@ -62,7 +64,7 @@ export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>
 
 /** Resend verification email request */
 export const resendVerificationSchema = z.object({
-  email: z.email(),
+  email: emailInputSchema,
 })
 
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>

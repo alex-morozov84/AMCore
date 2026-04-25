@@ -12,6 +12,7 @@ import {
   NotFoundException,
 } from '../../common/exceptions'
 import type { PrismaService } from '../../prisma'
+import { EmailIdentityService } from '../auth/email-identity.service'
 
 import type { InviteMemberDto } from './dto'
 import { MemberService } from './member.service'
@@ -25,6 +26,7 @@ describe('MemberService', () => {
   const mockUser: User = {
     id: 'user-2',
     email: 'invited@example.com',
+    emailCanonical: 'invited@example.com',
     emailVerified: false,
     passwordHash: null,
     name: null,
@@ -75,7 +77,8 @@ describe('MemberService', () => {
     orgsService = { bumpAclVersion: jest.fn().mockResolvedValue(undefined) }
     service = new MemberService(
       prisma as unknown as PrismaService,
-      orgsService as unknown as OrganizationsService
+      orgsService as unknown as OrganizationsService,
+      new EmailIdentityService()
     )
   })
 
@@ -93,8 +96,28 @@ describe('MemberService', () => {
       const result = await service.invite('org-1', dto, principal)
 
       expect(result).toEqual(mockMember)
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { emailCanonical: 'invited@example.com' },
+      })
       expect(prisma.$transaction).toHaveBeenCalled()
       expect(orgsService.bumpAclVersion).toHaveBeenCalledWith('org-1')
+    })
+
+    it('looks up invited user by canonical email', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUser)
+      prisma.orgMember.findUnique.mockResolvedValue(null)
+      prisma.role.findFirst.mockResolvedValue(mockMemberRole)
+      ;(prisma.$transaction as jest.Mock).mockResolvedValue(mockMember)
+
+      await service.invite(
+        'org-1',
+        { email: ' Invited@Example.COM ' } as InviteMemberDto,
+        principal
+      )
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { emailCanonical: 'invited@example.com' },
+      })
     })
 
     it('uses MEMBER system role when no roleId provided', async () => {

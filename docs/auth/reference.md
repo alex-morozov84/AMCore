@@ -7,6 +7,10 @@ Complete list of all auth endpoints with parameters and responses.
 **Auth header:** `Authorization: Bearer {accessToken}`
 **API key header:** `X-API-Key: {key}`
 
+**Email identity:** Email inputs are trimmed. Identity matching is
+case-insensitive through the server-side canonical email key, while API
+responses, JWT email claims, and outbound emails use the stored display email.
+
 ---
 
 ## Auth types per endpoint
@@ -26,11 +30,11 @@ Complete list of all auth endpoints with parameters and responses.
 
 #### `POST /auth/register` 🔓
 
-| Field      | Type   | Required | Description          |
-| ---------- | ------ | -------- | -------------------- |
-| `email`    | string | ✅       | Valid email address  |
-| `password` | string | ✅       | Minimum 8 characters |
-| `name`     | string | —        | Display name         |
+| Field      | Type   | Required | Description                                 |
+| ---------- | ------ | -------- | ------------------------------------------- |
+| `email`    | string | ✅       | Valid email address; trimmed before storage |
+| `password` | string | ✅       | Minimum 8 characters                        |
+| `name`     | string | —        | Display name                                |
 
 **Response** `200`:
 
@@ -45,8 +49,8 @@ Sets `refresh_token` cookie.
 #### `POST /auth/login` 🔓
 
 | Field      | Type   | Required |
-| ---------- | ------ | -------- |
-| `email`    | string | ✅       |
+| ---------- | ------ | -------- | -------------------------- |
+| `email`    | string | ✅       | Matched case-insensitively |
 | `password` | string | ✅       |
 
 **Response** `200`:
@@ -135,7 +139,7 @@ Revokes all sessions except the current one.
 | ------- | ------ | -------- |
 | `email` | string | ✅       |
 
-**Rate limit:** 3 requests per email per hour.
+**Rate limit:** 3 requests per canonical email per hour.
 
 **Response** `200` (always the same regardless of whether email exists):
 
@@ -176,7 +180,7 @@ Side effects: All sessions revoked.
 | ------- | ------ | -------- |
 | `email` | string | ✅       |
 
-**Rate limit:** 3 requests per email per hour.
+**Rate limit:** 3 requests per canonical email per hour.
 
 **Response** `200`:
 

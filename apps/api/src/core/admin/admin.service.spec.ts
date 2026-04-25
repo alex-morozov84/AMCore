@@ -18,6 +18,7 @@ describe('AdminService', () => {
   const mockUser: User = {
     id: 'user-1',
     email: 'user@example.com',
+    emailCanonical: 'user@example.com',
     emailVerified: false,
     passwordHash: null,
     name: 'Test User',

@@ -98,6 +98,12 @@ Backend:
 | OAuth            | Provider identity verified via OIDC/OAuth 2.0 |
 | API key          | Scoped token, hashed in DB                    |
 
+Email identity is case-insensitive inside AMCore. The original trimmed email is
+preserved as the display/contact address, while `emailCanonical` is the unique
+identity key used by auth, OAuth linking, account recovery, verification resend,
+organization member lookup, and email-scoped rate limits. AMCore does not apply
+provider-specific alias rules such as Gmail dot removal or plus-tag stripping.
+
 **Authorization** answers: "What can you do?"
 
 There are two independent layers:
@@ -129,12 +135,12 @@ Users who signed up via OAuth don't have a password — they can set one later t
 
 The login endpoint is rate-limited at two levels simultaneously:
 
-| Limit          | Threshold           | Window   | Penalty      |
-| -------------- | ------------------- | -------- | ------------ |
-| Per IP         | 100 failed attempts | 24 hours | Blocked      |
-| Per email + IP | 5 failed attempts   | 1 hour   | 15-min block |
+| Limit                    | Threshold           | Window   | Penalty      |
+| ------------------------ | ------------------- | -------- | ------------ |
+| Per IP                   | 100 failed attempts | 24 hours | Blocked      |
+| Per canonical email + IP | 5 failed attempts   | 1 hour   | 15-min block |
 
-The combination matters: the per-IP limit catches credential stuffing (many accounts, one IP), while the per-email+IP limit catches targeted attacks on a specific account.
+The combination matters: the per-IP limit catches credential stuffing (many accounts, one IP), while the per-canonical-email+IP limit catches targeted attacks on a specific account.
 
 On a successful login, both counters reset.
 

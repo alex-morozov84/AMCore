@@ -24,6 +24,12 @@ function hasRefreshTokenCookie(response: Response): boolean {
   return cookies ? cookies.some((c) => c.startsWith('refresh_token=')) : false
 }
 
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  const payload = token.split('.')[1]
+  if (!payload) throw new Error('Invalid JWT')
+  return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>
+}
+
 describe('Auth (e2e)', () => {
   let app: INestApplication
   let prisma: PrismaService
@@ -73,7 +79,7 @@ describe('Auth (e2e)', () => {
 
       // Verify user exists in database
       const user = await prisma.user.findUnique({
-        where: { email: 'newuser@example.com' },
+        where: { emailCanonical: 'newuser@example.com' },
       })
       expect(user).toBeDefined()
       expect(user?.name).toBe('New User')
@@ -107,6 +113,39 @@ describe('Auth (e2e)', () => {
         .expect(409)
 
       expect(response.body.message).toBeDefined()
+    })
+
+    it('should return 409 for duplicate email with different casing', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'CaseUser@Example.COM', password: 'StrongP@ss123' })
+        .expect(201)
+
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'caseuser@example.com', password: 'StrongP@ss123' })
+        .expect(409)
+    })
+
+    it('should trim email input while preserving display casing', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: '  Trimmed@Example.COM  ', password: 'StrongP@ss123' })
+        .expect(201)
+
+      expect(response.body.user.email).toBe('Trimmed@Example.COM')
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'trimmed@example.com' },
+      })
+      expect(user?.email).toBe('Trimmed@Example.COM')
+    })
+
+    it('should return 400 for whitespace-only email', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: '   ', password: 'StrongP@ss123' })
+        .expect(400)
     })
 
     it('should return 400 for invalid email', async () => {
@@ -183,6 +222,19 @@ describe('Auth (e2e)', () => {
       expect(hasRefreshTokenCookie(response)).toBe(true)
     })
 
+    it('should login with different email casing and keep display email in JWT', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: 'LOGIN@EXAMPLE.COM',
+          password: 'LoginP@ss123',
+        })
+        .expect(200)
+
+      expect(response.body.user.email).toBe('login@example.com')
+      expect(decodeJwtPayload(response.body.accessToken).email).toBe('login@example.com')
+    })
+
     it('should return 401 for wrong password', async () => {
       const response = await request(app.getHttpServer())
         .post('/auth/login')
@@ -209,7 +261,7 @@ describe('Auth (e2e)', () => {
 
     it('should update lastLoginAt timestamp', async () => {
       const userBefore = await prisma.user.findUnique({
-        where: { email: 'login@example.com' },
+        where: { emailCanonical: 'login@example.com' },
       })
       const lastLoginBefore = userBefore!.lastLoginAt
 
@@ -225,7 +277,7 @@ describe('Auth (e2e)', () => {
         .expect(200)
 
       const userAfter = await prisma.user.findUnique({
-        where: { email: 'login@example.com' },
+        where: { emailCanonical: 'login@example.com' },
       })
 
       expect(userAfter!.lastLoginAt!.getTime()).toBeGreaterThan(lastLoginBefore!.getTime())
@@ -589,6 +641,18 @@ describe('Auth (e2e)', () => {
       expect(response.body.message).toContain('If an account')
     })
 
+    it('should accept existing email with different casing', async () => {
+      await request(app.getHttpServer()).post('/auth/register').send({
+        email: 'ForgotCase@Example.COM',
+        password: 'ForgotP@ss123',
+      })
+
+      await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'forgotcase@example.com' })
+        .expect(200)
+    })
+
     it('should return 400 for invalid email format', async () => {
       const response = await request(app.getHttpServer())
         .post('/auth/forgot-password')
@@ -708,7 +772,9 @@ describe('Auth (e2e)', () => {
         password: 'VerifiedP@ss123',
       })
 
-      const user = await prisma.user.findUnique({ where: { email: 'alreadyverified@example.com' } })
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'alreadyverified@example.com' },
+      })
       const { token } = await tokenManager.generateEmailVerificationToken(user!.id)
       await request(app.getHttpServer()).post('/auth/verify-email').send({ token }).expect(204)
 
@@ -718,6 +784,18 @@ describe('Auth (e2e)', () => {
         .expect(200)
 
       expect(response.body.message).toContain('If the account')
+    })
+
+    it('should accept verification resend email with different casing', async () => {
+      await request(app.getHttpServer()).post('/auth/register').send({
+        email: 'VerifyCase@Example.COM',
+        password: 'VerifiedP@ss123',
+      })
+
+      await request(app.getHttpServer())
+        .post('/auth/resend-verification')
+        .send({ email: 'verifycase@example.com' })
+        .expect(200)
     })
 
     it('should return 400 for invalid email format', async () => {
@@ -801,6 +879,31 @@ describe('Auth (e2e)', () => {
       }
 
       // check() runs before DB lookup — correct password is still blocked
+      await request(app.getHttpServer()).post('/auth/login').send({ email, password }).expect(429)
+    })
+
+    it('should share rate-limit counters across email casing variants', async () => {
+      const email = 'brute-canonical@example.com'
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password })
+        .expect(201)
+
+      const variants = [
+        'BRUTE-CANONICAL@example.com',
+        'brute-canonical@EXAMPLE.COM',
+        'Brute-Canonical@example.com',
+        'brute-canonical@example.com',
+        'BRUTE-CANONICAL@EXAMPLE.COM',
+      ]
+
+      for (const variant of variants) {
+        await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email: variant, password: wrongPassword })
+          .expect(401)
+      }
+
       await request(app.getHttpServer()).post('/auth/login').send({ email, password }).expect(429)
     })
   })

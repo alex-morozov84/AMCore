@@ -6,6 +6,7 @@ import type { LoginInput, RegisterInput } from '@amcore/shared'
 import { AppException } from '../../common/exceptions'
 
 import { AuthService } from './auth.service'
+import { EmailIdentityService } from './email-identity.service'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { SessionService } from './session.service'
 import { createMockContext, type MockContext, mockContextToPrisma } from './test-context'
@@ -37,6 +38,7 @@ describe('AuthService', () => {
   const mockUser: User = {
     id: 'user-123',
     email: 'test@example.com',
+    emailCanonical: 'test@example.com',
     emailVerified: false,
     passwordHash: 'hashed-password-123',
     name: 'Test User',
@@ -131,6 +133,7 @@ describe('AuthService', () => {
       mockEmailService as never,
       mockUserCacheService as never,
       mockEnvService as never,
+      new EmailIdentityService(),
       mockCache as never,
       mockLoginRateLimiter
     )
@@ -162,12 +165,13 @@ describe('AuthService', () => {
       const result = await authService.register(registerInput, requestInfo)
 
       expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: registerInput.email },
+        where: { emailCanonical: registerInput.email },
       })
       expect(argon2.hash).toHaveBeenCalledWith(registerInput.password)
       expect(mockCtx.prisma.user.create).toHaveBeenCalledWith({
         data: {
           email: registerInput.email,
+          emailCanonical: registerInput.email,
           passwordHash: 'hashed-password',
           name: registerInput.name,
           lastLoginAt: expect.any(Date),
@@ -194,6 +198,33 @@ describe('AuthService', () => {
       const result = await authService.register(inputWithoutName, requestInfo)
 
       expect(result.user.name).toBeNull()
+    })
+
+    it('should preserve display email and store canonical email', async () => {
+      const mixedCaseInput = {
+        email: 'User@Example.COM',
+        password: 'Password123',
+      }
+
+      mockCtx.prisma.user.findUnique.mockResolvedValue(null)
+      ;(argon2.hash as jest.Mock).mockResolvedValue('hashed')
+      mockCtx.prisma.user.create.mockResolvedValue({ ...mockUser, email: mixedCaseInput.email })
+      mockTokenService.generateAccessToken.mockReturnValue('token')
+      mockSessionService.createSession.mockResolvedValue(
+        mockCreateSessionResult('refresh') as never
+      )
+
+      await authService.register(mixedCaseInput, requestInfo)
+
+      expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { emailCanonical: 'user@example.com' },
+      })
+      expect(mockCtx.prisma.user.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          email: 'User@Example.COM',
+          emailCanonical: 'user@example.com',
+        }),
+      })
     })
 
     it('should throw AppException if user already exists', async () => {
@@ -291,6 +322,28 @@ describe('AuthService', () => {
       )
     })
 
+    it('should lookup and rate-limit login by canonical email', async () => {
+      const mixedCaseLogin = { email: 'Test@Example.COM', password: 'Password123' }
+
+      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+      ;(argon2.verify as jest.Mock).mockResolvedValue(true)
+      mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, lastLoginAt: new Date() })
+      mockTokenService.generateAccessToken.mockReturnValue('token')
+      mockSessionService.createSession.mockResolvedValue(
+        mockCreateSessionResult('refresh') as never
+      )
+
+      await authService.login(mixedCaseLogin, requestInfo)
+
+      expect(mockLoginRateLimiter.check).toHaveBeenCalledWith(
+        'test@example.com',
+        requestInfo.ipAddress
+      )
+      expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { emailCanonical: 'test@example.com' },
+      })
+    })
+
     it('should throw 429 when rate limit is exceeded', async () => {
       mockLoginRateLimiter.check.mockRejectedValue(
         new AppException('Too many failed login attempts', 429)
@@ -353,6 +406,9 @@ describe('AuthService', () => {
 
       await expect(authService.forgotPassword('unknown@example.com')).resolves.not.toThrow()
 
+      expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { emailCanonical: 'unknown@example.com' },
+      })
       expect(mockEmailService.sendPasswordResetEmail).not.toHaveBeenCalled()
     })
 
@@ -373,6 +429,25 @@ describe('AuthService', () => {
           resetUrl: expect.stringContaining('reset-password?token='),
           expiresIn: '15 минут',
         })
+      )
+    })
+
+    it('should lookup password reset by canonical email but send to display email', async () => {
+      mockCtx.prisma.user.findUnique.mockResolvedValue({ ...mockUser, email: 'Test@Example.COM' })
+      mockCache.get.mockResolvedValue(null)
+      mockTokenManager.generatePasswordResetToken.mockResolvedValue({
+        token: 'a'.repeat(64),
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      })
+
+      await authService.forgotPassword(' test@example.com ')
+
+      expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { emailCanonical: 'test@example.com' },
+      })
+      expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        'Test@Example.COM',
+        expect.objectContaining({ name: 'Test User' })
       )
     })
 
@@ -435,6 +510,9 @@ describe('AuthService', () => {
 
       await expect(authService.resendVerificationEmail(mockUser.email)).resolves.not.toThrow()
 
+      expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { emailCanonical: mockUser.emailCanonical },
+      })
       expect(mockEmailService.sendEmailVerificationEmail).not.toHaveBeenCalled()
     })
 

@@ -4,6 +4,22 @@ Standard username/password auth — register, log in, reset your password, verif
 
 ---
 
+## Email identity policy
+
+AMCore treats email identity as case-insensitive. Incoming auth emails are
+trimmed, stored as the user-facing `email`, and compared through a separate
+canonical key.
+
+- `email` is the display/contact address returned in API responses, JWT claims,
+  and used for outbound email.
+- `emailCanonical` is the internal identity key used for uniqueness, login,
+  recovery, verification resend, OAuth linking, organization member lookup, and
+  email-scoped rate limits.
+- Provider-specific aliases are not normalized. `alex+tag@example.com` and
+  `alex@example.com` are different identities; Gmail dot removal is not applied.
+
+---
+
 ## Registration
 
 **Endpoint:** `POST /api/v1/auth/register`
@@ -20,7 +36,8 @@ curl -X POST https://api.amcore.dev/api/v1/auth/register \
 
 **What happens:**
 
-1. Email is checked for uniqueness — duplicate emails return `EMAIL_ALREADY_EXISTS`
+1. Email is trimmed and checked for canonical uniqueness — duplicate emails
+   across case variants return `EMAIL_ALREADY_EXISTS`
 2. Password is hashed with Argon2id (~100ms intentionally)
 3. A new user is created with `systemRole: USER` and `emailVerified: false`
 4. A verification email is queued (non-blocking — registration succeeds regardless)
@@ -66,8 +83,8 @@ curl -X POST https://api.amcore.dev/api/v1/auth/login \
 
 **What happens:**
 
-1. Rate limit is checked (5 failed attempts per email+IP per hour)
-2. User is looked up by email
+1. Rate limit is checked (5 failed attempts per canonical email+IP per hour)
+2. User is looked up by canonical email
 3. Password is verified against the Argon2 hash
 4. `lastLoginAt` is updated
 5. A new session is created (previous sessions on other devices remain active)
@@ -138,7 +155,7 @@ curl -X POST https://api.amcore.dev/api/v1/auth/forgot-password \
 
 **What happens:**
 
-1. Rate limit is checked (3 requests per email per hour)
+1. Rate limit is checked (3 requests per canonical email per hour)
 2. If the email exists, a reset token is generated (64 random bytes, SHA-256 hashed for storage)
 3. An email is sent with a link: `https://amcore.dev/reset-password?token={raw_token}`
 4. Token expires in **15 minutes**
@@ -153,7 +170,8 @@ curl -X POST https://api.amcore.dev/api/v1/auth/forgot-password \
 
 > **Why the same response?** If we returned different messages for existing vs non-existing emails, an attacker could use this endpoint to find out which emails are registered. The vague response protects your users' privacy.
 
-**Rate limit:** 3 requests per email per hour. After that: `429 Too Many Requests`.
+**Rate limit:** 3 requests per canonical email per hour. After that:
+`429 Too Many Requests`.
 
 ---
 
@@ -245,7 +263,7 @@ curl -X POST https://api.amcore.dev/api/v1/auth/resend-verification \
 }
 ```
 
-**Rate limit:** 3 requests per email per hour.
+**Rate limit:** 3 requests per canonical email per hour.
 
 ---
 

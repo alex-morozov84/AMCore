@@ -15,15 +15,15 @@ const BLOCK_TTL_MS = 15 * 60 * 1000 // 15 minutes
 /**
  * Login brute-force protection via two Redis counters:
  * - Per-IP: 100 failed attempts / 24h
- * - Per-email+IP: 5 failed attempts / 1h → 15-min block
+ * - Per-canonical-email+IP: 5 failed attempts / 1h → 15-min block
  */
 @Injectable()
 export class LoginRateLimiterService {
   constructor(@Inject(CACHE_MANAGER) private readonly cache: Cache) {}
 
   /** Check limits before attempting login. Throws 429 if exceeded. */
-  async check(email: string, ip: string): Promise<void> {
-    const blocked = await this.cache.get<number>(this.blockedKey(email, ip))
+  async check(emailCanonical: string, ip: string): Promise<void> {
+    const blocked = await this.cache.get<number>(this.blockedKey(emailCanonical, ip))
     if (blocked) {
       throw new AppException(
         'Too many failed login attempts. Please try again in 15 minutes.',
@@ -45,34 +45,35 @@ export class LoginRateLimiterService {
   }
 
   /** Record a failed login attempt. Sets 15-min block after USER_IP_MAX failures. */
-  async consume(email: string, ip: string): Promise<void> {
+  async consume(emailCanonical: string, ip: string): Promise<void> {
     const ipCount = ((await this.cache.get<number>(this.ipKey(ip))) ?? 0) + 1
     await this.cache.set(this.ipKey(ip), ipCount, IP_TTL_MS)
 
-    const userIpCount = ((await this.cache.get<number>(this.userIpKey(email, ip))) ?? 0) + 1
-    await this.cache.set(this.userIpKey(email, ip), userIpCount, USER_IP_TTL_MS)
+    const userIpCount =
+      ((await this.cache.get<number>(this.userIpKey(emailCanonical, ip))) ?? 0) + 1
+    await this.cache.set(this.userIpKey(emailCanonical, ip), userIpCount, USER_IP_TTL_MS)
 
     if (userIpCount >= USER_IP_MAX) {
-      await this.cache.set(this.blockedKey(email, ip), 1, BLOCK_TTL_MS)
+      await this.cache.set(this.blockedKey(emailCanonical, ip), 1, BLOCK_TTL_MS)
     }
   }
 
   /** Reset counters after successful login. */
-  async reset(email: string, ip: string): Promise<void> {
+  async reset(emailCanonical: string, ip: string): Promise<void> {
     await this.cache.del(this.ipKey(ip))
-    await this.cache.del(this.userIpKey(email, ip))
-    await this.cache.del(this.blockedKey(email, ip))
+    await this.cache.del(this.userIpKey(emailCanonical, ip))
+    await this.cache.del(this.blockedKey(emailCanonical, ip))
   }
 
   private ipKey(ip: string): string {
     return `rate:login_ip:${ip}`
   }
 
-  private userIpKey(email: string, ip: string): string {
-    return `rate:login_user_ip:${email}:${ip}`
+  private userIpKey(emailCanonical: string, ip: string): string {
+    return `rate:login_user_ip:${emailCanonical}:${ip}`
   }
 
-  private blockedKey(email: string, ip: string): string {
-    return `rate:login_blocked:${email}:${ip}`
+  private blockedKey(emailCanonical: string, ip: string): string {
+    return `rate:login_blocked:${emailCanonical}:${ip}`
   }
 }

@@ -162,7 +162,7 @@ describe('Organizations (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/organizations/${orgId}/members/invite`)
         .set('Authorization', `Bearer ${orgToken}`)
-        .send({ email: 'member@example.com', roleId: memberRole.id })
+        .send({ email: 'Member@Example.COM', roleId: memberRole.id })
         .expect(201)
 
       const members = await prisma.orgMember.findMany({ where: { organizationId: orgId } })

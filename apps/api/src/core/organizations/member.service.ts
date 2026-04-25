@@ -9,6 +9,7 @@ import {
   NotFoundException,
 } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
+import { EmailIdentityService } from '../auth/email-identity.service'
 
 import type { InviteMemberDto } from './dto'
 import { OrganizationsService } from './organizations.service'
@@ -17,7 +18,8 @@ import { OrganizationsService } from './organizations.service'
 export class MemberService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly orgsService: OrganizationsService
+    private readonly orgsService: OrganizationsService,
+    private readonly emailIdentity: EmailIdentityService
   ) {}
 
   /** Add a user to the organization by email. User must already have an account. */
@@ -28,7 +30,8 @@ export class MemberService {
   ): Promise<OrgMember> {
     this.assertOrgContext(principal, orgId)
 
-    const targetUser = await this.prisma.user.findUnique({ where: { email: dto.email } })
+    const emailCanonical = this.emailIdentity.canonicalize(dto.email)
+    const targetUser = await this.prisma.user.findUnique({ where: { emailCanonical } })
     if (!targetUser) throw new NotFoundException('No account found with this email address')
 
     const existing = await this.prisma.orgMember.findUnique({

@@ -137,7 +137,7 @@ describe('OAuth (e2e)', () => {
 
       // User should be created in database
       const user = await prisma.user.findUnique({
-        where: { email: 'oauth-user@example.com' },
+        where: { emailCanonical: 'oauth-user@example.com' },
         include: { accounts: true },
       })
       expect(user).toBeDefined()
@@ -351,7 +351,7 @@ describe('OAuth (e2e)', () => {
         .expect(201)
 
       const userBefore = await prisma.user.findUnique({
-        where: { email: 'oauth-user@example.com' },
+        where: { emailCanonical: 'oauth-user@example.com' },
       })
       expect(userBefore!.emailVerified).toBe(false)
 
@@ -367,9 +367,38 @@ describe('OAuth (e2e)', () => {
         .expect(302)
 
       const userAfter = await prisma.user.findUnique({
-        where: { email: 'oauth-user@example.com' },
+        where: { emailCanonical: 'oauth-user@example.com' },
       })
       expect(userAfter!.emailVerified).toBe(true)
+    })
+
+    it('should link existing user when provider email casing differs', async () => {
+      ;(providerFactory as unknown as { providers: Map<string, OAuthProvider> }).providers.set(
+        'google',
+        createMockProvider({ email: 'OAuth-User@Example.COM' })
+      )
+
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'oauth-user@example.com', password: 'StrongP@ss123' })
+        .expect(201)
+
+      const state = 'valid-state-mixed-case-email'
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+      })
+
+      await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(302)
+
+      const users = await prisma.user.findMany({
+        where: { emailCanonical: 'oauth-user@example.com' },
+      })
+      expect(users).toHaveLength(1)
+      expect(await prisma.oAuthAccount.count()).toBe(1)
     })
 
     it('should return 400 when provider returns no email', async () => {
@@ -427,6 +456,7 @@ describe('OAuth (e2e)', () => {
       const user = await prisma.user.create({
         data: {
           email: 'link-flow@example.com',
+          emailCanonical: 'link-flow@example.com',
           emailVerified: true,
           name: 'Link Flow User',
         },

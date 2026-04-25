@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { emailInputSchema } from './auth'
+
 // ===========================================
 // Request Schemas
 // ===========================================
@@ -32,7 +34,7 @@ export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>
 
 /** Invite member by email */
 export const inviteMemberSchema = z.object({
-  email: z.email(),
+  email: emailInputSchema,
   roleId: z.string().optional(), // defaults to system MEMBER role if omitted
 })
 
