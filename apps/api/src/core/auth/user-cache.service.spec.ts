@@ -1,7 +1,7 @@
-import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { Test, TestingModule } from '@nestjs/testing'
 import { SystemRole, type User } from '@prisma/client'
-import type { Cache } from 'cache-manager'
+
+import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
 import { UserCacheService } from './user-cache.service'
 
@@ -9,8 +9,15 @@ import { PrismaService } from '@/prisma'
 
 describe('UserCacheService', () => {
   let service: UserCacheService
-  let cache: Cache
+  let redis: jest.Mocked<Pick<AppRedisClient, 'get' | 'set' | 'del' | 'sMembers' | 'multi'>>
+  let lock: jest.Mocked<Pick<RedisLockService, 'acquire' | 'release'>>
   let prisma: PrismaService
+  let multi: {
+    del: jest.Mock
+    sAdd: jest.Mock
+    expire: jest.Mock
+    exec: jest.Mock
+  }
 
   const mockUser: User = {
     id: 'user-123',
@@ -23,22 +30,44 @@ describe('UserCacheService', () => {
     phone: null,
     locale: 'ru',
     timezone: 'Europe/Moscow',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    lastLoginAt: new Date(),
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+    lastLoginAt: new Date('2026-01-03T00:00:00.000Z'),
     systemRole: SystemRole.USER,
   }
 
+  const userKey = `auth:user:v2:${mockUser.id}`
+  const tagKey = `auth:user:v2:${mockUser.id}:keys`
+  const lockKey = `auth:lock:user:v2:${mockUser.id}`
+
   beforeEach(async () => {
+    multi = {
+      del: jest.fn().mockReturnThis(),
+      sAdd: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([]),
+    }
+
+    const mockRedis = {
+      get: jest.fn(),
+      set: jest.fn(),
+      del: jest.fn(),
+      sMembers: jest.fn(),
+      multi: jest.fn().mockReturnValue(multi),
+    }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserCacheService,
         {
-          provide: CACHE_MANAGER,
+          provide: REDIS_CLIENT,
+          useValue: mockRedis,
+        },
+        {
+          provide: RedisLockService,
           useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            del: jest.fn(),
+            acquire: jest.fn(),
+            release: jest.fn(),
           },
         },
         {
@@ -53,192 +82,187 @@ describe('UserCacheService', () => {
     }).compile()
 
     service = module.get<UserCacheService>(UserCacheService)
-    cache = module.get<Cache>(CACHE_MANAGER)
+    redis = module.get(REDIS_CLIENT)
+    lock = module.get(RedisLockService)
     prisma = module.get<PrismaService>(PrismaService)
 
-    // Reset metrics before each test
     service.resetMetrics()
+    jest
+      .spyOn(service as unknown as { sleep: (ms: number) => Promise<void> }, 'sleep')
+      .mockResolvedValue(undefined)
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
+    jest.restoreAllMocks()
   })
 
   describe('getUser', () => {
-    it('should return cached user when cache hit', async () => {
-      // Arrange
-      jest.spyOn(cache, 'get').mockResolvedValue(mockUser)
+    it('should return cached user envelope and revive date fields', async () => {
+      redis.get.mockResolvedValueOnce(JSON.stringify({ kind: 'hit', user: mockUser }))
 
-      // Act
       const result = await service.getUser(mockUser.id)
 
-      // Assert
       expect(result).toEqual(mockUser)
-      expect(cache.get).toHaveBeenCalledWith(`user:${mockUser.id}`)
+      expect(result?.createdAt).toBeInstanceOf(Date)
+      expect(result?.updatedAt).toBeInstanceOf(Date)
+      expect(result?.lastLoginAt).toBeInstanceOf(Date)
+      expect(redis.get).toHaveBeenCalledWith(userKey)
       expect(prisma.user.findUnique).not.toHaveBeenCalled()
 
-      // Verify metrics
       const metrics = service.getMetrics()
       expect(metrics.hits).toBe(1)
       expect(metrics.misses).toBe(0)
       expect(metrics.dbQueries).toBe(0)
     })
 
-    it('should query database and cache result when cache miss', async () => {
-      // Arrange
-      jest
-        .spyOn(cache, 'get')
-        .mockResolvedValueOnce(undefined) // First cache check
-        .mockResolvedValueOnce(undefined) // Lock check
-        .mockResolvedValueOnce(undefined) // Double-check after lock
+    it('should return null from negative cache without querying database', async () => {
+      redis.get.mockResolvedValueOnce(JSON.stringify({ kind: 'miss' }))
 
-      jest.spyOn(cache, 'set').mockResolvedValue(undefined)
+      const result = await service.getUser('missing-user')
+
+      expect(result).toBeNull()
+      expect(prisma.user.findUnique).not.toHaveBeenCalled()
+
+      const metrics = service.getMetrics()
+      expect(metrics.hits).toBe(1)
+      expect(metrics.misses).toBe(0)
+      expect(metrics.dbQueries).toBe(0)
+    })
+
+    it('should query database and cache hit envelope on cache miss', async () => {
+      redis.get.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+      lock.acquire.mockResolvedValueOnce('lock-token')
       jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser)
 
-      // Act
       const result = await service.getUser(mockUser.id)
 
-      // Assert
       expect(result).toEqual(mockUser)
+      expect(lock.acquire).toHaveBeenCalledWith(lockKey, 5000)
+      expect(lock.release).toHaveBeenCalledWith(lockKey, 'lock-token')
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: mockUser.id },
       })
-      expect(cache.set).toHaveBeenCalledWith(
-        `user:${mockUser.id}`,
-        mockUser,
-        600 * 1000 // TTL
+      expect(redis.set).toHaveBeenCalledWith(
+        userKey,
+        JSON.stringify({ kind: 'hit', user: mockUser }),
+        {
+          expiration: { type: 'PX', value: 600000 },
+        }
       )
+      expect(multi.sAdd).toHaveBeenCalledWith(tagKey, userKey)
+      expect(multi.expire).toHaveBeenCalledWith(tagKey, 86400)
+      expect(multi.exec).toHaveBeenCalled()
 
-      // Verify metrics
       const metrics = service.getMetrics()
       expect(metrics.hits).toBe(0)
       expect(metrics.misses).toBe(1)
       expect(metrics.dbQueries).toBe(1)
     })
 
-    it('should cache null result with short TTL when user not found', async () => {
-      // Arrange
-      jest
-        .spyOn(cache, 'get')
-        .mockResolvedValueOnce(undefined) // First cache check
-        .mockResolvedValueOnce(undefined) // Lock check
-        .mockResolvedValueOnce(undefined) // Double-check after lock
-
-      jest.spyOn(cache, 'set').mockResolvedValue(undefined)
+    it('should cache miss envelope with short TTL when user is not found', async () => {
+      redis.get.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+      lock.acquire.mockResolvedValueOnce('lock-token')
       jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null)
 
-      // Act
       const result = await service.getUser('non-existent')
 
-      // Assert
       expect(result).toBeNull()
-      expect(cache.set).toHaveBeenCalledWith('user:non-existent', null, 60 * 1000) // 1 minute TTL
+      expect(redis.set).toHaveBeenCalledWith(
+        'auth:user:v2:non-existent',
+        JSON.stringify({ kind: 'miss' }),
+        {
+          expiration: { type: 'PX', value: 60000 },
+        }
+      )
     })
 
-    it('should wait and retry when lock is held by another request', async () => {
-      // Arrange
-      jest
-        .spyOn(cache, 'get')
-        .mockResolvedValueOnce(undefined) // First cache check - miss
-        .mockResolvedValueOnce('1') // Lock check - held by another request
-        .mockResolvedValueOnce(mockUser) // Retry cache check - hit
-
-      // Act
-      const result = await service.getUser(mockUser.id)
-
-      // Assert
-      expect(result).toEqual(mockUser)
-      // Should not query database (another request did it)
-      expect(prisma.user.findUnique).not.toHaveBeenCalled()
-    })
-
-    it('should track cache keys for tag-based invalidation', async () => {
-      // Arrange
-      jest
-        .spyOn(cache, 'get')
-        .mockResolvedValueOnce(undefined) // First cache check
-        .mockResolvedValueOnce(undefined) // Lock check
-        .mockResolvedValueOnce(undefined) // Double-check after lock
-        .mockResolvedValueOnce([]) // Get tracking set (empty)
-
-      jest.spyOn(cache, 'set').mockResolvedValue(undefined)
+    it('should delete corrupt cache entry and refill from database', async () => {
+      redis.get.mockResolvedValueOnce('{bad-json').mockResolvedValueOnce(null)
+      lock.acquire.mockResolvedValueOnce('lock-token')
       jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser)
 
-      // Act
-      await service.getUser(mockUser.id)
+      const result = await service.getUser(mockUser.id)
 
-      // Assert
-      // Should store tracking set with cache key
-      expect(cache.set).toHaveBeenCalledWith(
-        `user:${mockUser.id}:cache_keys`,
-        [`user:${mockUser.id}`],
-        86400 * 1000 // 24h TTL
-      )
+      expect(result).toEqual(mockUser)
+      expect(redis.del).toHaveBeenCalledWith(userKey)
+      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1)
+    })
+
+    it('should wait and retry cache when lock is held by another request', async () => {
+      redis.get
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(JSON.stringify({ kind: 'hit', user: mockUser }))
+      lock.acquire.mockResolvedValueOnce(null)
+
+      const result = await service.getUser(mockUser.id)
+
+      expect(result).toEqual(mockUser)
+      expect(prisma.user.findUnique).not.toHaveBeenCalled()
+      expect(lock.release).not.toHaveBeenCalled()
+    })
+
+    it('should fall back to database after lock contention timeout', async () => {
+      redis.get.mockResolvedValue(null)
+      lock.acquire.mockResolvedValue(null)
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser)
+
+      const result = await service.getUser(mockUser.id)
+
+      expect(result).toEqual(mockUser)
+      expect(lock.acquire).toHaveBeenCalledTimes(5)
+      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1)
     })
   })
 
   describe('invalidateUser', () => {
-    it('should invalidate all cache keys for a user', async () => {
-      // Arrange
-      const cacheKeys = [`user:${mockUser.id}`, `user:${mockUser.id}:profile`]
-      jest.spyOn(cache, 'get').mockResolvedValue(cacheKeys)
-      jest.spyOn(cache, 'del').mockResolvedValue(true)
+    it('should invalidate primary key, tracked keys, and tracking set through MULTI', async () => {
+      redis.sMembers.mockResolvedValue([userKey, `${userKey}:profile`])
 
-      // Act
       await service.invalidateUser(mockUser.id)
 
-      // Assert
-      expect(cache.get).toHaveBeenCalledWith(`user:${mockUser.id}:cache_keys`)
-      expect(cache.del).toHaveBeenCalledTimes(3) // 2 cache keys + 1 tracking set
-      expect(cache.del).toHaveBeenCalledWith(cacheKeys[0])
-      expect(cache.del).toHaveBeenCalledWith(cacheKeys[1])
-      expect(cache.del).toHaveBeenCalledWith(`user:${mockUser.id}:cache_keys`)
+      expect(redis.sMembers).toHaveBeenCalledWith(tagKey)
+      expect(redis.multi).toHaveBeenCalled()
+      expect(multi.del).toHaveBeenCalledWith(userKey)
+      expect(multi.del).toHaveBeenCalledWith(`${userKey}:profile`)
+      expect(multi.del).toHaveBeenCalledWith(tagKey)
+      expect(multi.exec).toHaveBeenCalled()
     })
 
-    it('should handle no cache keys gracefully', async () => {
-      // Arrange
-      jest.spyOn(cache, 'get').mockResolvedValue([])
-      jest.spyOn(cache, 'del').mockResolvedValue(true)
+    it('should delete primary cache key even when tracking set is empty', async () => {
+      redis.sMembers.mockResolvedValue([])
 
-      // Act
       await service.invalidateUser(mockUser.id)
 
-      // Assert
-      expect(cache.del).not.toHaveBeenCalled()
+      expect(multi.del).toHaveBeenCalledWith(userKey)
+      expect(multi.del).toHaveBeenCalledWith(tagKey)
+      expect(multi.exec).toHaveBeenCalled()
     })
   })
 
   describe('invalidateUsers', () => {
     it('should invalidate multiple users in batch', async () => {
-      // Arrange
       const userIds = ['user-1', 'user-2', 'user-3']
-      jest.spyOn(cache, 'get').mockResolvedValue([`user:user-1`])
-      jest.spyOn(cache, 'del').mockResolvedValue(true)
+      redis.sMembers.mockResolvedValue([])
 
-      // Act
       await service.invalidateUsers(userIds)
 
-      // Assert
-      expect(cache.get).toHaveBeenCalledTimes(3)
-      userIds.forEach((id) => {
-        expect(cache.get).toHaveBeenCalledWith(`user:${id}:cache_keys`)
-      })
+      expect(redis.sMembers).toHaveBeenCalledTimes(3)
+      for (const id of userIds) {
+        expect(redis.sMembers).toHaveBeenCalledWith(`auth:user:v2:${id}:keys`)
+      }
     })
   })
 
   describe('getMetrics', () => {
     it('should return correct metrics', async () => {
-      // Arrange - simulate some cache activity
-      jest.spyOn(cache, 'get').mockResolvedValue(mockUser)
+      redis.get.mockResolvedValue(JSON.stringify({ kind: 'hit', user: mockUser }))
 
-      // Act - generate some hits
       await service.getUser(mockUser.id)
       await service.getUser(mockUser.id)
       await service.getUser(mockUser.id)
 
       const metrics = service.getMetrics()
 
-      // Assert
       expect(metrics.hits).toBe(3)
       expect(metrics.misses).toBe(0)
       expect(metrics.dbQueries).toBe(0)
@@ -246,26 +270,19 @@ describe('UserCacheService', () => {
       expect(metrics.hitRate).toBe('100.00%')
     })
 
-    it('should calculate hit rate correctly with mixed hits/misses', async () => {
-      // Arrange
-      jest
-        .spyOn(cache, 'get')
-        .mockResolvedValueOnce(mockUser) // Hit
-        .mockResolvedValueOnce(undefined) // Miss
-        .mockResolvedValueOnce(undefined) // Lock check
-        .mockResolvedValueOnce(undefined) // Double-check
-        .mockResolvedValueOnce([]) // Tracking set
-
-      jest.spyOn(cache, 'set').mockResolvedValue(undefined)
+    it('should calculate hit rate correctly with mixed hits and misses', async () => {
+      redis.get
+        .mockResolvedValueOnce(JSON.stringify({ kind: 'hit', user: mockUser }))
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+      lock.acquire.mockResolvedValueOnce('lock-token')
       jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser)
 
-      // Act
-      await service.getUser(mockUser.id) // Hit
-      await service.getUser('user-2') // Miss + DB query
+      await service.getUser(mockUser.id)
+      await service.getUser('user-2')
 
       const metrics = service.getMetrics()
 
-      // Assert
       expect(metrics.hits).toBe(1)
       expect(metrics.misses).toBe(1)
       expect(metrics.dbQueries).toBe(1)
@@ -276,15 +293,12 @@ describe('UserCacheService', () => {
 
   describe('resetMetrics', () => {
     it('should reset all metrics to zero', async () => {
-      // Arrange - generate some activity
-      jest.spyOn(cache, 'get').mockResolvedValue(mockUser)
+      redis.get.mockResolvedValue(JSON.stringify({ kind: 'hit', user: mockUser }))
       await service.getUser(mockUser.id)
 
-      // Act
       service.resetMetrics()
       const metrics = service.getMetrics()
 
-      // Assert
       expect(metrics.hits).toBe(0)
       expect(metrics.misses).toBe(0)
       expect(metrics.dbQueries).toBe(0)
