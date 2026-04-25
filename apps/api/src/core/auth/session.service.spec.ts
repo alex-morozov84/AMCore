@@ -60,20 +60,21 @@ describe('SessionService', () => {
   })
 
   describe('createSession', () => {
-    it('should create session and return raw refresh token', async () => {
+    it('should create session and return session with raw refresh token', async () => {
       const rawToken = 'raw-refresh-token-abc123'
       const hashedToken = 'hashed-abc123'
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      const session = {
+        ...mockSession,
+        refreshToken: hashedToken,
+        expiresAt,
+      }
 
       tokenService.generateRefreshToken.mockReturnValue(rawToken)
       tokenService.hashRefreshToken.mockReturnValue(hashedToken)
       tokenService.getRefreshTokenExpiration.mockReturnValue(expiresAt)
 
-      mockCtx.prisma.session.create.mockResolvedValue({
-        ...mockSession,
-        refreshToken: hashedToken,
-        expiresAt,
-      })
+      mockCtx.prisma.session.create.mockResolvedValue(session)
 
       const result = await sessionService.createSession({
         userId: 'user-123',
@@ -96,7 +97,7 @@ describe('SessionService', () => {
         },
       })
 
-      expect(result).toBe(rawToken) // Returns RAW token, not hashed
+      expect(result).toEqual({ session, refreshToken: rawToken })
     })
 
     it('should create session without userAgent and ipAddress', async () => {
@@ -124,7 +125,7 @@ describe('SessionService', () => {
         },
       })
 
-      expect(result).toBe(rawToken)
+      expect(result).toEqual({ session: mockSession, refreshToken: rawToken })
     })
 
     it('should handle prisma create errors', async () => {
@@ -580,11 +581,11 @@ describe('SessionService', () => {
 
       mockCtx.prisma.session.create.mockResolvedValue(mockSession)
 
-      const token1 = await sessionService.createSession({
+      const result1 = await sessionService.createSession({
         userId: 'user-123',
       })
 
-      expect(token1).toBe('raw-token-1')
+      expect(result1).toEqual({ session: mockSession, refreshToken: 'raw-token-1' })
 
       // Find session
       const sessionWithUser = {

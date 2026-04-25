@@ -56,15 +56,23 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
    - Fetches user profile from ID token
    - Finds existing user by (provider + providerId) or email
    - Creates user if new
-   - Creates session, issues tokens
+   - Creates session
+   - Issues a one-time login ticket
    │
    ▼
 7. Redirects to frontend:
-   https://amcore.dev/auth/callback?token=eyJhbGci...
+   https://amcore.dev/auth/callback?ticket=...
    + sets refresh_token cookie
    │
    ▼
-8. Frontend stores access token, redirects to dashboard
+8. Frontend exchanges ticket:
+   POST /api/v1/auth/oauth/exchange
+   Cookie: refresh_token
+   Body: { "ticket": "..." }
+   │
+   ▼
+9. Backend validates ticket + refresh session binding
+   and returns { accessToken }
 ```
 
 **PKCE** (Proof Key for Code Exchange) prevents authorization code interception attacks. The `code_verifier` is never sent to the browser — only the hash goes to the provider.
@@ -97,12 +105,42 @@ This is only called by the OAuth provider — not by your frontend directly. The
 
 After a successful login, the frontend receives:
 
-- An access token in the query string: `?token=eyJhbGci...`
+- A one-time login ticket in the query string: `?ticket=...`
 - A `refresh_token` cookie
 
-The frontend should extract the token from the URL, store it, and redirect to the dashboard.
+The frontend should exchange the ticket with `POST /api/v1/auth/oauth/exchange`.
+The access token is returned in the response body and is never placed in a URL.
+
+The ticket is single-use, stored in Redis under a SHA-256-derived key, and expires
+after 60 seconds. The exchange also requires the `refresh_token` cookie and
+verifies that the ticket is bound to the same session.
+
+Production deployments should avoid logging query strings for OAuth callback
+routes, because callback URLs still contain short-lived login tickets.
 
 > **Note:** On login, the backend searches for an existing user by `provider + providerId` first, then falls back to email matching. This means if a user registered with their Google email and later uses "Sign in with Google", their accounts are linked automatically.
+
+---
+
+## Exchanging the login ticket
+
+**Endpoint:** `POST /api/v1/auth/oauth/exchange`
+
+```bash
+curl -X POST https://api.amcore.dev/api/v1/auth/oauth/exchange \
+  -H "Content-Type: application/json" \
+  --cookie "refresh_token=..." \
+  -d '{"ticket":"..."}'
+```
+
+```json
+{
+  "accessToken": "eyJhbGci..."
+}
+```
+
+The refresh token is not rotated by this endpoint. It is only validated to bind
+the ticket to the session created during the OAuth callback.
 
 ---
 

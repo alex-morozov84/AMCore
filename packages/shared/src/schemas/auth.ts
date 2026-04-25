@@ -67,6 +67,13 @@ export const resendVerificationSchema = z.object({
 
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>
 
+/** OAuth login ticket exchange request */
+export const oauthExchangeRequestSchema = z.object({
+  ticket: z.string().min(1),
+})
+
+export type OAuthExchangeRequest = z.infer<typeof oauthExchangeRequestSchema>
+
 // ===========================================
 // Response Schemas
 // ===========================================
@@ -119,6 +126,13 @@ export const refreshResponseSchema = z.object({
 })
 
 export type RefreshResponse = z.infer<typeof refreshResponseSchema>
+
+/** OAuth login ticket exchange response */
+export const oauthExchangeResponseSchema = z.object({
+  accessToken: z.string(),
+})
+
+export type OAuthExchangeResponse = z.infer<typeof oauthExchangeResponseSchema>
 
 /** Success message response */
 export const messageResponseSchema = z.object({

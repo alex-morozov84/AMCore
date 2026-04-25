@@ -11,12 +11,14 @@ export {
   resetPasswordSchema,
   verifyEmailSchema,
   resendVerificationSchema,
+  oauthExchangeRequestSchema,
   // Response schemas
   userResponseSchema,
   authResponseSchema,
   sessionSchema,
   sessionsResponseSchema,
   refreshResponseSchema,
+  oauthExchangeResponseSchema,
   messageResponseSchema,
   // Types
   type RegisterInput,
@@ -27,11 +29,13 @@ export {
   type ResetPasswordInput,
   type VerifyEmailInput,
   type ResendVerificationInput,
+  type OAuthExchangeRequest,
   type UserResponse,
   type AuthResponse,
   type Session,
   type SessionsResponse,
   type RefreshResponse,
+  type OAuthExchangeResponse,
   type MessageResponse,
 } from './auth'
 

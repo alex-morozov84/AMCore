@@ -34,10 +34,25 @@ function createMockProvider(profile?: Partial<OAuthUserProfile>): OAuthProvider 
   }
 }
 
+function extractRefreshCookie(header: string | string[] | undefined): string {
+  const cookies = Array.isArray(header) ? header : header ? [header] : []
+  const refreshCookie = cookies.find((cookie) => cookie.startsWith('refresh_token='))
+  if (!refreshCookie) throw new Error('refresh_token cookie not found')
+  return refreshCookie.split(';')[0]!
+}
+
+function extractTicket(location: string | undefined): string {
+  if (!location) throw new Error('redirect location not found')
+  const url = new URL(location)
+  const ticket = url.searchParams.get('ticket')
+  if (!ticket) throw new Error('ticket not found in redirect URL')
+  return ticket
+}
+
 describe('OAuth (e2e)', () => {
   let app: INestApplication
   let prisma: PrismaService
-  let context: E2ETestContext
+  let context: E2ETestContext | undefined
   let stateService: OAuthStateService
   let providerFactory: OAuthProviderFactory
 
@@ -50,11 +65,13 @@ describe('OAuth (e2e)', () => {
   }, 120000)
 
   afterAll(async () => {
-    await teardownE2ETest(context)
+    if (context) {
+      await teardownE2ETest(context)
+    }
   })
 
   beforeEach(async () => {
-    await cleanDatabase(prisma, context.cache, context.throttlerStorage)
+    await cleanDatabase(prisma, context!.cache, context!.throttlerStorage)
     // Inject mock provider under 'google' name
     ;(providerFactory as unknown as { providers: Map<string, OAuthProvider> }).providers.set(
       'google',
@@ -114,8 +131,9 @@ describe('OAuth (e2e)', () => {
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
         .expect(302)
 
-      // Should redirect to frontend with access token
-      expect(res.headers.location).toContain('/auth/callback?token=')
+      // Should redirect to frontend with a one-time login ticket, never an access token.
+      expect(res.headers.location).toContain('/auth/callback?ticket=')
+      expect(res.headers.location).not.toContain('token=')
 
       // User should be created in database
       const user = await prisma.user.findUnique({
@@ -147,6 +165,125 @@ describe('OAuth (e2e)', () => {
       expect(refreshCookie).toBeDefined()
       expect(refreshCookie).toContain('HttpOnly')
       expect(refreshCookie).toContain('Path=/')
+    })
+
+    it('should exchange valid ticket with refresh cookie for access token', async () => {
+      const state = 'valid-state-exchange'
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
+
+      const callbackRes = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(302)
+
+      const ticket = extractTicket(callbackRes.headers.location)
+      const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
+
+      const exchangeRes = await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Cookie', refreshCookie)
+        .send({ ticket })
+        .expect(200)
+
+      expect(exchangeRes.body.accessToken).toEqual(expect.any(String))
+      expect(exchangeRes.body.accessToken.split('.')).toHaveLength(3)
+    })
+
+    it('should reject replay of the same ticket', async () => {
+      const state = 'valid-state-ticket-replay'
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
+
+      const callbackRes = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(302)
+
+      const ticket = extractTicket(callbackRes.headers.location)
+      const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Cookie', refreshCookie)
+        .send({ ticket })
+        .expect(200)
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Cookie', refreshCookie)
+        .send({ ticket })
+        .expect(401)
+    })
+
+    it('should reject exchange without refresh cookie', async () => {
+      const state = 'valid-state-no-cookie'
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
+
+      const callbackRes = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(302)
+
+      const ticket = extractTicket(callbackRes.headers.location)
+
+      await request(app.getHttpServer()).post('/auth/oauth/exchange').send({ ticket }).expect(401)
+    })
+
+    it('should reject invalid ticket', async () => {
+      const state = 'valid-state-invalid-ticket'
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
+
+      const callbackRes = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(302)
+
+      const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Cookie', refreshCookie)
+        .send({ ticket: 'invalid-ticket' })
+        .expect(401)
+    })
+
+    it('should reject missing or already consumed ticket', async () => {
+      const state = 'valid-state-consumed-ticket'
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
+
+      const callbackRes = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(302)
+
+      const ticket = extractTicket(callbackRes.headers.location)
+      const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Cookie', refreshCookie)
+        .send({ ticket })
+        .expect(200)
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Cookie', refreshCookie)
+        .send({ ticket })
+        .expect(401)
     })
 
     it('should login existing OAuth user without creating duplicate', async () => {
@@ -284,6 +421,32 @@ describe('OAuth (e2e)', () => {
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
         .expect(400)
+    })
+
+    it('should keep link flow redirect unchanged', async () => {
+      const user = await prisma.user.create({
+        data: {
+          email: 'link-flow@example.com',
+          emailVerified: true,
+          name: 'Link Flow User',
+        },
+      })
+
+      const state = 'valid-state-link-flow'
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'link',
+        userId: user.id,
+      })
+
+      const res = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(302)
+
+      expect(res.headers.location).toContain('/settings/linked-accounts?linked=google')
+      expect(res.headers.location).not.toContain('ticket=')
+      expect(res.headers.location).not.toContain('token=')
     })
   })
 })

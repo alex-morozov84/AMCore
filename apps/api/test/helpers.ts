@@ -125,13 +125,17 @@ async function closeCacheConnections(cache: Cache): Promise<void> {
 
     const client = await adapter.getClient()
 
-    if (typeof client.quit === 'function') {
-      await client.quit()
-      continue
-    }
+    try {
+      if (typeof client.quit === 'function') {
+        await client.quit()
+        continue
+      }
 
-    if (typeof client.disconnect === 'function') {
-      await client.disconnect()
+      if (typeof client.disconnect === 'function') {
+        await client.disconnect()
+      }
+    } catch {
+      // The app-level RedisConnectionService may have already closed a shared client.
     }
   }
 }

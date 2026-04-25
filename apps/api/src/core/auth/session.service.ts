@@ -14,6 +14,11 @@ interface CreateSessionParams {
   familyId?: string
 }
 
+export interface CreateSessionResult {
+  session: Session
+  refreshToken: string
+}
+
 export interface SessionInfo {
   id: string
   userAgent: string | null
@@ -31,8 +36,8 @@ export class SessionService {
     private readonly tokenService: TokenService
   ) {}
 
-  /** Create new session, return raw refresh token */
-  async createSession(params: CreateSessionParams): Promise<string> {
+  /** Create new session, return session row and raw refresh token */
+  async createSession(params: CreateSessionParams): Promise<CreateSessionResult> {
     const refreshToken = this.tokenService.generateRefreshToken()
     const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
     const expiresAt = this.tokenService.getRefreshTokenExpiration()
@@ -53,7 +58,7 @@ export class SessionService {
       userId: params.userId,
     })
 
-    return refreshToken
+    return { session, refreshToken }
   }
 
   /** Find session by refresh token hash */

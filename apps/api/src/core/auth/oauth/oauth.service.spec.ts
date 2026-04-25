@@ -42,7 +42,6 @@ const mockProfile = {
 describe('OAuthService', () => {
   let service: OAuthService
   let prisma: jest.Mocked<any>
-  let tokenService: jest.Mocked<any>
   let sessionService: jest.Mocked<any>
   let userCacheService: jest.Mocked<any>
   let providerFactory: jest.Mocked<any>
@@ -74,12 +73,11 @@ describe('OAuthService', () => {
       $transaction: jest.fn().mockImplementation((ops: any[]) => Promise.all(ops)),
     }
 
-    tokenService = {
-      generateAccessToken: jest.fn().mockReturnValue('jwt-access-token'),
-    }
-
     sessionService = {
-      createSession: jest.fn().mockResolvedValue('refresh-token-raw'),
+      createSession: jest.fn().mockResolvedValue({
+        session: { id: 'session-123' },
+        refreshToken: 'refresh-token-raw',
+      }),
     }
 
     userCacheService = {
@@ -102,7 +100,6 @@ describe('OAuthService', () => {
 
     service = new OAuthService(
       prisma,
-      tokenService,
       sessionService,
       userCacheService,
       providerFactory,
@@ -140,14 +137,19 @@ describe('OAuthService', () => {
   })
 
   describe('handleCallback', () => {
-    it('should return AuthResult with tokens on success', async () => {
+    it('should return login callback result with refresh token and access claims on success', async () => {
       prisma.user.create.mockResolvedValue(mockUser())
 
       const result = await service.handleCallback('google', 'code', 'state', requestInfo)
 
       if (result.mode !== 'login') throw new Error('Expected login result')
-      expect(result.accessToken).toBe('jwt-access-token')
       expect(result.refreshToken).toBe('refresh-token-raw')
+      expect(result.sessionId).toBe('session-123')
+      expect(result.accessClaims).toEqual({
+        sub: 'user-1',
+        email: 'user@example.com',
+        systemRole: 'USER',
+      })
       expect(result.user.email).toBe('user@example.com')
     })
 

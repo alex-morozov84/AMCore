@@ -79,7 +79,7 @@ export class AuthService {
       systemRole: user.systemRole,
     })
 
-    const refreshToken = await this.sessionService.createSession({
+    const { refreshToken } = await this.sessionService.createSession({
       userId: user.id,
       userAgent: requestInfo.userAgent,
       ipAddress: requestInfo.ipAddress,
@@ -157,7 +157,7 @@ export class AuthService {
       systemRole: user.systemRole,
     })
 
-    const refreshToken = await this.sessionService.createSession({
+    const { refreshToken } = await this.sessionService.createSession({
       userId: user.id,
       userAgent: requestInfo.userAgent,
       ipAddress: requestInfo.ipAddress,

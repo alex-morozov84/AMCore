@@ -23,6 +23,7 @@ import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { OAuthController } from './oauth/oauth.controller'
 import { OAuthService } from './oauth/oauth.service'
 import { OAuthClientService } from './oauth/oauth-client.service'
+import { OAuthLoginTicketService } from './oauth/oauth-login-ticket.service'
 import { OAuthStateService } from './oauth/oauth-state.service'
 import { OAuthProviderFactory } from './oauth/providers/oauth-provider.factory'
 import { PermissionsCacheService } from './permissions-cache.service'
@@ -54,6 +55,7 @@ import { UserCacheService } from './user-cache.service'
     AuthService,
     LoginRateLimiterService,
     OAuthClientService,
+    OAuthLoginTicketService,
     OAuthProviderFactory,
     OAuthService,
     OAuthStateService,

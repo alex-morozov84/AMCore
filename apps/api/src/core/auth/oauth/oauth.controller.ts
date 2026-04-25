@@ -1,15 +1,30 @@
-import { Controller, Get, HttpStatus, Param, Query, Req, Res } from '@nestjs/common'
-import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common'
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
 
-import { AuthErrorCode, AuthType } from '@amcore/shared'
+import { AuthErrorCode, AuthType, type OAuthExchangeResponse } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions'
 import { EnvService } from '../../../env/env.service'
 import { Auth } from '../decorators/auth.decorator'
 import { CurrentUser } from '../decorators/current-user.decorator'
+import { OAuthExchangeDto } from '../dto'
+import { SessionService } from '../session.service'
+import { TokenService } from '../token.service'
 
 import { OAuthService } from './oauth.service'
+import { OAuthLoginTicketService } from './oauth-login-ticket.service'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory'
 
 interface ProvidersResponse {
@@ -21,7 +36,10 @@ interface ProvidersResponse {
 export class OAuthController {
   constructor(
     private readonly oauthService: OAuthService,
+    private readonly ticketService: OAuthLoginTicketService,
     private readonly providerFactory: OAuthProviderFactory,
+    private readonly sessionService: SessionService,
+    private readonly tokenService: TokenService,
     private readonly env: EnvService
   ) {}
 
@@ -85,9 +103,65 @@ export class OAuthController {
         path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
-      res.redirect(`${frontendUrl}/auth/callback?token=${result.accessToken}`)
+
+      const ticket = await this.ticketService.issue({
+        userId: result.accessClaims.sub,
+        email: result.accessClaims.email,
+        systemRole: result.accessClaims.systemRole,
+        sessionId: result.sessionId,
+      })
+
+      res.redirect(`${frontendUrl}/auth/callback?ticket=${ticket}`)
     } else {
       res.redirect(`${frontendUrl}/settings/linked-accounts?linked=${provider}`)
     }
+  }
+
+  @Post('exchange')
+  @HttpCode(HttpStatus.OK)
+  @Auth(AuthType.None)
+  @ApiCookieAuth('refresh_token')
+  @ApiOperation({ summary: 'Exchange OAuth login ticket for access token' })
+  async exchange(
+    @Body() dto: OAuthExchangeDto,
+    @Req() req: Request
+  ): Promise<OAuthExchangeResponse> {
+    const refreshToken = req.cookies?.refresh_token
+    if (!refreshToken) {
+      throw this.invalidExchange()
+    }
+
+    let session: Awaited<ReturnType<SessionService['validateRefreshToken']>>
+    try {
+      const refreshTokenHash = this.tokenService.hashRefreshToken(refreshToken)
+      session = await this.sessionService.validateRefreshToken(refreshTokenHash)
+    } catch {
+      throw this.invalidExchange()
+    }
+
+    const claims = await this.ticketService.consume(dto.ticket)
+    if (!claims) {
+      throw this.invalidExchange()
+    }
+
+    if (session.id !== claims.sessionId || session.userId !== claims.userId) {
+      throw this.invalidExchange()
+    }
+
+    const accessToken = this.tokenService.generateAccessToken({
+      sub: claims.userId,
+      email: claims.email,
+      systemRole: claims.systemRole,
+    })
+
+    return { accessToken }
+  }
+
+  private invalidExchange(): AppException {
+    return new AppException(
+      'Invalid OAuth exchange',
+      HttpStatus.UNAUTHORIZED,
+      AuthErrorCode.OAUTH_TICKET_INVALID
+    )
   }
 }

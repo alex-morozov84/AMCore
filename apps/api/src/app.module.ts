@@ -22,10 +22,10 @@ import { AuthModule } from './core/auth/auth.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
 import { validate } from './env'
 import { EnvModule } from './env/env.module'
-import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
 import { EmailModule } from './infrastructure/email'
 import { QueueModule } from './infrastructure/queue'
+import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
 import { PrismaModule } from './prisma'
 import { ShutdownService } from './shutdown.service'
@@ -81,13 +81,17 @@ import { ShutdownService } from './shutdown.service'
       useFactory: createLoggingConfig,
     }),
 
+    RedisModule,
+
     // Cache (Redis)
     CacheModule.registerAsync({
       isGlobal: true,
-      imports: [EnvModule],
-      inject: [EnvService],
-      useFactory: (env: EnvService) => ({
-        stores: [new KeyvRedis(env.get('REDIS_URL'))],
+      imports: [RedisModule],
+      inject: [REDIS_CLIENT],
+      useFactory: (redisClient: AppRedisClient) => ({
+        // RedisConnectionService opens the shared client during Nest init; KeyvRedis defers
+        // commands until first cache operation, after providers have initialized.
+        stores: [new KeyvRedis(redisClient)],
         ttl: 60 * 1000, // 60 seconds default
       }),
     }),

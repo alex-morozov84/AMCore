@@ -224,9 +224,36 @@ Called by the OAuth provider — not directly by your app.
 
 Query params: `code`, `state` (both required)
 
-On success: redirects to `{FRONTEND_URL}/auth/callback?token={accessToken}` and sets `refresh_token` cookie.
+On success: redirects to `{FRONTEND_URL}/auth/callback?ticket={ticket}` and sets `refresh_token` cookie.
 
 On link success: redirects to `{FRONTEND_URL}/settings/linked-accounts?linked={provider}`.
+
+---
+
+#### `POST /auth/oauth/exchange` 🔓
+
+Exchanges a one-time OAuth login ticket for an access token.
+
+Requires `refresh_token` cookie from the OAuth callback.
+
+**Body:**
+
+```json
+{
+  "ticket": "one-time-ticket"
+}
+```
+
+**Response** `200`:
+
+```json
+{
+  "accessToken": "eyJhbGci..."
+}
+```
+
+Invalid, expired, or already used tickets return the same `401` as invalid
+refresh-cookie binding.
 
 ---
 
@@ -338,6 +365,7 @@ Use `errorCode` in your frontend for translations — it's stable across API ver
 | `OAUTH_EMAIL_REQUIRED`          | 400  | OAuth: provider gave no email, can't create user |
 | `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | OAuth: missing env vars for this provider        |
 | `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Link: provider account belongs to another user   |
+| `OAUTH_TICKET_INVALID`          | 401  | OAuth: login ticket exchange failed              |
 
 ---
 

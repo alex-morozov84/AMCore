@@ -50,6 +50,11 @@ describe('AuthService', () => {
     systemRole: SystemRole.USER,
   }
 
+  const mockCreateSessionResult = (refreshToken: string) => ({
+    session: { id: 'session-123' },
+    refreshToken,
+  })
+
   beforeEach(() => {
     mockCtx = createMockContext()
 
@@ -150,7 +155,9 @@ describe('AuthService', () => {
       ;(argon2.hash as jest.Mock).mockResolvedValue('hashed-password')
       mockCtx.prisma.user.create.mockResolvedValue(mockUser)
       mockTokenService.generateAccessToken.mockReturnValue('access-token-123')
-      mockSessionService.createSession.mockResolvedValue('refresh-token-456')
+      mockSessionService.createSession.mockResolvedValue(
+        mockCreateSessionResult('refresh-token-456') as never
+      )
 
       const result = await authService.register(registerInput, requestInfo)
 
@@ -180,7 +187,9 @@ describe('AuthService', () => {
       ;(argon2.hash as jest.Mock).mockResolvedValue('hashed')
       mockCtx.prisma.user.create.mockResolvedValue({ ...mockUser, name: null })
       mockTokenService.generateAccessToken.mockReturnValue('token')
-      mockSessionService.createSession.mockResolvedValue('refresh')
+      mockSessionService.createSession.mockResolvedValue(
+        mockCreateSessionResult('refresh') as never
+      )
 
       const result = await authService.register(inputWithoutName, requestInfo)
 
@@ -199,7 +208,9 @@ describe('AuthService', () => {
       ;(argon2.hash as jest.Mock).mockResolvedValue('hashed')
       mockCtx.prisma.user.create.mockResolvedValue(mockUser)
       mockTokenService.generateAccessToken.mockReturnValue('token')
-      mockSessionService.createSession.mockResolvedValue('refresh')
+      mockSessionService.createSession.mockResolvedValue(
+        mockCreateSessionResult('refresh') as never
+      )
 
       const beforeRegister = new Date()
       await authService.register(registerInput, requestInfo)
@@ -226,7 +237,9 @@ describe('AuthService', () => {
       ;(argon2.verify as jest.Mock).mockResolvedValue(true)
       mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, lastLoginAt: new Date() })
       mockTokenService.generateAccessToken.mockReturnValue('access-token-123')
-      mockSessionService.createSession.mockResolvedValue('refresh-token-456')
+      mockSessionService.createSession.mockResolvedValue(
+        mockCreateSessionResult('refresh-token-456') as never
+      )
 
       const result = await authService.login(loginInput, requestInfo)
 
@@ -266,7 +279,9 @@ describe('AuthService', () => {
       ;(argon2.verify as jest.Mock).mockResolvedValue(true)
       mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, lastLoginAt: new Date() })
       mockTokenService.generateAccessToken.mockReturnValue('token')
-      mockSessionService.createSession.mockResolvedValue('refresh')
+      mockSessionService.createSession.mockResolvedValue(
+        mockCreateSessionResult('refresh') as never
+      )
 
       await authService.login(loginInput, requestInfo)
 

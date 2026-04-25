@@ -8,7 +8,7 @@ import { AuthErrorCode } from '@amcore/shared'
 import { AppException } from '../../../common/exceptions'
 import { PrismaService } from '../../../prisma'
 import { SessionService } from '../session.service'
-import { TokenService } from '../token.service'
+import type { AccessTokenPayload } from '../token.service'
 import { UserCacheService } from '../user-cache.service'
 
 import { OAuthStateService } from './oauth-state.service'
@@ -17,8 +17,9 @@ import { OAuthProviderFactory } from './providers/oauth-provider.factory'
 interface LoginCallbackResult {
   mode: 'login'
   user: UserResponse
-  accessToken: string
   refreshToken: string
+  sessionId: string
+  accessClaims: AccessTokenPayload
 }
 
 interface LinkCallbackResult {
@@ -39,7 +40,6 @@ export class OAuthService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tokenService: TokenService,
     private readonly sessionService: SessionService,
     private readonly userCacheService: UserCacheService,
     private readonly providerFactory: OAuthProviderFactory,
@@ -108,12 +108,12 @@ export class OAuthService {
 
     const user = await this.findOrCreateUser(profile, providerName)
 
-    const accessToken = this.tokenService.generateAccessToken({
+    const accessClaims: AccessTokenPayload = {
       sub: user.id,
       email: user.email,
       systemRole: user.systemRole,
-    })
-    const refreshToken = await this.sessionService.createSession({
+    }
+    const { session, refreshToken } = await this.sessionService.createSession({
       userId: user.id,
       userAgent: requestInfo.userAgent,
       ipAddress: requestInfo.ipAddress,
@@ -121,7 +121,13 @@ export class OAuthService {
 
     this.logger.log({ msg: 'oauth login', userId: user.id, provider: providerName })
 
-    return { mode: 'login', user: this.mapUserToResponse(user), accessToken, refreshToken }
+    return {
+      mode: 'login',
+      user: this.mapUserToResponse(user),
+      refreshToken,
+      sessionId: session.id,
+      accessClaims,
+    }
   }
 
   private async attachProviderToUser(
