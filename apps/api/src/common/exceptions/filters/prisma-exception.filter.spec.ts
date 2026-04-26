@@ -137,6 +137,74 @@ describe('PrismaClientExceptionFilter', () => {
     )
   })
 
+  it('should map PrismaClientValidationError to 400 BAD_REQUEST', () => {
+    const exception = new Prisma.PrismaClientValidationError('Invalid invocation', {
+      clientVersion: '5.0.0',
+    })
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST)
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 400,
+        message: 'Invalid database query',
+        errorCode: 'PRISMA_VALIDATION_ERROR',
+      })
+    )
+  })
+
+  it('should map PrismaClientInitializationError to 503 SERVICE_UNAVAILABLE', () => {
+    const exception = new Prisma.PrismaClientInitializationError(
+      'Can not reach database server',
+      '5.0.0',
+      'P1001'
+    )
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE)
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 503,
+        message: 'Database temporarily unavailable',
+        errorCode: 'PRISMA_INITIALIZATION_ERROR',
+      })
+    )
+  })
+
+  it('should map PrismaClientUnknownRequestError to 503 SERVICE_UNAVAILABLE', () => {
+    const exception = new Prisma.PrismaClientUnknownRequestError('Connection lost', {
+      clientVersion: '5.0.0',
+    })
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE)
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 503,
+        message: 'Database temporarily unavailable',
+        errorCode: 'PRISMA_UNKNOWN_REQUEST_ERROR',
+      })
+    )
+  })
+
+  it('should map PrismaClientRustPanicError to 500 INTERNAL_SERVER_ERROR', () => {
+    const exception = new Prisma.PrismaClientRustPanicError('Engine panic', '5.0.0')
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR)
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 500,
+        message: 'Database engine error',
+        errorCode: 'PRISMA_ENGINE_ERROR',
+      })
+    )
+  })
+
   it('should include Prisma metadata in development', () => {
     const originalEnv = process.env.NODE_ENV
     process.env.NODE_ENV = 'development'
@@ -176,6 +244,30 @@ describe('PrismaClientExceptionFilter', () => {
     process.env.NODE_ENV = originalEnv
   })
 
+  it('should include initialization details in development', () => {
+    const originalEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+
+    const exception = new Prisma.PrismaClientInitializationError(
+      'Can not reach database server',
+      '5.0.0',
+      'P1001'
+    )
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: {
+          prismaType: 'PrismaClientInitializationError',
+          errorCode: 'P1001',
+        },
+      })
+    )
+
+    process.env.NODE_ENV = originalEnv
+  })
+
   it('should log Prisma errors with context', () => {
     const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
       code: 'P2002',
@@ -192,7 +284,26 @@ describe('PrismaClientExceptionFilter', () => {
         meta: { target: ['email'], modelName: 'User' },
         model: 'User',
       }),
-      expect.stringContaining('Prisma error: P2002')
+      expect.stringContaining('Prisma error: PRISMA_P2002')
+    )
+  })
+
+  it('should log initialization errors with Prisma type and code', () => {
+    const exception = new Prisma.PrismaClientInitializationError(
+      'Can not reach database server',
+      '5.0.0',
+      'P1001'
+    )
+
+    filter.catch(exception, mockHost)
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: exception,
+        prismaType: 'PrismaClientInitializationError',
+        prismaCode: 'P1001',
+      }),
+      expect.stringContaining('Prisma error: PRISMA_INITIALIZATION_ERROR')
     )
   })
 })
