@@ -1,7 +1,8 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common'
+import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 import * as argon2 from 'argon2'
 import type { Cache } from 'cache-manager'
+import { PinoLogger } from 'nestjs-pino'
 
 import type { LoginInput, RegisterInput, UserResponse } from '@amcore/shared'
 import { AuthErrorCode } from '@amcore/shared'
@@ -31,8 +32,6 @@ interface RequestInfo {
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name)
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
@@ -43,8 +42,11 @@ export class AuthService {
     private readonly env: EnvService,
     private readonly emailIdentity: EmailIdentityService,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
-    private readonly loginRateLimiter: LoginRateLimiterService
-  ) {}
+    private readonly loginRateLimiter: LoginRateLimiterService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(AuthService.name)
+  }
 
   /** Register new user */
   async register(input: RegisterInput, requestInfo: RequestInfo): Promise<AuthResult> {
@@ -98,15 +100,12 @@ export class AuthService {
         email: user.email,
         locale: user.locale as 'ru' | 'en',
       })
-      .catch((err: unknown) => this.logger.warn('Failed to send welcome email', { error: err }))
+      .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send welcome email'))
     void this.resendVerificationEmail(user.email).catch((err: unknown) =>
-      this.logger.warn('Failed to send verification email', { error: err })
+      this.logger.warn({ err }, 'Failed to send verification email')
     )
 
-    this.logger.log('User registered successfully', {
-      userId: user.id,
-      email: user.email,
-    })
+    this.logger.info({ userId: user.id, email: user.email }, 'User registered successfully')
 
     return {
       user: this.mapUserToResponse(user),
@@ -170,10 +169,7 @@ export class AuthService {
       ipAddress: requestInfo.ipAddress,
     })
 
-    this.logger.log('User logged in successfully', {
-      userId: user.id,
-      email: user.email,
-    })
+    this.logger.info({ userId: user.id, email: user.email }, 'User logged in successfully')
 
     return {
       user: this.mapUserToResponse(user),
@@ -185,7 +181,7 @@ export class AuthService {
   /** Logout (invalidate refresh token) */
   async logout(refreshTokenHash: string): Promise<void> {
     await this.sessionService.deleteByRefreshToken(refreshTokenHash)
-    this.logger.log('User logged out successfully')
+    this.logger.info('User logged out successfully')
   }
 
   /** Get user by ID */
@@ -214,7 +210,7 @@ export class AuthService {
       locale: user.locale as 'ru' | 'en',
     })
 
-    this.logger.log('Password reset email queued', { userId: user.id })
+    this.logger.info({ userId: user.id }, 'Password reset email queued')
   }
 
   /** Reset password using token */
@@ -249,7 +245,7 @@ export class AuthService {
       })
     }
 
-    this.logger.log('Password reset successfully', { userId })
+    this.logger.info({ userId }, 'Password reset successfully')
   }
 
   /** Verify email address using token */
@@ -270,7 +266,7 @@ export class AuthService {
 
     await this.userCacheService.invalidateUser(userId)
 
-    this.logger.log('Email verified successfully', { userId })
+    this.logger.info({ userId }, 'Email verified successfully')
   }
 
   /** Resend verification email (silent fail if already verified) */
@@ -293,7 +289,7 @@ export class AuthService {
       locale: user.locale as 'ru' | 'en',
     })
 
-    this.logger.log('Verification email queued', { userId: user.id })
+    this.logger.info({ userId: user.id }, 'Verification email queued')
   }
 
   /** Rate limit by key: max N requests per hour */

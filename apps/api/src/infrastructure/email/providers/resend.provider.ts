@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { PinoLogger } from 'nestjs-pino'
 import { Resend } from 'resend'
 
 import type { EmailProvider, SendEmailParams, SendEmailResult } from '../email.types'
@@ -13,10 +14,13 @@ import { EnvService } from '@/env/env.service'
  */
 @Injectable()
 export class ResendEmailProvider implements EmailProvider {
-  private readonly logger = new Logger(ResendEmailProvider.name)
   private readonly resend: Resend
 
-  constructor(private readonly env: EnvService) {
+  constructor(
+    private readonly env: EnvService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(ResendEmailProvider.name)
     const apiKey = this.env.get('RESEND_API_KEY')
 
     if (!apiKey) {
@@ -24,7 +28,7 @@ export class ResendEmailProvider implements EmailProvider {
     }
 
     this.resend = new Resend(apiKey)
-    this.logger.log('Resend provider initialized')
+    this.logger.info('Resend provider initialized')
   }
 
   async send(params: SendEmailParams): Promise<SendEmailResult> {
@@ -41,11 +45,7 @@ export class ResendEmailProvider implements EmailProvider {
       })
 
       if (error) {
-        this.logger.error('Failed to send email via Resend', {
-          to,
-          subject,
-          error: error.message,
-        })
+        this.logger.error({ to, subject, error: error.message }, 'Failed to send email via Resend')
 
         return {
           id: '',
@@ -54,11 +54,7 @@ export class ResendEmailProvider implements EmailProvider {
         }
       }
 
-      this.logger.log('Email sent successfully via Resend', {
-        id: data?.id,
-        to,
-        subject,
-      })
+      this.logger.info({ id: data?.id, to, subject }, 'Email sent successfully via Resend')
 
       return {
         id: data?.id || '',
@@ -67,11 +63,7 @@ export class ResendEmailProvider implements EmailProvider {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
 
-      this.logger.error('Resend API error', {
-        to,
-        subject,
-        error: message,
-      })
+      this.logger.error({ to, subject, error: message }, 'Resend API error')
 
       return {
         id: '',

@@ -1,5 +1,6 @@
 import { SystemRole, type User } from '@prisma/client'
 import * as argon2 from 'argon2'
+import type { PinoLogger } from 'nestjs-pino'
 
 import type { LoginInput, RegisterInput } from '@amcore/shared'
 
@@ -34,6 +35,7 @@ describe('AuthService', () => {
   let mockEnvService: { get: jest.Mock }
   let mockCache: { get: jest.Mock; set: jest.Mock }
   let mockLoginRateLimiter: jest.Mocked<LoginRateLimiterService>
+  let mockLogger: jest.Mocked<PinoLogger>
 
   const mockUser: User = {
     id: 'user-123',
@@ -124,6 +126,14 @@ describe('AuthService', () => {
       reset: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<LoginRateLimiterService>
 
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+
     const prisma = mockContextToPrisma(mockCtx)
     authService = new AuthService(
       prisma,
@@ -135,7 +145,8 @@ describe('AuthService', () => {
       mockEnvService as never,
       new EmailIdentityService(),
       mockCache as never,
-      mockLoginRateLimiter
+      mockLoginRateLimiter,
+      mockLogger
     )
 
     jest.clearAllMocks()

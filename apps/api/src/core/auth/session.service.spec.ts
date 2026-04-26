@@ -1,4 +1,5 @@
 import { type Session, SystemRole, type User } from '@prisma/client'
+import type { PinoLogger } from 'nestjs-pino'
 
 import { NotFoundException } from '../../common/exceptions'
 
@@ -10,6 +11,7 @@ describe('SessionService', () => {
   let sessionService: SessionService
   let mockCtx: MockContext
   let tokenService: jest.Mocked<TokenService>
+  let mockLogger: jest.Mocked<PinoLogger>
 
   const mockUser: User = {
     id: 'user-123',
@@ -52,8 +54,16 @@ describe('SessionService', () => {
       verifyAccessToken: jest.fn(),
     } as unknown as jest.Mocked<TokenService>
 
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+
     const prisma = mockContextToPrisma(mockCtx)
-    sessionService = new SessionService(prisma, tokenService)
+    sessionService = new SessionService(prisma, tokenService, mockLogger)
 
     mockCtx.prisma.$transaction.mockImplementation(async (callback: any) =>
       callback(mockCtx.prisma)

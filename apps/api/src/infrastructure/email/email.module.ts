@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { PinoLogger } from 'nestjs-pino'
 
 import { EmailService } from './email.service'
 import type { EmailProvider } from './email.types'
@@ -24,25 +25,30 @@ import { QueueModule, QueueService } from '@/infrastructure/queue'
     // Dynamic provider selection based on env
     {
       provide: 'EmailProvider',
-      inject: [EnvService],
-      useFactory: (env: EnvService): EmailProvider => {
+      inject: [EnvService, PinoLogger],
+      useFactory: (env: EnvService, logger: PinoLogger): EmailProvider => {
         const provider = env.get('EMAIL_PROVIDER')
 
         switch (provider) {
           case 'resend':
-            return new ResendEmailProvider(env)
+            return new ResendEmailProvider(env, logger)
           case 'mock':
           default:
-            return new MockEmailProvider()
+            return new MockEmailProvider(logger)
         }
       },
     },
     // Email service
     {
       provide: EmailService,
-      inject: ['EmailProvider', QueueService, EnvService],
-      useFactory: (emailProvider: EmailProvider, queueService: QueueService, env: EnvService) => {
-        return new EmailService(emailProvider, queueService, env)
+      inject: ['EmailProvider', QueueService, EnvService, PinoLogger],
+      useFactory: (
+        emailProvider: EmailProvider,
+        queueService: QueueService,
+        env: EnvService,
+        logger: PinoLogger
+      ) => {
+        return new EmailService(emailProvider, queueService, env, logger)
       },
     },
     // BullMQ processor

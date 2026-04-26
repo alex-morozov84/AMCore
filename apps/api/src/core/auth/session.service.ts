@@ -1,6 +1,7 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
+import { Injectable, UnauthorizedException } from '@nestjs/common'
 import type { Session, User } from '@prisma/client'
 import { randomBytes } from 'crypto'
+import { PinoLogger } from 'nestjs-pino'
 
 import { NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
@@ -29,12 +30,13 @@ export interface SessionInfo {
 
 @Injectable()
 export class SessionService {
-  private readonly logger = new Logger(SessionService.name)
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tokenService: TokenService
-  ) {}
+    private readonly tokenService: TokenService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(SessionService.name)
+  }
 
   /** Create new session, return session row and raw refresh token */
   async createSession(params: CreateSessionParams): Promise<CreateSessionResult> {
@@ -53,10 +55,7 @@ export class SessionService {
       },
     })
 
-    this.logger.log('Session created', {
-      sessionId: session.id,
-      userId: params.userId,
-    })
+    this.logger.info({ sessionId: session.id, userId: params.userId }, 'Session created')
 
     return { session, refreshToken }
   }
@@ -170,7 +169,7 @@ export class SessionService {
       })
     })
 
-    this.logger.log('Refresh token rotated', { userId: params.userId })
+    this.logger.info({ userId: params.userId }, 'Refresh token rotated')
 
     return refreshToken
   }
@@ -212,7 +211,7 @@ export class SessionService {
       throw new NotFoundException('Session', sessionId)
     }
 
-    this.logger.log('Session deleted', { sessionId, userId })
+    this.logger.info({ sessionId, userId }, 'Session deleted')
   }
 
   /** Delete all sessions for user (e.g. after password reset) */
@@ -220,7 +219,7 @@ export class SessionService {
     const result = await this.prisma.session.deleteMany({ where: { userId } })
 
     if (result.count > 0) {
-      this.logger.log('All sessions deleted', { userId, count: result.count })
+      this.logger.info({ userId, count: result.count }, 'All sessions deleted')
     }
   }
 
@@ -234,10 +233,7 @@ export class SessionService {
     })
 
     if (result.count > 0) {
-      this.logger.log('Other sessions deleted', {
-        userId,
-        count: result.count,
-      })
+      this.logger.info({ userId, count: result.count }, 'Other sessions deleted')
     }
   }
 
@@ -248,7 +244,7 @@ export class SessionService {
     })
 
     if (result.count > 0) {
-      this.logger.log('Expired sessions cleaned up', { count: result.count })
+      this.logger.info({ count: result.count }, 'Expired sessions cleaned up')
     }
   }
 
@@ -265,11 +261,7 @@ export class SessionService {
     })
 
     if (result.count > 0) {
-      this.logger.warn('Refresh token family revoked', {
-        familyId,
-        count: result.count,
-        reason,
-      })
+      this.logger.warn({ familyId, count: result.count, reason }, 'Refresh token family revoked')
     }
   }
 

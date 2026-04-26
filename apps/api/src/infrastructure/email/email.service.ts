@@ -1,5 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { render } from '@react-email/render'
+import { PinoLogger } from 'nestjs-pino'
 
 import type {
   EmailProvider,
@@ -31,14 +32,17 @@ import { QueueService } from '@/infrastructure/queue/queue.service'
  */
 @Injectable()
 export class EmailService {
-  private readonly logger = new Logger(EmailService.name)
-
   constructor(
     @Inject('EmailProvider') private readonly emailProvider: EmailProvider,
     private readonly queueService: QueueService,
-    private readonly env: EnvService
+    private readonly env: EnvService,
+    private readonly logger: PinoLogger
   ) {
-    this.logger.log(`Email service initialized with ${emailProvider.constructor.name}`)
+    this.logger.setContext(EmailService.name)
+    this.logger.info(
+      { provider: emailProvider.constructor.name },
+      `Email service initialized with ${emailProvider.constructor.name}`
+    )
   }
 
   /**
@@ -60,10 +64,7 @@ export class EmailService {
       },
     })
 
-    this.logger.log('Email queued', {
-      template: jobData.template,
-      to: jobData.to,
-    })
+    this.logger.info({ template: jobData.template, to: jobData.to }, 'Email queued')
   }
 
   /**

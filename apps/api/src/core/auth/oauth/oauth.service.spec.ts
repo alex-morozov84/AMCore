@@ -3,6 +3,7 @@ jest.mock('./oauth-client.service', () => ({ OAuthClientService: jest.fn() }))
 
 import { HttpStatus } from '@nestjs/common'
 import type { OAuthProvider, User } from '@prisma/client'
+import type { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode } from '@amcore/shared'
 
@@ -49,6 +50,7 @@ describe('OAuthService', () => {
   let providerFactory: jest.Mocked<any>
   let stateService: jest.Mocked<any>
   let mockProvider: jest.Mocked<any>
+  let mockLogger: jest.Mocked<PinoLogger>
 
   const requestInfo = { userAgent: 'test-agent', ipAddress: '127.0.0.1' }
 
@@ -100,13 +102,22 @@ describe('OAuthService', () => {
       } as OAuthStateData),
     }
 
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+
     service = new OAuthService(
       prisma,
       sessionService,
       userCacheService,
       providerFactory,
       stateService,
-      new EmailIdentityService()
+      new EmailIdentityService(),
+      mockLogger
     )
   })
 

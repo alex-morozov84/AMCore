@@ -1,5 +1,6 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { createClient } from '@redis/client'
+import { PinoLogger } from 'nestjs-pino'
 
 import { EnvService } from '../../env/env.service'
 
@@ -7,10 +8,13 @@ export type AppRedisClient = ReturnType<typeof createClient>
 
 @Injectable()
 export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(RedisConnectionService.name)
   private readonly redisClient: AppRedisClient
 
-  constructor(private readonly env: EnvService) {
+  constructor(
+    private readonly env: EnvService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(RedisConnectionService.name)
     this.redisClient = createClient({
       url: this.env.get('REDIS_URL'),
       socket: {
@@ -19,7 +23,7 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
     })
 
     this.redisClient.on('error', (error) => {
-      this.logger.error(error, 'Redis client error')
+      this.logger.error({ err: error }, 'Redis client error')
     })
   }
 

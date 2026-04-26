@@ -1,5 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import type { Permission } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
@@ -23,8 +24,6 @@ const MAX_LOCK_ATTEMPTS = 5
  */
 @Injectable()
 export class PermissionsCacheService {
-  private readonly logger = new Logger(PermissionsCacheService.name)
-
   private metrics = {
     hits: 0,
     misses: 0,
@@ -35,8 +34,11 @@ export class PermissionsCacheService {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: AppRedisClient,
     private readonly lock: RedisLockService,
-    private readonly prisma: PrismaService
-  ) {}
+    private readonly prisma: PrismaService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(PermissionsCacheService.name)
+  }
 
   async getPermissions(
     userId: string,
@@ -84,12 +86,10 @@ export class PermissionsCacheService {
       }
     }
 
-    this.logger.warn('Permissions cache lock contention timeout, falling back to DB', {
-      userId,
-      organizationId,
-      aclVersion,
-      attempts: MAX_LOCK_ATTEMPTS,
-    })
+    this.logger.warn(
+      { userId, organizationId, aclVersion, attempts: MAX_LOCK_ATTEMPTS },
+      'Permissions cache lock contention timeout, falling back to DB'
+    )
 
     return this.fetchAndCachePermissions(userId, organizationId, aclVersion)
   }
@@ -133,13 +133,16 @@ export class PermissionsCacheService {
       }
     )
 
-    this.logger.debug(`Permissions cached for user ${userId} in org ${organizationId}`, {
-      userId,
-      organizationId,
-      aclVersion,
-      permissionsCount: permissions.length,
-      ttlMs: PERMISSIONS_CACHE_TTL_MS,
-    })
+    this.logger.debug(
+      {
+        userId,
+        organizationId,
+        aclVersion,
+        permissionsCount: permissions.length,
+        ttlMs: PERMISSIONS_CACHE_TTL_MS,
+      },
+      `Permissions cached for user ${userId} in org ${organizationId}`
+    )
 
     return permissions
   }
@@ -192,7 +195,7 @@ export class PermissionsCacheService {
     })
 
     if (!member) {
-      this.logger.warn(`User ${userId} is not a member of org ${organizationId}`)
+      this.logger.warn({ userId, organizationId }, 'User is not a member of org')
       return []
     }
 
@@ -232,7 +235,7 @@ export class PermissionsCacheService {
   private logMetrics(): void {
     if (this.metrics.requests % 100 === 0) {
       const metrics = this.getMetrics()
-      this.logger.log('Permissions cache metrics', metrics)
+      this.logger.info(metrics, 'Permissions cache metrics')
     }
   }
 }

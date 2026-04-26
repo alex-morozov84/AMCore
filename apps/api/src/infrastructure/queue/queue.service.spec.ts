@@ -2,6 +2,7 @@ import { getQueueToken } from '@nestjs/bullmq'
 import { NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import type { Job, Queue } from 'bullmq'
+import { PinoLogger } from 'nestjs-pino'
 
 import { JobName, QueueName } from './constants/queues.constant'
 import { QueueService } from './queue.service'
@@ -10,6 +11,7 @@ describe('QueueService', () => {
   let service: QueueService
   let defaultQueue: jest.Mocked<Queue>
   let emailQueue: jest.Mocked<Queue>
+  let mockLogger: jest.Mocked<PinoLogger>
 
   beforeEach(async () => {
     // Create mock queues
@@ -26,6 +28,13 @@ describe('QueueService', () => {
 
     defaultQueue = createMockQueue()
     emailQueue = createMockQueue()
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -37,6 +46,10 @@ describe('QueueService', () => {
         {
           provide: getQueueToken(QueueName.EMAIL),
           useValue: emailQueue,
+        },
+        {
+          provide: PinoLogger,
+          useValue: mockLogger,
         },
       ],
     }).compile()

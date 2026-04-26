@@ -1,4 +1,5 @@
 import type { EmailVerificationToken, PasswordResetToken } from '@prisma/client'
+import type { PinoLogger } from 'nestjs-pino'
 
 import { AppException } from '../../common/exceptions'
 import type { EnvService } from '../../env/env.service'
@@ -10,6 +11,7 @@ describe('TokenManagerService', () => {
   let service: TokenManagerService
   let mockCtx: MockContext
   let envService: jest.Mocked<Pick<EnvService, 'get'>>
+  let mockLogger: jest.Mocked<PinoLogger>
 
   const userId = 'user-123'
 
@@ -44,9 +46,18 @@ describe('TokenManagerService', () => {
       }) as jest.MockedFunction<EnvService['get']>,
     }
 
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+
     service = new TokenManagerService(
       mockContextToPrisma(mockCtx),
-      envService as unknown as EnvService
+      envService as unknown as EnvService,
+      mockLogger
     )
   })
 

@@ -1,6 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq'
-import { Logger } from '@nestjs/common'
 import type { Job } from 'bullmq'
+import { PinoLogger } from 'nestjs-pino'
 
 import { JobName, QueueName } from '../constants/queues.constant'
 
@@ -11,10 +11,16 @@ interface HelloWorldJobData {
 
 @Processor(QueueName.DEFAULT)
 export class HelloWorldProcessor extends WorkerHost {
-  private readonly logger = new Logger(HelloWorldProcessor.name)
+  constructor(private readonly logger: PinoLogger) {
+    super()
+    this.logger.setContext(HelloWorldProcessor.name)
+  }
 
   async process(job: Job<HelloWorldJobData>): Promise<string> {
-    this.logger.log(`Processing job ${job.name} with ID ${job.id}`)
+    this.logger.info(
+      { jobName: job.name, jobId: job.id },
+      `Processing job ${job.name} with ID ${job.id}`
+    )
 
     // Only process hello-world jobs
     if (job.name !== JobName.HELLO_WORLD) {
@@ -28,7 +34,7 @@ export class HelloWorldProcessor extends WorkerHost {
 
     const result = `Hello, ${name}! ${message || 'Welcome to BullMQ.'}`
 
-    this.logger.log(`Job ${job.id} completed`, { result })
+    this.logger.info({ jobId: job.id, result }, `Job ${job.id} completed`)
 
     return result
   }

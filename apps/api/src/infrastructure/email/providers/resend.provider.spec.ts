@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import type { PinoLogger } from 'nestjs-pino'
 import { Resend } from 'resend'
 
 import { ResendEmailProvider } from './resend.provider'
@@ -13,6 +14,7 @@ describe('ResendEmailProvider', () => {
   let envService: jest.Mocked<EnvService>
   let mockResendInstance: any
   let mockSend: jest.Mock
+  let mockLogger: jest.Mocked<PinoLogger>
 
   beforeEach(async () => {
     // Create mock send function
@@ -45,7 +47,14 @@ describe('ResendEmailProvider', () => {
     }).compile()
 
     envService = module.get(EnvService)
-    provider = new ResendEmailProvider(envService)
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+    provider = new ResendEmailProvider(envService, mockLogger)
   })
 
   afterEach(() => {
@@ -59,7 +68,7 @@ describe('ResendEmailProvider', () => {
   it('should throw error if RESEND_API_KEY is missing', () => {
     envService.get.mockReturnValue(undefined as any)
 
-    expect(() => new ResendEmailProvider(envService)).toThrow(
+    expect(() => new ResendEmailProvider(envService, mockLogger)).toThrow(
       'RESEND_API_KEY is required for Resend provider'
     )
   })

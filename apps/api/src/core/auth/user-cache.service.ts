@@ -1,5 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import type { User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
@@ -34,8 +35,6 @@ const DATE_FIELDS = ['createdAt', 'updatedAt', 'lastLoginAt'] as const
  */
 @Injectable()
 export class UserCacheService {
-  private readonly logger = new Logger(UserCacheService.name)
-
   private metrics = {
     hits: 0,
     misses: 0,
@@ -46,8 +45,11 @@ export class UserCacheService {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: AppRedisClient,
     private readonly lock: RedisLockService,
-    private readonly prisma: PrismaService
-  ) {}
+    private readonly prisma: PrismaService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(UserCacheService.name)
+  }
 
   async getUser(userId: string): Promise<User | null> {
     this.metrics.requests++
@@ -91,10 +93,10 @@ export class UserCacheService {
       }
     }
 
-    this.logger.warn('User cache lock contention timeout, falling back to DB', {
-      userId,
-      attempts: MAX_LOCK_ATTEMPTS,
-    })
+    this.logger.warn(
+      { userId, attempts: MAX_LOCK_ATTEMPTS },
+      'User cache lock contention timeout, falling back to DB'
+    )
 
     return this.fetchAndCacheUser(userId)
   }
@@ -116,18 +118,16 @@ export class UserCacheService {
     }
     await multi.exec()
 
-    this.logger.log(`Invalidated ${keysToDelete.length - 1} cache keys for user ${userId}`, {
-      userId,
-      keysInvalidated: keysToDelete.length - 1,
-    })
+    this.logger.info(
+      { userId, keysInvalidated: keysToDelete.length - 1 },
+      `Invalidated ${keysToDelete.length - 1} cache keys for user ${userId}`
+    )
   }
 
   async invalidateUsers(userIds: string[]): Promise<void> {
     await Promise.all(userIds.map((userId) => this.invalidateUser(userId)))
 
-    this.logger.log(`Batch invalidated ${userIds.length} users`, {
-      count: userIds.length,
-    })
+    this.logger.info({ count: userIds.length }, `Batch invalidated ${userIds.length} users`)
   }
 
   getMetrics(): {
@@ -180,10 +180,7 @@ export class UserCacheService {
 
     await this.trackCacheKey(userId, this.getUserKey(userId))
 
-    this.logger.debug(`User ${userId} cached from DB`, {
-      userId,
-      ttlMs: USER_CACHE_TTL_MS,
-    })
+    this.logger.debug({ userId, ttlMs: USER_CACHE_TTL_MS }, `User ${userId} cached from DB`)
 
     return user
   }
@@ -256,7 +253,7 @@ export class UserCacheService {
   private logMetrics(): void {
     if (this.metrics.requests % 100 === 0) {
       const metrics = this.getMetrics()
-      this.logger.log('Cache metrics', metrics)
+      this.logger.info(metrics, 'Cache metrics')
     }
   }
 }

@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
+import type { PinoLogger } from 'nestjs-pino'
 
 import type { PrismaService } from '../../prisma'
 
@@ -8,10 +9,18 @@ import { CleanupService } from './cleanup.service'
 describe('CleanupService', () => {
   let service: CleanupService
   let prisma: DeepMockProxy<PrismaClient>
+  let mockLogger: jest.Mocked<PinoLogger>
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
-    service = new CleanupService(prisma as unknown as PrismaService)
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+    service = new CleanupService(prisma as unknown as PrismaService, mockLogger)
   })
 
   describe('runCleanup', () => {

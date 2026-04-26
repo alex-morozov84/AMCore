@@ -1,5 +1,6 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import { createHash, randomBytes } from 'crypto'
+import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode } from '@amcore/shared'
 
@@ -16,12 +17,13 @@ export type TokenType = 'password-reset' | 'email-verification'
 
 @Injectable()
 export class TokenManagerService {
-  private readonly logger = new Logger(TokenManagerService.name)
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly env: EnvService
-  ) {}
+    private readonly env: EnvService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(TokenManagerService.name)
+  }
 
   /** Generate password reset token (15 min expiry) */
   async generatePasswordResetToken(userId: string): Promise<GeneratedToken> {
@@ -36,7 +38,7 @@ export class TokenManagerService {
       data: { userId, tokenHash, expiresAt },
     })
 
-    this.logger.log('Password reset token generated', { userId })
+    this.logger.info({ userId }, 'Password reset token generated')
 
     return { token, expiresAt }
   }
@@ -84,7 +86,7 @@ export class TokenManagerService {
       data: { userId, tokenHash, expiresAt },
     })
 
-    this.logger.log('Email verification token generated', { userId })
+    this.logger.info({ userId }, 'Email verification token generated')
 
     return { token, expiresAt }
   }

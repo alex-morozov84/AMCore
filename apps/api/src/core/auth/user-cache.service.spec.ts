@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { SystemRole, type User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
@@ -18,6 +19,7 @@ describe('UserCacheService', () => {
     expire: jest.Mock
     exec: jest.Mock
   }
+  let mockLogger: jest.Mocked<PinoLogger>
 
   const mockUser: User = {
     id: 'user-123',
@@ -56,6 +58,14 @@ describe('UserCacheService', () => {
       multi: jest.fn().mockReturnValue(multi),
     }
 
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserCacheService,
@@ -77,6 +87,10 @@ describe('UserCacheService', () => {
               findUnique: jest.fn(),
             },
           },
+        },
+        {
+          provide: PinoLogger,
+          useValue: mockLogger,
         },
       ],
     }).compile()

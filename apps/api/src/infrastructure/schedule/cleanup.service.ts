@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { PinoLogger } from 'nestjs-pino'
 
 import { PrismaService } from '@/prisma'
 
@@ -22,15 +23,18 @@ export interface CleanupResult {
  */
 @Injectable()
 export class CleanupService {
-  private readonly logger = new Logger(CleanupService.name)
-
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(CleanupService.name)
+  }
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async scheduledCleanup(): Promise<void> {
-    this.logger.log('Starting scheduled cleanup')
+    this.logger.info('Starting scheduled cleanup')
     const result = await this.runCleanup()
-    this.logger.log('Scheduled cleanup complete', result)
+    this.logger.info(result, 'Scheduled cleanup complete')
   }
 
   async runCleanup(): Promise<CleanupResult> {

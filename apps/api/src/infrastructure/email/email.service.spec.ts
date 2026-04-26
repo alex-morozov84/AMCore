@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { PinoLogger } from 'nestjs-pino'
 
 import { EmailService } from './email.service'
 import type { EmailProvider, WelcomeEmailData } from './email.types'
@@ -33,8 +34,17 @@ describe('EmailService', () => {
   let service: EmailService
   let emailProvider: jest.Mocked<EmailProvider>
   let queueService: jest.Mocked<QueueService>
+  let mockLogger: jest.Mocked<PinoLogger>
 
   beforeEach(async () => {
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmailService,
@@ -55,6 +65,10 @@ describe('EmailService', () => {
           useValue: {
             get: jest.fn(),
           },
+        },
+        {
+          provide: PinoLogger,
+          useValue: mockLogger,
         },
       ],
     }).compile()

@@ -1,6 +1,7 @@
 import { InjectQueue } from '@nestjs/bullmq'
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import type { Job, Queue } from 'bullmq'
+import { PinoLogger } from 'nestjs-pino'
 
 import { QueueName } from './constants/queues.constant'
 import type { JobOptions } from './interfaces/job-options.interface'
@@ -9,18 +10,19 @@ import type { IQueueService } from './interfaces/queue.interface'
 
 @Injectable()
 export class QueueService implements IQueueService {
-  private readonly logger = new Logger(QueueService.name)
   private readonly queues = new Map<string, Queue>()
 
   constructor(
     @InjectQueue(QueueName.DEFAULT) defaultQueue: Queue,
-    @InjectQueue(QueueName.EMAIL) emailQueue: Queue
+    @InjectQueue(QueueName.EMAIL) emailQueue: Queue,
+    private readonly logger: PinoLogger
   ) {
+    this.logger.setContext(QueueService.name)
     // Register all queues for easy access
     this.queues.set(QueueName.DEFAULT, defaultQueue)
     this.queues.set(QueueName.EMAIL, emailQueue)
 
-    this.logger.log(`Initialized ${this.queues.size} queues`)
+    this.logger.info({ count: this.queues.size }, `Initialized ${this.queues.size} queues`)
   }
 
   async add<T = unknown>(
@@ -39,11 +41,7 @@ export class QueueService implements IQueueService {
 
     const job = await queue.add(jobName, data, mergedOptions)
 
-    this.logger.log(`Job added to queue "${queueName}"`, {
-      jobId: job.id,
-      jobName,
-      queueName,
-    })
+    this.logger.info({ jobId: job.id, jobName, queueName }, `Job added to queue "${queueName}"`)
 
     return job as Job<T>
   }
@@ -61,10 +59,7 @@ export class QueueService implements IQueueService {
 
     await job.remove()
 
-    this.logger.log(`Job removed from queue "${queueName}"`, {
-      jobId,
-      queueName,
-    })
+    this.logger.info({ jobId, queueName }, `Job removed from queue "${queueName}"`)
   }
 
   async getJob<T = unknown>(queueName: string, jobId: string): Promise<Job<T> | undefined> {
@@ -106,10 +101,7 @@ export class QueueService implements IQueueService {
 
     await job.retry()
 
-    this.logger.log(`Job retried in queue "${queueName}"`, {
-      jobId,
-      queueName,
-    })
+    this.logger.info({ jobId, queueName }, `Job retried in queue "${queueName}"`)
   }
 
   async pauseQueue(queueName: string): Promise<void> {
@@ -121,7 +113,7 @@ export class QueueService implements IQueueService {
 
     await queue.pause()
 
-    this.logger.log(`Queue paused`, { queueName })
+    this.logger.info({ queueName }, 'Queue paused')
   }
 
   async resumeQueue(queueName: string): Promise<void> {
@@ -133,7 +125,7 @@ export class QueueService implements IQueueService {
 
     await queue.resume()
 
-    this.logger.log(`Queue resumed`, { queueName })
+    this.logger.info({ queueName }, 'Queue resumed')
   }
 
   async cleanQueue(
@@ -149,12 +141,7 @@ export class QueueService implements IQueueService {
 
     const cleaned = await queue.clean(grace, 1000, status)
 
-    this.logger.log(`Queue cleaned`, {
-      queueName,
-      status,
-      grace,
-      cleaned: cleaned.length,
-    })
+    this.logger.info({ queueName, status, grace, cleaned: cleaned.length }, 'Queue cleaned')
 
     return cleaned
   }

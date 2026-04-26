@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import type { Permission } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
@@ -12,6 +13,7 @@ describe('PermissionsCacheService', () => {
   let redis: jest.Mocked<Pick<AppRedisClient, 'get' | 'set' | 'del'>>
   let lock: jest.Mocked<Pick<RedisLockService, 'acquire' | 'release'>>
   let prisma: PrismaService
+  let mockLogger: jest.Mocked<PinoLogger>
 
   const mockPermissions: Permission[] = [
     {
@@ -68,6 +70,14 @@ describe('PermissionsCacheService', () => {
   }
 
   beforeEach(async () => {
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PermissionsCacheService,
@@ -93,6 +103,10 @@ describe('PermissionsCacheService', () => {
               findUnique: jest.fn(),
             },
           },
+        },
+        {
+          provide: PinoLogger,
+          useValue: mockLogger,
         },
       ],
     }).compile()

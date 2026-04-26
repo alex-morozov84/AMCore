@@ -1,5 +1,6 @@
 import { SystemRole } from '@prisma/client'
 import type { Cache } from 'cache-manager'
+import type { PinoLogger } from 'nestjs-pino'
 
 import { NotFoundException } from '../../common/exceptions'
 import { createMockContext, type MockContext, mockContextToPrisma } from '../auth/test-context'
@@ -10,6 +11,7 @@ describe('ApiKeysService', () => {
   let service: ApiKeysService
   let mockCtx: MockContext
   let mockCache: jest.Mocked<Pick<Cache, 'get' | 'set' | 'del'>>
+  let mockLogger: jest.Mocked<PinoLogger>
 
   const mockApiKey = {
     id: 'key-1',
@@ -38,8 +40,16 @@ describe('ApiKeysService', () => {
       del: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<Pick<Cache, 'get' | 'set' | 'del'>>
 
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+
     const prisma = mockContextToPrisma(mockCtx)
-    service = new ApiKeysService(prisma, mockCache as unknown as Cache)
+    service = new ApiKeysService(prisma, mockCache as unknown as Cache, mockLogger)
   })
 
   afterEach(() => {

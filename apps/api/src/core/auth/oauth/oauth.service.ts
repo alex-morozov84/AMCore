@@ -1,6 +1,7 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import type { OAuthProvider, User } from '@prisma/client'
 import { randomBytes } from 'crypto'
+import { PinoLogger } from 'nestjs-pino'
 
 import type { OAuthUserProfile, UserResponse } from '@amcore/shared'
 import { AuthErrorCode } from '@amcore/shared'
@@ -37,16 +38,17 @@ interface RequestInfo {
 
 @Injectable()
 export class OAuthService {
-  private readonly logger = new Logger(OAuthService.name)
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessionService: SessionService,
     private readonly userCacheService: UserCacheService,
     private readonly providerFactory: OAuthProviderFactory,
     private readonly stateService: OAuthStateService,
-    private readonly emailIdentity: EmailIdentityService
-  ) {}
+    private readonly emailIdentity: EmailIdentityService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(OAuthService.name)
+  }
 
   async getAuthorizationURL(providerName: string): Promise<{ url: string }> {
     const provider = this.providerFactory.get(providerName)
@@ -96,7 +98,7 @@ export class OAuthService {
 
     if (stateData.mode === 'link') {
       const user = await this.attachProviderToUser(stateData.userId!, profile, providerName)
-      this.logger.log({ msg: 'oauth link', userId: stateData.userId, provider: providerName })
+      this.logger.info({ userId: stateData.userId, provider: providerName }, 'oauth link')
       return { mode: 'link', user: this.mapUserToResponse(user) }
     }
 
@@ -121,7 +123,7 @@ export class OAuthService {
       ipAddress: requestInfo.ipAddress,
     })
 
-    this.logger.log({ msg: 'oauth login', userId: user.id, provider: providerName })
+    this.logger.info({ userId: user.id, provider: providerName }, 'oauth login')
 
     return {
       mode: 'login',

@@ -1,10 +1,20 @@
+import type { PinoLogger } from 'nestjs-pino'
+
 import { MockEmailProvider } from './mock.provider'
 
 describe('MockEmailProvider', () => {
   let provider: MockEmailProvider
+  let mockLogger: jest.Mocked<PinoLogger>
 
   beforeEach(() => {
-    provider = new MockEmailProvider()
+    mockLogger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
+    provider = new MockEmailProvider(mockLogger)
   })
 
   it('should be defined', () => {

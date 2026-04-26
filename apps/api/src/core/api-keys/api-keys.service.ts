@@ -1,9 +1,10 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import type { Prisma } from '@prisma/client'
 import type { Cache } from 'cache-manager'
+import { PinoLogger } from 'nestjs-pino'
 
 import type { CreateApiKeyInput } from '@amcore/shared'
 
@@ -30,12 +31,13 @@ export interface ApiKeyListItem {
 
 @Injectable()
 export class ApiKeysService {
-  private readonly logger = new Logger(ApiKeysService.name)
-
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(CACHE_MANAGER) private readonly cache: Cache
-  ) {}
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(ApiKeysService.name)
+  }
 
   async create(userId: string, input: CreateApiKeyInput): Promise<CreateApiKeyResult> {
     const { key, shortToken, longToken } = this.generateKey()
@@ -54,7 +56,7 @@ export class ApiKeysService {
       },
     })
 
-    this.logger.log('API key created', { userId, apiKeyId: apiKey.id })
+    this.logger.info({ userId, apiKeyId: apiKey.id }, 'API key created')
 
     return {
       id: apiKey.id,
@@ -91,7 +93,7 @@ export class ApiKeysService {
       throw new NotFoundException('API key')
     }
 
-    this.logger.log('API key revoked', { userId, apiKeyId: id })
+    this.logger.info({ userId, apiKeyId: id }, 'API key revoked')
   }
 
   async verifyByShortToken(
@@ -120,7 +122,7 @@ export class ApiKeysService {
 
     void this.prisma.apiKey
       .update({ where: { id }, data: { lastUsedAt: new Date() } })
-      .catch((err: unknown) => this.logger.warn('Failed to update lastUsedAt', { error: err }))
+      .catch((err: unknown) => this.logger.warn({ err }, 'Failed to update lastUsedAt'))
 
     await this.cache.set(cacheKey, '1', 3600 * 1000)
   }
