@@ -19,6 +19,11 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+    DATABASE_POOL_MAX: z.coerce.number().int().min(1).default(10),
+    DATABASE_POOL_IDLE_MS: z.coerce.number().int().min(0).default(30000),
+    DATABASE_CONNECT_MS: z.coerce.number().int().min(0).default(5000),
+    DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
+    DATABASE_QUERY_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
     REDIS_URL: z.url(),
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     JWT_ACCESS_EXPIRATION: z.string().default('15m'),
@@ -94,6 +99,29 @@ const envSchema = z
         path: ['RESEND_API_KEY'],
         message: 'RESEND_API_KEY is required when EMAIL_PROVIDER is resend',
       })
+    }
+
+    if (env.NODE_ENV === 'production') {
+      let sslmode: string | null = null
+
+      try {
+        sslmode = new URL(env.DATABASE_URL).searchParams.get('sslmode')?.toLowerCase() ?? null
+      } catch {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['DATABASE_URL'],
+          message: 'DATABASE_URL must be a valid URL',
+        })
+        return
+      }
+
+      if (sslmode !== 'require' && sslmode !== 'verify-full') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['DATABASE_URL'],
+          message: 'DATABASE_URL must include sslmode=require or sslmode=verify-full in production',
+        })
+      }
     }
   })
 

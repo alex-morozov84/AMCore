@@ -103,7 +103,7 @@
     "happy-dom": "^20.8.4",
     "jest": "^30.3.0",
     "jest-mock-extended": "^4.0.0",
-    "prisma": "^7.4.2",
+    "prisma": "^7.5.0",
     "react": "^19.2.4",
     "source-map-support": "^0.5.21",
     "supertest": "^7.2.2",

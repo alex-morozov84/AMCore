@@ -57,4 +57,73 @@ describe('env validation', () => {
     expect(env.EMAIL_PROVIDER).toBe('resend')
     expect(env.RESEND_API_KEY).toBe('re_test_key_123')
   })
+
+  it('applies database pool defaults', () => {
+    const env = validate(baseEnv)
+
+    expect(env.DATABASE_POOL_MAX).toBe(10)
+    expect(env.DATABASE_POOL_IDLE_MS).toBe(30000)
+    expect(env.DATABASE_CONNECT_MS).toBe(5000)
+    expect(env.DATABASE_STATEMENT_TIMEOUT_MS).toBe(30000)
+    expect(env.DATABASE_QUERY_TIMEOUT_MS).toBe(30000)
+  })
+
+  it('fails in production when DATABASE_URL omits sslmode', () => {
+    expect(() =>
+      validate({
+        ...baseEnv,
+        NODE_ENV: 'production',
+      })
+    ).toThrow(ZodError)
+  })
+
+  it('accepts sslmode=require in production', () => {
+    const env = validate({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=require',
+    })
+
+    expect(env.DATABASE_URL).toContain('sslmode=require')
+  })
+
+  it('accepts sslmode=verify-full in production', () => {
+    const env = validate({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=verify-full',
+    })
+
+    expect(env.DATABASE_URL).toContain('sslmode=verify-full')
+  })
+
+  it('accepts uppercase sslmode in production', () => {
+    const env = validate({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=REQUIRE',
+    })
+
+    expect(env.DATABASE_URL).toContain('sslmode=REQUIRE')
+  })
+
+  it('rejects sslmode=disable in production', () => {
+    expect(() =>
+      validate({
+        ...baseEnv,
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=disable',
+      })
+    ).toThrow(ZodError)
+  })
+
+  it('rejects sslmode=prefer in production', () => {
+    expect(() =>
+      validate({
+        ...baseEnv,
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=prefer',
+      })
+    ).toThrow(ZodError)
+  })
 })
