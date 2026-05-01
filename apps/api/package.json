@@ -69,7 +69,7 @@
     "nestjs-cls": "^6.2.0",
     "nestjs-pino": "^4.6.1",
     "nestjs-zod": "^5.1.1",
-    "openid-client": "^6.8.2",
+    "openid-client": "^6.8.4",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.20.0",
