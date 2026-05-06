@@ -42,7 +42,7 @@
     "@keyv/redis": "^5.1.6",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/bullmq": "^11.0.4",
-    "@nestjs/cache-manager": "^3.1.0",
+    "@nestjs/cache-manager": "^3.1.2",
     "@nestjs/common": "^11.1.19",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.19",
