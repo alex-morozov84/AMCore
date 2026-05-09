@@ -55,7 +55,7 @@
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.5.0",
-    "@react-email/components": "^1.0.11",
+    "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.4",
     "@redis/client": "^5.10.0",
     "argon2": "^0.44.0",
