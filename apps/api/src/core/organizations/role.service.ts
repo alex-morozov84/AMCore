@@ -1,9 +1,9 @@
-import { ForbiddenException, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import type { Permission, Prisma, Role } from '@prisma/client'
 
 import type { RequestPrincipal } from '@amcore/shared'
 
-import { ConflictException, NotFoundException } from '../../common/exceptions'
+import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 
 import type { AssignPermissionDto, CreateRoleDto, UpdateRoleDto } from './dto'

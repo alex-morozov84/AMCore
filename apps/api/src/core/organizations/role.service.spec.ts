@@ -1,4 +1,3 @@
-import { ForbiddenException } from '@nestjs/common'
 import type { Permission, Role } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
@@ -6,7 +5,7 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { RequestPrincipal } from '@amcore/shared'
 import { SystemRole } from '@amcore/shared'
 
-import { ConflictException, NotFoundException } from '../../common/exceptions'
+import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import type { PrismaService } from '../../prisma'
 
 import type { AssignPermissionDto, CreateRoleDto, UpdateRoleDto } from './dto'

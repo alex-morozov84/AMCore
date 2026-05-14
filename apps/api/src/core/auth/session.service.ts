@@ -1,9 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import type { Session, User } from '@prisma/client'
 import { randomBytes } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
-import { NotFoundException } from '../../common/exceptions'
+import { AuthErrorCode } from '@amcore/shared'
+
+import { AppException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 
 import { TokenService } from './token.service'
@@ -73,12 +75,20 @@ export class SessionService {
     const session = await this.findByRefreshToken(hashedToken)
 
     if (!session) {
-      throw new UnauthorizedException('Invalid refresh token')
+      throw new AppException(
+        'Invalid refresh token',
+        HttpStatus.UNAUTHORIZED,
+        AuthErrorCode.TOKEN_INVALID
+      )
     }
 
     if (session.expiresAt < new Date()) {
       await this.deleteByRefreshToken(hashedToken)
-      throw new UnauthorizedException('Refresh token expired')
+      throw new AppException(
+        'Refresh token expired',
+        HttpStatus.UNAUTHORIZED,
+        AuthErrorCode.TOKEN_INVALID
+      )
     }
 
     if (session.revokedAt) {
@@ -86,7 +96,11 @@ export class SessionService {
         await this.revokeTokenFamily(session.familyId, 'reuse-detected')
       }
 
-      throw new UnauthorizedException('Refresh token is no longer valid')
+      throw new AppException(
+        'Refresh token is no longer valid',
+        HttpStatus.UNAUTHORIZED,
+        AuthErrorCode.TOKEN_INVALID
+      )
     }
 
     return session
@@ -104,14 +118,22 @@ export class SessionService {
       })
 
       if (!existing) {
-        throw new UnauthorizedException('Invalid refresh token')
+        throw new AppException(
+          'Invalid refresh token',
+          HttpStatus.UNAUTHORIZED,
+          AuthErrorCode.TOKEN_INVALID
+        )
       }
 
       if (existing.expiresAt < new Date()) {
         await tx.session.deleteMany({
           where: { refreshToken: oldHashedToken },
         })
-        throw new UnauthorizedException('Refresh token expired')
+        throw new AppException(
+          'Refresh token expired',
+          HttpStatus.UNAUTHORIZED,
+          AuthErrorCode.TOKEN_INVALID
+        )
       }
 
       if (existing.revokedAt) {
@@ -128,7 +150,11 @@ export class SessionService {
           })
         }
 
-        throw new UnauthorizedException('Refresh token is no longer valid')
+        throw new AppException(
+          'Refresh token is no longer valid',
+          HttpStatus.UNAUTHORIZED,
+          AuthErrorCode.TOKEN_INVALID
+        )
       }
 
       const revokeResult = await tx.session.updateMany({
@@ -154,7 +180,11 @@ export class SessionService {
           },
         })
 
-        throw new UnauthorizedException('Refresh token is no longer valid')
+        throw new AppException(
+          'Refresh token is no longer valid',
+          HttpStatus.UNAUTHORIZED,
+          AuthErrorCode.TOKEN_INVALID
+        )
       }
 
       await tx.session.create({

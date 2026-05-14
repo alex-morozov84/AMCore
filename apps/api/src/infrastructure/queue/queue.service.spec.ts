@@ -1,8 +1,9 @@
 import { getQueueToken } from '@nestjs/bullmq'
-import { NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import type { Job, Queue } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
+
+import { NotFoundException } from '../../common/exceptions'
 
 import { JobName, QueueName } from './constants/queues.constant'
 import { QueueService } from './queue.service'

@@ -1,7 +1,9 @@
 import { InjectQueue } from '@nestjs/bullmq'
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import type { Job, Queue } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
+
+import { NotFoundException } from '../../common/exceptions'
 
 import { QueueName } from './constants/queues.constant'
 import type { JobOptions } from './interfaces/job-options.interface'
@@ -34,7 +36,7 @@ export class QueueService implements IQueueService {
     const queue = this.getQueue(queueName)
 
     if (!queue) {
-      throw new NotFoundException(`Queue "${queueName}" not found`)
+      throw new NotFoundException('Queue', queueName)
     }
 
     const mergedOptions = { ...DEFAULT_JOB_OPTIONS, ...options }
@@ -54,7 +56,7 @@ export class QueueService implements IQueueService {
     const job = await this.getJob(queueName, jobId)
 
     if (!job) {
-      throw new NotFoundException(`Job "${jobId}" not found in queue "${queueName}"`)
+      throw new NotFoundException('Job', jobId)
     }
 
     await job.remove()
@@ -66,7 +68,7 @@ export class QueueService implements IQueueService {
     const queue = this.getQueue(queueName)
 
     if (!queue) {
-      throw new NotFoundException(`Queue "${queueName}" not found`)
+      throw new NotFoundException('Queue', queueName)
     }
 
     return (await queue.getJob(jobId)) as Job<T> | undefined
@@ -76,7 +78,7 @@ export class QueueService implements IQueueService {
     const queue = this.getQueue(queueName)
 
     if (!queue) {
-      throw new NotFoundException(`Queue "${queueName}" not found`)
+      throw new NotFoundException('Queue', queueName)
     }
 
     return queue.getActive()
@@ -86,7 +88,7 @@ export class QueueService implements IQueueService {
     const queue = this.getQueue(queueName)
 
     if (!queue) {
-      throw new NotFoundException(`Queue "${queueName}" not found`)
+      throw new NotFoundException('Queue', queueName)
     }
 
     return queue.getFailed()
@@ -96,7 +98,7 @@ export class QueueService implements IQueueService {
     const job = await this.getJob(queueName, jobId)
 
     if (!job) {
-      throw new NotFoundException(`Job "${jobId}" not found in queue "${queueName}"`)
+      throw new NotFoundException('Job', jobId)
     }
 
     await job.retry()
@@ -108,7 +110,7 @@ export class QueueService implements IQueueService {
     const queue = this.getQueue(queueName)
 
     if (!queue) {
-      throw new NotFoundException(`Queue "${queueName}" not found`)
+      throw new NotFoundException('Queue', queueName)
     }
 
     await queue.pause()
@@ -120,7 +122,7 @@ export class QueueService implements IQueueService {
     const queue = this.getQueue(queueName)
 
     if (!queue) {
-      throw new NotFoundException(`Queue "${queueName}" not found`)
+      throw new NotFoundException('Queue', queueName)
     }
 
     await queue.resume()
@@ -136,7 +138,7 @@ export class QueueService implements IQueueService {
     const queue = this.getQueue(queueName)
 
     if (!queue) {
-      throw new NotFoundException(`Queue "${queueName}" not found`)
+      throw new NotFoundException('Queue', queueName)
     }
 
     const cleaned = await queue.clean(grace, 1000, status)

@@ -1,4 +1,3 @@
-import { ForbiddenException, InternalServerErrorException } from '@nestjs/common'
 import type { Organization, OrgMember, Role } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
@@ -6,7 +5,12 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { RequestPrincipal } from '@amcore/shared'
 import { SystemRole } from '@amcore/shared'
 
-import { ConflictException, NotFoundException } from '../../common/exceptions'
+import {
+  AppException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '../../common/exceptions'
 import type { PrismaService } from '../../prisma'
 
 import { OrganizationsService } from './organizations.service'
@@ -77,13 +81,11 @@ describe('OrganizationsService', () => {
       )
     })
 
-    it('throws InternalServerErrorException when system roles are not seeded', async () => {
+    it('throws AppException when system roles are not seeded', async () => {
       prisma.organization.findUnique.mockResolvedValue(null)
       prisma.role.findFirst.mockResolvedValue(null) // no ADMIN role
 
-      await expect(service.create('user-1', { name: 'Acme Corp' })).rejects.toThrow(
-        InternalServerErrorException
-      )
+      await expect(service.create('user-1', { name: 'Acme Corp' })).rejects.toThrow(AppException)
     })
   })
 

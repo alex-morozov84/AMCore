@@ -1,12 +1,11 @@
 import type { ExecutionContext } from '@nestjs/common'
-import { ConflictException, UnauthorizedException } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { SystemRole as PrismaSystemRole, type User } from '@prisma/client'
 import type { Request, Response } from 'express'
 
 import { AuthErrorCode, type RequestPrincipal, SystemRole, type UserResponse } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
+import { AppException, ConflictException, UnauthorizedException } from '../../common/exceptions'
 
 // Mock email module to prevent TSX/ESM import issues
 jest.mock('../../infrastructure/email', () => ({
@@ -275,7 +274,7 @@ describe('AuthController', () => {
     })
 
     it('should throw UnauthorizedException for invalid credentials', async () => {
-      authService.login.mockRejectedValue(new UnauthorizedException('Неверный email или пароль'))
+      authService.login.mockRejectedValue(new UnauthorizedException('Invalid email or password'))
 
       await expect(controller.login(loginDto, mockRequest, mockResponse)).rejects.toThrow(
         UnauthorizedException

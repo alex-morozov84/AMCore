@@ -1,11 +1,16 @@
 import { randomBytes } from 'node:crypto'
 
-import { ForbiddenException, Injectable, InternalServerErrorException } from '@nestjs/common'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import type { Organization } from '@prisma/client'
 
 import type { RequestPrincipal } from '@amcore/shared'
 
-import { ConflictException, NotFoundException } from '../../common/exceptions'
+import {
+  AppException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
@@ -26,8 +31,10 @@ export class OrganizationsService {
       where: { name: 'ADMIN', isSystem: true, organizationId: null },
     })
     if (!adminRole) {
-      throw new InternalServerErrorException(
-        'System roles not initialized. Run: pnpm --filter api prisma:seed'
+      throw new AppException(
+        'System roles not initialized. Run: pnpm --filter api prisma:seed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'SYSTEM_NOT_INITIALIZED'
       )
     }
 

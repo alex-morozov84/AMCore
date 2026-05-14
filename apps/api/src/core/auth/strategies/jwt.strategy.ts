@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 
 import { type JwtPayload, type RequestPrincipal } from '@amcore/shared'
 
+import { UnauthorizedException } from '../../../common/exceptions'
 import { EnvService } from '../../../env/env.service'
 import { UserCacheService } from '../user-cache.service'
 
@@ -29,7 +30,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const user = await this.userCache.getUser(payload.sub)
 
     if (!user) {
-      throw new UnauthorizedException('Пользователь не найден')
+      throw new UnauthorizedException('User not found')
     }
 
     return {
