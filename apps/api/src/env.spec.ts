@@ -66,6 +66,26 @@ describe('env validation', () => {
     expect(env.DATABASE_CONNECT_MS).toBe(5000)
     expect(env.DATABASE_STATEMENT_TIMEOUT_MS).toBe(30000)
     expect(env.DATABASE_QUERY_TIMEOUT_MS).toBe(30000)
+    expect(env.SLOW_QUERY_THRESHOLD_MS).toBe(100)
+  })
+
+  it('applies production slow query threshold default', () => {
+    const env = validate({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=require',
+    })
+
+    expect(env.SLOW_QUERY_THRESHOLD_MS).toBe(500)
+  })
+
+  it('accepts an explicit slow query threshold override', () => {
+    const env = validate({
+      ...baseEnv,
+      SLOW_QUERY_THRESHOLD_MS: '750',
+    })
+
+    expect(env.SLOW_QUERY_THRESHOLD_MS).toBe(750)
   })
 
   it('fails in production when DATABASE_URL omits sslmode', () => {

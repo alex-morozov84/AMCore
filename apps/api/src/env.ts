@@ -24,6 +24,7 @@ const envSchema = z
     DATABASE_CONNECT_MS: z.coerce.number().int().min(0).default(5000),
     DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
     DATABASE_QUERY_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
+    SLOW_QUERY_THRESHOLD_MS: z.coerce.number().int().min(0).optional(),
     REDIS_URL: z.url(),
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     JWT_ACCESS_EXPIRATION: z.string().default('15m'),
@@ -58,6 +59,11 @@ const envSchema = z
     PASSWORD_RESET_EXPIRY_MINUTES: z.coerce.number().int().min(1).default(15),
     EMAIL_VERIFICATION_EXPIRY_HOURS: z.coerce.number().int().min(1).default(48),
   })
+  .transform((env) => ({
+    ...env,
+    SLOW_QUERY_THRESHOLD_MS:
+      env.SLOW_QUERY_THRESHOLD_MS ?? (env.NODE_ENV === 'production' ? 500 : 100),
+  }))
   .superRefine((env, ctx) => {
     const requireAllIfAny = (groupName: string, keys: Array<keyof typeof env>): void => {
       const hasAny = keys.some((key) => env[key] !== undefined)
