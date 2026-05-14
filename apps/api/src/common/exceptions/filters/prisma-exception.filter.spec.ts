@@ -2,6 +2,8 @@ import { ArgumentsHost, HttpStatus } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
+import { AuthErrorCode, ResourceErrorCode } from '@amcore/shared'
+
 import { PrismaClientExceptionFilter } from './prisma-exception.filter'
 
 describe('PrismaClientExceptionFilter', () => {
@@ -43,11 +45,11 @@ describe('PrismaClientExceptionFilter', () => {
     filter = new PrismaClientExceptionFilter(mockLogger, mockCls)
   })
 
-  it('should map P2002 to 409 CONFLICT (unique constraint)', () => {
+  it('should map P2002 on emailCanonical to EMAIL_ALREADY_EXISTS', () => {
     const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
       code: 'P2002',
       clientVersion: '5.0.0',
-      meta: { target: ['email'] },
+      meta: { target: ['emailCanonical'] },
     })
 
     filter.catch(exception, mockHost)
@@ -57,7 +59,90 @@ describe('PrismaClientExceptionFilter', () => {
       expect.objectContaining({
         statusCode: 409,
         message: 'Unique constraint violation',
-        errorCode: 'PRISMA_P2002',
+        errorCode: AuthErrorCode.EMAIL_ALREADY_EXISTS,
+      })
+    )
+  })
+
+  it('should map P2002 on phone to PHONE_ALREADY_EXISTS', () => {
+    const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: '5.0.0',
+      meta: { target: ['phone'] },
+    })
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 409,
+        errorCode: AuthErrorCode.PHONE_ALREADY_EXISTS,
+      })
+    )
+  })
+
+  it('should map P2002 on shortToken to API_KEY_ALREADY_EXISTS', () => {
+    const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: '5.0.0',
+      meta: { target: ['shortToken'] },
+    })
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 409,
+        errorCode: ResourceErrorCode.API_KEY_ALREADY_EXISTS,
+      })
+    )
+  })
+
+  it('should fall back to RESOURCE_ALREADY_EXISTS for unmapped P2002 target', () => {
+    const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: '5.0.0',
+      meta: { target: ['slug'] },
+    })
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 409,
+        errorCode: ResourceErrorCode.RESOURCE_ALREADY_EXISTS,
+      })
+    )
+  })
+
+  it('should fall back to RESOURCE_ALREADY_EXISTS when P2002 meta.target is missing', () => {
+    const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: '5.0.0',
+    })
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 409,
+        errorCode: ResourceErrorCode.RESOURCE_ALREADY_EXISTS,
+      })
+    )
+  })
+
+  it('should handle P2002 meta.target as a string (legacy Prisma shape)', () => {
+    const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: '5.0.0',
+      meta: { target: 'emailCanonical' as unknown as string[] },
+    })
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCode: AuthErrorCode.EMAIL_ALREADY_EXISTS,
       })
     )
   })
@@ -212,14 +297,14 @@ describe('PrismaClientExceptionFilter', () => {
     const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
       code: 'P2002',
       clientVersion: '5.0.0',
-      meta: { target: ['email'], modelName: 'User' },
+      meta: { target: ['emailCanonical'], modelName: 'User' },
     })
 
     filter.catch(exception, mockHost)
 
     expect(mockResponse.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        details: { target: ['email'], modelName: 'User' },
+        details: { target: ['emailCanonical'], modelName: 'User' },
       })
     )
 
@@ -233,7 +318,7 @@ describe('PrismaClientExceptionFilter', () => {
     const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
       code: 'P2002',
       clientVersion: '5.0.0',
-      meta: { target: ['email'] },
+      meta: { target: ['emailCanonical'] },
     })
 
     filter.catch(exception, mockHost)
@@ -272,7 +357,7 @@ describe('PrismaClientExceptionFilter', () => {
     const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
       code: 'P2002',
       clientVersion: '5.0.0',
-      meta: { target: ['email'], modelName: 'User' },
+      meta: { target: ['emailCanonical'], modelName: 'User' },
     })
 
     filter.catch(exception, mockHost)
@@ -281,10 +366,10 @@ describe('PrismaClientExceptionFilter', () => {
       expect.objectContaining({
         err: exception,
         prismaCode: 'P2002',
-        meta: { target: ['email'], modelName: 'User' },
+        meta: { target: ['emailCanonical'], modelName: 'User' },
         model: 'User',
       }),
-      expect.stringContaining('Prisma error: PRISMA_P2002')
+      expect.stringContaining(`Prisma error: ${AuthErrorCode.EMAIL_ALREADY_EXISTS}`)
     )
   })
 

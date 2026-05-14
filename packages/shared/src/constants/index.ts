@@ -3,6 +3,7 @@
 // Auth error codes (machine-readable, frontend translates via next-intl)
 export enum AuthErrorCode {
   EMAIL_ALREADY_EXISTS = 'EMAIL_ALREADY_EXISTS',
+  PHONE_ALREADY_EXISTS = 'PHONE_ALREADY_EXISTS',
   INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
   TOKEN_INVALID = 'TOKEN_INVALID',
   RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
@@ -14,6 +15,12 @@ export enum AuthErrorCode {
   OAUTH_PROVIDER_NOT_CONFIGURED = 'OAUTH_PROVIDER_NOT_CONFIGURED',
   OAUTH_ACCOUNT_ALREADY_LINKED = 'OAUTH_ACCOUNT_ALREADY_LINKED',
   OAUTH_TICKET_INVALID = 'OAUTH_TICKET_INVALID',
+}
+
+// Resource error codes (machine-readable, used across modules for DB-conflict cases)
+export enum ResourceErrorCode {
+  RESOURCE_ALREADY_EXISTS = 'RESOURCE_ALREADY_EXISTS',
+  API_KEY_ALREADY_EXISTS = 'API_KEY_ALREADY_EXISTS',
 }
 
 // HTTP Status codes

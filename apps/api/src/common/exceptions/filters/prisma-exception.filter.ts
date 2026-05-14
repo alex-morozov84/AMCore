@@ -4,11 +4,21 @@ import { Response } from 'express'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
+import { AuthErrorCode, ResourceErrorCode } from '@amcore/shared'
+
 import type { ErrorResponse } from '../types'
 
 interface PrismaErrorMapping {
   status: HttpStatus
   message: string
+}
+
+// P2002 (unique constraint) field → specific errorCode.
+// Frontend reads `errorCode`; keep keys aligned with Prisma schema field names.
+const P2002_FIELD_TO_ERROR_CODE: Record<string, string> = {
+  emailCanonical: AuthErrorCode.EMAIL_ALREADY_EXISTS,
+  phone: AuthErrorCode.PHONE_ALREADY_EXISTS,
+  shortToken: ResourceErrorCode.API_KEY_ALREADY_EXISTS,
 }
 
 type PrismaClientException =
@@ -112,8 +122,12 @@ export class PrismaClientExceptionFilter implements ExceptionFilter {
   } {
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       const mapping = this.errorCodeMapping[exception.code]
+      const errorCode =
+        exception.code === 'P2002'
+          ? this.resolveP2002ErrorCode(exception.meta?.['target'])
+          : `PRISMA_${exception.code}`
       return {
-        errorCode: `PRISMA_${exception.code}`,
+        errorCode,
         statusCode: mapping?.status ?? HttpStatus.INTERNAL_SERVER_ERROR,
         message: mapping?.message ?? 'Database error',
         ...(process.env.NODE_ENV === 'development' && exception.meta
@@ -182,5 +196,21 @@ export class PrismaClientExceptionFilter implements ExceptionFilter {
         prismaType: exception.name,
       },
     }
+  }
+
+  // Prisma reports `target` as string[] (current Prisma) or string (older versions).
+  // Pick the first matching field; fall back to a generic resource-conflict code.
+  private resolveP2002ErrorCode(target: unknown): string {
+    const fields = Array.isArray(target)
+      ? (target as unknown[]).filter((f): f is string => typeof f === 'string')
+      : typeof target === 'string'
+        ? target.split(/[,\s]+/).filter(Boolean)
+        : []
+
+    for (const field of fields) {
+      const code = P2002_FIELD_TO_ERROR_CODE[field]
+      if (code) return code
+    }
+    return ResourceErrorCode.RESOURCE_ALREADY_EXISTS
   }
 }
