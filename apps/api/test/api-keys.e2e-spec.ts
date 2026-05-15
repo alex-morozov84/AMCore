@@ -150,4 +150,54 @@ describe('API Keys (e2e)', () => {
         .expect(401)
     })
   })
+
+  /**
+   * AK-01: credential management routes are bearer-only.
+   *
+   * An API key must not be able to issue, enumerate, or revoke API keys —
+   * even keys belonging to its own owner. The invariant is enforced by
+   * `@Auth(AuthType.Bearer)` on `ApiKeysController`.
+   */
+  describe('AK-01: api keys cannot manage credentials', () => {
+    it('rejects POST /api-keys with api key auth', async () => {
+      const { token } = await registerAndGetToken('user@example.com')
+      const { key } = await createApiKey(token, 'Carrier', ['user:read'])
+
+      await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${key}`)
+        .send({ name: 'Should not be created', scopes: ['user:read'] })
+        .expect(401)
+    })
+
+    it('rejects GET /api-keys with api key auth', async () => {
+      const { token } = await registerAndGetToken('user@example.com')
+      const { key } = await createApiKey(token, 'Carrier', ['user:read'])
+
+      await request(app.getHttpServer())
+        .get('/api-keys')
+        .set('Authorization', `Bearer ${key}`)
+        .expect(401)
+    })
+
+    it('rejects DELETE /api-keys/:id with api key auth', async () => {
+      const { token } = await registerAndGetToken('user@example.com')
+      const { key } = await createApiKey(token, 'Carrier', ['user:read'])
+      const { id: targetId } = await createApiKey(token, 'Target', ['user:read'])
+
+      await request(app.getHttpServer())
+        .delete(`/api-keys/${targetId}`)
+        .set('Authorization', `Bearer ${key}`)
+        .expect(401)
+
+      // Target key still exists and authenticates
+      await request(app.getHttpServer())
+        .get('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+        .then((res) => {
+          expect((res.body as Array<{ id: string }>).some((k) => k.id === targetId)).toBe(true)
+        })
+    })
+  })
 })

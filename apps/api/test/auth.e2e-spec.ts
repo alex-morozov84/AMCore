@@ -577,6 +577,67 @@ describe('Auth (e2e)', () => {
     })
   })
 
+  /**
+   * AK-01: session-management routes are bearer-only.
+   *
+   * An API key must not be able to enumerate active sessions (recon surface)
+   * or revoke them (denial-of-service / eviction of legitimate user). The
+   * invariant is enforced by `@Auth(AuthType.Bearer)` on the three session
+   * routes in `AuthController`.
+   */
+  describe('AK-01: api keys cannot manage sessions', () => {
+    let apiKey: string
+    let sessionId: string
+
+    beforeEach(async () => {
+      const registerRes = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'session-ak@example.com', password: 'StrongP@ss123' })
+        .expect(201)
+
+      const accessToken = registerRes.body.accessToken as string
+
+      const created = await prisma.session.findMany({
+        where: { user: { email: 'session-ak@example.com' } },
+      })
+      sessionId = created[0]!.id
+
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Carrier', scopes: ['user:read'] })
+        .expect(201)
+
+      apiKey = keyRes.body.key as string
+    })
+
+    it('rejects GET /auth/sessions with api key auth', async () => {
+      await request(app.getHttpServer())
+        .get('/auth/sessions')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+    })
+
+    it('rejects DELETE /auth/sessions/:sessionId with api key auth', async () => {
+      await request(app.getHttpServer())
+        .delete(`/auth/sessions/${sessionId}`)
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+
+      // Session was not revoked
+      const stillThere = await prisma.session.findUnique({ where: { id: sessionId } })
+      expect(stillThere).not.toBeNull()
+      expect(stillThere?.revokedAt).toBeNull()
+    })
+
+    it('rejects DELETE /auth/sessions with api key auth', async () => {
+      await request(app.getHttpServer())
+        .delete('/auth/sessions')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+    })
+  })
+
   describe('Full Authentication Flow', () => {
     it('should complete: register → me → refresh → logout', async () => {
       // Create agent to persist cookies throughout the flow

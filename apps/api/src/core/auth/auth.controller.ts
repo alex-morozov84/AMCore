@@ -186,7 +186,13 @@ export class AuthController {
     return { user: profile }
   }
 
+  // Session-management routes are bearer-only — API keys must not be able to
+  // enumerate or revoke interactive browser sessions. Listing sessions exposes
+  // user-agent / IP-derived metadata (recon surface); revoking sessions from a
+  // leaked low-scope API key would let an attacker evict the legitimate user.
+  // See `ai/API_KEYS_REVIEW.md` AK-01.
   @Get('sessions')
+  @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all active sessions' })
   async sessions(
@@ -202,6 +208,7 @@ export class AuthController {
   }
 
   @Delete('sessions/:sessionId')
+  @Auth(AuthType.Bearer)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke specific session' })
@@ -213,6 +220,7 @@ export class AuthController {
   }
 
   @Delete('sessions')
+  @Auth(AuthType.Bearer)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke all sessions except current' })
