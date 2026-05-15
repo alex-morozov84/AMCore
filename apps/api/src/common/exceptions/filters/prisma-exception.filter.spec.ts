@@ -2,7 +2,7 @@ import { ArgumentsHost, HttpStatus } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AuthErrorCode, ResourceErrorCode } from '@amcore/shared'
+import { AuthErrorCode, InfrastructureErrorCode, ResourceErrorCode } from '@amcore/shared'
 
 import { PrismaClientExceptionFilter } from './prisma-exception.filter'
 
@@ -28,6 +28,7 @@ describe('PrismaClientExceptionFilter', () => {
     mockResponse = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
+      setHeader: jest.fn(),
     }
 
     mockRequest = {
@@ -145,6 +146,39 @@ describe('PrismaClientExceptionFilter', () => {
         errorCode: AuthErrorCode.EMAIL_ALREADY_EXISTS,
       })
     )
+  })
+
+  it('should map P2024 to 503 with DATABASE_POOL_TIMEOUT and Retry-After: 1', () => {
+    const exception = new Prisma.PrismaClientKnownRequestError(
+      'Timed out fetching a new connection from the connection pool',
+      {
+        code: 'P2024',
+        clientVersion: '7.5.0',
+      }
+    )
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE)
+    expect(mockResponse.setHeader).toHaveBeenCalledWith('Retry-After', '1')
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 503,
+        errorCode: InfrastructureErrorCode.DATABASE_POOL_TIMEOUT,
+        message: expect.stringContaining('pool exhausted'),
+      })
+    )
+  })
+
+  it('should not set Retry-After for non-transient Prisma errors', () => {
+    const exception = new Prisma.PrismaClientKnownRequestError('not found', {
+      code: 'P2025',
+      clientVersion: '7.5.0',
+    })
+
+    filter.catch(exception, mockHost)
+
+    expect(mockResponse.setHeader).not.toHaveBeenCalled()
   })
 
   it('should map P2025 to 404 NOT_FOUND (record not found)', () => {

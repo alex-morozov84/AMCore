@@ -23,6 +23,12 @@ export enum ResourceErrorCode {
   API_KEY_ALREADY_EXISTS = 'API_KEY_ALREADY_EXISTS',
 }
 
+// Infrastructure error codes — transient backend failures the client may retry
+// after a short backoff. Map to 503 Service Unavailable + Retry-After.
+export enum InfrastructureErrorCode {
+  DATABASE_POOL_TIMEOUT = 'DATABASE_POOL_TIMEOUT',
+}
+
 // HTTP Status codes
 export const HTTP_STATUS = {
   OK: 200,
