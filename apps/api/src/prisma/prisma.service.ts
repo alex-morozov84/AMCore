@@ -66,12 +66,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     })
 
     this.logger.setContext(PrismaService.name)
-    const onQuery = this.$on as (
+    // $on must be invoked with `this` bound to the PrismaClient instance — a
+    // detached reference (`const f = this.$on; f(...)`) loses binding and Prisma
+    // throws "Cannot read properties of undefined (reading '_engineConfig')".
+    const subscribeToQueries = this.$on as (
       eventType: 'query',
       listener: (event: SlowQueryEvent) => void
     ) => void
-
-    onQuery('query', (event) => {
+    subscribeToQueries.call(this, 'query', (event) => {
       logSlowQuery(event, slowQueryThresholdMs, this.logger)
     })
   }

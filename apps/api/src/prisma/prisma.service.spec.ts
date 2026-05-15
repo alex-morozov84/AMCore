@@ -1,6 +1,8 @@
 import type { PinoLogger } from 'nestjs-pino'
 
-import { logSlowQuery, resolveSlowQueryThresholdMs } from './prisma.service'
+import { EnvService } from '../env/env.service'
+
+import { logSlowQuery, PrismaService, resolveSlowQueryThresholdMs } from './prisma.service'
 
 describe('PrismaService slow query logging', () => {
   let logger: Pick<jest.Mocked<PinoLogger>, 'warn'>
@@ -68,5 +70,30 @@ describe('PrismaService slow query logging', () => {
     )
 
     expect(logger.warn).not.toHaveBeenCalled()
+  })
+})
+
+describe('PrismaService constructor', () => {
+  // Regression: subscribing to Prisma 'query' events must keep `this` bound to
+  // the client instance. A detached reference (`const f = this.$on; f(...)`)
+  // throws "Cannot read properties of undefined (reading '_engineConfig')".
+  it('constructs without losing $on `this` binding', () => {
+    const envValues: Record<string, unknown> = {
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
+      DATABASE_POOL_MAX: 10,
+      DATABASE_POOL_IDLE_MS: 30_000,
+      DATABASE_CONNECT_MS: 5_000,
+      DATABASE_STATEMENT_TIMEOUT_MS: 30_000,
+      DATABASE_QUERY_TIMEOUT_MS: 30_000,
+      NODE_ENV: 'test',
+      SLOW_QUERY_THRESHOLD_MS: 100,
+    }
+    const env = { get: (key: string) => envValues[key] } as unknown as EnvService
+    const logger = {
+      setContext: jest.fn(),
+      warn: jest.fn(),
+    } as unknown as PinoLogger
+
+    expect(() => new PrismaService(env, logger)).not.toThrow()
   })
 })
