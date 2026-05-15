@@ -1,3 +1,4 @@
+import type { WorkerHost } from '@nestjs/bullmq'
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { INestApplication } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
@@ -11,6 +12,8 @@ import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
 import { ZodValidationPipe } from 'nestjs-zod'
 
+import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
+import { HelloWorldProcessor } from '../src/infrastructure/queue/processors/hello-world.processor'
 import { PrismaService } from '../src/prisma'
 
 /**
@@ -114,46 +117,31 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
  * - Stops containers
  */
 export async function teardownE2ETest(context: E2ETestContext): Promise<void> {
-  await context.app.close()
-  await closeCacheConnections(context.cache)
   resetThrottlerStorage(context.throttlerStorage)
-  await context.prisma.$disconnect()
-  await Promise.all([
-    context.postgresContainer.stop({ timeout: 10_000 }),
-    context.redisContainer.stop({ timeout: 10_000 }),
-  ])
-  // Give underlying Docker/client sockets a moment to settle before Jest exits.
-  await new Promise((resolve) => setTimeout(resolve, 1_000))
+  await closeBullWorkers(context.app)
+  await context.app.close()
+  await context.redisContainer.stop({ timeout: 10_000 })
+  await context.postgresContainer.stop({ timeout: 10_000 })
+  // Testcontainers closes Docker/Reaper sockets asynchronously shortly after stop().
+  // Let them settle before Jest decides the suite leaked an open handle.
+  await new Promise((resolve) => setTimeout(resolve, 5_000))
 }
 
-async function closeCacheConnections(cache: Cache): Promise<void> {
-  type RedisClient = {
-    disconnect?: () => Promise<void> | void
-    quit?: () => Promise<void> | void
-  }
-  type KeyvStore = { _store?: KeyvAdapter; opts?: { store?: KeyvAdapter } }
-  type KeyvAdapter = { getClient?: () => Promise<RedisClient> }
+async function closeBullWorkers(app: INestApplication): Promise<void> {
+  await Promise.all([
+    closeBullWorker(app, HelloWorldProcessor),
+    closeBullWorker(app, EmailProcessor),
+  ])
+}
 
-  const stores = (cache as unknown as { stores?: KeyvStore[] }).stores ?? []
-
-  for (const keyv of stores) {
-    const adapter = keyv._store ?? keyv.opts?.store
-    if (!adapter || typeof adapter.getClient !== 'function') continue
-
-    const client = await adapter.getClient()
-
-    try {
-      if (typeof client.quit === 'function') {
-        await client.quit()
-        continue
-      }
-
-      if (typeof client.disconnect === 'function') {
-        await client.disconnect()
-      }
-    } catch {
-      // The app-level RedisConnectionService may have already closed a shared client.
-    }
+async function closeBullWorker(
+  app: INestApplication,
+  processor: new (...args: never[]) => WorkerHost
+): Promise<void> {
+  try {
+    await app.get(processor, { strict: false }).worker.close(true)
+  } catch {
+    // Processor may be absent in focused test modules or not registered yet.
   }
 }
 

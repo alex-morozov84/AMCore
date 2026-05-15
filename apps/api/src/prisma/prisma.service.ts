@@ -41,6 +41,8 @@ export function logSlowQuery(
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  private readonly pool: Pool
+
   constructor(
     env: EnvService,
     private readonly logger: PinoLogger
@@ -65,6 +67,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       log: [{ emit: 'event', level: 'query' }],
     })
 
+    this.pool = pool
     this.logger.setContext(PrismaService.name)
     // $on must be invoked with `this` bound to the PrismaClient instance — a
     // detached reference (`const f = this.$on; f(...)`) loses binding and Prisma
@@ -84,5 +87,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleDestroy(): Promise<void> {
     await this.$disconnect()
+    await this.pool.end()
   }
 }
