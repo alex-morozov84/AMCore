@@ -3,6 +3,7 @@ import { HttpAdapterHost } from '@nestjs/core'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
+import { sanitizeHeaders } from '../../utils'
 import type { ErrorResponse } from '../types'
 
 /**
@@ -54,7 +55,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
           req: {
             method: request.method,
             url: request.url,
-            headers: request.headers,
+            // Explicit source-side redaction. Pino's path-based redact still
+            // applies on top, but does not silently fail if the log shape
+            // changes or a new sensitive header is added later.
+            headers: sanitizeHeaders(request.headers),
           },
         },
         `Unhandled exception: ${message}`

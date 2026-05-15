@@ -150,6 +150,28 @@ describe('AllExceptionsFilter', () => {
     )
   })
 
+  it('sanitizes sensitive headers in 5xx logs at the source', () => {
+    mockRequest.headers = {
+      'user-agent': 'jest',
+      authorization: 'Bearer leaked-token',
+      cookie: 'refresh_token=leaked',
+      'x-api-key': 'leaked-key',
+    }
+
+    filter.catch(new Error('boom'), mockHost)
+
+    expect(mockLogger.error).toHaveBeenCalled()
+    const logArg = mockLogger.error.mock.calls[0]?.[0] as {
+      req: { headers: Record<string, string> }
+    }
+    expect(logArg.req.headers).toEqual({
+      'user-agent': 'jest',
+      authorization: '[REDACTED]',
+      cookie: '[REDACTED]',
+      'x-api-key': '[REDACTED]',
+    })
+  })
+
   it('should log client errors (4xx) as warnings', () => {
     const exception = new HttpException('Bad request', HttpStatus.BAD_REQUEST)
 
