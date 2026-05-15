@@ -58,6 +58,15 @@ export class AbilityFactory {
 
     // If no organization context, grant minimal personal permissions
     if (!principal.organizationId || principal.aclVersion == null) {
+      // Per ADR-033: API-key principals always carry organizationId +
+      // aclVersion. Reaching this branch with an api_key principal means
+      // ApiKeyGuard built an invalid principal — fail loudly instead of
+      // silently granting unscoped personal permissions (which would
+      // bypass apiKey.scopes entirely).
+      if (principal.type === 'api_key') {
+        throw new Error('API key principal must carry organization context (ADR-033)')
+      }
+
       // User can read and update their own profile
       rules.push({
         action: Action.Read,

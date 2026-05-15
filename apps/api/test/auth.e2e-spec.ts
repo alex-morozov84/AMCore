@@ -5,7 +5,14 @@ import request from 'supertest'
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import type { PrismaService } from '../src/prisma'
 
-import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
+import {
+  cleanDatabase,
+  cleanOrgData,
+  type E2ETestContext,
+  seedSystemRoles,
+  setupE2ETest,
+  teardownE2ETest,
+} from './helpers'
 
 /**
  * Extract refresh token from response cookies
@@ -44,6 +51,10 @@ describe('Auth (e2e)', () => {
     context = await setupE2ETest()
     app = context.app
     prisma = context.prisma
+    // Required for AK-01 sessions block which creates an organization
+    // (POST /organizations assigns the creator as ADMIN via system roles).
+    // Idempotent — safe even though most tests in this file don't need it.
+    await seedSystemRoles(prisma)
   }, 120000) // 2 min timeout for container start
 
   afterAll(async () => {
@@ -51,6 +62,8 @@ describe('Auth (e2e)', () => {
   }, 120000)
 
   beforeEach(async () => {
+    // Clean org-scoped data first (respects FK order; see helpers.ts).
+    await cleanOrgData(prisma)
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
   })
 
@@ -602,10 +615,18 @@ describe('Auth (e2e)', () => {
       })
       sessionId = created[0]!.id
 
+      // Per ADR-033: API keys are organization-scoped. Bootstrap an org
+      // before creating the carrier key used by these AK-01 assertions.
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Session AK Org' })
+        .expect(201)
+
       const keyRes = await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ name: 'Carrier', scopes: ['user:read'] })
+        .send({ name: 'Carrier', organizationId: orgRes.body.id, scopes: ['user:read'] })
         .expect(201)
 
       apiKey = keyRes.body.key as string

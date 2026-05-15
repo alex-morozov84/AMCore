@@ -85,6 +85,22 @@ describe('AbilityFactory', () => {
       expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
     })
 
+    // AK-04 / ADR-033: API-key principals must always carry org context.
+    // Reaching the no-org branch with type='api_key' is a guard bug and
+    // must fail loudly — silently granting personal permissions would
+    // bypass apiKey.scopes entirely.
+    it('rejects api_key principal without organization context (ADR-033)', async () => {
+      const principal: RequestPrincipal = {
+        type: 'api_key',
+        sub: 'user-1',
+        systemRole: SystemRole.User,
+        scopes: ['read:User'],
+      }
+
+      await expect(factory.createForUser(principal)).rejects.toThrow(/ADR-033/)
+      expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
+    })
+
     it('should load permissions from cache when aclVersion is 0 (fresh org)', async () => {
       const principal: RequestPrincipal = {
         type: 'jwt',

@@ -172,20 +172,23 @@ model EmailVerificationToken {
 // ===========================================
 
 model ApiKey {
-  id         String    @id @default(cuid())
-  name       String
-  shortToken String    @unique
-  keyHash    String
-  salt       String
-  scopes     String[]  @default([])
-  expiresAt  DateTime?
-  lastUsedAt DateTime?
-  createdAt  DateTime  @default(now())
-  userId     String
+  id             String    @id @default(cuid())
+  name           String
+  shortToken     String    @unique
+  keyHash        String
+  salt           String
+  scopes         String[]  @default([])
+  expiresAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  userId         String
+  organizationId String
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([organizationId])
   @@index([expiresAt])
   @@map("api_keys")
   @@schema("core")
@@ -206,6 +209,7 @@ model Organization {
   members     OrgMember[]
   roles       Role[]
   permissions Permission[]
+  apiKeys     ApiKey[]
 
   @@map("organizations")
   @@schema("core")

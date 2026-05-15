@@ -41,28 +41,55 @@ describe('API Keys (e2e)', () => {
     return { token: res.body.accessToken as string, userId: res.body.user.id as string }
   }
 
-  async function createApiKey(token: string, name = 'Test Key', scopes = ['user:read']) {
+  async function createOrganization(token: string, name = 'Acme', slug?: string) {
+    const res = await request(app.getHttpServer())
+      .post('/organizations')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name, ...(slug ? { slug } : {}) })
+      .expect(201)
+    return res.body.id as string
+  }
+
+  async function registerWithOrg(email: string, orgName = 'Acme', orgSlug?: string) {
+    const { token, userId } = await registerAndGetToken(email)
+    const organizationId = await createOrganization(token, orgName, orgSlug)
+    return { token, userId, organizationId }
+  }
+
+  async function createApiKey(
+    token: string,
+    organizationId: string,
+    name = 'Test Key',
+    scopes = ['user:read']
+  ) {
     const res = await request(app.getHttpServer())
       .post('/api-keys')
       .set('Authorization', `Bearer ${token}`)
-      .send({ name, scopes })
+      .send({ name, organizationId, scopes })
       .expect(201)
-    return res.body as { id: string; key: string; name: string; scopes: string[] }
+    return res.body as {
+      id: string
+      key: string
+      name: string
+      organizationId: string
+      scopes: string[]
+    }
   }
 
   describe('POST /api-keys', () => {
     it('creates key and returns full key value once', async () => {
-      const { token } = await registerAndGetToken('user@example.com')
+      const { token, organizationId } = await registerWithOrg('user@example.com')
 
       const res = await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${token}`)
-        .send({ name: 'My Integration', scopes: ['workout:read'] })
+        .send({ name: 'My Integration', organizationId, scopes: ['workout:read'] })
         .expect(201)
 
       expect(res.body.id).toBeDefined()
       expect(res.body.key).toMatch(/^amcore_live_/)
       expect(res.body.name).toBe('My Integration')
+      expect(res.body.organizationId).toBe(organizationId)
       expect(res.body.scopes).toEqual(['workout:read'])
       expect(res.body).not.toHaveProperty('keyHash')
       expect(res.body).not.toHaveProperty('salt')
@@ -71,16 +98,16 @@ describe('API Keys (e2e)', () => {
     it('returns 401 without auth', async () => {
       await request(app.getHttpServer())
         .post('/api-keys')
-        .send({ name: 'Key', scopes: ['user:read'] })
+        .send({ name: 'Key', organizationId: 'cuid', scopes: ['user:read'] })
         .expect(401)
     })
   })
 
   describe('GET /api-keys', () => {
     it('lists keys without secret fields', async () => {
-      const { token } = await registerAndGetToken('user@example.com')
-      await createApiKey(token, 'Key One', ['workout:read'])
-      await createApiKey(token, 'Key Two', ['user:read'])
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      await createApiKey(token, organizationId, 'Key One', ['workout:read'])
+      await createApiKey(token, organizationId, 'Key Two', ['user:read'])
 
       const res = await request(app.getHttpServer())
         .get('/api-keys')
@@ -94,14 +121,15 @@ describe('API Keys (e2e)', () => {
       expect(res.body[0]).not.toHaveProperty('salt')
       expect(res.body[0]).toHaveProperty('id')
       expect(res.body[0]).toHaveProperty('name')
+      expect(res.body[0]).toHaveProperty('organizationId')
       expect(res.body[0]).toHaveProperty('scopes')
     })
   })
 
   describe('DELETE /api-keys/:id', () => {
     it('revokes own key and returns 204', async () => {
-      const { token } = await registerAndGetToken('user@example.com')
-      const { id } = await createApiKey(token)
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { id } = await createApiKey(token, organizationId)
 
       await request(app.getHttpServer())
         .delete(`/api-keys/${id}`)
@@ -110,9 +138,13 @@ describe('API Keys (e2e)', () => {
     })
 
     it("returns 404 for another user's key", async () => {
-      const { token: token1 } = await registerAndGetToken('user1@example.com')
-      const { token: token2 } = await registerAndGetToken('user2@example.com')
-      const { id } = await createApiKey(token1)
+      const { token: token1, organizationId: org1 } = await registerWithOrg(
+        'user1@example.com',
+        'Org One',
+        'org-one'
+      )
+      const { token: token2 } = await registerWithOrg('user2@example.com', 'Org Two', 'org-two')
+      const { id } = await createApiKey(token1, org1)
 
       await request(app.getHttpServer())
         .delete(`/api-keys/${id}`)
@@ -123,8 +155,8 @@ describe('API Keys (e2e)', () => {
 
   describe('using api key for authentication', () => {
     it('authenticates GET /auth/me with valid api key', async () => {
-      const { token } = await registerAndGetToken('user@example.com')
-      const { key } = await createApiKey(token, 'CI Key', ['user:read'])
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'CI Key', ['user:read'])
 
       const res = await request(app.getHttpServer())
         .get('/auth/me')
@@ -136,8 +168,8 @@ describe('API Keys (e2e)', () => {
     })
 
     it('returns 401 after key is revoked', async () => {
-      const { token } = await registerAndGetToken('user@example.com')
-      const { key, id } = await createApiKey(token, 'Temp Key', ['user:read'])
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key, id } = await createApiKey(token, organizationId, 'Temp Key', ['user:read'])
 
       await request(app.getHttpServer())
         .delete(`/api-keys/${id}`)
@@ -160,19 +192,19 @@ describe('API Keys (e2e)', () => {
    */
   describe('AK-01: api keys cannot manage credentials', () => {
     it('rejects POST /api-keys with api key auth', async () => {
-      const { token } = await registerAndGetToken('user@example.com')
-      const { key } = await createApiKey(token, 'Carrier', ['user:read'])
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'Carrier', ['user:read'])
 
       await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${key}`)
-        .send({ name: 'Should not be created', scopes: ['user:read'] })
+        .send({ name: 'Should not be created', organizationId, scopes: ['user:read'] })
         .expect(401)
     })
 
     it('rejects GET /api-keys with api key auth', async () => {
-      const { token } = await registerAndGetToken('user@example.com')
-      const { key } = await createApiKey(token, 'Carrier', ['user:read'])
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'Carrier', ['user:read'])
 
       await request(app.getHttpServer())
         .get('/api-keys')
@@ -181,9 +213,9 @@ describe('API Keys (e2e)', () => {
     })
 
     it('rejects DELETE /api-keys/:id with api key auth', async () => {
-      const { token } = await registerAndGetToken('user@example.com')
-      const { key } = await createApiKey(token, 'Carrier', ['user:read'])
-      const { id: targetId } = await createApiKey(token, 'Target', ['user:read'])
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'Carrier', ['user:read'])
+      const { id: targetId } = await createApiKey(token, organizationId, 'Target', ['user:read'])
 
       await request(app.getHttpServer())
         .delete(`/api-keys/${targetId}`)
@@ -198,6 +230,68 @@ describe('API Keys (e2e)', () => {
         .then((res) => {
           expect((res.body as Array<{ id: string }>).some((k) => k.id === targetId)).toBe(true)
         })
+    })
+  })
+
+  /**
+   * AK-04 / ADR-033: API keys are organization-scoped credentials.
+   *
+   * - `organizationId` is required on the create-key payload (no implicit
+   *   "current org from JWT").
+   * - The creator must be a member of the bound organization at creation
+   *   time (`ApiKeysService.create()` membership check).
+   * - The principal built from an API key carries `organizationId` +
+   *   `aclVersion`; the credential continues to authenticate while the
+   *   owner remains a member of that org.
+   *
+   * End-to-end proof of scope×org authorization (allowed vs denied on a
+   * policy-protected route) is intentionally out of scope here — it
+   * lands in AK-10 once wildcard semantics are fixed in AK-09.
+   */
+  describe('AK-04: api keys bind to organization', () => {
+    it('rejects POST /api-keys without organizationId', async () => {
+      const { token } = await registerWithOrg('user@example.com')
+
+      const res = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Missing org', scopes: ['user:read'] })
+        .expect(400)
+
+      expect(res.body).toBeDefined()
+    })
+
+    it('rejects POST /api-keys when user is not a member of the org', async () => {
+      const { token: tokenA } = await registerWithOrg('a@example.com', 'Org A', 'org-a')
+      const { organizationId: orgB } = await registerWithOrg('b@example.com', 'Org B', 'org-b')
+
+      await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ name: 'Cross-org', organizationId: orgB, scopes: ['user:read'] })
+        .expect(403)
+    })
+
+    it('creates key when user is a member of the org', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+
+      const res = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Own org', organizationId, scopes: ['user:read'] })
+        .expect(201)
+
+      expect(res.body.organizationId).toBe(organizationId)
+    })
+
+    it('key authenticates /auth/me after creation (proves org-bound principal is built)', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'Auth proof', ['user:read'])
+
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${key}`)
+        .expect(200)
     })
   })
 })

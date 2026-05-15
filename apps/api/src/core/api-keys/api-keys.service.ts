@@ -8,13 +8,14 @@ import { PinoLogger } from 'nestjs-pino'
 
 import type { CreateApiKeyInput } from '@amcore/shared'
 
-import { NotFoundException } from '../../common/exceptions'
+import { ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 
 export interface CreateApiKeyResult {
   id: string
   name: string
   key: string
+  organizationId: string
   scopes: string[]
   expiresAt: string | null
   createdAt: string
@@ -23,6 +24,7 @@ export interface CreateApiKeyResult {
 export interface ApiKeyListItem {
   id: string
   name: string
+  organizationId: string
   scopes: string[]
   expiresAt: string | null
   lastUsedAt: string | null
@@ -40,6 +42,19 @@ export class ApiKeysService {
   }
 
   async create(userId: string, input: CreateApiKeyInput): Promise<CreateApiKeyResult> {
+    // Per ADR-033: API keys are organization-scoped. Creator must be a
+    // member of the bound organization at creation time. Membership is
+    // re-verified on each request by ApiKeyGuard (lazy invariant) so a
+    // later loss of membership invalidates the credential.
+    const membership = await this.prisma.orgMember.findUnique({
+      where: { userId_organizationId: { userId, organizationId: input.organizationId } },
+      select: { id: true },
+    })
+
+    if (!membership) {
+      throw new ForbiddenException('Not a member of the specified organization')
+    }
+
     const { key, shortToken, longToken } = this.generateKey()
     const salt = randomBytes(16).toString('hex')
     const keyHash = this.hashLongToken(longToken, salt)
@@ -53,15 +68,20 @@ export class ApiKeysService {
         scopes: input.scopes,
         expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
         userId,
+        organizationId: input.organizationId,
       },
     })
 
-    this.logger.info({ userId, apiKeyId: apiKey.id }, 'API key created')
+    this.logger.info(
+      { userId, apiKeyId: apiKey.id, organizationId: apiKey.organizationId },
+      'API key created'
+    )
 
     return {
       id: apiKey.id,
       name: apiKey.name,
       key,
+      organizationId: apiKey.organizationId,
       scopes: apiKey.scopes,
       expiresAt: apiKey.expiresAt?.toISOString() ?? null,
       createdAt: apiKey.createdAt.toISOString(),
@@ -77,6 +97,7 @@ export class ApiKeysService {
     return keys.map((k) => ({
       id: k.id,
       name: k.name,
+      organizationId: k.organizationId,
       scopes: k.scopes,
       expiresAt: k.expiresAt?.toISOString() ?? null,
       lastUsedAt: k.lastUsedAt?.toISOString() ?? null,

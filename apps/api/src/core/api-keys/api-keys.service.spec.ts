@@ -2,7 +2,7 @@ import { SystemRole } from '@prisma/client'
 import type { Cache } from 'cache-manager'
 import type { PinoLogger } from 'nestjs-pino'
 
-import { NotFoundException } from '../../common/exceptions'
+import { ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { createMockContext, type MockContext, mockContextToPrisma } from '../auth/test-context'
 
 import { ApiKeysService } from './api-keys.service'
@@ -24,6 +24,7 @@ describe('ApiKeysService', () => {
     lastUsedAt: null,
     createdAt: new Date('2024-01-01'),
     userId: 'user-1',
+    organizationId: 'org-1',
   }
 
   const mockApiKeyWithUser = {
@@ -57,10 +58,23 @@ describe('ApiKeysService', () => {
   })
 
   describe('create', () => {
+    const validInput = {
+      name: 'Test Key',
+      organizationId: 'org-1',
+      scopes: ['workout:read'],
+    }
+
+    function mockMembership(found: boolean) {
+      mockCtx.prisma.orgMember.findUnique.mockResolvedValue(
+        found ? ({ id: 'member-1' } as never) : null
+      )
+    }
+
     it('should store shortToken in plaintext and keyHash as sha256', async () => {
+      mockMembership(true)
       mockCtx.prisma.apiKey.create.mockResolvedValue(mockApiKey)
 
-      await service.create('user-1', { name: 'Test Key', scopes: ['workout:read'] })
+      await service.create('user-1', validInput)
 
       const createCall = mockCtx.prisma.apiKey.create.mock.calls[0]![0]!
 
@@ -70,13 +84,46 @@ describe('ApiKeysService', () => {
     })
 
     it('should return full key in response but not store it in db', async () => {
+      mockMembership(true)
       mockCtx.prisma.apiKey.create.mockResolvedValue(mockApiKey)
 
-      const result = await service.create('user-1', { name: 'Test Key', scopes: ['workout:read'] })
+      const result = await service.create('user-1', validInput)
 
       expect(result.key).toMatch(/^amcore_live_/)
       const createCall = mockCtx.prisma.apiKey.create.mock.calls[0]![0]!
       expect(createCall.data).not.toHaveProperty('key')
+    })
+
+    // AK-04 / ADR-033: API keys are organization-scoped credentials.
+    it('persists organizationId on the new key', async () => {
+      mockMembership(true)
+      mockCtx.prisma.apiKey.create.mockResolvedValue(mockApiKey)
+
+      const result = await service.create('user-1', validInput)
+
+      const createCall = mockCtx.prisma.apiKey.create.mock.calls[0]![0]!
+      expect(createCall.data.organizationId).toBe('org-1')
+      expect(result.organizationId).toBe('org-1')
+    })
+
+    // AK-04 / ADR-033: creator must be a member of the bound organization.
+    it('throws ForbiddenException when creator is not a member of the organization', async () => {
+      mockMembership(false)
+
+      await expect(service.create('user-1', validInput)).rejects.toThrow(ForbiddenException)
+      expect(mockCtx.prisma.apiKey.create).not.toHaveBeenCalled()
+    })
+
+    it('looks up membership by composite (userId, organizationId) key', async () => {
+      mockMembership(true)
+      mockCtx.prisma.apiKey.create.mockResolvedValue(mockApiKey)
+
+      await service.create('user-1', validInput)
+
+      expect(mockCtx.prisma.orgMember.findUnique).toHaveBeenCalledWith({
+        where: { userId_organizationId: { userId: 'user-1', organizationId: 'org-1' } },
+        select: { id: true },
+      })
     })
   })
 
