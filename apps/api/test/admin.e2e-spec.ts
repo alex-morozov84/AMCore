@@ -28,7 +28,7 @@ describe('Admin (e2e)', () => {
 
   afterAll(async () => {
     await teardownE2ETest(context)
-  })
+  }, 120000)
 
   beforeEach(async () => {
     await cleanOrgData(prisma)

@@ -17,7 +17,7 @@ describe('Health (e2e)', () => {
     if (context) {
       await teardownE2ETest(context)
     }
-  })
+  }, 120000)
 
   it.each([
     ['/health', ['database', 'redis', 'disk', 'memory_heap']],

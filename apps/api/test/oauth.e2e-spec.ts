@@ -68,7 +68,7 @@ describe('OAuth (e2e)', () => {
     if (context) {
       await teardownE2ETest(context)
     }
-  })
+  }, 120000)
 
   beforeEach(async () => {
     await cleanDatabase(prisma, context!.cache, context!.throttlerStorage)

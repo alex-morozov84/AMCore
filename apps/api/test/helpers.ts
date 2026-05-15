@@ -11,7 +11,6 @@ import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
 import { ZodValidationPipe } from 'nestjs-zod'
 
-import { AppModule } from '../src/app.module'
 import { PrismaService } from '../src/prisma'
 
 /**
@@ -54,10 +53,19 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
 
   process.env.DATABASE_URL = databaseUrl
   process.env.REDIS_URL = redisUrl
+  // E2E_DATABASE_URL: escape hatch consumed by prisma.config.ts to defeat
+  // Prisma CLI's `.env` auto-load (which otherwise overrides DATABASE_URL back
+  // to whatever sits in .env). Not used by application code.
+  process.env.E2E_DATABASE_URL = databaseUrl
 
   // Log test environment (suppress ESLint in tests)
   // eslint-disable-next-line no-console
   console.log('🔧 Test Environment:', { databaseUrl, redisUrl })
+
+  // Dynamic import AFTER process.env is set — otherwise AppModule's
+  // ConfigModule.forRoot() evaluates at static-import time with the .env file
+  // values and ignores our testcontainer URLs. See @nestjs/config issue #245.
+  const { AppModule } = await import('../src/app.module')
 
   // Create testing module with real AppModule (no mocks!)
   const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -84,8 +92,17 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
   await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS finance')
   await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS subscriptions')
 
-  // Deploy migrations
-  execSync('pnpm prisma migrate deploy', { stdio: 'inherit' })
+  // Deploy migrations against the testcontainer DB. We pass `env` explicitly
+  // because Jest's jest-environment-node sandboxes `process.env` and child
+  // processes spawned via execSync's default inheritance do NOT see mutations
+  // made by the test (verified empirically — DATABASE_URL was undefined in the
+  // subprocess despite being set on `process.env` above). Forwarding
+  // `E2E_DATABASE_URL` lets `prisma.config.ts` pick the testcontainer URL
+  // instead of the `.env`-derived production one.
+  execSync('pnpm prisma migrate deploy', {
+    stdio: 'inherit',
+    env: { ...process.env, E2E_DATABASE_URL: databaseUrl },
+  })
 
   return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
 }
