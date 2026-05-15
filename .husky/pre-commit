@@ -1,1 +1,1 @@
-pnpm lint-staged
+CI=true pnpm lint-staged
