@@ -77,7 +77,11 @@ export class HealthController {
    * Used by Kubernetes to detect if the application is ready to receive traffic.
    * If this fails, the pod is removed from the Service load balancer.
    *
-   * Checks: Database, Redis, Disk, Memory
+   * Checks: Database (connectivity + pool saturation), Redis, Disk, Memory.
+   * The DB check returns `down` when `pool.waiting` exceeds
+   * `DATABASE_POOL_WAITING_THRESHOLD`. Hysteresis (how long the breach
+   * must persist before K8s pulls the pod) is the job of
+   * `failureThreshold` + `periodSeconds`, not the app — see ADR-031.
    *
    * K8s config:
    * ```yaml
@@ -88,6 +92,8 @@ export class HealthController {
    *   initialDelaySeconds: 5
    *   periodSeconds: 5
    *   timeoutSeconds: 10        # Longer timeout for DB checks
+   *   failureThreshold: 3       # ~15 s of sustained saturation → pull pod
+   *   successThreshold: 1
    * ```
    */
   @Get('ready')

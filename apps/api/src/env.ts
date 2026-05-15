@@ -24,6 +24,7 @@ const envSchema = z
     DATABASE_CONNECT_MS: z.coerce.number().int().min(0).default(5000),
     DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
     DATABASE_QUERY_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
+    DATABASE_POOL_WAITING_THRESHOLD: z.coerce.number().int().min(0).default(5),
     SLOW_QUERY_THRESHOLD_MS: z.coerce.number().int().min(0).optional(),
     LOG_BODY_MAX_BYTES: z.coerce.number().int().min(0).default(4096),
     REDIS_URL: z.url(),

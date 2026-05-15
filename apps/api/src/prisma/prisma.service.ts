@@ -89,4 +89,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.$disconnect()
     await this.pool.end()
   }
+
+  // Pool stats for readiness probes / observability. Encapsulated so the
+  // underlying pg.Pool stays private. See `health/indicators/prisma.health.ts`
+  // for the consumer; defaults and tuning are documented in ADR-029.
+  getPoolStats(): { total: number; idle: number; waiting: number } {
+    return {
+      total: this.pool.totalCount,
+      idle: this.pool.idleCount,
+      waiting: this.pool.waitingCount,
+    }
+  }
 }
