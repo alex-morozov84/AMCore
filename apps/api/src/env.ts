@@ -25,6 +25,7 @@ const envSchema = z
     DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
     DATABASE_QUERY_TIMEOUT_MS: z.coerce.number().int().min(0).default(30000),
     SLOW_QUERY_THRESHOLD_MS: z.coerce.number().int().min(0).optional(),
+    LOG_BODY_MAX_BYTES: z.coerce.number().int().min(0).default(4096),
     REDIS_URL: z.url(),
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     JWT_ACCESS_EXPIRATION: z.string().default('15m'),
@@ -54,7 +55,7 @@ const envSchema = z
     EMAIL_FROM: z.email().default('noreply@amcore.com'),
     SUPPORT_EMAIL: z.email().default('support@amcore.com'),
     // Frontend URLs (for email links)
-    FRONTEND_URL: z.string().url().default('http://localhost:3002'),
+    FRONTEND_URL: z.url().default('http://localhost:3002'),
     // Auth token expiration
     PASSWORD_RESET_EXPIRY_MINUTES: z.coerce.number().int().min(1).default(15),
     EMAIL_VERIFICATION_EXPIRY_HOURS: z.coerce.number().int().min(1).default(48),

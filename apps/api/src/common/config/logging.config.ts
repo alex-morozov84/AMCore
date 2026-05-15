@@ -3,11 +3,43 @@ import type { ClsService } from 'nestjs-cls'
 import type { Params } from 'nestjs-pino'
 import { hostname } from 'os'
 
+export type TruncatedBody = {
+  _truncated: true
+  _originalBytes: number
+  _maxBytes: number
+  _topLevelKeys?: string[]
+}
+
+// Caps body payloads put into request logs. Small bodies pass through
+// unchanged so Pino's path-based redaction still resolves `req.body.password`
+// etc. Over-cap bodies collapse to a marker with size + top-level keys —
+// keeps the log line bounded without leaking field values.
+export function truncateBody(body: unknown, maxBytes: number): unknown | TruncatedBody {
+  if (body === undefined || body === null) return body
+
+  let serialized: string
+  try {
+    serialized = JSON.stringify(body)
+  } catch {
+    return { _truncated: true, _originalBytes: 0, _maxBytes: maxBytes }
+  }
+
+  const byteLength = Buffer.byteLength(serialized, 'utf8')
+  if (byteLength <= maxBytes) return body
+
+  return {
+    _truncated: true,
+    _originalBytes: byteLength,
+    _maxBytes: maxBytes,
+    _topLevelKeys: typeof body === 'object' && !Array.isArray(body) ? Object.keys(body) : undefined,
+  }
+}
+
 /**
  * Pino logging configuration for nestjs-pino
  * Includes: correlation ID, sensitive data redaction, request/response serializers, GDPR-compliant IP anonymization
  */
-export function createLoggingConfig(cls: ClsService): Params {
+export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Params {
   const isDevelopment = process.env.NODE_ENV !== 'production'
 
   return {
@@ -147,7 +179,10 @@ export function createLoggingConfig(cls: ClsService): Params {
               authorization: req.headers.authorization, // Will be redacted
               cookie: req.headers.cookie, // Will be redacted
             },
-            body: req.raw?.body || req.body, // Include body from raw request (sensitive fields will be redacted)
+            // Capped to `maxBodyBytes` (env LOG_BODY_MAX_BYTES, default 4096).
+            // Under the cap → object passes through so Pino redact paths apply.
+            // Over the cap → marker with original size + top-level keys.
+            body: truncateBody(req.raw?.body || req.body, maxBodyBytes),
             remoteAddress: req.socket?.remoteAddress,
             remotePort: req.socket?.remotePort,
           }

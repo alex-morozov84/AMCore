@@ -22,6 +22,7 @@ import { AuthModule } from './core/auth/auth.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
 import { validate } from './env'
 import { EnvModule } from './env/env.module'
+import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
 import { EmailModule } from './infrastructure/email'
 import { QueueModule } from './infrastructure/queue'
@@ -77,8 +78,9 @@ import { ShutdownService } from './shutdown.service'
 
     // Logging (with correlation ID from CLS)
     LoggerModule.forRootAsync({
-      inject: [ClsService],
-      useFactory: createLoggingConfig,
+      inject: [ClsService, EnvService],
+      useFactory: (cls: ClsService, env: EnvService) =>
+        createLoggingConfig(cls, env.get('LOG_BODY_MAX_BYTES')),
     }),
 
     RedisModule,
