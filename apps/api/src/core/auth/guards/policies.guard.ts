@@ -1,6 +1,7 @@
 import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
+import { ForbiddenException } from '../../../common/exceptions'
 import type { AppAbility } from '../casl/ability.factory'
 import {
   CHECK_POLICIES_KEY,
@@ -46,13 +47,18 @@ export class PoliciesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest()
     const ability: AppAbility = request.ability
 
-    // If no ability on request, deny access
+    // Throw rather than return false — Nest would otherwise convert false into a
+    // raw ForbiddenException without our domain errorCode.
     if (!ability) {
-      return false
+      throw new ForbiddenException('Authorization context not established')
     }
 
     // Execute all policy handlers - all must return true
-    return policyHandlers.every((handler) => this.execPolicyHandler(handler, ability))
+    const allowed = policyHandlers.every((handler) => this.execPolicyHandler(handler, ability))
+    if (!allowed) {
+      throw new ForbiddenException('Insufficient permissions')
+    }
+    return true
   }
 
   /**

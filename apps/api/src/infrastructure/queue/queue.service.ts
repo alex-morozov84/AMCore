@@ -1,9 +1,9 @@
 import { InjectQueue } from '@nestjs/bullmq'
-import { Injectable } from '@nestjs/common'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import type { Job, Queue } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
-import { NotFoundException } from '../../common/exceptions'
+import { AppException, NotFoundException } from '../../common/exceptions'
 
 import { QueueName } from './constants/queues.constant'
 import type { JobOptions } from './interfaces/job-options.interface'
@@ -56,7 +56,12 @@ export class QueueService implements IQueueService {
     const job = await this.getJob(queueName, jobId)
 
     if (!job) {
-      throw new NotFoundException('Job', jobId)
+      throw new AppException(
+        `Job "${jobId}" not found in queue "${queueName}"`,
+        HttpStatus.NOT_FOUND,
+        'RESOURCE_NOT_FOUND',
+        { resource: 'Job', jobId, queueName }
+      )
     }
 
     await job.remove()
@@ -98,7 +103,12 @@ export class QueueService implements IQueueService {
     const job = await this.getJob(queueName, jobId)
 
     if (!job) {
-      throw new NotFoundException('Job', jobId)
+      throw new AppException(
+        `Job "${jobId}" not found in queue "${queueName}"`,
+        HttpStatus.NOT_FOUND,
+        'RESOURCE_NOT_FOUND',
+        { resource: 'Job', jobId, queueName }
+      )
     }
 
     await job.retry()

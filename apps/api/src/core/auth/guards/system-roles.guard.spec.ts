@@ -4,6 +4,8 @@ import { Test, TestingModule } from '@nestjs/testing'
 
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
+import { ForbiddenException } from '../../../common/exceptions'
+
 import { SystemRolesGuard } from './system-roles.guard'
 
 describe('SystemRolesGuard', () => {
@@ -75,18 +77,16 @@ describe('SystemRolesGuard', () => {
     }
 
     const context = createMockContext(user)
-    const result = guard.canActivate(context)
 
-    expect(result).toBe(false)
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException)
   })
 
   it('should deny access when user is not authenticated', () => {
-    jest.spyOn(reflector, 'get').mockReturnValueOnce([SystemRole.User])
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValueOnce([SystemRole.User])
 
     const context = createMockContext(undefined)
-    const result = guard.canActivate(context)
 
-    expect(result).toBe(false)
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException)
   })
 
   it('should allow access when user has one of multiple required roles', () => {

@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core'
 
 import { type SystemRole } from '@amcore/shared'
 
+import { ForbiddenException } from '../../../common/exceptions'
 import { SYSTEM_ROLES_KEY } from '../decorators/system-roles.decorator'
 
 /**
@@ -46,12 +47,11 @@ export class SystemRolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest()
     const user = request.user
 
-    // If no user, deny access
-    if (!user) {
-      return false
+    // Throw rather than return false — Nest would otherwise convert false into a
+    // raw ForbiddenException without our domain errorCode.
+    if (!user || !requiredRoles.includes(user.systemRole)) {
+      throw new ForbiddenException('Insufficient system role')
     }
-
-    // Check if user has any of the required system roles
-    return requiredRoles.includes(user.systemRole)
+    return true
   }
 }

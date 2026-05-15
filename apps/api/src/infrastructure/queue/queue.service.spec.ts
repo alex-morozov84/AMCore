@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import type { Job, Queue } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
-import { NotFoundException } from '../../common/exceptions'
+import { AppException, NotFoundException } from '../../common/exceptions'
 
 import { JobName, QueueName } from './constants/queues.constant'
 import { QueueService } from './queue.service'
@@ -131,12 +131,13 @@ describe('QueueService', () => {
       expect(mockJob.remove).toHaveBeenCalled()
     })
 
-    it('should throw NotFoundException if job not found', async () => {
+    it('should throw with queue+job context if job not found', async () => {
       defaultQueue.getJob.mockResolvedValue(undefined as never)
 
-      await expect(service.removeJob(QueueName.DEFAULT, 'job-999')).rejects.toThrow(
-        NotFoundException
-      )
+      await expect(service.removeJob(QueueName.DEFAULT, 'job-999')).rejects.toThrow(AppException)
+      await expect(service.removeJob(QueueName.DEFAULT, 'job-999')).rejects.toMatchObject({
+        message: expect.stringContaining('"default"'),
+      })
     })
   })
 
@@ -206,12 +207,13 @@ describe('QueueService', () => {
       expect(mockJob.retry).toHaveBeenCalled()
     })
 
-    it('should throw NotFoundException if job not found', async () => {
+    it('should throw with queue+job context if job not found', async () => {
       defaultQueue.getJob.mockResolvedValue(undefined as never)
 
-      await expect(service.retryJob(QueueName.DEFAULT, 'job-999')).rejects.toThrow(
-        NotFoundException
-      )
+      await expect(service.retryJob(QueueName.DEFAULT, 'job-999')).rejects.toThrow(AppException)
+      await expect(service.retryJob(QueueName.DEFAULT, 'job-999')).rejects.toMatchObject({
+        message: expect.stringContaining('"default"'),
+      })
     })
   })
 

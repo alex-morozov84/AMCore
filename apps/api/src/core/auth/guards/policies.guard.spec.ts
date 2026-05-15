@@ -5,6 +5,8 @@ import { Test, TestingModule } from '@nestjs/testing'
 
 import { Action, Subject } from '@amcore/shared'
 
+import { ForbiddenException } from '../../../common/exceptions'
+
 import { PoliciesGuard } from './policies.guard'
 
 describe('PoliciesGuard', () => {
@@ -57,9 +59,8 @@ describe('PoliciesGuard', () => {
     jest.spyOn(reflector, 'get').mockReturnValueOnce([policyHandler])
 
     const context = createMockContext(null) // No ability (explicitly null)
-    const result = await guard.canActivate(context)
 
-    expect(result).toBe(false)
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
     expect(policyHandler).not.toHaveBeenCalled()
   })
 
@@ -83,9 +84,8 @@ describe('PoliciesGuard', () => {
     jest.spyOn(reflector, 'get').mockReturnValueOnce([handler1, handler2, handler3])
 
     const context = createMockContext()
-    const result = await guard.canActivate(context)
 
-    expect(result).toBe(false)
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
     expect(handler1).toHaveBeenCalled()
     expect(handler2).toHaveBeenCalled()
   })
@@ -118,8 +118,7 @@ describe('PoliciesGuard', () => {
     jest.spyOn(reflector, 'get').mockReturnValueOnce([policyHandler])
 
     const context = createMockContext()
-    const result = await guard.canActivate(context)
 
-    expect(result).toBe(false)
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
   })
 })

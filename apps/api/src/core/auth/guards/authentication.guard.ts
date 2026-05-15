@@ -101,16 +101,11 @@ export class AuthenticationGuard implements CanActivate {
       request.ability = ability
     }
 
-    // 5. Run authorization guards
-    const systemRolesCheck = await this.systemRolesGuard.canActivate(context)
-    if (!systemRolesCheck) {
-      return false
-    }
-
-    const policiesCheck = await this.policiesGuard.canActivate(context)
-    if (!policiesCheck) {
-      return false
-    }
+    // 5. Run authorization guards.
+    // These now throw domain ForbiddenException on denial rather than return false,
+    // so the response always carries a machine-readable errorCode.
+    await this.systemRolesGuard.canActivate(context)
+    await this.policiesGuard.canActivate(context)
 
     return true
   }
