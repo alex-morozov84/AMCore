@@ -50,8 +50,41 @@ export class AbilityFactory {
   async createForUser(principal: RequestPrincipal): Promise<AppAbility> {
     const rules: RawRuleOf<AppAbility>[] = []
 
-    // SUPER_ADMIN has full access to everything
+    // SUPER_ADMIN handling.
+    //
+    // JWT super-admin: full access (manage:all).
+    //
+    // API-key super-admin: scopes MUST still apply. Per ADR-033, every
+    // API-key principal is org-scoped and its effective permissions are
+    // `(owner's permissions) ∩ apiKey.scopes`. For a super-admin owner,
+    // "owner's permissions" is conceptually `all`, so the intersection
+    // reduces to the scope set itself — pushing each concrete
+    // `action:subject` pair directly as a rule is correct and is NOT a
+    // bypass of the intersection model. A future agent reading this
+    // branch should not "fix" it back to `manage:all`: that would
+    // re-introduce the AK-02 leak (narrow super-admin keys → full root).
+    //
+    // Wildcard tokens in scope strings (action='manage' or subject='all')
+    // are intentionally dropped at this stage. Wildcard semantics are
+    // owned by AK-09; the scope registry / validation belongs to AK-05.
+    // Until those land, honoring wildcards here would let a scope like
+    // `manage:all` become an implicit bypass via CASL's native wildcard
+    // expansion. Strict `parts.length !== 2` parsing also rejects
+    // malformed scopes (e.g. `read:User:extra`) instead of silently
+    // truncating them.
     if (principal.systemRole === SystemRole.SuperAdmin) {
+      if (principal.type === 'api_key') {
+        for (const scope of principal.scopes ?? []) {
+          const parts = scope.split(':')
+          if (parts.length !== 2) continue
+          const [action, subject] = parts
+          if (!action || !subject) continue
+          if (action === Action.Manage || subject === Subject.All) continue
+          rules.push({ action, subject } as RawRuleOf<AppAbility>)
+        }
+        return createPrismaAbility(rules)
+      }
+
       rules.push({ action: Action.Manage, subject: Subject.All })
       return createPrismaAbility(rules)
     }
