@@ -315,9 +315,25 @@ DELETE /api/v1/organizations/:orgId/members/:userId
 
 Their org permissions are gone immediately. Active JWT tokens expire within 15 minutes (the default access token lifetime).
 
-### "I want a read-only integration via API key" _(coming in Phase 3)_
+### "I want a read-only integration via API key"
 
-API key authentication with scopes is planned. You'll create a key with `scopes: ["read"]` — it will only be able to perform read operations regardless of the associated user's full role.
+Create a key bound to the org with narrow scopes:
+
+```http
+POST /api/v1/api-keys
+Authorization: Bearer {your-jwt}
+Content-Type: application/json
+
+{
+  "name": "Reporter",
+  "organizationId": "<your-org-id>",
+  "scopes": ["read:User", "read:Organization"]
+}
+```
+
+The key inherits `userPerms ∩ scopes` semantics — even if you're an
+`ADMIN`, this key can only read. See [API Keys](./auth/api-keys.md)
+for the complete guide (scope grammar, wildcards, error codes).
 
 ---
 

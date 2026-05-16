@@ -79,13 +79,16 @@ Response gives you a new `accessToken` and rotates the cookie.
 
 The system supports three ways to authenticate a request:
 
-| Method         | How                             | Use case                  |
-| -------------- | ------------------------------- | ------------------------- |
-| **JWT Bearer** | `Authorization: Bearer {token}` | Web/mobile apps, users    |
-| **API Key**    | `X-API-Key: amk_...`            | Server-to-server, scripts |
-| **None**       | No header                       | Public endpoints          |
+| Method         | How                                     | Use case                  |
+| -------------- | --------------------------------------- | ------------------------- |
+| **JWT Bearer** | `Authorization: Bearer {accessToken}`   | Web/mobile apps, users    |
+| **API Key**    | `Authorization: Bearer amcore_live_...` | Server-to-server, scripts |
+| **None**       | No header                               | Public endpoints          |
 
-Most endpoints accept both JWT and API key. Public endpoints (like `/auth/login`) require neither.
+JWT and API key share the same `Authorization: Bearer` header — the
+server tells them apart by the token format. Most data endpoints accept
+either. Credential and session management routes (`/api-keys/**`,
+`/auth/sessions/**`) require a JWT specifically — see [API Keys](./api-keys.md).
 
 ---
 

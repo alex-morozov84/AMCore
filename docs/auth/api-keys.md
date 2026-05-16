@@ -1,156 +1,253 @@
 # API Keys
 
-API keys are for server-to-server access — scripts, integrations, CI pipelines, and any situation where a human isn't logging in interactively. Instead of a user session, you use a long-lived token scoped to exactly what it needs.
+API keys are for server-to-server access — scripts, integrations, CI pipelines, and any situation where a human isn't logging in interactively. Instead of a user session, you use a long-lived token bound to a specific organization and scoped to exactly what it needs.
+
+> Replace `https://api.example.com` with your deployment URL throughout this guide.
 
 ---
 
 ## How API keys differ from user tokens
 
-|                 | JWT (user session)                 | API key                        |
-| --------------- | ---------------------------------- | ------------------------------ |
-| **Issued via**  | Login flow                         | Created in settings            |
-| **Lifetime**    | 15 min (access) / 7 days (refresh) | Set at creation (or no expiry) |
-| **Permissions** | Full user permissions              | User permissions ∩ key scopes  |
-| **Use case**    | Interactive apps                   | Automation, scripts            |
-| **Revocable**   | Revoking a session                 | Deleting the key               |
-| **Header**      | `Authorization: Bearer {token}`    | `X-API-Key: {token}`           |
+|                 | JWT (user session)             | API key                                                       |
+| --------------- | ------------------------------ | ------------------------------------------------------------- |
+| **Issued via**  | Login flow                     | `POST /api/v1/api-keys` (JWT-auth)                            |
+| **Lifetime**    | 15 min access / 7 days refresh | Set at creation, or no expiry                                 |
+| **Permissions** | Full user permissions          | `userPerms ∩ apiKey.scopes` (see Effective permissions below) |
+| **Header**      | `Authorization: Bearer eyJ...` | `Authorization: Bearer amcore_live_...`                       |
+| **Org context** | Picked via `/switch`           | Bound to one org at creation                                  |
+| **Revocable**   | Revoking the session           | `DELETE /api/v1/api-keys/:id`                                 |
+
+Both auth methods use the same `Authorization: Bearer` header — the server tells them apart by the token format. JWTs are `eyJ...`; API keys are `amcore_live_...`.
 
 ---
 
 ## Scopes
 
-When you create an API key, you define its **scopes** — the exact operations it's allowed to perform. Even if the user has full admin permissions, the key can't do more than its scopes allow.
+When you create an API key, you define its **scopes** — the exact operations it's allowed to perform. Even if the key's owner has full admin permissions, the key can't do more than its scopes allow.
 
-Scopes use the format `action:subject`:
+### Scope format
 
-| Scope            | What it allows     |
-| ---------------- | ------------------ |
-| `read:Contact`   | Read contacts      |
-| `create:Contact` | Create contacts    |
-| `update:Contact` | Update contacts    |
-| `delete:Contact` | Delete contacts    |
-| `read:User`      | Read user profiles |
+Every scope is `action:Subject`, case-sensitive:
 
-**Effective permissions** = user's org permissions **intersected with** key scopes.
+| Part      | Allowed values                                                      |
+| --------- | ------------------------------------------------------------------- |
+| `action`  | `create`, `read`, `update`, `delete`, `manage` (= all four)         |
+| `Subject` | `User`, `Organization`, `Role`, `Permission`, `all` (= any subject) |
+
+`Subject` is PascalCase for concrete types and lowercase `all` for the wildcard. Add domain subjects (e.g. `Contact`, `Deal`) by extending `packages/shared/src/enums/permissions.ts` — the scope schema picks them up automatically.
+
+### Examples
+
+| Scope                 | What it allows                                                   |
+| --------------------- | ---------------------------------------------------------------- |
+| `read:User`           | Read users in the bound org                                      |
+| `manage:Organization` | Full control over the bound organization (read + write + delete) |
+| `read:all`            | Read any subject in the bound org                                |
+| `manage:User`         | Full control over users in the bound org                         |
+
+### `manage:all` is rejected
+
+`manage:all` is forbidden at the schema layer. It would mean "no narrowing" — the key would have the same power as the owner's JWT, defeating the purpose of a scoped credential. Use a narrower scope (e.g. `manage:Organization` or `read:all`), or use your JWT directly.
+
+### Effective permissions
+
+`Effective permissions = owner's org permissions ∩ key scopes`.
 
 ```
-User can:    read:Contact, update:Contact, delete:Contact, read:User
-Key scopes:  read:Contact, create:Contact
+Owner has:        manage:Organization, read:all
+Key scopes:       read:Organization
 
-Effective:   read:Contact  ← only the overlap
+Effective rule:   read:Organization  (action narrows to read; subject stays Organization)
 ```
 
-This means: if the user loses the `update:Contact` permission later, the key also loses it — even though the key's scopes still list it.
+The intersection narrows along two axes (action and subject) independently. Wildcards `manage` and `all` behave as expected: `read:all ∩ read:User → read:User`, `manage:Organization ∩ read:Organization → read:Organization`.
+
+If the owner loses a permission later, the key loses it too on the next request — there's no separate permission grant on the key itself.
 
 ---
 
 ## Creating an API key
 
-**Endpoint:** `POST /api/v1/api-keys`
+**Endpoint:** `POST /api/v1/api-keys` — **JWT only**, API keys cannot manage credentials.
+
+The creator must be a member of the bound organization.
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/api-keys \
+curl -X POST https://api.example.com/api/v1/api-keys \
   -H "Authorization: Bearer eyJhbGci..." \
   -H "Content-Type: application/json" \
   -d '{
     "name": "CI Pipeline",
-    "scopes": ["read:Contact", "create:Contact"],
-    "expiresAt": "2025-01-01T00:00:00.000Z"
+    "organizationId": "cm1abc...",
+    "scopes": ["read:User", "read:Organization"],
+    "expiresAt": "2027-01-01T00:00:00.000Z"
   }'
 ```
+
+| Field            | Type     | Required | Description                                        |
+| ---------------- | -------- | -------- | -------------------------------------------------- |
+| `name`           | string   | ✅       | Human-readable label, 1–100 chars                  |
+| `organizationId` | CUID     | ✅       | The org this key is bound to; you must be a member |
+| `scopes`         | string[] | ✅       | At least one canonical `action:Subject` scope      |
+| `expiresAt`      | ISO date | —        | Omit for no expiry                                 |
 
 **Success response** `201 Created`:
 
 ```json
 {
-  "id": "key_abc123",
+  "id": "cm1xyz...",
   "name": "CI Pipeline",
-  "token": "amk_a1b2c3d4e5f6...",
-  "shortToken": "amk_a1b2**",
-  "scopes": ["read:Contact", "create:Contact"],
-  "expiresAt": "2025-01-01T00:00:00.000Z",
-  "createdAt": "2024-03-20T10:00:00.000Z"
+  "key": "amcore_live_a1B2c3D4e5F_x9Y8z7W6v5U4t3S2r1Q0p9O8n7M6l5K4",
+  "organizationId": "cm1abc...",
+  "scopes": ["read:User", "read:Organization"],
+  "expiresAt": "2027-01-01T00:00:00.000Z",
+  "createdAt": "2026-05-16T10:00:00.000Z"
 }
 ```
 
-> **Copy the token now.** The full `token` value is only shown once at creation. The backend only stores a hash — there's no way to retrieve the raw token later.
-
-The `shortToken` (`amk_a1b2**`) is the display version for UI listings — safe to show since it can't be used.
+> **Copy the `key` value immediately.** It's only returned once at creation. The server stores a salted SHA-256 hash and there's no way to retrieve the raw key later. Lost keys must be revoked and recreated.
 
 ---
 
 ## Using an API key
 
-Send the token in the `X-API-Key` header:
+Send the key in the `Authorization: Bearer` header — same as a JWT:
 
 ```bash
-curl https://api.amcore.dev/api/v1/contacts \
-  -H "X-API-Key: amk_a1b2c3d4e5f6..."
+curl https://api.example.com/api/v1/auth/me \
+  -H "Authorization: Bearer amcore_live_a1B2c3D4e5F_x9Y8z7W6v5U4t3S2r1Q0p9O8n7M6l5K4"
 ```
 
-Most endpoints accept **either** a JWT or an API key. The endpoint documentation notes when only one is accepted.
+Most data endpoints accept either a JWT or an API key. A few routes are deliberately JWT-only:
+
+| Route group               | API key accepted? | Why                                                                  |
+| ------------------------- | ----------------- | -------------------------------------------------------------------- |
+| `/api-keys/**`            | ❌                | Credential management — you can't create/list/revoke keys with a key |
+| `/auth/sessions/**`       | ❌                | Browser session management — out of scope for integrations           |
+| Everything else with auth | ✅                | Including `/auth/me` (identity self-check)                           |
+
+Attempts on JWT-only routes with an API key return `401 Unauthorized`.
+
+---
+
+## Organization binding
+
+An API key is bound to one organization at creation. The runtime re-verifies on every request that the key's owner is still a member of that organization — lose membership, lose the key.
+
+| Scenario                                   | Result                                 |
+| ------------------------------------------ | -------------------------------------- |
+| Owner removed from the bound org           | `401` on next request                  |
+| Bound org deleted                          | Key is cascaded; `401` on next request |
+| Request targets a different org's resource | `403` from policy guard, not auth      |
+
+Use one key per (owner, organization) pair. To grant cross-org access, issue multiple keys.
 
 ---
 
 ## Listing API keys
 
-**Endpoint:** `GET /api/v1/api-keys`
+**Endpoint:** `GET /api/v1/api-keys` — **JWT only**.
 
-Returns all keys for the authenticated user. The `token` field is never returned here — only the `shortToken`.
+Returns all keys for the authenticated user as a raw array. No secret fields are exposed.
 
 ```bash
-curl https://api.amcore.dev/api/v1/api-keys \
+curl https://api.example.com/api/v1/api-keys \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
 ```json
-{
-  "apiKeys": [
-    {
-      "id": "key_abc123",
-      "name": "CI Pipeline",
-      "shortToken": "amk_a1b2**",
-      "scopes": ["read:Contact", "create:Contact"],
-      "expiresAt": "2025-01-01T00:00:00.000Z",
-      "lastUsedAt": "2024-03-19T08:15:00.000Z",
-      "createdAt": "2024-03-01T10:00:00.000Z"
-    }
-  ]
-}
+[
+  {
+    "id": "cm1xyz...",
+    "name": "CI Pipeline",
+    "organizationId": "cm1abc...",
+    "scopes": ["read:User", "read:Organization"],
+    "expiresAt": "2027-01-01T00:00:00.000Z",
+    "lastUsedAt": "2026-05-15T08:15:00.000Z",
+    "createdAt": "2026-05-01T10:00:00.000Z"
+  }
+]
 ```
+
+`lastUsedAt` is updated on a best-effort basis (throttled cache) — it's diagnostic, not authoritative.
 
 ---
 
 ## Revoking an API key
 
-**Endpoint:** `DELETE /api/v1/api-keys/:keyId`
+**Endpoint:** `DELETE /api/v1/api-keys/:keyId` — **JWT only**.
 
 ```bash
-curl -X DELETE https://api.amcore.dev/api/v1/api-keys/key_abc123 \
+curl -X DELETE https://api.example.com/api/v1/api-keys/cm1xyz... \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
-**Success response:** `204 No Content`
+**Success response:** `204 No Content`. The key is immediately invalid; any in-flight request authenticated with it returns `401`.
 
-The key is immediately invalid — any in-flight request using it will fail.
+---
+
+## Validation errors
+
+Invalid scopes are rejected at `POST /api/v1/api-keys` with `400 Bad Request` and a per-scope error in the `errors` array. Each entry's `errorCode` is machine-readable and stable across API versions; use it for frontend localization.
+
+| Code                                 | Reason                                                        |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `API_KEY_SCOPE_INVALID_FORMAT`       | Not `action:Subject` shape (empty, `read`, `read:User:extra`) |
+| `API_KEY_SCOPE_UNKNOWN_ACTION`       | Action not in `{create, read, update, delete, manage}`        |
+| `API_KEY_SCOPE_UNKNOWN_SUBJECT`      | Subject not in the registry (typo, unknown module)            |
+| `API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN` | `manage:all` is rejected (see Scopes section above)           |
+
+Example response for `{ "scopes": ["read:User", "manage:all"] }`:
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "scopes.1",
+      "message": "`manage:all` is forbidden — would grant unrestricted access",
+      "code": "custom",
+      "errorCode": "API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN"
+    }
+  ]
+}
+```
+
+Note that the error is at `scopes.1` only — `read:User` at index 0 is valid and not reported.
+
+---
+
+## Authorization failures
+
+These are separate from schema validation — they happen at request time on routes that check policies (`@CheckPolicies(can(action, Subject))`):
+
+| Status | Cause                                                                                 |
+| ------ | ------------------------------------------------------------------------------------- |
+| `401`  | Key revoked, expired, owner lost org membership, or org deleted                       |
+| `403`  | Authenticated successfully, but scope intersection doesn't grant the required ability |
+
+A common case: a key with `scopes: ["read:Organization"]` calling `PATCH /api/v1/organizations/:id`. The intersection narrows action to `read`, and PATCH requires `manage`, so the policy guard returns `403`.
 
 ---
 
 ## Security notes
 
-**Store keys like passwords.** Anyone who has your API key can make requests as you (within its scopes). Don't:
+**Store keys like passwords.** Anyone who has your API key can make requests as the owner (within scope, within the bound org). Don't:
 
 - Commit keys to Git
 - Put them in client-side code
 - Log them in application logs
-- Share them in Slack/email
+- Share them in Slack or email
 
 **Use environment variables** on your server:
 
 ```bash
-export AMCORE_API_KEY="amk_a1b2c3d4e5f6..."
+export AMCORE_API_KEY="amcore_live_..."
 ```
 
 **Set expiry dates** for keys used in temporary contexts (a one-off migration, a contractor's access).
 
-**Use the narrowest scopes possible.** A key for reading reports doesn't need `delete:Contact`.
+**Use the narrowest scopes that work.** A read-only reporter doesn't need `manage:User`. Narrowing scopes is a one-way safety net — the intersection model means even a leaked narrow key can't escalate.
+
+**Rotate proactively.** If a key may have been exposed, revoke and recreate. There's no key "rotation" endpoint — `DELETE` + `POST` is the rotation pattern.

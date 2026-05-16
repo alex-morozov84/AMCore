@@ -2,10 +2,14 @@
 
 Complete list of all auth endpoints with parameters and responses.
 
-**Base URL:** `https://api.amcore.dev/api/v1`
+**Base URL:** `https://api.example.com/api/v1` (replace with your deployment URL)
 
-**Auth header:** `Authorization: Bearer {accessToken}`
-**API key header:** `X-API-Key: {key}`
+**Auth header:** `Authorization: Bearer {accessToken | amcore_live_...}`
+
+JWT access tokens and API keys both ride on the same header — the server
+disambiguates by token format. **Management routes** (`/api-keys/**`,
+`/auth/sessions/**`) require a JWT specifically; API-key auth is rejected
+with `401`.
 
 **Email identity:** Email inputs are trimmed. Identity matching is
 case-insensitive through the server-side canonical email key, while API
@@ -85,9 +89,10 @@ Rotates `refresh_token` cookie.
 
 ---
 
-#### `GET /auth/me` 🔑
+#### `GET /auth/me` 🗝️
 
-No parameters.
+No parameters. Accepts both JWT and API key — the canonical identity
+self-check endpoint for integrations.
 
 **Response** `200`: Full `UserObject`.
 
@@ -265,41 +270,65 @@ refresh-cookie binding.
 
 #### `POST /api-keys` 🔑
 
-| Field       | Type     | Required | Description                               |
-| ----------- | -------- | -------- | ----------------------------------------- |
-| `name`      | string   | ✅       | Human-readable label                      |
-| `scopes`    | string[] | ✅       | e.g. `["read:Contact", "create:Contact"]` |
-| `expiresAt` | ISO date | —        | Omit for no expiry                        |
+JWT required — API-key auth is rejected with `401`. See
+[API Keys guide](./api-keys.md) for the full conceptual model.
+
+| Field            | Type     | Required | Description                                            |
+| ---------------- | -------- | -------- | ------------------------------------------------------ |
+| `name`           | string   | ✅       | Human-readable label, 1–100 chars                      |
+| `organizationId` | CUID     | ✅       | The org this key is bound to; creator must be a member |
+| `scopes`         | string[] | ✅       | Canonical `action:Subject`; at least one element       |
+| `expiresAt`      | ISO date | —        | Omit for no expiry                                     |
+
+Scopes are validated against the `Action × Subject` registry; invalid
+scopes return `400` with codes from the
+[API Key Scope error codes](#api-key-scope-error-codes) table.
 
 **Response** `201`:
 
 ```json
 {
-  "id": "key_...",
+  "id": "cm1xyz...",
   "name": "CI Pipeline",
-  "token": "amk_...",
-  "shortToken": "amk_a1**",
-  "scopes": ["read:Contact"],
+  "key": "amcore_live_a1B2c3D4e5F_x9Y8z7W6v5U4t3S2r1Q0p9O8n7M6l5K4",
+  "organizationId": "cm1abc...",
+  "scopes": ["read:User"],
   "expiresAt": null,
-  "createdAt": "..."
+  "createdAt": "2026-05-16T10:00:00.000Z"
 }
 ```
 
-> The full `token` is only returned here. Save it immediately.
+> The full `key` is only returned here. Save it immediately — the server
+> stores a salted SHA-256 hash and cannot recover the raw value.
 
 ---
 
 #### `GET /api-keys` 🔑
 
+JWT required. Returns a raw array of the caller's keys (no wrapper, no
+secret fields).
+
 **Response** `200`:
 
 ```json
-{ "apiKeys": [ApiKeyObject, ...] }
+[
+  {
+    "id": "cm1xyz...",
+    "name": "CI Pipeline",
+    "organizationId": "cm1abc...",
+    "scopes": ["read:User"],
+    "expiresAt": null,
+    "lastUsedAt": "2026-05-15T08:15:00.000Z",
+    "createdAt": "2026-05-01T10:00:00.000Z"
+  }
+]
 ```
 
 ---
 
 #### `DELETE /api-keys/:keyId` 🔑
+
+JWT required. The key is immediately invalid.
 
 **Response** `204`
 
@@ -350,11 +379,38 @@ Some errors include extra context:
 }
 ```
 
+Validation failures (`400`) carry per-field issues in an `errors` array.
+Each entry has `field`, `message`, an optional Zod `code` (for built-in
+checks), and an optional project-specific `errorCode` (for custom
+refinements such as the API-key scope grammar):
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "scopes.1",
+      "message": "`manage:all` is forbidden — would grant unrestricted access",
+      "code": "custom",
+      "errorCode": "API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN"
+    }
+  ]
+}
+```
+
+Frontend localization should prefer `errorCode` when present, then
+fall back to the generic `code`, then to `message`.
+
 ---
 
 ## Error codes
 
 Use `errorCode` in your frontend for translations — it's stable across API versions. The `message` is in English and may change.
+
+### Top-level error codes
+
+Returned in the response root `errorCode`:
 
 | Code                            | HTTP | Description                                      |
 | ------------------------------- | ---- | ------------------------------------------------ |
@@ -370,6 +426,19 @@ Use `errorCode` in your frontend for translations — it's stable across API ver
 | `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | OAuth: missing env vars for this provider        |
 | `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Link: provider account belongs to another user   |
 | `OAUTH_TICKET_INVALID`          | 401  | OAuth: login ticket exchange failed              |
+
+### API Key Scope error codes
+
+Returned per-element in the `errors[]` array on `POST /api-keys`. These
+codes live on `errors[i].errorCode`, **not** the top-level `errorCode`
+(which stays unset for validation failures).
+
+| Code                                 | HTTP | Description                                               |
+| ------------------------------------ | ---- | --------------------------------------------------------- |
+| `API_KEY_SCOPE_INVALID_FORMAT`       | 400  | Not `action:Subject` shape (empty, no colon, extra parts) |
+| `API_KEY_SCOPE_UNKNOWN_ACTION`       | 400  | Action not in `{create, read, update, delete, manage}`    |
+| `API_KEY_SCOPE_UNKNOWN_SUBJECT`      | 400  | Subject not in the shared `Subject` enum                  |
+| `API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN` | 400  | `manage:all` rejected — would grant unrestricted access   |
 
 ---
 
