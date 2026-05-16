@@ -50,6 +50,22 @@ export class AbilityFactory {
   async createForUser(principal: RequestPrincipal): Promise<AppAbility> {
     const rules: RawRuleOf<AppAbility>[] = []
 
+    // ADR-033 invariant — enforced at the top so it applies to every
+    // downstream branch (super-admin, no-org, normal org). An api_key
+    // principal that reaches this factory without organizationId or
+    // aclVersion means ApiKeyGuard built an invalid principal; fail
+    // loudly instead of silently producing a partially-authorized
+    // ability. Hoisted out of the no-org branch in the AK-02 follow-up
+    // because the SUPER_ADMIN branch otherwise short-circuited around
+    // it and gave malformed super-admin api_key principals a scoped
+    // ability instead of failing fast.
+    if (
+      principal.type === 'api_key' &&
+      (!principal.organizationId || principal.aclVersion == null)
+    ) {
+      throw new Error('API key principal must carry organization context (ADR-033)')
+    }
+
     // SUPER_ADMIN handling.
     //
     // JWT super-admin: full access (manage:all).
@@ -89,17 +105,10 @@ export class AbilityFactory {
       return createPrismaAbility(rules)
     }
 
-    // If no organization context, grant minimal personal permissions
+    // If no organization context, grant minimal personal permissions.
+    // api_key principals are unreachable here per the ADR-033 invariant
+    // at the top of this function — only JWT users land in this branch.
     if (!principal.organizationId || principal.aclVersion == null) {
-      // Per ADR-033: API-key principals always carry organizationId +
-      // aclVersion. Reaching this branch with an api_key principal means
-      // ApiKeyGuard built an invalid principal — fail loudly instead of
-      // silently granting unscoped personal permissions (which would
-      // bypass apiKey.scopes entirely).
-      if (principal.type === 'api_key') {
-        throw new Error('API key principal must carry organization context (ADR-033)')
-      }
-
       // User can read and update their own profile
       rules.push({
         action: Action.Read,

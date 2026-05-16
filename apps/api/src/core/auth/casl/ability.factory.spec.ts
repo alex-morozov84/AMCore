@@ -151,6 +151,23 @@ describe('AbilityFactory', () => {
         expect(ability.can(Action.Update, Subject.Organization)).toBe(false)
       })
 
+      // Follow-up to GPT review of Stage 3: the ADR-033 invariant was
+      // originally nested in the no-org branch, but the SUPER_ADMIN
+      // branch fired first and would have silently produced a scoped
+      // ability for a malformed super-admin api_key principal. After
+      // the hoist, the invariant catches this case too.
+      it('rejects SUPER_ADMIN api_key principal without organization context (ADR-033)', async () => {
+        const principal: RequestPrincipal = {
+          type: 'api_key',
+          sub: 'admin-1',
+          systemRole: SystemRole.SuperAdmin,
+          scopes: ['read:User'],
+        }
+
+        await expect(factory.createForUser(principal)).rejects.toThrow(/ADR-033/)
+        expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
+      })
+
       it('SUPER_ADMIN api-key rejects malformed scopes', async () => {
         const principal: RequestPrincipal = {
           type: 'api_key',
