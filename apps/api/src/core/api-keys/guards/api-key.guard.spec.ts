@@ -1,6 +1,7 @@
 import type { ExecutionContext } from '@nestjs/common'
 
 import { createMockContext, type MockContext, mockContextToPrisma } from '../../auth/test-context'
+import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service'
 import { ApiKeysService } from '../api-keys.service'
 
 import { ApiKeyGuard } from './api-key.guard'
@@ -8,6 +9,7 @@ import { ApiKeyGuard } from './api-key.guard'
 describe('ApiKeyGuard', () => {
   let guard: ApiKeyGuard
   let apiKeysService: jest.Mocked<Pick<ApiKeysService, 'verifyByShortToken' | 'touchLastUsed'>>
+  let abuseLimiter: jest.Mocked<Pick<ApiKeyAbuseLimiterService, 'check' | 'consume' | 'reset'>>
   let mockCtx: MockContext
 
   const mockApiKey = {
@@ -18,9 +20,14 @@ describe('ApiKeyGuard', () => {
     user: { systemRole: 'USER' },
   }
 
-  const createMockExecutionContext = (authHeader?: string): ExecutionContext => {
+  const SHORT_TOKEN = 'abc12345xyz'
+  const FINGERPRINT = ApiKeyAbuseLimiterService.fingerprint(SHORT_TOKEN)
+
+  const createMockExecutionContext = (authHeader?: string, ip = '1.2.3.4'): ExecutionContext => {
     const mockRequest = {
       headers: authHeader ? { authorization: authHeader } : {},
+      ip,
+      socket: { remoteAddress: ip },
       user: undefined as unknown,
     }
 
@@ -46,11 +53,18 @@ describe('ApiKeyGuard', () => {
       touchLastUsed: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<Pick<ApiKeysService, 'verifyByShortToken' | 'touchLastUsed'>>
 
+    abuseLimiter = {
+      check: jest.fn().mockResolvedValue(undefined),
+      consume: jest.fn().mockResolvedValue(undefined),
+      reset: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<Pick<ApiKeyAbuseLimiterService, 'check' | 'consume' | 'reset'>>
+
     mockCtx = createMockContext()
 
     guard = new ApiKeyGuard(
       apiKeysService as unknown as ApiKeysService,
-      mockContextToPrisma(mockCtx)
+      mockContextToPrisma(mockCtx),
+      abuseLimiter as unknown as ApiKeyAbuseLimiterService
     )
   })
 
@@ -63,13 +77,13 @@ describe('ApiKeyGuard', () => {
     mockMembership({ found: true, aclVersion: 7 })
 
     const context = createMockExecutionContext(
-      'Bearer amcore_live_abc12345xyz_12345678901234567890123456789012'
+      `Bearer amcore_live_${SHORT_TOKEN}_12345678901234567890123456789012`
     )
     const result = await guard.canActivate(context)
 
     expect(result).toBe(true)
     expect(apiKeysService.verifyByShortToken).toHaveBeenCalledWith(
-      'abc12345xyz',
+      SHORT_TOKEN,
       '12345678901234567890123456789012'
     )
 
@@ -90,7 +104,7 @@ describe('ApiKeyGuard', () => {
     mockMembership({ found: true })
 
     const context = createMockExecutionContext(
-      'Bearer amcore_live_abc12345xyz_12345678901234567890123456789012'
+      `Bearer amcore_live_${SHORT_TOKEN}_12345678901234567890123456789012`
     )
     await guard.canActivate(context)
 
@@ -142,7 +156,7 @@ describe('ApiKeyGuard', () => {
     apiKeysService.verifyByShortToken.mockResolvedValue(null)
 
     const context = createMockExecutionContext(
-      'Bearer amcore_live_abc12345xyz_12345678901234567890123456789012'
+      `Bearer amcore_live_${SHORT_TOKEN}_12345678901234567890123456789012`
     )
     const result = await guard.canActivate(context)
 
@@ -155,7 +169,7 @@ describe('ApiKeyGuard', () => {
     mockMembership({ found: false })
 
     const context = createMockExecutionContext(
-      'Bearer amcore_live_abc12345xyz_12345678901234567890123456789012'
+      `Bearer amcore_live_${SHORT_TOKEN}_12345678901234567890123456789012`
     )
     const result = await guard.canActivate(context)
 
@@ -170,10 +184,134 @@ describe('ApiKeyGuard', () => {
     mockCtx.prisma.orgMember.findUnique.mockResolvedValue(null)
 
     const context = createMockExecutionContext(
-      'Bearer amcore_live_abc12345xyz_12345678901234567890123456789012'
+      `Bearer amcore_live_${SHORT_TOKEN}_12345678901234567890123456789012`
     )
     const result = await guard.canActivate(context)
 
     expect(result).toBe(false)
+  })
+
+  // AK-07: brute-force protection on failed verifies.
+  describe('AK-07: abuse limiter integration', () => {
+    const VALID_HEADER = `Bearer amcore_live_${SHORT_TOKEN}_12345678901234567890123456789012`
+
+    it('does not call the limiter for pre-parse failures (missing header)', async () => {
+      const context = createMockExecutionContext()
+      await guard.canActivate(context)
+
+      expect(abuseLimiter.check).not.toHaveBeenCalled()
+      expect(abuseLimiter.consume).not.toHaveBeenCalled()
+      expect(abuseLimiter.reset).not.toHaveBeenCalled()
+    })
+
+    it('does not call the limiter for non-amcore Bearer headers', async () => {
+      const context = createMockExecutionContext('Bearer eyJ.jwt.token')
+      await guard.canActivate(context)
+
+      expect(abuseLimiter.check).not.toHaveBeenCalled()
+      expect(abuseLimiter.consume).not.toHaveBeenCalled()
+    })
+
+    it('does not call the limiter for malformed amcore_ headers', async () => {
+      const context = createMockExecutionContext('Bearer amcore_live_brokenformat')
+      await guard.canActivate(context)
+
+      expect(abuseLimiter.check).not.toHaveBeenCalled()
+      expect(abuseLimiter.consume).not.toHaveBeenCalled()
+    })
+
+    it('check() is called with (ip, fingerprint) before any DB work', async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(null)
+
+      await guard.canActivate(createMockExecutionContext(VALID_HEADER, '5.6.7.8'))
+
+      expect(abuseLimiter.check).toHaveBeenCalledWith('5.6.7.8', FINGERPRINT)
+      // check is awaited before verify
+      const checkCallIdx = abuseLimiter.check.mock.invocationCallOrder[0]!
+      const verifyCallIdx = apiKeysService.verifyByShortToken.mock.invocationCallOrder[0]!
+      expect(checkCallIdx).toBeLessThan(verifyCallIdx)
+    })
+
+    it('consume() is called when verifyByShortToken returns null', async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(null)
+
+      const result = await guard.canActivate(createMockExecutionContext(VALID_HEADER, '5.6.7.8'))
+
+      expect(result).toBe(false)
+      expect(abuseLimiter.consume).toHaveBeenCalledWith('5.6.7.8', FINGERPRINT)
+      expect(abuseLimiter.reset).not.toHaveBeenCalled()
+    })
+
+    it('consume() is called when membership lookup returns null', async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(mockApiKey as never)
+      mockMembership({ found: false })
+
+      const result = await guard.canActivate(createMockExecutionContext(VALID_HEADER, '5.6.7.8'))
+
+      expect(result).toBe(false)
+      expect(abuseLimiter.consume).toHaveBeenCalledWith('5.6.7.8', FINGERPRINT)
+      expect(abuseLimiter.reset).not.toHaveBeenCalled()
+    })
+
+    it('reset() is called with fingerprint only (no IP) on success', async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(mockApiKey as never)
+      mockMembership({ found: true })
+
+      const result = await guard.canActivate(createMockExecutionContext(VALID_HEADER, '5.6.7.8'))
+
+      expect(result).toBe(true)
+      expect(abuseLimiter.reset).toHaveBeenCalledWith(FINGERPRINT)
+      expect(abuseLimiter.reset).toHaveBeenCalledTimes(1)
+      expect(abuseLimiter.consume).not.toHaveBeenCalled()
+    })
+
+    it('propagates 429 from check() — no DB work happens', async () => {
+      abuseLimiter.check.mockRejectedValueOnce(new Error('Too many failed attempts'))
+
+      await expect(guard.canActivate(createMockExecutionContext(VALID_HEADER))).rejects.toThrow(
+        /Too many failed attempts/
+      )
+
+      expect(apiKeysService.verifyByShortToken).not.toHaveBeenCalled()
+      expect(mockCtx.prisma.orgMember.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('falls back to socket.remoteAddress when req.ip is undefined', async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(null)
+
+      const ctx = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            headers: { authorization: VALID_HEADER },
+            ip: undefined,
+            socket: { remoteAddress: '9.9.9.9' },
+            user: undefined,
+          }),
+        }),
+      } as unknown as ExecutionContext
+
+      await guard.canActivate(ctx)
+
+      expect(abuseLimiter.check).toHaveBeenCalledWith('9.9.9.9', FINGERPRINT)
+    })
+
+    it("uses 'unknown' when both req.ip and socket.remoteAddress are missing", async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(null)
+
+      const ctx = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            headers: { authorization: VALID_HEADER },
+            ip: undefined,
+            socket: {},
+            user: undefined,
+          }),
+        }),
+      } as unknown as ExecutionContext
+
+      await guard.canActivate(ctx)
+
+      expect(abuseLimiter.check).toHaveBeenCalledWith('unknown', FINGERPRINT)
+    })
   })
 })

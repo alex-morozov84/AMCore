@@ -4,6 +4,7 @@ import type { Request } from 'express'
 import type { RequestPrincipal } from '@amcore/shared'
 
 import { PrismaService } from '../../../prisma'
+import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service'
 import { ApiKeysService } from '../api-keys.service'
 
 @Injectable()
@@ -13,18 +14,36 @@ export class ApiKeyGuard implements CanActivate {
 
   constructor(
     private readonly apiKeysService: ApiKeysService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly abuseLimiter: ApiKeyAbuseLimiterService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>()
     const parsed = this.parseApiKey(request)
 
+    // Not our header (missing, JWT, or malformed prefix). The limiter is
+    // intentionally not consulted here: pre-parse failures are too noisy
+    // (typos, clients sending JWT) and the global ThrottlerGuard already
+    // bounds per-IP request volume.
     if (!parsed) return false
+
+    const ip = this.extractIp(request)
+    const fingerprint = ApiKeyAbuseLimiterService.fingerprint(parsed.shortToken)
+
+    // AK-07: throws 429 + RATE_LIMIT_EXCEEDED if either the per-IP or
+    // per-fingerprint failure counter is at the limit. Propagates through
+    // AuthenticationGuard (the api-key branch deliberately has no
+    // try/catch — see AK-11). Order matters: check before any DB work so
+    // a saturated IP cannot keep loading the database with hot-misses.
+    await this.abuseLimiter.check(ip, fingerprint)
 
     const apiKey = await this.apiKeysService.verifyByShortToken(parsed.shortToken, parsed.longToken)
 
-    if (!apiKey) return false
+    if (!apiKey) {
+      await this.abuseLimiter.consume(ip, fingerprint)
+      return false
+    }
 
     // Per ADR-033: API key principal must always carry org context.
     // Owner membership in the bound organization is re-verified on every
@@ -42,7 +61,16 @@ export class ApiKeyGuard implements CanActivate {
       include: { organization: { select: { aclVersion: true } } },
     })
 
-    if (!membership) return false
+    if (!membership) {
+      await this.abuseLimiter.consume(ip, fingerprint)
+      return false
+    }
+
+    // Success — clear the fingerprint counter so brief integration churn
+    // (e.g. a CI run with one bad attempt before fixing the key) doesn't
+    // accumulate forever. IP counter intentionally stays — a single valid
+    // key must not whitewash unrelated bad attempts from the same source.
+    await this.abuseLimiter.reset(fingerprint)
 
     const principal: RequestPrincipal = {
       type: 'api_key',
@@ -74,5 +102,16 @@ export class ApiKeyGuard implements CanActivate {
     const longToken = match[3]!
 
     return { shortToken, longToken }
+  }
+
+  /**
+   * Use the direct socket peer IP. `req.ip` already respects `trust proxy`
+   * if the app sets it (we don't, in the starter — see deployment docs
+   * for proxy-aware configuration). Falling back to `socket.remoteAddress`
+   * covers the rare null case; `'unknown'` keeps the limiter usable when
+   * neither is available (Redis key is still well-formed).
+   */
+  private extractIp(request: Request): string {
+    return request.ip ?? request.socket.remoteAddress ?? 'unknown'
   }
 }
