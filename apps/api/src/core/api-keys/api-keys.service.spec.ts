@@ -219,5 +219,77 @@ describe('ApiKeysService', () => {
       })
       expect(mockCache.set).toHaveBeenCalledWith('api_key:last_used:key-1', '1', 3600 * 1000)
     })
+
+    // AK-12: cache I/O must not propagate. The caller does `void
+    // touchLastUsed(...)` — any uncaught error becomes an unhandled
+    // rejection. Each cache op is wrapped; a flaky Redis only ever
+    // produces a warn log, never breaks an authenticated request.
+    describe('AK-12: best-effort cache I/O', () => {
+      it('cache.get rejection → no throw, warn logged, db update still fires', async () => {
+        mockCache.get.mockRejectedValueOnce(new Error('Redis ECONNRESET'))
+        mockCtx.prisma.apiKey.update.mockResolvedValue(mockApiKey)
+
+        await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
+        await new Promise((resolve) => setImmediate(resolve))
+
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ apiKeyId: 'key-1' }),
+          expect.stringContaining('Failed to read api_key last_used cache gate')
+        )
+        // Falls through to the DB update — we don't know if it was a
+        // recent touch, so we do the extra write rather than skip silently.
+        expect(mockCtx.prisma.apiKey.update).toHaveBeenCalled()
+      })
+
+      it('cache.set rejection → no throw, warn logged', async () => {
+        mockCache.get.mockResolvedValue(null)
+        mockCache.set.mockRejectedValueOnce(new Error('Redis OOM'))
+        mockCtx.prisma.apiKey.update.mockResolvedValue(mockApiKey)
+
+        await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
+        await new Promise((resolve) => setImmediate(resolve))
+
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ apiKeyId: 'key-1' }),
+          expect.stringContaining('Failed to set api_key last_used cache gate')
+        )
+      })
+
+      it('both cache ops reject → method completes, two warns', async () => {
+        mockCache.get.mockRejectedValueOnce(new Error('get failed'))
+        mockCache.set.mockRejectedValueOnce(new Error('set failed'))
+        mockCtx.prisma.apiKey.update.mockResolvedValue(mockApiKey)
+
+        await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
+        await new Promise((resolve) => setImmediate(resolve))
+
+        const warnMessages = mockLogger.warn.mock.calls.map(([, msg]) => msg)
+        expect(warnMessages).toEqual(
+          expect.arrayContaining([
+            expect.stringContaining('Failed to read api_key last_used cache gate'),
+            expect.stringContaining('Failed to set api_key last_used cache gate'),
+          ])
+        )
+      })
+
+      // Raw key material (shortToken / longToken / hash / salt) must never
+      // appear in any log emitted by this method.
+      it('warn payloads never contain raw key material', async () => {
+        mockCache.get.mockRejectedValueOnce(new Error('boom'))
+        mockCache.set.mockRejectedValueOnce(new Error('boom'))
+        mockCtx.prisma.apiKey.update.mockResolvedValue(mockApiKey)
+
+        await service.touchLastUsed('key-1')
+        await new Promise((resolve) => setImmediate(resolve))
+
+        for (const [payload] of mockLogger.warn.mock.calls) {
+          const obj = payload as Record<string, unknown>
+          expect(obj).not.toHaveProperty('shortToken')
+          expect(obj).not.toHaveProperty('longToken')
+          expect(obj).not.toHaveProperty('keyHash')
+          expect(obj).not.toHaveProperty('salt')
+        }
+      })
+    })
   })
 })

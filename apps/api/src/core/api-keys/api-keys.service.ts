@@ -135,17 +135,48 @@ export class ApiKeysService {
     return apiKey
   }
 
+  // AK-12: lastUsedAt is operational metadata and must never make a
+  // valid request fail. The caller (`ApiKeyGuard`) intentionally
+  // discards the returned promise (`void touchLastUsed(...)`), so any
+  // error escaping this method becomes an unhandled rejection. Every
+  // I/O is wrapped — cache flakiness or a revoke race only ever
+  // produces a warn log, never propagates.
   async touchLastUsed(id: string): Promise<void> {
     const cacheKey = `api_key:last_used:${id}`
-    const alreadyUpdated = await this.cache.get(cacheKey)
+
+    let alreadyUpdated: unknown = false
+    try {
+      alreadyUpdated = await this.cache.get(cacheKey)
+    } catch (err) {
+      this.logger.warn(
+        { err, apiKeyId: id },
+        'Failed to read api_key last_used cache gate (continuing)'
+      )
+      // Fall through: without the cache gate we'll do one extra DB
+      // write per request, but the request itself succeeds.
+    }
 
     if (alreadyUpdated) return
 
+    // Best-effort update. P2025 (record not found) is expected when
+    // revoke() races between verify and touch — the existing .catch()
+    // swallows it.
+    //
+    // DO NOT switch to `upsert` here. Upsert would resurrect a revoked
+    // key row with the same id, defeating revocation. The race is
+    // already safe; keep `update` + tolerant catch.
     void this.prisma.apiKey
       .update({ where: { id }, data: { lastUsedAt: new Date() } })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to update lastUsedAt'))
 
-    await this.cache.set(cacheKey, '1', 3600 * 1000)
+    try {
+      await this.cache.set(cacheKey, '1', 3600 * 1000)
+    } catch (err) {
+      this.logger.warn(
+        { err, apiKeyId: id },
+        'Failed to set api_key last_used cache gate (continuing)'
+      )
+    }
   }
 
   // AK-08: only `live` is supported. A real test/sandbox mode would need
