@@ -29,6 +29,17 @@ export enum InfrastructureErrorCode {
   DATABASE_POOL_TIMEOUT = 'DATABASE_POOL_TIMEOUT',
 }
 
+// API-key scope grammar error codes (AK-05).
+// Returned per-scope in `errors[].errorCode` on POST /api-keys when the
+// scope string fails schema validation. Frontend localizes via next-intl
+// keyed on the code; raw API consumers can fall back to `message`.
+export enum ApiKeyScopeErrorCode {
+  API_KEY_SCOPE_INVALID_FORMAT = 'API_KEY_SCOPE_INVALID_FORMAT',
+  API_KEY_SCOPE_UNKNOWN_ACTION = 'API_KEY_SCOPE_UNKNOWN_ACTION',
+  API_KEY_SCOPE_UNKNOWN_SUBJECT = 'API_KEY_SCOPE_UNKNOWN_SUBJECT',
+  API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN = 'API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN',
+}
+
 // HTTP Status codes
 export const HTTP_STATUS = {
   OK: 200,

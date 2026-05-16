@@ -14,7 +14,7 @@ describe('ApiKeyGuard', () => {
     id: 'key-1',
     userId: 'user-1',
     organizationId: 'org-1',
-    scopes: ['workout:read'],
+    scopes: ['read:User'],
     user: { systemRole: 'USER' },
   }
 
@@ -81,7 +81,7 @@ describe('ApiKeyGuard', () => {
       systemRole: 'USER',
       organizationId: 'org-1',
       aclVersion: 7,
-      scopes: ['workout:read'],
+      scopes: ['read:User'],
     })
   })
 

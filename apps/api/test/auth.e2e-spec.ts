@@ -626,7 +626,7 @@ describe('Auth (e2e)', () => {
       const keyRes = await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ name: 'Carrier', organizationId: orgRes.body.id, scopes: ['user:read'] })
+        .send({ name: 'Carrier', organizationId: orgRes.body.id, scopes: ['read:User'] })
         .expect(201)
 
       apiKey = keyRes.body.key as string

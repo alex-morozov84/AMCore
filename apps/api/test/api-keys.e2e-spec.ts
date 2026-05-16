@@ -296,6 +296,83 @@ describe('API Keys (e2e)', () => {
   })
 
   /**
+   * AK-05: scope validation rejects invalid input at the schema layer.
+   *
+   * Before AK-05, `scopes` was `z.array(z.string()).min(1)` — any string
+   * was accepted, including non-canonical formats like `user:read`,
+   * unknown actions/subjects, and `manage:all`. The result was a silent
+   * failure: 201 on create, then 403 on every authorized request with no
+   * diagnostic. This block proves that the schema now rejects each
+   * failure mode at the 400 layer with a machine-readable error code in
+   * `errors[].errorCode`.
+   */
+  describe('AK-05: scope validation rejects invalid input', () => {
+    const postWithScopes = (token: string, organizationId: string, scopes: string[]) =>
+      request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Invalid scope test', organizationId, scopes })
+
+    it('rejects manage:all → 400 + API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+
+      const res = await postWithScopes(token, organizationId, ['manage:all']).expect(400)
+      const fieldErrors = res.body.errors as Array<{ field: string; errorCode?: string }>
+      expect(fieldErrors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'scopes.0',
+            errorCode: 'API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN',
+          }),
+        ])
+      )
+    })
+
+    it('rejects unknown subject read:NonExistent → 400 + API_KEY_SCOPE_UNKNOWN_SUBJECT', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+
+      const res = await postWithScopes(token, organizationId, ['read:NonExistent']).expect(400)
+      const fieldErrors = res.body.errors as Array<{ field: string; errorCode?: string }>
+      expect(fieldErrors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'scopes.0',
+            errorCode: 'API_KEY_SCOPE_UNKNOWN_SUBJECT',
+          }),
+        ])
+      )
+    })
+
+    it('rejects unknown action user:read (old format) → 400 + API_KEY_SCOPE_UNKNOWN_ACTION', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+
+      const res = await postWithScopes(token, organizationId, ['user:read']).expect(400)
+      const fieldErrors = res.body.errors as Array<{ field: string; errorCode?: string }>
+      expect(fieldErrors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'scopes.0',
+            errorCode: 'API_KEY_SCOPE_UNKNOWN_ACTION',
+          }),
+        ])
+      )
+    })
+
+    it('mixed valid + invalid: error appears at scopes.1, not scopes.0', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+
+      const res = await postWithScopes(token, organizationId, ['read:User', 'manage:all']).expect(
+        400
+      )
+      const fieldErrors = res.body.errors as Array<{ field: string; errorCode?: string }>
+      const badIndex = fieldErrors.find((e) => e.field === 'scopes.1')
+      const goodIndex = fieldErrors.find((e) => e.field === 'scopes.0')
+      expect(badIndex?.errorCode).toBe('API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN')
+      expect(goodIndex).toBeUndefined()
+    })
+  })
+
+  /**
    * AK-10: scope authorization on a policy-protected route.
    *
    * Before AK-09 landed, the api-keys e2e suite only hit `/auth/me`,
@@ -357,18 +434,12 @@ describe('API Keys (e2e)', () => {
         .expect(403)
     })
 
-    // Locks Stage 4's defense-in-depth at runtime: manage:all is dropped
-    // at the applyScopes parse step until AK-05 scope registry rejects it
-    // at the schema layer.
-    it('manage:all → 403 (scope dropped until AK-05)', async () => {
-      const { token, organizationId } = await registerWithOrg('user@example.com')
-      const { key } = await createApiKey(token, organizationId, 'BadScope', ['manage:all'])
-
-      await request(app.getHttpServer())
-        .patch(`/organizations/${organizationId}`)
-        .set('Authorization', `Bearer ${key}`)
-        .send({ name: 'Should fail' })
-        .expect(403)
-    })
+    // Note: the original Stage 5 `manage:all → 403` case was removed in
+    // Stage 6 / AK-05. The schema now rejects `manage:all` at POST /api-keys
+    // with `API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN`, so the create-then-deny
+    // flow is no longer reachable from the API. Stage 4's defense-in-depth
+    // drop in `applyScopes` is still exercised by unit tests in
+    // `ability.factory.spec.ts`. The "scope rejected at schema" case
+    // lives in the AK-05 describe block above.
   })
 })

@@ -19,7 +19,7 @@ describe('ApiKeysService', () => {
     shortToken: 'abc12345',
     keyHash: 'a'.repeat(64),
     salt: 'somesalt',
-    scopes: ['workout:read'],
+    scopes: ['read:User'],
     expiresAt: null,
     lastUsedAt: null,
     createdAt: new Date('2024-01-01'),
@@ -61,7 +61,7 @@ describe('ApiKeysService', () => {
     const validInput = {
       name: 'Test Key',
       organizationId: 'org-1',
-      scopes: ['workout:read'],
+      scopes: ['read:User'],
     }
 
     function mockMembership(found: boolean) {

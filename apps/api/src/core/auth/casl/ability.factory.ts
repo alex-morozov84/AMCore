@@ -98,13 +98,14 @@ export class AbilityFactory {
    * of every (scope, permission) pair via {@link intersect}; the
    * intersection can only narrow, never expand.
    *
-   * `manage:all` scope is dropped here as defense-in-depth: it would
-   * mean "no narrowing", which contradicts the least-privilege intent
-   * of issuing a scoped key. Schema-level validation belongs to AK-05.
-   * Drop is applied to the scope side only — the synthesized SUPER_ADMIN
-   * owner permission `{manage, all}` is the granted side and must pass
-   * through untouched (otherwise super-admin api_keys would always be
-   * empty).
+   * `manage:all` scope is dropped here as defense-in-depth. The primary
+   * line of validation is `createApiKeySchema` (AK-05), which rejects
+   * `manage:all` at the DTO layer with `API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN`.
+   * This drop survives only for seed scripts / raw DB writes / future
+   * bypass scenarios that skip Zod validation. Drop is applied to the
+   * scope side only — the synthesized SUPER_ADMIN owner permission
+   * `{manage, all}` is the granted side and must pass through untouched
+   * (otherwise super-admin api_keys would always be empty).
    *
    * Strict `parts.length !== 2` parsing rejects malformed scopes such
    * as `read:User:extra` instead of silently truncating them.

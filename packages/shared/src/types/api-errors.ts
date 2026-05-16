@@ -9,6 +9,14 @@ export interface ValidationError {
   message: string
   /** Zod error code for translation mapping (e.g., 'invalid_type', 'too_small') */
   code?: string
+  /**
+   * Project-specific machine-readable code (e.g. `API_KEY_SCOPE_UNKNOWN_ACTION`).
+   * Populated by `superRefine` custom issues that pass `params.errorCode`.
+   * Frontend localizes via next-intl keyed on this code; the generic `code`
+   * field stays Zod-native for built-in error compatibility. Optional —
+   * most validation errors are Zod built-ins without a project-specific code.
+   */
+  errorCode?: string
 }
 
 /**

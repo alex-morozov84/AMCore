@@ -129,11 +129,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return []
     }
 
-    // Transform Zod errors to our ValidationError format
-    return errors.map((err) => ({
-      field: Array.isArray(err.path) ? err.path.join('.') : String(err.path || 'unknown'),
-      message: String(err.message || 'Validation error'),
-      code: err.code ? String(err.code) : undefined,
-    }))
+    // Transform Zod errors to our ValidationError format.
+    // Project-specific machine-readable codes ride on custom-issue `params.errorCode`
+    // (set via `ctx.addIssue({ code: 'custom', params: { errorCode } })`).
+    return errors.map((err) => {
+      const params = (err.params ?? undefined) as Record<string, unknown> | undefined
+      const rawErrorCode = params?.['errorCode']
+      return {
+        field: Array.isArray(err.path) ? err.path.join('.') : String(err.path || 'unknown'),
+        message: String(err.message || 'Validation error'),
+        code: err.code ? String(err.code) : undefined,
+        errorCode: typeof rawErrorCode === 'string' ? rawErrorCode : undefined,
+      }
+    })
   }
 }
