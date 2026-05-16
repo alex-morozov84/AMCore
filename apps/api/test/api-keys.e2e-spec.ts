@@ -60,7 +60,7 @@ describe('API Keys (e2e)', () => {
     token: string,
     organizationId: string,
     name = 'Test Key',
-    scopes = ['user:read']
+    scopes = ['read:User']
   ) {
     const res = await request(app.getHttpServer())
       .post('/api-keys')
@@ -83,14 +83,14 @@ describe('API Keys (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${token}`)
-        .send({ name: 'My Integration', organizationId, scopes: ['workout:read'] })
+        .send({ name: 'My Integration', organizationId, scopes: ['read:User'] })
         .expect(201)
 
       expect(res.body.id).toBeDefined()
       expect(res.body.key).toMatch(/^amcore_live_/)
       expect(res.body.name).toBe('My Integration')
       expect(res.body.organizationId).toBe(organizationId)
-      expect(res.body.scopes).toEqual(['workout:read'])
+      expect(res.body.scopes).toEqual(['read:User'])
       expect(res.body).not.toHaveProperty('keyHash')
       expect(res.body).not.toHaveProperty('salt')
     })
@@ -98,7 +98,7 @@ describe('API Keys (e2e)', () => {
     it('returns 401 without auth', async () => {
       await request(app.getHttpServer())
         .post('/api-keys')
-        .send({ name: 'Key', organizationId: 'cuid', scopes: ['user:read'] })
+        .send({ name: 'Key', organizationId: 'cuid', scopes: ['read:User'] })
         .expect(401)
     })
   })
@@ -106,8 +106,8 @@ describe('API Keys (e2e)', () => {
   describe('GET /api-keys', () => {
     it('lists keys without secret fields', async () => {
       const { token, organizationId } = await registerWithOrg('user@example.com')
-      await createApiKey(token, organizationId, 'Key One', ['workout:read'])
-      await createApiKey(token, organizationId, 'Key Two', ['user:read'])
+      await createApiKey(token, organizationId, 'Key One', ['read:User'])
+      await createApiKey(token, organizationId, 'Key Two', ['read:User'])
 
       const res = await request(app.getHttpServer())
         .get('/api-keys')
@@ -156,7 +156,7 @@ describe('API Keys (e2e)', () => {
   describe('using api key for authentication', () => {
     it('authenticates GET /auth/me with valid api key', async () => {
       const { token, organizationId } = await registerWithOrg('user@example.com')
-      const { key } = await createApiKey(token, organizationId, 'CI Key', ['user:read'])
+      const { key } = await createApiKey(token, organizationId, 'CI Key', ['read:User'])
 
       const res = await request(app.getHttpServer())
         .get('/auth/me')
@@ -169,7 +169,7 @@ describe('API Keys (e2e)', () => {
 
     it('returns 401 after key is revoked', async () => {
       const { token, organizationId } = await registerWithOrg('user@example.com')
-      const { key, id } = await createApiKey(token, organizationId, 'Temp Key', ['user:read'])
+      const { key, id } = await createApiKey(token, organizationId, 'Temp Key', ['read:User'])
 
       await request(app.getHttpServer())
         .delete(`/api-keys/${id}`)
@@ -193,18 +193,18 @@ describe('API Keys (e2e)', () => {
   describe('AK-01: api keys cannot manage credentials', () => {
     it('rejects POST /api-keys with api key auth', async () => {
       const { token, organizationId } = await registerWithOrg('user@example.com')
-      const { key } = await createApiKey(token, organizationId, 'Carrier', ['user:read'])
+      const { key } = await createApiKey(token, organizationId, 'Carrier', ['read:User'])
 
       await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${key}`)
-        .send({ name: 'Should not be created', organizationId, scopes: ['user:read'] })
+        .send({ name: 'Should not be created', organizationId, scopes: ['read:User'] })
         .expect(401)
     })
 
     it('rejects GET /api-keys with api key auth', async () => {
       const { token, organizationId } = await registerWithOrg('user@example.com')
-      const { key } = await createApiKey(token, organizationId, 'Carrier', ['user:read'])
+      const { key } = await createApiKey(token, organizationId, 'Carrier', ['read:User'])
 
       await request(app.getHttpServer())
         .get('/api-keys')
@@ -214,8 +214,8 @@ describe('API Keys (e2e)', () => {
 
     it('rejects DELETE /api-keys/:id with api key auth', async () => {
       const { token, organizationId } = await registerWithOrg('user@example.com')
-      const { key } = await createApiKey(token, organizationId, 'Carrier', ['user:read'])
-      const { id: targetId } = await createApiKey(token, organizationId, 'Target', ['user:read'])
+      const { key } = await createApiKey(token, organizationId, 'Carrier', ['read:User'])
+      const { id: targetId } = await createApiKey(token, organizationId, 'Target', ['read:User'])
 
       await request(app.getHttpServer())
         .delete(`/api-keys/${targetId}`)
@@ -244,9 +244,9 @@ describe('API Keys (e2e)', () => {
    *   `aclVersion`; the credential continues to authenticate while the
    *   owner remains a member of that org.
    *
-   * End-to-end proof of scope×org authorization (allowed vs denied on a
-   * policy-protected route) is intentionally out of scope here — it
-   * lands in AK-10 once wildcard semantics are fixed in AK-09.
+   * End-to-end proof of scope×org authorization on a policy-protected
+   * route lives in the AK-10 describe block below (added 2026-05-16,
+   * after AK-09 wildcard-aware intersection landed).
    */
   describe('AK-04: api keys bind to organization', () => {
     it('rejects POST /api-keys without organizationId', async () => {
@@ -255,7 +255,7 @@ describe('API Keys (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${token}`)
-        .send({ name: 'Missing org', scopes: ['user:read'] })
+        .send({ name: 'Missing org', scopes: ['read:User'] })
         .expect(400)
 
       expect(res.body).toBeDefined()
@@ -268,7 +268,7 @@ describe('API Keys (e2e)', () => {
       await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${tokenA}`)
-        .send({ name: 'Cross-org', organizationId: orgB, scopes: ['user:read'] })
+        .send({ name: 'Cross-org', organizationId: orgB, scopes: ['read:User'] })
         .expect(403)
     })
 
@@ -278,7 +278,7 @@ describe('API Keys (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${token}`)
-        .send({ name: 'Own org', organizationId, scopes: ['user:read'] })
+        .send({ name: 'Own org', organizationId, scopes: ['read:User'] })
         .expect(201)
 
       expect(res.body.organizationId).toBe(organizationId)
@@ -286,12 +286,89 @@ describe('API Keys (e2e)', () => {
 
     it('key authenticates /auth/me after creation (proves org-bound principal is built)', async () => {
       const { token, organizationId } = await registerWithOrg('user@example.com')
-      const { key } = await createApiKey(token, organizationId, 'Auth proof', ['user:read'])
+      const { key } = await createApiKey(token, organizationId, 'Auth proof', ['read:User'])
 
       await request(app.getHttpServer())
         .get('/auth/me')
         .set('Authorization', `Bearer ${key}`)
         .expect(200)
+    })
+  })
+
+  /**
+   * AK-10: scope authorization on a policy-protected route.
+   *
+   * Before AK-09 landed, the api-keys e2e suite only hit `/auth/me`,
+   * which has no `@CheckPolicies` handler — so the tests proved
+   * authentication but never exercised the CASL `userPerms ∩ scopes`
+   * model. This block targets `PATCH /organizations/:id`, which is
+   * guarded by `@CheckPolicies(can(Manage, Organization))`, and proves
+   * that wildcard-aware intersection (Stage 4) behaves correctly under
+   * a real authorization decision.
+   *
+   * Setup for every case: the registering user creates the organization
+   * → becomes ADMIN → holds `manage:Organization` in seeded permissions.
+   * The api-key is bound to that same org. Only the scope differs.
+   */
+  describe('AK-10: scope authorization on policy-protected route', () => {
+    it('manage:Organization → 200 on PATCH /organizations/:id', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'Manager', ['manage:Organization'])
+
+      const res = await request(app.getHttpServer())
+        .patch(`/organizations/${organizationId}`)
+        .set('Authorization', `Bearer ${key}`)
+        .send({ name: 'Updated Org' })
+        .expect(200)
+
+      expect(res.body.name).toBe('Updated Org')
+    })
+
+    it('read:Organization → 403 (action narrows to read; PATCH needs Manage)', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'Reader', ['read:Organization'])
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/${organizationId}`)
+        .set('Authorization', `Bearer ${key}`)
+        .send({ name: 'Should fail' })
+        .expect(403)
+    })
+
+    it('read:User → 403 (disjoint subject)', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'UserReader', ['read:User'])
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/${organizationId}`)
+        .set('Authorization', `Bearer ${key}`)
+        .send({ name: 'Should fail' })
+        .expect(403)
+    })
+
+    it('read:all → 403 (wildcard scope: subject opens up, action stays read)', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'AllReader', ['read:all'])
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/${organizationId}`)
+        .set('Authorization', `Bearer ${key}`)
+        .send({ name: 'Should fail' })
+        .expect(403)
+    })
+
+    // Locks Stage 4's defense-in-depth at runtime: manage:all is dropped
+    // at the applyScopes parse step until AK-05 scope registry rejects it
+    // at the schema layer.
+    it('manage:all → 403 (scope dropped until AK-05)', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'BadScope', ['manage:all'])
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/${organizationId}`)
+        .set('Authorization', `Bearer ${key}`)
+        .send({ name: 'Should fail' })
+        .expect(403)
     })
   })
 })
