@@ -1,5 +1,6 @@
-import { Action, ApiKeyScopeErrorCode, Subject, createApiKeySchema } from '@amcore/shared'
 import { z } from 'zod'
+
+import { Action, ApiKeyScopeErrorCode, createApiKeySchema, Subject } from '@amcore/shared'
 
 // AK-05 schema validation tests.
 //

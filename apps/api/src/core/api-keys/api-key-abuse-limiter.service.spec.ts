@@ -56,15 +56,11 @@ describe('ApiKeyAbuseLimiterService (AK-07)', () => {
     it('throws 429 + RATE_LIMIT_EXCEEDED when IP counter is at the limit', async () => {
       cache.get.mockResolvedValueOnce(100).mockResolvedValueOnce(0)
 
-      try {
-        await service.check('1.2.3.4', 'fp123')
-        fail('expected throw')
-      } catch (e) {
-        expect(e).toBeInstanceOf(AppException)
-        const exc = e as AppException
-        expect(exc.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS)
-        expect(exc.errorCode).toBe(AuthErrorCode.RATE_LIMIT_EXCEEDED)
-      }
+      const err = await service.check('1.2.3.4', 'fp123').catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(AppException)
+      expect((err as AppException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS)
+      expect((err as AppException).errorCode).toBe(AuthErrorCode.RATE_LIMIT_EXCEEDED)
     })
 
     it('throws 429 + RATE_LIMIT_EXCEEDED when fingerprint counter is at the limit', async () => {
@@ -75,14 +71,11 @@ describe('ApiKeyAbuseLimiterService (AK-07)', () => {
 
     it('includes retryAfterSeconds in the exception details', async () => {
       cache.get.mockResolvedValueOnce(100).mockResolvedValueOnce(0)
-      try {
-        await service.check('1.2.3.4', 'fp123')
-        fail('expected throw')
-      } catch (e) {
-        expect(e).toBeInstanceOf(AppException)
-        const exc = e as AppException
-        expect(exc.details).toEqual({ retryAfterSeconds: 3600 })
-      }
+
+      const err = await service.check('1.2.3.4', 'fp123').catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(AppException)
+      expect((err as AppException).details).toEqual({ retryAfterSeconds: 3600 })
     })
   })
 

@@ -1,10 +1,4 @@
-import {
-  ForbiddenException,
-  HttpException,
-  HttpStatus,
-  InternalServerErrorException,
-  type ExecutionContext,
-} from '@nestjs/common'
+import { type ExecutionContext, HttpException, HttpStatus } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
 import { AuthErrorCode } from '@amcore/shared'
@@ -17,6 +11,12 @@ import { AuthenticationGuard } from './authentication.guard'
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { PoliciesGuard } from './policies.guard'
 import { SystemRolesGuard } from './system-roles.guard'
+
+// Raw NestJS exception subclasses (ForbiddenException, etc.) are banned
+// in src/** per the PR 7 / cross-cutting review rule. For tests that need
+// to simulate guards throwing specific HTTP statuses, construct
+// HttpException with HttpStatus directly — the discriminator under test
+// keys on `getStatus()`, not on the concrete class.
 
 // AK-11 contract: the auth chain swallows decision-class failures
 // (401/403) and propagates infrastructure failures. This file pins the
@@ -82,8 +82,10 @@ describe('AuthenticationGuard', () => {
       expect(apiKeyGuard.canActivate).toHaveBeenCalledTimes(1)
     })
 
-    it('JWT throws ForbiddenException → swallowed, chain falls through to ApiKey', async () => {
-      jwtAuthGuard.canActivate.mockRejectedValueOnce(new ForbiddenException('blocked'))
+    it('JWT throws HttpException(403) → swallowed, chain falls through to ApiKey', async () => {
+      jwtAuthGuard.canActivate.mockRejectedValueOnce(
+        new HttpException('blocked', HttpStatus.FORBIDDEN)
+      )
       apiKeyGuard.canActivate.mockResolvedValue(false)
 
       await expect(guard.canActivate(createContext())).rejects.toMatchObject({
@@ -93,17 +95,17 @@ describe('AuthenticationGuard', () => {
       expect(apiKeyGuard.canActivate).toHaveBeenCalledTimes(1)
     })
 
-    it('JWT throws InternalServerErrorException → propagates, ApiKey not tried', async () => {
+    it('JWT throws HttpException(500) → propagates, ApiKey not tried', async () => {
       // Models a Redis outage during JwtStrategy.validate() user lookup.
       // Pre-AK-11 this was masked as 401; the new policy surfaces it.
       jwtAuthGuard.canActivate.mockRejectedValueOnce(
-        new InternalServerErrorException('Redis connection refused')
+        new HttpException('Redis connection refused', HttpStatus.INTERNAL_SERVER_ERROR)
       )
       apiKeyGuard.canActivate.mockResolvedValue(false)
 
-      await expect(guard.canActivate(createContext())).rejects.toBeInstanceOf(
-        InternalServerErrorException
-      )
+      await expect(guard.canActivate(createContext())).rejects.toMatchObject({
+        message: 'Redis connection refused',
+      })
 
       expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
     })
@@ -118,9 +120,10 @@ describe('AuthenticationGuard', () => {
       expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
     })
 
-    // Stage 8 regression kept verbatim. After the AK-11 unification both
-    // branches share the discriminating catch; this test guarantees 429
-    // (the AK-07 rate-limit signal) still escapes the chain unchanged.
+    // Stage 8 regression kept (refactored away from try/catch+fail to
+    // satisfy jest/no-conditional-expect after AK-11). Both branches now
+    // share the discriminating catch; this test guarantees 429 (the
+    // AK-07 rate-limit signal) still escapes the chain unchanged.
     it('ApiKey throws AppException(429) → propagates (AK-07 regression)', async () => {
       jwtAuthGuard.canActivate.mockResolvedValue(false)
       apiKeyGuard.canActivate.mockRejectedValueOnce(
@@ -132,15 +135,11 @@ describe('AuthenticationGuard', () => {
         )
       )
 
-      try {
-        await guard.canActivate(createContext())
-        fail('expected throw')
-      } catch (e) {
-        expect(e).toBeInstanceOf(AppException)
-        const exc = e as AppException
-        expect(exc.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS)
-        expect(exc.errorCode).toBe(AuthErrorCode.RATE_LIMIT_EXCEEDED)
-      }
+      const err = await guard.canActivate(createContext()).catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(AppException)
+      expect((err as AppException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS)
+      expect((err as AppException).errorCode).toBe(AuthErrorCode.RATE_LIMIT_EXCEEDED)
     })
 
     it('ApiKey throws generic Error → propagates (e.g. Redis dependency lost)', async () => {
@@ -150,11 +149,13 @@ describe('AuthenticationGuard', () => {
       await expect(guard.canActivate(createContext())).rejects.toThrow('Redis ECONNRESET')
     })
 
-    it('ApiKey throws ForbiddenException → swallowed, final result is 401', async () => {
+    it('ApiKey throws HttpException(403) → swallowed, final result is 401', async () => {
       // ApiKeyGuard returns false on decision today, but for symmetry the
       // chain must also tolerate a thrown 403 from any future auth strategy.
       jwtAuthGuard.canActivate.mockResolvedValue(false)
-      apiKeyGuard.canActivate.mockRejectedValueOnce(new ForbiddenException('blocked'))
+      apiKeyGuard.canActivate.mockRejectedValueOnce(
+        new HttpException('blocked', HttpStatus.FORBIDDEN)
+      )
 
       await expect(guard.canActivate(createContext())).rejects.toMatchObject({
         message: 'Unauthorized',
