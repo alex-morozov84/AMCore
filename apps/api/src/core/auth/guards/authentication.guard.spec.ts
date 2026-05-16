@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, type ExecutionContext } from '@nestjs/common'
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  InternalServerErrorException,
+  type ExecutionContext,
+} from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
 import { AuthErrorCode } from '@amcore/shared'
@@ -12,16 +18,17 @@ import { JwtAuthGuard } from './jwt-auth.guard'
 import { PoliciesGuard } from './policies.guard'
 import { SystemRolesGuard } from './system-roles.guard'
 
-// AK-07 regression — AppException(429) thrown by ApiKeyGuard.canActivate
-// must propagate through AuthenticationGuard, not be swallowed into 401.
-//
-// The JWT branch deliberately catches everything (so a stale JWT falls
-// through to the api-key attempt); the api-key branch deliberately
-// does NOT catch (per AK-11 framing). This test locks that asymmetry
-// in place so AK-11 work later can't accidentally re-symmetrize the
-// chain and swallow the limiter's 429.
+// AK-11 contract: the auth chain swallows decision-class failures
+// (401/403) and propagates infrastructure failures. This file pins the
+// policy via concrete cases — JWT 401 swallowed (stale token → try
+// ApiKey), JWT 500 propagates (Redis lookup failure surfaces, not masked
+// as 401), ApiKey 429 propagates (AK-07 rate-limit), ApiKey generic Error
+// propagates, ApiKey 403 swallowed for symmetry. The Stage 8 regression
+// for 429 propagation is preserved verbatim — it's the canonical
+// "infra propagates" test and must stay green after the AK-11 refactor
+// unified both branches under one discriminating catch.
 
-describe('AuthenticationGuard (AK-07 regression)', () => {
+describe('AuthenticationGuard', () => {
   let guard: AuthenticationGuard
   let reflector: jest.Mocked<Pick<Reflector, 'getAllAndOverride'>>
   let jwtAuthGuard: jest.Mocked<Pick<JwtAuthGuard, 'canActivate'>>
@@ -55,48 +62,103 @@ describe('AuthenticationGuard (AK-07 regression)', () => {
       jwtAuthGuard as unknown as JwtAuthGuard,
       apiKeyGuard as unknown as ApiKeyGuard,
       // AbilityFactory / SystemRolesGuard / PoliciesGuard are not exercised
-      // because the test throws inside the auth-chain stage (step 3).
+      // because every test below either succeeds or throws inside step 3
+      // (the auth chain), before the authz stage runs.
       {} as unknown as AbilityFactory,
       {} as unknown as SystemRolesGuard,
       {} as unknown as PoliciesGuard
     )
   })
 
-  it('propagates AppException(429) from ApiKeyGuard without swallowing to 401', async () => {
-    // JWT fails (no token) — auth chain moves to ApiKey.
-    jwtAuthGuard.canActivate.mockResolvedValue(false)
-    apiKeyGuard.canActivate.mockRejectedValueOnce(
-      new AppException(
-        'Too many failed API key attempts. Please try again later.',
-        HttpStatus.TOO_MANY_REQUESTS,
-        AuthErrorCode.RATE_LIMIT_EXCEEDED,
-        { retryAfterSeconds: 3600 }
-      )
-    )
+  describe('AK-11: decision-class failures swallowed, infra propagates', () => {
+    it('JWT throws UnauthorizedException → swallowed, chain falls through to ApiKey', async () => {
+      jwtAuthGuard.canActivate.mockRejectedValueOnce(new HttpException('expired', 401))
+      apiKeyGuard.canActivate.mockResolvedValue(false)
 
-    try {
-      await guard.canActivate(createContext())
-      fail('expected throw')
-    } catch (e) {
-      expect(e).toBeInstanceOf(AppException)
-      const exc = e as AppException
-      expect(exc.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS)
-      expect(exc.errorCode).toBe(AuthErrorCode.RATE_LIMIT_EXCEEDED)
-    }
-  })
+      await expect(guard.canActivate(createContext())).rejects.toMatchObject({
+        message: 'Unauthorized',
+      })
 
-  // Defensive: JWT branch must still swallow its own errors so a stale
-  // JWT can fall through to ApiKey auth. If a future refactor adds a
-  // catch around the ApiKey branch, this test will fail in pair with
-  // the propagation test above.
-  it('still swallows JWT auth errors (chain continues to ApiKey)', async () => {
-    jwtAuthGuard.canActivate.mockRejectedValueOnce(new HttpException('expired', 401))
-    apiKeyGuard.canActivate.mockResolvedValue(false) // also fails → final 401
-
-    await expect(guard.canActivate(createContext())).rejects.toMatchObject({
-      message: 'Unauthorized',
+      expect(apiKeyGuard.canActivate).toHaveBeenCalledTimes(1)
     })
 
-    expect(apiKeyGuard.canActivate).toHaveBeenCalledTimes(1)
+    it('JWT throws ForbiddenException → swallowed, chain falls through to ApiKey', async () => {
+      jwtAuthGuard.canActivate.mockRejectedValueOnce(new ForbiddenException('blocked'))
+      apiKeyGuard.canActivate.mockResolvedValue(false)
+
+      await expect(guard.canActivate(createContext())).rejects.toMatchObject({
+        message: 'Unauthorized',
+      })
+
+      expect(apiKeyGuard.canActivate).toHaveBeenCalledTimes(1)
+    })
+
+    it('JWT throws InternalServerErrorException → propagates, ApiKey not tried', async () => {
+      // Models a Redis outage during JwtStrategy.validate() user lookup.
+      // Pre-AK-11 this was masked as 401; the new policy surfaces it.
+      jwtAuthGuard.canActivate.mockRejectedValueOnce(
+        new InternalServerErrorException('Redis connection refused')
+      )
+      apiKeyGuard.canActivate.mockResolvedValue(false)
+
+      await expect(guard.canActivate(createContext())).rejects.toBeInstanceOf(
+        InternalServerErrorException
+      )
+
+      expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+    })
+
+    it('JWT throws generic Error → propagates, ApiKey not tried', async () => {
+      // Non-HttpException — definitely not decision-class.
+      jwtAuthGuard.canActivate.mockRejectedValueOnce(new Error('unexpected'))
+      apiKeyGuard.canActivate.mockResolvedValue(false)
+
+      await expect(guard.canActivate(createContext())).rejects.toThrow('unexpected')
+
+      expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+    })
+
+    // Stage 8 regression kept verbatim. After the AK-11 unification both
+    // branches share the discriminating catch; this test guarantees 429
+    // (the AK-07 rate-limit signal) still escapes the chain unchanged.
+    it('ApiKey throws AppException(429) → propagates (AK-07 regression)', async () => {
+      jwtAuthGuard.canActivate.mockResolvedValue(false)
+      apiKeyGuard.canActivate.mockRejectedValueOnce(
+        new AppException(
+          'Too many failed API key attempts. Please try again later.',
+          HttpStatus.TOO_MANY_REQUESTS,
+          AuthErrorCode.RATE_LIMIT_EXCEEDED,
+          { retryAfterSeconds: 3600 }
+        )
+      )
+
+      try {
+        await guard.canActivate(createContext())
+        fail('expected throw')
+      } catch (e) {
+        expect(e).toBeInstanceOf(AppException)
+        const exc = e as AppException
+        expect(exc.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS)
+        expect(exc.errorCode).toBe(AuthErrorCode.RATE_LIMIT_EXCEEDED)
+      }
+    })
+
+    it('ApiKey throws generic Error → propagates (e.g. Redis dependency lost)', async () => {
+      jwtAuthGuard.canActivate.mockResolvedValue(false)
+      apiKeyGuard.canActivate.mockRejectedValueOnce(new Error('Redis ECONNRESET'))
+
+      await expect(guard.canActivate(createContext())).rejects.toThrow('Redis ECONNRESET')
+    })
+
+    it('ApiKey throws ForbiddenException → swallowed, final result is 401', async () => {
+      // ApiKeyGuard returns false on decision today, but for symmetry the
+      // chain must also tolerate a thrown 403 from any future auth strategy.
+      jwtAuthGuard.canActivate.mockResolvedValue(false)
+      apiKeyGuard.canActivate.mockRejectedValueOnce(new ForbiddenException('blocked'))
+
+      await expect(guard.canActivate(createContext())).rejects.toMatchObject({
+        message: 'Unauthorized',
+      })
+    })
   })
 })

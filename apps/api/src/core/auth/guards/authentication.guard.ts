@@ -1,4 +1,10 @@
-import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common'
+import {
+  type CanActivate,
+  type ExecutionContext,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
 import { AuthType } from '@amcore/shared'
@@ -11,6 +17,28 @@ import { AUTH_TYPE_KEY } from '../decorators/auth.decorator'
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { PoliciesGuard } from './policies.guard'
 import { SystemRolesGuard } from './system-roles.guard'
+
+/**
+ * AK-11: distinguish decision-class failures from infrastructure failures
+ * in the auth chain.
+ *
+ * Decision-class (401/403) means "this credential is not valid here, try
+ * the next auth type" — swallow and continue the loop. Anything else is
+ * infrastructure (database pool timeout → 503 via PrismaClientExceptionFilter
+ * per ADR-032, Redis down → 500, rate limit overflow → 429 from AK-07,
+ * unexpected runtime error → 500) and MUST propagate so the global filters
+ * map it to the right status and so observability sees real failures
+ * instead of a flood of fake 401s.
+ *
+ * Keep this discriminator narrow. Adding more statuses (e.g. 400) would
+ * make the chain forgiving in ways it shouldn't be — schema validation
+ * lives at the controller layer, not here.
+ */
+function isDecisionError(err: unknown): boolean {
+  if (!(err instanceof HttpException)) return false
+  const status = err.getStatus()
+  return status === HttpStatus.UNAUTHORIZED || status === HttpStatus.FORBIDDEN
+}
 
 /**
  * AuthenticationGuard
@@ -64,27 +92,31 @@ export class AuthenticationGuard implements CanActivate {
       return true
     }
 
-    // 3. Authenticate - try each auth type until one succeeds
+    // 3. Authenticate — try each auth type until one succeeds.
+    // Both branches use the same isDecisionError discriminator: 401/403
+    // means "wrong credential, try next"; anything else propagates so the
+    // global filters can produce the correct status (503 for pool timeout,
+    // 429 for rate-limit, 500 for unexpected). This is the AK-11 invariant
+    // — see the JSDoc above isDecisionError for the policy rationale.
     let authenticated = false
     for (const type of authTypes) {
-      if (type === AuthType.Bearer) {
-        try {
-          const result = await this.jwtAuthGuard.canActivate(context)
-          if (result) {
-            authenticated = true
-            break
-          }
-        } catch {
-          // JWT auth failed — try next auth type
-        }
-      }
+      const guard =
+        type === AuthType.Bearer
+          ? this.jwtAuthGuard
+          : type === AuthType.ApiKey
+            ? this.apiKeyGuard
+            : null
 
-      if (type === AuthType.ApiKey) {
-        const result = await this.apiKeyGuard.canActivate(context)
-        if (result) {
+      if (!guard) continue
+
+      try {
+        if (await guard.canActivate(context)) {
           authenticated = true
           break
         }
+      } catch (err) {
+        if (!isDecisionError(err)) throw err
+        // decision-class — try next auth type
       }
     }
 
