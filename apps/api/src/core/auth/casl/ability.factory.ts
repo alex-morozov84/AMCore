@@ -22,43 +22,49 @@ type AppSubjects =
 // AppAbility type for CASL + Prisma
 export type AppAbility = PureAbility<[string, AppSubjects], PrismaQuery>
 
-/**
- * AbilityFactory
- *
- * Builds CASL abilities from user permissions.
- *
- * Flow:
- * 1. Check if SUPER_ADMIN → grant all permissions
- * 2. If no org context → minimal personal permissions (read/update own profile)
- * 3. Load permissions from cache (PermissionsCacheService)
- * 4. Build CASL ability with interpolated conditions
- *
- * The resulting ability is used in:
- * - Guards (PoliciesGuard) to check authorization
- * - Services (via accessibleBy()) to filter queries
- */
+// Structural subset of Prisma's Permission the factory actually uses.
+// Keeping the surface narrow lets us synthesize owner permissions (e.g.
+// for SUPER_ADMIN) without inventing fake id/timestamp fields and
+// documents that the rule-building pipeline only depends on these five.
+type AbilityPermission = Pick<
+  Permission,
+  'action' | 'subject' | 'conditions' | 'fields' | 'inverted'
+>
+
+// Synthesized owner-permission baseline for SUPER_ADMIN principals.
+// JWT super-admin (no scopes) gets manage:all unchanged; api_key
+// super-admin runs this through applyScopes and the scopes narrow it.
+const SUPER_ADMIN_OWNER_PERMISSIONS: AbilityPermission[] = [
+  {
+    action: Action.Manage,
+    subject: Subject.All,
+    conditions: null,
+    fields: [],
+    inverted: false,
+  },
+]
+
 @Injectable()
 export class AbilityFactory {
   constructor(private readonly permissionsCache: PermissionsCacheService) {}
 
   /**
-   * Create CASL ability for a user
+   * Build a CASL ability for the request principal.
    *
-   * @param principal - RequestPrincipal from JWT or API key
-   * @returns AppAbility with rules from user's permissions
+   * Flow:
+   *  1. ADR-033 invariant — api_key principal must carry org context.
+   *  2. SUPER_ADMIN: synthesize manage:all and pass through applyScopes
+   *     (unified with the normal flow — see AK-09).
+   *  3. JWT users without org context get minimal personal permissions.
+   *     api_key principals are unreachable here per (1).
+   *  4. Normal flow: load org permissions, intersect with scopes,
+   *     build ability.
    */
   async createForUser(principal: RequestPrincipal): Promise<AppAbility> {
-    const rules: RawRuleOf<AppAbility>[] = []
-
-    // ADR-033 invariant — enforced at the top so it applies to every
-    // downstream branch (super-admin, no-org, normal org). An api_key
-    // principal that reaches this factory without organizationId or
-    // aclVersion means ApiKeyGuard built an invalid principal; fail
-    // loudly instead of silently producing a partially-authorized
-    // ability. Hoisted out of the no-org branch in the AK-02 follow-up
-    // because the SUPER_ADMIN branch otherwise short-circuited around
-    // it and gave malformed super-admin api_key principals a scoped
-    // ability instead of failing fast.
+    // ADR-033 invariant — hoisted to the top so every downstream branch
+    // sees a well-formed api_key principal. A guard that forgot to
+    // attach org context must fail loudly rather than receive a
+    // partially-authorized ability.
     if (
       principal.type === 'api_key' &&
       (!principal.organizationId || principal.aclVersion == null)
@@ -66,82 +72,107 @@ export class AbilityFactory {
       throw new Error('API key principal must carry organization context (ADR-033)')
     }
 
-    // SUPER_ADMIN handling.
-    //
-    // JWT super-admin: full access (manage:all).
-    //
-    // API-key super-admin: scopes MUST still apply. Per ADR-033, every
-    // API-key principal is org-scoped and its effective permissions are
-    // `(owner's permissions) ∩ apiKey.scopes`. For a super-admin owner,
-    // "owner's permissions" is conceptually `all`, so the intersection
-    // reduces to the scope set itself — pushing each concrete
-    // `action:subject` pair directly as a rule is correct and is NOT a
-    // bypass of the intersection model. A future agent reading this
-    // branch should not "fix" it back to `manage:all`: that would
-    // re-introduce the AK-02 leak (narrow super-admin keys → full root).
-    //
-    // Wildcard tokens in scope strings (action='manage' or subject='all')
-    // are intentionally dropped at this stage. Wildcard semantics are
-    // owned by AK-09; the scope registry / validation belongs to AK-05.
-    // Until those land, honoring wildcards here would let a scope like
-    // `manage:all` become an implicit bypass via CASL's native wildcard
-    // expansion. Strict `parts.length !== 2` parsing also rejects
-    // malformed scopes (e.g. `read:User:extra`) instead of silently
-    // truncating them.
     if (principal.systemRole === SystemRole.SuperAdmin) {
-      if (principal.type === 'api_key') {
-        for (const scope of principal.scopes ?? []) {
-          const parts = scope.split(':')
-          if (parts.length !== 2) continue
-          const [action, subject] = parts
-          if (!action || !subject) continue
-          if (action === Action.Manage || subject === Subject.All) continue
-          rules.push({ action, subject } as RawRuleOf<AppAbility>)
-        }
-        return createPrismaAbility(rules)
-      }
-
-      rules.push({ action: Action.Manage, subject: Subject.All })
-      return createPrismaAbility(rules)
+      const effective = this.applyScopes(SUPER_ADMIN_OWNER_PERMISSIONS, principal.scopes)
+      return this.buildAbility(effective, principal)
     }
 
-    // If no organization context, grant minimal personal permissions.
-    // api_key principals are unreachable here per the ADR-033 invariant
-    // at the top of this function — only JWT users land in this branch.
     if (!principal.organizationId || principal.aclVersion == null) {
-      // User can read and update their own profile
-      rules.push({
-        action: Action.Read,
-        subject: Subject.User,
-        conditions: { id: principal.sub },
-      })
-      rules.push({
-        action: Action.Update,
-        subject: Subject.User,
-        conditions: { id: principal.sub },
-      })
-      return createPrismaAbility(rules)
+      return this.buildPersonalAbility(principal)
     }
 
-    // Load permissions from cache
     const permissions = await this.permissionsCache.getPermissions(
       principal.sub,
       principal.organizationId,
       principal.aclVersion
     )
+    const effective = this.applyScopes(permissions, principal.scopes)
+    return this.buildAbility(effective, principal)
+  }
 
-    // Apply scope filtering for API keys
-    const effectivePermissions = this.applyScopes(permissions, principal.scopes)
+  /**
+   * Intersect owner permissions with API-key scopes (AK-09).
+   *
+   * For JWT users (scopes === undefined) returns owner permissions
+   * unchanged. For api_key principals computes the pairwise intersection
+   * of every (scope, permission) pair via {@link intersect}; the
+   * intersection can only narrow, never expand.
+   *
+   * `manage:all` scope is dropped here as defense-in-depth: it would
+   * mean "no narrowing", which contradicts the least-privilege intent
+   * of issuing a scoped key. Schema-level validation belongs to AK-05.
+   * Drop is applied to the scope side only — the synthesized SUPER_ADMIN
+   * owner permission `{manage, all}` is the granted side and must pass
+   * through untouched (otherwise super-admin api_keys would always be
+   * empty).
+   *
+   * Strict `parts.length !== 2` parsing rejects malformed scopes such
+   * as `read:User:extra` instead of silently truncating them.
+   *
+   * Conditions / fields / inverted are preserved from the permission
+   * side — scopes are coarse action×subject filters, while those three
+   * operate on the resource axis and belong to the user's grant.
+   */
+  private applyScopes(permissions: AbilityPermission[], scopes?: string[]): AbilityPermission[] {
+    if (!scopes) return permissions
 
-    // Build ability from permissions
-    for (const permission of effectivePermissions) {
-      // Interpolate conditions: replace ${user.sub} with actual values
+    const result: AbilityPermission[] = []
+    for (const scope of scopes) {
+      const parts = scope.split(':')
+      if (parts.length !== 2) continue
+      const [scopeAction, scopeSubject] = parts
+      if (!scopeAction || !scopeSubject) continue
+      if (scopeAction === Action.Manage && scopeSubject === Subject.All) continue
+
+      for (const perm of permissions) {
+        const narrowed = this.intersect(scopeAction, scopeSubject, perm.action, perm.subject)
+        if (!narrowed) continue
+        result.push({ ...perm, action: narrowed.action, subject: narrowed.subject })
+      }
+    }
+    return result
+  }
+
+  /**
+   * Wildcard-aware intersection of a scope with a permission.
+   * Returns the narrowed (action, subject) pair, or null when disjoint.
+   *
+   * Lattice:
+   *  - Action.Manage is the top of the action axis.
+   *  - Subject.All is the top of the subject axis.
+   *  - intersect(top, X) = X on each axis independently.
+   *
+   * Pure math — policy decisions live in {@link applyScopes}.
+   */
+  private intersect(
+    scopeAction: string,
+    scopeSubject: string,
+    permAction: string,
+    permSubject: string
+  ): { action: string; subject: string } | null {
+    let action: string
+    if (scopeAction === permAction) action = permAction
+    else if (scopeAction === Action.Manage) action = permAction
+    else if (permAction === Action.Manage) action = scopeAction
+    else return null
+
+    let subject: string
+    if (scopeSubject === permSubject) subject = permSubject
+    else if (scopeSubject === Subject.All) subject = permSubject
+    else if (permSubject === Subject.All) subject = scopeSubject
+    else return null
+
+    return { action, subject }
+  }
+
+  /** Build CASL ability from effective permissions, interpolating conditions. */
+  private buildAbility(permissions: AbilityPermission[], principal: RequestPrincipal): AppAbility {
+    const rules: RawRuleOf<AppAbility>[] = []
+    for (const permission of permissions) {
       const conditions = permission.conditions
         ? interpolateConditions(permission.conditions as Record<string, unknown>, principal)
         : undefined
 
-      // Build raw rule from database permission
-      // Type assertion needed: DB stores strings, CASL expects typed subjects
       const rawRule: RawRuleOf<AppAbility> = {
         action: permission.action,
         subject: permission.subject,
@@ -152,36 +183,22 @@ export class AbilityFactory {
 
       rules.push(rawRule)
     }
-
     return createPrismaAbility(rules)
   }
 
-  /**
-   * Apply scope filtering for API keys
-   *
-   * Effective permissions = userPermissions ∩ scopes
-   * - If scopes is undefined (JWT user) → return all permissions
-   * - If scopes is defined (API key) → filter permissions to only those in scopes
-   *
-   * Scope format: "action:subject" (e.g., "read:Contact", "create:Deal")
-   *
-   * @param permissions - User's permissions from roles
-   * @param scopes - API key scopes (undefined for JWT users)
-   * @returns Filtered permissions
-   */
-  private applyScopes(permissions: Permission[], scopes?: string[]): Permission[] {
-    // No scopes = JWT user = full permissions
-    if (!scopes) {
-      return permissions
-    }
-
-    // Parse scopes into action:subject pairs
-    const allowedScopes = new Set(scopes)
-
-    // Filter permissions to only those in scopes
-    return permissions.filter((permission) => {
-      const scopeKey = `${permission.action}:${permission.subject}`
-      return allowedScopes.has(scopeKey)
-    })
+  /** Minimal personal ability for JWT users without org context. */
+  private buildPersonalAbility(principal: RequestPrincipal): AppAbility {
+    return createPrismaAbility([
+      {
+        action: Action.Read,
+        subject: Subject.User,
+        conditions: { id: principal.sub },
+      },
+      {
+        action: Action.Update,
+        subject: Subject.User,
+        conditions: { id: principal.sub },
+      },
+    ])
   }
 }
