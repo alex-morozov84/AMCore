@@ -148,14 +148,17 @@ export class ApiKeysService {
     await this.cache.set(cacheKey, '1', 3600 * 1000)
   }
 
-  private generateKey(env: 'live' | 'test' = 'live'): {
+  // AK-08: only `live` is supported. A real test/sandbox mode would need
+  // data-scope separation (Stripe-style) and is a future feature with its
+  // own ADR — until then the prefix is a constant.
+  private generateKey(): {
     key: string
     shortToken: string
     longToken: string
   } {
     const shortToken = randomBytes(8).toString('base64url')
     const longToken = randomBytes(24).toString('base64url')
-    const key = `amcore_${env}_${shortToken}_${longToken}`
+    const key = `amcore_live_${shortToken}_${longToken}`
     return { key, shortToken, longToken }
   }
 

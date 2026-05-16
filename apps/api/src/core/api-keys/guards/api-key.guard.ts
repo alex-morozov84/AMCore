@@ -9,8 +9,14 @@ import { ApiKeysService } from '../api-keys.service'
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  private static readonly API_KEY_PATTERN =
-    /^amcore_(live|test)_([A-Za-z0-9_-]{11})_([A-Za-z0-9_-]{32})$/
+  // AK-08: only the `amcore_live_` prefix is accepted. `amcore_test_` was
+  // historically matched here but never produced (no API path issued
+  // test-mode keys), making the prefix a misleading no-op — any live key
+  // would also authenticate when sent with the test_ spelling because
+  // lookup is by shortToken alone. Real test mode is a future product
+  // feature requiring data scope separation; until then live-only is the
+  // honest contract.
+  private static readonly API_KEY_PATTERN = /^amcore_live_([A-Za-z0-9_-]{11})_([A-Za-z0-9_-]{32})$/
 
   constructor(
     private readonly apiKeysService: ApiKeysService,
@@ -98,8 +104,8 @@ export class ApiKeyGuard implements CanActivate {
 
     if (!match) return null
 
-    const shortToken = match[2]!
-    const longToken = match[3]!
+    const shortToken = match[1]!
+    const longToken = match[2]!
 
     return { shortToken, longToken }
   }

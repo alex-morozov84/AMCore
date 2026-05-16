@@ -152,6 +152,22 @@ describe('ApiKeyGuard', () => {
     expect(result).toBe(false)
   })
 
+  // AK-08: only `amcore_live_` is accepted. The historical `amcore_test_`
+  // spelling never carried real semantics (lookup is by shortToken alone,
+  // so test_ would have authenticated any live key). Now treated like any
+  // other malformed prefix — pre-parse failure, no limiter contact.
+  it('denies amcore_test_ prefix (AK-08; pre-parse failure, no limiter)', async () => {
+    const context = createMockExecutionContext(
+      `Bearer amcore_test_${SHORT_TOKEN}_12345678901234567890123456789012`
+    )
+    const result = await guard.canActivate(context)
+
+    expect(result).toBe(false)
+    expect(apiKeysService.verifyByShortToken).not.toHaveBeenCalled()
+    expect(abuseLimiter.check).not.toHaveBeenCalled()
+    expect(abuseLimiter.consume).not.toHaveBeenCalled()
+  })
+
   it('denies when verification fails', async () => {
     apiKeysService.verifyByShortToken.mockResolvedValue(null)
 
