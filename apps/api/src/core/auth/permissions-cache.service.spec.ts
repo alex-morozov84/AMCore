@@ -362,6 +362,67 @@ describe('PermissionsCacheService', () => {
             organizationId: 'org-1',
             roleIds: ['role-from-org-b'],
             roleOrganizationIds: ['org-b'],
+            roleIsSystem: [false],
+          }),
+          expect.stringContaining('OA-05')
+        )
+      })
+
+      // Tightening: the filter mirrors MemberService.assertRoleAssignable
+      // so it doesn't silently pass shapes the primary path would
+      // reject. A "system" claim with a non-null organizationId, or a
+      // non-system row with organizationId === null, are both rejected
+      // even though the prior, looser filter would pass the latter.
+      it('drops malformed roles (organizationId === null but isSystem === false) — mirrors assertRoleAssignable', async () => {
+        const malformedPermission: Permission = {
+          id: 'perm-malformed',
+          action: 'manage',
+          subject: 'all',
+          conditions: null,
+          fields: [],
+          inverted: false,
+          organizationId: null,
+        }
+        const memberWithMalformedRole = {
+          ...mockMember,
+          roles: [
+            mockMember.roles[0],
+            {
+              id: 'member-role-malformed',
+              memberId: 'member-1',
+              roleId: 'role-malformed',
+              role: {
+                id: 'role-malformed',
+                name: 'Wannabe-System',
+                description: null,
+                isSystem: false, // malformed: claims org-scope (null) but not system
+                organizationId: null,
+                permissions: [
+                  {
+                    roleId: 'role-malformed',
+                    permissionId: 'perm-malformed',
+                    permission: malformedPermission,
+                  },
+                ],
+              },
+            },
+          ],
+        }
+        redis.get.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+        lock.acquire.mockResolvedValueOnce('lock-token')
+        jest
+          .spyOn(prisma.orgMember, 'findUnique')
+          .mockResolvedValueOnce(memberWithMalformedRole as never)
+
+        const result = await service.getPermissions('user-1', 'org-1', 5)
+
+        expect(result).toEqual(mockPermissions)
+        expect(result.some((p) => p.id === 'perm-malformed')).toBe(false)
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            roleIds: ['role-malformed'],
+            roleOrganizationIds: [null],
+            roleIsSystem: [false],
           }),
           expect.stringContaining('OA-05')
         )

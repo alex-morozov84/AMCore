@@ -199,35 +199,44 @@ export class PermissionsCacheService {
       return []
     }
 
-    // OA-05 defense-in-depth: drop any role whose `organizationId` is
-    // neither `null` (system roles) nor the requested org. The primary
-    // fix is `MemberService.assertRoleAssignable`, which prevents
-    // foreign-org role rows from being inserted into `MemberRole` in
-    // the first place. This filter exists for two scenarios:
-    //   - pre-fix data: rows that may have been planted before
-    //     OA-05 landed
-    //   - data corruption: any bypass of the service layer (raw SQL,
-    //     migrations, future bug)
-    // A foreign-org row reaching this point is a signal worth
-    // surfacing — we warn with metadata sufficient to identify the
-    // membership and the foreign role without leaking PII.
-    const foreignRoles = member.roles.filter(
-      (mr) => mr.role.organizationId !== null && mr.role.organizationId !== organizationId
-    )
-    if (foreignRoles.length > 0) {
+    // OA-05 defense-in-depth: mirror the rule in
+    // `MemberService.assertRoleAssignable` so this filter doesn't
+    // silently pass shapes that the primary path would reject.
+    //
+    // A role is safe iff:
+    //   - it is a system role: `isSystem === true && organizationId === null`, or
+    //   - it is owned by the requested org: `organizationId === organizationId`.
+    //
+    // Everything else is dropped:
+    //   - foreign-org custom roles (`organizationId === foreign`)
+    //   - malformed rows where `organizationId === null` but
+    //     `isSystem !== true` (impossible via the primary API path,
+    //     but raw-SQL or migration mistakes could produce them; the
+    //     filter must not pass them)
+    //
+    // A dropped row reaching this point is a signal worth surfacing
+    // — we warn with metadata sufficient to identify the membership
+    // and the unsafe role without leaking PII.
+    const isSafeRole = (mr: (typeof member.roles)[number]): boolean => {
+      const { isSystem, organizationId: roleOrgId } = mr.role
+      if (isSystem && roleOrgId === null) return true
+      if (roleOrgId === organizationId) return true
+      return false
+    }
+    const unsafeRoles = member.roles.filter((mr) => !isSafeRole(mr))
+    if (unsafeRoles.length > 0) {
       this.logger.warn(
         {
           userId,
           organizationId,
-          roleIds: foreignRoles.map((mr) => mr.role.id),
-          roleOrganizationIds: foreignRoles.map((mr) => mr.role.organizationId),
+          roleIds: unsafeRoles.map((mr) => mr.role.id),
+          roleOrganizationIds: unsafeRoles.map((mr) => mr.role.organizationId),
+          roleIsSystem: unsafeRoles.map((mr) => mr.role.isSystem),
         },
-        'OA-05: dropping role(s) attached to a foreign organization'
+        'OA-05: dropping role(s) that fail the role-assignability rule'
       )
     }
-    const safeMemberRoles = member.roles.filter(
-      (mr) => mr.role.organizationId === null || mr.role.organizationId === organizationId
-    )
+    const safeMemberRoles = member.roles.filter(isSafeRole)
 
     const permissions: Permission[] = []
     const seenPermissionIds = new Set<string>()
