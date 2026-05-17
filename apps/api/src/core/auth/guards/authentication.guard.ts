@@ -81,11 +81,17 @@ export class AuthenticationGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // 1. Get auth types from @Auth() decorator (default: [AuthType.Bearer])
+    // Default fallback is [AuthType.Bearer] per ADR-034 — see
+    // `apps/api/src/core/auth/decorators/auth.decorator.ts` JSDoc and
+    // ADR-034 in `ai/DECISIONS.md` for the rationale (fail-safe default,
+    // server-side industry alignment, and the OA-01/02 lineage that
+    // motivated the flip from the prior permissive default). The
+    // ADR-034 allowlist of routes that opt in to AuthType.ApiKey is
+    // enforced by `auth-decorator-coverage.spec.ts` as a metadata test.
     const authTypes = this.reflector.getAllAndOverride<AuthType[]>(AUTH_TYPE_KEY, [
       context.getHandler(),
       context.getClass(),
-    ]) ?? [AuthType.Bearer, AuthType.ApiKey]
+    ]) ?? [AuthType.Bearer]
 
     // 2. If public route (AuthType.None), skip all checks
     if (authTypes.includes(AuthType.None)) {

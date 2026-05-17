@@ -1,7 +1,7 @@
 import { type ExecutionContext, HttpException, HttpStatus } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
-import { AuthErrorCode } from '@amcore/shared'
+import { AuthErrorCode, AuthType } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions'
 import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
@@ -54,8 +54,14 @@ describe('AuthenticationGuard', () => {
       Pick<ApiKeyGuard, 'canActivate'>
     >
 
-    // Default: no @Auth() decorator → falls through to [Bearer, ApiKey] default.
-    reflector.getAllAndOverride.mockReturnValue(undefined)
+    // AK-11 tests below validate chain behavior when both auth types are
+    // active — that is the only scenario where decision/infra swallow vs
+    // propagate matters. Post-ADR-034 this state is reached only via an
+    // explicit `@Auth(AuthType.Bearer, AuthType.ApiKey)` annotation (the
+    // runtime fallback for undecorated routes is `[AuthType.Bearer]`).
+    // The default-fallback behavior itself is asserted in the separate
+    // "ADR-034 default" describe block below.
+    reflector.getAllAndOverride.mockReturnValue([AuthType.Bearer, AuthType.ApiKey])
 
     guard = new AuthenticationGuard(
       reflector as unknown as Reflector,
@@ -160,6 +166,24 @@ describe('AuthenticationGuard', () => {
       await expect(guard.canActivate(createContext())).rejects.toMatchObject({
         message: 'Unauthorized',
       })
+    })
+  })
+
+  describe('ADR-034 default: no @Auth() decorator → [AuthType.Bearer] only', () => {
+    // Pin the runtime fallback the controller-side guardrail in
+    // `auth-decorator-coverage.spec.ts` relies on. If this assertion
+    // ever flips, the whole bearer-only default story (ADR-034 / OA-11)
+    // is broken — a missing decorator would silently let API keys
+    // through again.
+    it('an undecorated route does not invoke ApiKeyGuard even if JWT fails', async () => {
+      reflector.getAllAndOverride.mockReturnValue(undefined)
+      jwtAuthGuard.canActivate.mockResolvedValue(false)
+
+      await expect(guard.canActivate(createContext())).rejects.toMatchObject({
+        message: 'Unauthorized',
+      })
+
+      expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
     })
   })
 })

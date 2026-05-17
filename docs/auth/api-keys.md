@@ -118,17 +118,25 @@ curl https://api.example.com/api/v1/auth/me \
   -H "Authorization: Bearer amcore_live_a1B2c3D4e5F_x9Y8z7W6v5U4t3S2r1Q0p9O8n7M6l5K4"
 ```
 
-Most data endpoints accept either a JWT or an API key. A few routes are deliberately JWT-only:
+Routes are JWT-only by default. A small, explicit allowlist of routes accepts API keys; everything else returns `401 Unauthorized` when called with one.
 
-| Route group                 | API key accepted? | Why                                                                                                                   |
-| --------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `/api-keys/**`              | ❌                | Credential management — you can't create/list/revoke keys with a key                                                  |
-| `/auth/sessions/**`         | ❌                | Browser session management — out of scope for integrations                                                            |
-| `/organizations/:id/switch` | ❌                | Mints a new JWT — would let a scoped key trade itself for a full-permission token                                     |
-| `/admin/**`                 | ❌                | Platform-admin operations — SUPER_ADMIN-owned keys would otherwise bypass scopes (the system-role guard ignores them) |
-| Everything else with auth   | ✅                | Including `/auth/me` (identity self-check)                                                                            |
+The allowlist (current — see "transitional" note below):
 
-Attempts on JWT-only routes with an API key return `401 Unauthorized`.
+| Route group                       | API key accepted?   | Why                                                                                                                                                                                                          |
+| --------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /auth/me`                    | ✅                  | Identity self-check for integrations. Stable opt-in.                                                                                                                                                         |
+| `/organizations` (lifecycle/read) | ✅ _(transitional)_ | `userPerms ∩ scopes` per ADR-033. May be narrowed per-handler in a follow-up: `POST /organizations` and `GET /organizations` are likely to become JWT-only; `GET /organizations/:id` likely org-scoped only. |
+| `/organizations/:id/switch`       | ❌                  | Mints a new JWT — would let a scoped key trade itself for a full-permission token.                                                                                                                           |
+| `/organizations/:id/members/**`   | ✅ _(transitional)_ | Member management with `manage:Organization` scope per ADR-033. Per-handler `@CheckPolicies` is the actual authorization gate. May gain role-ownership narrowings in a follow-up.                            |
+| `/organizations/:id/roles/**`     | ✅ _(transitional)_ | Org-role management with `manage:Organization` scope per ADR-033. May gain stricter org-context assertions in a follow-up; the API-key opt-in stays.                                                         |
+| `/api-keys/**`                    | ❌                  | Credential management — you can't create/list/revoke keys with a key.                                                                                                                                        |
+| `/auth/sessions/**`               | ❌                  | Browser session management — out of scope for integrations.                                                                                                                                                  |
+| `/admin/**`                       | ❌                  | Platform-admin operations — SUPER_ADMIN-owned keys would otherwise bypass scopes (the system-role guard ignores them).                                                                                       |
+| Everything else with auth         | ❌                  | JWT-only by default — bearer-only is the safe baseline.                                                                                                                                                      |
+
+> **Transitional rows.** The three `(transitional)` rows reflect the current Stage 1c allowlist after the bearer-only default flip. Follow-up reviews of the Organizations/Admin surface (Stage 2 and Stage 4 in `ai/ORGANIZATIONS_ADMIN_REVIEW.md`) may narrow API-key access on those routes per handler — but they will not expand it. The handler-level `@CheckPolicies` decorators remain the actual authorization gate within each accepted route.
+
+Adding API-key acceptance to a new route requires an ADR amendment to `ai/DECISIONS.md` (ADR-034) plus a matching entry in `apps/api/src/core/auth/decorators/auth-decorator-coverage.spec.ts`; the metadata test fails until both agree.
 
 ---
 
