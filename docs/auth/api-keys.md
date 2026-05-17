@@ -120,7 +120,7 @@ curl https://api.example.com/api/v1/auth/me \
 
 Routes are JWT-only by default. A small, explicit allowlist of routes accepts API keys; everything else returns `401 Unauthorized` when called with one.
 
-The allowlist (current — see "transitional" note below):
+The allowlist:
 
 | Route group                     | API key accepted? | Why                                                                                                                                                                                                                                              |
 | ------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
