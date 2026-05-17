@@ -87,7 +87,17 @@ export default [
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       'no-console': 'off',
-      'jest/expect-expect': ['warn', { assertFunctionNames: ['expect', 'request.**.expect'] }],
+      // `expect*` is a micromatch-style glob (rule uses case-insensitive
+      // custom regex — see `eslint-plugin-jest/src/rules/expect-expect.ts`
+      // `matchesAssertFunctionName`). Encodes the convention that any
+      // helper containing assertions is named with an `expect` prefix
+      // (`expectScopeError`, etc.) so future helpers do not need a
+      // per-name entry. The `request.**.expect` entry stays for supertest
+      // chains: `request(app).get(...).expect(200)`.
+      'jest/expect-expect': [
+        'warn',
+        { assertFunctionNames: ['expect', 'expect*', 'request.**.expect'] },
+      ],
     },
   },
 ]
