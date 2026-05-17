@@ -138,7 +138,7 @@ The allowlist:
 
 > The allowlist is stable post-Stage 4. Per-handler `@CheckPolicies` decorators remain the actual authorization gate within each accepted route; service-level `assertOrgContext` binds URL `:orgId` parameters to the principal's bound org so cross-tenant catalogue reads cannot slip through function-level policies (OA-03 / OA-06).
 
-Adding API-key acceptance to a new route requires an ADR amendment to `ai/DECISIONS.md` (ADR-034) plus a matching entry in `apps/api/src/core/auth/decorators/auth-decorator-coverage.spec.ts`; the metadata test fails until both agree.
+Adding API-key acceptance to a new route requires an ADR-034 amendment in `ai/decisions/adr-034-auth-default-bearer-only.md` plus a matching entry in `apps/api/src/core/auth/decorators/auth-decorator-coverage.spec.ts`; the metadata test fails until both agree.
 
 ---
 
