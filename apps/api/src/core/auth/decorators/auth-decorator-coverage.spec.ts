@@ -9,22 +9,23 @@
  *    explicit keeps the matrix auditable.
  *
  * 2. **Every handler whose resolved auth-types contain
- *    `AuthType.ApiKey` matches an entry in the ADR-034 allowlist.**
- *    This is the Stage 1c inversion of the previous check: the
- *    runtime default flipped to `[AuthType.Bearer]`, so the only way
- *    a route accepts an API key is an explicit `@Auth(..., AuthType.ApiKey)`,
- *    and the only way that annotation is legitimate is matching the
- *    allowlist in ADR-034 §"Allowlist of routes that accept
- *    `AuthType.ApiKey` after Stage 1c".
+ *    `AuthType.ApiKey` matches an exact route-signature entry in the
+ *    ADR-034 allowlist.** The runtime default after Stage 1c is
+ *    `[AuthType.Bearer]`, so ApiKey acceptance reaches a handler only
+ *    through an explicit `@Auth(..., AuthType.ApiKey)` (handler- or
+ *    class-level). This check then asserts that every such opt-in is
+ *    enumerated by route signature — class-wide entries would
+ *    silently bless any new handler added to an annotated class,
+ *    contradicting the ADR-034 amendment process.
  *
  * The allowlist below is the canonical machine-readable form of
- * ADR-034's table. Every new ApiKey-accepting surface requires both
- * an ADR amendment AND an entry here — the test failure message
- * tells the next agent exactly that.
+ * ADR-034's enumerated allowlist. Every new ApiKey-accepting surface
+ * requires both an ADR amendment AND a per-handler entry here — the
+ * test failure message tells the next agent exactly that.
  *
- * Entries use **route signatures**, not class/method names. This
- * survives controller-class or method renames (the URL is the actual
- * public contract).
+ * Entries use **route signatures** (HTTP verb + class path + handler
+ * path) — survives controller-class or method renames, since the URL
+ * is the actual public contract.
  *
  * See ADR-034 in `ai/DECISIONS.md` and
  * `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
@@ -66,70 +67,167 @@ const CORE_DIR = path.resolve(__dirname, '..', '..')
 /**
  * ADR-034 allowlist of routes that may opt in to `AuthType.ApiKey`.
  *
- * Two entry shapes:
- *   - `{ kind: 'class', classPath, reason }` — every handler under the
- *     controller whose `@Controller(path)` argument matches `classPath`
- *     may accept API keys. Use when API-key acceptance is the
- *     controller-wide policy (current Stage 1c default for the org
- *     `userPerms ∩ scopes` surfaces).
- *   - `{ kind: 'handler', method, classPath, handlerPath, reason }` —
- *     only this specific route signature may accept API keys. Use for
- *     deliberate single-handler dual-auth surfaces (e.g. identity
- *     self-check).
+ * Each entry is an **exact route signature** — `{ method, classPath,
+ * handlerPath }`. There are no class-wide entries: a class-level entry
+ * would silently approve any new handler added to that controller,
+ * which contradicts the ADR-034 amendment process (every new
+ * ApiKey-accepting surface must be an explicit, reviewed decision).
+ * Per-handler entries force new handlers to fail this guardrail until
+ * an ADR amendment + spec edit are landed for them specifically.
  *
  * `method` uses `RequestMethod` (NestJS enum). `classPath` and
  * `handlerPath` are the literal strings passed to `@Controller(...)`
  * and the HTTP-verb decorator (`@Get('me')`, `@Post(':id/switch')`,
  * etc.); leading/trailing slashes are stripped before comparison.
+ * Handlers decorated with `@Get()` / `@Post()` (no path argument)
+ * have `handlerPath === ''`.
+ *
+ * Source-side annotations stay class-level where it makes the auth
+ * matrix readable (e.g. `@Auth(Bearer, ApiKey)` on
+ * `OrganizationsController`); the per-handler precision lives in this
+ * allowlist. The asymmetry is the safety property — if a new handler
+ * is added inside an annotated class, the class annotation still
+ * resolves ApiKey for it, but this allowlist will not contain a
+ * matching route signature, so the test fails until both the ADR and
+ * this list are updated.
  *
  * Stage 2 (`OA-03`) and Stage 4 (`OA-05`/`OA-06`) are expected to
- * narrow the class-level org entries below to handler-level entries.
- * Until then the class-level allowance reflects the current
- * `userPerms ∩ scopes` boundary inside each controller.
+ * narrow the transitional entries below — likely by removing or
+ * tightening Org lifecycle entries. Stable entries (`AuthController.me`)
+ * have no expected narrowing.
+ *
+ * The allowlist below mirrors the per-handler enumeration in ADR-034
+ * §"Enumerated allowlist entries". Keep both in sync — the test
+ * failure message instructs the next agent to update both.
  */
-interface ClassAllowlistEntry {
-  kind: 'class'
-  classPath: string
-  reason: string
-}
-
 interface HandlerAllowlistEntry {
-  kind: 'handler'
   method: RequestMethod
   classPath: string
   handlerPath: string
   reason: string
 }
 
-type AllowlistEntry = ClassAllowlistEntry | HandlerAllowlistEntry
-
-const ADR_034_APIKEY_ALLOWLIST: readonly AllowlistEntry[] = [
+const ADR_034_APIKEY_ALLOWLIST: readonly HandlerAllowlistEntry[] = [
+  // OrganizationsController — class @Auth(Bearer, ApiKey); every
+  // handler below resolves to dual-auth. switchOrganization is NOT
+  // listed because its handler-level @Auth(Bearer) override removes
+  // ApiKey from the resolved auth-types (OA-01).
+  // Transitional Stage 1c entries — Stage 2 (OA-03) expected to
+  // narrow: create/list likely become Bearer-only, GET /:id likely
+  // org-scoped only.
   {
-    kind: 'class',
+    method: RequestMethod.POST,
     classPath: 'organizations',
-    reason:
-      'Org lifecycle/read surface — ApiKey access governed by ADR-033 (userPerms ∩ scopes). ' +
-      'switchOrganization handler overrides to Bearer-only per OA-01. ' +
-      'Transitional Stage 1c entry — Stage 2 (OA-03) may narrow per-handler.',
+    handlerPath: '',
+    reason: 'create — Transitional (Stage 2 OA-03 may move to Bearer-only).',
   },
   {
-    kind: 'class',
+    method: RequestMethod.GET,
+    classPath: 'organizations',
+    handlerPath: '',
+    reason: 'findAll — Transitional (Stage 2 OA-03 may move to Bearer-only).',
+  },
+  {
+    method: RequestMethod.GET,
+    classPath: 'organizations',
+    handlerPath: ':id',
+    reason:
+      'findOne — Transitional (Stage 2 OA-03 may restrict to principal.organizationId === :id).',
+  },
+  {
+    method: RequestMethod.PATCH,
+    classPath: 'organizations',
+    handlerPath: ':id',
+    reason:
+      'update — Manage Organization via @CheckPolicies. Stable per ADR-033 (userPerms ∩ scopes).',
+  },
+  {
+    method: RequestMethod.DELETE,
+    classPath: 'organizations',
+    handlerPath: ':id',
+    reason:
+      'remove — Manage Organization via @CheckPolicies. Stable per ADR-033 (userPerms ∩ scopes).',
+  },
+
+  // MembersController — class @Auth(Bearer, ApiKey); every handler
+  // resolves to dual-auth. Transitional — Stage 4 (OA-05) may add
+  // role-ownership narrowings on assign/remove role handlers, but
+  // the auth-types matrix is not expected to change.
+  {
+    method: RequestMethod.POST,
     classPath: 'organizations/:orgId/members',
-    reason:
-      'Members management — ApiKey with manage:Organization scope per ADR-033. ' +
-      'Per-handler @CheckPolicies remains the actual authorization gate. ' +
-      'Transitional — Stage 4 (OA-05) may add role-ownership narrowings.',
+    handlerPath: 'invite',
+    reason: 'invite — manage:Organization scope per ADR-033.',
   },
   {
-    kind: 'class',
+    method: RequestMethod.DELETE,
+    classPath: 'organizations/:orgId/members',
+    handlerPath: ':userId',
+    reason: 'removeMember — manage:Organization scope per ADR-033.',
+  },
+  {
+    method: RequestMethod.POST,
+    classPath: 'organizations/:orgId/members',
+    handlerPath: ':userId/roles/:roleId',
+    reason:
+      'assignRole — manage:Organization scope per ADR-033. ' +
+      'Transitional — Stage 4 (OA-05) may add role-ownership check.',
+  },
+  {
+    method: RequestMethod.DELETE,
+    classPath: 'organizations/:orgId/members',
+    handlerPath: ':userId/roles/:roleId',
+    reason:
+      'removeRole — manage:Organization scope per ADR-033. ' +
+      'Transitional — Stage 4 (OA-05) may add role-ownership check.',
+  },
+
+  // RolesController — class @Auth(Bearer, ApiKey); every handler
+  // resolves to dual-auth. Transitional — Stage 4 (OA-06) is
+  // expected to add assertOrgContext to listRoles. Auth-types matrix
+  // unaffected; these entries stay after that change.
+  {
+    method: RequestMethod.GET,
     classPath: 'organizations/:orgId/roles',
+    handlerPath: '',
     reason:
-      'Org role management — ApiKey with manage:Organization scope per ADR-033. ' +
-      'Transitional — Stage 4 (OA-06) is expected to add assertOrgContext to listRoles ' +
-      '(auth-types matrix unaffected; this entry stays after that change).',
+      'listRoles — manage:Organization scope per ADR-033. ' +
+      'Transitional — Stage 4 (OA-06) is expected to add assertOrgContext.',
   },
   {
-    kind: 'handler',
+    method: RequestMethod.POST,
+    classPath: 'organizations/:orgId/roles',
+    handlerPath: '',
+    reason: 'createRole — manage:Organization scope per ADR-033.',
+  },
+  {
+    method: RequestMethod.PATCH,
+    classPath: 'organizations/:orgId/roles',
+    handlerPath: ':roleId',
+    reason: 'updateRole — manage:Organization scope per ADR-033.',
+  },
+  {
+    method: RequestMethod.DELETE,
+    classPath: 'organizations/:orgId/roles',
+    handlerPath: ':roleId',
+    reason: 'deleteRole — manage:Organization scope per ADR-033.',
+  },
+  {
+    method: RequestMethod.POST,
+    classPath: 'organizations/:orgId/roles',
+    handlerPath: ':roleId/permissions',
+    reason: 'assignPermission — manage:Organization scope per ADR-033.',
+  },
+  {
+    method: RequestMethod.DELETE,
+    classPath: 'organizations/:orgId/roles',
+    handlerPath: ':roleId/permissions/:permId',
+    reason: 'removePermission — manage:Organization scope per ADR-033.',
+  },
+
+  // AuthController.me — handler-level @Auth(Bearer, ApiKey).
+  // Stable opt-in per AK-01 — identity self-check surface.
+  {
     method: RequestMethod.GET,
     classPath: 'auth',
     handlerPath: 'me',
@@ -170,15 +268,11 @@ function matchesAllowlist(
   method: RequestMethod,
   classPath: string,
   handlerPath: string
-): AllowlistEntry | undefined {
-  return ADR_034_APIKEY_ALLOWLIST.find((entry) => {
-    if (entry.kind === 'class') {
-      return entry.classPath === classPath
-    }
-    return (
+): HandlerAllowlistEntry | undefined {
+  return ADR_034_APIKEY_ALLOWLIST.find(
+    (entry) =>
       entry.method === method && entry.classPath === classPath && entry.handlerPath === handlerPath
-    )
-  })
+  )
 }
 
 interface MissingExplicitAuth {

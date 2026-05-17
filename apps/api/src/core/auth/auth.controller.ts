@@ -183,11 +183,11 @@ export class AuthController {
    * single identity self-check endpoint that integrations can call to
    * verify their credential is well-formed and to introspect their
    * effective user identity. See API_KEYS_REVIEW.md AK-01 for the
-   * original deliberate decision. The explicit annotation is part of
-   * Stage 1a's `core/**` sweep (`ai/ORGANIZATIONS_ADMIN_REVIEW.md`
-   * OA-11) — every handler in core/** must declare its auth-types
-   * explicitly so the metadata test guardrail can enforce the
-   * discipline ahead of Stage 1c's default flip (ADR-034).
+   * original deliberate decision. The explicit annotation is a
+   * registered ADR-034 allowlist entry (per `auth-decorator-coverage.spec.ts`);
+   * the runtime default after Stage 1c is `[AuthType.Bearer]`, so this
+   * explicit `@Auth(Bearer, ApiKey)` is what makes the route
+   * dual-auth.
    */
   @Get('me')
   @Auth(AuthType.Bearer, AuthType.ApiKey)

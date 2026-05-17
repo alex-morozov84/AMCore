@@ -23,11 +23,17 @@ import type { RoleWithPermissions } from './role.service'
 import { RoleService } from './role.service'
 
 /**
- * Stage 1a explicit-annotation sweep — pins the controller-wide auth
- * default. API keys may manage org roles subject to the CASL
- * `userPerms ∩ scopes` model; per-handler `@CheckPolicies` decorators
- * are the actual authorization gate. See
- * `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
+ * Class-level `@Auth(AuthType.Bearer, AuthType.ApiKey)` is an explicit
+ * dual-auth opt-in registered in ADR-034's allowlist (runtime default
+ * after Stage 1c is `[AuthType.Bearer]`). API keys may manage org
+ * roles subject to the CASL `userPerms ∩ scopes` model; the
+ * per-handler `@CheckPolicies` decorators are the actual authorization
+ * gate.
+ *
+ * The ADR-034 allowlist in `auth-decorator-coverage.spec.ts` enumerates
+ * each handler in this controller individually — adding a new handler
+ * also requires an allowlist entry (via ADR amendment) for the
+ * metadata test to pass. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
  */
 @ApiTags('organizations')
 @ApiBearerAuth()

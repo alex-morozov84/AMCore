@@ -23,14 +23,18 @@ import { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
 import { OrganizationsService } from './organizations.service'
 
 /**
- * Class-level `@Auth(AuthType.Bearer, AuthType.ApiKey)` makes the
- * controller-wide default explicit (matches the current runtime default
- * for undecorated routes). Per-handler overrides apply via
+ * Class-level `@Auth(AuthType.Bearer, AuthType.ApiKey)` is an explicit
+ * dual-auth opt-in registered in ADR-034's allowlist (runtime default
+ * after Stage 1c is `[AuthType.Bearer]` — every ApiKey acceptance is
+ * explicit). Per-handler overrides apply via
  * `reflector.getAllAndOverride([handler, class])`: `switchOrganization`
  * carries `@Auth(AuthType.Bearer)` because it mints a JWT (OA-01).
  *
- * Stage 1a explicit-annotation sweep — see `ai/ORGANIZATIONS_ADMIN_REVIEW.md`
- * OA-11 and the `auth-decorator-coverage.spec.ts` guardrail.
+ * The ADR-034 allowlist in `auth-decorator-coverage.spec.ts` enumerates
+ * each ApiKey-accepting handler in this controller individually — a new
+ * handler added here inherits the class annotation but must also be
+ * added to the allowlist (via ADR amendment) for the metadata test to
+ * pass. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
