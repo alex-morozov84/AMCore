@@ -18,8 +18,22 @@ export class RoleService {
     private readonly orgsService: OrganizationsService
   ) {}
 
-  /** List system roles + org-specific custom roles, each with their permissions */
-  async listRoles(orgId: string): Promise<RoleWithPermissions[]> {
+  /**
+   * List system roles + org-specific custom roles, each with their
+   * permissions.
+   *
+   * OA-06: caller must be in the requested org's context — the
+   * @CheckPolicies(Manage, Organization) gate on the controller is
+   * function-level (it confirms the principal *has* manage on
+   * Organization somewhere) but does not bind the decision to
+   * `:orgId`. An admin switched into org A could otherwise call
+   * GET /organizations/{orgB}/roles and read org B's custom-role +
+   * permission catalogue. Cross-tenant read by URL parameter is the
+   * canonical BOLA shape (OWASP API1:2023). assertOrgContext binds
+   * the URL `:orgId` to `principal.organizationId`.
+   */
+  async listRoles(orgId: string, principal: RequestPrincipal): Promise<RoleWithPermissions[]> {
+    this.assertOrgContext(principal, orgId)
     return this.prisma.role.findMany({
       where: { OR: [{ organizationId: orgId }, { isSystem: true, organizationId: null }] },
       include: { permissions: { include: { permission: true } } },

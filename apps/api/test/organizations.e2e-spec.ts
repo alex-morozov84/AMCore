@@ -514,4 +514,87 @@ describe('Organizations (e2e)', () => {
         .expect(403)
     })
   })
+
+  /**
+   * OA-06: `GET /organizations/:orgId/roles` carried a function-level
+   * `@CheckPolicies(Manage, Organization)` but no per-orgId boundary
+   * check. An admin switched into org A could call the route with
+   * `:orgId = orgB` and read org B's role + permission catalogue —
+   * canonical OWASP API1:2023 BOLA. Service-level `assertOrgContext`
+   * now binds `:orgId` to `principal.organizationId`.
+   */
+  describe('OA-06: list roles requires matching org context', () => {
+    it('rejects GET /organizations/:orgB/roles when the admin is switched into org A', async () => {
+      // userA admin in org A.
+      const tokenA = await registerAndLogin('user-a@example.com')
+      const orgARes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ name: 'Org A' })
+        .expect(201)
+      const orgA = orgARes.body.id as string
+      const switchARes = await request(app.getHttpServer())
+        .post(`/organizations/${orgA}/switch`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200)
+      const orgAToken = switchARes.body.accessToken as string
+
+      // userB admin in org B. Creates a custom role so the leak
+      // surface (org-B catalogue) is non-trivial — the test would
+      // still hold with only system roles, but a custom role makes
+      // the leak concretely visible if the boundary were absent.
+      const tokenB = await registerAndLogin('user-b@example.com')
+      const orgBRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ name: 'Org B' })
+        .expect(201)
+      const orgB = orgBRes.body.id as string
+      const switchBRes = await request(app.getHttpServer())
+        .post(`/organizations/${orgB}/switch`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200)
+      const orgBToken = switchBRes.body.accessToken as string
+
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgB}/roles`)
+        .set('Authorization', `Bearer ${orgBToken}`)
+        .send({ name: 'OrgB-Secret', description: 'Should not leak across orgs' })
+        .expect(201)
+
+      // userA, switched into org A, asks for org B's roles. The
+      // function-level @CheckPolicies on the controller was already
+      // satisfied (userA holds manage:Organization in org A), so
+      // before OA-06 this would have been 200 with org B's catalogue.
+      // After OA-06 the service-level assertOrgContext rejects with
+      // 403 *before* the catalogue read.
+      await request(app.getHttpServer())
+        .get(`/organizations/${orgB}/roles`)
+        .set('Authorization', `Bearer ${orgAToken}`)
+        .expect(403)
+    })
+
+    it('allows GET /organizations/:orgA/roles when the admin is switched into the same org A', async () => {
+      const token = await registerAndLogin('admin@example.com')
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Acme' })
+        .expect(201)
+      const orgId = orgRes.body.id as string
+      const switchRes = await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/switch`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+      const orgToken = switchRes.body.accessToken as string
+
+      const res = await request(app.getHttpServer())
+        .get(`/organizations/${orgId}/roles`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .expect(200)
+
+      const names = res.body.map((r: { name: string }) => r.name)
+      expect(names).toEqual(expect.arrayContaining(['ADMIN', 'MEMBER', 'VIEWER']))
+    })
+  })
 })

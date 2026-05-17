@@ -65,7 +65,7 @@ describe('RoleService', () => {
     it('returns system roles and org-specific roles with permissions', async () => {
       prisma.role.findMany.mockResolvedValue([mockSystemRole, mockCustomRole] as never)
 
-      const result = await service.listRoles('org-1')
+      const result = await service.listRoles('org-1', principal)
 
       expect(result).toHaveLength(2)
       expect(prisma.role.findMany).toHaveBeenCalledWith(
@@ -73,6 +73,40 @@ describe('RoleService', () => {
           include: expect.objectContaining({ permissions: expect.anything() }),
         })
       )
+    })
+
+    // OA-06: listRoles previously took only orgId — the function-level
+    // @CheckPolicies on the controller proved the caller had manage
+    // on Organization *somewhere*, but did not bind that decision to
+    // the URL :orgId. A switched-in admin of org A could call
+    // GET /organizations/{orgB}/roles and read org B's role/permission
+    // catalogue (OWASP API1:2023 BOLA). The service now requires the
+    // principal and rejects mismatching org context before any
+    // Prisma read.
+    it('OA-06: throws ForbiddenException when principal.organizationId does not match the requested orgId', async () => {
+      const switchedIntoAnotherOrg: RequestPrincipal = {
+        ...principal,
+        organizationId: 'org-other',
+      }
+
+      await expect(service.listRoles('org-1', switchedIntoAnotherOrg)).rejects.toThrow(
+        ForbiddenException
+      )
+      // Critical: rejection must fire before the catalogue read. A
+      // pre-read 403 is what makes this a *boundary* fix; a post-read
+      // 403 would still leak through e.g. timing channels.
+      expect(prisma.role.findMany).not.toHaveBeenCalled()
+    })
+
+    it('OA-06: throws ForbiddenException when principal has no org-context', async () => {
+      const noOrgPrincipal: RequestPrincipal = {
+        ...principal,
+        organizationId: undefined,
+        aclVersion: undefined,
+      }
+
+      await expect(service.listRoles('org-1', noOrgPrincipal)).rejects.toThrow(ForbiddenException)
+      expect(prisma.role.findMany).not.toHaveBeenCalled()
     })
   })
 

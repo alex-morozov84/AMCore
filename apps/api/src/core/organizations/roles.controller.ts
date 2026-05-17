@@ -45,8 +45,11 @@ export class RolesController {
   @Get()
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'List all roles in the organization — ADMIN only' })
-  listRoles(@Param('orgId') orgId: string): Promise<RoleWithPermissions[]> {
-    return this.roleService.listRoles(orgId)
+  listRoles(
+    @Param('orgId') orgId: string,
+    @CurrentUser() principal: RequestPrincipal
+  ): Promise<RoleWithPermissions[]> {
+    return this.roleService.listRoles(orgId, principal)
   }
 
   @Post()
