@@ -12,17 +12,39 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import type { Organization, User } from '@prisma/client'
 
-import { SystemRole } from '@amcore/shared'
+import { AuthType, SystemRole } from '@amcore/shared'
 
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
+import { Auth } from '../auth/decorators/auth.decorator'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
 import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
 
+/**
+ * OA-02: admin routes are bearer-only.
+ *
+ * `SystemRolesGuard` checks only `request.user.systemRole`, not the
+ * credential type or `principal.scopes`. The principal an API key
+ * produces inherits `systemRole` from the owning user
+ * (`ApiKeyGuard.canActivate` → `apiKey.user.systemRole`), so a
+ * SUPER_ADMIN-owned API key with arbitrarily narrow scopes — e.g.
+ * `['read:User']` — would otherwise satisfy the system-role check and
+ * reach handlers that perform unrestricted Prisma writes. Admin
+ * routes also have no `@CheckPolicies`, so the CASL
+ * `userPerms ∩ scopes` intersection (AK-09 / Stage 4) is not
+ * consulted here at all.
+ *
+ * `@Auth(AuthType.Bearer)` at the class level short-circuits the
+ * auth chain to the JWT branch only; an API key fails the JWT
+ * branch as a decision-class 401 (per AK-11 `isDecisionError`).
+ *
+ * See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-02 and ADR-033.
+ */
 @ApiTags('admin')
 @ApiBearerAuth()
 @Controller('admin')
+@Auth(AuthType.Bearer)
 @SystemRoles(SystemRole.SuperAdmin)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}

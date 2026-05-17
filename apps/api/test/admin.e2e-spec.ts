@@ -162,4 +162,131 @@ describe('Admin (e2e)', () => {
       expect(Array.isArray(res.body.data)).toBe(true)
     })
   })
+
+  /**
+   * OA-02: admin routes are bearer-only.
+   *
+   * `SystemRolesGuard` only checks `user.systemRole`; it does not look
+   * at credential type or scopes. The principal an `ApiKeyGuard` builds
+   * inherits `systemRole` from the owning user, so a SUPER_ADMIN-owned
+   * API key with a deliberately narrow scope (`read:User`) would pass
+   * the system-role check and reach the admin handler without any
+   * scope intersection — `/admin/**` has no `@CheckPolicies`, so the
+   * CASL ability built from `userPerms ∩ scopes` is not consulted.
+   *
+   * Class-level `@Auth(AuthType.Bearer)` on `AdminController` closes
+   * this: the auth chain skips the API-key branch entirely, and an
+   * `amcore_live_...` bearer fails the JWT branch as 401.
+   *
+   * Coverage strategy: the SUPER_ADMIN-owned key is the actual
+   * vulnerability — a USER-owned key would also have been stopped by
+   * `SystemRolesGuard`. We assert SUPER_ADMIN denial on every route
+   * (each handler must be inside the class-level decorator's reach),
+   * plus a USER-owned sanity case on one route to prove the
+   * auth-type policy fires first.
+   */
+  describe('OA-02: api keys cannot reach admin routes', () => {
+    /**
+     * Promotes the user to SUPER_ADMIN, creates an org owned by them,
+     * issues an API key bound to that org with a deliberately narrow
+     * scope, and returns the raw key plus the org id. Returns the
+     * fresh SUPER_ADMIN JWT so callers can also confirm positive
+     * SUPER_ADMIN access on the same routes if needed.
+     */
+    async function setupSuperAdminWithKey() {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${superToken}`)
+        .send({ name: 'Admin Org' })
+        .expect(201)
+      const orgId = orgRes.body.id as string
+
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${superToken}`)
+        .send({ name: 'Privileged attacker key', organizationId: orgId, scopes: ['read:User'] })
+        .expect(201)
+      return { apiKey: keyRes.body.key as string, superToken, userId }
+    }
+
+    /**
+     * USER-owned API key is also rejected at the auth-type layer.
+     * `SystemRolesGuard` would have stopped this credential too, but
+     * the denial must surface from the auth chain before any
+     * system-role decision so that `@Auth(AuthType.Bearer)` is the
+     * single authoritative gate.
+     */
+    it('USER-owned API key → GET /admin/users → 401', async () => {
+      const { token } = await registerAndGetToken('user@example.com')
+
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'User Org' })
+        .expect(201)
+
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Regular key', organizationId: orgRes.body.id, scopes: ['read:User'] })
+        .expect(201)
+
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${keyRes.body.key}`)
+        .expect(401)
+    })
+
+    it('SUPER_ADMIN-owned API key authenticates on /auth/me (sanity)', async () => {
+      const { apiKey } = await setupSuperAdminWithKey()
+
+      // Sanity: the key is well-formed and the owner's role does not
+      // get rejected elsewhere — every 401 below is the auth-type
+      // policy at /admin, not a malformed credential.
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(200)
+    })
+
+    it('SUPER_ADMIN-owned API key → GET /admin/users → 401', async () => {
+      const { apiKey } = await setupSuperAdminWithKey()
+
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+    })
+
+    it('SUPER_ADMIN-owned API key → PATCH /admin/users/:id → 401', async () => {
+      const { apiKey, userId } = await setupSuperAdminWithKey()
+
+      await request(app.getHttpServer())
+        .patch(`/admin/users/${userId}`)
+        .set('Authorization', `Bearer ${apiKey}`)
+        .send({ systemRole: SystemRole.User })
+        .expect(401)
+    })
+
+    it('SUPER_ADMIN-owned API key → POST /admin/cleanup → 401', async () => {
+      const { apiKey } = await setupSuperAdminWithKey()
+
+      await request(app.getHttpServer())
+        .post('/admin/cleanup')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+    })
+
+    it('SUPER_ADMIN-owned API key → GET /admin/organizations → 401', async () => {
+      const { apiKey } = await setupSuperAdminWithKey()
+
+      await request(app.getHttpServer())
+        .get('/admin/organizations')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+    })
+  })
 })

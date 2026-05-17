@@ -120,12 +120,13 @@ curl https://api.example.com/api/v1/auth/me \
 
 Most data endpoints accept either a JWT or an API key. A few routes are deliberately JWT-only:
 
-| Route group                 | API key accepted? | Why                                                                               |
-| --------------------------- | ----------------- | --------------------------------------------------------------------------------- |
-| `/api-keys/**`              | ❌                | Credential management — you can't create/list/revoke keys with a key              |
-| `/auth/sessions/**`         | ❌                | Browser session management — out of scope for integrations                        |
-| `/organizations/:id/switch` | ❌                | Mints a new JWT — would let a scoped key trade itself for a full-permission token |
-| Everything else with auth   | ✅                | Including `/auth/me` (identity self-check)                                        |
+| Route group                 | API key accepted? | Why                                                                                                                   |
+| --------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `/api-keys/**`              | ❌                | Credential management — you can't create/list/revoke keys with a key                                                  |
+| `/auth/sessions/**`         | ❌                | Browser session management — out of scope for integrations                                                            |
+| `/organizations/:id/switch` | ❌                | Mints a new JWT — would let a scoped key trade itself for a full-permission token                                     |
+| `/admin/**`                 | ❌                | Platform-admin operations — SUPER_ADMIN-owned keys would otherwise bypass scopes (the system-role guard ignores them) |
+| Everything else with auth   | ✅                | Including `/auth/me` (identity self-check)                                                                            |
 
 Attempts on JWT-only routes with an API key return `401 Unauthorized`.
 
