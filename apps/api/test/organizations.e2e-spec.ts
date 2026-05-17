@@ -219,6 +219,45 @@ describe('Organizations (e2e)', () => {
         .expect(401)
     })
 
+    it('rejects GET /organizations/:id with 403 when api key is bound to that org but scope does not include read:Organization (userPerms ∩ scopes per ADR-033)', async () => {
+      const token = await registerAndLogin('owner@example.com')
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Acme' })
+        .expect(201)
+      const orgId = orgRes.body.id as string
+
+      // Key bound to the exact same org, but scope is read:User —
+      // owner is ADMIN of this org (so userPerms include
+      // manage:Organization), but the intersection with read:User
+      // narrows to nothing on the Organization axis. The bound-org
+      // check would pass; the ability check is what catches this.
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          name: 'User-scoped key',
+          organizationId: orgId,
+          scopes: ['read:User'],
+        })
+        .expect(201)
+      const apiKey = keyRes.body.key as string
+
+      // Sanity: the key is well-formed and authenticates on a route
+      // that accepts API keys (here /auth/me) — proves the 403 below
+      // is the ability check, not auth-type or malformed-key.
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(200)
+
+      await request(app.getHttpServer())
+        .get(`/organizations/${orgId}`)
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(403)
+    })
+
     it('allows GET /organizations/:id when the api key is bound to that exact org', async () => {
       const token = await registerAndLogin('owner@example.com')
       const orgRes = await request(app.getHttpServer())

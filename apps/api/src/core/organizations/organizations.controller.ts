@@ -14,8 +14,10 @@ import type { Organization } from '@prisma/client'
 
 import { Action, AuthType, type RequestPrincipal, Subject } from '@amcore/shared'
 
+import type { AppAbility } from '../auth/casl/ability.factory'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
+import { CurrentAbility } from '../auth/decorators/current-ability.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { TokenService } from '../auth/token.service'
 
@@ -78,20 +80,27 @@ export class OrganizationsController {
   }
 
   /**
-   * OA-03: dual-auth, but API keys are constrained to their bound org
-   * (`principal.organizationId === :id`). JWT principals follow the
+   * OA-03: dual-auth, but API keys are constrained on two axes
+   * (`principal.organizationId === :id` AND
+   * `ability.can(Read, Organization)`). The first axis is the
+   * bound-org boundary; the second is the `userPerms ∩ scopes`
+   * invariant from ADR-033 — a scoped key with e.g. `read:User` must
+   * not be able to read the org record. JWT principals follow the
    * existing membership check — read does not require `/switch`,
    * otherwise the UI would face a chicken-and-egg "switch before you
-   * can choose an org" cycle. Discrimination lives in the service so
-   * the rule sits next to the business logic.
+   * can choose an org" cycle, AND a JWT without org-context has an
+   * empty personal ability that would block all reads if we applied
+   * the same ability check uniformly. Discrimination lives in the
+   * service so the rule sits next to the business logic.
    */
   @Get(':id')
   @ApiOperation({ summary: 'Get organization details (must be a member)' })
   findOne(
     @Param('id') id: string,
-    @CurrentUser() principal: RequestPrincipal
+    @CurrentUser() principal: RequestPrincipal,
+    @CurrentAbility() ability: AppAbility
   ): Promise<Organization> {
-    return this.orgsService.findOne(id, principal)
+    return this.orgsService.findOne(id, principal, ability)
   }
 
   @Patch(':id')

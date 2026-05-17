@@ -12,8 +12,17 @@ import {
   NotFoundException,
 } from '../../common/exceptions'
 import type { PrismaService } from '../../prisma'
+import type { AppAbility } from '../auth/casl/ability.factory'
 
 import { OrganizationsService } from './organizations.service'
+
+// findOne reads `ability.can(Read, Organization)` only for api_key
+// principals (OA-03). JWT cases pass `allowAbility()`; api_key cases
+// pick the variant that matches the scenario under test.
+const allowAbility = (): AppAbility =>
+  ({ can: jest.fn().mockReturnValue(true) }) as unknown as AppAbility
+const denyAbility = (): AppAbility =>
+  ({ can: jest.fn().mockReturnValue(false) }) as unknown as AppAbility
 
 describe('OrganizationsService', () => {
   let service: OrganizationsService
@@ -106,7 +115,9 @@ describe('OrganizationsService', () => {
       prisma.organization.findUnique.mockResolvedValue(mockOrg)
       prisma.orgMember.findUnique.mockResolvedValue(mockMember)
 
-      const result = await service.findOne('org-1', mockPrincipal)
+      // JWT path does not consult ability — denyAbility() proves the
+      // check is skipped (would otherwise throw).
+      const result = await service.findOne('org-1', mockPrincipal, denyAbility())
       expect(result).toEqual(mockOrg)
     })
 
@@ -120,7 +131,10 @@ describe('OrganizationsService', () => {
         aclVersion: undefined,
       }
 
-      const result = await service.findOne('org-1', noOrgPrincipal)
+      // JWT without org-context has an empty personal ability;
+      // denyAbility() simulates that exactly. The check is skipped
+      // for JWT.
+      const result = await service.findOne('org-1', noOrgPrincipal, denyAbility())
       expect(result).toEqual(mockOrg)
     })
 
@@ -128,14 +142,18 @@ describe('OrganizationsService', () => {
       prisma.organization.findUnique.mockResolvedValue(null)
       prisma.orgMember.findUnique.mockResolvedValue(null)
 
-      await expect(service.findOne('org-1', mockPrincipal)).rejects.toThrow(NotFoundException)
+      await expect(service.findOne('org-1', mockPrincipal, allowAbility())).rejects.toThrow(
+        NotFoundException
+      )
     })
 
     it('throws ForbiddenException when user is not a member', async () => {
       prisma.organization.findUnique.mockResolvedValue(mockOrg)
       prisma.orgMember.findUnique.mockResolvedValue(null)
 
-      await expect(service.findOne('org-1', mockPrincipal)).rejects.toThrow(ForbiddenException)
+      await expect(service.findOne('org-1', mockPrincipal, allowAbility())).rejects.toThrow(
+        ForbiddenException
+      )
     })
 
     // OA-03: API-key principals are bound to one org per ADR-033 and
@@ -153,12 +171,37 @@ describe('OrganizationsService', () => {
         scopes: ['read:Organization'],
       }
 
-      await expect(service.findOne('org-1', apiKeyPrincipal)).rejects.toThrow(ForbiddenException)
+      await expect(service.findOne('org-1', apiKeyPrincipal, allowAbility())).rejects.toThrow(
+        ForbiddenException
+      )
       expect(prisma.organization.findUnique).not.toHaveBeenCalled()
       expect(prisma.orgMember.findUnique).not.toHaveBeenCalled()
     })
 
-    it('OA-03: returns org when api_key principal targets its bound org and owner is a member', async () => {
+    // OA-03 (follow-up): api_key bound to the requested org but with a
+    // scope that does NOT include read:Organization (e.g. `read:User`)
+    // must still be denied — `userPerms ∩ scopes` per ADR-033. The
+    // ability is built from `permsInBoundOrg ∩ scopes` so a key with
+    // only `read:User` resolves can(Read, Organization) === false.
+    it('OA-03: throws ForbiddenException when api_key bound to same org but ability denies read:Organization', async () => {
+      const apiKeyPrincipal: RequestPrincipal = {
+        ...mockPrincipal,
+        type: 'api_key',
+        organizationId: 'org-1',
+        aclVersion: 0,
+        scopes: ['read:User'], // does not allow read:Organization
+      }
+
+      const ability = denyAbility() // can(Read, Organization) === false
+      await expect(service.findOne('org-1', apiKeyPrincipal, ability)).rejects.toThrow(
+        ForbiddenException
+      )
+      expect(ability.can).toHaveBeenCalledWith('read', 'Organization')
+      expect(prisma.organization.findUnique).not.toHaveBeenCalled()
+      expect(prisma.orgMember.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('OA-03: returns org when api_key principal targets its bound org with read:Organization in ability', async () => {
       prisma.organization.findUnique.mockResolvedValue(mockOrg)
       prisma.orgMember.findUnique.mockResolvedValue(mockMember)
 
@@ -170,7 +213,7 @@ describe('OrganizationsService', () => {
         scopes: ['read:Organization'],
       }
 
-      const result = await service.findOne('org-1', apiKeyPrincipal)
+      const result = await service.findOne('org-1', apiKeyPrincipal, allowAbility())
       expect(result).toEqual(mockOrg)
     })
   })

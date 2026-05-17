@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { HttpStatus, Injectable } from '@nestjs/common'
 import type { Organization } from '@prisma/client'
 
-import type { RequestPrincipal } from '@amcore/shared'
+import { Action, type RequestPrincipal, Subject } from '@amcore/shared'
 
 import {
   AppException,
@@ -12,6 +12,7 @@ import {
   NotFoundException,
 } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
+import type { AppAbility } from '../auth/casl/ability.factory'
 
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
 
@@ -54,17 +55,37 @@ export class OrganizationsService {
     return memberships.map((m) => m.organization)
   }
 
-  async findOne(id: string, principal: RequestPrincipal): Promise<Organization> {
-    // OA-03: API-key principals are bound to one org per ADR-033 and
-    // must not read another org's record, even if the owning user is
-    // also a member there. The check is 403 (not 404) because this is a
-    // credential-boundary violation, not org-existence concealment —
-    // the test scenario explicitly builds owner membership in both orgs
-    // to prove the boundary fires, not a missing membership.
-    if (principal.type === 'api_key' && principal.organizationId !== id) {
-      throw new ForbiddenException(
-        'API key is bound to a different organization and cannot read this one'
-      )
+  async findOne(
+    id: string,
+    principal: RequestPrincipal,
+    ability: AppAbility
+  ): Promise<Organization> {
+    // OA-03: api_key principals are constrained on two axes; JWT
+    // principals fall through both checks and rely on the membership
+    // check below.
+    if (principal.type === 'api_key') {
+      // Bound-org boundary. 403 (not 404) — credential-boundary
+      // violation, not org-existence concealment; the e2e scenario
+      // explicitly builds owner membership in both orgs to prove the
+      // boundary fires, not a missing membership.
+      if (principal.organizationId !== id) {
+        throw new ForbiddenException(
+          'API key is bound to a different organization and cannot read this one'
+        )
+      }
+      // userPerms ∩ scopes invariant (ADR-033). The ability was built
+      // by AbilityFactory from `permsInBoundOrg ∩ apiKey.scopes`, so a
+      // key with `read:User` produces no rule on Organization and
+      // `can(Read, Organization)` is false. This is what blocks a
+      // narrowly-scoped key from reading the org record even within
+      // its own bound org. JWT principals are NOT checked here:
+      // without org-context their ability is the personal empty
+      // ability, and applying the same check would break the
+      // "browse-before-switch" UI flow that OA-03 deliberately
+      // preserves.
+      if (!ability.can(Action.Read, Subject.Organization)) {
+        throw new ForbiddenException('API key scope does not allow reading this organization')
+      }
     }
 
     const [org, member] = await Promise.all([
