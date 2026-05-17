@@ -108,45 +108,38 @@ interface HandlerAllowlistEntry {
 }
 
 const ADR_034_APIKEY_ALLOWLIST: readonly HandlerAllowlistEntry[] = [
-  // OrganizationsController — class @Auth(Bearer, ApiKey); every
-  // handler below resolves to dual-auth. switchOrganization is NOT
-  // listed because its handler-level @Auth(Bearer) override removes
-  // ApiKey from the resolved auth-types (OA-01).
-  // Transitional Stage 1c entries — Stage 2 (OA-03) expected to
-  // narrow: create/list likely become Bearer-only, GET /:id likely
-  // org-scoped only.
-  {
-    method: RequestMethod.POST,
-    classPath: 'organizations',
-    handlerPath: '',
-    reason: 'create — Transitional (Stage 2 OA-03 may move to Bearer-only).',
-  },
-  {
-    method: RequestMethod.GET,
-    classPath: 'organizations',
-    handlerPath: '',
-    reason: 'findAll — Transitional (Stage 2 OA-03 may move to Bearer-only).',
-  },
+  // OrganizationsController — class @Auth(Bearer, ApiKey); per-handler
+  // overrides apply. switchOrganization is NOT listed because its
+  // handler-level @Auth(Bearer) override removes ApiKey from the
+  // resolved auth-types (OA-01). create / findAll are NOT listed
+  // because Stage 2 (OA-03) gave them handler-level @Auth(Bearer)
+  // overrides — JWT-only (creation is interactive; listing leaks
+  // org-membership topology beyond the key's bound org). The
+  // remaining three entries are stable post-Stage 2.
   {
     method: RequestMethod.GET,
     classPath: 'organizations',
     handlerPath: ':id',
     reason:
-      'findOne — Transitional (Stage 2 OA-03 may restrict to principal.organizationId === :id).',
+      'findOne — service-level discriminating check enforces ' +
+      'principal.organizationId === :id for api_key principals (OA-03). ' +
+      'JWT principals keep membership-based read (no /switch required). Stable.',
   },
   {
     method: RequestMethod.PATCH,
     classPath: 'organizations',
     handlerPath: ':id',
     reason:
-      'update — Manage Organization via @CheckPolicies. Stable per ADR-033 (userPerms ∩ scopes).',
+      'update — Manage Organization via @CheckPolicies + service-level assertOrgContext. ' +
+      'Stable per ADR-033 (userPerms ∩ scopes).',
   },
   {
     method: RequestMethod.DELETE,
     classPath: 'organizations',
     handlerPath: ':id',
     reason:
-      'remove — Manage Organization via @CheckPolicies. Stable per ADR-033 (userPerms ∩ scopes).',
+      'remove — Manage Organization via @CheckPolicies + service-level assertOrgContext. ' +
+      'Stable per ADR-033 (userPerms ∩ scopes).',
   },
 
   // MembersController — class @Auth(Bearer, ApiKey); every handler

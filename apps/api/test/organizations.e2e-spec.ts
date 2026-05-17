@@ -150,6 +150,171 @@ describe('Organizations (e2e)', () => {
     })
   })
 
+  /**
+   * OA-03: API keys are organization-bound credentials per ADR-033 and
+   * must not operate outside that boundary on the org lifecycle/read
+   * surface. After Stage 2:
+   *
+   *   - `POST /organizations` and `GET /organizations` are JWT-only
+   *     (creation is interactive; listing leaks owner's org topology).
+   *   - `GET /organizations/:id` accepts API keys only when
+   *     `principal.organizationId === :id` (`OrganizationsService.findOne`
+   *     discriminating check); JWT principals keep the existing
+   *     membership-based read.
+   *
+   * The cross-org test below explicitly invites the API-key owner into
+   * the foreign org first, so the membership check passes — proving
+   * the 403 fires from the OA-03 boundary, not from a missing
+   * membership.
+   */
+  describe('OA-03: api keys cannot operate outside their bound org', () => {
+    it('rejects POST /organizations with 401 (JWT-only — would otherwise let a scoped key spin up a new org with owner as admin)', async () => {
+      const token = await registerAndLogin('owner@example.com')
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Acme' })
+        .expect(201)
+
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          name: 'Create attempt',
+          organizationId: orgRes.body.id as string,
+          scopes: ['read:Organization'],
+        })
+        .expect(201)
+      const apiKey = keyRes.body.key as string
+
+      await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .send({ name: 'Should not be created' })
+        .expect(401)
+    })
+
+    it('rejects GET /organizations with 401 (JWT-only — would otherwise leak the owner org-membership topology)', async () => {
+      const token = await registerAndLogin('owner@example.com')
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Acme' })
+        .expect(201)
+
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          name: 'List attempt',
+          organizationId: orgRes.body.id as string,
+          scopes: ['read:Organization'],
+        })
+        .expect(201)
+      const apiKey = keyRes.body.key as string
+
+      await request(app.getHttpServer())
+        .get('/organizations')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+    })
+
+    it('allows GET /organizations/:id when the api key is bound to that exact org', async () => {
+      const token = await registerAndLogin('owner@example.com')
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Acme' })
+        .expect(201)
+      const orgId = orgRes.body.id as string
+
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          name: 'Own-org reader',
+          organizationId: orgId,
+          scopes: ['read:Organization'],
+        })
+        .expect(201)
+      const apiKey = keyRes.body.key as string
+
+      const res = await request(app.getHttpServer())
+        .get(`/organizations/${orgId}`)
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(200)
+
+      expect(res.body.id).toBe(orgId)
+    })
+
+    it('rejects GET /organizations/:id with 403 when api key targets a different org (owner is a member of both — proves the bound-org boundary fires, not the generic membership check)', async () => {
+      // userA owns org A.
+      const tokenA = await registerAndLogin('user-a@example.com')
+      const orgARes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ name: 'Org A' })
+        .expect(201)
+      const orgA = orgARes.body.id as string
+
+      // userB owns org B.
+      const tokenB = await registerAndLogin('user-b@example.com')
+      const orgBRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ name: 'Org B' })
+        .expect(201)
+      const orgB = orgBRes.body.id as string
+
+      // userB switches into org B and invites userA as a MEMBER.
+      const switchRes = await request(app.getHttpServer())
+        .post(`/organizations/${orgB}/switch`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200)
+      const orgBToken = switchRes.body.accessToken as string
+
+      const rolesRes = await request(app.getHttpServer())
+        .get(`/organizations/${orgB}/roles`)
+        .set('Authorization', `Bearer ${orgBToken}`)
+        .expect(200)
+      const memberRole = rolesRes.body.find((r: { name: string }) => r.name === 'MEMBER')
+
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgB}/members/invite`)
+        .set('Authorization', `Bearer ${orgBToken}`)
+        .send({ email: 'user-a@example.com', roleId: memberRole.id })
+        .expect(201)
+
+      // Sanity: userA is now a member of BOTH org A and org B. A
+      // membership-only check would let the cross-org read through —
+      // the 403 below must come from OA-03's bound-org boundary.
+      const orgBMembers = await prisma.orgMember.findMany({ where: { organizationId: orgB } })
+      expect(orgBMembers).toHaveLength(2)
+
+      // userA creates an API key bound to org A only.
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ name: 'Bound to A', organizationId: orgA, scopes: ['read:Organization'] })
+        .expect(201)
+      const apiKey = keyRes.body.key as string
+
+      // Own org — allowed (sanity that the key works at all).
+      await request(app.getHttpServer())
+        .get(`/organizations/${orgA}`)
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(200)
+
+      // Cross-org — rejected with 403, NOT 404 (this is a credential-
+      // boundary violation, not org-existence concealment) and NOT a
+      // membership 403 (owner is a member, established above).
+      await request(app.getHttpServer())
+        .get(`/organizations/${orgB}`)
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(403)
+    })
+  })
+
   describe('Org-protected endpoints (require org context)', () => {
     let adminToken: string
     let orgToken: string

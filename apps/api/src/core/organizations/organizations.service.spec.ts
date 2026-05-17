@@ -102,11 +102,25 @@ describe('OrganizationsService', () => {
   })
 
   describe('findOne', () => {
-    it('returns org when user is a member', async () => {
+    it('returns org when JWT principal is a member', async () => {
       prisma.organization.findUnique.mockResolvedValue(mockOrg)
       prisma.orgMember.findUnique.mockResolvedValue(mockMember)
 
-      const result = await service.findOne('org-1', 'user-1')
+      const result = await service.findOne('org-1', mockPrincipal)
+      expect(result).toEqual(mockOrg)
+    })
+
+    it('returns org when JWT principal has no org-context but is a member (read does not require /switch)', async () => {
+      prisma.organization.findUnique.mockResolvedValue(mockOrg)
+      prisma.orgMember.findUnique.mockResolvedValue(mockMember)
+
+      const noOrgPrincipal: RequestPrincipal = {
+        ...mockPrincipal,
+        organizationId: undefined,
+        aclVersion: undefined,
+      }
+
+      const result = await service.findOne('org-1', noOrgPrincipal)
       expect(result).toEqual(mockOrg)
     })
 
@@ -114,14 +128,50 @@ describe('OrganizationsService', () => {
       prisma.organization.findUnique.mockResolvedValue(null)
       prisma.orgMember.findUnique.mockResolvedValue(null)
 
-      await expect(service.findOne('org-1', 'user-1')).rejects.toThrow(NotFoundException)
+      await expect(service.findOne('org-1', mockPrincipal)).rejects.toThrow(NotFoundException)
     })
 
     it('throws ForbiddenException when user is not a member', async () => {
       prisma.organization.findUnique.mockResolvedValue(mockOrg)
       prisma.orgMember.findUnique.mockResolvedValue(null)
 
-      await expect(service.findOne('org-1', 'user-1')).rejects.toThrow(ForbiddenException)
+      await expect(service.findOne('org-1', mockPrincipal)).rejects.toThrow(ForbiddenException)
+    })
+
+    // OA-03: API-key principals are bound to one org per ADR-033 and
+    // must not read another org's record, even when the owning user is
+    // a member of both. The 403 here proves the credential-boundary
+    // check fires before the membership/existence Prisma queries — note
+    // the mocks are not asserted, because the early return prevents
+    // them from being called.
+    it('OA-03: throws ForbiddenException when api_key principal targets a different org', async () => {
+      const apiKeyPrincipal: RequestPrincipal = {
+        ...mockPrincipal,
+        type: 'api_key',
+        organizationId: 'org-bound', // bound to a different org than the request
+        aclVersion: 0,
+        scopes: ['read:Organization'],
+      }
+
+      await expect(service.findOne('org-1', apiKeyPrincipal)).rejects.toThrow(ForbiddenException)
+      expect(prisma.organization.findUnique).not.toHaveBeenCalled()
+      expect(prisma.orgMember.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('OA-03: returns org when api_key principal targets its bound org and owner is a member', async () => {
+      prisma.organization.findUnique.mockResolvedValue(mockOrg)
+      prisma.orgMember.findUnique.mockResolvedValue(mockMember)
+
+      const apiKeyPrincipal: RequestPrincipal = {
+        ...mockPrincipal,
+        type: 'api_key',
+        organizationId: 'org-1',
+        aclVersion: 0,
+        scopes: ['read:Organization'],
+      }
+
+      const result = await service.findOne('org-1', apiKeyPrincipal)
+      expect(result).toEqual(mockOrg)
     })
   })
 

@@ -46,7 +46,15 @@ export class OrganizationsController {
     private readonly tokenService: TokenService
   ) {}
 
+  /**
+   * OA-03: JWT-only. Creating a new organization makes the caller an
+   * ADMIN of a brand-new org. An API key bound to org A would otherwise
+   * be able to spin up org C where the owner is ADMIN — cross-org
+   * expansion through an integration credential. Org creation is an
+   * interactive-session decision; integrations should never need it.
+   */
   @Post()
+  @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'Create a new organization — caller becomes ADMIN' })
   create(
     @Body() dto: CreateOrganizationDto,
@@ -55,16 +63,35 @@ export class OrganizationsController {
     return this.orgsService.create(userId, dto)
   }
 
+  /**
+   * OA-03: JWT-only. Listing all organizations the owner belongs to
+   * leaks org-membership topology beyond the API key's bound org —
+   * a scoped key for org A would return B, C, and any other org the
+   * owner is in. Org discovery is interactive UI; integrations get
+   * their org via the key's bound `organizationId`.
+   */
   @Get()
+  @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'List all organizations the current user belongs to' })
   findAll(@CurrentUser('sub') userId: string): Promise<Organization[]> {
     return this.orgsService.findAllForUser(userId)
   }
 
+  /**
+   * OA-03: dual-auth, but API keys are constrained to their bound org
+   * (`principal.organizationId === :id`). JWT principals follow the
+   * existing membership check — read does not require `/switch`,
+   * otherwise the UI would face a chicken-and-egg "switch before you
+   * can choose an org" cycle. Discrimination lives in the service so
+   * the rule sits next to the business logic.
+   */
   @Get(':id')
   @ApiOperation({ summary: 'Get organization details (must be a member)' })
-  findOne(@Param('id') id: string, @CurrentUser('sub') userId: string): Promise<Organization> {
-    return this.orgsService.findOne(id, userId)
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() principal: RequestPrincipal
+  ): Promise<Organization> {
+    return this.orgsService.findOne(id, principal)
   }
 
   @Patch(':id')

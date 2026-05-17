@@ -54,11 +54,23 @@ export class OrganizationsService {
     return memberships.map((m) => m.organization)
   }
 
-  async findOne(id: string, userId: string): Promise<Organization> {
+  async findOne(id: string, principal: RequestPrincipal): Promise<Organization> {
+    // OA-03: API-key principals are bound to one org per ADR-033 and
+    // must not read another org's record, even if the owning user is
+    // also a member there. The check is 403 (not 404) because this is a
+    // credential-boundary violation, not org-existence concealment —
+    // the test scenario explicitly builds owner membership in both orgs
+    // to prove the boundary fires, not a missing membership.
+    if (principal.type === 'api_key' && principal.organizationId !== id) {
+      throw new ForbiddenException(
+        'API key is bound to a different organization and cannot read this one'
+      )
+    }
+
     const [org, member] = await Promise.all([
       this.prisma.organization.findUnique({ where: { id } }),
       this.prisma.orgMember.findUnique({
-        where: { userId_organizationId: { userId, organizationId: id } },
+        where: { userId_organizationId: { userId: principal.sub, organizationId: id } },
       }),
     ])
     if (!org) throw new NotFoundException('Organization', id)
