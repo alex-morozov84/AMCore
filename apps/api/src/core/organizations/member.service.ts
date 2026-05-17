@@ -52,10 +52,16 @@ export class MemberService {
         data: { userId: targetUser.id, organizationId: orgId },
       })
       await tx.memberRole.create({ data: { memberId: m.id, roleId } })
+      // OA-12: bump aclVersion inside the same transaction so the
+      // cache version cannot diverge from the ACL state on a
+      // transient DB failure between the membership write and the
+      // bump. Cache invalidation (OA-04) is intentionally outside
+      // the transaction — see post-commit call below.
+      await this.orgsService.bumpAclVersionTx(orgId, tx)
       return m
     })
 
-    await this.orgsService.bumpAclVersion(orgId)
+    await this.orgsService.invalidateAclVersion(orgId)
     return member
   }
 
@@ -72,8 +78,14 @@ export class MemberService {
     if (!member) throw new NotFoundException('Member not found in this organization')
 
     await this.assertNotLastAdmin(orgId, targetUserId)
-    await this.prisma.orgMember.delete({ where: { id: member.id } })
-    await this.orgsService.bumpAclVersion(orgId)
+    // OA-12: delete + bump in the same transaction so a transient
+    // DB failure between delete and bump cannot leave the cache
+    // serving stale permissions for the removed member.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.orgMember.delete({ where: { id: member.id } })
+      await this.orgsService.bumpAclVersionTx(orgId, tx)
+    })
+    await this.orgsService.invalidateAclVersion(orgId)
   }
 
   async assignRole(
@@ -93,6 +105,7 @@ export class MemberService {
     // transaction so the role's organizationId can't change between
     // check and write. Conflict detection is hoisted into the same
     // transaction for the same reason.
+    // OA-12: bump aclVersion inside the same transaction.
     await this.prisma.$transaction(async (tx) => {
       await this.assertRoleAssignable(roleId, orgId, tx)
 
@@ -102,8 +115,9 @@ export class MemberService {
       if (alreadyAssigned) throw new ConflictException('Member already has this role')
 
       await tx.memberRole.create({ data: { memberId: member.id, roleId } })
+      await this.orgsService.bumpAclVersionTx(orgId, tx)
     })
-    await this.orgsService.bumpAclVersion(orgId)
+    await this.orgsService.invalidateAclVersion(orgId)
   }
 
   async removeRole(
@@ -124,8 +138,13 @@ export class MemberService {
       await this.assertNotLastAdmin(orgId, targetUserId)
     }
 
-    await this.prisma.memberRole.deleteMany({ where: { memberId: member.id, roleId } })
-    await this.orgsService.bumpAclVersion(orgId)
+    // OA-12: deleteMany + bump in the same transaction so a transient
+    // DB failure cannot leave the cache stale on a partial role-removal.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.memberRole.deleteMany({ where: { memberId: member.id, roleId } })
+      await this.orgsService.bumpAclVersionTx(orgId, tx)
+    })
+    await this.orgsService.invalidateAclVersion(orgId)
   }
 
   /** Guard: target user must not be the last ADMIN in this org */

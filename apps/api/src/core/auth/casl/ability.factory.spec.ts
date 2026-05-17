@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 
 import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
 
+import { OrgAclVersionService } from '../org-acl-version.service'
 import { PermissionsCacheService } from '../permissions-cache.service'
 
 import { AbilityFactory } from './ability.factory'
@@ -10,6 +11,7 @@ import { AbilityFactory } from './ability.factory'
 describe('AbilityFactory', () => {
   let factory: AbilityFactory
   let permissionsCache: jest.Mocked<PermissionsCacheService>
+  let orgAclVersion: jest.Mocked<Pick<OrgAclVersionService, 'getCurrent'>>
 
   const mockPermissions = [
     {
@@ -36,6 +38,9 @@ describe('AbilityFactory', () => {
     const mockPermissionsCache = {
       getPermissions: jest.fn(),
     }
+    const mockOrgAclVersion = {
+      getCurrent: jest.fn().mockResolvedValue(5),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -44,11 +49,16 @@ describe('AbilityFactory', () => {
           provide: PermissionsCacheService,
           useValue: mockPermissionsCache,
         },
+        {
+          provide: OrgAclVersionService,
+          useValue: mockOrgAclVersion,
+        },
       ],
     }).compile()
 
     factory = module.get<AbilityFactory>(AbilityFactory)
     permissionsCache = module.get(PermissionsCacheService)
+    orgAclVersion = module.get(OrgAclVersionService)
   })
 
   afterEach(() => {
@@ -69,6 +79,7 @@ describe('AbilityFactory', () => {
       expect(ability.can(Action.Delete, Subject.User)).toBe(true)
       expect(ability.can(Action.Create, Subject.Organization)).toBe(true)
       expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
+      expect(orgAclVersion.getCurrent).not.toHaveBeenCalled()
     })
 
     // AK-02 (closed 2026-05-16, Stage 3): SUPER_ADMIN early return must not
@@ -101,6 +112,7 @@ describe('AbilityFactory', () => {
         expect(ability.can(Action.Delete, Subject.User)).toBe(false)
         expect(ability.can(Action.Manage, Subject.All)).toBe(false)
         expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
+        expect(orgAclVersion.getCurrent).not.toHaveBeenCalled()
       })
 
       it('SUPER_ADMIN api-key with empty scopes has no permissions', async () => {
@@ -119,6 +131,7 @@ describe('AbilityFactory', () => {
         expect(ability.can(Action.Manage, Subject.All)).toBe(false)
         expect(ability.can(Action.Create, Subject.Organization)).toBe(false)
         expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
+        expect(orgAclVersion.getCurrent).not.toHaveBeenCalled()
       })
 
       // manage:all is the only scope shape that has "no narrowing" effect
@@ -440,6 +453,7 @@ describe('AbilityFactory', () => {
       expect(ability.can(Action.Update, Subject.User)).toBe(true)
       expect(ability.can(Action.Delete, Subject.User)).toBe(false)
       expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
+      expect(orgAclVersion.getCurrent).not.toHaveBeenCalled()
     })
 
     // AK-04 / ADR-033: API-key principals must always carry org context.
@@ -458,35 +472,39 @@ describe('AbilityFactory', () => {
       expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
     })
 
-    it('should load permissions from cache when aclVersion is 0 (fresh org)', async () => {
+    it('should load permissions from cache when current aclVersion is 0 (fresh org)', async () => {
       const principal: RequestPrincipal = {
         type: 'jwt',
         sub: 'user-1',
         systemRole: SystemRole.User,
         organizationId: 'org-1',
-        aclVersion: 0,
+        aclVersion: 999,
       }
+      orgAclVersion.getCurrent.mockResolvedValueOnce(0)
       permissionsCache.getPermissions.mockResolvedValue([])
 
       await factory.createForUser(principal)
 
+      expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
       expect(permissionsCache.getPermissions).toHaveBeenCalledWith('user-1', 'org-1', 0)
     })
 
-    it('should load permissions from cache for org user', async () => {
+    it('OA-04: JWT org user uses current aclVersion, not stale JWT payload aclVersion', async () => {
       const principal: RequestPrincipal = {
         type: 'jwt',
         sub: 'user-1',
         systemRole: SystemRole.User,
         organizationId: 'org-1',
-        aclVersion: 5,
+        aclVersion: 3,
       }
 
+      orgAclVersion.getCurrent.mockResolvedValueOnce(4)
       permissionsCache.getPermissions.mockResolvedValueOnce(mockPermissions as any)
 
       const ability = await factory.createForUser(principal)
 
-      expect(permissionsCache.getPermissions).toHaveBeenCalledWith('user-1', 'org-1', 5)
+      expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
+      expect(permissionsCache.getPermissions).toHaveBeenCalledWith('user-1', 'org-1', 4)
       expect(ability.can(Action.Read, Subject.User)).toBe(true)
       expect(ability.can(Action.Create, Subject.Organization)).toBe(true)
     })
@@ -506,6 +524,7 @@ describe('AbilityFactory', () => {
 
       // Permission has condition: { id: '${user.sub}' } → interpolated to { id: 'user-123' }
       expect(ability.can(Action.Read, Subject.User)).toBe(true)
+      expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
     })
 
     it('should handle inverted permissions (explicit deny)', async () => {
@@ -534,6 +553,7 @@ describe('AbilityFactory', () => {
       const ability = await factory.createForUser(principal)
 
       expect(ability.can(Action.Delete, Subject.User)).toBe(false)
+      expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
     })
 
     it('should apply scopes for API key users', async () => {
@@ -555,6 +575,7 @@ describe('AbilityFactory', () => {
 
       // Should NOT have create:Organization (not in scopes)
       expect(ability.can(Action.Create, Subject.Organization)).toBe(false)
+      expect(orgAclVersion.getCurrent).not.toHaveBeenCalled()
     })
 
     it('should grant full permissions for JWT users (no scopes)', async () => {
@@ -570,6 +591,7 @@ describe('AbilityFactory', () => {
 
       const ability = await factory.createForUser(principal)
 
+      expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
       expect(ability.can(Action.Read, Subject.User)).toBe(true)
       expect(ability.can(Action.Create, Subject.Organization)).toBe(true)
     })

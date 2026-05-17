@@ -27,11 +27,13 @@ const envSchema = z
     DATABASE_POOL_WAITING_THRESHOLD: z.coerce.number().int().min(0).default(5),
     SLOW_QUERY_THRESHOLD_MS: z.coerce.number().int().min(0).optional(),
     LOG_BODY_MAX_BYTES: z.coerce.number().int().min(0).default(4096),
+    HEALTH_DISK_THRESHOLD_PERCENT: z.coerce.number().min(0).max(1).default(0.9),
     REDIS_URL: z.url(),
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     JWT_ACCESS_EXPIRATION: z.string().default('15m'),
     JWT_REFRESH_EXPIRATION: z.string().default('7d'),
     JWT_REFRESH_DAYS: z.coerce.number().int().min(1).max(365).default(7),
+    RBAC_ACLV_CACHE_TTL_MS: z.coerce.number().int().min(0).default(0),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(5002),
     CORS_ORIGIN: z
       .string()

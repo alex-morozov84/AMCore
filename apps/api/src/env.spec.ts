@@ -67,6 +67,8 @@ describe('env validation', () => {
     expect(env.DATABASE_STATEMENT_TIMEOUT_MS).toBe(30000)
     expect(env.DATABASE_QUERY_TIMEOUT_MS).toBe(30000)
     expect(env.SLOW_QUERY_THRESHOLD_MS).toBe(100)
+    expect(env.HEALTH_DISK_THRESHOLD_PERCENT).toBe(0.9)
+    expect(env.RBAC_ACLV_CACHE_TTL_MS).toBe(0)
   })
 
   it('applies production slow query threshold default', () => {
@@ -86,6 +88,15 @@ describe('env validation', () => {
     })
 
     expect(env.SLOW_QUERY_THRESHOLD_MS).toBe(750)
+  })
+
+  it('accepts an explicit health disk threshold override', () => {
+    const env = validate({
+      ...baseEnv,
+      HEALTH_DISK_THRESHOLD_PERCENT: '0.99',
+    })
+
+    expect(env.HEALTH_DISK_THRESHOLD_PERCENT).toBe(0.99)
   })
 
   it('fails in production when DATABASE_URL omits sslmode', () => {

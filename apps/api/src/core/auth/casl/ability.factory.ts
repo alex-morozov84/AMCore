@@ -5,6 +5,7 @@ import type { Organization, Permission, Role, User } from '@prisma/client'
 
 import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
 
+import { OrgAclVersionService } from '../org-acl-version.service'
 import { PermissionsCacheService } from '../permissions-cache.service'
 
 import { interpolateConditions } from './interpolate-conditions'
@@ -46,7 +47,10 @@ const SUPER_ADMIN_OWNER_PERMISSIONS: AbilityPermission[] = [
 
 @Injectable()
 export class AbilityFactory {
-  constructor(private readonly permissionsCache: PermissionsCacheService) {}
+  constructor(
+    private readonly permissionsCache: PermissionsCacheService,
+    private readonly orgAclVersion: OrgAclVersionService
+  ) {}
 
   /**
    * Build a CASL ability for the request principal.
@@ -81,13 +85,23 @@ export class AbilityFactory {
       return this.buildPersonalAbility(principal)
     }
 
+    const organizationId = principal.organizationId
+    const aclVersion =
+      principal.type === 'jwt'
+        ? // ADR-035 / OA-04: JWT payload aclVersion can be stale.
+          // Current org aclVersion is authoritative for permission
+          // cache key selection; api_key principals already get the
+          // current version in ApiKeyGuard.
+          await this.orgAclVersion.getCurrent(organizationId)
+        : principal.aclVersion
+
     const permissions = await this.permissionsCache.getPermissions(
       principal.sub,
-      principal.organizationId,
-      principal.aclVersion
+      organizationId,
+      aclVersion
     )
     const effective = this.applyScopes(permissions, principal.scopes)
-    return this.buildAbility(effective, principal)
+    return this.buildAbility(effective, { ...principal, aclVersion })
   }
 
   /**

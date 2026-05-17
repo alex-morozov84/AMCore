@@ -15,7 +15,9 @@ import { RoleService } from './role.service'
 describe('RoleService', () => {
   let service: RoleService
   let prisma: DeepMockProxy<PrismaClient>
-  let orgsService: jest.Mocked<Pick<OrganizationsService, 'bumpAclVersion'>>
+  let orgsService: jest.Mocked<
+    Pick<OrganizationsService, 'bumpAclVersion' | 'bumpAclVersionTx' | 'invalidateAclVersion'>
+  >
 
   const mockCustomRole: Role = {
     id: 'role-custom',
@@ -54,10 +56,21 @@ describe('RoleService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
-    orgsService = { bumpAclVersion: jest.fn().mockResolvedValue(undefined) }
+    orgsService = {
+      bumpAclVersion: jest.fn().mockResolvedValue(undefined),
+      bumpAclVersionTx: jest.fn().mockResolvedValue(undefined),
+      invalidateAclVersion: jest.fn().mockResolvedValue(undefined),
+    }
     service = new RoleService(
       prisma as unknown as PrismaService,
       orgsService as unknown as OrganizationsService
+    )
+    // OA-12: deleteRole / assignPermission / removePermission all
+    // wrap their DB writes + bump in a $transaction. Delegate tx to
+    // the same prisma mock so the callback runs and the existing
+    // per-call mocks remain reusable inside.
+    ;(prisma.$transaction as unknown as jest.Mock).mockImplementation(
+      async (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma)
     )
   })
 
@@ -176,7 +189,9 @@ describe('RoleService', () => {
       await service.deleteRole('org-1', 'role-custom', principal)
 
       expect(prisma.role.delete).toHaveBeenCalledWith({ where: { id: 'role-custom' } })
-      expect(orgsService.bumpAclVersion).toHaveBeenCalledWith('org-1')
+      expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
+      expect(orgsService.bumpAclVersionTx.mock.calls[0]?.[0]).toBe('org-1')
+      expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
     })
 
     it('throws ForbiddenException when trying to delete a system role', async () => {
@@ -202,7 +217,9 @@ describe('RoleService', () => {
 
       expect(result).toEqual(mockPermission)
       expect(prisma.rolePermission.create).toHaveBeenCalled()
-      expect(orgsService.bumpAclVersion).toHaveBeenCalledWith('org-1')
+      expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
+      expect(orgsService.bumpAclVersionTx.mock.calls[0]?.[0]).toBe('org-1')
+      expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
     })
 
     it('throws ForbiddenException when org context mismatches', async () => {
@@ -225,7 +242,9 @@ describe('RoleService', () => {
       await service.removePermission('org-1', 'role-custom', 'perm-1', principal)
 
       expect(prisma.permission.delete).toHaveBeenCalledWith({ where: { id: 'perm-1' } })
-      expect(orgsService.bumpAclVersion).toHaveBeenCalledWith('org-1')
+      expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
+      expect(orgsService.bumpAclVersionTx.mock.calls[0]?.[0]).toBe('org-1')
+      expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
     })
 
     it('throws NotFoundException when permission link not found', async () => {

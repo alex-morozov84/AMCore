@@ -314,6 +314,7 @@ DELETE /api/v1/organizations/:orgId/members/:userId
 ```
 
 Their org permissions are gone immediately. Active JWT tokens expire within 15 minutes (the default access token lifetime).
+Org-scoped authorization checks the current server-side ACL version on each request, so stale JWTs do not keep removed org permissions alive until token expiry.
 
 ### "I want a read-only integration via API key"
 

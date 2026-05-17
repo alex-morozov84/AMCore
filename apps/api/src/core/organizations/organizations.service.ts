@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 
 import { HttpStatus, Injectable } from '@nestjs/common'
-import type { Organization } from '@prisma/client'
+import type { Organization, Prisma } from '@prisma/client'
 
 import { Action, type RequestPrincipal, Subject } from '@amcore/shared'
 
@@ -13,12 +13,18 @@ import {
 } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 import type { AppAbility } from '../auth/casl/ability.factory'
+import { OrgAclVersionService } from '../auth/org-acl-version.service'
 
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
 
+type PrismaTx = Prisma.TransactionClient
+
 @Injectable()
 export class OrganizationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aclVersionService: OrgAclVersionService
+  ) {}
 
   async create(userId: string, dto: CreateOrganizationDto): Promise<Organization> {
     const slug = dto.slug ?? (await this.generateSlug(dto.name))
@@ -131,9 +137,50 @@ export class OrganizationsService {
     return { aclVersion: member.organization.aclVersion }
   }
 
-  /** Increment aclVersion to bust permissions cache for this org */
+  /**
+   * Increment aclVersion to bust permissions cache for this org —
+   * non-transactional variant. Retained per ADR-035 for one-off
+   * callers that don't have an enclosing `$transaction` (e.g.
+   * future admin operations). ACL mutation sites in
+   * `MemberService` / `RoleService` must use {@link bumpAclVersionTx}
+   * so the bump rolls back with the mutation.
+   *
+   * Post-commit cache invalidation runs after the DB update. If Redis
+   * invalidation fails, `OrgAclVersionService` records an error-level
+   * freshness incident but does not turn a committed DB mutation into
+   * a false client failure.
+   */
   async bumpAclVersion(orgId: string): Promise<void> {
     await this.prisma.organization.update({
+      where: { id: orgId },
+      data: { aclVersion: { increment: 1 } },
+    })
+    await this.invalidateAclVersion(orgId)
+  }
+
+  async invalidateAclVersion(orgId: string): Promise<void> {
+    await this.aclVersionService.invalidate(orgId)
+  }
+
+  /**
+   * Transactional variant of {@link bumpAclVersion} for ADR-035 / OA-12.
+   *
+   * Must be called inside the same `$transaction` as the ACL mutation
+   * whose effect this bump is meant to invalidate. If the surrounding
+   * transaction rolls back, the increment rolls back with it — the
+   * cache version and the DB ACL state can no longer drift on
+   * transient DB failures.
+   *
+   * Cache invalidation (OA-04) is the caller's job: call
+   * `OrgAclVersionService.invalidate(orgId)` after the surrounding
+   * `$transaction` commits successfully. Doing the Redis `DEL` inside
+   * the transaction would mix non-transactional I/O into the unit of
+   * work — a rollback would not undo it, breaking the freshness
+   * contract in the opposite direction (cache emptied for an
+   * un-applied bump).
+   */
+  async bumpAclVersionTx(orgId: string, tx: PrismaTx): Promise<void> {
+    await tx.organization.update({
       where: { id: orgId },
       data: { aclVersion: { increment: 1 } },
     })

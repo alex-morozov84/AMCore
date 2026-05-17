@@ -8,6 +8,7 @@ import { PrismaHealthIndicator } from './indicators/prisma.health'
 import { RedisHealthIndicator } from './indicators/redis.health'
 
 import { AUTH_TYPE_KEY } from '@/core/auth/decorators/auth.decorator'
+import { EnvService } from '@/env/env.service'
 
 describe('HealthController', () => {
   let controller: HealthController
@@ -16,6 +17,7 @@ describe('HealthController', () => {
   let redisIndicator: jest.Mocked<RedisHealthIndicator>
   let diskIndicator: jest.Mocked<DiskHealthIndicator>
   let memoryIndicator: jest.Mocked<MemoryHealthIndicator>
+  let env: jest.Mocked<EnvService>
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -51,6 +53,15 @@ describe('HealthController', () => {
             checkHeap: jest.fn(),
           },
         },
+        {
+          provide: EnvService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === 'HEALTH_DISK_THRESHOLD_PERCENT') return 0.9
+              return undefined
+            }),
+          },
+        },
       ],
     }).compile()
 
@@ -60,6 +71,7 @@ describe('HealthController', () => {
     redisIndicator = module.get(RedisHealthIndicator)
     diskIndicator = module.get(DiskHealthIndicator)
     memoryIndicator = module.get(MemoryHealthIndicator)
+    env = module.get(EnvService)
   })
 
   it('should be defined', () => {
@@ -141,6 +153,7 @@ describe('HealthController', () => {
       )
       expect(prismaIndicator.isHealthy).toHaveBeenCalledWith('database')
       expect(redisIndicator.isHealthy).toHaveBeenCalledWith('redis')
+      expect(env.get).toHaveBeenCalledWith('HEALTH_DISK_THRESHOLD_PERCENT')
       expect(diskIndicator.checkStorage).toHaveBeenCalledWith('disk', {
         thresholdPercent: 0.9,
         path: '/',
@@ -204,6 +217,7 @@ describe('HealthController', () => {
       expect(result).toEqual(mockResult)
       expect(prismaIndicator.isHealthy).toHaveBeenCalledWith('database')
       expect(redisIndicator.isHealthy).toHaveBeenCalledWith('redis')
+      expect(env.get).toHaveBeenCalledWith('HEALTH_DISK_THRESHOLD_PERCENT')
       expect(diskIndicator.checkStorage).toHaveBeenCalledWith('disk', {
         thresholdPercent: 0.9,
         path: '/',

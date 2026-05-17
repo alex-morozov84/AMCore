@@ -81,8 +81,14 @@ export class RoleService {
   async deleteRole(orgId: string, roleId: string, principal: RequestPrincipal): Promise<void> {
     this.assertOrgContext(principal, orgId)
     await this.findCustomRole(orgId, roleId)
-    await this.prisma.role.delete({ where: { id: roleId } })
-    await this.orgsService.bumpAclVersion(orgId)
+    // OA-12: delete + bump in the same transaction so a transient DB
+    // failure cannot leave the cache version diverged from the deleted
+    // role's effect on permissions.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.role.delete({ where: { id: roleId } })
+      await this.orgsService.bumpAclVersionTx(orgId, tx)
+    })
+    await this.orgsService.invalidateAclVersion(orgId)
   }
 
   /** Create a permission and assign it to the role */
@@ -95,18 +101,27 @@ export class RoleService {
     this.assertOrgContext(principal, orgId)
     await this.findCustomRole(orgId, roleId)
 
-    const permission = await this.prisma.permission.create({
-      data: {
-        action: dto.action,
-        subject: dto.subject,
-        conditions: (dto.conditions as Prisma.InputJsonValue) ?? undefined,
-        fields: dto.fields ?? [],
-        inverted: dto.inverted ?? false,
-        organizationId: orgId,
-      },
+    // OA-12: permission create + role link + bump in the same
+    // transaction. Wrapping the existing two-step (permission then
+    // rolePermission) here also closes the OA-10 orphan-permission
+    // window in part — full OA-10 fix is its own stage, but the
+    // transactional bump makes the rolling-back case cleaner.
+    const permission = await this.prisma.$transaction(async (tx) => {
+      const permission = await tx.permission.create({
+        data: {
+          action: dto.action,
+          subject: dto.subject,
+          conditions: (dto.conditions as Prisma.InputJsonValue) ?? undefined,
+          fields: dto.fields ?? [],
+          inverted: dto.inverted ?? false,
+          organizationId: orgId,
+        },
+      })
+      await tx.rolePermission.create({ data: { roleId, permissionId: permission.id } })
+      await this.orgsService.bumpAclVersionTx(orgId, tx)
+      return permission
     })
-    await this.prisma.rolePermission.create({ data: { roleId, permissionId: permission.id } })
-    await this.orgsService.bumpAclVersion(orgId)
+    await this.orgsService.invalidateAclVersion(orgId)
     return permission
   }
 
@@ -128,9 +143,13 @@ export class RoleService {
       throw new ForbiddenException('Cannot remove system-level permissions')
     }
 
-    // Deleting Permission cascades to RolePermission
-    await this.prisma.permission.delete({ where: { id: permId } })
-    await this.orgsService.bumpAclVersion(orgId)
+    // OA-12: delete + bump in the same transaction. Deleting Permission
+    // cascades to RolePermission via the FK relation.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.permission.delete({ where: { id: permId } })
+      await this.orgsService.bumpAclVersionTx(orgId, tx)
+    })
+    await this.orgsService.invalidateAclVersion(orgId)
   }
 
   /** Only org-specific, non-system roles can be managed */

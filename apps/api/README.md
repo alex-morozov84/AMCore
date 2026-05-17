@@ -181,6 +181,7 @@ Sensitive fields automatically redacted: passwords, tokens, API keys, cookies, a
 | `GET /health/live`    | Memory 1.5 GB only                | Liveness probe  |
 
 Health endpoints bypass rate limiting (`@SkipThrottle`) and are excluded from access logs.
+Readiness disk usage threshold defaults to `HEALTH_DISK_THRESHOLD_PERCENT=0.9`.
 
 ## Tests
 

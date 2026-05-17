@@ -13,6 +13,7 @@ import {
 } from '../../common/exceptions'
 import type { PrismaService } from '../../prisma'
 import type { AppAbility } from '../auth/casl/ability.factory'
+import type { OrgAclVersionService } from '../auth/org-acl-version.service'
 
 import { OrganizationsService } from './organizations.service'
 
@@ -27,6 +28,7 @@ const denyAbility = (): AppAbility =>
 describe('OrganizationsService', () => {
   let service: OrganizationsService
   let prisma: DeepMockProxy<PrismaClient>
+  let aclVersionService: jest.Mocked<Pick<OrgAclVersionService, 'invalidate'>>
 
   const mockOrg: Organization = {
     id: 'org-1',
@@ -63,7 +65,11 @@ describe('OrganizationsService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
-    service = new OrganizationsService(prisma as unknown as PrismaService)
+    aclVersionService = { invalidate: jest.fn().mockResolvedValue(undefined) }
+    service = new OrganizationsService(
+      prisma as unknown as PrismaService,
+      aclVersionService as unknown as OrgAclVersionService
+    )
   })
 
   describe('create', () => {
@@ -273,6 +279,22 @@ describe('OrganizationsService', () => {
         where: { id: 'org-1' },
         data: { aclVersion: { increment: 1 } },
       })
+      expect(aclVersionService.invalidate).toHaveBeenCalledWith('org-1')
+    })
+
+    it('increments aclVersion inside an existing transaction without invalidating Redis', async () => {
+      await service.bumpAclVersionTx('org-1', prisma as never)
+
+      expect(prisma.organization.update).toHaveBeenCalledWith({
+        where: { id: 'org-1' },
+        data: { aclVersion: { increment: 1 } },
+      })
+      expect(aclVersionService.invalidate).not.toHaveBeenCalled()
+    })
+
+    it('invalidates aclVersion cache through the dedicated wrapper', async () => {
+      await service.invalidateAclVersion('org-1')
+      expect(aclVersionService.invalidate).toHaveBeenCalledWith('org-1')
     })
   })
 })

@@ -27,6 +27,7 @@ import { OAuthClientService } from './oauth/oauth-client.service'
 import { OAuthLoginTicketService } from './oauth/oauth-login-ticket.service'
 import { OAuthStateService } from './oauth/oauth-state.service'
 import { OAuthProviderFactory } from './oauth/providers/oauth-provider.factory'
+import { OrgAclVersionService } from './org-acl-version.service'
 import { PermissionsCacheService } from './permissions-cache.service'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
@@ -69,6 +70,7 @@ import { UserCacheService } from './user-cache.service'
     UserCacheService,
     // RBAC
     AbilityFactory,
+    OrgAclVersionService,
     PermissionsCacheService,
     JwtAuthGuard,
     PoliciesGuard,
@@ -78,6 +80,13 @@ import { UserCacheService } from './user-cache.service'
     // Registered in AuthModule so it runs AFTER ThrottlerGuard (AppModule)
     { provide: APP_GUARD, useClass: AuthenticationGuard },
   ],
-  exports: [AuthService, UserCacheService, AbilityFactory, TokenService, EmailIdentityService],
+  exports: [
+    AuthService,
+    UserCacheService,
+    AbilityFactory,
+    TokenService,
+    EmailIdentityService,
+    OrgAclVersionService,
+  ],
 })
 export class AuthModule {}

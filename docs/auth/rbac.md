@@ -187,27 +187,34 @@ async updateContact(userId: string, orgId: string, contactId: string, data: any)
 Loading permissions from the database on every request would be slow. Instead, permissions are cached in Redis with a version-based invalidation strategy.
 
 ```
-Cache key: perm:{orgId}:{userId}:{aclVersion}
-TTL:       1 hour
+Current org ACL version: auth:org:aclv:v1:{orgId}
+Permissions cache key:   auth:perm:v2:{orgId}:{userId}:{aclVersion}
+Permissions TTL:         1 hour
 ```
 
-When an admin changes roles or permissions, `aclVersion` on the organization is incremented. The next request from affected users will use a new cache key (miss → fresh load). Old cache entries expire naturally.
+When an admin changes memberships, roles, or permissions, the ACL mutation and the organization's `aclVersion` increment commit in the same database transaction. After that commit, the server invalidates the cached current ACL version for the organization.
+
+On the next authenticated org-scoped request, the backend reads the current org `aclVersion` and uses it in the permissions cache key. If the version changed, the request misses the old permission cache entry and loads fresh permissions. Old permission cache entries expire naturally.
 
 **This means:** Permission changes take effect on the **next request** after the version bump — no need to sign out.
+
+If Redis cannot be read, the server falls back to the database for the current `aclVersion`. If post-commit Redis invalidation fails, the mutation remains committed and the server records an error-level freshness incident with metric name `auth.rbac.aclv_invalidate_failure`; monitor this signal in production.
+
+By default, the current ACL version cache has no TTL and relies on explicit invalidation. Setting `RBAC_ACLV_CACHE_TTL_MS` enables a bounded fallback mode where stale permission decisions can last up to that TTL if invalidation fails.
 
 ---
 
 ## aclVersion and stale tokens
 
-The JWT contains `aclVersion` at the time of login/refresh. When the backend loads permissions, it uses this version as part of the cache key.
+The JWT contains `aclVersion` at the time of login/refresh, but the backend does not trust that embedded value for org-scoped authorization. It uses the token's org context to read the current organization `aclVersion` before building the ability.
 
 ```
 User logs in  → JWT has aclVersion: 3
 Admin changes permissions → org.aclVersion becomes 4
-User's next request → JWT still says 3 → cache miss → loads fresh aclVersion: 4 permissions
+User's next request → JWT still says 3 → backend reads current aclVersion: 4 → cache miss → loads fresh permissions
 ```
 
-Old permissions (version 3) are loaded from cache if any user still has an older token — but they expire within 1 hour and the next refresh token cycle will embed the new version.
+The embedded JWT version is still useful as a snapshot/debug value, and the next refresh token cycle will embed the newer version. Authorization decisions use the server-side current version.
 
 ---
 

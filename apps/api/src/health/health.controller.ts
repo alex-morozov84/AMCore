@@ -16,6 +16,7 @@ import { PrismaHealthIndicator } from './indicators/prisma.health'
 import { RedisHealthIndicator } from './indicators/redis.health'
 
 import { Auth } from '@/core/auth/decorators/auth.decorator'
+import { EnvService } from '@/env/env.service'
 
 @ApiTags('health')
 @Controller('health')
@@ -27,7 +28,8 @@ export class HealthController {
     private readonly prisma: PrismaHealthIndicator,
     private readonly redis: RedisHealthIndicator,
     private readonly disk: DiskHealthIndicator,
-    private readonly memory: MemoryHealthIndicator
+    private readonly memory: MemoryHealthIndicator,
+    private readonly env: EnvService
   ) {}
 
   @Get()
@@ -145,7 +147,7 @@ export class HealthController {
       () => this.redis.isHealthy('redis'),
       () =>
         this.disk.checkStorage('disk', {
-          thresholdPercent: 0.9,
+          thresholdPercent: this.env.get('HEALTH_DISK_THRESHOLD_PERCENT'),
           path: '/',
         }),
       () => this.memory.checkHeap('memory_heap', 1024 * 1024 * 1024),

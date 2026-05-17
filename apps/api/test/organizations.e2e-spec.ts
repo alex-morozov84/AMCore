@@ -597,4 +597,73 @@ describe('Organizations (e2e)', () => {
       expect(names).toEqual(expect.arrayContaining(['ADMIN', 'MEMBER', 'VIEWER']))
     })
   })
+
+  /**
+   * OA-04/OA-12: role changes must affect already-issued JWTs on the
+   * next request. The first target request below warms the permissions
+   * cache under the old aclVersion; removing ADMIN bumps aclVersion in
+   * the same DB transaction and invalidates the org aclVersion cache.
+   * The second request reuses the same target JWT and must see the new
+   * version immediately.
+   */
+  describe('OA-04/OA-12: RBAC freshness for stale JWT aclVersion', () => {
+    it('revokes role permissions on the next request without waiting for JWT refresh', async () => {
+      const adminToken = await registerAndLogin('admin@example.com')
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'Acme' })
+        .expect(201)
+      const orgId = orgRes.body.id as string
+      const adminOrgToken = (
+        await request(app.getHttpServer())
+          .post(`/organizations/${orgId}/switch`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200)
+      ).body.accessToken as string
+
+      await registerAndLogin('target@example.com')
+      const rolesRes = await request(app.getHttpServer())
+        .get(`/organizations/${orgId}/roles`)
+        .set('Authorization', `Bearer ${adminOrgToken}`)
+        .expect(200)
+      const adminRole = rolesRes.body.find((r: { name: string }) => r.name === 'ADMIN')
+      expect(adminRole?.id).toBeDefined()
+
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/members/invite`)
+        .set('Authorization', `Bearer ${adminOrgToken}`)
+        .send({ email: 'target@example.com', roleId: adminRole.id })
+        .expect(201)
+
+      const targetLogin = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'target@example.com', password: 'StrongP@ss123' })
+        .expect(200)
+      const targetOrgToken = (
+        await request(app.getHttpServer())
+          .post(`/organizations/${orgId}/switch`)
+          .set('Authorization', `Bearer ${targetLogin.body.accessToken as string}`)
+          .expect(200)
+      ).body.accessToken as string
+
+      // Warm permissions cache for target at the old aclVersion.
+      await request(app.getHttpServer())
+        .get(`/organizations/${orgId}/roles`)
+        .set('Authorization', `Bearer ${targetOrgToken}`)
+        .expect(200)
+
+      await request(app.getHttpServer())
+        .delete(`/organizations/${orgId}/members/${targetLogin.body.user.id}/roles/${adminRole.id}`)
+        .set('Authorization', `Bearer ${adminOrgToken}`)
+        .expect(204)
+
+      // Same JWT, no refresh. Must see current aclVersion and lose
+      // manage:Organization immediately.
+      await request(app.getHttpServer())
+        .get(`/organizations/${orgId}/roles`)
+        .set('Authorization', `Bearer ${targetOrgToken}`)
+        .expect(403)
+    })
+  })
 })

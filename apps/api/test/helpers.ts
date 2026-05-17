@@ -56,6 +56,9 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
 
   process.env.DATABASE_URL = databaseUrl
   process.env.REDIS_URL = redisUrl
+  // Keep readiness e2e deterministic on developer machines where the root
+  // APFS volume may legitimately report >90% used.
+  process.env.HEALTH_DISK_THRESHOLD_PERCENT = '0.99'
   // E2E_DATABASE_URL: escape hatch consumed by prisma.config.ts to defeat
   // Prisma CLI's `.env` auto-load (which otherwise overrides DATABASE_URL back
   // to whatever sits in .env). Not used by application code.

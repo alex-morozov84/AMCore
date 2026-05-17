@@ -21,7 +21,9 @@ import type { OrganizationsService } from './organizations.service'
 describe('MemberService', () => {
   let service: MemberService
   let prisma: DeepMockProxy<PrismaClient>
-  let orgsService: jest.Mocked<Pick<OrganizationsService, 'bumpAclVersion'>>
+  let orgsService: jest.Mocked<
+    Pick<OrganizationsService, 'bumpAclVersion' | 'bumpAclVersionTx' | 'invalidateAclVersion'>
+  >
 
   const mockUser: User = {
     id: 'user-2',
@@ -74,7 +76,11 @@ describe('MemberService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
-    orgsService = { bumpAclVersion: jest.fn().mockResolvedValue(undefined) }
+    orgsService = {
+      bumpAclVersion: jest.fn().mockResolvedValue(undefined),
+      bumpAclVersionTx: jest.fn().mockResolvedValue(undefined),
+      invalidateAclVersion: jest.fn().mockResolvedValue(undefined),
+    }
     service = new MemberService(
       prisma as unknown as PrismaService,
       orgsService as unknown as OrganizationsService,
@@ -112,7 +118,9 @@ describe('MemberService', () => {
         where: { emailCanonical: 'invited@example.com' },
       })
       expect(prisma.$transaction).toHaveBeenCalled()
-      expect(orgsService.bumpAclVersion).toHaveBeenCalledWith('org-1')
+      expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
+      expect(orgsService.bumpAclVersionTx.mock.calls[0]?.[0]).toBe('org-1')
+      expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
     })
 
     it('looks up invited user by canonical email', async () => {
@@ -244,7 +252,9 @@ describe('MemberService', () => {
       await service.removeMember('org-1', 'user-2', principal)
 
       expect(prisma.orgMember.delete).toHaveBeenCalledWith({ where: { id: mockMember.id } })
-      expect(orgsService.bumpAclVersion).toHaveBeenCalledWith('org-1')
+      expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
+      expect(orgsService.bumpAclVersionTx.mock.calls[0]?.[0]).toBe('org-1')
+      expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
     })
 
     it('throws NotFoundException when member not in org', async () => {
@@ -287,7 +297,9 @@ describe('MemberService', () => {
       await service.assignRole('org-1', 'user-2', 'role-viewer', principal)
 
       expect(prisma.memberRole.create).toHaveBeenCalled()
-      expect(orgsService.bumpAclVersion).toHaveBeenCalledWith('org-1')
+      expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
+      expect(orgsService.bumpAclVersionTx.mock.calls[0]?.[0]).toBe('org-1')
+      expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
     })
 
     it('throws NotFoundException when member not in org', async () => {
@@ -374,7 +386,9 @@ describe('MemberService', () => {
       await service.removeRole('org-1', 'user-2', 'role-viewer', principal) // not admin role
 
       expect(prisma.memberRole.deleteMany).toHaveBeenCalled()
-      expect(orgsService.bumpAclVersion).toHaveBeenCalledWith('org-1')
+      expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
+      expect(orgsService.bumpAclVersionTx.mock.calls[0]?.[0]).toBe('org-1')
+      expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
     })
 
     it('throws BusinessRuleViolationException when removing last admin role', async () => {
