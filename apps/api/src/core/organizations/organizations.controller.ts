@@ -12,8 +12,9 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { Organization } from '@prisma/client'
 
-import { Action, type RequestPrincipal, Subject } from '@amcore/shared'
+import { Action, AuthType, type RequestPrincipal, Subject } from '@amcore/shared'
 
+import { Auth } from '../auth/decorators/auth.decorator'
 import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { TokenService } from '../auth/token.service'
@@ -74,8 +75,16 @@ export class OrganizationsController {
    * Returns a new access token with this organization's context (organizationId + aclVersion).
    * Client should replace the current access token with the returned one.
    * Org context is required for ADMIN operations and CASL permission evaluation.
+   *
+   * OA-01: bearer-only. An API key must never be convertible into a JWT —
+   * doing so would let a narrowly-scoped integration credential mint a
+   * full-permission token for the owner, bypassing the
+   * `userPerms ∩ scopes` invariant from ADR-033, and could even cross
+   * organizations the API key is not bound to (the handler trusts only
+   * `user.sub` here). See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-01.
    */
   @Post(':id/switch')
+  @Auth(AuthType.Bearer)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get new JWT with this organization context — must be a member' })
   async switchOrganization(

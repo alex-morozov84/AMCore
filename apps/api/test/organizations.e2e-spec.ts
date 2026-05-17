@@ -111,6 +111,43 @@ describe('Organizations (e2e)', () => {
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(403)
     })
+
+    /**
+     * OA-01: bearer-only. An API key — even one bound to this exact org —
+     * must not be convertible into a JWT. Otherwise a narrowly-scoped
+     * integration credential could mint a full-permission token for the
+     * owner, bypassing `userPerms ∩ scopes` (ADR-033), and could even
+     * target a different organization the owner happens to belong to.
+     * See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-01.
+     */
+    it('OA-01: rejects API key with 401, even when bound to the target org', async () => {
+      const token = await registerAndLogin('owner@example.com')
+
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Acme Corp' })
+      const orgId = orgRes.body.id as string
+
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Switch attempt', organizationId: orgId, scopes: ['read:User'] })
+        .expect(201)
+      const apiKey = keyRes.body.key as string
+
+      // Sanity: the API key authenticates on a route that accepts it,
+      // proving 401 below is the auth-type policy and not a malformed key.
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(200)
+
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/switch`)
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+    })
   })
 
   describe('Org-protected endpoints (require org context)', () => {
