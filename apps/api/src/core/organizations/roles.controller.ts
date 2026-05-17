@@ -12,8 +12,9 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { Permission, Role } from '@prisma/client'
 
-import { Action, type RequestPrincipal, Subject } from '@amcore/shared'
+import { Action, AuthType, type RequestPrincipal, Subject } from '@amcore/shared'
 
+import { Auth } from '../auth/decorators/auth.decorator'
 import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
@@ -21,9 +22,17 @@ import { AssignPermissionDto, CreateRoleDto, UpdateRoleDto } from './dto'
 import type { RoleWithPermissions } from './role.service'
 import { RoleService } from './role.service'
 
+/**
+ * Stage 1a explicit-annotation sweep — pins the controller-wide auth
+ * default. API keys may manage org roles subject to the CASL
+ * `userPerms ∩ scopes` model; per-handler `@CheckPolicies` decorators
+ * are the actual authorization gate. See
+ * `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
+ */
 @ApiTags('organizations')
 @ApiBearerAuth()
 @Controller('organizations/:orgId/roles')
+@Auth(AuthType.Bearer, AuthType.ApiKey)
 export class RolesController {
   constructor(private readonly roleService: RoleService) {}
 

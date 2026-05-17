@@ -2,17 +2,27 @@ import { Body, Controller, Delete, HttpCode, HttpStatus, Param, Post } from '@ne
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { OrgMember } from '@prisma/client'
 
-import { Action, type RequestPrincipal, Subject } from '@amcore/shared'
+import { Action, AuthType, type RequestPrincipal, Subject } from '@amcore/shared'
 
+import { Auth } from '../auth/decorators/auth.decorator'
 import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
 import { InviteMemberDto } from './dto'
 import { MemberService } from './member.service'
 
+/**
+ * Stage 1a explicit-annotation sweep — pins the controller-wide auth
+ * default. API keys may invite/remove/assign roles within their bound
+ * organization subject to the CASL `userPerms ∩ scopes` model (e.g.
+ * `manage:Organization` scope from a SUPER_ADMIN-owned key); the
+ * `@CheckPolicies` decorators on each handler are the actual
+ * authorization gate. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
+ */
 @ApiTags('organizations')
 @ApiBearerAuth()
 @Controller('organizations/:orgId/members')
+@Auth(AuthType.Bearer, AuthType.ApiKey)
 export class MembersController {
   constructor(private readonly memberService: MemberService) {}
 

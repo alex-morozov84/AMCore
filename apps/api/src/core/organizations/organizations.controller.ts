@@ -22,9 +22,20 @@ import { TokenService } from '../auth/token.service'
 import { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
 import { OrganizationsService } from './organizations.service'
 
+/**
+ * Class-level `@Auth(AuthType.Bearer, AuthType.ApiKey)` makes the
+ * controller-wide default explicit (matches the current runtime default
+ * for undecorated routes). Per-handler overrides apply via
+ * `reflector.getAllAndOverride([handler, class])`: `switchOrganization`
+ * carries `@Auth(AuthType.Bearer)` because it mints a JWT (OA-01).
+ *
+ * Stage 1a explicit-annotation sweep — see `ai/ORGANIZATIONS_ADMIN_REVIEW.md`
+ * OA-11 and the `auth-decorator-coverage.spec.ts` guardrail.
+ */
 @ApiTags('organizations')
 @ApiBearerAuth()
 @Controller('organizations')
+@Auth(AuthType.Bearer, AuthType.ApiKey)
 export class OrganizationsController {
   constructor(
     private readonly orgsService: OrganizationsService,
