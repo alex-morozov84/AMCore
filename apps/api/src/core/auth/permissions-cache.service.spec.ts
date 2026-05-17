@@ -296,6 +296,92 @@ describe('PermissionsCacheService', () => {
       expect(lock.acquire).toHaveBeenCalledTimes(5)
       expect(prisma.orgMember.findUnique).toHaveBeenCalledTimes(1)
     })
+
+    // OA-05 defense-in-depth: even if MemberService.assertRoleAssignable
+    // is bypassed (raw SQL / migration / pre-fix data), the cache
+    // loader must not surface permissions from a role whose
+    // organizationId belongs to a different org. The primary fix is
+    // in MemberService; this filter is a second wall.
+    describe('OA-05: defense-in-depth filter for foreign-org role rows', () => {
+      const foreignOrgPermission: Permission = {
+        id: 'perm-foreign',
+        action: 'manage',
+        subject: 'Organization',
+        conditions: null,
+        fields: [],
+        inverted: false,
+        organizationId: 'org-b',
+      }
+
+      const memberWithForeignRole = {
+        ...mockMember,
+        roles: [
+          mockMember.roles[0], // legit same-org role
+          {
+            id: 'member-role-foreign',
+            memberId: 'member-1',
+            roleId: 'role-from-org-b',
+            role: {
+              id: 'role-from-org-b',
+              name: 'Editor',
+              description: null,
+              isSystem: false,
+              organizationId: 'org-b',
+              permissions: [
+                {
+                  roleId: 'role-from-org-b',
+                  permissionId: 'perm-foreign',
+                  permission: foreignOrgPermission,
+                },
+              ],
+            },
+          },
+        ],
+      }
+
+      it('drops permissions from foreign-org roles and logs a warn', async () => {
+        redis.get.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+        lock.acquire.mockResolvedValueOnce('lock-token')
+        jest
+          .spyOn(prisma.orgMember, 'findUnique')
+          .mockResolvedValueOnce(memberWithForeignRole as never)
+
+        const result = await service.getPermissions('user-1', 'org-1', 5)
+
+        // Only the legit role's permissions surface.
+        expect(result).toEqual(mockPermissions)
+        expect(result.some((p) => p.id === 'perm-foreign')).toBe(false)
+
+        // Warn carries identifying metadata for the offending row but
+        // no PII. The role/orgId arrays are observability signal: a
+        // foreign-org row reaching the cache loader is either pre-fix
+        // data or a bypass of the service layer.
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userId: 'user-1',
+            organizationId: 'org-1',
+            roleIds: ['role-from-org-b'],
+            roleOrganizationIds: ['org-b'],
+          }),
+          expect.stringContaining('OA-05')
+        )
+      })
+
+      it('does not warn when every role belongs to the requested org or is a system role', async () => {
+        redis.get.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+        lock.acquire.mockResolvedValueOnce('lock-token')
+        jest.spyOn(prisma.orgMember, 'findUnique').mockResolvedValueOnce(mockMember as never)
+
+        await service.getPermissions('user-1', 'org-1', 5)
+
+        // No OA-05 warn — the mock has only a same-org role.
+        const warnCalls = mockLogger.warn.mock.calls
+        const oa05Warn = warnCalls.find(
+          (call) => typeof call[1] === 'string' && call[1].includes('OA-05')
+        )
+        expect(oa05Warn).toBeUndefined()
+      })
+    })
   })
 
   describe('getMetrics', () => {

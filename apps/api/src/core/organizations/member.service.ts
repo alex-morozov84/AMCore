@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import type { OrgMember } from '@prisma/client'
+import type { OrgMember, Prisma } from '@prisma/client'
 
 import type { RequestPrincipal } from '@amcore/shared'
 
@@ -14,6 +14,8 @@ import { EmailIdentityService } from '../auth/email-identity.service'
 
 import type { InviteMemberDto } from './dto'
 import { OrganizationsService } from './organizations.service'
+
+type PrismaTx = Prisma.TransactionClient
 
 @Injectable()
 export class MemberService {
@@ -43,6 +45,9 @@ export class MemberService {
     const roleId = dto.roleId ?? (await this.getSystemRoleId('MEMBER'))
 
     const member = await this.prisma.$transaction(async (tx) => {
+      // OA-05: validate role ownership inside the same transaction so
+      // the role's organizationId can't change between check and write.
+      await this.assertRoleAssignable(roleId, orgId, tx)
       const m = await tx.orgMember.create({
         data: { userId: targetUser.id, organizationId: orgId },
       })
@@ -84,12 +89,20 @@ export class MemberService {
     })
     if (!member) throw new NotFoundException('Member not found in this organization')
 
-    const alreadyAssigned = await this.prisma.memberRole.findUnique({
-      where: { memberId_roleId: { memberId: member.id, roleId } },
-    })
-    if (alreadyAssigned) throw new ConflictException('Member already has this role')
+    // OA-05: role-ownership validation + assignment in the same
+    // transaction so the role's organizationId can't change between
+    // check and write. Conflict detection is hoisted into the same
+    // transaction for the same reason.
+    await this.prisma.$transaction(async (tx) => {
+      await this.assertRoleAssignable(roleId, orgId, tx)
 
-    await this.prisma.memberRole.create({ data: { memberId: member.id, roleId } })
+      const alreadyAssigned = await tx.memberRole.findUnique({
+        where: { memberId_roleId: { memberId: member.id, roleId } },
+      })
+      if (alreadyAssigned) throw new ConflictException('Member already has this role')
+
+      await tx.memberRole.create({ data: { memberId: member.id, roleId } })
+    })
     await this.orgsService.bumpAclVersion(orgId)
   }
 
@@ -129,6 +142,38 @@ export class MemberService {
       throw new BusinessRuleViolationException(
         'Cannot remove the last administrator from an organization'
       )
+    }
+  }
+
+  /**
+   * OA-05: a role can be attached to a member of `orgId` only when it
+   * is either:
+   *   - a system role (`isSystem === true && organizationId === null`), or
+   *   - a custom role owned by the same organization
+   *     (`organizationId === orgId`).
+   *
+   * Anything else — a custom role from a foreign organization, a row
+   * that doesn't exist, or a system row with the wrong shape — is
+   * rejected with a uniform 403. The uniform response is deliberate:
+   * distinguishing "role belongs to org B" from "role does not exist"
+   * would let an attacker enumerate roleIds across orgs by status
+   * code or timing.
+   *
+   * Must be called inside the same transaction that creates the
+   * `MemberRole` link, otherwise the role's `organizationId` could
+   * change between the check and the write.
+   */
+  private async assertRoleAssignable(roleId: string, orgId: string, tx: PrismaTx): Promise<void> {
+    const role = await tx.role.findUnique({
+      where: { id: roleId },
+      select: { organizationId: true, isSystem: true },
+    })
+
+    const isSystemRole = role?.isSystem === true && role.organizationId === null
+    const isOwnedCustomRole = role !== null && role.organizationId === orgId
+
+    if (!isSystemRole && !isOwnedCustomRole) {
+      throw new ForbiddenException('Role is not assignable in this organization')
     }
   }
 

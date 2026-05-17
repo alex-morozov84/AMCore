@@ -420,4 +420,98 @@ describe('Organizations (e2e)', () => {
       expect(res.body).toMatchObject({ name: 'Editor', organizationId: orgId })
     })
   })
+
+  /**
+   * OA-05: role ownership invariant. A member of org A must never be
+   * assigned a custom role owned by org B. The unit suite covers the
+   * service-level branches; this e2e proves the boundary holds end-to-
+   * end on the real invite route, including the uniform 403 response
+   * that prevents roleId enumeration.
+   */
+  describe('OA-05: role ownership across orgs', () => {
+    it('rejects invite carrying a custom roleId from a different organization with 403', async () => {
+      // userA admin in org A.
+      const tokenA = await registerAndLogin('user-a@example.com')
+      const orgARes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ name: 'Org A' })
+        .expect(201)
+      const orgA = orgARes.body.id as string
+      const switchARes = await request(app.getHttpServer())
+        .post(`/organizations/${orgA}/switch`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200)
+      const orgAToken = switchARes.body.accessToken as string
+
+      // userB admin in org B; creates a custom role X scoped to org B.
+      const tokenB = await registerAndLogin('user-b@example.com')
+      const orgBRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ name: 'Org B' })
+        .expect(201)
+      const orgB = orgBRes.body.id as string
+      const switchBRes = await request(app.getHttpServer())
+        .post(`/organizations/${orgB}/switch`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200)
+      const orgBToken = switchBRes.body.accessToken as string
+
+      const foreignRoleRes = await request(app.getHttpServer())
+        .post(`/organizations/${orgB}/roles`)
+        .set('Authorization', `Bearer ${orgBToken}`)
+        .send({ name: 'OrgB-Editor', description: 'Belongs to org B only' })
+        .expect(201)
+      const foreignRoleId = foreignRoleRes.body.id as string
+
+      // Register a target user (must exist for the invite-by-email
+      // lookup to succeed; otherwise we'd get a 404 from the user
+      // lookup and would not exercise the role-ownership branch).
+      await registerAndLogin('target@example.com')
+
+      // userA (admin in org A) attempts to invite target into org A
+      // with the foreign roleId from org B → must be 403, NOT 404
+      // (uniform with the "roleId does not exist" path so an attacker
+      // cannot enumerate roleIds across orgs via status code).
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgA}/members/invite`)
+        .set('Authorization', `Bearer ${orgAToken}`)
+        .send({ email: 'target@example.com', roleId: foreignRoleId })
+        .expect(403)
+
+      // No membership should have been created for the target — proves
+      // the rejection fires before the org-member write.
+      const orgAMembers = await prisma.orgMember.findMany({ where: { organizationId: orgA } })
+      // Only userA (admin) should be a member of org A.
+      expect(orgAMembers).toHaveLength(1)
+    })
+
+    it('returns 403 for non-existent roleId — uniform with foreign-org rejection (no enumeration)', async () => {
+      const token = await registerAndLogin('admin@example.com')
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Acme' })
+        .expect(201)
+      const orgId = orgRes.body.id as string
+      const switchRes = await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/switch`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+      const orgToken = switchRes.body.accessToken as string
+
+      await registerAndLogin('target@example.com')
+
+      // Bogus roleId — must come back as 403 (same code as the
+      // foreign-org case above), not 404. A 404 here would confirm
+      // "this roleId does not exist", letting an attacker distinguish
+      // foreign vs missing roleIds.
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/members/invite`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({ email: 'target@example.com', roleId: 'cmp9aaaaa0000000000000000' })
+        .expect(403)
+    })
+  })
 })

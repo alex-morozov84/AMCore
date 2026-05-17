@@ -199,10 +199,40 @@ export class PermissionsCacheService {
       return []
     }
 
+    // OA-05 defense-in-depth: drop any role whose `organizationId` is
+    // neither `null` (system roles) nor the requested org. The primary
+    // fix is `MemberService.assertRoleAssignable`, which prevents
+    // foreign-org role rows from being inserted into `MemberRole` in
+    // the first place. This filter exists for two scenarios:
+    //   - pre-fix data: rows that may have been planted before
+    //     OA-05 landed
+    //   - data corruption: any bypass of the service layer (raw SQL,
+    //     migrations, future bug)
+    // A foreign-org row reaching this point is a signal worth
+    // surfacing — we warn with metadata sufficient to identify the
+    // membership and the foreign role without leaking PII.
+    const foreignRoles = member.roles.filter(
+      (mr) => mr.role.organizationId !== null && mr.role.organizationId !== organizationId
+    )
+    if (foreignRoles.length > 0) {
+      this.logger.warn(
+        {
+          userId,
+          organizationId,
+          roleIds: foreignRoles.map((mr) => mr.role.id),
+          roleOrganizationIds: foreignRoles.map((mr) => mr.role.organizationId),
+        },
+        'OA-05: dropping role(s) attached to a foreign organization'
+      )
+    }
+    const safeMemberRoles = member.roles.filter(
+      (mr) => mr.role.organizationId === null || mr.role.organizationId === organizationId
+    )
+
     const permissions: Permission[] = []
     const seenPermissionIds = new Set<string>()
 
-    for (const memberRole of member.roles) {
+    for (const memberRole of safeMemberRoles) {
       for (const rolePermission of memberRole.role.permissions) {
         const permission = rolePermission.permission
 
