@@ -153,12 +153,20 @@ describe('OrganizationsService', () => {
       )
     })
 
-    it('throws ForbiddenException when user is not a member', async () => {
+    /**
+     * OB-04: JWT non-member access conceals org existence. Existing-
+     * but-not-member and missing-org both return NotFoundException —
+     * previously the former returned ForbiddenException and let an
+     * attacker enumerate org IDs by status code. The API-key OA-03
+     * branch (403 credential-boundary) is intentionally untouched —
+     * see its own describe below.
+     */
+    it('throws NotFoundException when JWT user is not a member (OB-04)', async () => {
       prisma.organization.findUnique.mockResolvedValue(mockOrg)
       prisma.orgMember.findUnique.mockResolvedValue(null)
 
       await expect(service.findOne('org-1', mockPrincipal, allowAbility())).rejects.toThrow(
-        ForbiddenException
+        NotFoundException
       )
     })
 

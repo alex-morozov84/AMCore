@@ -354,6 +354,47 @@ describe('Organizations (e2e)', () => {
     })
   })
 
+  /**
+   * OB-04: JWT non-member access conceals organization existence.
+   *
+   * `GET /organizations/:id` from a JWT principal that is not a
+   * member of `:id` returns 404 — the same response a missing org
+   * produces — so an attacker cannot enumerate org IDs by comparing
+   * 403 (exists, no access) against 404 (does not exist). The
+   * API-key OA-03 boundary above is intentionally a different
+   * contract: its 403 fires on credential-boundary mismatch (the
+   * key is bound to a different org), not on concealment, and the
+   * caller has already authenticated as a key that proves access to
+   * a known org.
+   */
+  describe('OB-04: organization existence concealed from non-members (JWT)', () => {
+    it('GET /organizations/:id from JWT non-member returns 404 (existing org)', async () => {
+      const ownerToken = await registerAndLogin('owner@example.com')
+      const otherToken = await registerAndLogin('other@example.com')
+
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: 'Hidden Corp' })
+        .expect(201)
+      const orgId = orgRes.body.id as string
+
+      await request(app.getHttpServer())
+        .get(`/organizations/${orgId}`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .expect(404)
+    })
+
+    it('GET /organizations/:id from JWT for a non-existent CUID also returns 404 (status parity)', async () => {
+      const token = await registerAndLogin('lonely@example.com')
+
+      await request(app.getHttpServer())
+        .get('/organizations/cmnonexistent00000000000000')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404)
+    })
+  })
+
   describe('Org-protected endpoints (require org context)', () => {
     let adminToken: string
     let orgToken: string

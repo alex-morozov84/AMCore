@@ -100,8 +100,14 @@ export class OrganizationsService {
         where: { userId_organizationId: { userId: principal.sub, organizationId: id } },
       }),
     ])
-    if (!org) throw new NotFoundException('Organization', id)
-    if (!member) throw new ForbiddenException('You are not a member of this organization')
+    // OB-04: from a non-member JWT principal, missing org and
+    // existing-but-not-member must produce the same response so an
+    // attacker cannot enumerate org IDs by status code. The API-key
+    // branch above intentionally keeps 403 — that path is a
+    // credential-boundary violation (OA-03), not concealment, and the
+    // caller has already authenticated as a key bound to a different
+    // org.
+    if (!org || !member) throw new NotFoundException('Organization', id)
     return org
   }
 
