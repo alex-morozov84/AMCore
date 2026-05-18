@@ -73,7 +73,10 @@ describe('AuthService', () => {
     mockTokenManager = {
       generatePasswordResetToken: jest.fn(),
       verifyPasswordResetToken: jest.fn(),
-      generateEmailVerificationToken: jest.fn(),
+      generateEmailVerificationToken: jest.fn().mockResolvedValue({
+        token: 'default-verify-token',
+        expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+      }),
       verifyEmailVerificationToken: jest.fn(),
       consumePasswordResetToken: jest.fn(),
       consumeEmailVerificationToken: jest.fn(),
@@ -263,6 +266,138 @@ describe('AuthService', () => {
 
       expect(lastLoginAt.getTime()).toBeGreaterThanOrEqual(beforeRegister.getTime())
       expect(lastLoginAt.getTime()).toBeLessThanOrEqual(afterRegister.getTime())
+    })
+
+    /**
+     * Regression: register() must generate the verification token in-band so
+     * the row is committed before HTTP 201 returns. Earlier code did
+     * `void this.resendVerificationEmail(user.email).catch(...)` which is a
+     * race: its first step invalidates existing tokens, so a subsequent
+     * verify-email or resend-verification could be silently poisoned. The
+     * race was env-dependent (macOS won it, WSL2 lost it). Lock the
+     * behavior down.
+     */
+    describe('email verification token race fix', () => {
+      const setupRegisterMocks = () => {
+        mockCtx.prisma.user.findUnique.mockResolvedValue(null)
+        ;(argon2.hash as jest.Mock).mockResolvedValue('hashed')
+        mockCtx.prisma.user.create.mockResolvedValue(mockUser)
+        mockTokenService.generateAccessToken.mockReturnValue('token')
+        mockSessionService.createSession.mockResolvedValue(
+          mockCreateSessionResult('refresh') as never
+        )
+      }
+
+      it('generates verification token via tokenManager inside register()', async () => {
+        setupRegisterMocks()
+        mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          token: 'verify-token-abc',
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        })
+
+        await authService.register(registerInput, requestInfo)
+
+        expect(mockTokenManager.generateEmailVerificationToken).toHaveBeenCalledTimes(1)
+        expect(mockTokenManager.generateEmailVerificationToken).toHaveBeenCalledWith(mockUser.id)
+      })
+
+      it('does not call resendVerificationEmail from register()', async () => {
+        setupRegisterMocks()
+        mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          token: 'verify-token-abc',
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        })
+        const resendSpy = jest.spyOn(authService, 'resendVerificationEmail')
+
+        await authService.register(registerInput, requestInfo)
+
+        expect(resendSpy).not.toHaveBeenCalled()
+      })
+
+      it('passes the generated token in the email verification URL', async () => {
+        setupRegisterMocks()
+        mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          token: 'verify-token-xyz',
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        })
+
+        await authService.register(registerInput, requestInfo)
+
+        // Email send is fire-and-forget; let the microtask queue drain.
+        await new Promise((resolve) => setImmediate(resolve))
+
+        expect(mockEmailService.sendEmailVerificationEmail).toHaveBeenCalledTimes(1)
+        const [, payload] = mockEmailService.sendEmailVerificationEmail.mock.calls[0]!
+        expect(payload.verificationUrl).toContain('token=verify-token-xyz')
+      })
+
+      it('awaits token generation before returning the auth response', async () => {
+        setupRegisterMocks()
+        let resolveToken!: (value: { token: string; expiresAt: Date }) => void
+        const pending = new Promise<{ token: string; expiresAt: Date }>((resolve) => {
+          resolveToken = resolve
+        })
+        mockTokenManager.generateEmailVerificationToken.mockReturnValue(pending)
+
+        let resolved = false
+        const registerPromise = authService.register(registerInput, requestInfo).then((res) => {
+          resolved = true
+          return res
+        })
+
+        // Let microtasks settle; register() must still be pending on the
+        // unresolved token generation.
+        await new Promise((resolve) => setImmediate(resolve))
+        expect(resolved).toBe(false)
+
+        resolveToken({
+          token: 'late-token',
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        })
+        await expect(registerPromise).resolves.toBeDefined()
+        expect(resolved).toBe(true)
+      })
+
+      it('does not fail register() when the verification email send rejects', async () => {
+        setupRegisterMocks()
+        mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          token: 'verify-token-abc',
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        })
+        mockEmailService.sendEmailVerificationEmail.mockRejectedValue(new Error('SMTP unavailable'))
+
+        await expect(authService.register(registerInput, requestInfo)).resolves.toMatchObject({
+          accessToken: 'token',
+          refreshToken: 'refresh',
+        })
+
+        // Let the catch handler run on the rejected fire-and-forget send.
+        await new Promise((resolve) => setImmediate(resolve))
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ err: expect.any(Error) }),
+          'Failed to send verification email'
+        )
+      })
+
+      it('does not fail register() when the welcome email send rejects', async () => {
+        setupRegisterMocks()
+        mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          token: 'verify-token-abc',
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        })
+        mockEmailService.sendWelcomeEmail.mockRejectedValue(new Error('SMTP unavailable'))
+
+        await expect(authService.register(registerInput, requestInfo)).resolves.toMatchObject({
+          accessToken: 'token',
+          refreshToken: 'refresh',
+        })
+
+        await new Promise((resolve) => setImmediate(resolve))
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ err: expect.any(Error) }),
+          'Failed to send welcome email'
+        )
+      })
     })
   })
 

@@ -93,6 +93,17 @@ export class AuthService {
       ipAddress: requestInfo.ipAddress,
     })
 
+    // Generate verification token synchronously so the row is committed
+    // before HTTP 201 returns. Calling resendVerificationEmail here would
+    // race with any immediately-following user action that creates a token
+    // (its first step invalidates all existing user tokens), so we build
+    // the URL in-band and only the email *send* stays non-blocking.
+    const { token: verificationToken } = await this.tokenManager.generateEmailVerificationToken(
+      user.id
+    )
+    const verificationUrl = `${this.env.get('FRONTEND_URL')}/verify-email?token=${verificationToken}`
+    const expiresIn = `${this.env.get('EMAIL_VERIFICATION_EXPIRY_HOURS')} часов`
+
     // Queue welcome + verification emails (non-blocking, silent fail)
     void this.emailService
       .sendWelcomeEmail({
@@ -101,9 +112,14 @@ export class AuthService {
         locale: user.locale as 'ru' | 'en',
       })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send welcome email'))
-    void this.resendVerificationEmail(user.email).catch((err: unknown) =>
-      this.logger.warn({ err }, 'Failed to send verification email')
-    )
+    void this.emailService
+      .sendEmailVerificationEmail(user.email, {
+        name: user.name ?? user.email,
+        verificationUrl,
+        expiresIn,
+        locale: user.locale as 'ru' | 'en',
+      })
+      .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send verification email'))
 
     this.logger.info({ userId: user.id, email: user.email }, 'User registered successfully')
 
