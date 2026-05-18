@@ -3,7 +3,13 @@ import { randomBytes } from 'node:crypto'
 import { HttpStatus, Injectable } from '@nestjs/common'
 import type { Organization, Prisma } from '@prisma/client'
 
-import { Action, type RequestPrincipal, Subject } from '@amcore/shared'
+import {
+  Action,
+  type OrganizationListResponse,
+  type OrgResponse,
+  type RequestPrincipal,
+  Subject,
+} from '@amcore/shared'
 
 import {
   AppException,
@@ -53,12 +59,42 @@ export class OrganizationsService {
     })
   }
 
-  async findAllForUser(userId: string): Promise<Organization[]> {
-    const memberships = await this.prisma.orgMember.findMany({
-      where: { userId },
-      include: { organization: true },
-    })
-    return memberships.map((m) => m.organization)
+  async findAllForUser(
+    userId: string,
+    page: number,
+    limit: number
+  ): Promise<OrganizationListResponse> {
+    // ADR-036: paginated envelope. ORDER BY createdAt DESC, id ASC on
+    // the join (sort the organizations by their own createdAt, with
+    // id as the tie-break for deterministic page boundaries).
+    const skip = (page - 1) * limit
+    const [memberships, total] = await Promise.all([
+      this.prisma.orgMember.findMany({
+        where: { userId },
+        skip,
+        take: limit,
+        orderBy: [{ organization: { createdAt: 'desc' } }, { organization: { id: 'asc' } }],
+        include: { organization: true },
+      }),
+      this.prisma.orgMember.count({ where: { userId } }),
+    ])
+    return {
+      data: memberships.map((m) => this.toOrgResponse(m.organization)),
+      total,
+      page,
+      limit,
+    }
+  }
+
+  private toOrgResponse(org: Organization): OrgResponse {
+    return {
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      aclVersion: org.aclVersion,
+      createdAt: org.createdAt.toISOString(),
+      updatedAt: org.updatedAt.toISOString(),
+    }
   }
 
   async findOne(

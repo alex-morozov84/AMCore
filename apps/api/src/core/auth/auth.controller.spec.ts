@@ -3,7 +3,13 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { SystemRole as PrismaSystemRole, type User } from '@prisma/client'
 import type { Request, Response } from 'express'
 
-import { AuthErrorCode, type RequestPrincipal, SystemRole, type UserResponse } from '@amcore/shared'
+import {
+  AuthErrorCode,
+  type RequestPrincipal,
+  type SessionsListResponse,
+  SystemRole,
+  type UserResponse,
+} from '@amcore/shared'
 
 import { AppException, ConflictException, UnauthorizedException } from '../../common/exceptions'
 
@@ -25,7 +31,6 @@ import type {
   VerifyEmailDto,
 } from './dto'
 import { JwtAuthGuard, RefreshTokenGuard } from './guards'
-import type { SessionInfo } from './session.service'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 
@@ -395,50 +400,58 @@ describe('AuthController', () => {
   })
 
   describe('sessions', () => {
-    const mockSessions: SessionInfo[] = [
-      {
-        id: 'session-1',
-        userAgent: 'test-agent',
-        ipAddress: '127.0.0.1',
-        createdAt: new Date('2025-01-27T10:00:00.000Z'),
-        current: true,
-      },
-      {
-        id: 'session-2',
-        userAgent: 'mobile-agent',
-        ipAddress: '192.168.1.1',
-        createdAt: new Date('2025-01-26T10:00:00.000Z'),
-        current: false,
-      },
-    ]
+    const mockEnvelope: SessionsListResponse = {
+      data: [
+        {
+          id: 'session-1',
+          userAgent: 'test-agent',
+          ipAddress: '127.0.0.1',
+          createdAt: '2025-01-27T10:00:00.000Z',
+          current: true,
+        },
+        {
+          id: 'session-2',
+          userAgent: 'mobile-agent',
+          ipAddress: '192.168.1.1',
+          createdAt: '2025-01-26T10:00:00.000Z',
+          current: false,
+        },
+      ],
+      total: 2,
+      page: 1,
+      limit: 20,
+    }
+    const defaultPagination = { page: 1, limit: 20 }
 
-    it('should return all user sessions with current marked', async () => {
+    it('returns paginated envelope with current marked (OB-05)', async () => {
       const requestWithCookie = {
         ...mockRequest,
         cookies: { refresh_token: mockRefreshToken },
       } as unknown as Request
 
       tokenService.hashRefreshToken.mockReturnValue('current-hashed-token')
-      sessionService.getUserSessions.mockResolvedValue(mockSessions)
+      sessionService.getUserSessions.mockResolvedValue(mockEnvelope)
 
-      const result = await controller.sessions(mockUser.id, requestWithCookie)
+      const result = await controller.sessions(mockUser.id, requestWithCookie, defaultPagination)
 
       expect(tokenService.hashRefreshToken).toHaveBeenCalledWith(mockRefreshToken)
       expect(sessionService.getUserSessions).toHaveBeenCalledWith(
         mockUser.id,
-        'current-hashed-token'
+        'current-hashed-token',
+        1,
+        20
       )
-      expect(result).toEqual({ sessions: mockSessions })
+      expect(result).toEqual(mockEnvelope)
     })
 
-    it('should get sessions without current hash if no cookie', async () => {
-      sessionService.getUserSessions.mockResolvedValue(mockSessions)
+    it('forwards undefined currentHash when no cookie', async () => {
+      sessionService.getUserSessions.mockResolvedValue(mockEnvelope)
 
-      const result = await controller.sessions(mockUser.id, mockRequest)
+      const result = await controller.sessions(mockUser.id, mockRequest, defaultPagination)
 
       expect(tokenService.hashRefreshToken).not.toHaveBeenCalled()
-      expect(sessionService.getUserSessions).toHaveBeenCalledWith(mockUser.id, undefined)
-      expect(result).toEqual({ sessions: mockSessions })
+      expect(sessionService.getUserSessions).toHaveBeenCalledWith(mockUser.id, undefined, 1, 20)
+      expect(result).toEqual(mockEnvelope)
     })
   })
 

@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client'
 import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
+import type { ApiKeyListResponse } from '@amcore/shared'
 import type { CreateApiKeyInput } from '@amcore/shared'
 
 import { ForbiddenException, NotFoundException } from '../../common/exceptions'
@@ -88,21 +89,35 @@ export class ApiKeysService {
     }
   }
 
-  async findAllForUser(userId: string): Promise<ApiKeyListItem[]> {
-    const keys = await this.prisma.apiKey.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
+  async findAllForUser(userId: string, page: number, limit: number): Promise<ApiKeyListResponse> {
+    // ADR-036: paginated envelope. ORDER BY createdAt DESC, id ASC for
+    // deterministic page boundaries (createdAt is usually unique but
+    // not guaranteed; id tie-break is mandatory).
+    const skip = (page - 1) * limit
+    const [keys, total] = await Promise.all([
+      this.prisma.apiKey.findMany({
+        where: { userId },
+        skip,
+        take: limit,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      }),
+      this.prisma.apiKey.count({ where: { userId } }),
+    ])
 
-    return keys.map((k) => ({
-      id: k.id,
-      name: k.name,
-      organizationId: k.organizationId,
-      scopes: k.scopes,
-      expiresAt: k.expiresAt?.toISOString() ?? null,
-      lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
-      createdAt: k.createdAt.toISOString(),
-    }))
+    return {
+      data: keys.map((k) => ({
+        id: k.id,
+        name: k.name,
+        organizationId: k.organizationId,
+        scopes: k.scopes,
+        expiresAt: k.expiresAt?.toISOString() ?? null,
+        lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
+        createdAt: k.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+    }
   }
 
   async revoke(id: string, userId: string): Promise<void> {

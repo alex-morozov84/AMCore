@@ -8,18 +8,28 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import type { Permission, Role } from '@prisma/client'
+import { ZodSerializerDto } from 'nestjs-zod'
 
-import { Action, AuthType, type RequestPrincipal, Subject } from '@amcore/shared'
+import {
+  Action,
+  AuthType,
+  PAGINATION,
+  type RequestPrincipal,
+  type RoleListResponse,
+  Subject,
+} from '@amcore/shared'
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
 import { AssignPermissionDto, CreateRoleDto, UpdateRoleDto } from './dto'
-import type { RoleWithPermissions } from './role.service'
+import { RoleListResponseDto } from './dto/organization-list-response.dto'
 import { RoleService } from './role.service'
 
 /**
@@ -45,11 +55,28 @@ export class RolesController {
   @Get()
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'List all roles in the organization — ADMIN only' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    minimum: 1,
+    example: PAGINATION.DEFAULT_PAGE,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION.MAX_LIMIT,
+    example: PAGINATION.DEFAULT_LIMIT,
+  })
+  @ZodSerializerDto(RoleListResponseDto)
   listRoles(
     @Param('orgId') orgId: string,
-    @CurrentUser() principal: RequestPrincipal
-  ): Promise<RoleWithPermissions[]> {
-    return this.roleService.listRoles(orgId, principal)
+    @CurrentUser() principal: RequestPrincipal,
+    @Query() pagination: PaginationQueryDto
+  ): Promise<RoleListResponse> {
+    return this.roleService.listRoles(orgId, principal, pagination.page, pagination.limit)
   }
 
   @Post()

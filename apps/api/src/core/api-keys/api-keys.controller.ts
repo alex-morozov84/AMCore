@@ -1,11 +1,30 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common'
+import { ApiQuery } from '@nestjs/swagger'
+import { ZodSerializerDto } from 'nestjs-zod'
 
-import { AuthType, type RequestPrincipal } from '@amcore/shared'
+import {
+  type ApiKeyListResponse,
+  AuthType,
+  PAGINATION,
+  type RequestPrincipal,
+} from '@amcore/shared'
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
-import { type ApiKeyListItem, ApiKeysService, type CreateApiKeyResult } from './api-keys.service'
+import { ApiKeysService, type CreateApiKeyResult } from './api-keys.service'
+import { ApiKeyListResponseDto } from './dto/api-key-list-response.dto'
 import { CreateApiKeyDto } from './dto/create-api-key.dto'
 
 /**
@@ -31,8 +50,27 @@ export class ApiKeysController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: RequestPrincipal): Promise<ApiKeyListItem[]> {
-    return this.apiKeysService.findAllForUser(user.sub)
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    minimum: 1,
+    example: PAGINATION.DEFAULT_PAGE,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION.MAX_LIMIT,
+    example: PAGINATION.DEFAULT_LIMIT,
+  })
+  @ZodSerializerDto(ApiKeyListResponseDto)
+  findAll(
+    @CurrentUser() user: RequestPrincipal,
+    @Query() pagination: PaginationQueryDto
+  ): Promise<ApiKeyListResponse> {
+    return this.apiKeysService.findAllForUser(user.sub, pagination.page, pagination.limit)
   }
 
   @Delete(':id')

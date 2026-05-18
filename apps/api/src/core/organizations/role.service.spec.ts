@@ -75,17 +75,36 @@ describe('RoleService', () => {
   })
 
   describe('listRoles', () => {
-    it('returns system roles and org-specific roles with permissions', async () => {
-      prisma.role.findMany.mockResolvedValue([mockSystemRole, mockCustomRole] as never)
+    it('returns paginated envelope with system and org-specific roles (OB-05)', async () => {
+      prisma.role.findMany.mockResolvedValue([
+        { ...mockSystemRole, permissions: [] },
+        { ...mockCustomRole, permissions: [] },
+      ] as never)
+      prisma.role.count.mockResolvedValue(2)
 
-      const result = await service.listRoles('org-1', principal)
+      const result = await service.listRoles('org-1', principal, 1, 20)
 
-      expect(result).toHaveLength(2)
+      expect(result.total).toBe(2)
+      expect(result.page).toBe(1)
+      expect(result.limit).toBe(20)
+      expect(result.data).toHaveLength(2)
       expect(prisma.role.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           include: expect.objectContaining({ permissions: expect.anything() }),
         })
       )
+    })
+
+    it('applies skip/take and `isSystem DESC, name ASC, id ASC` order (ADR-036 — Role has no createdAt)', async () => {
+      prisma.role.findMany.mockResolvedValue([])
+      prisma.role.count.mockResolvedValue(0)
+
+      await service.listRoles('org-1', principal, 2, 10)
+
+      const arg = prisma.role.findMany.mock.calls[0]![0]!
+      expect(arg.skip).toBe(10)
+      expect(arg.take).toBe(10)
+      expect(arg.orderBy).toEqual([{ isSystem: 'desc' }, { name: 'asc' }, { id: 'asc' }])
     })
 
     // OA-06: listRoles previously took only orgId — the function-level
@@ -102,7 +121,7 @@ describe('RoleService', () => {
         organizationId: 'org-other',
       }
 
-      await expect(service.listRoles('org-1', switchedIntoAnotherOrg)).rejects.toThrow(
+      await expect(service.listRoles('org-1', switchedIntoAnotherOrg, 1, 20)).rejects.toThrow(
         ForbiddenException
       )
       // Critical: rejection must fire before the catalogue read. A
@@ -118,7 +137,9 @@ describe('RoleService', () => {
         aclVersion: undefined,
       }
 
-      await expect(service.listRoles('org-1', noOrgPrincipal)).rejects.toThrow(ForbiddenException)
+      await expect(service.listRoles('org-1', noOrgPrincipal, 1, 20)).rejects.toThrow(
+        ForbiddenException
+      )
       expect(prisma.role.findMany).not.toHaveBeenCalled()
     })
   })

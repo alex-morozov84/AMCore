@@ -105,14 +105,35 @@ describe('OrganizationsService', () => {
   })
 
   describe('findAllForUser', () => {
-    it('returns organizations mapped from user memberships', async () => {
+    it('returns paginated envelope with mapped organizations (OB-05)', async () => {
       prisma.orgMember.findMany.mockResolvedValue([
         { ...mockMember, organization: mockOrg } as OrgMember & { organization: Organization },
       ] as never)
+      prisma.orgMember.count.mockResolvedValue(1)
 
-      const result = await service.findAllForUser('user-1')
+      const result = await service.findAllForUser('user-1', 1, 20)
 
-      expect(result).toEqual([mockOrg])
+      expect(result.total).toBe(1)
+      expect(result.page).toBe(1)
+      expect(result.limit).toBe(20)
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0]?.id).toBe(mockOrg.id)
+      expect(typeof result.data[0]?.createdAt).toBe('string')
+    })
+
+    it('applies skip/take and deterministic ORDER BY (ADR-036)', async () => {
+      prisma.orgMember.findMany.mockResolvedValue([])
+      prisma.orgMember.count.mockResolvedValue(0)
+
+      await service.findAllForUser('user-1', 2, 10)
+
+      const arg = prisma.orgMember.findMany.mock.calls[0]![0]!
+      expect(arg.skip).toBe(10)
+      expect(arg.take).toBe(10)
+      expect(arg.orderBy).toEqual([
+        { organization: { createdAt: 'desc' } },
+        { organization: { id: 'asc' } },
+      ])
     })
   })
 

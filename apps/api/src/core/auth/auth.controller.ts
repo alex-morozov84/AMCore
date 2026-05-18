@@ -7,20 +7,25 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import type { User } from '@prisma/client'
 import type { Request, Response } from 'express'
+import { ZodSerializerDto } from 'nestjs-zod'
 
 import {
   AuthType,
+  PAGINATION,
   type RequestPrincipal,
+  type SessionsListResponse,
   type UserResponse as SharedUserResponse,
 } from '@amcore/shared'
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { EnvService } from '../../env/env.service'
 
 import { AuthService } from './auth.service'
@@ -34,8 +39,9 @@ import {
   ResetPasswordDto,
   VerifyEmailDto,
 } from './dto'
+import { SessionsListResponseDto } from './dto/sessions-list-response.dto'
 import { RefreshTokenGuard } from './guards'
-import { type SessionInfo, SessionService } from './session.service'
+import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 
 interface AuthResponse {
@@ -55,9 +61,8 @@ interface ProfileResponse {
   user: SharedUserResponse | null
 }
 
-interface SessionsResponse {
-  sessions: SessionInfo[]
-}
+// Sessions wire shape lives in `@amcore/shared`
+// (`sessionsListResponseSchema`). Local interface removed in OB-05.
 
 @ApiTags('auth')
 @Controller('auth')
@@ -207,16 +212,36 @@ export class AuthController {
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all active sessions' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    minimum: 1,
+    example: PAGINATION.DEFAULT_PAGE,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION.MAX_LIMIT,
+    example: PAGINATION.DEFAULT_LIMIT,
+  })
+  @ZodSerializerDto(SessionsListResponseDto)
   async sessions(
     @CurrentUser('sub') userId: string,
-    @Req() req: Request
-  ): Promise<SessionsResponse> {
+    @Req() req: Request,
+    @Query() pagination: PaginationQueryDto
+  ): Promise<SessionsListResponse> {
     const refreshToken = req.cookies?.refresh_token
     const currentHash = refreshToken ? this.tokenService.hashRefreshToken(refreshToken) : undefined
 
-    const sessions = await this.sessionService.getUserSessions(userId, currentHash)
-
-    return { sessions }
+    return this.sessionService.getUserSessions(
+      userId,
+      currentHash,
+      pagination.page,
+      pagination.limit
+    )
   }
 
   @Delete('sessions/:sessionId')

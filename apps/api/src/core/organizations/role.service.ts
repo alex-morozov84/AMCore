@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import type { Permission, Prisma, Role } from '@prisma/client'
 
-import type { RequestPrincipal } from '@amcore/shared'
+import type { OrgRoleResponse, RequestPrincipal, RoleListResponse } from '@amcore/shared'
 
 import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
@@ -32,12 +32,56 @@ export class RoleService {
    * canonical BOLA shape (OWASP API1:2023). assertOrgContext binds
    * the URL `:orgId` to `principal.organizationId`.
    */
-  async listRoles(orgId: string, principal: RequestPrincipal): Promise<RoleWithPermissions[]> {
+  async listRoles(
+    orgId: string,
+    principal: RequestPrincipal,
+    page: number,
+    limit: number
+  ): Promise<RoleListResponse> {
     this.assertOrgContext(principal, orgId)
-    return this.prisma.role.findMany({
-      where: { OR: [{ organizationId: orgId }, { isSystem: true, organizationId: null }] },
-      include: { permissions: { include: { permission: true } } },
-    })
+
+    // ADR-036: `Role` has no `createdAt`. Endpoint-local sort key:
+    // `isSystem DESC, name ASC, id ASC` — system roles first as a
+    // stable section header for the client, alphabetical within
+    // each section, id as the final deterministic tie-break.
+    const where = { OR: [{ organizationId: orgId }, { isSystem: true, organizationId: null }] }
+    const skip = (page - 1) * limit
+    const [rows, total] = await Promise.all([
+      this.prisma.role.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [{ isSystem: 'desc' }, { name: 'asc' }, { id: 'asc' }],
+        include: { permissions: { include: { permission: true } } },
+      }),
+      this.prisma.role.count({ where }),
+    ])
+
+    return {
+      data: rows.map((row) => this.toOrgRoleResponse(row)),
+      total,
+      page,
+      limit,
+    }
+  }
+
+  private toOrgRoleResponse(row: RoleWithPermissions): OrgRoleResponse {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      isSystem: row.isSystem,
+      organizationId: row.organizationId,
+      permissions: row.permissions.map((rp) => ({
+        id: rp.permission.id,
+        action: rp.permission.action,
+        subject: rp.permission.subject,
+        conditions: rp.permission.conditions,
+        fields: rp.permission.fields,
+        inverted: rp.permission.inverted,
+        organizationId: rp.permission.organizationId,
+      })),
+    }
   }
 
   async createRole(orgId: string, dto: CreateRoleDto, principal: RequestPrincipal): Promise<Role> {

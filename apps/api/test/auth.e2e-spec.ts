@@ -483,20 +483,23 @@ describe('Auth (e2e)', () => {
       accessToken = response.body.accessToken
     })
 
-    it('should return all user sessions', async () => {
+    it('returns all user sessions in paginated envelope (OB-05)', async () => {
       const response = await agent
         .get('/auth/sessions')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200)
 
-      expect(response.body.sessions).toHaveLength(1)
-      expect(response.body.sessions[0]).toMatchObject({
+      expect(response.body.data).toHaveLength(1)
+      expect(response.body.total).toBe(1)
+      expect(response.body.page).toBe(1)
+      expect(response.body.limit).toBe(20)
+      expect(response.body.data[0]).toMatchObject({
         id: expect.any(String),
         current: true,
       })
     })
 
-    it('should mark current session correctly', async () => {
+    it('marks current session correctly within envelope', async () => {
       // Create second session via login (using new agent to simulate different device)
       await request(app.getHttpServer()).post('/auth/login').send({
         email: 'sessions@example.com',
@@ -508,8 +511,8 @@ describe('Auth (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200)
 
-      expect(response.body.sessions).toHaveLength(2)
-      const currentSessions = response.body.sessions.filter((s: { current: boolean }) => s.current)
+      expect(response.body.data).toHaveLength(2)
+      const currentSessions = response.body.data.filter((s: { current: boolean }) => s.current)
       expect(currentSessions).toHaveLength(1)
     })
   })

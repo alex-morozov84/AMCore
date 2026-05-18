@@ -3,7 +3,7 @@ import type { Session, User } from '@prisma/client'
 import { randomBytes } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AuthErrorCode } from '@amcore/shared'
+import { AuthErrorCode, type SessionsListResponse } from '@amcore/shared'
 
 import { AppException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
@@ -211,24 +211,45 @@ export class SessionService {
     })
   }
 
-  /** Get all sessions for user */
-  async getUserSessions(userId: string, currentTokenHash?: string): Promise<SessionInfo[]> {
-    const sessions = await this.prisma.session.findMany({
-      where: {
-        userId,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+  /**
+   * Get all active sessions for a user — paginated envelope per
+   * ADR-036 / OB-05.
+   *
+   * ORDER BY createdAt DESC, id ASC for deterministic page boundaries.
+   * `current` is computed against `currentTokenHash` for whichever
+   * session the caller is currently authenticated as; that session
+   * may or may not appear on the requested page.
+   */
+  async getUserSessions(
+    userId: string,
+    currentTokenHash: string | undefined,
+    page: number,
+    limit: number
+  ): Promise<SessionsListResponse> {
+    const where = { userId, revokedAt: null, expiresAt: { gt: new Date() } }
+    const skip = (page - 1) * limit
+    const [sessions, total] = await Promise.all([
+      this.prisma.session.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      }),
+      this.prisma.session.count({ where }),
+    ])
 
-    return sessions.map((s) => ({
-      id: s.id,
-      userAgent: s.userAgent,
-      ipAddress: s.ipAddress,
-      createdAt: s.createdAt,
-      current: s.refreshToken === currentTokenHash,
-    }))
+    return {
+      data: sessions.map((s) => ({
+        id: s.id,
+        userAgent: s.userAgent,
+        ipAddress: s.ipAddress,
+        createdAt: s.createdAt.toISOString(),
+        current: s.refreshToken === currentTokenHash,
+      })),
+      total,
+      page,
+      limit,
+    }
   }
 
   /** Delete specific session */

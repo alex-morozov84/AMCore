@@ -8,12 +8,22 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import type { Organization } from '@prisma/client'
+import { ZodSerializerDto } from 'nestjs-zod'
 
-import { Action, AuthType, type RequestPrincipal, Subject } from '@amcore/shared'
+import {
+  Action,
+  AuthType,
+  type OrganizationListResponse,
+  PAGINATION,
+  type RequestPrincipal,
+  Subject,
+} from '@amcore/shared'
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import type { AppAbility } from '../auth/casl/ability.factory'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
@@ -22,6 +32,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { TokenService } from '../auth/token.service'
 
 import { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
+import { OrganizationListResponseDto } from './dto/organization-list-response.dto'
 import { OrganizationsService } from './organizations.service'
 
 /**
@@ -75,8 +86,27 @@ export class OrganizationsController {
   @Get()
   @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'List all organizations the current user belongs to' })
-  findAll(@CurrentUser('sub') userId: string): Promise<Organization[]> {
-    return this.orgsService.findAllForUser(userId)
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    minimum: 1,
+    example: PAGINATION.DEFAULT_PAGE,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION.MAX_LIMIT,
+    example: PAGINATION.DEFAULT_LIMIT,
+  })
+  @ZodSerializerDto(OrganizationListResponseDto)
+  findAll(
+    @CurrentUser('sub') userId: string,
+    @Query() pagination: PaginationQueryDto
+  ): Promise<OrganizationListResponse> {
+    return this.orgsService.findAllForUser(userId, pagination.page, pagination.limit)
   }
 
   /**

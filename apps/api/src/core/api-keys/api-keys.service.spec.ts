@@ -128,16 +128,32 @@ describe('ApiKeysService', () => {
   })
 
   describe('findAllForUser', () => {
-    it('should return list without secret fields', async () => {
+    it('returns paginated envelope without secret fields (OB-05)', async () => {
       mockCtx.prisma.apiKey.findMany.mockResolvedValue([mockApiKey])
+      mockCtx.prisma.apiKey.count.mockResolvedValue(1)
 
-      const result = await service.findAllForUser('user-1')
+      const result = await service.findAllForUser('user-1', 1, 20)
 
-      expect(result).toHaveLength(1)
-      expect(result[0]!.id).toBe('key-1')
-      expect(result[0]).not.toHaveProperty('keyHash')
-      expect(result[0]).not.toHaveProperty('salt')
-      expect(result[0]).not.toHaveProperty('shortToken')
+      expect(result.total).toBe(1)
+      expect(result.page).toBe(1)
+      expect(result.limit).toBe(20)
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0]!.id).toBe('key-1')
+      expect(result.data[0]).not.toHaveProperty('keyHash')
+      expect(result.data[0]).not.toHaveProperty('salt')
+      expect(result.data[0]).not.toHaveProperty('shortToken')
+    })
+
+    it('applies skip/take and `createdAt DESC, id ASC` order (ADR-036)', async () => {
+      mockCtx.prisma.apiKey.findMany.mockResolvedValue([])
+      mockCtx.prisma.apiKey.count.mockResolvedValue(0)
+
+      await service.findAllForUser('user-1', 2, 10)
+
+      const arg = mockCtx.prisma.apiKey.findMany.mock.calls[0]![0]!
+      expect(arg.skip).toBe(10)
+      expect(arg.take).toBe(10)
+      expect(arg.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'asc' }])
     })
   })
 

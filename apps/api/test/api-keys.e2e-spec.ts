@@ -104,7 +104,7 @@ describe('API Keys (e2e)', () => {
   })
 
   describe('GET /api-keys', () => {
-    it('lists keys without secret fields', async () => {
+    it('lists keys without secret fields in paginated envelope (OB-05)', async () => {
       const { token, organizationId } = await registerWithOrg('user@example.com')
       await createApiKey(token, organizationId, 'Key One', ['read:User'])
       await createApiKey(token, organizationId, 'Key Two', ['read:User'])
@@ -114,15 +114,18 @@ describe('API Keys (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200)
 
-      expect(Array.isArray(res.body)).toBe(true)
-      expect(res.body).toHaveLength(2)
-      expect(res.body[0]).not.toHaveProperty('key')
-      expect(res.body[0]).not.toHaveProperty('keyHash')
-      expect(res.body[0]).not.toHaveProperty('salt')
-      expect(res.body[0]).toHaveProperty('id')
-      expect(res.body[0]).toHaveProperty('name')
-      expect(res.body[0]).toHaveProperty('organizationId')
-      expect(res.body[0]).toHaveProperty('scopes')
+      expect(res.body.total).toBe(2)
+      expect(res.body.page).toBe(1)
+      expect(res.body.limit).toBe(20)
+      expect(Array.isArray(res.body.data)).toBe(true)
+      expect(res.body.data).toHaveLength(2)
+      expect(res.body.data[0]).not.toHaveProperty('key')
+      expect(res.body.data[0]).not.toHaveProperty('keyHash')
+      expect(res.body.data[0]).not.toHaveProperty('salt')
+      expect(res.body.data[0]).toHaveProperty('id')
+      expect(res.body.data[0]).toHaveProperty('name')
+      expect(res.body.data[0]).toHaveProperty('organizationId')
+      expect(res.body.data[0]).toHaveProperty('scopes')
     })
   })
 
@@ -222,13 +225,14 @@ describe('API Keys (e2e)', () => {
         .set('Authorization', `Bearer ${key}`)
         .expect(401)
 
-      // Target key still exists and authenticates
+      // Target key still exists and authenticates (OB-05 envelope).
       await request(app.getHttpServer())
         .get('/api-keys')
         .set('Authorization', `Bearer ${token}`)
         .expect(200)
         .then((res) => {
-          expect((res.body as Array<{ id: string }>).some((k) => k.id === targetId)).toBe(true)
+          const body = res.body as { data: Array<{ id: string }> }
+          expect(body.data.some((k) => k.id === targetId)).toBe(true)
         })
     })
   })

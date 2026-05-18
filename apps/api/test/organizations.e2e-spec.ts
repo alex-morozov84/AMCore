@@ -73,8 +73,12 @@ describe('Organizations (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200)
 
-      expect(res.body).toHaveLength(1)
-      expect(res.body[0]).toMatchObject({ name: 'Acme Corp' })
+      // OB-05: paginated envelope.
+      expect(res.body.data).toHaveLength(1)
+      expect(res.body.total).toBe(1)
+      expect(res.body.page).toBe(1)
+      expect(res.body.limit).toBe(20)
+      expect(res.body.data[0]).toMatchObject({ name: 'Acme Corp' })
     })
   })
 
@@ -316,7 +320,7 @@ describe('Organizations (e2e)', () => {
         .get(`/organizations/${orgB}/roles`)
         .set('Authorization', `Bearer ${orgBToken}`)
         .expect(200)
-      const memberRole = rolesRes.body.find((r: { name: string }) => r.name === 'MEMBER')
+      const memberRole = rolesRes.body.data.find((r: { name: string }) => r.name === 'MEMBER')
 
       await request(app.getHttpServer())
         .post(`/organizations/${orgB}/members/invite`)
@@ -420,7 +424,7 @@ describe('Organizations (e2e)', () => {
         .set('Authorization', `Bearer ${orgToken}`)
         .expect(200)
 
-      const names = res.body.map((r: { name: string }) => r.name)
+      const names = res.body.data.map((r: { name: string }) => r.name)
       expect(names).toContain('ADMIN')
       expect(names).toContain('MEMBER')
       expect(names).toContain('VIEWER')
@@ -439,7 +443,7 @@ describe('Organizations (e2e)', () => {
       const rolesRes = await request(app.getHttpServer())
         .get(`/organizations/${orgId}/roles`)
         .set('Authorization', `Bearer ${orgToken}`)
-      const memberRole = rolesRes.body.find((r: { name: string }) => r.name === 'MEMBER')
+      const memberRole = rolesRes.body.data.find((r: { name: string }) => r.name === 'MEMBER')
 
       await request(app.getHttpServer())
         .post(`/organizations/${orgId}/members/invite`)
@@ -545,7 +549,7 @@ describe('Organizations (e2e)', () => {
           .get(`/organizations/${orgId}/roles`)
           .set('Authorization', `Bearer ${orgToken}`)
           .expect(200)
-        adminRoleId = rolesRes.body.find((r: { name: string }) => r.name === 'ADMIN').id
+        adminRoleId = rolesRes.body.data.find((r: { name: string }) => r.name === 'ADMIN').id
       })
 
       it('blocks removing the last admin member', async () => {
@@ -740,7 +744,7 @@ describe('Organizations (e2e)', () => {
         .set('Authorization', `Bearer ${orgToken}`)
         .expect(200)
 
-      const names = res.body.map((r: { name: string }) => r.name)
+      const names = res.body.data.map((r: { name: string }) => r.name)
       expect(names).toEqual(expect.arrayContaining(['ADMIN', 'MEMBER', 'VIEWER']))
     })
   })
@@ -774,7 +778,7 @@ describe('Organizations (e2e)', () => {
         .get(`/organizations/${orgId}/roles`)
         .set('Authorization', `Bearer ${adminOrgToken}`)
         .expect(200)
-      const adminRole = rolesRes.body.find((r: { name: string }) => r.name === 'ADMIN')
+      const adminRole = rolesRes.body.data.find((r: { name: string }) => r.name === 'ADMIN')
       expect(adminRole?.id).toBeDefined()
 
       await request(app.getHttpServer())

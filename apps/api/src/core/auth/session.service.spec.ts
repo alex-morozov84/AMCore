@@ -412,10 +412,11 @@ describe('SessionService', () => {
       },
     ]
 
-    it('should return all user sessions with current flag', async () => {
+    it('returns paginated envelope with current flag (OB-05)', async () => {
       mockCtx.prisma.session.findMany.mockResolvedValue(sessions)
+      mockCtx.prisma.session.count.mockResolvedValue(2)
 
-      const result = await sessionService.getUserSessions('user-123', 'hash-1')
+      const result = await sessionService.getUserSessions('user-123', 'hash-1', 1, 20)
 
       expect(mockCtx.prisma.session.findMany).toHaveBeenCalledWith({
         where: {
@@ -423,55 +424,69 @@ describe('SessionService', () => {
           revokedAt: null,
           expiresAt: { gt: expect.any(Date) },
         },
-        orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 20,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       })
 
-      expect(result).toHaveLength(2)
-      expect(result[0]!.current).toBe(true) // hash-1
-      expect(result[1]!.current).toBe(false) // hash-2
+      expect(result.total).toBe(2)
+      expect(result.page).toBe(1)
+      expect(result.limit).toBe(20)
+      expect(result.data).toHaveLength(2)
+      expect(result.data[0]!.current).toBe(true) // hash-1
+      expect(result.data[1]!.current).toBe(false) // hash-2
     })
 
-    it('should return sessions without current flag if no currentTokenHash', async () => {
+    it('returns envelope without current flag when no currentTokenHash provided', async () => {
       mockCtx.prisma.session.findMany.mockResolvedValue(sessions)
+      mockCtx.prisma.session.count.mockResolvedValue(2)
 
-      const result = await sessionService.getUserSessions('user-123')
+      const result = await sessionService.getUserSessions('user-123', undefined, 1, 20)
 
-      expect(result).toHaveLength(2)
-      expect(result[0]!.current).toBe(false)
-      expect(result[1]!.current).toBe(false)
+      expect(result.data).toHaveLength(2)
+      expect(result.data[0]!.current).toBe(false)
+      expect(result.data[1]!.current).toBe(false)
     })
 
-    it('should return empty array if user has no sessions', async () => {
+    it('returns empty envelope when user has no sessions', async () => {
       mockCtx.prisma.session.findMany.mockResolvedValue([])
+      mockCtx.prisma.session.count.mockResolvedValue(0)
 
-      const result = await sessionService.getUserSessions('user-no-sessions')
+      const result = await sessionService.getUserSessions('user-no-sessions', undefined, 1, 20)
 
-      expect(result).toEqual([])
+      expect(result.data).toEqual([])
+      expect(result.total).toBe(0)
+      expect(result.page).toBe(1)
+      expect(result.limit).toBe(20)
     })
 
-    it('should map session fields correctly', async () => {
+    it('maps session fields correctly with ISO-string createdAt', async () => {
       mockCtx.prisma.session.findMany.mockResolvedValue([sessions[0]!])
+      mockCtx.prisma.session.count.mockResolvedValue(1)
 
-      const result = await sessionService.getUserSessions('user-123')
+      const result = await sessionService.getUserSessions('user-123', undefined, 1, 20)
 
-      expect(result[0]).toBeDefined()
-      expect(result[0]!).toEqual({
+      expect(result.data[0]).toBeDefined()
+      expect(result.data[0]!).toEqual({
         id: 'session-1',
         userAgent: 'Chrome',
         ipAddress: '192.168.1.1',
-        createdAt: expect.any(Date),
+        createdAt: sessions[0]!.createdAt.toISOString(),
         current: false,
       })
     })
 
-    it('should order sessions by creation date descending', async () => {
+    it('applies skip/take and deterministic ORDER BY (ADR-036)', async () => {
       mockCtx.prisma.session.findMany.mockResolvedValue(sessions)
+      mockCtx.prisma.session.count.mockResolvedValue(2)
 
-      await sessionService.getUserSessions('user-123')
+      await sessionService.getUserSessions('user-123', undefined, 2, 10)
 
       expect(mockCtx.prisma.session.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          orderBy: { createdAt: 'desc' },
+          skip: 10,
+          take: 10,
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         })
       )
     })
