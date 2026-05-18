@@ -291,7 +291,7 @@ describe('RoleService', () => {
   })
 
   describe('assignPermission', () => {
-    const dto: AssignPermissionDto = { action: 'read', subject: 'Contact' } as AssignPermissionDto
+    const dto: AssignPermissionDto = { action: 'read', subject: 'User' } as AssignPermissionDto
 
     it('creates permission and links it to the role', async () => {
       prisma.role.findFirst.mockResolvedValue(mockCustomRole)

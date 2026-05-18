@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { Action, Subject } from '../enums/permissions'
+
 import { emailInputSchema } from './auth'
 
 // ===========================================
@@ -56,10 +58,34 @@ export const updateRoleSchema = z.object({
 
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>
 
-/** Assign permission to role */
+/**
+ * Assign permission to role.
+ *
+ * OB-01: `action` and `subject` are both validated against the shared
+ * `Action` and `Subject` enums in `packages/shared/src/enums/permissions.ts`.
+ * Previously `subject` was a free-form string capped at 100 chars,
+ * contradicting the closed-registry contract documented for fork
+ * authors and letting typos (`'Contac'`, `'usr'`) create dead
+ * permissions that no controller policy would ever consult. Forks
+ * extend the registry by editing `Subject` (and `Action` for
+ * symmetry); the schema now actually enforces what those enums
+ * advertise.
+ *
+ * `Subject.All` remains valid: the seed uses `read:all`, `create:all`
+ * for the system MEMBER role, and `manage:all` is the SUPER_ADMIN
+ * wildcard. The API-key scope rule that forbids `manage:all` is a
+ * credential-equivalence concern (AK-05), not applicable to DB role
+ * permissions.
+ */
 export const assignPermissionSchema = z.object({
-  action: z.enum(['create', 'read', 'update', 'delete', 'manage']),
-  subject: z.string().min(1).max(100),
+  action: z.enum([Action.Create, Action.Read, Action.Update, Action.Delete, Action.Manage]),
+  subject: z.enum([
+    Subject.User,
+    Subject.Organization,
+    Subject.Role,
+    Subject.Permission,
+    Subject.All,
+  ]),
   conditions: z.record(z.string(), z.unknown()).optional(),
   fields: z.array(z.string()).optional(),
   inverted: z.boolean().optional().default(false),

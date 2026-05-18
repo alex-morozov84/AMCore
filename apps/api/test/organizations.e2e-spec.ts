@@ -421,6 +421,27 @@ describe('Organizations (e2e)', () => {
     })
 
     /**
+     * OB-01: assignPermissionSchema.subject is now enum-validated. A
+     * typoed or domain subject the fork forgot to register in
+     * `packages/shared/src/enums/permissions.ts` must be rejected at
+     * the request boundary, not silently inserted as a dead row.
+     */
+    it('POST /organizations/:id/roles/:rid/permissions — rejects off-enum subject with 400', async () => {
+      const createRoleRes = await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/roles`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({ name: 'EnumGuardRole' })
+        .expect(201)
+      const roleId = createRoleRes.body.id as string
+
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/roles/${roleId}/permissions`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({ action: 'read', subject: 'Contact' })
+        .expect(400)
+    })
+
+    /**
      * OA-10: org-scoped permissions that exist only because of a
      * custom role must not survive its deletion. End-to-end check:
      * baseline org permission count → create role + assign two perms
