@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { Action, Subject } from '../enums/permissions'
 
 import { emailInputSchema } from './auth'
+import { paginatedResponseSchema } from './pagination'
 
 // ===========================================
 // Request Schemas
@@ -109,6 +110,11 @@ export const orgResponseSchema = z.object({
 
 export type OrgResponse = z.infer<typeof orgResponseSchema>
 
+/** Paginated organization list (ADR-036 / OB-05). */
+export const organizationListResponseSchema = paginatedResponseSchema(orgResponseSchema)
+
+export type OrganizationListResponse = z.infer<typeof organizationListResponseSchema>
+
 /** Permission response */
 export const permissionResponseSchema = z.object({
   id: z.string(),
@@ -133,6 +139,11 @@ export const orgRoleResponseSchema = z.object({
 })
 
 export type OrgRoleResponse = z.infer<typeof orgRoleResponseSchema>
+
+/** Paginated role list (ADR-036 / OB-05). */
+export const roleListResponseSchema = paginatedResponseSchema(orgRoleResponseSchema)
+
+export type RoleListResponse = z.infer<typeof roleListResponseSchema>
 
 /** Switch organization response */
 export const switchOrgResponseSchema = z.object({

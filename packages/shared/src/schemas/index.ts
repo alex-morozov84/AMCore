@@ -16,7 +16,7 @@ export {
   userResponseSchema,
   authResponseSchema,
   sessionSchema,
-  sessionsResponseSchema,
+  sessionsListResponseSchema,
   refreshResponseSchema,
   oauthExchangeResponseSchema,
   messageResponseSchema,
@@ -33,7 +33,7 @@ export {
   type UserResponse,
   type AuthResponse,
   type Session,
-  type SessionsResponse,
+  type SessionsListResponse,
   type RefreshResponse,
   type OAuthExchangeResponse,
   type MessageResponse,
@@ -48,8 +48,10 @@ export {
   updateRoleSchema,
   assignPermissionSchema,
   orgResponseSchema,
+  organizationListResponseSchema,
   permissionResponseSchema,
   orgRoleResponseSchema,
+  roleListResponseSchema,
   switchOrgResponseSchema,
   type CreateOrganizationInput,
   type UpdateOrganizationInput,
@@ -58,8 +60,10 @@ export {
   type UpdateRoleInput,
   type AssignPermissionInput,
   type OrgResponse,
+  type OrganizationListResponse,
   type PermissionResponse,
   type OrgRoleResponse,
+  type RoleListResponse,
   type SwitchOrgResponse,
 } from './organization'
 
@@ -89,4 +93,11 @@ export {
 } from './pagination'
 
 // API Keys schemas
-export { createApiKeySchema, type CreateApiKeyInput } from './api-keys'
+export {
+  createApiKeySchema,
+  apiKeyListItemSchema,
+  apiKeyListResponseSchema,
+  type CreateApiKeyInput,
+  type ApiKeyListItemResponse,
+  type ApiKeyListResponse,
+} from './api-keys'

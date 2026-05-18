@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { ApiKeyScopeErrorCode } from '../constants'
 import { Action, Subject } from '../enums/permissions'
 
+import { paginatedResponseSchema } from './pagination'
+
 // Allowed scope grammar (AK-05).
 //
 // A scope is exactly `action:Subject`, where `action` is a value of the
@@ -71,3 +73,27 @@ export const createApiKeySchema = z.object({
 })
 
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>
+
+/**
+ * API key list item (response shape for GET /api-keys, OB-05).
+ *
+ * Mirrors the `ApiKeyListItem` TypeScript interface in
+ * `apps/api/src/core/api-keys/api-keys.service.ts`. The plaintext
+ * token is never exposed on the list endpoint — only metadata.
+ */
+export const apiKeyListItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  organizationId: z.string(),
+  scopes: z.array(z.string()),
+  expiresAt: z.iso.datetime().nullable(),
+  lastUsedAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+})
+
+export type ApiKeyListItemResponse = z.infer<typeof apiKeyListItemSchema>
+
+/** Paginated API key list (ADR-036 / OB-05). */
+export const apiKeyListResponseSchema = paginatedResponseSchema(apiKeyListItemSchema)
+
+export type ApiKeyListResponse = z.infer<typeof apiKeyListResponseSchema>

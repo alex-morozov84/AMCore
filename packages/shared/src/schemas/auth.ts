@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { paginatedResponseSchema } from './pagination'
+
 export const emailInputSchema = z.string().trim().pipe(z.email())
 
 // ===========================================
@@ -115,12 +117,17 @@ export const sessionSchema = z.object({
 
 export type Session = z.infer<typeof sessionSchema>
 
-/** Sessions list response */
-export const sessionsResponseSchema = z.object({
-  sessions: z.array(sessionSchema),
-})
+/**
+ * Sessions list response — paginated envelope (ADR-036 / OB-05).
+ *
+ * Previously `{ sessions: Session[] }`. Now `{ data, total, page, limit }`
+ * to match the canonical envelope shared by every other list endpoint.
+ * `apps/web/src/shared/api/auth-api.ts` and downstream UI consumers
+ * switch to `body.data[i]` in the same stage.
+ */
+export const sessionsListResponseSchema = paginatedResponseSchema(sessionSchema)
 
-export type SessionsResponse = z.infer<typeof sessionsResponseSchema>
+export type SessionsListResponse = z.infer<typeof sessionsListResponseSchema>
 
 /** Token refresh response */
 export const refreshResponseSchema = z.object({
