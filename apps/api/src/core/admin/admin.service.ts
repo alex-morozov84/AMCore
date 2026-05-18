@@ -1,18 +1,22 @@
 import { Injectable } from '@nestjs/common'
 import type { Prisma } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 import {
   type AdminOrganizationListResponse,
   type AdminOrganizationResponse,
   type AdminUserListResponse,
   type AdminUserResponse,
-  type SystemRole,
+  type RequestPrincipal,
+  SystemRole,
 } from '@amcore/shared'
 
-import { NotFoundException } from '../../common/exceptions'
+import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { CleanupService } from '../../infrastructure/schedule/cleanup.service'
 import { PrismaService } from '../../prisma'
+
+type PrismaTx = Prisma.TransactionClient
 
 /**
  * Prisma `select` allowlist for admin user responses (OA-07).
@@ -62,8 +66,11 @@ type AdminOrganizationRow = Prisma.OrganizationGetPayload<{
 export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cleanupService: CleanupService
-  ) {}
+    private readonly cleanupService: CleanupService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(AdminService.name)
+  }
 
   async findAllUsers(page: number, limit: number): Promise<AdminUserListResponse> {
     const skip = (page - 1) * limit
@@ -84,19 +91,102 @@ export class AdminService {
     }
   }
 
-  async updateUserSystemRole(id: string, systemRole: SystemRole): Promise<AdminUserResponse> {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } })
-    if (!user) throw new NotFoundException('User', id)
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: { systemRole },
-      select: ADMIN_USER_SELECT,
+  /**
+   * Change a user's platform-level system role (OA-09).
+   *
+   * Self-demotion is denied based on the request principal, not on a
+   * re-read of current DB state. Reaching this method already means
+   * the actor is SUPER_ADMIN at the time of the request (enforced by
+   * `SystemRolesGuard`); a self-targeted demotion is a foot-gun
+   * regardless of how stale the actor's token is. The alternative
+   * (read DB → maybe allow if actor was already demoted meanwhile)
+   * would tie the user-facing rule to a race we don't want.
+   *
+   * Last-SUPER_ADMIN guard runs inside a transaction-scoped advisory
+   * lock (`system-role:SUPER_ADMIN`) so two concurrent demotions
+   * cannot both see `otherSACount === 1` and both succeed (Postgres
+   * READ COMMITTED would allow that without the lock).
+   *
+   * No-op requests (`before === after`) short-circuit: no DB write,
+   * no audit event — emitting "role changed" with identical before/
+   * after fields would be misleading.
+   *
+   * Audit log is emitted strictly **after** the transaction commits,
+   * so a rolled-back attempt never produces a misleading
+   * `system_role_changed` event.
+   */
+  async updateUserSystemRole(
+    id: string,
+    systemRole: SystemRole,
+    actor: RequestPrincipal
+  ): Promise<AdminUserResponse> {
+    if (id === actor.sub && systemRole !== SystemRole.SuperAdmin) {
+      throw new BusinessRuleViolationException('You cannot change your own system role')
+    }
+
+    const { before, after, row } = await this.prisma.$transaction(async (tx) => {
+      await this.acquireXactLock(tx, 'system-role:SUPER_ADMIN')
+
+      const target = await tx.user.findUnique({ where: { id }, select: ADMIN_USER_SELECT })
+      if (!target) throw new NotFoundException('User', id)
+
+      // No-op: nothing to write, nothing to audit.
+      if (target.systemRole === systemRole) {
+        return { before: target.systemRole, after: target.systemRole, row: target }
+      }
+
+      // Last-SUPER_ADMIN guard for the demotion case only.
+      if (target.systemRole === SystemRole.SuperAdmin && systemRole !== SystemRole.SuperAdmin) {
+        const otherSACount = await tx.user.count({
+          where: { systemRole: SystemRole.SuperAdmin, id: { not: id } },
+        })
+        if (otherSACount === 0) {
+          throw new BusinessRuleViolationException('Cannot demote the last SUPER_ADMIN')
+        }
+      }
+
+      const updated = await tx.user.update({
+        where: { id },
+        data: { systemRole },
+        select: ADMIN_USER_SELECT,
+      })
+      return { before: target.systemRole, after: updated.systemRole, row: updated }
     })
-    return this.toAdminUserResponse(updated)
+
+    if (before !== after) {
+      this.logger.info(
+        {
+          event: 'auth.admin.system_role_changed',
+          actorUserId: actor.sub,
+          targetUserId: id,
+          beforeSystemRole: before,
+          afterSystemRole: after,
+        },
+        'Admin changed user system role'
+      )
+    }
+
+    return this.toAdminUserResponse(row)
   }
 
-  runCleanup(): Promise<CleanupResult> {
-    return this.cleanupService.runCleanup()
+  /**
+   * Manually trigger the expired-records cleanup (OA-09). Audit log
+   * is emitted on success only; failures propagate through the
+   * exception filter chain and are logged there.
+   */
+  async runCleanup(actor: RequestPrincipal): Promise<CleanupResult> {
+    const result = await this.cleanupService.runCleanup()
+
+    this.logger.info(
+      {
+        event: 'auth.admin.cleanup_executed',
+        actorUserId: actor.sub,
+        counts: result,
+      },
+      'Admin triggered cleanup'
+    )
+
+    return result
   }
 
   async findAllOrganizations(page: number, limit: number): Promise<AdminOrganizationListResponse> {
@@ -116,6 +206,16 @@ export class AdminService {
       page,
       limit,
     }
+  }
+
+  /**
+   * Transaction-scoped advisory lock. Hashed via `hashtextextended` so
+   * any string namespace fits into Postgres `bigint`. `${key}` is
+   * always parameterized — never string-interpolated — so callers
+   * cannot accidentally inject SQL through a lock key.
+   */
+  private async acquireXactLock(tx: PrismaTx, key: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0)::bigint)`
   }
 
   /**

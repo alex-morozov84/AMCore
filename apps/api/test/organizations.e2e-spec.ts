@@ -419,6 +419,49 @@ describe('Organizations (e2e)', () => {
 
       expect(res.body).toMatchObject({ name: 'Editor', organizationId: orgId })
     })
+
+    /**
+     * OA-09 companion: last-admin guard end-to-end. Owner is the
+     * only admin in this org by construction (creator becomes admin
+     * via the org-create flow); removing them as a member or stripping
+     * their ADMIN role must return 400 + BUSINESS_RULE_VIOLATION.
+     */
+    describe('OA-09 companion: protect last org admin', () => {
+      let adminUserId: string
+      let adminRoleId: string
+
+      beforeEach(async () => {
+        const meRes = await request(app.getHttpServer())
+          .get('/auth/me')
+          .set('Authorization', `Bearer ${orgToken}`)
+          .expect(200)
+        adminUserId = meRes.body.user.id as string
+
+        const rolesRes = await request(app.getHttpServer())
+          .get(`/organizations/${orgId}/roles`)
+          .set('Authorization', `Bearer ${orgToken}`)
+          .expect(200)
+        adminRoleId = rolesRes.body.find((r: { name: string }) => r.name === 'ADMIN').id
+      })
+
+      it('blocks removing the last admin member', async () => {
+        const res = await request(app.getHttpServer())
+          .delete(`/organizations/${orgId}/members/${adminUserId}`)
+          .set('Authorization', `Bearer ${orgToken}`)
+          .expect(400)
+
+        expect(res.body.errorCode).toBe('BUSINESS_RULE_VIOLATION')
+      })
+
+      it('blocks stripping the last admin role from the only admin', async () => {
+        const res = await request(app.getHttpServer())
+          .delete(`/organizations/${orgId}/members/${adminUserId}/roles/${adminRoleId}`)
+          .set('Authorization', `Bearer ${orgToken}`)
+          .expect(400)
+
+        expect(res.body.errorCode).toBe('BUSINESS_RULE_VIOLATION')
+      })
+    })
   })
 
   /**

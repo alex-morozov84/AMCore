@@ -252,6 +252,64 @@ describe('Admin (e2e)', () => {
     })
   })
 
+  /**
+   * OA-09: protect SUPER_ADMIN role transitions.
+   *
+   * Self-demotion (foot-gun protection) is the only path that the
+   * API can reach the last-SA guard through — `SystemRolesGuard`
+   * requires the actor to be SUPER_ADMIN, so a non-self demotion
+   * always has the actor as another SUPER_ADMIN. The unit test in
+   * `admin.service.spec.ts` locks down the in-transaction last-SA
+   * guard for the defense-in-depth case; here we cover what users
+   * actually see on the wire.
+   */
+  describe('OA-09: protect SUPER_ADMIN role transitions', () => {
+    it('denies self-demotion with 400 + BUSINESS_RULE_VIOLATION', async () => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      const res = await request(app.getHttpServer())
+        .patch(`/admin/users/${userId}`)
+        .set('Authorization', `Bearer ${superToken}`)
+        .send({ systemRole: SystemRole.User })
+        .expect(400)
+
+      expect(res.body.errorCode).toBe('BUSINESS_RULE_VIOLATION')
+    })
+
+    it('demotes target SUPER_ADMIN when another SUPER_ADMIN exists', async () => {
+      const { userId: targetId } = await registerAndGetToken('peer-sa@example.com')
+      await prisma.user.update({
+        where: { id: targetId },
+        data: { systemRole: 'SUPER_ADMIN' },
+      })
+      const { userId: actorId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(actorId)
+
+      const res = await request(app.getHttpServer())
+        .patch(`/admin/users/${targetId}`)
+        .set('Authorization', `Bearer ${superToken}`)
+        .send({ systemRole: SystemRole.User })
+        .expect(200)
+
+      expect(res.body.systemRole).toBe(SystemRole.User)
+    })
+
+    it('no-op same-role request returns 200 with current role unchanged', async () => {
+      const { userId: targetId } = await registerAndGetToken('target-noop@example.com')
+      const { userId: actorId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(actorId)
+
+      const res = await request(app.getHttpServer())
+        .patch(`/admin/users/${targetId}`)
+        .set('Authorization', `Bearer ${superToken}`)
+        .send({ systemRole: SystemRole.User })
+        .expect(200)
+
+      expect(res.body.systemRole).toBe(SystemRole.User)
+    })
+  })
+
   describe('POST /admin/cleanup', () => {
     it('returns cleanup counts for SUPER_ADMIN', async () => {
       const { userId } = await registerAndGetToken('superadmin@example.com')

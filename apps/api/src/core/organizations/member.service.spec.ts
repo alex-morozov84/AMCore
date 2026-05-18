@@ -95,6 +95,7 @@ describe('MemberService', () => {
     ;(prisma.$transaction as unknown as jest.Mock).mockImplementation(
       async (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma)
     )
+    prisma.$executeRaw.mockResolvedValue(0 as never)
   })
 
   describe('invite', () => {
@@ -273,6 +274,41 @@ describe('MemberService', () => {
         BusinessRuleViolationException
       )
     })
+
+    /**
+     * OA-09 companion: under Postgres READ COMMITTED, two concurrent
+     * removeMember calls would both see two admins and both succeed.
+     * The per-org advisory lock serializes them. Lock must fire
+     * *before* any state read inside the transaction, otherwise the
+     * lock buys nothing.
+     */
+    describe('OA-09 companion: advisory lock + tx-aware reads', () => {
+      it('acquires per-org advisory lock inside the transaction before reads', async () => {
+        prisma.orgMember.findUnique.mockResolvedValue(mockMember)
+        prisma.role.findFirst.mockResolvedValue(mockAdminRole)
+        prisma.memberRole.findMany.mockResolvedValue([])
+        prisma.orgMember.delete.mockResolvedValue(mockMember)
+
+        await service.removeMember('org-1', 'user-2', principal)
+
+        const txOrder = (prisma.$transaction as unknown as jest.Mock).mock.invocationCallOrder[0]
+        const lockOrder = prisma.$executeRaw.mock.invocationCallOrder[0]
+        const memberReadOrder = prisma.orgMember.findUnique.mock.invocationCallOrder[0]
+        const adminCountOrder = prisma.memberRole.findMany.mock.invocationCallOrder[0]
+        const deleteOrder = prisma.orgMember.delete.mock.invocationCallOrder[0]
+
+        expect(txOrder).toBeDefined()
+        expect(lockOrder).toBeDefined()
+        expect(memberReadOrder).toBeDefined()
+        expect(adminCountOrder).toBeDefined()
+        expect(deleteOrder).toBeDefined()
+        // tx opens first, lock immediately inside, then reads, then write.
+        expect(txOrder!).toBeLessThan(lockOrder!)
+        expect(lockOrder!).toBeLessThan(memberReadOrder!)
+        expect(memberReadOrder!).toBeLessThan(adminCountOrder!)
+        expect(adminCountOrder!).toBeLessThan(deleteOrder!)
+      })
+    })
   })
 
   describe('assignRole', () => {
@@ -399,6 +435,36 @@ describe('MemberService', () => {
       await expect(service.removeRole('org-1', 'user-2', 'role-admin', principal)).rejects.toThrow(
         BusinessRuleViolationException
       )
+    })
+
+    /**
+     * OA-09 companion: removeRole must run member read, system-role
+     * lookup, and last-admin assertion through the transaction client,
+     * not `this.prisma` — that's how the advisory lock binds the
+     * subsequent delete to a stable snapshot.
+     */
+    it('acquires advisory lock before reads and runs member read inside the transaction', async () => {
+      prisma.orgMember.findUnique.mockResolvedValue(mockMember)
+      prisma.role.findFirst.mockResolvedValue(mockAdminRole)
+      prisma.memberRole.deleteMany.mockResolvedValue({ count: 1 })
+
+      await service.removeRole('org-1', 'user-2', 'role-viewer', principal)
+
+      const txOrder = (prisma.$transaction as unknown as jest.Mock).mock.invocationCallOrder[0]
+      const lockOrder = prisma.$executeRaw.mock.invocationCallOrder[0]
+      const memberReadOrder = prisma.orgMember.findUnique.mock.invocationCallOrder[0]
+      const adminRoleLookupOrder = prisma.role.findFirst.mock.invocationCallOrder[0]
+      const deleteOrder = prisma.memberRole.deleteMany.mock.invocationCallOrder[0]
+
+      expect(txOrder).toBeDefined()
+      expect(lockOrder).toBeDefined()
+      expect(memberReadOrder).toBeDefined()
+      expect(adminRoleLookupOrder).toBeDefined()
+      expect(deleteOrder).toBeDefined()
+      expect(txOrder!).toBeLessThan(lockOrder!)
+      expect(lockOrder!).toBeLessThan(memberReadOrder!)
+      expect(memberReadOrder!).toBeLessThan(adminRoleLookupOrder!)
+      expect(adminRoleLookupOrder!).toBeLessThan(deleteOrder!)
     })
   })
 })

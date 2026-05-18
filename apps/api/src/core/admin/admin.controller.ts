@@ -18,12 +18,14 @@ import {
   type AdminUserResponse,
   AuthType,
   PAGINATION,
+  type RequestPrincipal,
   SystemRole,
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { Auth } from '../auth/decorators/auth.decorator'
+import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
@@ -86,17 +88,18 @@ export class AdminController {
   @ApiOperation({ summary: 'Update user system role — SUPER_ADMIN only' })
   @ZodSerializerDto(AdminUserResponseDto)
   updateUserSystemRole(
+    @CurrentUser() actor: RequestPrincipal,
     @Param('id') id: string,
     @Body() dto: UpdateSystemRoleDto
   ): Promise<AdminUserResponse> {
-    return this.adminService.updateUserSystemRole(id, dto.systemRole)
+    return this.adminService.updateUserSystemRole(id, dto.systemRole, actor)
   }
 
   @Post('cleanup')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Manually trigger expired records cleanup — SUPER_ADMIN only' })
-  runCleanup(): Promise<CleanupResult> {
-    return this.adminService.runCleanup()
+  runCleanup(@CurrentUser() actor: RequestPrincipal): Promise<CleanupResult> {
+    return this.adminService.runCleanup(actor)
   }
 
   @Get('organizations')

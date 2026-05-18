@@ -72,16 +72,26 @@ export class MemberService {
   ): Promise<void> {
     this.assertOrgContext(principal, orgId)
 
-    const member = await this.prisma.orgMember.findUnique({
-      where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
-    })
-    if (!member) throw new NotFoundException('Member not found in this organization')
-
-    await this.assertNotLastAdmin(orgId, targetUserId)
-    // OA-12: delete + bump in the same transaction so a transient
-    // DB failure between delete and bump cannot leave the cache
-    // serving stale permissions for the removed member.
+    // OA-09 companion: all last-admin-sensitive reads happen inside
+    // the transaction after acquiring a per-org advisory lock. Under
+    // Postgres READ COMMITTED, two concurrent removeMember calls would
+    // otherwise both see two admins and both succeed, leaving the org
+    // with zero administrators. The advisory lock serializes them on
+    // the same `org:last-admin:${orgId}` key so the second caller
+    // observes the post-commit state of the first.
     await this.prisma.$transaction(async (tx) => {
+      await this.acquireXactLock(tx, `org:last-admin:${orgId}`)
+
+      const member = await tx.orgMember.findUnique({
+        where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
+      })
+      if (!member) throw new NotFoundException('Member not found in this organization')
+
+      await this.assertNotLastAdmin(orgId, targetUserId, tx)
+
+      // OA-12: delete + bump in the same transaction so a transient
+      // DB failure between delete and bump cannot leave the cache
+      // serving stale permissions for the removed member.
       await tx.orgMember.delete({ where: { id: member.id } })
       await this.orgsService.bumpAclVersionTx(orgId, tx)
     })
@@ -128,30 +138,46 @@ export class MemberService {
   ): Promise<void> {
     this.assertOrgContext(principal, orgId)
 
-    const member = await this.prisma.orgMember.findUnique({
-      where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
-    })
-    if (!member) throw new NotFoundException('Member not found in this organization')
-
-    const adminRoleId = await this.getSystemRoleId('ADMIN')
-    if (roleId === adminRoleId) {
-      await this.assertNotLastAdmin(orgId, targetUserId)
-    }
-
-    // OA-12: deleteMany + bump in the same transaction so a transient
-    // DB failure cannot leave the cache stale on a partial role-removal.
+    // OA-09 companion: lock + read + assertion + write all inside one
+    // transaction. See `removeMember` for the full rationale on the
+    // advisory lock.
     await this.prisma.$transaction(async (tx) => {
+      await this.acquireXactLock(tx, `org:last-admin:${orgId}`)
+
+      const member = await tx.orgMember.findUnique({
+        where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
+      })
+      if (!member) throw new NotFoundException('Member not found in this organization')
+
+      const adminRoleId = await this.getSystemRoleId('ADMIN', tx)
+      if (roleId === adminRoleId) {
+        await this.assertNotLastAdmin(orgId, targetUserId, tx)
+      }
+
+      // OA-12: deleteMany + bump in the same transaction so a transient
+      // DB failure cannot leave the cache stale on a partial role-removal.
       await tx.memberRole.deleteMany({ where: { memberId: member.id, roleId } })
       await this.orgsService.bumpAclVersionTx(orgId, tx)
     })
     await this.orgsService.invalidateAclVersion(orgId)
   }
 
-  /** Guard: target user must not be the last ADMIN in this org */
-  private async assertNotLastAdmin(orgId: string, targetUserId: string): Promise<void> {
-    const adminRoleId = await this.getSystemRoleId('ADMIN')
+  /**
+   * Guard: target user must not be the last ADMIN in this org.
+   *
+   * Must be called inside the same transaction that performs the
+   * subsequent removal, and only after `acquireXactLock` on the
+   * org-scoped last-admin key — otherwise two callers can both pass
+   * this check and both commit, leaving the org with no admins.
+   */
+  private async assertNotLastAdmin(
+    orgId: string,
+    targetUserId: string,
+    tx: PrismaTx
+  ): Promise<void> {
+    const adminRoleId = await this.getSystemRoleId('ADMIN', tx)
 
-    const admins = await this.prisma.memberRole.findMany({
+    const admins = await tx.memberRole.findMany({
       where: { roleId: adminRoleId, member: { organizationId: orgId } },
       include: { member: { select: { userId: true } } },
     })
@@ -162,6 +188,15 @@ export class MemberService {
         'Cannot remove the last administrator from an organization'
       )
     }
+  }
+
+  /**
+   * Transaction-scoped advisory lock — parameterized `$executeRaw`
+   * tagged template so the key is never string-interpolated. Mirrors
+   * the helper in `AdminService` (OA-09).
+   */
+  private async acquireXactLock(tx: PrismaTx, key: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0)::bigint)`
   }
 
   /**
@@ -204,8 +239,11 @@ export class MemberService {
     }
   }
 
-  private async getSystemRoleId(name: 'ADMIN' | 'MEMBER'): Promise<string> {
-    const role = await this.prisma.role.findFirst({
+  private async getSystemRoleId(
+    name: 'ADMIN' | 'MEMBER',
+    db: PrismaService | PrismaTx = this.prisma
+  ): Promise<string> {
+    const role = await db.role.findFirst({
       where: { name, isSystem: true, organizationId: null },
       select: { id: true },
     })

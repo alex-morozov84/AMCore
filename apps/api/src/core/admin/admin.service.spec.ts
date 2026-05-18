@@ -1,10 +1,11 @@
 import type { Organization, User } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
+import type { PinoLogger } from 'nestjs-pino'
 
-import { SystemRole } from '@amcore/shared'
+import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { NotFoundException } from '../../common/exceptions'
+import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions'
 import type { CleanupService } from '../../infrastructure/schedule/cleanup.service'
 import type { PrismaService } from '../../prisma'
 
@@ -14,6 +15,7 @@ describe('AdminService', () => {
   let service: AdminService
   let prisma: DeepMockProxy<PrismaClient>
   let cleanupService: jest.Mocked<Pick<CleanupService, 'runCleanup'>>
+  let logger: jest.Mocked<PinoLogger>
 
   const createdAt = new Date('2026-05-01T10:00:00.000Z')
   const updatedAt = new Date('2026-05-02T10:00:00.000Z')
@@ -45,13 +47,34 @@ describe('AdminService', () => {
     updatedAt,
   }
 
+  const actor: RequestPrincipal = {
+    type: 'jwt',
+    sub: 'actor-sa',
+    systemRole: SystemRole.SuperAdmin,
+  }
+
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
     cleanupService = { runCleanup: jest.fn() }
+    logger = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    } as unknown as jest.Mocked<PinoLogger>
     service = new AdminService(
       prisma as unknown as PrismaService,
-      cleanupService as unknown as CleanupService
+      cleanupService as unknown as CleanupService,
+      logger
     )
+    // Delegate $transaction callbacks to the same prisma mock so test
+    // mocks set on the outer prisma instance (findUnique, count,
+    // update, $executeRaw) are observable from inside the callback.
+    ;(prisma.$transaction as unknown as jest.Mock).mockImplementation(
+      async (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma)
+    )
+    prisma.$executeRaw.mockResolvedValue(0 as never)
   })
 
   describe('findAllUsers', () => {
@@ -133,11 +156,12 @@ describe('AdminService', () => {
 
   describe('updateUserSystemRole', () => {
     it('updates system role when user exists', async () => {
-      const updated: User = { ...mockUser, systemRole: 'SUPER_ADMIN' }
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1' } as User)
+      const target: User = { ...mockUser, id: 'user-1', systemRole: 'USER' }
+      const updated: User = { ...target, systemRole: 'SUPER_ADMIN' }
+      prisma.user.findUnique.mockResolvedValue(target)
       prisma.user.update.mockResolvedValue(updated)
 
-      const result = await service.updateUserSystemRole('user-1', SystemRole.SuperAdmin)
+      const result = await service.updateUserSystemRole('user-1', SystemRole.SuperAdmin, actor)
 
       expect(result.systemRole).toBe('SUPER_ADMIN')
       expect(prisma.user.update).toHaveBeenCalledWith(
@@ -150,10 +174,12 @@ describe('AdminService', () => {
 
     /** OA-07: update also uses ADMIN_USER_SELECT and returns sanitized shape. */
     it('queries Prisma update with the ADMIN_USER_SELECT allowlist', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1' } as User)
-      prisma.user.update.mockResolvedValue(mockUser)
+      const target: User = { ...mockUser, id: 'user-1', systemRole: 'USER' }
+      const updated: User = { ...target, systemRole: 'SUPER_ADMIN' }
+      prisma.user.findUnique.mockResolvedValue(target)
+      prisma.user.update.mockResolvedValue(updated)
 
-      const result = await service.updateUserSystemRole('user-1', SystemRole.SuperAdmin)
+      const result = await service.updateUserSystemRole('user-1', SystemRole.SuperAdmin, actor)
 
       expect(prisma.user.update).toHaveBeenCalledTimes(1)
       const arg = prisma.user.update.mock.calls[0]![0]!
@@ -169,13 +195,111 @@ describe('AdminService', () => {
       prisma.user.findUnique.mockResolvedValue(null)
 
       await expect(
-        service.updateUserSystemRole('nonexistent', SystemRole.SuperAdmin)
+        service.updateUserSystemRole('nonexistent', SystemRole.SuperAdmin, actor)
       ).rejects.toThrow(NotFoundException)
+    })
+
+    /**
+     * OA-09: self-demotion is rejected purely based on the request
+     * principal (no DB read needed at this gate). `prisma.user.update`
+     * must never be reached. We allow the gate to perform DB reads
+     * later for uniformity if implementation chooses to, but the
+     * write must not happen.
+     */
+    describe('OA-09 last-admin guard + audit', () => {
+      it('rejects self-demotion before update', async () => {
+        await expect(
+          service.updateUserSystemRole(actor.sub, SystemRole.User, {
+            ...actor,
+            sub: actor.sub,
+          })
+        ).rejects.toThrow(BusinessRuleViolationException)
+        expect(prisma.user.update).not.toHaveBeenCalled()
+      })
+
+      it('rejects last-SUPER_ADMIN demotion (non-self target)', async () => {
+        const target: User = { ...mockUser, id: 'sa-target', systemRole: 'SUPER_ADMIN' }
+        prisma.user.findUnique.mockResolvedValue(target)
+        prisma.user.count.mockResolvedValue(0)
+
+        await expect(
+          service.updateUserSystemRole('sa-target', SystemRole.User, actor)
+        ).rejects.toThrow(BusinessRuleViolationException)
+        expect(prisma.user.update).not.toHaveBeenCalled()
+        expect(prisma.user.count).toHaveBeenCalledWith({
+          where: { systemRole: SystemRole.SuperAdmin, id: { not: 'sa-target' } },
+        })
+      })
+
+      it('allows SUPER_ADMIN demotion when another SUPER_ADMIN exists', async () => {
+        const target: User = { ...mockUser, id: 'sa-target', systemRole: 'SUPER_ADMIN' }
+        const updated: User = { ...target, systemRole: 'USER' }
+        prisma.user.findUnique.mockResolvedValue(target)
+        prisma.user.count.mockResolvedValue(1)
+        prisma.user.update.mockResolvedValue(updated)
+
+        const result = await service.updateUserSystemRole('sa-target', SystemRole.User, actor)
+
+        expect(result.systemRole).toBe('USER')
+        expect(prisma.user.update).toHaveBeenCalledTimes(1)
+      })
+
+      it('no-op (before === requested) skips update and audit', async () => {
+        const target: User = { ...mockUser, id: 'user-x', systemRole: 'USER' }
+        prisma.user.findUnique.mockResolvedValue(target)
+
+        await service.updateUserSystemRole('user-x', SystemRole.User, actor)
+
+        expect(prisma.user.update).not.toHaveBeenCalled()
+        const auditCalls = logger.info.mock.calls.filter(
+          (c) => (c[0] as { event?: string }).event === 'auth.admin.system_role_changed'
+        )
+        expect(auditCalls).toHaveLength(0)
+      })
+
+      it('acquires advisory lock before findUnique and update inside the transaction', async () => {
+        const target: User = { ...mockUser, id: 'sa-target', systemRole: 'SUPER_ADMIN' }
+        const updated: User = { ...target, systemRole: 'USER' }
+        prisma.user.findUnique.mockResolvedValue(target)
+        prisma.user.count.mockResolvedValue(1)
+        prisma.user.update.mockResolvedValue(updated)
+
+        await service.updateUserSystemRole('sa-target', SystemRole.User, actor)
+
+        const lockOrder = prisma.$executeRaw.mock.invocationCallOrder[0]
+        const findOrder = prisma.user.findUnique.mock.invocationCallOrder[0]
+        const updateOrder = prisma.user.update.mock.invocationCallOrder[0]
+        expect(lockOrder).toBeDefined()
+        expect(findOrder).toBeDefined()
+        expect(updateOrder).toBeDefined()
+        expect(lockOrder!).toBeLessThan(findOrder!)
+        expect(findOrder!).toBeLessThan(updateOrder!)
+      })
+
+      it('emits audit log after successful role change', async () => {
+        const target: User = { ...mockUser, id: 'user-1', systemRole: 'USER' }
+        const updated: User = { ...target, systemRole: 'SUPER_ADMIN' }
+        prisma.user.findUnique.mockResolvedValue(target)
+        prisma.user.update.mockResolvedValue(updated)
+
+        await service.updateUserSystemRole('user-1', SystemRole.SuperAdmin, actor)
+
+        expect(logger.info).toHaveBeenCalledWith(
+          {
+            event: 'auth.admin.system_role_changed',
+            actorUserId: actor.sub,
+            targetUserId: 'user-1',
+            beforeSystemRole: 'USER',
+            afterSystemRole: 'SUPER_ADMIN',
+          },
+          'Admin changed user system role'
+        )
+      })
     })
   })
 
   describe('runCleanup', () => {
-    it('delegates to CleanupService and returns result', async () => {
+    it('delegates to CleanupService, returns result, emits audit log', async () => {
       const mockResult = {
         expiredSessions: 5,
         expiredPasswordResetTokens: 3,
@@ -184,10 +308,28 @@ describe('AdminService', () => {
       }
       cleanupService.runCleanup.mockResolvedValue(mockResult)
 
-      const result = await service.runCleanup()
+      const result = await service.runCleanup(actor)
 
       expect(result).toEqual(mockResult)
       expect(cleanupService.runCleanup).toHaveBeenCalled()
+      expect(logger.info).toHaveBeenCalledWith(
+        {
+          event: 'auth.admin.cleanup_executed',
+          actorUserId: actor.sub,
+          counts: mockResult,
+        },
+        'Admin triggered cleanup'
+      )
+    })
+
+    it('does not emit audit when cleanup throws', async () => {
+      cleanupService.runCleanup.mockRejectedValue(new Error('cleanup failed'))
+
+      await expect(service.runCleanup(actor)).rejects.toThrow('cleanup failed')
+      const auditCalls = logger.info.mock.calls.filter(
+        (c) => (c[0] as { event?: string }).event === 'auth.admin.cleanup_executed'
+      )
+      expect(auditCalls).toHaveLength(0)
     })
   })
 
