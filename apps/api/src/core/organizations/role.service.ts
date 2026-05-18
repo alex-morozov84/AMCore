@@ -84,8 +84,39 @@ export class RoleService {
     // OA-12: delete + bump in the same transaction so a transient DB
     // failure cannot leave the cache version diverged from the deleted
     // role's effect on permissions.
+    //
+    // OA-10: `assignPermission` creates a fresh org-scoped Permission
+    // per role assignment, and `Role` has no FK pointing at
+    // `Permission` (only the join table `RolePermission` cascades on
+    // role delete). Without GC, dropping a custom role leaves its
+    // exclusive permissions in the DB until the whole org is dropped.
+    //
+    // GC is narrow on purpose: collect the permission IDs linked to
+    // this role *before* the role.delete cascades the join rows away,
+    // then delete only those IDs that are
+    //   1. org-scoped (`organizationId === orgId`, never system perms
+    //      with `organizationId === null`); and
+    //   2. now linked to no roles (`roles: { none: {} }` — survives a
+    //      shared-permission case where another role still uses it).
     await this.prisma.$transaction(async (tx) => {
+      const links = await tx.rolePermission.findMany({
+        where: { roleId },
+        select: { permissionId: true },
+      })
+      const permissionIds = links.map((l) => l.permissionId)
+
       await tx.role.delete({ where: { id: roleId } })
+
+      if (permissionIds.length > 0) {
+        await tx.permission.deleteMany({
+          where: {
+            id: { in: permissionIds },
+            organizationId: orgId,
+            roles: { none: {} },
+          },
+        })
+      }
+
       await this.orgsService.bumpAclVersionTx(orgId, tx)
     })
     await this.orgsService.invalidateAclVersion(orgId)

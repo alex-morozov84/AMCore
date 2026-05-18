@@ -184,6 +184,7 @@ describe('RoleService', () => {
   describe('deleteRole', () => {
     it('deletes custom role and bumps aclVersion', async () => {
       prisma.role.findFirst.mockResolvedValue(mockCustomRole)
+      prisma.rolePermission.findMany.mockResolvedValue([])
       prisma.role.delete.mockResolvedValue(mockCustomRole)
 
       await service.deleteRole('org-1', 'role-custom', principal)
@@ -199,6 +200,93 @@ describe('RoleService', () => {
       await expect(service.deleteRole('org-1', 'role-admin', principal)).rejects.toThrow(
         ForbiddenException
       )
+    })
+
+    /**
+     * OA-10: org-scoped permissions linked exclusively to a custom
+     * role were leaked when the role was deleted (Role has no FK at
+     * Permission; cascade only clears the join table). GC is narrow:
+     * collected IDs only, defense-in-depth filters keep system perms
+     * and shared perms intact.
+     */
+    describe('OA-10: orphan permission GC', () => {
+      it('garbage-collects permissions linked exclusively to the deleted role', async () => {
+        prisma.role.findFirst.mockResolvedValue(mockCustomRole)
+        prisma.rolePermission.findMany.mockResolvedValue([
+          { roleId: 'role-custom', permissionId: 'perm-1' },
+          { roleId: 'role-custom', permissionId: 'perm-2' },
+        ] as never)
+        prisma.role.delete.mockResolvedValue(mockCustomRole)
+        prisma.permission.deleteMany.mockResolvedValue({ count: 2 })
+
+        await service.deleteRole('org-1', 'role-custom', principal)
+
+        expect(prisma.permission.deleteMany).toHaveBeenCalledTimes(1)
+        expect(prisma.permission.deleteMany).toHaveBeenCalledWith({
+          where: {
+            id: { in: ['perm-1', 'perm-2'] },
+            organizationId: 'org-1',
+            roles: { none: {} },
+          },
+        })
+      })
+
+      it('does not call deleteMany when the role had no permissions linked', async () => {
+        prisma.role.findFirst.mockResolvedValue(mockCustomRole)
+        prisma.rolePermission.findMany.mockResolvedValue([])
+        prisma.role.delete.mockResolvedValue(mockCustomRole)
+
+        await service.deleteRole('org-1', 'role-custom', principal)
+
+        expect(prisma.permission.deleteMany).not.toHaveBeenCalled()
+      })
+
+      it('filters by organizationId and roles:none so shared/system permissions cannot be deleted', async () => {
+        // Defense-in-depth assertion: even with a malformed input we
+        // produce the right `where` shape. The Prisma engine then
+        // filters out system perms (organizationId === null) and
+        // shared perms (roles.length > 0) by predicate, never by the
+        // caller's discipline.
+        prisma.role.findFirst.mockResolvedValue(mockCustomRole)
+        prisma.rolePermission.findMany.mockResolvedValue([
+          { roleId: 'role-custom', permissionId: 'perm-shared' },
+          { roleId: 'role-custom', permissionId: 'perm-system' },
+        ] as never)
+        prisma.role.delete.mockResolvedValue(mockCustomRole)
+        prisma.permission.deleteMany.mockResolvedValue({ count: 0 })
+
+        await service.deleteRole('org-1', 'role-custom', principal)
+
+        const arg = prisma.permission.deleteMany.mock.calls[0]![0]!
+        expect(arg.where).toMatchObject({
+          organizationId: 'org-1',
+          roles: { none: {} },
+        })
+        expect((arg.where as { id?: { in: string[] } }).id?.in).toEqual([
+          'perm-shared',
+          'perm-system',
+        ])
+      })
+
+      it('collects permission IDs before role.delete (so cascade does not race the read)', async () => {
+        prisma.role.findFirst.mockResolvedValue(mockCustomRole)
+        prisma.rolePermission.findMany.mockResolvedValue([
+          { roleId: 'role-custom', permissionId: 'perm-1' },
+        ] as never)
+        prisma.role.delete.mockResolvedValue(mockCustomRole)
+        prisma.permission.deleteMany.mockResolvedValue({ count: 1 })
+
+        await service.deleteRole('org-1', 'role-custom', principal)
+
+        const findOrder = prisma.rolePermission.findMany.mock.invocationCallOrder[0]
+        const deleteOrder = prisma.role.delete.mock.invocationCallOrder[0]
+        const gcOrder = prisma.permission.deleteMany.mock.invocationCallOrder[0]
+        expect(findOrder).toBeDefined()
+        expect(deleteOrder).toBeDefined()
+        expect(gcOrder).toBeDefined()
+        expect(findOrder!).toBeLessThan(deleteOrder!)
+        expect(deleteOrder!).toBeLessThan(gcOrder!)
+      })
     })
   })
 

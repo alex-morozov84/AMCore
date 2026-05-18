@@ -421,6 +421,48 @@ describe('Organizations (e2e)', () => {
     })
 
     /**
+     * OA-10: org-scoped permissions that exist only because of a
+     * custom role must not survive its deletion. End-to-end check:
+     * baseline org permission count → create role + assign two perms
+     * (count + 2) → delete role → count returns to baseline.
+     */
+    it('DELETE /organizations/:id/roles/:rid — garbage-collects orphan org-scoped permissions', async () => {
+      const baselineCount = await prisma.permission.count({ where: { organizationId: orgId } })
+
+      const createRoleRes = await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/roles`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({ name: 'TempRole', description: 'Temporary role for GC test' })
+        .expect(201)
+      const tempRoleId = createRoleRes.body.id as string
+
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/roles/${tempRoleId}/permissions`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({ action: 'read', subject: 'User' })
+        .expect(201)
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/roles/${tempRoleId}/permissions`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({ action: 'update', subject: 'User' })
+        .expect(201)
+
+      const beforeDelete = await prisma.permission.count({ where: { organizationId: orgId } })
+      expect(beforeDelete).toBe(baselineCount + 2)
+
+      await request(app.getHttpServer())
+        .delete(`/organizations/${orgId}/roles/${tempRoleId}`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .expect(204)
+
+      const afterDelete = await prisma.permission.count({ where: { organizationId: orgId } })
+      expect(afterDelete).toBe(baselineCount)
+
+      const systemUntouched = await prisma.permission.count({ where: { organizationId: null } })
+      expect(systemUntouched).toBeGreaterThan(0)
+    })
+
+    /**
      * OA-09 companion: last-admin guard end-to-end. Owner is the
      * only admin in this org by construction (creator becomes admin
      * via the org-create flow); removing them as a member or stripping
