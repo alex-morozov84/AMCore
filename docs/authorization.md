@@ -126,8 +126,25 @@ All management endpoints require org context in the JWT (call `/switch` first) a
 
 **List roles in an org:**
 
+Paginated list per ADR-036. Accepts `?page=N&limit=M`
+(`1 ≤ page`, `1 ≤ limit ≤ 100`; defaults `page=1, limit=20`).
+Order: `isSystem DESC, name ASC, id ASC` (system roles first as a
+stable section header, alphabetical within each section).
+
 ```http
-GET /api/v1/organizations/:orgId/roles
+GET /api/v1/organizations/:orgId/roles?page=1&limit=20
+```
+
+```json
+{
+  "data": [
+    { "id": "role_admin", "name": "ADMIN", "isSystem": true, "...": "..." },
+    { "id": "role_xyz", "name": "Editor", "isSystem": false, "...": "..." }
+  ],
+  "total": 2,
+  "page": 1,
+  "limit": 20
+}
 ```
 
 **Create a custom role:**
@@ -164,10 +181,19 @@ DELETE /api/v1/organizations/:orgId/roles/:roleId
 POST /api/v1/organizations/:orgId/roles/:roleId/permissions
 Content-Type: application/json
 
-{ "action": "manage", "subject": "Deal" }
+{ "action": "manage", "subject": "Organization" }
 ```
 
-To limit a permission to the user's own records, add a condition:
+`subject` must be a value of the `Subject` enum in
+`packages/shared/src/enums/permissions.ts` (built-in: `User`,
+`Organization`, `Role`, `Permission`, `all`). To attach a permission
+on a domain subject such as `Deal` or `Contact`, extend the enum
+first and rebuild `@amcore/shared`; otherwise the request returns
+`400` (OB-01).
+
+To limit a permission to the user's own records, add a condition.
+The example below assumes the fork has added `Deal` to the
+`Subject` enum:
 
 ```json
 {

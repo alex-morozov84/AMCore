@@ -91,22 +91,29 @@ Roles are bundles of permissions. A permission defines what action can be perfor
 ```
 Permission {
   action:     "create" | "read" | "update" | "delete" | "manage"
-  subject:    "Contact" | "User" | "Organization" | "all"
+  subject:    "User" | "Organization" | "Role" | "Permission" | "all"
   conditions: { "assignedToId": "${user.id}" }   ← optional, limits scope
   fields:     ["name", "email"]                   ← optional, field-level
   inverted:   false                               ← true = explicit DENY
 }
 ```
 
-**Actions:**
+**Actions** (closed enum — `Action` in `@amcore/shared`):
 
 - `create`, `read`, `update`, `delete` — specific operations
 - `manage` — wildcard for all actions on a subject
 
-**Subjects:**
+**Subjects** (closed enum — `Subject` in
+`packages/shared/src/enums/permissions.ts`):
 
-- Named resources: `Contact`, `User`, `Organization`, `Role`, `Permission`
-- `all` — wildcard for every subject (combined with `manage` = superuser)
+- Built-in: `User`, `Organization`, `Role`, `Permission`
+- `all` — wildcard for every subject (combined with `manage` =
+  superuser)
+
+> Per OB-01 the `assignPermissionSchema` validates both `action` and
+> `subject` against these closed enums. To add a domain subject
+> (`Contact`, `Deal`, `Invoice`, etc.) a fork must extend the
+> `Subject` enum first; off-enum values now return `400 Bad Request`.
 
 ### Example permission set
 
@@ -232,25 +239,41 @@ curl -X POST https://api.amcore.dev/api/v1/organizations \
 ### Add a member
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/organizations/org_xyz/members \
+curl -X POST https://api.amcore.dev/api/v1/organizations/org_xyz/members/invite \
   -H "Authorization: Bearer eyJhbGci..." \
-  -d '{"userId": "cm1abc...", "roleIds": ["role_admin"]}'
+  -d '{"email": "member@example.com", "roleId": "role_member"}'
 ```
 
-### Create a role
+### Create a role and attach permissions
+
+Roles and permissions are created in two steps — the API does not
+accept inline permissions on role creation. (Each permission needs
+to be validated, audited, and linked separately; the join row plus
+the `aclVersion` bump are transactional per ADR-035.)
 
 ```bash
+# 1. Create the role
 curl -X POST https://api.amcore.dev/api/v1/organizations/org_xyz/roles \
   -H "Authorization: Bearer eyJhbGci..." \
-  -d '{
-    "name": "Editor",
-    "permissions": [
-      { "action": "create", "subject": "Contact" },
-      { "action": "read",   "subject": "Contact" },
-      { "action": "update", "subject": "Contact", "conditions": {"assignedToId": "${user.id}"} }
-    ]
-  }'
+  -d '{ "name": "OrgManager", "description": "Org-scope manager" }'
+# Response: { "id": "role_abc", "name": "OrgManager", ... }
+
+# 2. Attach permissions one by one
+curl -X POST https://api.amcore.dev/api/v1/organizations/org_xyz/roles/role_abc/permissions \
+  -H "Authorization: Bearer eyJhbGci..." \
+  -d '{ "action": "manage", "subject": "Organization" }'
+
+curl -X POST https://api.amcore.dev/api/v1/organizations/org_xyz/roles/role_abc/permissions \
+  -H "Authorization: Bearer eyJhbGci..." \
+  -d '{ "action": "read", "subject": "User" }'
 ```
+
+> **Subject must come from the `Subject` enum** in
+> `packages/shared/src/enums/permissions.ts` (built-in: `User`,
+> `Organization`, `Role`, `Permission`, `all`). To use a domain
+> subject like `Contact` or `Deal`, extend the enum first and
+> rebuild `@amcore/shared`; otherwise the request returns `400`
+> (OB-01).
 
 ---
 

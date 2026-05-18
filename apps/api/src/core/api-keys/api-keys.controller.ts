@@ -30,10 +30,16 @@ import { CreateApiKeyDto } from './dto/create-api-key.dto'
 /**
  * Credential management routes are bearer-only.
  *
- * The global auth default accepts both JWT and API key, but credential issuance
- * and revocation are high-risk operations that must require an interactive
- * user session — an API key must not be able to create, list, or revoke API
- * keys. See `ai/API_KEYS_REVIEW.md` AK-01 and ADR-024.
+ * After ADR-034 (Stage 1c) the runtime default in
+ * `AuthenticationGuard` is `[AuthType.Bearer]`, so an undecorated
+ * controller would already reject API keys. We still pin the
+ * annotation here explicitly — every route under `core/**` declares
+ * its accepted auth types per the ADR-034 allowlist, and the
+ * metadata guardrail test enforces that. Credential issuance and
+ * revocation are high-risk operations that must require an
+ * interactive user session — an API key must not be able to create,
+ * list, or revoke API keys. See `ai/API_KEYS_REVIEW.md` AK-01 and
+ * ADR-024 / ADR-034.
  */
 @Auth(AuthType.Bearer)
 @Controller('api-keys')
