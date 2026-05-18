@@ -87,10 +87,12 @@ export class AdminController {
 
   @Patch('users/:id')
   @ApiOperation({ summary: 'Update user system role — SUPER_ADMIN only' })
-  // OB-03: privileged operation, but routine enough that the
-  // default `admin` 5/min bucket is too tight. 20/min keeps admins
-  // unblocked while still rate-limiting credential-theft attempts.
-  @Throttle({ admin: { limit: 20, ttl: 60_000 } })
+  // OB-03: override the global `long` bucket (default 100/min) to
+  // 20/min for this privileged operation. Adding a new named
+  // bucket in `ThrottlerModule.forRoot` would cap every route in
+  // the API at the admin limit (caught in Stage 7 final-e2e), so
+  // we narrow the existing `long` bucket per-handler instead.
+  @Throttle({ long: { limit: 20, ttl: 60_000 } })
   @ZodSerializerDto(AdminUserResponseDto)
   updateUserSystemRole(
     @CurrentUser() actor: RequestPrincipal,
@@ -103,9 +105,9 @@ export class AdminController {
   @Post('cleanup')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Manually trigger expired records cleanup — SUPER_ADMIN only' })
-  // OB-03: heavy DB sweep. Default `admin` bucket (5/min) applies —
-  // no override needed.
-  @Throttle({ admin: { limit: 5, ttl: 60_000 } })
+  // OB-03: heavy DB sweep — override `long` to 5/min for this
+  // handler. Same per-handler-override pattern as above.
+  @Throttle({ long: { limit: 5, ttl: 60_000 } })
   runCleanup(@CurrentUser() actor: RequestPrincipal): Promise<CleanupResult> {
     return this.adminService.runCleanup(actor)
   }

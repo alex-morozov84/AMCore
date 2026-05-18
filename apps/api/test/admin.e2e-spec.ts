@@ -253,13 +253,20 @@ describe('Admin (e2e)', () => {
   })
 
   /**
-   * OB-03: privileged admin operations are throttled via a dedicated
-   * `admin` named bucket (`@nestjs/throttler` v6). Storage is reset
-   * between tests via `cleanDatabase` -> `resetThrottlerStorage`, so
-   * the 6th call here is the first one to exhaust the bucket — the
-   * test does NOT depend on what the first 5 cleanups actually did
-   * (counts vary because cleanup mutates DB state), only that the
-   * throttle gate fires.
+   * OB-03: privileged admin operations narrow the existing `long`
+   * bucket per-handler via `@Throttle({ long: { ... } })`. Storage
+   * is reset between tests via `cleanDatabase` ->
+   * `resetThrottlerStorage`, so the 6th call here is the first one
+   * to exhaust the per-handler 5/min override — the test does NOT
+   * depend on what the first 5 cleanups actually did (counts vary
+   * because cleanup mutates DB state), only that the throttle gate
+   * fires.
+   *
+   * Why per-handler `@Throttle({ long: ... })` and not a third
+   * named bucket: registering a third `admin` bucket in
+   * `ThrottlerModule.forRoot` would apply its limit to every route
+   * in the API (caught in Stage 7 final-e2e when login-burst tests
+   * regressed). The per-handler override stays local.
    *
    * If this test ever proves flaky on CI under load, drop it — the
    * `@nestjs/throttler` runtime is covered by its own suite, and the
@@ -269,7 +276,7 @@ describe('Admin (e2e)', () => {
    * public `index` and a metadata test would couple us to internals.
    */
   describe('OB-03: admin operations throttle on 6th rapid call', () => {
-    it('POST /admin/cleanup → 429 on the 6th call within the 5/min admin bucket', async () => {
+    it('POST /admin/cleanup → 429 on the 6th call within the 5/min long-bucket override', async () => {
       const { userId } = await registerAndGetToken('superadmin@example.com')
       const superToken = await promoteToSuperAdmin(userId)
 
