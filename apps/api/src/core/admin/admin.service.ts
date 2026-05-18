@@ -1,15 +1,18 @@
 import { Injectable } from '@nestjs/common'
-import type { Organization, Prisma } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
-import { type AdminUserListResponse, type AdminUserResponse, type SystemRole } from '@amcore/shared'
+import {
+  type AdminOrganizationListResponse,
+  type AdminOrganizationResponse,
+  type AdminUserListResponse,
+  type AdminUserResponse,
+  type SystemRole,
+} from '@amcore/shared'
 
 import { NotFoundException } from '../../common/exceptions'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { CleanupService } from '../../infrastructure/schedule/cleanup.service'
 import { PrismaService } from '../../prisma'
-
-const DEFAULT_LIMIT = 20
-const MAX_LIMIT = 100
 
 /**
  * Prisma `select` allowlist for admin user responses (OA-07).
@@ -36,6 +39,25 @@ const ADMIN_USER_SELECT = {
 
 type AdminUserRow = Prisma.UserGetPayload<{ select: typeof ADMIN_USER_SELECT }>
 
+/**
+ * Prisma `select` allowlist for admin organization responses (OA-08).
+ *
+ * Mirrors `adminOrganizationResponseSchema`. `aclVersion` (internal
+ * RBAC freshness counter, ADR-035) is deliberately absent so the wire
+ * shape does not depend on internal cache invalidation state.
+ */
+const ADMIN_ORGANIZATION_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  createdAt: true,
+  updatedAt: true,
+} as const satisfies Prisma.OrganizationSelect
+
+type AdminOrganizationRow = Prisma.OrganizationGetPayload<{
+  select: typeof ADMIN_ORGANIZATION_SELECT
+}>
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -43,19 +65,23 @@ export class AdminService {
     private readonly cleanupService: CleanupService
   ) {}
 
-  async findAllUsers(page = 1, limit = DEFAULT_LIMIT): Promise<AdminUserListResponse> {
-    const take = Math.min(limit, MAX_LIMIT)
-    const skip = (page - 1) * take
+  async findAllUsers(page: number, limit: number): Promise<AdminUserListResponse> {
+    const skip = (page - 1) * limit
     const [rows, total] = await Promise.all([
       this.prisma.user.findMany({
         skip,
-        take,
+        take: limit,
         orderBy: { createdAt: 'desc' },
         select: ADMIN_USER_SELECT,
       }),
       this.prisma.user.count(),
     ])
-    return { data: rows.map((row) => this.toAdminUserResponse(row)), total }
+    return {
+      data: rows.map((row) => this.toAdminUserResponse(row)),
+      total,
+      page,
+      limit,
+    }
   }
 
   async updateUserSystemRole(id: string, systemRole: SystemRole): Promise<AdminUserResponse> {
@@ -73,17 +99,23 @@ export class AdminService {
     return this.cleanupService.runCleanup()
   }
 
-  async findAllOrganizations(
-    page = 1,
-    limit = DEFAULT_LIMIT
-  ): Promise<{ data: Organization[]; total: number }> {
-    const take = Math.min(limit, MAX_LIMIT)
-    const skip = (page - 1) * take
-    const [data, total] = await Promise.all([
-      this.prisma.organization.findMany({ skip, take, orderBy: { createdAt: 'desc' } }),
+  async findAllOrganizations(page: number, limit: number): Promise<AdminOrganizationListResponse> {
+    const skip = (page - 1) * limit
+    const [rows, total] = await Promise.all([
+      this.prisma.organization.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: ADMIN_ORGANIZATION_SELECT,
+      }),
       this.prisma.organization.count(),
     ])
-    return { data, total }
+    return {
+      data: rows.map((row) => this.toAdminOrganizationResponse(row)),
+      total,
+      page,
+      limit,
+    }
   }
 
   /**
@@ -107,6 +139,17 @@ export class AdminService {
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       lastLoginAt: row.lastLoginAt?.toISOString() ?? null,
+    }
+  }
+
+  /** Sole exit path from admin organization reads (OA-08). */
+  private toAdminOrganizationResponse(row: AdminOrganizationRow): AdminOrganizationResponse {
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     }
   }
 }

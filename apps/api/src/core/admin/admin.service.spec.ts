@@ -40,9 +40,9 @@ describe('AdminService', () => {
     id: 'org-1',
     name: 'Acme Corp',
     slug: 'acme',
-    aclVersion: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    aclVersion: 7,
+    createdAt,
+    updatedAt,
   }
 
   beforeEach(() => {
@@ -55,13 +55,15 @@ describe('AdminService', () => {
   })
 
   describe('findAllUsers', () => {
-    it('returns paginated users with defaults', async () => {
+    it('returns paginated users with page/limit envelope', async () => {
       prisma.user.findMany.mockResolvedValue([mockUser])
       prisma.user.count.mockResolvedValue(1)
 
-      const result = await service.findAllUsers()
+      const result = await service.findAllUsers(1, 20)
 
       expect(result.total).toBe(1)
+      expect(result.page).toBe(1)
+      expect(result.limit).toBe(20)
       expect(result.data).toHaveLength(1)
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 0, take: 20 })
@@ -72,20 +74,13 @@ describe('AdminService', () => {
       prisma.user.findMany.mockResolvedValue([])
       prisma.user.count.mockResolvedValue(0)
 
-      await service.findAllUsers(2, 10)
+      const result = await service.findAllUsers(2, 10)
 
+      expect(result.page).toBe(2)
+      expect(result.limit).toBe(10)
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 10, take: 10 })
       )
-    })
-
-    it('caps limit at MAX_LIMIT (100)', async () => {
-      prisma.user.findMany.mockResolvedValue([])
-      prisma.user.count.mockResolvedValue(0)
-
-      await service.findAllUsers(1, 999)
-
-      expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }))
     })
 
     /**
@@ -97,7 +92,7 @@ describe('AdminService', () => {
       prisma.user.findMany.mockResolvedValue([])
       prisma.user.count.mockResolvedValue(0)
 
-      await service.findAllUsers()
+      await service.findAllUsers(1, 20)
 
       expect(prisma.user.findMany).toHaveBeenCalledTimes(1)
       const arg = prisma.user.findMany.mock.calls[0]![0]!
@@ -122,7 +117,7 @@ describe('AdminService', () => {
       prisma.user.findMany.mockResolvedValue([mockUser])
       prisma.user.count.mockResolvedValue(1)
 
-      const result = await service.findAllUsers()
+      const result = await service.findAllUsers(1, 20)
       expect(result.data).toHaveLength(1)
       const user = result.data[0]!
 
@@ -197,24 +192,53 @@ describe('AdminService', () => {
   })
 
   describe('findAllOrganizations', () => {
-    it('returns paginated organizations', async () => {
+    it('returns paginated organizations with page/limit envelope', async () => {
       prisma.organization.findMany.mockResolvedValue([mockOrg])
       prisma.organization.count.mockResolvedValue(1)
 
-      const result = await service.findAllOrganizations()
+      const result = await service.findAllOrganizations(1, 20)
 
-      expect(result).toEqual({ data: [mockOrg], total: 1 })
+      expect(result.total).toBe(1)
+      expect(result.page).toBe(1)
+      expect(result.limit).toBe(20)
+      expect(result.data).toHaveLength(1)
     })
 
-    it('caps limit at MAX_LIMIT (100)', async () => {
+    /**
+     * OA-08: organization reads use a `select` allowlist; `aclVersion`
+     * (internal RBAC freshness counter, ADR-035) is not read from DB
+     * and never leaks to the wire.
+     */
+    it('queries Prisma with the ADMIN_ORGANIZATION_SELECT allowlist (no aclVersion)', async () => {
       prisma.organization.findMany.mockResolvedValue([])
       prisma.organization.count.mockResolvedValue(0)
 
-      await service.findAllOrganizations(1, 500)
+      await service.findAllOrganizations(1, 20)
 
-      expect(prisma.organization.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 100 })
-      )
+      const arg = prisma.organization.findMany.mock.calls[0]![0]!
+      expect(arg.select).toBeDefined()
+      expect(arg.select).not.toHaveProperty('aclVersion')
+      expect(arg.select).toMatchObject({
+        id: true,
+        name: true,
+        slug: true,
+        createdAt: true,
+        updatedAt: true,
+      })
+    })
+
+    it('returns sanitized org shape with ISO-string dates and no aclVersion', async () => {
+      prisma.organization.findMany.mockResolvedValue([mockOrg])
+      prisma.organization.count.mockResolvedValue(1)
+
+      const result = await service.findAllOrganizations(1, 20)
+      expect(result.data).toHaveLength(1)
+      const org = result.data[0]!
+
+      expect(org).not.toHaveProperty('aclVersion')
+      expect(typeof org.createdAt).toBe('string')
+      expect(typeof org.updatedAt).toBe('string')
+      expect(org.createdAt).toBe(createdAt.toISOString())
     })
   })
 })

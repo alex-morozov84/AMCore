@@ -10,21 +10,24 @@ import {
   Query,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
-import type { Organization } from '@prisma/client'
 import { ZodSerializerDto } from 'nestjs-zod'
 
 import {
+  type AdminOrganizationListResponse,
   type AdminUserListResponse,
   type AdminUserResponse,
   AuthType,
+  PAGINATION,
   SystemRole,
 } from '@amcore/shared'
 
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
+import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto'
 import { AdminUserListResponseDto, AdminUserResponseDto } from './dto/admin-user-response.dto'
 import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
 
@@ -58,13 +61,24 @@ export class AdminController {
 
   @Get('users')
   @ApiOperation({ summary: 'List all users — SUPER_ADMIN only' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    minimum: 1,
+    example: PAGINATION.DEFAULT_PAGE,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION.MAX_LIMIT,
+    example: PAGINATION.DEFAULT_LIMIT,
+  })
   @ZodSerializerDto(AdminUserListResponseDto)
-  findAllUsers(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number
-  ): Promise<AdminUserListResponse> {
+  findAllUsers(@Query() pagination: PaginationQueryDto): Promise<AdminUserListResponse> {
+    const { page, limit } = pagination
     return this.adminService.findAllUsers(page, limit)
   }
 
@@ -87,12 +101,26 @@ export class AdminController {
 
   @Get('organizations')
   @ApiOperation({ summary: 'List all organizations — SUPER_ADMIN only' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    minimum: 1,
+    example: PAGINATION.DEFAULT_PAGE,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION.MAX_LIMIT,
+    example: PAGINATION.DEFAULT_LIMIT,
+  })
+  @ZodSerializerDto(AdminOrganizationListResponseDto)
   findAllOrganizations(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number
-  ): Promise<{ data: Organization[]; total: number }> {
+    @Query() pagination: PaginationQueryDto
+  ): Promise<AdminOrganizationListResponse> {
+    const { page, limit } = pagination
     return this.adminService.findAllOrganizations(page, limit)
   }
 }

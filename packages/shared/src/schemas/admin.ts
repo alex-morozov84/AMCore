@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { SystemRole } from '../enums'
 
 import { userResponseSchema } from './auth'
+import { paginatedResponseSchema } from './pagination'
 
 /** Update user system role (SUPER_ADMIN only) */
 export const updateUserSystemRoleSchema = z.object({
@@ -27,16 +28,30 @@ export const adminUserResponseSchema = userResponseSchema.extend({
 
 export type AdminUserResponse = z.infer<typeof adminUserResponseSchema>
 
-/**
- * Admin user list response — flat envelope `{ data, total }`.
- *
- * Stage 5 / Commit 2 (OA-08) replaces this with
- * `paginatedResponseSchema(adminUserResponseSchema)` adding `page` and
- * `limit` for client convenience.
- */
-export const adminUserListResponseSchema = z.object({
-  data: z.array(adminUserResponseSchema),
-  total: z.number().int().nonnegative(),
-})
+/** Paginated admin user list (OA-08 envelope). */
+export const adminUserListResponseSchema = paginatedResponseSchema(adminUserResponseSchema)
 
 export type AdminUserListResponse = z.infer<typeof adminUserListResponseSchema>
+
+/**
+ * Admin-facing organization response (OA-08).
+ *
+ * Deliberately omits `aclVersion` (internal RBAC freshness counter
+ * documented in ADR-035; not part of the admin product surface).
+ */
+export const adminOrganizationResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+})
+
+export type AdminOrganizationResponse = z.infer<typeof adminOrganizationResponseSchema>
+
+/** Paginated admin organization list (OA-08 envelope). */
+export const adminOrganizationListResponseSchema = paginatedResponseSchema(
+  adminOrganizationResponseSchema
+)
+
+export type AdminOrganizationListResponse = z.infer<typeof adminOrganizationListResponseSchema>

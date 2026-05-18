@@ -133,6 +133,98 @@ describe('Admin (e2e)', () => {
     })
   })
 
+  /**
+   * OA-08: admin list endpoints validate `page`/`limit` via Zod and
+   * return the paginated envelope `{ data, total, page, limit }`.
+   * Invalid input maps to a clean field-level 400, not a Prisma
+   * 500 (the old behavior). Organization list also enforces the
+   * Prisma `select` allowlist — `aclVersion` (ADR-035 internal RBAC
+   * counter) never appears on the wire.
+   */
+  describe('OA-08: pagination validation', () => {
+    it('GET /admin/users without query returns defaults page=1 limit=20', async () => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      const res = await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(200)
+
+      expect(res.body.page).toBe(1)
+      expect(res.body.limit).toBe(20)
+      expect(typeof res.body.total).toBe('number')
+    })
+
+    it('GET /admin/users with valid pagination respects page+limit', async () => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      await registerAndGetToken('other-1@example.com')
+      await registerAndGetToken('other-2@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      const res = await request(app.getHttpServer())
+        .get('/admin/users?page=2&limit=2')
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(200)
+
+      expect(res.body.page).toBe(2)
+      expect(res.body.limit).toBe(2)
+      expect(res.body.data.length).toBeLessThanOrEqual(2)
+    })
+
+    it.each([
+      ['?page=abc', 'page=abc'],
+      ['?page=0', 'page=0'],
+      ['?page=-1', 'page=-1'],
+      ['?limit=0', 'limit=0'],
+      ['?limit=-5', 'limit=-5'],
+      ['?limit=101', 'limit=101'],
+      ['?limit=abc', 'limit=abc'],
+    ])('GET /admin/users %s → 400', async (qs) => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      await request(app.getHttpServer())
+        .get(`/admin/users${qs}`)
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(400)
+    })
+
+    it('GET /admin/organizations rejects invalid limit with 400', async () => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      await request(app.getHttpServer())
+        .get('/admin/organizations?limit=999')
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(400)
+    })
+
+    it('GET /admin/organizations returns envelope without aclVersion', async () => {
+      const { userId, token: userToken } = await registerAndGetToken('superadmin@example.com')
+      await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ name: 'Pagination Test Org' })
+        .expect(201)
+      const superToken = await promoteToSuperAdmin(userId)
+
+      const res = await request(app.getHttpServer())
+        .get('/admin/organizations')
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(200)
+
+      expect(res.body.page).toBe(1)
+      expect(res.body.limit).toBe(20)
+      expect(res.body.data.length).toBeGreaterThan(0)
+      for (const org of res.body.data) {
+        expect(org).not.toHaveProperty('aclVersion')
+        expect(typeof org.createdAt).toBe('string')
+        expect(typeof org.updatedAt).toBe('string')
+      }
+    })
+  })
+
   describe('PATCH /admin/users/:id', () => {
     it('promotes user to SUPER_ADMIN', async () => {
       const { userId: targetId } = await registerAndGetToken('target@example.com')
