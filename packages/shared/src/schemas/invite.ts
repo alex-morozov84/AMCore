@@ -13,8 +13,8 @@ import { paginatedResponseSchema } from './pagination'
  * Replaces the previous `inviteMemberSchema` semantics. The endpoint
  * accepts an email and an optional roleId; the response is uniform
  * `{ status: 'invited' }` regardless of whether the email has an
- * account, is already a member, or is unknown — see ai/INVITE_FLOW
- * plan for the non-enumeration contract.
+ * account, is already a member, or is unknown — see OB-02 for the
+ * non-enumeration contract.
  */
 export const createInviteSchema = z.object({
   email: emailInputSchema,
@@ -50,10 +50,17 @@ export const inviteResponseSchema = z.object({
 
 export type InviteResponse = z.infer<typeof inviteResponseSchema>
 
-/** Response for `POST /auth/invites/accept` on success. */
+/**
+ * Response for `POST /auth/invites/accept` on success.
+ *
+ * `roleId` is always a concrete role id — never null. If the invite's
+ * named custom role was deleted before accept (FK `SetNull` left
+ * `invite.roleId` null), the accept handler assigns the system MEMBER
+ * role as a lower-privilege fallback and returns that id.
+ */
 export const acceptInviteResponseSchema = z.object({
   organizationId: z.string(),
-  roleId: z.string().nullable(),
+  roleId: z.string(),
 })
 
 export type AcceptInviteResponse = z.infer<typeof acceptInviteResponseSchema>

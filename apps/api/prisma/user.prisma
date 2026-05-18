@@ -310,10 +310,28 @@ model RolePermission {
 //
 // Uniqueness is enforced via a Postgres partial unique index
 // (declared declaratively here via `@@unique(..., where: {...})`
-// using the `partialIndexes` preview feature). The constraint
-// only applies to active invites — accepted or revoked rows can
-// coexist with a new active invite for the same (org, email)
-// pair, so legitimate re-invite after revoke/accept is possible.
+// using the `partialIndexes` preview feature). The predicate
+// covers any row that has not yet been terminally settled —
+// `acceptedAt IS NULL AND revokedAt IS NULL` — so an expired
+// pending row still counts as "active" for the constraint.
+//
+// Re-invite contract (Stage B implements, pinned here for
+// invariant-clarity at the schema level):
+//
+//   - For (orgId, emailCanonical) with no row in the active
+//     bucket, `createInvite` inserts a new row.
+//   - For (orgId, emailCanonical) with an existing active row
+//     (pending or expired-pending), `createInvite` rotates that
+//     row in place — new `tokenHash`, refreshed `expiresAt`,
+//     possibly updated `roleId`/`invitedById`. The audit
+//     timestamp of the first attempt collapses; this is an
+//     accepted trade-off for the simpler partial-unique scope
+//     vs introducing an `expiredAt` column purely for audit
+//     chronology.
+//   - Accepted or revoked rows are outside the partial unique
+//     scope and can coexist with a fresh active row for the
+//     same pair, so legitimate re-invite after a terminal
+//     settle is possible without overwriting history.
 model OrgInvite {
   id               String   @id @default(cuid())
   organizationId   String
@@ -339,6 +357,7 @@ model OrgInvite {
   @@unique([organizationId, emailCanonical], where: { acceptedAt: null, revokedAt: null })
   @@index([emailCanonical])
   @@index([expiresAt])
+  @@index([organizationId, createdAt])
   @@map("org_invites")
   @@schema("core")
 }
