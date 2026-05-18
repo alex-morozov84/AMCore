@@ -288,6 +288,15 @@ prisma.permission.create({ data: { action: 'manage', subject: 'Contact' } })
 
 ## Common scenarios
 
+> The scenarios below reference domain subjects like `Contact` and
+> `Deal` for illustration. They are not built into the `Subject`
+> enum out of the box. To run any of these scenarios literally, add
+> the required subject to `packages/shared/src/enums/permissions.ts`
+> first (see [Adding your own subjects](#adding-your-own-subjects))
+> and rebuild `@amcore/shared`; otherwise
+> `POST /organizations/:orgId/roles/:roleId/permissions` returns
+> `400` (OB-01).
+
 ### "I want John to read contacts but not delete them"
 
 Create a role, add a `read` permission, assign it to John:
