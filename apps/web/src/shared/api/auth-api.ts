@@ -1,13 +1,15 @@
-import type { AuthResponse, LoginInput, RegisterInput, Session, UserResponse } from '@amcore/shared'
+import type {
+  AuthResponse,
+  LoginInput,
+  RegisterInput,
+  SessionsListResponse,
+  UserResponse,
+} from '@amcore/shared'
 
 import { apiClient } from './client'
 
 interface MeResponse {
   user: UserResponse
-}
-
-interface SessionsResponse {
-  sessions: Session[]
 }
 
 interface MessageResponse {
@@ -35,8 +37,11 @@ export const authApi = {
     return response.data
   },
 
-  getSessions: async (): Promise<SessionsResponse> => {
-    const response = await apiClient.get<SessionsResponse>('/auth/sessions')
+  // OB-05: `/auth/sessions` returns the canonical paginated envelope
+  // `{ data, total, page, limit }` per ADR-036. Read `body.data[i]`,
+  // not the legacy `body.sessions[i]`.
+  getSessions: async (): Promise<SessionsListResponse> => {
+    const response = await apiClient.get<SessionsListResponse>('/auth/sessions')
     return response.data
   },
 
