@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { PinoLogger } from 'nestjs-pino'
 
 import { EmailService } from './email.service'
-import type { EmailProvider, WelcomeEmailData } from './email.types'
+import type { EmailProvider, SendEmailJobData, WelcomeEmailData } from './email.types'
 import { EmailTemplate } from './email.types'
 
 import { EnvService } from '@/env/env.service'
@@ -106,7 +106,7 @@ describe('EmailService', () => {
         template: EmailTemplate.WELCOME,
         to: 'test@example.com',
         data: { name: 'Test User', email: 'test@example.com' },
-      }
+      } satisfies SendEmailJobData
 
       await service.queue(jobData)
 
