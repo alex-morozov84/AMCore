@@ -160,25 +160,32 @@ Use one key per (owner, organization) pair. To grant cross-org access, issue mul
 
 **Endpoint:** `GET /api/v1/api-keys` — **JWT only**.
 
-Returns all keys for the authenticated user as a raw array. No secret fields are exposed.
+Paginated list (ADR-036). Accepts `?page=N&limit=M` with `1 ≤ page`
+and `1 ≤ limit ≤ 100`; defaults `page=1, limit=20`. Keys are ordered
+newest first (`createdAt DESC, id ASC`). No secret fields are exposed.
 
 ```bash
-curl https://api.example.com/api/v1/api-keys \
+curl 'https://api.example.com/api/v1/api-keys?page=1&limit=20' \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
 ```json
-[
-  {
-    "id": "cm1xyz...",
-    "name": "CI Pipeline",
-    "organizationId": "cm1abc...",
-    "scopes": ["read:User", "read:Organization"],
-    "expiresAt": "2027-01-01T00:00:00.000Z",
-    "lastUsedAt": "2026-05-15T08:15:00.000Z",
-    "createdAt": "2026-05-01T10:00:00.000Z"
-  }
-]
+{
+  "data": [
+    {
+      "id": "cm1xyz...",
+      "name": "CI Pipeline",
+      "organizationId": "cm1abc...",
+      "scopes": ["read:User", "read:Organization"],
+      "expiresAt": "2027-01-01T00:00:00.000Z",
+      "lastUsedAt": "2026-05-15T08:15:00.000Z",
+      "createdAt": "2026-05-01T10:00:00.000Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20
+}
 ```
 
 `lastUsedAt` is updated on a best-effort basis (throttled cache) — it's diagnostic, not authoritative.

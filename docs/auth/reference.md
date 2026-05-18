@@ -102,11 +102,14 @@ self-check endpoint for integrations.
 
 #### `GET /auth/sessions` 🔑
 
+Paginated list (ADR-036). Accepts the canonical `?page=N&limit=M` query
+parameters (`1 ≤ page`, `1 ≤ limit ≤ 100`; defaults `page=1, limit=20`).
+
 **Response** `200`:
 
 ```json
 {
-  "sessions": [
+  "data": [
     {
       "id": "sess_...",
       "userAgent": "Mozilla/5.0...",
@@ -114,7 +117,10 @@ self-check endpoint for integrations.
       "createdAt": "2024-03-20T10:00:00.000Z",
       "current": true
     }
-  ]
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20
 }
 ```
 
@@ -305,23 +311,29 @@ scopes return `400` with codes from the
 
 #### `GET /api-keys` 🔑
 
-JWT required. Returns a raw array of the caller's keys (no wrapper, no
-secret fields).
+JWT required. Paginated list (ADR-036). Accepts `?page=N&limit=M`
+(`1 ≤ page`, `1 ≤ limit ≤ 100`; defaults `page=1, limit=20`). No
+secret fields in the response.
 
 **Response** `200`:
 
 ```json
-[
-  {
-    "id": "cm1xyz...",
-    "name": "CI Pipeline",
-    "organizationId": "cm1abc...",
-    "scopes": ["read:User"],
-    "expiresAt": null,
-    "lastUsedAt": "2026-05-15T08:15:00.000Z",
-    "createdAt": "2026-05-01T10:00:00.000Z"
-  }
-]
+{
+  "data": [
+    {
+      "id": "cm1xyz...",
+      "name": "CI Pipeline",
+      "organizationId": "cm1abc...",
+      "scopes": ["read:User"],
+      "expiresAt": null,
+      "lastUsedAt": "2026-05-15T08:15:00.000Z",
+      "createdAt": "2026-05-01T10:00:00.000Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20
+}
 ```
 
 ---

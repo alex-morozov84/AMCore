@@ -75,8 +75,14 @@ A new `refresh_token` cookie is set with the rotated token.
 
 **Endpoint:** `GET /api/v1/auth/sessions`
 
+Paginated list (ADR-036). Accepts the canonical pagination query
+parameters: `?page=N&limit=M` with `1 ≤ page` and
+`1 ≤ limit ≤ 100`; both default to `page=1, limit=20` if omitted.
+Sessions are ordered newest first (`createdAt DESC, id ASC`) so page
+boundaries are deterministic.
+
 ```bash
-curl https://api.amcore.dev/api/v1/auth/sessions \
+curl 'https://api.amcore.dev/api/v1/auth/sessions?page=1&limit=20' \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
@@ -84,7 +90,7 @@ curl https://api.amcore.dev/api/v1/auth/sessions \
 
 ```json
 {
-  "sessions": [
+  "data": [
     {
       "id": "sess_abc123",
       "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36...",
@@ -99,7 +105,10 @@ curl https://api.amcore.dev/api/v1/auth/sessions \
       "createdAt": "2024-03-18T14:22:00.000Z",
       "current": false
     }
-  ]
+  ],
+  "total": 2,
+  "page": 1,
+  "limit": 20
 }
 ```
 
