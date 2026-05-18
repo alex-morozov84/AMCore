@@ -10,6 +10,7 @@ import {
   Query,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import { ZodSerializerDto } from 'nestjs-zod'
 
 import {
@@ -86,6 +87,10 @@ export class AdminController {
 
   @Patch('users/:id')
   @ApiOperation({ summary: 'Update user system role — SUPER_ADMIN only' })
+  // OB-03: privileged operation, but routine enough that the
+  // default `admin` 5/min bucket is too tight. 20/min keeps admins
+  // unblocked while still rate-limiting credential-theft attempts.
+  @Throttle({ admin: { limit: 20, ttl: 60_000 } })
   @ZodSerializerDto(AdminUserResponseDto)
   updateUserSystemRole(
     @CurrentUser() actor: RequestPrincipal,
@@ -98,6 +103,9 @@ export class AdminController {
   @Post('cleanup')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Manually trigger expired records cleanup — SUPER_ADMIN only' })
+  // OB-03: heavy DB sweep. Default `admin` bucket (5/min) applies —
+  // no override needed.
+  @Throttle({ admin: { limit: 5, ttl: 60_000 } })
   runCleanup(@CurrentUser() actor: RequestPrincipal): Promise<CleanupResult> {
     return this.adminService.runCleanup(actor)
   }

@@ -253,6 +253,41 @@ describe('Admin (e2e)', () => {
   })
 
   /**
+   * OB-03: privileged admin operations are throttled via a dedicated
+   * `admin` named bucket (`@nestjs/throttler` v6). Storage is reset
+   * between tests via `cleanDatabase` -> `resetThrottlerStorage`, so
+   * the 6th call here is the first one to exhaust the bucket — the
+   * test does NOT depend on what the first 5 cleanups actually did
+   * (counts vary because cleanup mutates DB state), only that the
+   * throttle gate fires.
+   *
+   * If this test ever proves flaky on CI under load, drop it — the
+   * `@nestjs/throttler` runtime is covered by its own suite, and the
+   * decorator metadata is verified by typecheck. We prefer one
+   * focused e2e over a fragile metadata-key probe because the
+   * THROTTLER_* constants are not re-exported from the package's
+   * public `index` and a metadata test would couple us to internals.
+   */
+  describe('OB-03: admin operations throttle on 6th rapid call', () => {
+    it('POST /admin/cleanup → 429 on the 6th call within the 5/min admin bucket', async () => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      for (let i = 0; i < 5; i++) {
+        await request(app.getHttpServer())
+          .post('/admin/cleanup')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+      }
+
+      await request(app.getHttpServer())
+        .post('/admin/cleanup')
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(429)
+    })
+  })
+
+  /**
    * OA-09: protect SUPER_ADMIN role transitions.
    *
    * Self-demotion (foot-gun protection) is the only path that the

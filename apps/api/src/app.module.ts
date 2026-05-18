@@ -99,6 +99,11 @@ import { ShutdownService } from './shutdown.service'
     }),
 
     // Rate limiting
+    //
+    // OB-03: `admin` is a dedicated, stricter named bucket for
+    // privileged admin operations. It applies on top of `short` and
+    // `long`. Routes opt in via `@Throttle({ admin: { ... } })`; the
+    // bucket is inert for any handler that does not declare it.
     ThrottlerModule.forRoot([
       {
         name: 'short',
@@ -109,6 +114,11 @@ import { ShutdownService } from './shutdown.service'
         name: 'long',
         ttl: 60000, // 1 minute
         limit: 100, // 100 requests per minute
+      },
+      {
+        name: 'admin',
+        ttl: 60_000, // 1 minute
+        limit: 5, // 5 privileged operations per minute — overridable per-route
       },
     ]),
 
