@@ -62,6 +62,9 @@ model User {
   emailVerificationTokens  EmailVerificationToken[]
   memberships              OrgMember[]
   apiKeys                  ApiKey[]
+  invitesSent              OrgInvite[] @relation("InvitesSent")
+  invitesAccepted          OrgInvite[] @relation("InvitesAccepted")
+  invitesRevoked           OrgInvite[] @relation("InvitesRevoked")
 
   @@map("users")
   @@schema("core")
@@ -210,6 +213,7 @@ model Organization {
   roles       Role[]
   permissions Permission[]
   apiKeys     ApiKey[]
+  invites     OrgInvite[]
 
   @@map("organizations")
   @@schema("core")
@@ -254,6 +258,7 @@ model Role {
   organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   permissions  RolePermission[]
   members      MemberRole[]
+  invites      OrgInvite[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -287,5 +292,53 @@ model RolePermission {
 
   @@id([roleId, permissionId])
   @@map("role_permissions")
+  @@schema("core")
+}
+
+// ===========================================
+// Organization Invites (OB-02)
+// ===========================================
+//
+// Pending-invite model for org membership. Replaces the previous
+// "user must already exist" flow, which leaked platform-wide
+// registration state via 404 vs 201 status-code deltas.
+//
+// Identity is bound by canonical email at create time and
+// re-verified at accept time against the authenticated caller's
+// `emailCanonical`. The raw token lives only inside the email
+// body; only `tokenHash` (SHA-256) is at rest.
+//
+// Uniqueness is enforced via a Postgres partial unique index
+// (declared declaratively here via `@@unique(..., where: {...})`
+// using the `partialIndexes` preview feature). The constraint
+// only applies to active invites — accepted or revoked rows can
+// coexist with a new active invite for the same (org, email)
+// pair, so legitimate re-invite after revoke/accept is possible.
+model OrgInvite {
+  id               String   @id @default(cuid())
+  organizationId   String
+  emailCanonical   String
+  email            String
+  roleId           String?
+  invitedById      String?
+  tokenHash        String   @unique
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  revokedAt        DateTime?
+  revokedById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           Role?        @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  invitedBy      User?        @relation("InvitesSent", fields: [invitedById], references: [id], onDelete: SetNull)
+  acceptedByUser User?        @relation("InvitesAccepted", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  revokedByUser  User?        @relation("InvitesRevoked", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, emailCanonical], where: { acceptedAt: null, revokedAt: null })
+  @@index([emailCanonical])
+  @@index([expiresAt])
+  @@map("org_invites")
   @@schema("core")
 }

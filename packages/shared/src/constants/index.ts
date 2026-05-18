@@ -40,6 +40,20 @@ export enum ApiKeyScopeErrorCode {
   API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN = 'API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN',
 }
 
+// Invite flow error codes (OB-02).
+//
+// `INVITE_INVALID_OR_EXPIRED` is deliberately umbrella — token not
+// found, expired, revoked, already accepted, or email mismatch all
+// collapse to one code with one generic message. The accept side must
+// be non-enumerating for invite-token guesses; distinguishing the
+// underlying state would let an attacker probe a stolen token to learn
+// "the invite exists but is for someone else" vs "no such invite".
+export enum InviteErrorCode {
+  INVITE_INVALID_OR_EXPIRED = 'INVITE_INVALID_OR_EXPIRED',
+  INVITE_ALREADY_MEMBER = 'INVITE_ALREADY_MEMBER',
+  INVITE_EMAIL_NOT_VERIFIED = 'INVITE_EMAIL_NOT_VERIFIED',
+}
+
 // HTTP Status codes
 export const HTTP_STATUS = {
   OK: 200,
