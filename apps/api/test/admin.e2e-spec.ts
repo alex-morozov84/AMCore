@@ -87,6 +87,52 @@ describe('Admin (e2e)', () => {
     })
   })
 
+  /**
+   * OA-07: admin responses must not expose `passwordHash` (argon2 hash)
+   * or `emailCanonical` (internal normalization). `ZodSerializerDto`
+   * strips anything outside `adminUserResponseSchema` at the transport
+   * layer; the Prisma `select` allowlist prevents the DB from reading
+   * those columns in the first place. Both must hold.
+   */
+  describe('OA-07: admin user responses exclude passwordHash', () => {
+    it('GET /admin/users → 200 with no passwordHash and no emailCanonical', async () => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      const res = await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(200)
+
+      expect(res.body.data.length).toBeGreaterThan(0)
+      for (const user of res.body.data) {
+        expect(user).not.toHaveProperty('passwordHash')
+        expect(user).not.toHaveProperty('emailCanonical')
+        expect(typeof user.createdAt).toBe('string')
+        expect(typeof user.updatedAt).toBe('string')
+        expect(user.systemRole).toBeDefined()
+      }
+    })
+
+    it('PATCH /admin/users/:id → 200 with no passwordHash and no emailCanonical', async () => {
+      const { userId: targetId } = await registerAndGetToken('target@example.com')
+      const { userId: adminId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(adminId)
+
+      const res = await request(app.getHttpServer())
+        .patch(`/admin/users/${targetId}`)
+        .set('Authorization', `Bearer ${superToken}`)
+        .send({ systemRole: SystemRole.SuperAdmin })
+        .expect(200)
+
+      expect(res.body).not.toHaveProperty('passwordHash')
+      expect(res.body).not.toHaveProperty('emailCanonical')
+      expect(res.body.systemRole).toBe(SystemRole.SuperAdmin)
+      expect(typeof res.body.createdAt).toBe('string')
+      expect(typeof res.body.updatedAt).toBe('string')
+    })
+  })
+
   describe('PATCH /admin/users/:id', () => {
     it('promotes user to SUPER_ADMIN', async () => {
       const { userId: targetId } = await registerAndGetToken('target@example.com')

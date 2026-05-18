@@ -67,7 +67,14 @@ export {
 export { userSchema, type User } from './user'
 
 // Admin schemas
-export { updateUserSystemRoleSchema, type UpdateUserSystemRoleInput } from './admin'
+export {
+  updateUserSystemRoleSchema,
+  adminUserResponseSchema,
+  adminUserListResponseSchema,
+  type UpdateUserSystemRoleInput,
+  type AdminUserResponse,
+  type AdminUserListResponse,
+} from './admin'
 
 // API Keys schemas
 export { createApiKeySchema, type CreateApiKeyInput } from './api-keys'

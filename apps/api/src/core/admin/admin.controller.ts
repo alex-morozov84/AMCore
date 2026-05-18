@@ -10,15 +10,22 @@ import {
   Query,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
-import type { Organization, User } from '@prisma/client'
+import type { Organization } from '@prisma/client'
+import { ZodSerializerDto } from 'nestjs-zod'
 
-import { AuthType, SystemRole } from '@amcore/shared'
+import {
+  type AdminUserListResponse,
+  type AdminUserResponse,
+  AuthType,
+  SystemRole,
+} from '@amcore/shared'
 
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
+import { AdminUserListResponseDto, AdminUserResponseDto } from './dto/admin-user-response.dto'
 import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
 
 /**
@@ -53,16 +60,21 @@ export class AdminController {
   @ApiOperation({ summary: 'List all users — SUPER_ADMIN only' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ZodSerializerDto(AdminUserListResponseDto)
   findAllUsers(
     @Query('page') page?: number,
     @Query('limit') limit?: number
-  ): Promise<{ data: User[]; total: number }> {
+  ): Promise<AdminUserListResponse> {
     return this.adminService.findAllUsers(page, limit)
   }
 
   @Patch('users/:id')
   @ApiOperation({ summary: 'Update user system role — SUPER_ADMIN only' })
-  updateUserSystemRole(@Param('id') id: string, @Body() dto: UpdateSystemRoleDto): Promise<User> {
+  @ZodSerializerDto(AdminUserResponseDto)
+  updateUserSystemRole(
+    @Param('id') id: string,
+    @Body() dto: UpdateSystemRoleDto
+  ): Promise<AdminUserResponse> {
     return this.adminService.updateUserSystemRole(id, dto.systemRole)
   }
 
