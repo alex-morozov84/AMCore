@@ -8,6 +8,7 @@ import { MembersController } from './members.controller'
 import { OrganizationsController } from './organizations.controller'
 import { OrganizationsService } from './organizations.service'
 import { RoleService } from './role.service'
+import { RoleAssignabilityService } from './role-assignability.service'
 import { RolesController } from './roles.controller'
 
 @Module({
@@ -16,7 +17,7 @@ import { RolesController } from './roles.controller'
     AuthModule, // Provides TokenService (for /switch) + AuthenticationGuard (global)
   ],
   controllers: [OrganizationsController, MembersController, RolesController],
-  providers: [OrganizationsService, MemberService, RoleService],
+  providers: [OrganizationsService, MemberService, RoleService, RoleAssignabilityService],
   exports: [OrganizationsService],
 })
 export class OrganizationsModule {}

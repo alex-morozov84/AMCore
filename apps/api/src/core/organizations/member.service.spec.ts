@@ -17,6 +17,7 @@ import { EmailIdentityService } from '../auth/email-identity.service'
 import type { InviteMemberDto } from './dto'
 import { MemberService } from './member.service'
 import type { OrganizationsService } from './organizations.service'
+import { RoleAssignabilityService } from './role-assignability.service'
 
 describe('MemberService', () => {
   let service: MemberService
@@ -84,7 +85,8 @@ describe('MemberService', () => {
     service = new MemberService(
       prisma as unknown as PrismaService,
       orgsService as unknown as OrganizationsService,
-      new EmailIdentityService()
+      new EmailIdentityService(),
+      new RoleAssignabilityService()
     )
     // After OA-05 the invite() and assignRole() flows execute their
     // real work inside $transaction (the role-ownership check, the

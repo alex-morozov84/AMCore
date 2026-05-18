@@ -14,6 +14,7 @@ import { EmailIdentityService } from '../auth/email-identity.service'
 
 import type { InviteMemberDto } from './dto'
 import { OrganizationsService } from './organizations.service'
+import { RoleAssignabilityService } from './role-assignability.service'
 
 type PrismaTx = Prisma.TransactionClient
 
@@ -22,7 +23,8 @@ export class MemberService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orgsService: OrganizationsService,
-    private readonly emailIdentity: EmailIdentityService
+    private readonly emailIdentity: EmailIdentityService,
+    private readonly roleAssignability: RoleAssignabilityService
   ) {}
 
   /** Add a user to the organization by email. User must already have an account. */
@@ -47,7 +49,7 @@ export class MemberService {
     const member = await this.prisma.$transaction(async (tx) => {
       // OA-05: validate role ownership inside the same transaction so
       // the role's organizationId can't change between check and write.
-      await this.assertRoleAssignable(roleId, orgId, tx)
+      await this.roleAssignability.assert(roleId, orgId, tx)
       const m = await tx.orgMember.create({
         data: { userId: targetUser.id, organizationId: orgId },
       })
@@ -117,7 +119,7 @@ export class MemberService {
     // transaction for the same reason.
     // OA-12: bump aclVersion inside the same transaction.
     await this.prisma.$transaction(async (tx) => {
-      await this.assertRoleAssignable(roleId, orgId, tx)
+      await this.roleAssignability.assert(roleId, orgId, tx)
 
       const alreadyAssigned = await tx.memberRole.findUnique({
         where: { memberId_roleId: { memberId: member.id, roleId } },
@@ -197,38 +199,6 @@ export class MemberService {
    */
   private async acquireXactLock(tx: PrismaTx, key: string): Promise<void> {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0)::bigint)`
-  }
-
-  /**
-   * OA-05: a role can be attached to a member of `orgId` only when it
-   * is either:
-   *   - a system role (`isSystem === true && organizationId === null`), or
-   *   - a custom role owned by the same organization
-   *     (`organizationId === orgId`).
-   *
-   * Anything else — a custom role from a foreign organization, a row
-   * that doesn't exist, or a system row with the wrong shape — is
-   * rejected with a uniform 403. The uniform response is deliberate:
-   * distinguishing "role belongs to org B" from "role does not exist"
-   * would let an attacker enumerate roleIds across orgs by status
-   * code or timing.
-   *
-   * Must be called inside the same transaction that creates the
-   * `MemberRole` link, otherwise the role's `organizationId` could
-   * change between the check and the write.
-   */
-  private async assertRoleAssignable(roleId: string, orgId: string, tx: PrismaTx): Promise<void> {
-    const role = await tx.role.findUnique({
-      where: { id: roleId },
-      select: { organizationId: true, isSystem: true },
-    })
-
-    const isSystemRole = role?.isSystem === true && role.organizationId === null
-    const isOwnedCustomRole = role !== null && role.organizationId === orgId
-
-    if (!isSystemRole && !isOwnedCustomRole) {
-      throw new ForbiddenException('Role is not assignable in this organization')
-    }
   }
 
   private assertOrgContext(principal: RequestPrincipal, orgId: string): void {
