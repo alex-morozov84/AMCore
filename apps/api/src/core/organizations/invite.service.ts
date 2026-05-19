@@ -67,17 +67,13 @@ type CreateInviteBranch =
  * canonical-email match runs against a fresh user row from
  * `UserCacheService`, not stale JWT claims).
  *
- * **Stage B notes** (this file ships in B.2, controllers in C, email
- * wiring + cleanup + audit-doc + frontend in D):
- *
- *  - `createInvite` generates the raw token, stores its SHA-256, and
- *    discards the raw value at the end of the call. Stage D updates
- *    this site to enqueue an `ORG_INVITE` email job carrying the raw
- *    token before discard. Between Stage C (route exposed) and Stage D
- *    (email send wired) the route works but no email reaches the
- *    invitee — accepted dev-only intermediate state.
- *  - Old `MemberService.invite` remains in place until Stage C swaps
- *    the controller; both services coexist for one stage.
+ * **Stage D wiring still pending.** `createInvite` generates the raw
+ * token, stores its SHA-256, and discards the raw value at the end of
+ * the call (see `TODO (Stage D)` below). Until Stage D enqueues an
+ * `ORG_INVITE` email job carrying the raw token before discard, the
+ * accept route is callable but no email reaches the invitee — an
+ * accepted dev-only intermediate state called out in public docs and
+ * Swagger summaries.
  */
 @Injectable()
 export class InviteService {

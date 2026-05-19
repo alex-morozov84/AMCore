@@ -239,11 +239,11 @@ curl -X POST https://api.amcore.dev/api/v1/organizations \
 ### Invite a member
 
 Invites are a two-step flow. The admin creates a pending invite by
-email; the recipient accepts the invite from the email link to attach
-the membership. The create endpoint always returns the same
-`202 { "status": "invited" }` regardless of whether the email already
-has an account, is already a member, or is unknown — so the response
-shape cannot be used to enumerate platform users.
+email; the recipient accepts the invite to attach the membership. The
+create endpoint always returns the same `202 { "status": "invited" }`
+regardless of whether the email already has an account, is already a
+member, or is unknown — so the response shape cannot be used to
+enumerate platform users.
 
 ```bash
 # Step 1 — admin: create a pending invite
@@ -253,16 +253,24 @@ curl -X POST https://api.amcore.dev/api/v1/organizations/org_xyz/members/invite 
 # 202 Accepted
 # { "status": "invited" }
 
-# Step 2 — recipient: accept with the token from the invite email
+# Step 2 — recipient: accept with the raw invite token
 curl -X POST https://api.amcore.dev/api/v1/auth/invites/accept \
   -H "Authorization: Bearer <recipient bearer token>" \
-  -d '{"token": "<token from invite email>"}'
+  -d '{"token": "<raw invite token>"}'
 # 200 OK
 # { "organizationId": "org_xyz", "roleId": "role_member" }
 ```
 
 The recipient must be authenticated as the canonical-email owner of
 the invite, and that account must have a verified email address.
+
+> **Token delivery is wired in the next hardening stage.** The
+> create/list/revoke/accept HTTP surface is live and stable, but the
+> automatic invite email that hands the invitee their raw token is
+> still in development (the runtime currently generates and discards
+> the token until that stage lands). Until then, exercising the accept
+> route end-to-end requires reading the token directly out of the
+> `OrgInvite` row.
 
 ### Create a role and attach permissions
 

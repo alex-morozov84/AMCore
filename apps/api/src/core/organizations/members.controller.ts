@@ -56,7 +56,10 @@ export class MembersController {
       '{status:"invited"} regardless of whether the email already has an ' +
       'account, is already a member, or is unknown. The pending invite is ' +
       'attached to a membership when the recipient calls ' +
-      'POST /auth/invites/accept with the token from the invite email.',
+      'POST /auth/invites/accept with the raw invite token. ' +
+      'Note: automatic invite-email delivery of the raw token lands in ' +
+      'the next hardening stage; the runtime currently generates and ' +
+      'discards the token until that stage ships.',
   })
   invite(
     @Param('orgId') orgId: string,

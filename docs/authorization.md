@@ -113,21 +113,29 @@ The response is always uniform:
 { "status": "invited" }
 ```
 
-The invitee accepts the pending invite using the token delivered in
-the invite email/link:
+The invitee accepts the pending invite by posting the raw invite
+token:
 
 ```http
 POST /api/v1/auth/invites/accept
 Authorization: Bearer <invitee bearer token>
 Content-Type: application/json
 
-{ "token": "<token from invite email>" }
+{ "token": "<raw invite token>" }
 ```
 
 A successful accept attaches the membership and returns
 `{ "organizationId": "...", "roleId": "..." }`. The accepting user must
 own the canonical email the invite was issued for and must have a
 verified email address.
+
+> **Token delivery is wired in the next hardening stage.** The HTTP
+> create/list/revoke/accept surface is live and stable, but the
+> automatic invite email that hands the invitee their raw token is
+> still in development (the runtime currently generates and discards
+> the token until that stage lands). For now, callers that need to
+> exercise the accept route end-to-end can read the token directly out
+> of the `OrgInvite` row.
 
 > The invitee does **not** need an account before the invite is sent —
 > they can register at any time before accepting.
