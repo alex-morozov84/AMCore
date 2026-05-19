@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import type { OrgMember, Prisma } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
 import type { RequestPrincipal } from '@amcore/shared'
 
@@ -10,62 +10,28 @@ import {
   NotFoundException,
 } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
-import { EmailIdentityService } from '../auth/email-identity.service'
 
-import type { InviteMemberDto } from './dto'
 import { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
 
 type PrismaTx = Prisma.TransactionClient
 
+/**
+ * Membership lifecycle service for `MembersController`.
+ *
+ * Previously also owned the `invite()` flow with the
+ * "user must already exist" contract. Stage C of OB-02 moved the
+ * invite flow to `InviteService` (pending-invite, uniform 202
+ * response, accept-at-membership). The post-membership operations
+ * — removeMember / assignRole / removeRole — stay here.
+ */
 @Injectable()
 export class MemberService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orgsService: OrganizationsService,
-    private readonly emailIdentity: EmailIdentityService,
     private readonly roleAssignability: RoleAssignabilityService
   ) {}
-
-  /** Add a user to the organization by email. User must already have an account. */
-  async invite(
-    orgId: string,
-    dto: InviteMemberDto,
-    principal: RequestPrincipal
-  ): Promise<OrgMember> {
-    this.assertOrgContext(principal, orgId)
-
-    const emailCanonical = this.emailIdentity.canonicalize(dto.email)
-    const targetUser = await this.prisma.user.findUnique({ where: { emailCanonical } })
-    if (!targetUser) throw new NotFoundException('No account found with this email address')
-
-    const existing = await this.prisma.orgMember.findUnique({
-      where: { userId_organizationId: { userId: targetUser.id, organizationId: orgId } },
-    })
-    if (existing) throw new ConflictException('User is already a member of this organization')
-
-    const roleId = dto.roleId ?? (await this.getSystemRoleId('MEMBER'))
-
-    const member = await this.prisma.$transaction(async (tx) => {
-      // OA-05: validate role ownership inside the same transaction so
-      // the role's organizationId can't change between check and write.
-      await this.roleAssignability.assert(roleId, orgId, tx)
-      const m = await tx.orgMember.create({
-        data: { userId: targetUser.id, organizationId: orgId },
-      })
-      await tx.memberRole.create({ data: { memberId: m.id, roleId } })
-      // OA-12: bump aclVersion inside the same transaction so the
-      // cache version cannot diverge from the ACL state on a
-      // transient DB failure between the membership write and the
-      // bump. Cache invalidation (OA-04) is intentionally outside
-      // the transaction — see post-commit call below.
-      await this.orgsService.bumpAclVersionTx(orgId, tx)
-      return m
-    })
-
-    await this.orgsService.invalidateAclVersion(orgId)
-    return member
-  }
 
   async removeMember(
     orgId: string,
@@ -210,7 +176,7 @@ export class MemberService {
   }
 
   private async getSystemRoleId(
-    name: 'ADMIN' | 'MEMBER',
+    name: 'ADMIN',
     db: PrismaService | PrismaTx = this.prisma
   ): Promise<string> {
     const role = await db.role.findFirst({

@@ -1,46 +1,69 @@
 import { Body, Controller, Delete, HttpCode, HttpStatus, Param, Post } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
-import type { OrgMember } from '@prisma/client'
+import { ZodSerializerDto } from 'nestjs-zod'
 
-import { Action, AuthType, type RequestPrincipal, Subject } from '@amcore/shared'
+import {
+  Action,
+  AuthType,
+  type InviteResponse,
+  type RequestPrincipal,
+  Subject,
+} from '@amcore/shared'
 
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
-import { InviteMemberDto } from './dto'
+import { CreateInviteDto, InviteResponseDto } from './dto'
+import { InviteService } from './invite.service'
 import { MemberService } from './member.service'
 
 /**
  * Class-level `@Auth(AuthType.Bearer, AuthType.ApiKey)` is an explicit
- * dual-auth opt-in registered in ADR-034's allowlist (runtime default
- * after Stage 1c is `[AuthType.Bearer]`). API keys may invite/remove
- * /assign roles within their bound organization subject to the CASL
- * `userPerms ∩ scopes` model (e.g. `manage:Organization` scope from a
- * SUPER_ADMIN-owned key); the per-handler `@CheckPolicies` decorators
- * are the actual authorization gate.
+ * dual-auth opt-in registered in ADR-034's allowlist. API keys may
+ * invite/remove/assign roles within their bound organization subject to
+ * the CASL `userPerms ∩ scopes` model; the per-handler `@CheckPolicies`
+ * decorators are the actual authorization gate.
+ *
+ * OB-02 Stage C deliberately preserves dual-auth on the invite handler —
+ * the credential matrix is unchanged by the move to a non-enumerating
+ * pending-invite contract. Narrowing invite to bearer-only is a
+ * separate decision that would require an ADR-034 amendment and an
+ * allowlist deletion. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OB-02.
  *
  * The ADR-034 allowlist in `auth-decorator-coverage.spec.ts` enumerates
  * each handler in this controller individually — adding a new handler
  * also requires an allowlist entry (via ADR amendment) for the
- * metadata test to pass. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
+ * metadata test to pass. See OA-11.
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
 @Controller('organizations/:orgId/members')
 @Auth(AuthType.Bearer, AuthType.ApiKey)
 export class MembersController {
-  constructor(private readonly memberService: MemberService) {}
+  constructor(
+    private readonly memberService: MemberService,
+    private readonly inviteService: InviteService
+  ) {}
 
   @Post('invite')
+  @HttpCode(HttpStatus.ACCEPTED)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
-  @ApiOperation({ summary: 'Add a user to the organization by email — ADMIN only' })
+  @ZodSerializerDto(InviteResponseDto)
+  @ApiOperation({
+    summary:
+      'Invite a user by email — ADMIN only. Returns a uniform 202 ' +
+      '{status:"invited"} regardless of whether the email already has an ' +
+      'account, is already a member, or is unknown. The pending invite is ' +
+      'attached to a membership when the recipient calls ' +
+      'POST /auth/invites/accept with the token from the invite email.',
+  })
   invite(
     @Param('orgId') orgId: string,
-    @Body() dto: InviteMemberDto,
+    @Body() dto: CreateInviteDto,
     @CurrentUser() principal: RequestPrincipal
-  ): Promise<OrgMember> {
-    return this.memberService.invite(orgId, dto, principal)
+  ): Promise<InviteResponse> {
+    return this.inviteService.createInvite(orgId, dto, principal)
   }
 
   @Delete(':userId')

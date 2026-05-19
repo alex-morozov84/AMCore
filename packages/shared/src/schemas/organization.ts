@@ -2,7 +2,6 @@ import { z } from 'zod'
 
 import { Action, Subject } from '../enums/permissions'
 
-import { emailInputSchema } from './auth'
 import { paginatedResponseSchema } from './pagination'
 
 // ===========================================
@@ -34,14 +33,6 @@ export const updateOrganizationSchema = z.object({
 })
 
 export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>
-
-/** Invite member by email */
-export const inviteMemberSchema = z.object({
-  email: emailInputSchema,
-  roleId: z.string().optional(), // defaults to system MEMBER role if omitted
-})
-
-export type InviteMemberInput = z.infer<typeof inviteMemberSchema>
 
 /** Create custom role */
 export const createRoleSchema = z.object({

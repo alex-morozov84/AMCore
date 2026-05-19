@@ -3,9 +3,11 @@ import { Module } from '@nestjs/common'
 import { PrismaModule } from '../../prisma'
 import { AuthModule } from '../auth/auth.module'
 
+import { AuthInvitesController } from './auth-invites.controller'
 import { InviteService } from './invite.service'
 import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
 import { InviteRateLimiterService } from './invite-rate-limiter.service'
+import { InvitesController } from './invites.controller'
 import { MemberService } from './member.service'
 import { MembersController } from './members.controller'
 import { OrganizationsController } from './organizations.controller'
@@ -19,7 +21,13 @@ import { RolesController } from './roles.controller'
     PrismaModule,
     AuthModule, // Provides TokenService (for /switch) + AuthenticationGuard (global) + UserCacheService + EmailIdentityService
   ],
-  controllers: [OrganizationsController, MembersController, RolesController],
+  controllers: [
+    OrganizationsController,
+    MembersController,
+    RolesController,
+    InvitesController,
+    AuthInvitesController,
+  ],
   providers: [
     OrganizationsService,
     MemberService,

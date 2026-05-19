@@ -43,7 +43,6 @@ export {
 export {
   createOrganizationSchema,
   updateOrganizationSchema,
-  inviteMemberSchema,
   createRoleSchema,
   updateRoleSchema,
   assignPermissionSchema,
@@ -55,7 +54,6 @@ export {
   switchOrgResponseSchema,
   type CreateOrganizationInput,
   type UpdateOrganizationInput,
-  type InviteMemberInput,
   type CreateRoleInput,
   type UpdateRoleInput,
   type AssignPermissionInput,

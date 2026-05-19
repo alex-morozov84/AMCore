@@ -1,4 +1,4 @@
-import type { OrgMember, Role, User } from '@prisma/client'
+import type { OrgMember, Role } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
@@ -12,9 +12,7 @@ import {
   NotFoundException,
 } from '../../common/exceptions'
 import type { PrismaService } from '../../prisma'
-import { EmailIdentityService } from '../auth/email-identity.service'
 
-import type { InviteMemberDto } from './dto'
 import { MemberService } from './member.service'
 import type { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
@@ -26,23 +24,6 @@ describe('MemberService', () => {
     Pick<OrganizationsService, 'bumpAclVersion' | 'bumpAclVersionTx' | 'invalidateAclVersion'>
   >
 
-  const mockUser: User = {
-    id: 'user-2',
-    email: 'invited@example.com',
-    emailCanonical: 'invited@example.com',
-    emailVerified: false,
-    passwordHash: null,
-    name: null,
-    avatarUrl: null,
-    phone: null,
-    locale: 'ru',
-    timezone: 'Europe/Moscow',
-    systemRole: 'USER',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    lastLoginAt: null,
-  }
-
   const mockMember: OrgMember = {
     id: 'member-1',
     userId: 'user-2',
@@ -53,14 +34,6 @@ describe('MemberService', () => {
   const mockAdminRole: Role = {
     id: 'role-admin',
     name: 'ADMIN',
-    description: null,
-    isSystem: true,
-    organizationId: null,
-  }
-
-  const mockMemberRole: Role = {
-    id: 'role-member',
-    name: 'MEMBER',
     description: null,
     isSystem: true,
     organizationId: null,
@@ -85,164 +58,17 @@ describe('MemberService', () => {
     service = new MemberService(
       prisma as unknown as PrismaService,
       orgsService as unknown as OrganizationsService,
-      new EmailIdentityService(),
       new RoleAssignabilityService()
     )
-    // After OA-05 the invite() and assignRole() flows execute their
-    // real work inside $transaction (the role-ownership check, the
-    // membership / role-link write, and the conflict lookup for
-    // assignRole). Tests need the callback to actually run so they
-    // exercise that code. Delegating tx to the same prisma mock keeps
-    // the existing per-call mocks reusable inside the callback.
+    // After OA-05 the assignRole() flow executes its real work inside
+    // $transaction (the role-ownership check, the conflict lookup, and
+    // the role-link write). Tests need the callback to actually run so
+    // they exercise that code. Delegating tx to the same prisma mock
+    // keeps the existing per-call mocks reusable inside the callback.
     ;(prisma.$transaction as unknown as jest.Mock).mockImplementation(
       async (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma)
     )
     prisma.$executeRaw.mockResolvedValue(0 as never)
-  })
-
-  describe('invite', () => {
-    const dto: InviteMemberDto = {
-      email: 'invited@example.com',
-      roleId: 'role-member',
-    } as InviteMemberDto
-
-    it('creates membership with specified role', async () => {
-      prisma.user.findUnique.mockResolvedValue(mockUser)
-      prisma.orgMember.findUnique.mockResolvedValue(null)
-      // assertRoleAssignable inside the tx → role.findUnique returns
-      // a system role, allowed.
-      prisma.role.findUnique.mockResolvedValue(mockMemberRole)
-      prisma.orgMember.create.mockResolvedValue(mockMember)
-
-      const result = await service.invite('org-1', dto, principal)
-
-      expect(result).toEqual(mockMember)
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { emailCanonical: 'invited@example.com' },
-      })
-      expect(prisma.$transaction).toHaveBeenCalled()
-      expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
-      expect(orgsService.bumpAclVersionTx.mock.calls[0]?.[0]).toBe('org-1')
-      expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
-    })
-
-    it('looks up invited user by canonical email', async () => {
-      prisma.user.findUnique.mockResolvedValue(mockUser)
-      prisma.orgMember.findUnique.mockResolvedValue(null)
-      prisma.role.findFirst.mockResolvedValue(mockMemberRole)
-      prisma.role.findUnique.mockResolvedValue(mockMemberRole)
-      prisma.orgMember.create.mockResolvedValue(mockMember)
-
-      await service.invite(
-        'org-1',
-        { email: ' Invited@Example.COM ' } as InviteMemberDto,
-        principal
-      )
-
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { emailCanonical: 'invited@example.com' },
-      })
-    })
-
-    it('uses MEMBER system role when no roleId provided', async () => {
-      const dtoNoRole: InviteMemberDto = { email: 'invited@example.com' } as InviteMemberDto
-      prisma.user.findUnique.mockResolvedValue(mockUser)
-      prisma.orgMember.findUnique.mockResolvedValue(null)
-      prisma.role.findFirst.mockResolvedValue(mockMemberRole)
-      prisma.role.findUnique.mockResolvedValue(mockMemberRole)
-      prisma.orgMember.create.mockResolvedValue(mockMember)
-
-      await service.invite('org-1', dtoNoRole, principal)
-
-      expect(prisma.role.findFirst).toHaveBeenCalledWith({
-        where: { name: 'MEMBER', isSystem: true, organizationId: null },
-        select: { id: true },
-      })
-    })
-
-    it('throws ForbiddenException when org context mismatches', async () => {
-      const wrongPrincipal = { ...principal, organizationId: 'org-other' }
-      await expect(service.invite('org-1', dto, wrongPrincipal)).rejects.toThrow(ForbiddenException)
-    })
-
-    it('throws NotFoundException when invited email has no account', async () => {
-      prisma.user.findUnique.mockResolvedValue(null)
-      await expect(service.invite('org-1', dto, principal)).rejects.toThrow(NotFoundException)
-    })
-
-    it('throws ConflictException when user is already a member', async () => {
-      prisma.user.findUnique.mockResolvedValue(mockUser)
-      prisma.orgMember.findUnique.mockResolvedValue(mockMember)
-      await expect(service.invite('org-1', dto, principal)).rejects.toThrow(ConflictException)
-    })
-
-    // OA-05: role-ownership invariant. Three reject paths must all
-    // produce the same 403 + message so an attacker can't enumerate
-    // roleIds across orgs by status code or response shape.
-    describe('OA-05: role ownership', () => {
-      const foreignCustomRole: Role = {
-        id: 'role-from-org-b',
-        name: 'Editor',
-        description: null,
-        isSystem: false,
-        organizationId: 'org-b',
-      }
-      const sameOrgCustomRole: Role = {
-        id: 'role-from-org-1',
-        name: 'Editor',
-        description: null,
-        isSystem: false,
-        organizationId: 'org-1',
-      }
-
-      it('rejects invite with foreign-org custom roleId → 403', async () => {
-        prisma.user.findUnique.mockResolvedValue(mockUser)
-        prisma.orgMember.findUnique.mockResolvedValue(null)
-        prisma.role.findUnique.mockResolvedValue(foreignCustomRole)
-
-        await expect(
-          service.invite(
-            'org-1',
-            { email: 'invited@example.com', roleId: 'role-from-org-b' } as InviteMemberDto,
-            principal
-          )
-        ).rejects.toThrow(ForbiddenException)
-        // Defense-in-depth: write must NOT happen on the rejection path.
-        expect(prisma.orgMember.create).not.toHaveBeenCalled()
-        expect(prisma.memberRole.create).not.toHaveBeenCalled()
-      })
-
-      it('rejects invite with non-existent roleId → 403 (same message — no roleId enumeration)', async () => {
-        prisma.user.findUnique.mockResolvedValue(mockUser)
-        prisma.orgMember.findUnique.mockResolvedValue(null)
-        prisma.role.findUnique.mockResolvedValue(null)
-
-        await expect(
-          service.invite(
-            'org-1',
-            { email: 'invited@example.com', roleId: 'role-nonexistent' } as InviteMemberDto,
-            principal
-          )
-        ).rejects.toThrow(ForbiddenException)
-        expect(prisma.orgMember.create).not.toHaveBeenCalled()
-        expect(prisma.memberRole.create).not.toHaveBeenCalled()
-      })
-
-      it('accepts invite with same-org custom roleId', async () => {
-        prisma.user.findUnique.mockResolvedValue(mockUser)
-        prisma.orgMember.findUnique.mockResolvedValue(null)
-        prisma.role.findUnique.mockResolvedValue(sameOrgCustomRole)
-        prisma.orgMember.create.mockResolvedValue(mockMember)
-
-        await expect(
-          service.invite(
-            'org-1',
-            { email: 'invited@example.com', roleId: 'role-from-org-1' } as InviteMemberDto,
-            principal
-          )
-        ).resolves.toEqual(mockMember)
-      })
-    })
   })
 
   describe('removeMember', () => {

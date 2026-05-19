@@ -205,6 +205,42 @@ export async function cleanOrgData(prisma: PrismaService): Promise<void> {
 }
 
 /**
+ * Attach an existing user to an existing organization with a specific role,
+ * bypassing the HTTP invite/accept flow.
+ *
+ * Tests that exercise post-membership behaviour (RBAC freshness, role
+ * removal, cross-org boundary checks, etc.) used to chain through the
+ * legacy `POST /organizations/:orgId/members/invite` endpoint, which
+ * created the membership synchronously. After OB-02 Stage C the invite
+ * route no longer auto-creates a membership — it issues a pending
+ * `OrgInvite` row that is materialized only via `POST /auth/invites/accept`.
+ * Going through that flow in setup just to attach a known user to a
+ * known org is wasteful and obscures the test intent.
+ *
+ * This helper writes `OrgMember` + `MemberRole` rows directly and bumps
+ * the org's `aclVersion`. It does NOT invalidate any permissions cache —
+ * tests that care about cache freshness should warm the cache after
+ * calling this helper (see the OA-04/OA-12 regression for the pattern).
+ */
+export async function seedOrgMember(
+  prisma: PrismaService,
+  { orgId, userId, roleId }: { orgId: string; userId: string; roleId: string }
+): Promise<{ memberId: string }> {
+  return prisma.$transaction(async (tx) => {
+    const member = await tx.orgMember.create({
+      data: { userId, organizationId: orgId },
+      select: { id: true },
+    })
+    await tx.memberRole.create({ data: { memberId: member.id, roleId } })
+    await tx.organization.update({
+      where: { id: orgId },
+      data: { aclVersion: { increment: 1 } },
+    })
+    return { memberId: member.id }
+  })
+}
+
+/**
  * Seed system roles and permissions required for RBAC tests.
  * Idempotent — safe to call multiple times.
  */

@@ -106,7 +106,31 @@ Content-Type: application/json
 }
 ```
 
-> The invited user must already have an account.
+The response is always uniform:
+
+```http
+202 Accepted
+{ "status": "invited" }
+```
+
+The invitee accepts the pending invite using the token delivered in
+the invite email/link:
+
+```http
+POST /api/v1/auth/invites/accept
+Authorization: Bearer <invitee bearer token>
+Content-Type: application/json
+
+{ "token": "<token from invite email>" }
+```
+
+A successful accept attaches the membership and returns
+`{ "organizationId": "...", "roleId": "..." }`. The accepting user must
+own the canonical email the invite was issued for and must have a
+verified email address.
+
+> The invitee does **not** need an account before the invite is sent —
+> they can register at any time before accepting.
 
 ### 4. Switch to org context
 

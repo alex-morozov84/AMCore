@@ -236,13 +236,33 @@ curl -X POST https://api.amcore.dev/api/v1/organizations \
   -d '{"name": "Acme Corp", "slug": "acme-corp"}'
 ```
 
-### Add a member
+### Invite a member
+
+Invites are a two-step flow. The admin creates a pending invite by
+email; the recipient accepts the invite from the email link to attach
+the membership. The create endpoint always returns the same
+`202 { "status": "invited" }` regardless of whether the email already
+has an account, is already a member, or is unknown — so the response
+shape cannot be used to enumerate platform users.
 
 ```bash
+# Step 1 — admin: create a pending invite
 curl -X POST https://api.amcore.dev/api/v1/organizations/org_xyz/members/invite \
   -H "Authorization: Bearer eyJhbGci..." \
   -d '{"email": "member@example.com", "roleId": "role_member"}'
+# 202 Accepted
+# { "status": "invited" }
+
+# Step 2 — recipient: accept with the token from the invite email
+curl -X POST https://api.amcore.dev/api/v1/auth/invites/accept \
+  -H "Authorization: Bearer <recipient bearer token>" \
+  -d '{"token": "<token from invite email>"}'
+# 200 OK
+# { "organizationId": "org_xyz", "roleId": "role_member" }
 ```
+
+The recipient must be authenticated as the canonical-email owner of
+the invite, and that account must have a verified email address.
 
 ### Create a role and attach permissions
 

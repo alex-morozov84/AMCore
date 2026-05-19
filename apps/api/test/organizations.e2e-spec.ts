@@ -7,6 +7,7 @@ import {
   cleanDatabase,
   cleanOrgData,
   type E2ETestContext,
+  seedOrgMember,
   seedSystemRoles,
   setupE2ETest,
   teardownE2ETest,
@@ -309,24 +310,33 @@ describe('Organizations (e2e)', () => {
         .expect(201)
       const orgB = orgBRes.body.id as string
 
-      // userB switches into org B and invites userA as a MEMBER.
-      const switchRes = await request(app.getHttpServer())
-        .post(`/organizations/${orgB}/switch`)
-        .set('Authorization', `Bearer ${tokenB}`)
-        .expect(200)
-      const orgBToken = switchRes.body.accessToken as string
-
+      // Attach userA to org B as MEMBER directly. The OB-02 Stage C invite
+      // flow is two-step (pending invite + accept); going through it just
+      // to set up dual membership here would only obscure intent. The
+      // actual subject of this test is the API-key cross-org boundary.
       const rolesRes = await request(app.getHttpServer())
         .get(`/organizations/${orgB}/roles`)
-        .set('Authorization', `Bearer ${orgBToken}`)
+        .set(
+          'Authorization',
+          `Bearer ${
+            (
+              await request(app.getHttpServer())
+                .post(`/organizations/${orgB}/switch`)
+                .set('Authorization', `Bearer ${tokenB}`)
+                .expect(200)
+            ).body.accessToken as string
+          }`
+        )
         .expect(200)
       const memberRole = rolesRes.body.data.find((r: { name: string }) => r.name === 'MEMBER')
-
-      await request(app.getHttpServer())
-        .post(`/organizations/${orgB}/members/invite`)
-        .set('Authorization', `Bearer ${orgBToken}`)
-        .send({ email: 'user-a@example.com', roleId: memberRole.id })
-        .expect(201)
+      const userARow = await prisma.user.findUniqueOrThrow({
+        where: { emailCanonical: 'user-a@example.com' },
+      })
+      await seedOrgMember(prisma, {
+        orgId: orgB,
+        userId: userARow.id,
+        roleId: memberRole.id as string,
+      })
 
       // Sanity: userA is now a member of BOTH org A and org B. A
       // membership-only check would let the cross-org read through —
@@ -437,7 +447,7 @@ describe('Organizations (e2e)', () => {
         .expect(403)
     })
 
-    it('POST /organizations/:id/members/invite — invites existing user as MEMBER', async () => {
+    it('POST /organizations/:id/members/invite — returns uniform 202 and does NOT auto-create membership (OB-02 Stage C)', async () => {
       await registerAndLogin('member@example.com')
 
       const rolesRes = await request(app.getHttpServer())
@@ -445,14 +455,18 @@ describe('Organizations (e2e)', () => {
         .set('Authorization', `Bearer ${orgToken}`)
       const memberRole = rolesRes.body.data.find((r: { name: string }) => r.name === 'MEMBER')
 
-      await request(app.getHttpServer())
+      const inviteRes = await request(app.getHttpServer())
         .post(`/organizations/${orgId}/members/invite`)
         .set('Authorization', `Bearer ${orgToken}`)
         .send({ email: 'Member@Example.COM', roleId: memberRole.id })
-        .expect(201)
+        .expect(202)
 
+      expect(inviteRes.body).toEqual({ status: 'invited' })
+
+      // No membership is materialized until the invitee accepts. End-to-end
+      // accept flow + non-enumeration coverage lives in invites.e2e-spec.ts.
       const members = await prisma.orgMember.findMany({ where: { organizationId: orgId } })
-      expect(members).toHaveLength(2)
+      expect(members).toHaveLength(1) // only the org creator
     })
 
     it('POST /organizations/:id/roles — creates custom role', async () => {
@@ -616,15 +630,12 @@ describe('Organizations (e2e)', () => {
         .expect(201)
       const foreignRoleId = foreignRoleRes.body.id as string
 
-      // Register a target user (must exist for the invite-by-email
-      // lookup to succeed; otherwise we'd get a 404 from the user
-      // lookup and would not exercise the role-ownership branch).
-      await registerAndLogin('target@example.com')
-
-      // userA (admin in org A) attempts to invite target into org A
-      // with the foreign roleId from org B → must be 403, NOT 404
+      // userA (admin in org A) attempts to invite a target into org A
+      // with the foreign roleId from org B → must be 403, NOT 202
       // (uniform with the "roleId does not exist" path so an attacker
-      // cannot enumerate roleIds across orgs via status code).
+      // cannot enumerate roleIds across orgs via status code). The
+      // role-assignability check fires inside the createInvite tx
+      // before any email lookup, so target user existence is irrelevant.
       await request(app.getHttpServer())
         .post(`/organizations/${orgA}/members/invite`)
         .set('Authorization', `Bearer ${orgAToken}`)
@@ -652,12 +663,12 @@ describe('Organizations (e2e)', () => {
         .expect(200)
       const orgToken = switchRes.body.accessToken as string
 
-      await registerAndLogin('target@example.com')
-
       // Bogus roleId — must come back as 403 (same code as the
-      // foreign-org case above), not 404. A 404 here would confirm
-      // "this roleId does not exist", letting an attacker distinguish
-      // foreign vs missing roleIds.
+      // foreign-org case above), not 202. A 202 here would confirm
+      // "this roleId does not exist" via the success path, letting an
+      // attacker distinguish foreign vs missing roleIds. The role-
+      // assignability check fires before any email lookup, so target
+      // user existence is irrelevant.
       await request(app.getHttpServer())
         .post(`/organizations/${orgId}/members/invite`)
         .set('Authorization', `Bearer ${orgToken}`)
@@ -781,11 +792,17 @@ describe('Organizations (e2e)', () => {
       const adminRole = rolesRes.body.data.find((r: { name: string }) => r.name === 'ADMIN')
       expect(adminRole?.id).toBeDefined()
 
-      await request(app.getHttpServer())
-        .post(`/organizations/${orgId}/members/invite`)
-        .set('Authorization', `Bearer ${adminOrgToken}`)
-        .send({ email: 'target@example.com', roleId: adminRole.id })
-        .expect(201)
+      // Attach target as ADMIN directly. OB-02 Stage C made invite a
+      // two-step pending flow; bypassing it here keeps the setup focused
+      // on the RBAC-freshness invariant under test.
+      const targetUser = await prisma.user.findUniqueOrThrow({
+        where: { emailCanonical: 'target@example.com' },
+      })
+      await seedOrgMember(prisma, {
+        orgId,
+        userId: targetUser.id,
+        roleId: adminRole.id as string,
+      })
 
       const targetLogin = await request(app.getHttpServer())
         .post('/auth/login')

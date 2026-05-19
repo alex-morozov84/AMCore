@@ -299,8 +299,9 @@ export class InviteService {
 
     // Already accepted: terminal in a different direction. Revoke is
     // meaningless after accept — the resulting member is removed via
-    // DELETE /members/:userId. 409 distinguishes "wrong operation for
-    // current state" from "missing resource".
+    // DELETE /members/:userId. BusinessRuleViolationException surfaces
+    // as 400 + errorCode BUSINESS_RULE_VIOLATION so callers can branch
+    // on the discriminating wrong-state error code rather than status.
     if (invite.acceptedAt !== null) {
       throw new BusinessRuleViolationException(
         'Cannot revoke an accepted invite — remove the member via DELETE /members/:userId'
