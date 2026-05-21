@@ -60,7 +60,7 @@
     "@redis/client": "^5.10.0",
     "argon2": "^0.44.0",
     "axios": "^1.14.0",
-    "bullmq": "^5.76.6",
+    "bullmq": "^5.76.10",
     "cache-manager": "^7.2.8",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
