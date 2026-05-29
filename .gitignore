@@ -58,6 +58,9 @@ public/workbox-*.js.map
 ai/
 CLAUDE.md
 
+# Claude Code local agent state (permissions, locks) — never commit
+.claude/
+
 # Local Prisma generated client (will be in node_modules)
 generated/
 
