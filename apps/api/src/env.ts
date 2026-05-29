@@ -29,6 +29,21 @@ const envSchema = z
     LOG_BODY_MAX_BYTES: z.coerce.number().int().min(0).default(4096),
     HEALTH_DISK_THRESHOLD_PERCENT: z.coerce.number().min(0).max(1).default(0.9),
     REDIS_URL: z.url(),
+    // Bull Board queue dashboard. Disabled in production unless explicitly
+    // enabled (EQS-01: zero default attack surface). In non-production it is
+    // mounted but still protected by SUPER_ADMIN cookie auth. Enum-transform
+    // rather than z.coerce.boolean() — the latter treats the string 'false'
+    // as true.
+    //
+    // NOTE: the mount gate in queue.module.ts reads this from `process.env` at
+    // module-import time, BEFORE ConfigModule loads the .env file. This schema
+    // entry validates/types the flag for app code, but to enable the dashboard
+    // in production you must set ENABLE_BULL_BOARD as a real process env var,
+    // not via the .env file. See `.env.example` and `bull-board-mount-gate.ts`.
+    ENABLE_BULL_BOARD: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     JWT_ACCESS_EXPIRATION: z.string().default('15m'),
     JWT_REFRESH_EXPIRATION: z.string().default('7d'),

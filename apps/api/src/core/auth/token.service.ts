@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import { createHash, randomBytes } from 'crypto'
+import { randomBytes } from 'crypto'
 
 import { type SystemRole } from '@amcore/shared'
 
 import { EnvService } from '../../env/env.service'
+
+import { hashRefreshToken } from './utils/refresh-token-hash'
 
 export interface AccessTokenPayload {
   sub: string
@@ -36,9 +38,9 @@ export class TokenService {
     return randomBytes(32).toString('hex')
   }
 
-  /** Hash refresh token for storage */
+  /** Hash refresh token for storage (delegates to the shared pure helper) */
   hashRefreshToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex')
+    return hashRefreshToken(token)
   }
 
   /** Get refresh token expiration date */

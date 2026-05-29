@@ -8,10 +8,18 @@ import { SystemRoles } from '@/core/auth/decorators/system-roles.decorator'
 /**
  * Bull Board Dashboard Controller
  *
- * This controller serves as a placeholder for Bull Board router.
- * The actual Bull Board UI is mounted in QueueModule.
+ * Swagger-only placeholder so the dashboard route appears in the OpenAPI doc.
+ * It does NOT enforce access: the real Bull Board UI is mounted as Express
+ * middleware in `QueueModule` (`BullBoardModule.forRootAsync`), so this
+ * controller's `@SystemRoles` guard never runs for the UI's requests.
  *
- * Access: http://localhost:3001/admin/queues (SUPER_ADMIN only)
+ * Real enforcement (EQS-01):
+ * - **Mount gate** — the controller and the router are only registered when
+ *   `ENABLE_BULL_BOARD=true` (or any non-production env); in production they
+ *   are absent by default.
+ * - **Auth** — `createBullBoardAuthMiddleware` runs before the router: it
+ *   rejects API-key / `x-api-key` machine credentials and requires a valid
+ *   `refresh_token` cookie belonging to a `SUPER_ADMIN` user.
  */
 @ApiTags('Admin')
 @ApiBearerAuth()

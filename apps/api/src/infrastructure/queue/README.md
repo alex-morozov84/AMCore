@@ -215,7 +215,12 @@ await this.queueService.cleanQueue(QueueName.DEFAULT, 86400, 'failed')
 
 ## Bull Board Dashboard
 
-Access the Bull Board UI at: **http://localhost:3001/admin/queues**
+Access the Bull Board UI under the **`/admin/queues`** route. It is mounted as
+Express middleware by `@bull-board/nestjs`; the exact reachable URL follows the
+app's global prefix (the adapter base path is `getGlobalPrefix() + route`), so a
+production app started with `setGlobalPrefix('api/v1')` serves it under
+`/api/v1/admin/queues`, while the e2e harness (no global prefix) serves it at
+`/admin/queues`. Confirm the path for your bootstrap if you change the prefix.
 
 Features:
 
@@ -225,7 +230,26 @@ Features:
 - Clean up old jobs
 - View job details and logs
 
-**Note:** Dashboard is protected by JWT authentication (see `DashboardController`).
+**Access control (EQS-01):**
+
+- **Mount gate** — not mounted in production unless `ENABLE_BULL_BOARD=true`;
+  the router and placeholder controller are absent from the module graph by
+  default (zero attack surface). Mounted by default in non-production, but
+  still protected.
+- **Auth** — enforcement is `createBullBoardAuthMiddleware` (runs before the
+  router), **not** the `DashboardController` `@SystemRoles` guard (that
+  controller is a Swagger-only placeholder and never sees the UI's requests).
+  The middleware rejects API-key / `x-api-key` machine credentials and requires
+  a valid `refresh_token` cookie belonging to a `SUPER_ADMIN` user
+  (read-only verification — no session rotation). Browser UI only; there is no
+  bearer-token path. See ADR-034 amendment 2026-05-29.
+- **Auth coverage is path-independent.** The auth middleware and the Bull Board
+  router are bound in the _same_ registration call
+  (`consumer.apply(middleware, router).forRoutes(route)`), so they always mount
+  at the identical path — whatever the global prefix resolves to, the
+  middleware gates the router and all of its subroutes (incl. the data API that
+  exposes job payloads). The e2e proves this for `/admin/queues` and
+  `/admin/queues/api/queues`.
 
 ## Job Options Reference
 
