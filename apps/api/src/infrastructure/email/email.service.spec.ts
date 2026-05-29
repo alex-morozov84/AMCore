@@ -243,9 +243,56 @@ describe('EmailService', () => {
       expect(result.subject).toBe('emailVerification.subject')
     })
 
+    it('should render org invite template', async () => {
+      const data = {
+        orgName: 'Acme Inc.',
+        inviterName: 'Alex',
+        inviterEmail: 'alex@example.com',
+        roleName: 'MEMBER',
+        hasAccount: true,
+        acceptUrl: 'https://example.com/invite/accept?token=abc',
+        expiresIn: '7 days',
+      }
+
+      const result = await service.renderTemplate(EmailTemplate.ORG_INVITE, data)
+
+      expect(result.html).toBeTruthy()
+      expect(typeof result.html).toBe('string')
+      expect(result.subject).toBe('orgInvite.subject')
+    })
+
     it('should throw error for unknown template', async () => {
       await expect(service.renderTemplate('unknown' as any, {} as any)).rejects.toThrow(
         'Unknown template'
+      )
+    })
+  })
+
+  describe('sendOrgInviteEmail', () => {
+    it('should queue an org invite email with the ORG_INVITE template', async () => {
+      const data = {
+        orgName: 'Acme Inc.',
+        inviterName: 'Alex',
+        inviterEmail: 'alex@example.com',
+        roleName: 'MEMBER',
+        hasAccount: false,
+        acceptUrl: 'https://example.com/invite/accept?token=abc',
+        expiresIn: '7 days',
+      }
+
+      queueService.add.mockResolvedValue({} as any)
+
+      await service.sendOrgInviteEmail('invitee@example.com', data)
+
+      expect(queueService.add).toHaveBeenCalledWith(
+        QueueName.EMAIL,
+        JobName.SEND_EMAIL,
+        {
+          template: EmailTemplate.ORG_INVITE,
+          to: 'invitee@example.com',
+          data,
+        },
+        expect.any(Object)
       )
     })
   })

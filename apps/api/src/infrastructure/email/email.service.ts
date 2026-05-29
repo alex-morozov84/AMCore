@@ -5,6 +5,7 @@ import { PinoLogger } from 'nestjs-pino'
 import type {
   EmailProvider,
   EmailVerificationData,
+  OrgInviteEmailData,
   PasswordChangedEmailData,
   PasswordResetEmailData,
   SendEmailJobData,
@@ -15,6 +16,7 @@ import type {
 import { EmailTemplate } from './email.types'
 import type { Locale } from './messages'
 import { EmailVerificationEmail, getEmailVerificationSubject } from './templates/email-verification'
+import { getOrgInviteSubject, OrgInviteEmail } from './templates/org-invite'
 import { getPasswordChangedSubject, PasswordChangedEmail } from './templates/password-changed'
 import { getPasswordResetSubject, PasswordResetEmail } from './templates/password-reset'
 import { getWelcomeSubject, WelcomeEmail } from './templates/welcome'
@@ -112,6 +114,20 @@ export class EmailService {
   }
 
   /**
+   * Send organization invite email (OB-02).
+   *
+   * Dispatched by `InviteService.createInvite` after the invite row is
+   * committed, carrying the raw accept token inside `data.acceptUrl`.
+   */
+  async sendOrgInviteEmail(email: string, data: OrgInviteEmailData): Promise<void> {
+    await this.queue({
+      template: EmailTemplate.ORG_INVITE,
+      to: email,
+      data,
+    })
+  }
+
+  /**
    * Render email template to HTML
    *
    * @param template - Template to render
@@ -125,6 +141,7 @@ export class EmailService {
       | PasswordResetEmailData
       | EmailVerificationData
       | PasswordChangedEmailData
+      | OrgInviteEmailData
   ): Promise<{ html: string; subject: string }> {
     const locale: Locale = data.locale || 'ru'
     let html: string
@@ -150,6 +167,13 @@ export class EmailService {
         html = await render(PasswordChangedEmail(data as PasswordChangedEmailData))
         subject = getPasswordChangedSubject(locale)
         break
+
+      case EmailTemplate.ORG_INVITE: {
+        const inviteData = data as OrgInviteEmailData
+        html = await render(OrgInviteEmail(inviteData))
+        subject = getOrgInviteSubject(inviteData.orgName, locale)
+        break
+      }
 
       default:
         throw new Error(`Unknown template: ${template}`)

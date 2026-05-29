@@ -57,6 +57,19 @@ export const emailMessages = {
     'passwordChanged.securityWarning':
       'Если это были не вы, немедленно свяжитесь с нами по адресу {supportEmail}',
     'passwordChanged.footer': 'С уважением, команда AMCore',
+
+    // Organization Invite
+    'orgInvite.subject': 'Приглашение в организацию {orgName}',
+    'orgInvite.preview': '{inviterName} приглашает вас в {orgName} на AMCore',
+    'orgInvite.title': 'Вас пригласили в {orgName}',
+    'orgInvite.intro':
+      '{inviterName} ({inviterEmail}) приглашает вас присоединиться к организации «{orgName}» в AMCore.',
+    'orgInvite.roleInfo': 'Вам будет назначена роль: {roleName}.',
+    'orgInvite.ctaSignIn': 'Войти и принять приглашение',
+    'orgInvite.ctaSignUp': 'Создать аккаунт и присоединиться',
+    'orgInvite.expiresInfo': 'Это приглашение действительно в течение {expiresIn}.',
+    'orgInvite.ignoreInfo': 'Если вы не ожидали это приглашение, просто проигнорируйте письмо.',
+    'orgInvite.footer': 'С уважением, команда AMCore',
   },
   en: {
     // Welcome Email
@@ -103,5 +116,18 @@ export const emailMessages = {
     'passwordChanged.securityWarning':
       'If this was not you, please contact us immediately at {supportEmail}',
     'passwordChanged.footer': 'Best regards, AMCore team',
+
+    // Organization Invite
+    'orgInvite.subject': 'Invitation to join {orgName}',
+    'orgInvite.preview': '{inviterName} invited you to {orgName} on AMCore',
+    'orgInvite.title': 'You have been invited to {orgName}',
+    'orgInvite.intro':
+      '{inviterName} ({inviterEmail}) has invited you to join the "{orgName}" organization on AMCore.',
+    'orgInvite.roleInfo': 'You will be assigned the role: {roleName}.',
+    'orgInvite.ctaSignIn': 'Sign in to accept the invitation',
+    'orgInvite.ctaSignUp': 'Create an account to join',
+    'orgInvite.expiresInfo': 'This invitation is valid for {expiresIn}.',
+    'orgInvite.ignoreInfo': 'If you were not expecting this invitation, simply ignore this email.',
+    'orgInvite.footer': 'Best regards, AMCore team',
   },
 } as const

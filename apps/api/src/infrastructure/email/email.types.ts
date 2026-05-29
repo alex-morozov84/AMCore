@@ -78,11 +78,6 @@ export interface PasswordChangedEmailData {
  * decided server-side at send time, not introspected from the token —
  * the recipient already knows their own account state, so the differ-
  * entiation leaks nothing.
- *
- * Stage B reserves this interface for type-completeness; the template
- * implementation and the actual queue wiring inside
- * `InviteService.createInvite` land together in Stage D so a deployed
- * job never hits a missing `renderTemplate` case.
  */
 export interface OrgInviteEmailData {
   orgName: string
@@ -106,20 +101,29 @@ export enum EmailTemplate {
   ORG_INVITE = 'org-invite',
 }
 
-export type RenderableEmailTemplate = Exclude<EmailTemplate, EmailTemplate.ORG_INVITE>
+/**
+ * Every template is renderable as of OB-02 Stage D — `ORG_INVITE` is no
+ * longer excluded now that `EmailService.renderTemplate` handles it and
+ * `InviteService.createInvite` dispatches it. The alias is retained as
+ * the documented "queueable templates" contract for `SendEmailJobData`.
+ */
+export type RenderableEmailTemplate = EmailTemplate
 
 /**
- * BullMQ job data for sending emails
+ * BullMQ job data for sending emails.
  *
- * `OrgInviteEmailData` is deliberately not in this union yet — Stage B
- * reserves the enum value and the interface, but the queue dispatch
- * wiring (and the matching `renderTemplate` case) land in Stage D so
- * the worker never sees an unrenderable job. TypeScript enforces the
- * gap: any premature `EmailService.queue({ template: ORG_INVITE, ... })`
- * call fails to type-check until Stage D widens this union.
+ * The data union covers every renderable template. `ORG_INVITE` was
+ * wired in OB-02 Stage D: the queue dispatch in
+ * `InviteService.createInvite` and the matching `renderTemplate` case
+ * land together so a deployed worker never sees an unrenderable job.
  */
 export interface SendEmailJobData {
   template: RenderableEmailTemplate
   to: string
-  data: WelcomeEmailData | PasswordResetEmailData | EmailVerificationData | PasswordChangedEmailData
+  data:
+    | WelcomeEmailData
+    | PasswordResetEmailData
+    | EmailVerificationData
+    | PasswordChangedEmailData
+    | OrgInviteEmailData
 }
