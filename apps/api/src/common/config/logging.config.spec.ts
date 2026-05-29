@@ -28,8 +28,50 @@ describe('createLoggingConfig', () => {
         '*.tokenHash',
         '*.keyHash',
         '*.salt',
+        // Token-bearing action URLs (EQS-02)
+        '*.resetUrl',
+        '*.verificationUrl',
+        '*.acceptUrl',
       ])
     )
+  })
+
+  it('redacts token-bearing action URLs in actual log output (EQS-02)', () => {
+    const config = createLoggingConfig(clsServiceMock, 4096)
+    const stream = new PassThrough()
+    let output = ''
+
+    stream.on('data', (chunk) => {
+      output += chunk.toString()
+    })
+
+    const nestjsPinoPath = require.resolve('nestjs-pino')
+    const pinoPath = require.resolve('pino', { paths: [nestjsPinoPath] })
+    const pino = require(pinoPath) as (
+      options: object,
+      destination: NodeJS.WritableStream
+    ) => {
+      info: (obj: object, msg: string) => void
+    }
+
+    const pinoHttp = config.pinoHttp as { redact?: object }
+    const logger = pino({ redact: pinoHttp.redact }, stream)
+
+    logger.info(
+      {
+        data: {
+          resetUrl: 'https://app/reset-password?token=reset-secret',
+          verificationUrl: 'https://app/verify-email?token=verify-secret',
+          acceptUrl: 'https://app/invite/accept?token=invite-secret',
+        },
+      },
+      'test'
+    )
+
+    expect(output).not.toContain('reset-secret')
+    expect(output).not.toContain('verify-secret')
+    expect(output).not.toContain('invite-secret')
+    expect(output).toContain('[REDACTED]')
   })
 
   it('excludes startup health checks from auto logging', () => {

@@ -123,6 +123,49 @@ describe('EmailService', () => {
         })
       )
     })
+
+    it('rejects a non-queueable (secret-bearing) template at runtime (EQS-02)', async () => {
+      // A caller bypassing TypeScript must still be refused — secret templates
+      // must never be persisted in BullMQ/Redis/Bull Board.
+      const jobData = {
+        template: EmailTemplate.PASSWORD_RESET,
+        to: 'test@example.com',
+        data: { name: 'X', resetUrl: 'https://x/reset?token=abc', expiresIn: '1m' },
+      } as unknown as SendEmailJobData
+
+      await expect(service.queue(jobData)).rejects.toThrow(/non-queueable/)
+      expect(queueService.add).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('sendNow (direct, never enqueues — EQS-02)', () => {
+    it('renders and sends via the provider without touching the queue', async () => {
+      emailProvider.send.mockResolvedValue({ id: 'e_1', success: true })
+
+      await service.sendNow(EmailTemplate.PASSWORD_RESET, 'to@example.com', {
+        name: 'X',
+        resetUrl: 'https://x/reset?token=abc',
+        expiresIn: '1m',
+      })
+
+      expect(emailProvider.send).toHaveBeenCalledTimes(1)
+      expect(emailProvider.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'to@example.com' })
+      )
+      expect(queueService.add).not.toHaveBeenCalled()
+    })
+
+    it('throws when the provider reports failure', async () => {
+      emailProvider.send.mockResolvedValue({ id: '', success: false, error: 'boom' })
+
+      await expect(
+        service.sendNow(EmailTemplate.EMAIL_VERIFICATION, 'to@example.com', {
+          name: 'X',
+          verificationUrl: 'https://x/verify?token=xyz',
+          expiresIn: '24h',
+        })
+      ).rejects.toThrow('boom')
+    })
   })
 
   describe('sendWelcomeEmail', () => {
@@ -150,52 +193,40 @@ describe('EmailService', () => {
   })
 
   describe('sendPasswordResetEmail', () => {
-    it('should queue password reset email', async () => {
+    it('sends directly and never enqueues the reset token (EQS-02)', async () => {
       const data = {
         name: 'John Doe',
         resetUrl: 'https://example.com/reset?token=abc',
         expiresIn: '1 час',
       }
 
-      queueService.add.mockResolvedValue({} as any)
+      emailProvider.send.mockResolvedValue({ id: 'e_1', success: true })
 
       await service.sendPasswordResetEmail('john@example.com', data)
 
-      expect(queueService.add).toHaveBeenCalledWith(
-        QueueName.EMAIL,
-        JobName.SEND_EMAIL,
-        {
-          template: EmailTemplate.PASSWORD_RESET,
-          to: 'john@example.com',
-          data,
-        },
-        expect.any(Object)
+      expect(emailProvider.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'john@example.com' })
       )
+      expect(queueService.add).not.toHaveBeenCalled()
     })
   })
 
   describe('sendEmailVerificationEmail', () => {
-    it('should queue email verification email', async () => {
+    it('sends directly and never enqueues the verification token (EQS-02)', async () => {
       const data = {
         name: 'John Doe',
         verificationUrl: 'https://example.com/verify?token=xyz',
         expiresIn: '24 часа',
       }
 
-      queueService.add.mockResolvedValue({} as any)
+      emailProvider.send.mockResolvedValue({ id: 'e_1', success: true })
 
       await service.sendEmailVerificationEmail('john@example.com', data)
 
-      expect(queueService.add).toHaveBeenCalledWith(
-        QueueName.EMAIL,
-        JobName.SEND_EMAIL,
-        {
-          template: EmailTemplate.EMAIL_VERIFICATION,
-          to: 'john@example.com',
-          data,
-        },
-        expect.any(Object)
+      expect(emailProvider.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'john@example.com' })
       )
+      expect(queueService.add).not.toHaveBeenCalled()
     })
   })
 
@@ -269,7 +300,7 @@ describe('EmailService', () => {
   })
 
   describe('sendOrgInviteEmail', () => {
-    it('should queue an org invite email with the ORG_INVITE template', async () => {
+    it('sends directly and never enqueues the accept token (EQS-02)', async () => {
       const data = {
         orgName: 'Acme Inc.',
         inviterName: 'Alex',
@@ -280,20 +311,14 @@ describe('EmailService', () => {
         expiresIn: '7 days',
       }
 
-      queueService.add.mockResolvedValue({} as any)
+      emailProvider.send.mockResolvedValue({ id: 'e_1', success: true })
 
       await service.sendOrgInviteEmail('invitee@example.com', data)
 
-      expect(queueService.add).toHaveBeenCalledWith(
-        QueueName.EMAIL,
-        JobName.SEND_EMAIL,
-        {
-          template: EmailTemplate.ORG_INVITE,
-          to: 'invitee@example.com',
-          data,
-        },
-        expect.any(Object)
+      expect(emailProvider.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'invitee@example.com' })
       )
+      expect(queueService.add).not.toHaveBeenCalled()
     })
   })
 })

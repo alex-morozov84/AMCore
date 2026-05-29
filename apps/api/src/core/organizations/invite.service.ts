@@ -83,11 +83,14 @@ interface CreateInviteResult {
  * canonical-email match runs against a fresh user row from
  * `UserCacheService`, not stale JWT claims).
  *
- * Stage D wires email delivery: `createInvite` enqueues an `ORG_INVITE`
- * job carrying the raw token in its `acceptUrl` AFTER the transaction
- * commits (never inside — a rolled-back invite must not send a live
- * token). Dispatch is best-effort: a queue/lookup failure is logged and
- * swallowed so the uniform 202 contract holds (`dispatchInviteEmail`).
+ * Stage D wires email delivery: `createInvite` sends the `ORG_INVITE`
+ * email AFTER the transaction commits (never inside — a rolled-back invite
+ * must not send a live token). The send is **direct** via
+ * `EmailService.sendNow` and is **never enqueued** — the raw token in
+ * `acceptUrl` must not be persisted in BullMQ/Redis/Bull Board (EQS-02,
+ * ADR-016 amendment 2026-05-29). Dispatch is best-effort: a send/lookup
+ * failure is logged (without the token) and swallowed so the uniform 202
+ * contract holds (`dispatchInviteEmail`).
  */
 @Injectable()
 export class InviteService {

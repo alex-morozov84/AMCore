@@ -8,12 +8,14 @@ import type {
   OrgInviteEmailData,
   PasswordChangedEmailData,
   PasswordResetEmailData,
+  RenderableEmailData,
+  RenderableEmailTemplate,
   SendEmailJobData,
   SendEmailParams,
   SendEmailResult,
   WelcomeEmailData,
 } from './email.types'
-import { EmailTemplate } from './email.types'
+import { EmailTemplate, QUEUEABLE_EMAIL_TEMPLATES } from './email.types'
 import type { Locale } from './messages'
 import { EmailVerificationEmail, getEmailVerificationSubject } from './templates/email-verification'
 import { getOrgInviteSubject, OrgInviteEmail } from './templates/org-invite'
@@ -55,9 +57,21 @@ export class EmailService {
   }
 
   /**
-   * Queue email for async sending (via BullMQ)
+   * Queue email for async sending (via BullMQ).
+   *
+   * Only non-secret (`QueueableEmailTemplate`) emails may be enqueued. The
+   * runtime guard backs up the compile-time `SendEmailJobData` narrowing for
+   * callers that bypass TypeScript — a secret-bearing template must never be
+   * persisted in BullMQ/Redis/Bull Board (EQS-02). Use `sendNow` for those.
    */
   async queue(jobData: SendEmailJobData): Promise<void> {
+    if (!QUEUEABLE_EMAIL_TEMPLATES.has(jobData.template)) {
+      throw new Error(
+        `Refusing to enqueue non-queueable email template "${jobData.template}": ` +
+          'secret-bearing templates must be sent via sendNow (EQS-02)'
+      )
+    }
+
     await this.queueService.add(QueueName.EMAIL, JobName.SEND_EMAIL, jobData, {
       attempts: 3,
       backoff: {
@@ -67,6 +81,30 @@ export class EmailService {
     })
 
     this.logger.info({ template: jobData.template, to: jobData.to }, 'Email queued')
+  }
+
+  /**
+   * Send an email immediately, in-process, WITHOUT enqueuing (EQS-02).
+   *
+   * Used for secret-bearing templates (password reset, email verification, org
+   * invite): the rendered token URL lives only in memory → render → provider,
+   * so the raw token is never serialized into BullMQ/Redis/Bull Board. Throws
+   * on send failure so the caller's existing best-effort/await semantics apply.
+   * Never logs the payload (which carries the token URL) — only template + to.
+   */
+  async sendNow(
+    template: RenderableEmailTemplate,
+    to: string,
+    data: RenderableEmailData
+  ): Promise<void> {
+    const { html, subject } = await this.renderTemplate(template, data)
+    const result = await this.send({ to, subject, html })
+
+    if (!result.success) {
+      throw new Error(result.error || 'Email sending failed')
+    }
+
+    this.logger.info({ template, to }, 'Email sent (direct, not queued)')
   }
 
   /**
@@ -81,25 +119,21 @@ export class EmailService {
   }
 
   /**
-   * Send password reset email
+   * Send password reset email.
+   *
+   * Direct send (EQS-02) — the reset token URL must never be enqueued.
    */
   async sendPasswordResetEmail(email: string, data: PasswordResetEmailData): Promise<void> {
-    await this.queue({
-      template: EmailTemplate.PASSWORD_RESET,
-      to: email,
-      data,
-    })
+    await this.sendNow(EmailTemplate.PASSWORD_RESET, email, data)
   }
 
   /**
-   * Send email verification email
+   * Send email verification email.
+   *
+   * Direct send (EQS-02) — the verification token URL must never be enqueued.
    */
   async sendEmailVerificationEmail(email: string, data: EmailVerificationData): Promise<void> {
-    await this.queue({
-      template: EmailTemplate.EMAIL_VERIFICATION,
-      to: email,
-      data,
-    })
+    await this.sendNow(EmailTemplate.EMAIL_VERIFICATION, email, data)
   }
 
   /**
@@ -120,11 +154,7 @@ export class EmailService {
    * committed, carrying the raw accept token inside `data.acceptUrl`.
    */
   async sendOrgInviteEmail(email: string, data: OrgInviteEmailData): Promise<void> {
-    await this.queue({
-      template: EmailTemplate.ORG_INVITE,
-      to: email,
-      data,
-    })
+    await this.sendNow(EmailTemplate.ORG_INVITE, email, data)
   }
 
   /**
@@ -136,12 +166,7 @@ export class EmailService {
    */
   async renderTemplate(
     template: EmailTemplate,
-    data:
-      | WelcomeEmailData
-      | PasswordResetEmailData
-      | EmailVerificationData
-      | PasswordChangedEmailData
-      | OrgInviteEmailData
+    data: RenderableEmailData
   ): Promise<{ html: string; subject: string }> {
     const locale: Locale = data.locale || 'ru'
     let html: string

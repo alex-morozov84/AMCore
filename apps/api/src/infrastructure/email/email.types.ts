@@ -102,28 +102,44 @@ export enum EmailTemplate {
 }
 
 /**
- * Every template is renderable as of OB-02 Stage D — `ORG_INVITE` is no
- * longer excluded now that `EmailService.renderTemplate` handles it and
- * `InviteService.createInvite` dispatches it. The alias is retained as
- * the documented "queueable templates" contract for `SendEmailJobData`.
+ * Every template is renderable: `EmailService.renderTemplate` handles all five
+ * and `sendNow` uses it for the secret-bearing ones.
  */
 export type RenderableEmailTemplate = EmailTemplate
 
+/** Data payload for any renderable template (used by `renderTemplate` / `sendNow`). */
+export type RenderableEmailData =
+  | WelcomeEmailData
+  | PasswordResetEmailData
+  | EmailVerificationData
+  | PasswordChangedEmailData
+  | OrgInviteEmailData
+
 /**
- * BullMQ job data for sending emails.
+ * Templates that may be enqueued (EQS-02, Stage 2).
  *
- * The data union covers every renderable template. `ORG_INVITE` was
- * wired in OB-02 Stage D: the queue dispatch in
- * `InviteService.createInvite` and the matching `renderTemplate` case
- * land together so a deployed worker never sees an unrenderable job.
+ * Only non-secret templates are queueable. `PASSWORD_RESET`,
+ * `EMAIL_VERIFICATION`, and `ORG_INVITE` carry a live token URL and must NEVER
+ * be persisted in BullMQ/Redis/Bull Board — they go through
+ * `EmailService.sendNow` (direct, in-process) instead. Narrowing
+ * `SendEmailJobData` to this union makes "secrets are never enqueued" a
+ * compile-time guarantee; `EmailService.queue` re-checks it at runtime for
+ * callers that bypass TypeScript. See ADR-016 amendment 2026-05-29.
+ */
+export type QueueableEmailTemplate = EmailTemplate.WELCOME | EmailTemplate.PASSWORD_CHANGED
+
+/** Runtime allowlist mirroring `QueueableEmailTemplate` for the `queue()` guard. */
+export const QUEUEABLE_EMAIL_TEMPLATES: ReadonlySet<EmailTemplate> = new Set([
+  EmailTemplate.WELCOME,
+  EmailTemplate.PASSWORD_CHANGED,
+])
+
+/**
+ * BullMQ job data for sending emails. Restricted to non-secret
+ * (`QueueableEmailTemplate`) payloads — see `QueueableEmailTemplate`.
  */
 export interface SendEmailJobData {
-  template: RenderableEmailTemplate
+  template: QueueableEmailTemplate
   to: string
-  data:
-    | WelcomeEmailData
-    | PasswordResetEmailData
-    | EmailVerificationData
-    | PasswordChangedEmailData
-    | OrgInviteEmailData
+  data: WelcomeEmailData | PasswordChangedEmailData
 }

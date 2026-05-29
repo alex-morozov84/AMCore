@@ -219,14 +219,25 @@ export class AuthService {
     const resetUrl = `${this.env.get('FRONTEND_URL')}/reset-password?token=${token}`
     const expiresIn = `${this.env.get('PASSWORD_RESET_EXPIRY_MINUTES')} минут`
 
-    await this.emailService.sendPasswordResetEmail(user.email, {
-      name: user.name ?? user.email,
-      resetUrl,
-      expiresIn,
-      locale: user.locale as 'ru' | 'en',
-    })
-
-    this.logger.info({ userId: user.id }, 'Password reset email queued')
+    // Best-effort: secret-bearing emails are sent directly (EQS-02) and
+    // `sendNow` throws on provider failure. Swallow it here — letting a 500
+    // surface for a known email while unknown emails return 200 would be an
+    // account-enumeration oracle on this recovery endpoint. Never log the
+    // reset URL/token — only the provider error message.
+    try {
+      await this.emailService.sendPasswordResetEmail(user.email, {
+        name: user.name ?? user.email,
+        resetUrl,
+        expiresIn,
+        locale: user.locale as 'ru' | 'en',
+      })
+      this.logger.info({ userId: user.id }, 'Password reset email sent')
+    } catch (err) {
+      this.logger.warn(
+        { userId: user.id, err: err instanceof Error ? err.message : 'unknown' },
+        'Failed to send password reset email'
+      )
+    }
   }
 
   /** Reset password using token */
@@ -298,14 +309,23 @@ export class AuthService {
     const verificationUrl = `${this.env.get('FRONTEND_URL')}/verify-email?token=${token}`
     const expiresIn = `${this.env.get('EMAIL_VERIFICATION_EXPIRY_HOURS')} часов`
 
-    await this.emailService.sendEmailVerificationEmail(user.email, {
-      name: user.name ?? user.email,
-      verificationUrl,
-      expiresIn,
-      locale: user.locale as 'ru' | 'en',
-    })
-
-    this.logger.info({ userId: user.id }, 'Verification email queued')
+    // Best-effort, same enumeration rationale as forgotPassword: a direct-send
+    // failure (EQS-02 `sendNow` throws) must not turn into a 500 that reveals
+    // the account exists and is unverified. Never log the verification token.
+    try {
+      await this.emailService.sendEmailVerificationEmail(user.email, {
+        name: user.name ?? user.email,
+        verificationUrl,
+        expiresIn,
+        locale: user.locale as 'ru' | 'en',
+      })
+      this.logger.info({ userId: user.id }, 'Verification email sent')
+    } catch (err) {
+      this.logger.warn(
+        { userId: user.id, err: err instanceof Error ? err.message : 'unknown' },
+        'Failed to send verification email'
+      )
+    }
   }
 
   /** Rate limit by key: max N requests per hour */

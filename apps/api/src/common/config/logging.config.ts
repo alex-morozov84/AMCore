@@ -118,6 +118,16 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
           '*.keyHash',
           '*.salt',
 
+          // Token-bearing action URLs (EQS-02) — these embed a live
+          // reset/verification/invite token in their query string. They are
+          // sent via EmailService.sendNow and never enqueued, but redact them
+          // defensively in case an in-memory email payload is ever logged.
+          // (fast-redact matches whole key segments, so `*Url` would not work;
+          // enumerate the concrete keys with an intermediate wildcard.)
+          '*.resetUrl',
+          '*.verificationUrl',
+          '*.acceptUrl',
+
           // Known nested hashes / credentials
           'req.body.user.passwordHash',
           'req.body.user.tokenHash',

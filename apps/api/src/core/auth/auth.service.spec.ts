@@ -602,6 +602,20 @@ describe('AuthService', () => {
 
       await expect(authService.forgotPassword(mockUser.email)).rejects.toThrow(AppException)
     })
+
+    it('does not throw when the direct send fails (no enumeration oracle — EQS-02)', async () => {
+      // sendNow throws on provider failure; for a KNOWN email that must not
+      // become a 500 while unknown emails return 200.
+      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+      mockCache.get.mockResolvedValue(null)
+      mockTokenManager.generatePasswordResetToken.mockResolvedValue({
+        token: 'a'.repeat(64),
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      })
+      mockEmailService.sendPasswordResetEmail.mockRejectedValue(new Error('provider down'))
+
+      await expect(authService.forgotPassword(mockUser.email)).resolves.not.toThrow()
+    })
   })
 
   describe('resetPassword', () => {
@@ -679,6 +693,18 @@ describe('AuthService', () => {
           expiresIn: '48 часов',
         })
       )
+    })
+
+    it('does not throw when the direct send fails (no enumeration oracle — EQS-02)', async () => {
+      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+      mockCache.get.mockResolvedValue(null)
+      mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+        token: 'b'.repeat(64),
+        expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+      })
+      mockEmailService.sendEmailVerificationEmail.mockRejectedValue(new Error('provider down'))
+
+      await expect(authService.resendVerificationEmail(mockUser.email)).resolves.not.toThrow()
     })
   })
 })

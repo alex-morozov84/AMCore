@@ -106,6 +106,30 @@ describe('EmailProcessor', () => {
       expect(emailService.send).not.toHaveBeenCalled()
     })
 
+    it('discards a non-queueable (secret-bearing) job without rendering, sending, or throwing (EQS-02)', async () => {
+      // Simulates a legacy/injected Redis job carrying a secret template + token
+      // URL. Job data is untrusted at runtime; the processor must not emit it.
+      const job = {
+        id: 'job-legacy',
+        name: JobName.SEND_EMAIL,
+        data: {
+          template: EmailTemplate.PASSWORD_RESET,
+          to: 'victim@example.com',
+          data: { name: 'X', resetUrl: 'https://x/reset?token=leak', expiresIn: '15m' },
+        },
+        attemptsMade: 0,
+      } as unknown as Job<SendEmailJobData>
+
+      await expect(processor.process(job)).resolves.toBeUndefined()
+
+      expect(emailService.renderTemplate).not.toHaveBeenCalled()
+      expect(emailService.send).not.toHaveBeenCalled()
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: 'job-legacy', template: EmailTemplate.PASSWORD_RESET }),
+        expect.stringContaining('non-queueable')
+      )
+    })
+
     it('should throw error if email sending fails', async () => {
       const jobData: SendEmailJobData = {
         template: EmailTemplate.WELCOME,
