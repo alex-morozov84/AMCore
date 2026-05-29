@@ -23,12 +23,24 @@ describe('CleanupService', () => {
     service = new CleanupService(prisma as unknown as PrismaService, mockLogger)
   })
 
+  // Default all deleteMany mocks to zero so each test only sets what it asserts.
+  const zeroAll = (): void => {
+    prisma.session.deleteMany.mockResolvedValue({ count: 0 })
+    prisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 })
+    prisma.emailVerificationToken.deleteMany.mockResolvedValue({ count: 0 })
+    prisma.apiKey.deleteMany.mockResolvedValue({ count: 0 })
+    prisma.orgInvite.deleteMany.mockResolvedValue({ count: 0 })
+  }
+
   describe('runCleanup', () => {
-    it('deletes all four types of expired records and returns counts', async () => {
+    it('deletes all five types of expired records and returns counts', async () => {
       prisma.session.deleteMany.mockResolvedValue({ count: 5 })
       prisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 3 })
       prisma.emailVerificationToken.deleteMany.mockResolvedValue({ count: 7 })
       prisma.apiKey.deleteMany.mockResolvedValue({ count: 2 })
+      prisma.orgInvite.deleteMany
+        .mockResolvedValueOnce({ count: 4 }) // expired pending
+        .mockResolvedValueOnce({ count: 1 }) // stale terminal
 
       const result = await service.runCleanup()
 
@@ -37,14 +49,28 @@ describe('CleanupService', () => {
         expiredPasswordResetTokens: 3,
         expiredEmailVerificationTokens: 7,
         expiredApiKeys: 2,
+        expiredPendingInvites: 4,
+        staleTerminalInvites: 1,
       })
     })
 
-    it('runs all four deletions in parallel', async () => {
-      prisma.session.deleteMany.mockResolvedValue({ count: 0 })
-      prisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 })
-      prisma.emailVerificationToken.deleteMany.mockResolvedValue({ count: 0 })
-      prisma.apiKey.deleteMany.mockResolvedValue({ count: 0 })
+    it('deletes expired-pending and stale-terminal invites with the right where-clauses', async () => {
+      zeroAll()
+
+      await service.runCleanup()
+
+      expect(prisma.orgInvite.deleteMany).toHaveBeenCalledWith({
+        where: { expiresAt: { lt: expect.any(Date) }, acceptedAt: null, revokedAt: null },
+      })
+      expect(prisma.orgInvite.deleteMany).toHaveBeenCalledWith({
+        where: {
+          OR: [{ acceptedAt: { lt: expect.any(Date) } }, { revokedAt: { lt: expect.any(Date) } }],
+        },
+      })
+    })
+
+    it('runs the token/key deletions in parallel', async () => {
+      zeroAll()
 
       await service.runCleanup()
 
@@ -63,10 +89,7 @@ describe('CleanupService', () => {
     })
 
     it('returns zero counts when nothing to clean up', async () => {
-      prisma.session.deleteMany.mockResolvedValue({ count: 0 })
-      prisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 })
-      prisma.emailVerificationToken.deleteMany.mockResolvedValue({ count: 0 })
-      prisma.apiKey.deleteMany.mockResolvedValue({ count: 0 })
+      zeroAll()
 
       const result = await service.runCleanup()
 
@@ -75,6 +98,8 @@ describe('CleanupService', () => {
         expiredPasswordResetTokens: 0,
         expiredEmailVerificationTokens: 0,
         expiredApiKeys: 0,
+        expiredPendingInvites: 0,
+        staleTerminalInvites: 0,
       })
     })
   })
