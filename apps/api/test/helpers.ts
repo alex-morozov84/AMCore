@@ -10,11 +10,32 @@ import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redi
 import type { Cache } from 'cache-manager'
 import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
+import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 
 import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
 import { HelloWorldProcessor } from '../src/infrastructure/queue/processors/hello-world.processor'
 import { PrismaService } from '../src/prisma'
+
+/**
+ * No-op PinoLogger stub for e2e. Per ai/TESTING.md "Known NestJS E2E Runtime
+ * Caveat": once the Nest DI graph grows (OB-02 Stage D added the EmailModule
+ * import + InviteService email deps to OrganizationsModule), the real
+ * `nestjs-pino` provider makes `Test.createTestingModule(...).compile()` hang
+ * indefinitely under Jest + ts-jest ESM — InstanceLoader stops mid-bootstrap
+ * with no thrown error. Overriding only the logger sidesteps it. This is a
+ * test-harness workaround; production logging is unchanged.
+ */
+const noopPinoLogger = {
+  setContext: () => {},
+  trace: () => {},
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  fatal: () => {},
+  assign: () => {},
+} as unknown as PinoLogger
 
 /**
  * Global test context with PostgreSQL and Redis containers
@@ -73,10 +94,15 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
   // values and ignores our testcontainer URLs. See @nestjs/config issue #245.
   const { AppModule } = await import('../src/app.module')
 
-  // Create testing module with real AppModule (no mocks!)
+  // Create testing module with real AppModule (no mocks!). Only PinoLogger is
+  // overridden — see noopPinoLogger above and ai/TESTING.md for why this is
+  // required once the DI graph grows.
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [AppModule],
-  }).compile()
+  })
+    .overrideProvider(PinoLogger)
+    .useValue(noopPinoLogger)
+    .compile()
 
   // Create app instance
   const app = moduleFixture.createNestApplication()
