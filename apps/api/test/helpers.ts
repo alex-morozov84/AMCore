@@ -27,14 +27,14 @@ import { PrismaService } from '../src/prisma'
  * test-harness workaround; production logging is unchanged.
  */
 const noopPinoLogger = {
-  setContext: () => {},
-  trace: () => {},
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  fatal: () => {},
-  assign: () => {},
+  setContext: () => undefined,
+  trace: () => undefined,
+  debug: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+  fatal: () => undefined,
+  assign: () => undefined,
 } as unknown as PinoLogger
 
 /**
