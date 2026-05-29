@@ -15,6 +15,8 @@ import {
 
 import { AppException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { BusinessRuleViolationException } from '../../common/exceptions/domain/business-rule.exception'
+import { EnvService } from '../../env/env.service'
+import { EmailService } from '../../infrastructure/email'
 import { PrismaService } from '../../prisma'
 import { EmailIdentityService } from '../auth/email-identity.service'
 import { UserCacheService } from '../auth/user-cache.service'
@@ -37,6 +39,20 @@ type CreateInviteBranch =
   | 'rotated_existing'
   | 'pending_known_user'
   | 'pending_new_email'
+
+/**
+ * Carried out of the `createInvite` transaction so the post-commit email
+ * dispatch needs no second recipient lookup. `recipientLocale` comes from
+ * the known user's row (or null for an unknown email — defaulted to `ru`
+ * at send time). `hasAccount` drives the email CTA branch.
+ */
+interface CreateInviteResult {
+  branch: CreateInviteBranch
+  inviteId: string | null
+  rawToken: string | null
+  hasAccount: boolean
+  recipientLocale: string | null
+}
 
 /**
  * Invite service (OB-02).
@@ -67,13 +83,11 @@ type CreateInviteBranch =
  * canonical-email match runs against a fresh user row from
  * `UserCacheService`, not stale JWT claims).
  *
- * **Stage D wiring still pending.** `createInvite` generates the raw
- * token, stores its SHA-256, and discards the raw value at the end of
- * the call (see `TODO (Stage D)` below). Until Stage D enqueues an
- * `ORG_INVITE` email job carrying the raw token before discard, the
- * accept route is callable but no email reaches the invitee — an
- * accepted dev-only intermediate state called out in public docs and
- * Swagger summaries.
+ * Stage D wires email delivery: `createInvite` enqueues an `ORG_INVITE`
+ * job carrying the raw token in its `acceptUrl` AFTER the transaction
+ * commits (never inside — a rolled-back invite must not send a live
+ * token). Dispatch is best-effort: a queue/lookup failure is logged and
+ * swallowed so the uniform 202 contract holds (`dispatchInviteEmail`).
  */
 @Injectable()
 export class InviteService {
@@ -85,6 +99,8 @@ export class InviteService {
     private readonly userCacheService: UserCacheService,
     private readonly inviteRateLimiter: InviteRateLimiterService,
     private readonly acceptLimiter: InviteAcceptLimiterService,
+    private readonly emailService: EmailService,
+    private readonly env: EnvService,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(InviteService.name)
@@ -108,7 +124,7 @@ export class InviteService {
 
     const roleId = dto.roleId ?? (await this.getSystemRoleId('MEMBER'))
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result: CreateInviteResult = await this.prisma.$transaction(async (tx) => {
       await this.acquireXactLock(tx, `org-invite:${orgId}:${emailCanonical}`)
 
       // OA-05: assignability inside the tx so role.organizationId can't
@@ -117,8 +133,11 @@ export class InviteService {
 
       const targetUser = await tx.user.findUnique({
         where: { emailCanonical },
-        select: { id: true },
+        select: { id: true, locale: true },
       })
+
+      const hasAccount = targetUser !== null
+      const recipientLocale = targetUser?.locale ?? null
 
       // Branch A: already a member — silent no-op (no row, no email,
       // audit only). Caller observes the same uniform 202; admin can
@@ -131,7 +150,13 @@ export class InviteService {
           select: { id: true },
         })
         if (existingMember) {
-          return { branch: 'noop_already_member' as const, inviteId: null, rawToken: null }
+          return {
+            branch: 'noop_already_member' as const,
+            inviteId: null,
+            rawToken: null,
+            hasAccount,
+            recipientLocale,
+          }
         }
       }
 
@@ -170,6 +195,8 @@ export class InviteService {
           branch: 'rotated_existing' as const,
           inviteId: existing.id,
           rawToken,
+          hasAccount,
+          recipientLocale,
         }
       }
 
@@ -189,14 +216,25 @@ export class InviteService {
         branch: (targetUser ? 'pending_known_user' : 'pending_new_email') as CreateInviteBranch,
         inviteId: created.id,
         rawToken,
+        hasAccount,
+        recipientLocale,
       }
     })
 
-    // TODO (Stage D): enqueue invite email here using `result.rawToken`
-    // before it falls out of scope. Stage B intentionally does not wire
-    // the dispatch — see `EmailTemplate.ORG_INVITE` reservation in
-    // `email.types.ts` and the design-constraint notes on this class.
-    void result.rawToken
+    // Dispatch the invite email AFTER the transaction commits — never
+    // inside the tx, or a rolled-back invite could still send a live
+    // token. `noop_already_member` has a null rawToken and sends nothing.
+    if (result.rawToken !== null) {
+      await this.dispatchInviteEmail({
+        orgId,
+        roleId,
+        inviterUserId: principal.sub,
+        recipientEmail: dto.email,
+        rawToken: result.rawToken,
+        hasAccount: result.hasAccount,
+        recipientLocale: result.recipientLocale,
+      })
+    }
 
     this.logger.info(
       {
@@ -536,6 +574,59 @@ export class InviteService {
       throw new Error(`System ${name} role not found. Run: pnpm --filter api db:seed`)
     }
     return role.id
+  }
+
+  /**
+   * Best-effort post-commit invite email. The invite row is already
+   * committed, so a queue/lookup failure must not fail the uniform 202 —
+   * it is logged and swallowed (a re-invite rotates the token and
+   * re-sends). Org/role are read with explicit selects and fall back
+   * softly if they were deleted in the commit→dispatch window. The raw
+   * token only ever leaves via `acceptUrl`; it is never logged.
+   */
+  private async dispatchInviteEmail(args: {
+    orgId: string
+    roleId: string
+    inviterUserId: string
+    recipientEmail: string
+    rawToken: string
+    hasAccount: boolean
+    recipientLocale: string | null
+  }): Promise<void> {
+    try {
+      const [org, inviter, role] = await Promise.all([
+        this.prisma.organization.findUnique({
+          where: { id: args.orgId },
+          select: { name: true },
+        }),
+        this.userCacheService.getUser(args.inviterUserId),
+        this.prisma.role.findUnique({ where: { id: args.roleId }, select: { name: true } }),
+      ])
+
+      const locale: 'ru' | 'en' = args.recipientLocale === 'en' ? 'en' : 'ru'
+      const acceptUrl = `${this.env.get('FRONTEND_URL')}/invite/accept?token=${args.rawToken}`
+
+      await this.emailService.sendOrgInviteEmail(args.recipientEmail, {
+        orgName: org?.name ?? 'AMCore',
+        inviterName: inviter?.name ?? inviter?.email ?? 'AMCore',
+        inviterEmail: inviter?.email ?? '',
+        roleName: role?.name ?? 'MEMBER',
+        hasAccount: args.hasAccount,
+        acceptUrl,
+        expiresIn: locale === 'en' ? `${INVITE_EXPIRY_DAYS} days` : `${INVITE_EXPIRY_DAYS} дней`,
+        locale,
+      })
+    } catch (err) {
+      // Never log the raw token / acceptUrl — only the non-PII email hash.
+      this.logger.warn(
+        {
+          event: 'org.invite.email_dispatch_failed',
+          orgId: args.orgId,
+          err: err instanceof Error ? err.message : 'unknown',
+        },
+        'Org invite email dispatch failed (invite row already committed)'
+      )
+    }
   }
 
   private hashToken(token: string): string {

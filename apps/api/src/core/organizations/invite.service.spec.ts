@@ -7,6 +7,8 @@ import { InviteErrorCode, type RequestPrincipal, SystemRole } from '@amcore/shar
 
 import { AppException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { BusinessRuleViolationException } from '../../common/exceptions/domain/business-rule.exception'
+import type { EnvService } from '../../env/env.service'
+import type { EmailService } from '../../infrastructure/email'
 import type { PrismaService } from '../../prisma'
 import { EmailIdentityService } from '../auth/email-identity.service'
 import type { UserCacheService } from '../auth/user-cache.service'
@@ -17,6 +19,16 @@ import type { InviteRateLimiterService } from './invite-rate-limiter.service'
 import type { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
 
+// InviteService imports EmailService, which transitively pulls the ESM-only
+// React Email / FormatJS chain. Mock the leaves so this unit suite loads
+// (same pattern as email.service.spec.ts / email.processor.spec.ts).
+jest.mock('@react-email/render', () => ({
+  render: jest.fn(async () => '<html></html>'),
+}))
+jest.mock('@formatjs/intl', () => ({
+  createIntl: jest.fn(() => ({ formatMessage: jest.fn((descriptor) => descriptor.id) })),
+}))
+
 describe('InviteService', () => {
   let service: InviteService
   let prisma: DeepMockProxy<PrismaClient>
@@ -26,6 +38,8 @@ describe('InviteService', () => {
   let userCacheService: jest.Mocked<Pick<UserCacheService, 'getUser'>>
   let inviteRateLimiter: jest.Mocked<Pick<InviteRateLimiterService, 'check' | 'consume'>>
   let acceptLimiter: jest.Mocked<Pick<InviteAcceptLimiterService, 'check' | 'consume' | 'reset'>>
+  let emailService: jest.Mocked<Pick<EmailService, 'sendOrgInviteEmail'>>
+  let env: { get: jest.Mock }
   let logger: jest.Mocked<PinoLogger>
 
   const memberRole: Role = {
@@ -103,6 +117,8 @@ describe('InviteService', () => {
       consume: jest.fn().mockResolvedValue(undefined),
       reset: jest.fn().mockResolvedValue(undefined),
     }
+    emailService = { sendOrgInviteEmail: jest.fn().mockResolvedValue(undefined) }
+    env = { get: jest.fn().mockReturnValue('https://app.example.com') }
     logger = {
       setContext: jest.fn(),
       info: jest.fn(),
@@ -119,6 +135,8 @@ describe('InviteService', () => {
       userCacheService as unknown as UserCacheService,
       inviteRateLimiter as unknown as InviteRateLimiterService,
       acceptLimiter as unknown as InviteAcceptLimiterService,
+      emailService as unknown as EmailService,
+      env as unknown as EnvService,
       logger
     )
     ;(prisma.$transaction as unknown as jest.Mock).mockImplementation(
@@ -305,6 +323,109 @@ describe('InviteService', () => {
       const payload = auditCall?.[0] as { emailHash: string }
       expect(payload.emailHash).toMatch(/^[0-9a-f]{64}$/)
       expect(JSON.stringify(payload)).not.toContain('leak-check@example.com')
+    })
+  })
+
+  describe('createInvite — email dispatch (Stage D)', () => {
+    const inviterUser: User = {
+      ...targetUser,
+      id: 'user-admin',
+      email: 'admin@example.com',
+      name: 'Org Admin',
+    }
+
+    beforeEach(() => {
+      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findUnique.mockResolvedValue(memberRole)
+      prisma.organization.findUnique.mockResolvedValue({
+        id: 'org-1',
+        name: 'Acme Inc.',
+      } as never)
+      userCacheService.getUser.mockResolvedValue(inviterUser)
+    })
+
+    it('sends an org invite email with hasAccount=true for a known non-member', async () => {
+      prisma.user.findUnique.mockResolvedValue(targetUser)
+      prisma.orgMember.findUnique.mockResolvedValue(null)
+      prisma.orgInvite.findFirst.mockResolvedValue(null)
+      prisma.orgInvite.create.mockResolvedValue(inviteRow)
+
+      await service.createInvite('org-1', { email: 'invited@example.com' }, principal)
+
+      expect(emailService.sendOrgInviteEmail).toHaveBeenCalledTimes(1)
+      const [to, data] = emailService.sendOrgInviteEmail.mock.calls[0]!
+      expect(to).toBe('invited@example.com')
+      expect(data).toEqual(
+        expect.objectContaining({
+          orgName: 'Acme Inc.',
+          inviterName: 'Org Admin',
+          inviterEmail: 'admin@example.com',
+          roleName: 'MEMBER',
+          hasAccount: true,
+          locale: 'ru',
+        })
+      )
+      // Raw token reaches the recipient only via acceptUrl.
+      expect(data.acceptUrl).toMatch(/^https:\/\/app\.example\.com\/invite\/accept\?token=.+/)
+    })
+
+    it('sends an org invite email with hasAccount=false for an unknown email', async () => {
+      prisma.user.findUnique.mockResolvedValue(null)
+      prisma.orgInvite.findFirst.mockResolvedValue(null)
+      prisma.orgInvite.create.mockResolvedValue(inviteRow)
+
+      await service.createInvite('org-1', { email: 'newperson@example.com' }, principal)
+
+      expect(emailService.sendOrgInviteEmail).toHaveBeenCalledTimes(1)
+      const [, data] = emailService.sendOrgInviteEmail.mock.calls[0]!
+      expect(data.hasAccount).toBe(false)
+      expect(data.locale).toBe('ru')
+    })
+
+    it('sends an org invite email when rotating an existing active row', async () => {
+      prisma.user.findUnique.mockResolvedValue(targetUser)
+      prisma.orgMember.findUnique.mockResolvedValue(null)
+      prisma.orgInvite.findFirst.mockResolvedValue({ ...inviteRow, id: 'invite-existing' })
+      prisma.orgInvite.update.mockResolvedValue({ ...inviteRow, id: 'invite-existing' })
+
+      await service.createInvite('org-1', { email: 'invited@example.com' }, principal)
+
+      expect(emailService.sendOrgInviteEmail).toHaveBeenCalledTimes(1)
+    })
+
+    it('does NOT send an email when the target is already a member', async () => {
+      prisma.user.findUnique.mockResolvedValue(targetUser)
+      prisma.orgMember.findUnique.mockResolvedValue({
+        id: 'member-existing',
+        userId: targetUser.id,
+        organizationId: 'org-1',
+        createdAt: new Date(),
+      })
+
+      await service.createInvite('org-1', { email: 'invited@example.com' }, principal)
+
+      expect(emailService.sendOrgInviteEmail).not.toHaveBeenCalled()
+    })
+
+    it('swallows a dispatch failure and still returns uniform 202 (row already committed)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null)
+      prisma.orgInvite.findFirst.mockResolvedValue(null)
+      prisma.orgInvite.create.mockResolvedValue(inviteRow)
+      emailService.sendOrgInviteEmail.mockRejectedValue(new Error('queue down'))
+
+      const result = await service.createInvite(
+        'org-1',
+        { email: 'newperson@example.com' },
+        principal
+      )
+
+      expect(result).toEqual({ status: 'invited' })
+      const warnCall = logger.warn.mock.calls.find(
+        ([payload]) => (payload as { event?: string }).event === 'org.invite.email_dispatch_failed'
+      )
+      expect(warnCall).toBeDefined()
+      // The failure log must not carry the raw token.
+      expect(JSON.stringify(warnCall?.[0])).not.toContain('token=')
     })
   })
 

@@ -24,6 +24,15 @@ import { InvitesController } from './invites.controller'
 import type { MemberService } from './member.service'
 import { MembersController } from './members.controller'
 
+// InviteService imports EmailService, which transitively pulls the ESM-only
+// React Email / FormatJS chain. Mock the leaves so this unit suite loads.
+jest.mock('@react-email/render', () => ({
+  render: jest.fn(async () => '<html></html>'),
+}))
+jest.mock('@formatjs/intl', () => ({
+  createIntl: jest.fn(() => ({ formatMessage: jest.fn((descriptor) => descriptor.id) })),
+}))
+
 const principal: RequestPrincipal = {
   type: 'jwt',
   sub: 'user-1',

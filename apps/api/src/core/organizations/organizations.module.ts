@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 
+import { EmailModule } from '../../infrastructure/email'
 import { PrismaModule } from '../../prisma'
 import { AuthModule } from '../auth/auth.module'
 
@@ -20,6 +21,7 @@ import { RolesController } from './roles.controller'
   imports: [
     PrismaModule,
     AuthModule, // Provides TokenService (for /switch) + AuthenticationGuard (global) + UserCacheService + EmailIdentityService
+    EmailModule, // Provides EmailService for invite dispatch (OB-02 Stage D)
   ],
   controllers: [
     OrganizationsController,
