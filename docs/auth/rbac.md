@@ -264,13 +264,9 @@ curl -X POST https://api.amcore.dev/api/v1/auth/invites/accept \
 The recipient must be authenticated as the canonical-email owner of
 the invite, and that account must have a verified email address.
 
-> **Token delivery is wired in the next hardening stage.** The
-> create/list/revoke/accept HTTP surface is live and stable, but the
-> automatic invite email that hands the invitee their raw token is
-> still in development (the runtime currently generates and discards
-> the token until that stage lands). Until then, exercising the accept
-> route end-to-end requires reading the token directly out of the
-> `OrgInvite` row.
+> The raw accept token is delivered to the recipient by email when the
+> invite is created. See [Organization invites](./invites.md) for the
+> full end-to-end flow, email behavior, and expiry/cleanup semantics.
 
 ### Create a role and attach permissions
 

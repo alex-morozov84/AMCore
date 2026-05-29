@@ -44,15 +44,13 @@ export class AuthInvitesController {
   @ZodSerializerDto(AcceptInviteResponseDto)
   @ApiOperation({
     summary:
-      'Accept a pending invite using the raw invite token. The ' +
-      'authenticated user must own the canonical email the invite was ' +
-      'issued for and must have a verified email address. On success ' +
-      'creates the org membership and returns { organizationId, roleId }. ' +
-      'Negative paths (token missing / expired / revoked / already accepted / ' +
-      'email mismatch) all return 400 with errorCode INVITE_INVALID_OR_EXPIRED. ' +
-      'Note: automatic invite-email delivery of the raw token lands in the ' +
-      'next hardening stage; this route is callable today only when the ' +
-      'caller already has the raw token by other means.',
+      'Accept a pending invite using the raw invite token from the invite ' +
+      'email. The authenticated user must own the canonical email the ' +
+      'invite was issued for and must have a verified email address. On ' +
+      'success creates the org membership and returns { organizationId, ' +
+      'roleId }. Negative paths (token missing / expired / revoked / ' +
+      'already accepted / email mismatch) all return 400 with errorCode ' +
+      'INVITE_INVALID_OR_EXPIRED.',
   })
   accept(
     @Body() dto: AcceptInviteDto,

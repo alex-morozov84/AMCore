@@ -15,6 +15,7 @@ This guide covers everything — from "how do I log a user in" to "how do I rest
 | [OAuth](./oauth.md)             | Social login (Google, GitHub, Apple, Telegram) + account linking |
 | [Sessions](./sessions.md)       | Managing active sessions, token rotation, multi-device           |
 | [RBAC](./rbac.md)               | Roles, organizations, and permission checks                      |
+| [Invites](./invites.md)         | Inviting people to an organization by email                      |
 | [API Keys](./api-keys.md)       | Machine-to-machine access with scoped keys                       |
 | [API Reference](./reference.md) | All endpoints, parameters, and error codes                       |
 

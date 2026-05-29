@@ -129,13 +129,9 @@ A successful accept attaches the membership and returns
 own the canonical email the invite was issued for and must have a
 verified email address.
 
-> **Token delivery is wired in the next hardening stage.** The HTTP
-> create/list/revoke/accept surface is live and stable, but the
-> automatic invite email that hands the invitee their raw token is
-> still in development (the runtime currently generates and discards
-> the token until that stage lands). For now, callers that need to
-> exercise the accept route end-to-end can read the token directly out
-> of the `OrgInvite` row.
+> The invite email carrying the raw accept token is delivered
+> automatically when the invite is created. See
+> [Organization invites](./auth/invites.md) for the full end-to-end flow.
 
 > The invitee does **not** need an account before the invite is sent —
 > they can register at any time before accepting.
