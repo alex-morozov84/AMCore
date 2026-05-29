@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import type { Job } from 'bullmq'
+import { type Job, UnrecoverableError } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
 import { EmailService } from '../email.service'
@@ -89,6 +89,7 @@ describe('EmailProcessor', () => {
         to: 'test@example.com',
         subject: 'Welcome',
         html: '<p>Welcome!</p>',
+        idempotencyKey: 'email:job-123', // EQS-03: stable across retries
       })
     })
 
@@ -106,7 +107,7 @@ describe('EmailProcessor', () => {
       expect(emailService.send).not.toHaveBeenCalled()
     })
 
-    it('discards a non-queueable (secret-bearing) job without rendering, sending, or throwing (EQS-02)', async () => {
+    it('discards a secret-bearing job without rendering, sending, or throwing (EQS-02)', async () => {
       // Simulates a legacy/injected Redis job carrying a secret template + token
       // URL. Job data is untrusted at runtime; the processor must not emit it.
       const job = {
@@ -126,55 +127,96 @@ describe('EmailProcessor', () => {
       expect(emailService.send).not.toHaveBeenCalled()
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({ jobId: 'job-legacy', template: EmailTemplate.PASSWORD_RESET }),
-        expect.stringContaining('non-queueable')
+        expect.stringContaining('secret-bearing')
       )
     })
 
-    it('should throw error if email sending fails', async () => {
-      const jobData: SendEmailJobData = {
-        template: EmailTemplate.WELCOME,
-        to: 'test@example.com',
-        data: { name: 'Test User', email: 'test@example.com' },
-      }
-
+    it('dead-letters null/non-object job data deterministically (no TypeError retry)', async () => {
       const job = {
-        id: 'job-789',
+        id: 'job-null',
         name: JobName.SEND_EMAIL,
-        data: jobData,
+        data: null,
         attemptsMade: 0,
-      } as Job<SendEmailJobData>
+      } as unknown as Job<SendEmailJobData>
 
-      emailService.renderTemplate.mockResolvedValue({
-        html: '<p>Welcome!</p>',
-        subject: 'Welcome',
-      })
+      await expect(processor.process(job)).rejects.toBeInstanceOf(UnrecoverableError)
+      expect(emailService.renderTemplate).not.toHaveBeenCalled()
+      expect(emailService.send).not.toHaveBeenCalled()
+    })
 
+    it('dead-letters an object with no template (not silently completed)', async () => {
+      const job = {
+        id: 'job-no-template',
+        name: JobName.SEND_EMAIL,
+        data: { to: 'x@example.com', data: { name: 'X' } },
+        attemptsMade: 0,
+      } as unknown as Job<SendEmailJobData>
+
+      await expect(processor.process(job)).rejects.toBeInstanceOf(UnrecoverableError)
+      expect(emailService.send).not.toHaveBeenCalled()
+    })
+
+    const welcomeJob = (id: string, attemptsMade = 0): Job<SendEmailJobData> =>
+      ({
+        id,
+        name: JobName.SEND_EMAIL,
+        data: {
+          template: EmailTemplate.WELCOME,
+          to: 'test@example.com',
+          data: { name: 'Test User', email: 'test@example.com' },
+        },
+        attemptsMade,
+      }) as Job<SendEmailJobData>
+
+    it('retries a transient send failure (plain Error, not UnrecoverableError) — EQS-03', async () => {
+      emailService.renderTemplate.mockResolvedValue({ html: '<p>Welcome!</p>', subject: 'Welcome' })
       emailService.send.mockResolvedValue({
         id: '',
         success: false,
-        error: 'SMTP error',
+        error: 'rate limited',
+        retryable: true,
       })
 
-      await expect(processor.process(job)).rejects.toThrow('SMTP error')
+      await expect(processor.process(welcomeJob('job-transient'))).rejects.toThrow('rate limited')
+      await expect(processor.process(welcomeJob('job-transient'))).rejects.not.toBeInstanceOf(
+        UnrecoverableError
+      )
     })
 
-    it('should throw error if rendering fails', async () => {
-      const jobData: SendEmailJobData = {
-        template: EmailTemplate.WELCOME,
-        to: 'test@example.com',
-        data: { name: 'Test User', email: 'test@example.com' },
-      }
+    it('does NOT retry a deterministic send failure (UnrecoverableError) — EQS-03', async () => {
+      emailService.renderTemplate.mockResolvedValue({ html: '<p>Welcome!</p>', subject: 'Welcome' })
+      emailService.send.mockResolvedValue({
+        id: '',
+        success: false,
+        error: 'invalid from address',
+        retryable: false,
+      })
 
-      const job = {
-        id: 'job-101',
-        name: JobName.SEND_EMAIL,
-        data: jobData,
-        attemptsMade: 1,
-      } as Job<SendEmailJobData>
+      await expect(processor.process(welcomeJob('job-det'))).rejects.toBeInstanceOf(
+        UnrecoverableError
+      )
+    })
 
+    it('treats a render failure as deterministic (UnrecoverableError, no send) — EQS-03', async () => {
       emailService.renderTemplate.mockRejectedValue(new Error('Template error'))
 
-      await expect(processor.process(job)).rejects.toThrow('Template error')
+      await expect(processor.process(welcomeJob('job-render'))).rejects.toBeInstanceOf(
+        UnrecoverableError
+      )
+      expect(emailService.send).not.toHaveBeenCalled()
+    })
+
+    it('treats an invalid payload as deterministic, without rendering or sending (EQS-07)', async () => {
+      const job = {
+        id: 'job-invalid',
+        name: JobName.SEND_EMAIL,
+        // queueable template but malformed data (missing required `email`)
+        data: { template: EmailTemplate.WELCOME, to: 'test@example.com', data: { name: 'X' } },
+        attemptsMade: 0,
+      } as unknown as Job<SendEmailJobData>
+
+      await expect(processor.process(job)).rejects.toBeInstanceOf(UnrecoverableError)
+      expect(emailService.renderTemplate).not.toHaveBeenCalled()
       expect(emailService.send).not.toHaveBeenCalled()
     })
 
@@ -206,6 +248,45 @@ describe('EmailProcessor', () => {
 
       // Should log attempt 3 (attemptsMade + 1)
       expect(emailService.renderTemplate).toHaveBeenCalled()
+    })
+  })
+
+  describe('onFailed (dead-letter signal — EQS-03)', () => {
+    const failedJob = (attemptsMade: number, attempts: number): Job<SendEmailJobData> =>
+      ({
+        id: 'job-dl',
+        data: {
+          template: EmailTemplate.WELCOME,
+          to: 'test@example.com',
+          data: { name: 'X', email: 'test@example.com' },
+        },
+        attemptsMade,
+        opts: { attempts },
+      }) as Job<SendEmailJobData>
+
+    it('emits a dead-letter error once attempts are exhausted', () => {
+      processor.onFailed(failedJob(3, 3), new Error('still failing'))
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'email.job.dead_letter', jobId: 'job-dl' }),
+        expect.stringContaining('dead-lettered')
+      )
+    })
+
+    it('emits a dead-letter error immediately for an UnrecoverableError', () => {
+      const err = new UnrecoverableError('invalid payload')
+      processor.onFailed(failedJob(0, 3), err)
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'email.job.dead_letter', unrecoverable: true }),
+        expect.any(String)
+      )
+    })
+
+    it('stays silent on a non-terminal (will-retry) failure', () => {
+      processor.onFailed(failedJob(1, 3), new Error('transient'))
+
+      expect(mockLogger.error).not.toHaveBeenCalled()
     })
   })
 })

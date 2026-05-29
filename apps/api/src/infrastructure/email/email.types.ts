@@ -16,6 +16,12 @@ export interface SendEmailParams {
   text?: string
   from?: string
   replyTo?: string
+  /**
+   * Idempotency key forwarded to the provider (EQS-03). Set by the email
+   * processor to a value derived from the BullMQ job id so a retry after a
+   * post-accept network blip does not double-send. Ignored by the mock provider.
+   */
+  idempotencyKey?: string
 }
 
 /**
@@ -25,6 +31,13 @@ export interface SendEmailResult {
   id: string
   success: boolean
   error?: string
+  /**
+   * Whether a failed send is worth retrying (EQS-03). The provider classifies
+   * its error: deterministic config/payload errors → `false` (the processor
+   * raises `UnrecoverableError`, no retry); transient/unknown → `true` (retry,
+   * bounded by `attempts`, then dead-letter). Undefined on success.
+   */
+  retryable?: boolean
 }
 
 /**
@@ -135,11 +148,24 @@ export const QUEUEABLE_EMAIL_TEMPLATES: ReadonlySet<EmailTemplate> = new Set([
 ])
 
 /**
- * BullMQ job data for sending emails. Restricted to non-secret
- * (`QueueableEmailTemplate`) payloads — see `QueueableEmailTemplate`.
+ * Secret-bearing templates (carry a live token URL). The email processor
+ * discards a job with one of these (completes without render/send and without
+ * dead-letter, so the token-bearing payload is not retained — EQS-02). Distinct
+ * from "not queueable": a garbage/missing template is NOT in this set, so it
+ * falls through to validation and is observably dead-lettered rather than
+ * silently completed.
  */
-export interface SendEmailJobData {
-  template: QueueableEmailTemplate
-  to: string
-  data: WelcomeEmailData | PasswordChangedEmailData
-}
+export const SECRET_EMAIL_TEMPLATES: ReadonlySet<EmailTemplate> = new Set([
+  EmailTemplate.PASSWORD_RESET,
+  EmailTemplate.EMAIL_VERIFICATION,
+  EmailTemplate.ORG_INVITE,
+])
+
+/**
+ * BullMQ job data for sending a (non-secret) queued email.
+ *
+ * Derived from the Zod schema (`z.infer`) so the runtime validation and the
+ * compile-time type cannot drift (EQS-03/EQS-07). Restricted to
+ * `QueueableEmailTemplate` payloads.
+ */
+export type { SendEmailJobData } from './email.schema'

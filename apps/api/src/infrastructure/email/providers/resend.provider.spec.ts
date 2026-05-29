@@ -93,14 +93,17 @@ describe('ResendEmailProvider', () => {
         success: true,
       })
 
-      expect(mockSend).toHaveBeenCalledWith({
-        from: 'noreply@amcore.com',
-        to: ['test@example.com'],
-        subject: 'Test Subject',
-        html: '<p>Test</p>',
-        text: undefined,
-        replyTo: undefined,
-      })
+      expect(mockSend).toHaveBeenCalledWith(
+        {
+          from: 'noreply@amcore.com',
+          to: ['test@example.com'],
+          subject: 'Test Subject',
+          html: '<p>Test</p>',
+          text: undefined,
+          replyTo: undefined,
+        },
+        undefined // no idempotency key on this call
+      )
     })
 
     it('should use custom from address', async () => {
@@ -119,14 +122,15 @@ describe('ResendEmailProvider', () => {
       expect(mockSend).toHaveBeenCalledWith(
         expect.objectContaining({
           from: 'custom@example.com',
-        })
+        }),
+        undefined
       )
     })
 
-    it('should handle Resend API error', async () => {
+    it('classifies a deterministic Resend error as non-retryable (EQS-03)', async () => {
       mockSend.mockResolvedValue({
         data: null,
-        error: { message: 'Invalid API key' },
+        error: { message: 'Invalid API key', name: 'invalid_api_key' },
       } as any)
 
       const result = await provider.send({
@@ -139,10 +143,45 @@ describe('ResendEmailProvider', () => {
         id: '',
         success: false,
         error: 'Invalid API key',
+        retryable: false,
       })
+      // Per-attempt failures log at warn, not error — the processor owns the
+      // terminal error-level dead-letter signal (EQS-03).
+      expect(mockLogger.warn).toHaveBeenCalled()
+      expect(mockLogger.error).not.toHaveBeenCalled()
     })
 
-    it('should handle exception during send', async () => {
+    it('classifies a transient Resend error as retryable (EQS-03)', async () => {
+      mockSend.mockResolvedValue({
+        data: null,
+        error: { message: 'Too many requests', name: 'rate_limit_exceeded' },
+      } as any)
+
+      const result = await provider.send({
+        to: 'test@example.com',
+        subject: 'Test',
+        html: '<p>Test</p>',
+      })
+
+      expect(result).toMatchObject({ success: false, retryable: true })
+    })
+
+    it('classifies an unknown Resend error code as retryable (safe default — EQS-03)', async () => {
+      mockSend.mockResolvedValue({
+        data: null,
+        error: { message: 'Weird', name: 'some_future_code' },
+      } as any)
+
+      const result = await provider.send({
+        to: 'test@example.com',
+        subject: 'Test',
+        html: '<p>Test</p>',
+      })
+
+      expect(result).toMatchObject({ success: false, retryable: true })
+    })
+
+    it('treats a thrown exception (network) as retryable (EQS-03)', async () => {
       mockSend.mockRejectedValue(new Error('Network error'))
 
       const result = await provider.send({
@@ -155,6 +194,24 @@ describe('ResendEmailProvider', () => {
         id: '',
         success: false,
         error: 'Network error',
+        retryable: true,
+      })
+      expect(mockLogger.warn).toHaveBeenCalled()
+      expect(mockLogger.error).not.toHaveBeenCalled()
+    })
+
+    it('forwards the idempotency key to Resend (EQS-03)', async () => {
+      mockSend.mockResolvedValue({ data: { id: 'email_1' }, error: null } as any)
+
+      await provider.send({
+        to: 'test@example.com',
+        subject: 'Test',
+        html: '<p>Test</p>',
+        idempotencyKey: 'email:job-42',
+      })
+
+      expect(mockSend).toHaveBeenCalledWith(expect.any(Object), {
+        idempotencyKey: 'email:job-42',
       })
     })
 
@@ -172,14 +229,17 @@ describe('ResendEmailProvider', () => {
         replyTo: 'reply@example.com',
       })
 
-      expect(mockSend).toHaveBeenCalledWith({
-        from: 'noreply@amcore.com',
-        to: ['test@example.com'],
-        subject: 'Test',
-        html: '<p>Test</p>',
-        text: 'Plain text',
-        replyTo: 'reply@example.com',
-      })
+      expect(mockSend).toHaveBeenCalledWith(
+        {
+          from: 'noreply@amcore.com',
+          to: ['test@example.com'],
+          subject: 'Test',
+          html: '<p>Test</p>',
+          text: 'Plain text',
+          replyTo: 'reply@example.com',
+        },
+        undefined
+      )
     })
   })
 })
