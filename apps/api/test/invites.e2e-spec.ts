@@ -9,6 +9,7 @@ import {
   cleanDatabase,
   cleanOrgData,
   type E2ETestContext,
+  seedOrgMember,
   seedSystemRoles,
   setupE2ETest,
   teardownE2ETest,
@@ -622,6 +623,68 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
         .set('Authorization', `Bearer ${apiKey}`)
         .send({ token: randomBytes(32).toString('base64url') })
         .expect(401)
+    })
+
+    /**
+     * Cross-org boundary on the (dual-auth) invite-create route. An API
+     * key is an org-bound credential per ADR-033; `InviteService.createInvite`
+     * calls `assertOrgContext(principal, orgId)` before any write, so a key
+     * bound to org A cannot invite into org B.
+     *
+     * The expected status is 403, not 401: the route is dual-auth so the key
+     * authenticates, and the owner is seeded into org B as a MEMBER below, so
+     * a membership-only check would pass — the denial must come from the
+     * org-context boundary, not from a missing membership or a malformed key.
+     * The scope is `manage:Organization` so `@CheckPolicies(Manage,
+     * Organization)` passes and the 403 originates at the org-context
+     * assertion, not at authorization.
+     */
+    it('POST /organizations/:orgId/members/invite rejects an API key bound to a different org with 403', async () => {
+      // userA — admin of org A.
+      const {
+        adminToken: tokenA,
+        orgId: orgA,
+        adminUserId: userAId,
+      } = await setupAdminOrg('user-a@example.com')
+
+      // userB — owns org B.
+      const tokenB = await registerAndLogin('user-b@example.com')
+      const orgBRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ name: 'Org B' })
+        .expect(201)
+      const orgB = orgBRes.body.id as string
+
+      // Seed userA into org B as MEMBER directly — a membership-only check
+      // would now pass, so the 403 below must come from the bound-org boundary.
+      const memberRole = await prisma.role.findFirstOrThrow({
+        where: { name: 'MEMBER', isSystem: true, organizationId: null },
+      })
+      await seedOrgMember(prisma, { orgId: orgB, userId: userAId, roleId: memberRole.id })
+      const orgBMembers = await prisma.orgMember.findMany({ where: { organizationId: orgB } })
+      expect(orgBMembers).toHaveLength(2)
+
+      // userA creates an API key bound to org A only.
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ name: 'Bound to A', organizationId: orgA, scopes: ['manage:Organization'] })
+        .expect(201)
+      const apiKey = keyRes.body.key as string
+
+      // Cross-org invite — rejected with 403 (credential bound to org A).
+      await request(app.getHttpServer())
+        .post(`/organizations/${orgB}/members/invite`)
+        .set('Authorization', `Bearer ${apiKey}`)
+        .send({ email: 'cross-org-target@example.com' })
+        .expect(403)
+
+      // No partial write: the rejected call created no invite row in org B.
+      const leaked = await prisma.orgInvite.findFirst({
+        where: { organizationId: orgB, emailCanonical: 'cross-org-target@example.com' },
+      })
+      expect(leaked).toBeNull()
     })
   })
 })
