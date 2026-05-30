@@ -157,4 +157,20 @@ export class EmailProcessor extends WorkerHost {
       'Email job dead-lettered (will not be retried)'
     )
   }
+
+  /**
+   * Worker-side Redis/connection observability (EQS-06). The worker holds its
+   * own blocking connection (BRPOPLPUSH), separate from the producer's queue
+   * client. Without this, a Redis outage can stall job processing with NO
+   * `email.job.dead_letter` (jobs aren't failing — they're un-pulled) and no
+   * producer-side add failure. This is the worker-side counterpart to
+   * `QueueService`'s `queue.redis_error`. Never logs job payloads.
+   */
+  @OnWorkerEvent('error')
+  onError(error: Error): void {
+    this.logger.error(
+      { event: 'queue.worker_error', error: error?.message },
+      'Email worker Redis/connection error'
+    )
+  }
 }

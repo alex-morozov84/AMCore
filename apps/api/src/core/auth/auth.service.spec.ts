@@ -641,6 +641,40 @@ describe('AuthService', () => {
       expect(mockUserCacheService.invalidateUser).toHaveBeenCalledWith(mockUser.id)
       expect(mockEmailService.sendPasswordChangedEmail).toHaveBeenCalled()
     })
+
+    it('still resolves when the password-changed email enqueue fails (EQS-06)', async () => {
+      const tokenHash = 'a'.repeat(64)
+      mockTokenManager.verifyPasswordResetToken.mockResolvedValue({
+        userId: mockUser.id,
+        tokenHash,
+      })
+      ;(argon2.hash as jest.Mock).mockResolvedValue('new-hashed-password')
+      ;(mockCtx.prisma.$transaction as jest.Mock).mockImplementation(
+        (fn: (tx: typeof mockCtx.prisma) => Promise<unknown>) => fn(mockCtx.prisma)
+      )
+      mockCtx.prisma.passwordResetToken.update.mockResolvedValue({} as never)
+      mockCtx.prisma.user.update.mockResolvedValue(mockUser)
+      mockSessionService.deleteAllByUserId.mockResolvedValue(undefined)
+      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+      // Simulate a Redis/BullMQ outage on the queued PASSWORD_CHANGED send.
+      mockEmailService.sendPasswordChangedEmail.mockRejectedValue(new Error('Redis down'))
+
+      // Best-effort fire-and-forget: the reset must NOT reject.
+      await expect(
+        authService.resetPassword('a'.repeat(64), 'NewPassword123')
+      ).resolves.toBeUndefined()
+
+      // Password change + session invalidation still happened.
+      expect(mockCtx.prisma.user.update).toHaveBeenCalled()
+      expect(mockSessionService.deleteAllByUserId).toHaveBeenCalledWith(mockUser.id)
+
+      // The swallowed failure is logged at warn (flush the microtask queue first).
+      await Promise.resolve()
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: mockUser.id }),
+        expect.stringContaining('Failed to send password changed email')
+      )
+    })
   })
 
   describe('verifyEmail', () => {

@@ -343,23 +343,59 @@ describe('MyService', () => {
 Environment variables:
 
 ```env
+# Plain (local/dev):
 REDIS_URL=redis://localhost:6379
+# TLS (managed Redis — Upstash/ElastiCache/Redis Cloud) + Redis 6 ACL:
+# REDIS_URL=rediss://username:password@host:6380/0
 ```
 
-Queue config (`queue.config.ts`):
+The BullMQ connection is built from `REDIS_URL` by `buildBullConnection`
+(`redis-connection.config.ts`) — the single, tested source of the connection
+options (EQS-06):
+
+- **TLS** is enabled **iff** the scheme is `rediss://` (`tls: { servername }`).
+  Plain `redis://` is left untouched.
+- **username / password / db** are all parsed (ACL-aware; credentials are
+  percent-decoded).
+- **`retryStrategy`** mirrors `RedisConnectionService` (50 ms/attempt, capped at
+  2 s) so both Redis clients reconnect on one curve.
+- **`maxRetriesPerRequest` is deliberately NOT set** on this producer
+  connection — `null` would make `queue.add()` hang forever during an outage,
+  and BullMQ already enforces `null` on the worker's blocking connection itself.
 
 ```typescript
+// Effective connection (rediss:// example)
 {
-  redis: {
-    host: 'localhost',
-    port: 6379,
-    password: undefined,
-    db: 0,
-  },
-  prefix: 'amcore', // All queues will be prefixed with 'amcore:'
-  defaultJobOptions: { /* ... */ }
+  host, port, db,
+  username, password,                       // when present in the URL
+  tls: { servername: host },                // only for rediss://
+  retryStrategy: (n) => Math.min(n*50, 2000),
 }
+// prefix: 'amcore'; defaultJobOptions: { /* ... */ }
 ```
+
+### Outage behavior & observability (EQS-06)
+
+- **Enqueuing a transactional email is best-effort** relative to the primary
+  request — a Redis/BullMQ outage must **never** turn a user-facing mutation
+  (whose real work already committed) into a 500. `QueueService.add` keeps
+  throwing (it is the low-level primitive); the **caller** decides. Email
+  notification call sites are fire-and-forget (`void send(...).catch(warn)`):
+  e.g. `register`/welcome and `resetPassword`/password-changed. Secret-bearing
+  emails (reset/verification/invite) are sent directly via `EmailService.sendNow`
+  and never touch the queue at all (EQS-02), so an outage cannot affect them.
+- **Observability** is logged at error level on both connections:
+  - producer — `QueueService.onModuleInit` attaches an `error` listener
+    **synchronously on the BullMQ `Queue`** (QueueBase re-emits connection
+    errors) → `event: 'queue.redis_error'`. The `reconnecting` listener (only on
+    the raw ioredis client) is attached **fire-and-forget** via
+    `void queue.client.then(...)` → `queue.redis_reconnecting` (warn). It is
+    **never awaited**: `queue.client` is BullMQ's ready-gated promise and may
+    never settle while Redis is down, so awaiting it would hang bootstrap.
+  - worker — `EmailProcessor` `@OnWorkerEvent('error')` →
+    `event: 'queue.worker_error'` (the worker holds a separate blocking
+    connection; without this a Redis outage can stall processing with no
+    `email.job.dead_letter` and no producer-side failure).
 
 ## Architecture
 

@@ -263,13 +263,24 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } })
     if (user) {
-      await this.emailService.sendPasswordChangedEmail(user.email, {
-        name: user.name ?? user.email,
-        changedAt: new Date().toISOString(),
-        loginUrl: `${this.env.get('FRONTEND_URL')}/login`,
-        supportEmail: this.env.get('SUPPORT_EMAIL'),
-        locale: user.locale as 'ru' | 'en',
-      })
+      // Best-effort, fire-and-forget (EQS-06 / OD-5): the password change is
+      // already committed above. PASSWORD_CHANGED is queued, so a Redis/BullMQ
+      // outage here must not 500 a successful reset (and `void` avoids blocking
+      // the response on a stalled `add()`). Mirrors the register/welcome path.
+      void this.emailService
+        .sendPasswordChangedEmail(user.email, {
+          name: user.name ?? user.email,
+          changedAt: new Date().toISOString(),
+          loginUrl: `${this.env.get('FRONTEND_URL')}/login`,
+          supportEmail: this.env.get('SUPPORT_EMAIL'),
+          locale: user.locale as 'ru' | 'en',
+        })
+        .catch((err: unknown) =>
+          this.logger.warn(
+            { userId, err: err instanceof Error ? err.message : 'unknown' },
+            'Failed to send password changed email'
+          )
+        )
     }
 
     this.logger.info({ userId }, 'Password reset successfully')

@@ -3,7 +3,6 @@ import { ExpressAdapter } from '@bull-board/express'
 import { BullBoardModule } from '@bull-board/nestjs'
 import { BullModule } from '@nestjs/bullmq'
 import { Module } from '@nestjs/common'
-import { URL } from 'url'
 
 import { QueueName } from './constants/queues.constant'
 import { createBullBoardAuthMiddleware } from './dashboard/bull-board-auth.middleware'
@@ -13,6 +12,7 @@ import { isBullBoardEnabled } from './dashboard/bull-board-mount-gate'
 import { DashboardController } from './dashboard/dashboard.controller'
 import { HelloWorldProcessor } from './processors/hello-world.processor'
 import { QueueService } from './queue.service'
+import { buildBullConnection } from './redis-connection.config'
 
 import { EnvModule } from '@/env/env.module'
 import { EnvService } from '@/env/env.service'
@@ -60,16 +60,10 @@ const bullBoardImports = bullBoardEnabled
       imports: [EnvModule],
       inject: [EnvService],
       useFactory: (env: EnvService) => {
-        // Parse REDIS_URL from validated env
-        const redisUrl = new URL(env.get('REDIS_URL'))
-
         return {
-          connection: {
-            host: redisUrl.hostname,
-            port: parseInt(redisUrl.port, 10) || 6379,
-            password: redisUrl.password || undefined,
-            db: redisUrl.pathname ? parseInt(redisUrl.pathname.slice(1), 10) : 0,
-          },
+          // EQS-06: TLS (rediss://), ACL username, and a reconnect retryStrategy
+          // — built from the validated REDIS_URL by a single tested helper.
+          connection: buildBullConnection(env.get('REDIS_URL')),
           prefix: 'amcore',
           defaultJobOptions: {
             attempts: 3,

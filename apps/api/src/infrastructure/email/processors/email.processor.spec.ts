@@ -289,4 +289,15 @@ describe('EmailProcessor', () => {
       expect(mockLogger.error).not.toHaveBeenCalled()
     })
   })
+
+  describe('onError (worker Redis/connection observability — EQS-06)', () => {
+    it('logs queue.worker_error at error level with no payload', () => {
+      processor.onError(new Error('ECONNREFUSED'))
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'queue.worker_error', error: 'ECONNREFUSED' }),
+        expect.stringContaining('worker Redis/connection error')
+      )
+    })
+  })
 })

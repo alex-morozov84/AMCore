@@ -1,6 +1,7 @@
 import { getQueueToken } from '@nestjs/bullmq'
 import { Test, TestingModule } from '@nestjs/testing'
 import type { Job, Queue } from 'bullmq'
+import { EventEmitter } from 'events'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AppException, NotFoundException } from '../../common/exceptions'
@@ -15,9 +16,11 @@ describe('QueueService', () => {
   let mockLogger: jest.Mocked<PinoLogger>
 
   beforeEach(async () => {
-    // Create mock queues
+    // Create mock queues. EventEmitter-based so the synchronous `queue.on('error')`
+    // wiring in onModuleInit works; `client` resolves to a raw-client emitter for
+    // the fire-and-forget `reconnecting` listener.
     const createMockQueue = (): jest.Mocked<Queue> =>
-      ({
+      Object.assign(new EventEmitter(), {
         add: jest.fn(),
         getJob: jest.fn(),
         getActive: jest.fn(),
@@ -25,6 +28,7 @@ describe('QueueService', () => {
         pause: jest.fn(),
         resume: jest.fn(),
         clean: jest.fn(),
+        client: Promise.resolve(new EventEmitter()),
       }) as unknown as jest.Mocked<Queue>
 
     defaultQueue = createMockQueue()
@@ -60,6 +64,65 @@ describe('QueueService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined()
+  })
+
+  describe('onModuleInit (EQS-06 producer observability)', () => {
+    it('logs queue.redis_error at error level when the Queue emits an error', () => {
+      service.onModuleInit()
+
+      // QueueBase re-emits underlying connection errors on the Queue itself.
+      ;(emailQueue as unknown as EventEmitter).emit('error', new Error('ECONNREFUSED'))
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'queue.redis_error', queueName: QueueName.EMAIL }),
+        expect.any(String)
+      )
+    })
+
+    it('returns synchronously without awaiting the (possibly-never-ready) client', () => {
+      // A client promise that never settles must not hang onModuleInit.
+      ;(emailQueue as unknown as { client: Promise<EventEmitter> }).client = new Promise(() => {
+        /* never settles — simulates Redis down with unbounded retryStrategy */
+      })
+
+      expect(() => service.onModuleInit()).not.toThrow()
+      // Synchronous error wiring still works on the never-ready queue.
+      ;(emailQueue as unknown as EventEmitter).emit('error', new Error('down'))
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'queue.redis_error' }),
+        expect.any(String)
+      )
+    })
+
+    it('attaches a reconnecting listener once the client is ready (fire-and-forget)', async () => {
+      const client = new EventEmitter()
+      ;(emailQueue as unknown as { client: Promise<EventEmitter> }).client = Promise.resolve(client)
+
+      service.onModuleInit()
+      // Flush the queue.client.then microtask so the listener is attached.
+      await (emailQueue as unknown as { client: Promise<EventEmitter> }).client
+
+      client.emit('reconnecting')
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'queue.redis_reconnecting', queueName: QueueName.EMAIL }),
+        expect.any(String)
+      )
+    })
+
+    it('swallows a rejected client without breaking boot', async () => {
+      const rejected = Promise.reject(new Error('no connection'))
+      ;(emailQueue as unknown as { client: Promise<EventEmitter> }).client = rejected
+
+      expect(() => service.onModuleInit()).not.toThrow()
+      await rejected.catch(() => undefined)
+      await Promise.resolve()
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ queueName: QueueName.EMAIL }),
+        expect.stringContaining('Failed to attach')
+      )
+    })
   })
 
   describe('add', () => {
