@@ -307,6 +307,7 @@ describe('AdminService', () => {
         expiredApiKeys: 0,
         expiredPendingInvites: 2,
         staleTerminalInvites: 1,
+        failures: [],
       }
       cleanupService.runCleanup.mockResolvedValue(mockResult)
 
