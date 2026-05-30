@@ -29,6 +29,7 @@ import { OAuthStateService } from './oauth/oauth-state.service'
 import { OAuthProviderFactory } from './oauth/providers/oauth-provider.factory'
 import { OrgAclVersionService } from './org-acl-version.service'
 import { PermissionsCacheService } from './permissions-cache.service'
+import { PrivilegedRoleService } from './privileged-role.service'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
 import { TokenService } from './token.service'
@@ -74,6 +75,7 @@ import { UserCacheService } from './user-cache.service'
     PermissionsCacheService,
     JwtAuthGuard,
     PoliciesGuard,
+    PrivilegedRoleService,
     SystemRolesGuard,
     AuthenticationGuard,
     // Single global guard: authenticate → build ability → authorize

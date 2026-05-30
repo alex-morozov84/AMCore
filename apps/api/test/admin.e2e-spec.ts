@@ -530,4 +530,117 @@ describe('Admin (e2e)', () => {
         .expect(401)
     })
   })
+
+  /**
+   * OB-06a (ADR-037): privileged-role freshness. `SystemRolesGuard` grants
+   * SUPER_ADMIN only when the JWT claim AND the current DB role are both
+   * SUPER_ADMIN (direct DB read). A system-role change also revokes the
+   * target's sessions, so a promotion cannot silently elevate an existing
+   * refresh session and a demoted admin is signed out.
+   */
+  describe('OB-06a: privileged-role freshness', () => {
+    async function makeSuperAdmin(email: string) {
+      const { userId } = await registerAndGetToken(email)
+      await prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: 'StrongP@ss123' })
+        .expect(200)
+      return {
+        userId,
+        token: res.body.accessToken as string,
+        cookie: res.headers['set-cookie'] as unknown as string[],
+      }
+    }
+
+    it('positive control: a genuine SUPER_ADMIN (claim ∩ DB) is allowed', async () => {
+      const a = await makeSuperAdmin('admin-a@example.com')
+
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${a.token}`)
+        .expect(200)
+    })
+
+    it('T1: a demoted SUPER_ADMIN is denied on the next request with the pre-demotion token', async () => {
+      const a = await makeSuperAdmin('admin-a@example.com')
+      const b = await makeSuperAdmin('admin-b@example.com')
+
+      // B works while genuinely SUPER_ADMIN.
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${b.token}`)
+        .expect(200)
+
+      // A demotes B (another SUPER_ADMIN exists → allowed).
+      await request(app.getHttpServer())
+        .patch(`/admin/users/${b.userId}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ systemRole: SystemRole.User })
+        .expect(200)
+
+      // B's still-valid pre-demotion token is now denied: claim SA ∩ DB USER.
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${b.token}`)
+        .expect(403)
+    })
+
+    it('T1: a demoted SUPER_ADMIN cannot refresh (sessions revoked)', async () => {
+      const a = await makeSuperAdmin('admin-a@example.com')
+      const b = await makeSuperAdmin('admin-b@example.com')
+
+      await request(app.getHttpServer())
+        .patch(`/admin/users/${b.userId}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ systemRole: SystemRole.User })
+        .expect(200)
+
+      await request(app.getHttpServer()).post('/auth/refresh').set('Cookie', b.cookie).expect(401)
+    })
+
+    it('T4: a promotion does not elevate the old USER-claim token, and revokes its refresh session', async () => {
+      const a = await makeSuperAdmin('admin-a@example.com')
+
+      const reg = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'promoted@example.com', password: 'StrongP@ss123' })
+        .expect(201)
+      const promotedId = reg.body.user.id as string
+      const oldUserToken = reg.body.accessToken as string
+      const oldCookie = reg.headers['set-cookie'] as unknown as string[]
+
+      // Sanity: USER cannot reach admin.
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${oldUserToken}`)
+        .expect(403)
+
+      // A promotes the user to SUPER_ADMIN.
+      await request(app.getHttpServer())
+        .patch(`/admin/users/${promotedId}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ systemRole: SystemRole.SuperAdmin })
+        .expect(200)
+
+      // The OLD token still carries the USER claim → still 403 (no silent elevation).
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${oldUserToken}`)
+        .expect(403)
+
+      // The old refresh session was revoked on promotion → cannot silently mint an SA token.
+      await request(app.getHttpServer()).post('/auth/refresh').set('Cookie', oldCookie).expect(401)
+
+      // Only a fresh re-login yields a working SUPER_ADMIN token.
+      const relogin = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'promoted@example.com', password: 'StrongP@ss123' })
+        .expect(200)
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${relogin.body.accessToken}`)
+        .expect(200)
+    })
+  })
 })

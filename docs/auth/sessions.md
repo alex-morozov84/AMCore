@@ -156,7 +156,15 @@ Sessions don't just expire — they can be invalidated by specific events:
 | Session revoked by user  | That specific session only            |
 | "Sign out everywhere"    | All sessions except current           |
 | Logout                   | Current session only                  |
+| System-role change       | All sessions of the affected user     |
 | Session expired (7 days) | Cleaned up by nightly job             |
+
+A **system-role change** (e.g. a `SUPER_ADMIN` promotion or demotion via the
+admin API) revokes **all** of the target user's sessions, so they must
+re-authenticate. This pairs with the system-role freshness check
+([rbac.md](./rbac.md)): a demotion loses privileged access on the next request,
+and a promotion cannot silently elevate an existing refresh session — it requires
+a fresh login. See ADR-037.
 
 ---
 

@@ -49,6 +49,28 @@ System roles are stored in the JWT and apply everywhere in the platform.
 getAllUsers() { ... }
 ```
 
+### System-role freshness (next request)
+
+The `systemRole` in your JWT is **necessary but not sufficient** on
+`@SystemRoles` routes. On every privileged request the guard re-reads your
+**current** `systemRole` straight from the database and requires that **both**
+the token claim **and** the current DB role satisfy the requirement
+(`claim ∩ current DB role`). Consequences:
+
+- **Demotion takes effect on the next request.** If a `SUPER_ADMIN` is demoted,
+  their existing access token — even though still cryptographically valid for up
+  to its 15-minute lifetime — is rejected on `/admin/**` immediately; no need to
+  wait for the token to expire.
+- **Promotion requires a new token.** A freshly promoted user's _existing_ token
+  still carries the old `USER` claim and is not elevated. They get admin access
+  only after obtaining a new token via re-login.
+- **A system-role change revokes that user's sessions** (see
+  [sessions.md](./sessions.md)), so a promotion cannot silently elevate an
+  existing refresh session and a demoted admin is signed out.
+
+This mirrors the org-permission freshness contract below and is specified in
+ADR-037.
+
 ---
 
 ## Organizations

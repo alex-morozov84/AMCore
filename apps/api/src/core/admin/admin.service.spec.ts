@@ -75,6 +75,10 @@ describe('AdminService', () => {
       async (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma)
     )
     prisma.$executeRaw.mockResolvedValue(0 as never)
+    // OB-06a: updateUserSystemRole revokes the target's sessions on any
+    // role change; default the post-commit deleteMany so role-change tests
+    // that don't assert on it still resolve cleanly.
+    prisma.session.deleteMany.mockResolvedValue({ count: 0 } as never)
   })
 
   describe('findAllUsers', () => {
@@ -294,6 +298,98 @@ describe('AdminService', () => {
           },
           'Admin changed user system role'
         )
+      })
+    })
+
+    /**
+     * OB-06a / ADR-037 (amendment 2026-05-30): a committed system-role change
+     * revokes the target's sessions on ANY `before !== after` change
+     * (demotion + promotion), best-effort, post-commit. No-op does not revoke.
+     */
+    describe('OB-06a session revocation', () => {
+      it('revokes target sessions after a promotion (any before !== after)', async () => {
+        const target: User = { ...mockUser, id: 'user-1', systemRole: 'USER' }
+        const updated: User = { ...target, systemRole: 'SUPER_ADMIN' }
+        prisma.user.findUnique.mockResolvedValue(target)
+        prisma.user.update.mockResolvedValue(updated)
+        prisma.session.deleteMany.mockResolvedValue({ count: 3 } as never)
+
+        await service.updateUserSystemRole('user-1', SystemRole.SuperAdmin, actor)
+
+        expect(prisma.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1' } })
+        expect(logger.info).toHaveBeenCalledWith(
+          {
+            event: 'auth.admin.sessions_revoked',
+            actorUserId: actor.sub,
+            targetUserId: 'user-1',
+            count: 3,
+          },
+          'Revoked target sessions after system-role change'
+        )
+      })
+
+      it('revokes target sessions after a demotion', async () => {
+        const target: User = { ...mockUser, id: 'sa-target', systemRole: 'SUPER_ADMIN' }
+        const updated: User = { ...target, systemRole: 'USER' }
+        prisma.user.findUnique.mockResolvedValue(target)
+        prisma.user.count.mockResolvedValue(1)
+        prisma.user.update.mockResolvedValue(updated)
+        prisma.session.deleteMany.mockResolvedValue({ count: 2 } as never)
+
+        await service.updateUserSystemRole('sa-target', SystemRole.User, actor)
+
+        expect(prisma.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'sa-target' } })
+      })
+
+      it('does not revoke on a no-op (before === after)', async () => {
+        const target: User = { ...mockUser, id: 'user-x', systemRole: 'USER' }
+        prisma.user.findUnique.mockResolvedValue(target)
+
+        await service.updateUserSystemRole('user-x', SystemRole.User, actor)
+
+        expect(prisma.session.deleteMany).not.toHaveBeenCalled()
+      })
+
+      it('swallows a revocation failure: role change still succeeds, warn emitted', async () => {
+        const target: User = { ...mockUser, id: 'user-1', systemRole: 'USER' }
+        const updated: User = { ...target, systemRole: 'SUPER_ADMIN' }
+        prisma.user.findUnique.mockResolvedValue(target)
+        prisma.user.update.mockResolvedValue(updated)
+        prisma.session.deleteMany.mockRejectedValue(new Error('redis/db down'))
+
+        const result = await service.updateUserSystemRole('user-1', SystemRole.SuperAdmin, actor)
+
+        expect(result.systemRole).toBe('SUPER_ADMIN')
+        expect(logger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: 'auth.admin.session_revoke_failed',
+            actorUserId: actor.sub,
+            targetUserId: 'user-1',
+          }),
+          'Failed to revoke target sessions after system-role change'
+        )
+      })
+
+      it('revocation log carries only actor/target CUIDs + count — no token material', async () => {
+        const target: User = { ...mockUser, id: 'user-1', systemRole: 'USER' }
+        const updated: User = { ...target, systemRole: 'SUPER_ADMIN' }
+        prisma.user.findUnique.mockResolvedValue(target)
+        prisma.user.update.mockResolvedValue(updated)
+        prisma.session.deleteMany.mockResolvedValue({ count: 1 } as never)
+
+        await service.updateUserSystemRole('user-1', SystemRole.SuperAdmin, actor)
+
+        const revokeLog = logger.info.mock.calls.find(
+          (c) => (c[0] as { event?: string }).event === 'auth.admin.sessions_revoked'
+        )
+        expect(revokeLog).toBeDefined()
+        const payload = revokeLog![0] as Record<string, unknown>
+        expect(Object.keys(payload).sort()).toEqual([
+          'actorUserId',
+          'count',
+          'event',
+          'targetUserId',
+        ])
       })
     })
   })

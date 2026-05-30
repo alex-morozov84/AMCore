@@ -164,6 +164,8 @@ export class AdminService {
         },
         'Admin changed user system role'
       )
+
+      await this.revokeTargetSessions(id, actor.sub)
     }
 
     return this.toAdminUserResponse(row)
@@ -205,6 +207,41 @@ export class AdminService {
       total,
       page,
       limit,
+    }
+  }
+
+  /**
+   * Revoke the target user's sessions after a committed system-role change
+   * (OB-06a / ADR-037, amendment 2026-05-30 — fires on ANY `before !== after`
+   * change, demotion and promotion alike).
+   *
+   * Why both directions: a demotion loses privileged access on the next
+   * request via the `SystemRolesGuard` claim ∩ current-DB-role check; this
+   * revocation additionally signs the user out so a compromised admin's
+   * sessions are killed, and — critically — a promotion cannot silently
+   * elevate an existing lower-privilege refresh session (refresh mints from
+   * the current DB role), so the promoted user must re-authenticate.
+   *
+   * Best-effort and post-commit: the role change is already committed, so a
+   * Redis/DB hiccup here must NOT roll it back or surface as 500 (mirrors the
+   * AK-12 best-effort pattern). A direct `deleteMany` is used rather than
+   * injecting `SessionService` to avoid importing the cycle-heavy `AuthModule`
+   * into `AdminModule`; the semantics are identical. The payloads carry only
+   * CUIDs and a count — the operation never reads a refresh-token value or
+   * hash, so there is no token material to leak.
+   */
+  private async revokeTargetSessions(targetUserId: string, actorUserId: string): Promise<void> {
+    try {
+      const { count } = await this.prisma.session.deleteMany({ where: { userId: targetUserId } })
+      this.logger.info(
+        { event: 'auth.admin.sessions_revoked', actorUserId, targetUserId, count },
+        'Revoked target sessions after system-role change'
+      )
+    } catch (err) {
+      this.logger.warn(
+        { event: 'auth.admin.session_revoke_failed', actorUserId, targetUserId, err },
+        'Failed to revoke target sessions after system-role change'
+      )
     }
   }
 
