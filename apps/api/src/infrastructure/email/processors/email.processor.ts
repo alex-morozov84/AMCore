@@ -90,7 +90,7 @@ export class EmailProcessor extends WorkerHost {
 
     // Render — deterministic. A render failure will not heal on retry (same
     // deployed template code + same validated data), so it is unrecoverable.
-    let rendered: { html: string; subject: string }
+    let rendered: { html: string; text: string; subject: string }
     try {
       rendered = await this.emailService.renderTemplate(parsed.data.template, parsed.data.data)
     } catch (error) {
@@ -108,6 +108,7 @@ export class EmailProcessor extends WorkerHost {
       to: parsed.data.to,
       subject: rendered.subject,
       html: rendered.html,
+      text: rendered.text,
       idempotencyKey: job.id ? `email:${job.id}` : undefined,
     })
 

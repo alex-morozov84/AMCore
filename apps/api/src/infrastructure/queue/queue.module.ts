@@ -10,7 +10,7 @@ import { BullBoardAuthModule } from './dashboard/bull-board-auth.module'
 import { BullBoardAuthService } from './dashboard/bull-board-auth.service'
 import { isBullBoardEnabled } from './dashboard/bull-board-mount-gate'
 import { DashboardController } from './dashboard/dashboard.controller'
-import { HelloWorldProcessor } from './processors/hello-world.processor'
+import { DEFAULT_JOB_OPTIONS } from './interfaces/job-options.interface'
 import { QueueService } from './queue.service'
 import { buildBullConnection } from './redis-connection.config'
 
@@ -65,21 +65,8 @@ const bullBoardImports = bullBoardEnabled
           // — built from the validated REDIS_URL by a single tested helper.
           connection: buildBullConnection(env.get('REDIS_URL')),
           prefix: 'amcore',
-          defaultJobOptions: {
-            attempts: 3,
-            backoff: {
-              type: 'exponential' as const,
-              delay: 1000,
-            },
-            removeOnComplete: {
-              age: 3600, // 1 hour
-              count: 100,
-            },
-            removeOnFail: {
-              age: 86400, // 24 hours
-              count: 1000,
-            },
-          },
+          // EQS-11: single source of truth for default job options.
+          defaultJobOptions: DEFAULT_JOB_OPTIONS,
         }
       },
     }),
@@ -91,7 +78,7 @@ const bullBoardImports = bullBoardEnabled
     ...bullBoardImports,
   ],
   controllers: bullBoardEnabled ? [DashboardController] : [],
-  providers: [QueueService, HelloWorldProcessor],
+  providers: [QueueService],
   exports: [QueueService],
 })
 export class QueueModule {}

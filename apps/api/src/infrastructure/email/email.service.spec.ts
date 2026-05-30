@@ -110,6 +110,10 @@ describe('EmailService', () => {
 
       await service.queue(jobData)
 
+      // EQS-11: options come from the derived EMAIL_JOB_OPTIONS — the email 2s
+      // first-retry backoff is preserved, while attempts + removeOnComplete /
+      // removeOnFail are inherited from the single-source DEFAULT_JOB_OPTIONS
+      // (proving it is the derived constant, not a bespoke literal).
       expect(queueService.add).toHaveBeenCalledWith(
         QueueName.EMAIL,
         JobName.SEND_EMAIL,
@@ -120,6 +124,8 @@ describe('EmailService', () => {
             type: 'exponential',
             delay: 2000,
           },
+          removeOnComplete: expect.objectContaining({ age: 3600 }),
+          removeOnFail: expect.objectContaining({ age: 86400 }),
         })
       )
     })
@@ -149,8 +155,13 @@ describe('EmailService', () => {
       })
 
       expect(emailProvider.send).toHaveBeenCalledTimes(1)
+      // EQS-08: sendNow forwards the plaintext alternative alongside html.
       expect(emailProvider.send).toHaveBeenCalledWith(
-        expect.objectContaining({ to: 'to@example.com' })
+        expect.objectContaining({
+          to: 'to@example.com',
+          html: expect.any(String),
+          text: expect.any(String),
+        })
       )
       expect(queueService.add).not.toHaveBeenCalled()
     })
@@ -239,10 +250,12 @@ describe('EmailService', () => {
 
       const result = await service.renderTemplate(EmailTemplate.WELCOME, data)
 
-      // Unit test: check that HTML and subject are returned
-      // Content testing is done in integration tests (Vitest)
+      // Unit test: check that HTML, plaintext, and subject are returned.
+      // Real plaintext content is validated in integration tests (Vitest).
       expect(result.html).toBeTruthy()
       expect(typeof result.html).toBe('string')
+      expect(typeof result.text).toBe('string') // EQS-08: plaintext alternative
+      expect(result.text).toBeTruthy()
       expect(result.subject).toBe('welcome.subject')
     })
 

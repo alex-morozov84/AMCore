@@ -76,12 +76,11 @@ just its SHA-256 hash and never returns or logs the raw value.
 > endpoint) is implemented by the app that forks this starter.
 
 Email delivery is **best-effort**: after the invite row is committed, the
-job is enqueued and the actual provider send happens asynchronously in a
-background worker — so the `202` is not blocked on email _delivery_. The
-enqueue step itself (and its lookups) is awaited but its failure is logged
-and swallowed, never failing the `202`. If the queue is down the invite
-still exists and the admin can re-invite (which rotates the token and
-re-sends).
+backend renders and sends the invite email directly via the configured provider.
+The raw accept token is carried only inside the email link and is never
+serialized into BullMQ/Redis/Bull Board. Dispatch failures are logged and
+swallowed, never failing the `202`. If delivery fails, the invite still exists
+and the admin can re-invite (which rotates the token and re-sends).
 
 ---
 

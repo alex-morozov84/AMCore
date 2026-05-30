@@ -6,7 +6,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { AppException, NotFoundException } from '../../common/exceptions'
 
-import { JobName, QueueName } from './constants/queues.constant'
+import { QueueName } from './constants/queues.constant'
 import { QueueService } from './queue.service'
 
 describe('QueueService', () => {
@@ -132,11 +132,11 @@ describe('QueueService', () => {
 
       defaultQueue.add.mockResolvedValue(mockJob as never)
 
-      const result = await service.add(QueueName.DEFAULT, JobName.HELLO_WORLD, jobData)
+      const result = await service.add(QueueName.DEFAULT, 'test-job', jobData)
 
       expect(result).toEqual(mockJob)
       expect(defaultQueue.add).toHaveBeenCalledWith(
-        JobName.HELLO_WORLD,
+        'test-job',
         jobData,
         expect.objectContaining({
           attempts: 3,
@@ -146,9 +146,7 @@ describe('QueueService', () => {
     })
 
     it('should throw NotFoundException for unknown queue', async () => {
-      await expect(service.add('unknown-queue', JobName.HELLO_WORLD, {})).rejects.toThrow(
-        NotFoundException
-      )
+      await expect(service.add('unknown-queue', 'test-job', {})).rejects.toThrow(NotFoundException)
     })
 
     it('should merge custom options with defaults', async () => {
@@ -158,10 +156,10 @@ describe('QueueService', () => {
 
       defaultQueue.add.mockResolvedValue(mockJob as never)
 
-      await service.add(QueueName.DEFAULT, JobName.HELLO_WORLD, jobData, customOptions)
+      await service.add(QueueName.DEFAULT, 'test-job', jobData, customOptions)
 
       expect(defaultQueue.add).toHaveBeenCalledWith(
-        JobName.HELLO_WORLD,
+        'test-job',
         jobData,
         expect.objectContaining({
           priority: 10,

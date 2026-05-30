@@ -40,7 +40,8 @@ curl -X POST https://api.amcore.dev/api/v1/auth/register \
    across case variants return `EMAIL_ALREADY_EXISTS`
 2. Password is hashed with Argon2id (~100ms intentionally)
 3. A new user is created with `systemRole: USER` and `emailVerified: false`
-4. A verification email is queued (non-blocking — registration succeeds regardless)
+4. A verification email is sent best-effort and never queued (the raw token
+   exists only in the email link)
 5. A session is created, tokens are issued
 
 **Success response** `200 OK`:

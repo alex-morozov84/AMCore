@@ -25,7 +25,21 @@ import { getWelcomeSubject, WelcomeEmail } from './templates/welcome'
 
 import { EnvService } from '@/env/env.service'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
+import { DEFAULT_JOB_OPTIONS } from '@/infrastructure/queue/interfaces/job-options.interface'
 import { QueueService } from '@/infrastructure/queue/queue.service'
+
+/**
+ * Job options for queued (non-secret) emails (EQS-11).
+ *
+ * Derived from the single-source `DEFAULT_JOB_OPTIONS`; overrides only the
+ * first-retry backoff to 2s — email retries are intentionally gentler than the
+ * generic 1s default. A named derived constant removes the duplicate literal
+ * without changing retry timing.
+ */
+const EMAIL_JOB_OPTIONS = {
+  ...DEFAULT_JOB_OPTIONS,
+  backoff: { type: 'exponential' as const, delay: 2000 },
+}
 
 /**
  * Email Service
@@ -72,13 +86,7 @@ export class EmailService {
       )
     }
 
-    await this.queueService.add(QueueName.EMAIL, JobName.SEND_EMAIL, jobData, {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000, // Start with 2 seconds
-      },
-    })
+    await this.queueService.add(QueueName.EMAIL, JobName.SEND_EMAIL, jobData, EMAIL_JOB_OPTIONS)
 
     this.logger.info({ template: jobData.template, to: jobData.to }, 'Email queued')
   }
@@ -97,8 +105,8 @@ export class EmailService {
     to: string,
     data: RenderableEmailData
   ): Promise<void> {
-    const { html, subject } = await this.renderTemplate(template, data)
-    const result = await this.send({ to, subject, html })
+    const { html, text, subject } = await this.renderTemplate(template, data)
+    const result = await this.send({ to, subject, html, text })
 
     if (!result.success) {
       throw new Error(result.error || 'Email sending failed')
@@ -158,44 +166,44 @@ export class EmailService {
   }
 
   /**
-   * Render email template to HTML
+   * Render an email template to a multipart HTML + plaintext body (EQS-08).
    *
    * @param template - Template to render
    * @param data - Template data
-   * @returns Rendered HTML and localized subject
+   * @returns Rendered HTML, a derived plaintext alternative, and the localized subject
    */
   async renderTemplate(
     template: EmailTemplate,
     data: RenderableEmailData
-  ): Promise<{ html: string; subject: string }> {
+  ): Promise<{ html: string; text: string; subject: string }> {
     const locale: Locale = data.locale || 'ru'
-    let html: string
+    let element: Parameters<typeof render>[0]
     let subject: string
 
     switch (template) {
       case EmailTemplate.WELCOME:
-        html = await render(WelcomeEmail(data as WelcomeEmailData))
+        element = WelcomeEmail(data as WelcomeEmailData)
         subject = getWelcomeSubject(locale)
         break
 
       case EmailTemplate.PASSWORD_RESET:
-        html = await render(PasswordResetEmail(data as PasswordResetEmailData))
+        element = PasswordResetEmail(data as PasswordResetEmailData)
         subject = getPasswordResetSubject(locale)
         break
 
       case EmailTemplate.EMAIL_VERIFICATION:
-        html = await render(EmailVerificationEmail(data as EmailVerificationData))
+        element = EmailVerificationEmail(data as EmailVerificationData)
         subject = getEmailVerificationSubject(locale)
         break
 
       case EmailTemplate.PASSWORD_CHANGED:
-        html = await render(PasswordChangedEmail(data as PasswordChangedEmailData))
+        element = PasswordChangedEmail(data as PasswordChangedEmailData)
         subject = getPasswordChangedSubject(locale)
         break
 
       case EmailTemplate.ORG_INVITE: {
         const inviteData = data as OrgInviteEmailData
-        html = await render(OrgInviteEmail(inviteData))
+        element = OrgInviteEmail(inviteData)
         subject = getOrgInviteSubject(inviteData.orgName, locale)
         break
       }
@@ -204,6 +212,13 @@ export class EmailService {
         throw new Error(`Unknown template: ${template}`)
     }
 
-    return { html, subject }
+    // Render the HTML and a plaintext alternative from the SAME component
+    // (EQS-08). React Email derives the text from the rendered HTML via
+    // html-to-text, so there is no second text source to maintain and no
+    // html/text drift. Multipart html+text improves deliverability and is
+    // readable by text-only/accessibility clients.
+    const [html, text] = await Promise.all([render(element), render(element, { plainText: true })])
+
+    return { html, text, subject }
   }
 }

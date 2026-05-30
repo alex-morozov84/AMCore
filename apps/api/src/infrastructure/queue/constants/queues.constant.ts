@@ -24,8 +24,4 @@ export enum QueueName {
 export enum JobName {
   // Email jobs
   SEND_EMAIL = 'send-email',
-  SEND_BULK_EMAIL = 'send-bulk-email',
-
-  // Example jobs
-  HELLO_WORLD = 'hello-world',
 }

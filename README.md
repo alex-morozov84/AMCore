@@ -105,17 +105,17 @@ The backend is a fully-featured NestJS starter. Everything below is production-r
 
 ### Infrastructure
 
-- **Email** — Resend (prod) / Mock (dev), React Email templates, FormatJS i18n (RU/EN), BullMQ delivery
+- **Email** — Resend (prod) / Mock (dev), React Email templates, FormatJS i18n (RU/EN), direct send for secret links, BullMQ for non-secret notifications
 - **Queue** — BullMQ, multiple queues, Bull Board at `/admin/queues` (SUPER_ADMIN only)
 - **Cache** — Cache-aside with distributed locking (stampede protection), tag-based invalidation
 - **Health Checks** — `/health`, `/health/startup`, `/health/ready`, `/health/live` (Kubernetes-ready)
-- **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys)
+- **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys, invites) with multi-instance locking
 
 ### Tests
 
-- **462 total:** 382 unit (40 suites) + 80 E2E (5 suites via Testcontainers)
-- E2E suites: auth, organizations, admin, api-keys, oauth
-- Email templates: Vitest integration tests (real rendering, RU/EN)
+- Backend unit tests: Jest
+- E2E suites: Jest + Testcontainers
+- Email templates: Vitest integration tests (real rendering, RU/EN, plaintext)
 
 ### Documentation
 

@@ -14,7 +14,6 @@ import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 
 import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
-import { HelloWorldProcessor } from '../src/infrastructure/queue/processors/hello-world.processor'
 import { PrismaService } from '../src/prisma'
 
 /**
@@ -157,10 +156,7 @@ export async function teardownE2ETest(context: E2ETestContext): Promise<void> {
 }
 
 async function closeBullWorkers(app: INestApplication): Promise<void> {
-  await Promise.all([
-    closeBullWorker(app, HelloWorldProcessor),
-    closeBullWorker(app, EmailProcessor),
-  ])
+  await Promise.all([closeBullWorker(app, EmailProcessor)])
 }
 
 async function closeBullWorker(

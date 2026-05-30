@@ -59,7 +59,7 @@ apps/api/src/
 │       └── admin.controller.ts
 │
 ├── infrastructure/
-│   ├── email/                  # Resend + React Email + BullMQ
+│   ├── email/                  # Resend + React Email (direct secret sends + queued notifications)
 │   ├── queue/                  # BullMQ setup + Bull Board
 │   └── schedule/               # Nightly cleanup cron
 │
@@ -185,16 +185,17 @@ Readiness disk usage threshold defaults to `HEALTH_DISK_THRESHOLD_PERCENT=0.9`.
 
 ## Tests
 
-**462 total:** 382 unit (40 suites) + 80 E2E (5 suites)
+Run the current suite locally; counts move as the starter hardening track adds
+coverage.
 
-| Suite                | Unit                    | E2E      |
-| -------------------- | ----------------------- | -------- |
-| Auth (core)          | ✅                      | 42 tests |
-| OAuth providers      | ✅                      | 14 tests |
-| Organizations + RBAC | ✅                      | 10 tests |
-| Admin                | ✅                      | 7 tests  |
-| API Keys             | ✅                      | 7 tests  |
-| Email templates      | Vitest (real rendering) | —        |
+| Suite                | Unit                    | E2E |
+| -------------------- | ----------------------- | --- |
+| Auth (core)          | ✅                      | ✅  |
+| OAuth providers      | ✅                      | ✅  |
+| Organizations + RBAC | ✅                      | ✅  |
+| Admin                | ✅                      | ✅  |
+| API Keys             | ✅                      | ✅  |
+| Email templates      | Vitest (real rendering) | —   |
 
 ```bash
 pnpm --filter api test                              # all unit tests

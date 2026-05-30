@@ -16,19 +16,24 @@ Production-ready job queue system built on BullMQ for handling async operations.
 
 ### 1. Inject QueueService
 
+> **Note:** the starter ships **one** real processor — `EmailProcessor` on the
+> `email` queue. `QueueName.DEFAULT` is a registered generic queue with **no
+> default worker**; the snippets below are illustrative. Add your own `JobName`
+> and a processor (see "Creating a Job Processor") before enqueuing to it.
+
 ```typescript
 import { Injectable } from '@nestjs/common'
-import { QueueService, QueueName, JobName } from '@/infrastructure/queue'
+import { QueueService, QueueName } from '@/infrastructure/queue'
 
 @Injectable()
 export class MyService {
   constructor(private readonly queueService: QueueService) {}
 
   async doSomethingAsync() {
-    // Add a job to the queue
-    const job = await this.queueService.add(QueueName.DEFAULT, JobName.HELLO_WORLD, {
-      name: 'Alex',
-      message: 'Test message',
+    // Add a job to the queue (define your own job-name string/enum)
+    const job = await this.queueService.add(QueueName.DEFAULT, 'my-job', {
+      userId: 'user-123',
+      action: 'sync',
     })
 
     console.log('Job added:', job.id)
@@ -66,6 +71,10 @@ await this.queueService.add(QueueName.EMAIL, JobName.SEND_EMAIL, emailData, {
 ```
 
 ## Creating a Job Processor
+
+> Illustrative example — `MyJobProcessor` is **not** part of the shipped starter
+> (the demo HelloWorld processor was intentionally removed; only `EmailProcessor`
+> ships). Use this as a template for your own processors.
 
 ### 1. Define Job Data Interface
 
@@ -119,7 +128,7 @@ Add to `QueueModule` providers:
 ```typescript
 @Module({
   // ...
-  providers: [QueueService, HelloWorldProcessor, MyJobProcessor],
+  providers: [QueueService, MyJobProcessor],
 })
 export class QueueModule {}
 ```
@@ -269,7 +278,15 @@ interface JobOptions {
 
 ### Default Options
 
+Single source of truth: `DEFAULT_JOB_OPTIONS` in
+`interfaces/job-options.interface.ts`. It is applied both as the module-level
+`defaultJobOptions` (`queue.module.ts`) and merged per-`add` by `QueueService`.
+Per-domain overrides derive from it rather than re-declaring literals — e.g. the
+email queue uses `EMAIL_JOB_OPTIONS = { ...DEFAULT_JOB_OPTIONS, backoff: {
+type: 'exponential', delay: 2000 } }` (gentler first retry).
+
 ```typescript
+// DEFAULT_JOB_OPTIONS
 {
   attempts: 3,
   backoff: {

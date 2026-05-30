@@ -73,6 +73,7 @@ describe('EmailProcessor', () => {
 
       emailService.renderTemplate.mockResolvedValue({
         html: '<p>Welcome!</p>',
+        text: 'Welcome!',
         subject: 'Welcome',
       })
 
@@ -89,6 +90,7 @@ describe('EmailProcessor', () => {
         to: 'test@example.com',
         subject: 'Welcome',
         html: '<p>Welcome!</p>',
+        text: 'Welcome!', // EQS-08: plaintext alternative forwarded
         idempotencyKey: 'email:job-123', // EQS-03: stable across retries
       })
     })
@@ -169,7 +171,11 @@ describe('EmailProcessor', () => {
       }) as Job<SendEmailJobData>
 
     it('retries a transient send failure (plain Error, not UnrecoverableError) — EQS-03', async () => {
-      emailService.renderTemplate.mockResolvedValue({ html: '<p>Welcome!</p>', subject: 'Welcome' })
+      emailService.renderTemplate.mockResolvedValue({
+        html: '<p>Welcome!</p>',
+        text: 'Welcome!',
+        subject: 'Welcome',
+      })
       emailService.send.mockResolvedValue({
         id: '',
         success: false,
@@ -184,7 +190,11 @@ describe('EmailProcessor', () => {
     })
 
     it('does NOT retry a deterministic send failure (UnrecoverableError) — EQS-03', async () => {
-      emailService.renderTemplate.mockResolvedValue({ html: '<p>Welcome!</p>', subject: 'Welcome' })
+      emailService.renderTemplate.mockResolvedValue({
+        html: '<p>Welcome!</p>',
+        text: 'Welcome!',
+        subject: 'Welcome',
+      })
       emailService.send.mockResolvedValue({
         id: '',
         success: false,
@@ -236,6 +246,7 @@ describe('EmailProcessor', () => {
 
       emailService.renderTemplate.mockResolvedValue({
         html: '<p>Welcome!</p>',
+        text: 'Welcome!',
         subject: 'Welcome',
       })
 
