@@ -24,7 +24,7 @@ import {
   S3Client,
   UploadPartCommand,
 } from '@aws-sdk/client-s3'
-import { type AwsStub, mockClient } from 'aws-sdk-client-mock'
+import { mockClient } from 'aws-sdk-client-mock'
 
 import { bufferFromBody } from './body.util'
 
@@ -76,12 +76,7 @@ function store(s: S3Store, key: string, body: Buffer, meta: Partial<StoredObject
   return object
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function setupS3Mock(): {
-  store: S3Store
-  s3Mock: AwsStub<any, any, any>
-  restore: () => void
-} {
+export function setupS3Mock(): { store: S3Store; restore: () => void } {
   const objects: S3Store = new Map()
   const multipart = new Map<string, MultipartUpload>()
   let uploadCounter = 0
@@ -206,5 +201,5 @@ export function setupS3Mock(): {
     return { CopyObjectResult: { ETag: copied.etag, LastModified: copied.lastModified } }
   })
 
-  return { store: objects, s3Mock, restore: () => s3Mock.restore() }
+  return { store: objects, restore: () => s3Mock.restore() }
 }
