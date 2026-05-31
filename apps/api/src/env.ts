@@ -80,12 +80,53 @@ const envSchema = z
     // Auth token expiration
     PASSWORD_RESET_EXPIRY_MINUTES: z.coerce.number().int().min(1).default(15),
     EMAIL_VERIFICATION_EXPIRY_HOURS: z.coerce.number().int().min(1).default(48),
+    // ---------------------------------------------------------------------
+    // Storage (cloud-agnostic file storage — see ai/STORAGE_PLAN.md)
+    // ---------------------------------------------------------------------
+    // Driver default is environment-derived (production -> s3, test -> memory,
+    // otherwise local); resolved in the transform below so an unset value is
+    // never `undefined`.
+    STORAGE_DRIVER: z.enum(['s3', 'local', 'memory']).optional(),
+    // S3-compatible config (required when STORAGE_DRIVER=s3; endpoint stays
+    // optional — AWS derives it, non-AWS providers set it explicitly).
+    STORAGE_ENDPOINT: optionalEnvUrl(),
+    STORAGE_PUBLIC_ENDPOINT: optionalEnvUrl(),
+    STORAGE_REGION: z.string().min(1).default('us-east-1'),
+    STORAGE_BUCKET: optionalEnvString(),
+    STORAGE_ACCESS_KEY_ID: optionalEnvString(),
+    STORAGE_SECRET_ACCESS_KEY: optionalEnvString(),
+    STORAGE_FORCE_PATH_STYLE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    // Local driver config.
+    STORAGE_LOCAL_ROOT: z.string().min(1).default('./uploads'),
+    STORAGE_LOCAL_PUBLIC_BASE_URL: optionalEnvUrl(),
+    // Limits & signed-URL TTLs (seconds). Max TTL is the SigV4 7-day hard limit.
+    STORAGE_MAX_FILE_SIZE: z.coerce.number().int().min(1).default(52428800),
+    STORAGE_SIGNED_URL_DEFAULT_TTL: z.coerce.number().int().min(1).default(3600),
+    STORAGE_SIGNED_URL_MAX_TTL: z.coerce.number().int().min(1).max(604800).default(604800),
+    // Opt-in storage readiness check (Decision B): off by default.
+    STORAGE_HEALTH_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
   })
-  .transform((env) => ({
-    ...env,
-    SLOW_QUERY_THRESHOLD_MS:
-      env.SLOW_QUERY_THRESHOLD_MS ?? (env.NODE_ENV === 'production' ? 500 : 100),
-  }))
+  .transform((env) => {
+    // Locked invariant (Decision C): dev -> local, test -> memory,
+    // production -> s3. Defaulting prod to s3 (not local) means a prod deploy
+    // without storage config fails the s3 fail-fast below rather than silently
+    // writing to local disk.
+    const storageDriverDefault =
+      env.NODE_ENV === 'production' ? 's3' : env.NODE_ENV === 'test' ? 'memory' : 'local'
+
+    return {
+      ...env,
+      SLOW_QUERY_THRESHOLD_MS:
+        env.SLOW_QUERY_THRESHOLD_MS ?? (env.NODE_ENV === 'production' ? 500 : 100),
+      STORAGE_DRIVER: env.STORAGE_DRIVER ?? storageDriverDefault,
+    }
+  })
   .superRefine((env, ctx) => {
     const requireAllIfAny = (groupName: string, keys: Array<keyof typeof env>): void => {
       const hasAny = keys.some((key) => env[key] !== undefined)
@@ -126,6 +167,34 @@ const envSchema = z
         code: 'custom',
         path: ['RESEND_API_KEY'],
         message: 'RESEND_API_KEY is required when EMAIL_PROVIDER is resend',
+      })
+    }
+
+    // Storage: when the s3 driver is selected, credentials + target are
+    // mandatory. STORAGE_ENDPOINT stays optional (AWS derives it; non-AWS
+    // providers set it explicitly). STORAGE_REGION always has a default.
+    if (env.STORAGE_DRIVER === 's3') {
+      for (const key of [
+        'STORAGE_BUCKET',
+        'STORAGE_ACCESS_KEY_ID',
+        'STORAGE_SECRET_ACCESS_KEY',
+        'STORAGE_REGION',
+      ] as const) {
+        if (!env[key]) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: `${key} is required when STORAGE_DRIVER is s3`,
+          })
+        }
+      }
+    }
+
+    if (env.STORAGE_SIGNED_URL_DEFAULT_TTL > env.STORAGE_SIGNED_URL_MAX_TTL) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['STORAGE_SIGNED_URL_DEFAULT_TTL'],
+        message: 'STORAGE_SIGNED_URL_DEFAULT_TTL must be <= STORAGE_SIGNED_URL_MAX_TTL',
       })
     }
 
