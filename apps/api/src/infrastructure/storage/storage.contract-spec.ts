@@ -194,6 +194,20 @@ export function runStorageProviderContract(
       })
     })
 
+    describe('prefix directories are not objects', () => {
+      it('does not treat a key prefix as an existing object', async () => {
+        await provider.upload({ key: 'dir/child.txt', body: Buffer.from('c') })
+        expect(await provider.exists('dir')).toBe(false)
+        await expect(provider.getMetadata('dir')).rejects.toThrow()
+      })
+
+      it('delete on a prefix is a no-op and preserves children', async () => {
+        await provider.upload({ key: 'dir2/child.txt', body: Buffer.from('c') })
+        await provider.delete('dir2')
+        expect(await provider.exists('dir2/child.txt')).toBe(true)
+      })
+    })
+
     describe('object-key validation', () => {
       it('rejects a traversal key on upload', async () => {
         await expect(
