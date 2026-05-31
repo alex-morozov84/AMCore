@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -60,6 +60,15 @@ describe('LocalStorageProvider', () => {
     it('returns an empty listing when the root does not exist yet', async () => {
       const provider = new LocalStorageProvider({ root: path.join(makeRoot(), 'not-created') })
       expect(await provider.list({ prefix: '' })).toEqual({ files: [], isTruncated: false })
+    })
+
+    it('exists rethrows real FS errors instead of reporting "absent"', async () => {
+      // Make the reserved objects/ path a FILE, so stat on objects/<key> hits
+      // ENOTDIR — a real fault that must not be swallowed as "not found".
+      const root = makeRoot()
+      await writeFile(path.join(root, 'objects'), 'not a directory')
+      const provider = new LocalStorageProvider({ root })
+      await expect(provider.exists('x.txt')).rejects.toThrow()
     })
   })
 

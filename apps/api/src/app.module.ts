@@ -28,6 +28,7 @@ import { EmailModule } from './infrastructure/email'
 import { QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
+import { StorageModule } from './infrastructure/storage'
 import { PrismaModule } from './prisma'
 import { ShutdownService } from './shutdown.service'
 
@@ -130,6 +131,9 @@ import { ShutdownService } from './shutdown.service'
 
     // Email infrastructure
     EmailModule,
+
+    // Storage infrastructure (driver selected by STORAGE_DRIVER)
+    StorageModule.forRoot(),
 
     // Scheduled tasks (nightly cleanup of expired sessions/tokens)
     ScheduleModule,

@@ -128,8 +128,12 @@ export class LocalStorageProvider implements StorageProvider {
   async exists(key: string): Promise<boolean> {
     try {
       return (await stat(this.objectPath(key))).isFile()
-    } catch {
-      return false
+    } catch (err) {
+      // Only a genuine "not found" means the object is absent. Real FS faults
+      // (EACCES, ENOTDIR, bad root) must propagate so callers — notably the
+      // health probe — don't read a broken filesystem as "object missing / ok".
+      if (this.isErrno(err, 'ENOENT')) return false
+      throw err
     }
   }
 

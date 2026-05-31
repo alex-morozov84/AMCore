@@ -17,6 +17,7 @@ import { RedisHealthIndicator } from './indicators/redis.health'
 
 import { Auth } from '@/core/auth/decorators/auth.decorator'
 import { EnvService } from '@/env/env.service'
+import { StorageHealthIndicator } from '@/infrastructure/storage'
 
 @ApiTags('health')
 @Controller('health')
@@ -29,6 +30,7 @@ export class HealthController {
     private readonly redis: RedisHealthIndicator,
     private readonly disk: DiskHealthIndicator,
     private readonly memory: MemoryHealthIndicator,
+    private readonly storage: StorageHealthIndicator,
     private readonly env: EnvService
   ) {}
 
@@ -142,7 +144,7 @@ export class HealthController {
   }
 
   private getReadinessChecks(): HealthIndicatorFunction[] {
-    return [
+    const checks: HealthIndicatorFunction[] = [
       () => this.prisma.isHealthy('database'),
       () => this.redis.isHealthy('redis'),
       () =>
@@ -152,5 +154,13 @@ export class HealthController {
         }),
       () => this.memory.checkHeap('memory_heap', 1024 * 1024 * 1024),
     ]
+
+    // Opt-in (Decision B): storage is not on the core request hot path, so it
+    // joins readiness only when explicitly enabled.
+    if (this.env.get('STORAGE_HEALTH_ENABLED')) {
+      checks.push(() => this.storage.isHealthy('storage'))
+    }
+
+    return checks
   }
 }

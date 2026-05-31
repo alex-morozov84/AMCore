@@ -111,6 +111,10 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+    // Key the storage health probe HEADs. Override to a key inside the allowed
+    // prefix when using object-scoped S3 credentials, so the probe isn't a
+    // false 403. Never needs to exist (a 404 still proves connectivity).
+    STORAGE_HEALTH_PROBE_KEY: z.string().min(1).default('__storage_health_check__'),
   })
   .transform((env) => {
     // Locked invariant (Decision C): dev -> local, test -> memory,
