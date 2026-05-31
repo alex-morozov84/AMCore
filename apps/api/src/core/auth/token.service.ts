@@ -14,6 +14,9 @@ export interface AccessTokenPayload {
   systemRole: SystemRole
   organizationId?: string
   aclVersion?: number
+  // OB-06b / ADR-037: session id, read only by FreshAuthGuard on
+  // @RequireFreshAuth routes. Passed straight through sign/verify.
+  sid?: string
 }
 
 @Injectable()

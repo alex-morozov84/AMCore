@@ -40,6 +40,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       systemRole: payload.systemRole,
       organizationId: payload.organizationId,
       aclVersion: payload.aclVersion,
+      // Carried for FreshAuthGuard (OB-06b); inert on all other routes.
+      sid: payload.sid,
     }
   }
 }

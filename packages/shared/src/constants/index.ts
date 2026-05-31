@@ -15,6 +15,13 @@ export enum AuthErrorCode {
   OAUTH_PROVIDER_NOT_CONFIGURED = 'OAUTH_PROVIDER_NOT_CONFIGURED',
   OAUTH_ACCOUNT_ALREADY_LINKED = 'OAUTH_ACCOUNT_ALREADY_LINKED',
   OAUTH_TICKET_INVALID = 'OAUTH_TICKET_INVALID',
+  // OB-06b / ADR-037 step-up. STEP_UP_REQUIRED is returned with 403 on a
+  // @RequireFreshAuth route (or /auth/step-up) when the session's recent-auth
+  // is missing/stale; the client re-verifies via POST /auth/step-up.
+  // STEP_UP_METHOD_UNAVAILABLE (403) means the account has no password
+  // (OAuth-only) so password step-up is impossible — factor step-up is future MFA.
+  STEP_UP_REQUIRED = 'STEP_UP_REQUIRED',
+  STEP_UP_METHOD_UNAVAILABLE = 'STEP_UP_METHOD_UNAVAILABLE',
 }
 
 // Resource error codes (machine-readable, used across modules for DB-conflict cases)

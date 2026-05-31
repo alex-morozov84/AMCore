@@ -15,6 +15,7 @@ import { AbilityFactory } from './casl/ability.factory'
 import { EmailIdentityService } from './email-identity.service'
 import {
   AuthenticationGuard,
+  FreshAuthGuard,
   JwtAuthGuard,
   PoliciesGuard,
   RefreshTokenGuard,
@@ -77,6 +78,7 @@ import { UserCacheService } from './user-cache.service'
     PoliciesGuard,
     PrivilegedRoleService,
     SystemRolesGuard,
+    FreshAuthGuard,
     AuthenticationGuard,
     // Single global guard: authenticate → build ability → authorize
     // Registered in AuthModule so it runs AFTER ThrottlerGuard (AppModule)

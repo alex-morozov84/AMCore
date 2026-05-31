@@ -37,6 +37,7 @@ import {
   RegisterDto,
   ResendVerificationDto,
   ResetPasswordDto,
+  StepUpDto,
   VerifyEmailDto,
 } from './dto'
 import { SessionsListResponseDto } from './dto/sessions-list-response.dto'
@@ -164,18 +165,22 @@ export class AuthController {
       refreshTokenHash: string
     }
 
-    // Rotate refresh token
-    const newRefreshToken = await this.sessionService.rotateRefreshToken(refreshTokenHash, {
-      userId: user.id,
-      userAgent: req.headers['user-agent'],
-      ipAddress: req.ip,
-    })
+    // Rotate refresh token; the new session id becomes the access token `sid`.
+    const { refreshToken: newRefreshToken, sessionId } =
+      await this.sessionService.rotateRefreshToken(refreshTokenHash, {
+        userId: user.id,
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip,
+      })
 
-    // Generate new access token with current system role (org context not preserved — use /switch)
+    // Generate new access token with current system role (org context not preserved — use /switch).
+    // `sid` points at the rotated session, which carried `lastAuthAt` forward
+    // (refresh preserves step-up freshness but never renews it — OB-06b).
     const accessToken = this.tokenService.generateAccessToken({
       sub: user.id,
       email: user.email,
       systemRole: user.systemRole,
+      sid: sessionId,
     })
 
     res.cookie('refresh_token', newRefreshToken, this.cookieOptions)
@@ -201,6 +206,26 @@ export class AuthController {
   async me(@CurrentUser() user: RequestPrincipal): Promise<ProfileResponse> {
     const profile = await this.authService.getUserById(user.sub)
     return { user: profile }
+  }
+
+  /**
+   * Step-up re-authentication (OB-06b / ADR-037). Bearer-only: the caller
+   * re-enters their password to refresh the current session's recent-auth
+   * window, so they can perform destructive admin operations guarded by
+   * `@RequireFreshAuth`. No new session, no refresh-token rotation. `req.ip`
+   * is threaded through for the shared login brute-force limiter.
+   */
+  @Post('step-up')
+  @HttpCode(HttpStatus.OK)
+  @Auth(AuthType.Bearer)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Re-verify password to refresh step-up freshness' })
+  async stepUp(
+    @CurrentUser() principal: RequestPrincipal,
+    @Body() dto: StepUpDto,
+    @Req() req: Request
+  ): Promise<TokenResponse> {
+    return this.authService.stepUp(principal, dto.password, req.ip ?? '')
   }
 
   // Session-management routes are bearer-only — API keys must not be able to

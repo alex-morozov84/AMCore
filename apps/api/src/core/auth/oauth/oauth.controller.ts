@@ -152,6 +152,9 @@ export class OAuthController {
       sub: claims.userId,
       email: claims.email,
       systemRole: claims.systemRole,
+      // The validated session this ticket belongs to — carries `sid` for
+      // OB-06b step-up freshness (session.id === claims.sessionId, asserted above).
+      sid: claims.sessionId,
     })
 
     return { accessToken }

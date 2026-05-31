@@ -11,6 +11,7 @@ export interface RequestPrincipal {
   aclVersion?: number
   scopes?: string[] // API key only: ['contact:read', 'deal:create']
   // undefined = no restriction (JWT users)
+  sid?: string // JWT only: session id, for @RequireFreshAuth step-up checks (OB-06b)
 }
 // Effective permissions = userRolePermissions ∩ scopes (Auth0 validated pattern)
 // JWT:     scopes = undefined → full role permissions

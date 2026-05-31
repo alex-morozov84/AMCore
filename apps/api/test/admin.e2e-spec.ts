@@ -11,6 +11,7 @@ import {
   type E2ETestContext,
   seedSystemRoles,
   setupE2ETest,
+  signAccessToken,
   teardownE2ETest,
 } from './helpers'
 
@@ -641,6 +642,192 @@ describe('Admin (e2e)', () => {
         .get('/admin/users')
         .set('Authorization', `Bearer ${relogin.body.accessToken}`)
         .expect(200)
+    })
+  })
+
+  /**
+   * OB-06b (ADR-037): step-up. Destructive admin mutations
+   * (`PATCH /admin/users/:id`, `POST /admin/cleanup`) require the actor's
+   * session to have been (re)authenticated within the step-up window. Listing
+   * routes are unaffected. Sessions are aged deterministically via Prisma.
+   */
+  describe('OB-06b: step-up for destructive admin ops', () => {
+    const PASSWORD = 'StrongP@ss123'
+
+    async function makeSuperAdmin(email: string) {
+      const reg = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password: PASSWORD })
+        .expect(201)
+      await prisma.user.update({
+        where: { id: reg.body.user.id as string },
+        data: { systemRole: 'SUPER_ADMIN' },
+      })
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: PASSWORD })
+        .expect(200)
+      return {
+        userId: reg.body.user.id as string,
+        token: login.body.accessToken as string,
+        cookie: login.headers['set-cookie'] as unknown as string[],
+      }
+    }
+
+    // Age the actor's live sessions past the 10-min step-up window.
+    async function ageSessions(userId: string) {
+      await prisma.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { lastAuthAt: new Date(Date.now() - 60 * 60 * 1000) },
+      })
+    }
+
+    it('listing routes are unaffected by stale auth', async () => {
+      const a = await makeSuperAdmin('sa-listing@example.com')
+      await ageSessions(a.userId)
+
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${a.token}`)
+        .expect(200)
+    })
+
+    it('stale session → 403 STEP_UP_REQUIRED on a destructive op', async () => {
+      const a = await makeSuperAdmin('sa-stale@example.com')
+      const { userId: targetId } = await registerAndGetToken('target-stale@example.com')
+      await ageSessions(a.userId)
+
+      const res = await request(app.getHttpServer())
+        .patch(`/admin/users/${targetId}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ systemRole: SystemRole.SuperAdmin })
+        .expect(403)
+
+      expect(res.body.errorCode).toBe('STEP_UP_REQUIRED')
+    })
+
+    it('step-up refreshes the session and unblocks the destructive op', async () => {
+      const a = await makeSuperAdmin('sa-stepup@example.com')
+      const { userId: targetId } = await registerAndGetToken('target-stepup@example.com')
+      await ageSessions(a.userId)
+
+      await request(app.getHttpServer())
+        .patch(`/admin/users/${targetId}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ systemRole: SystemRole.SuperAdmin })
+        .expect(403)
+
+      await request(app.getHttpServer())
+        .post('/auth/step-up')
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ password: PASSWORD })
+        .expect(200)
+
+      // Server-side session freshness: the same token now passes.
+      await request(app.getHttpServer())
+        .patch(`/admin/users/${targetId}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ systemRole: SystemRole.SuperAdmin })
+        .expect(200)
+    })
+
+    it('refresh alone does NOT satisfy step-up (freshness carried, not renewed)', async () => {
+      const a = await makeSuperAdmin('sa-refresh@example.com')
+      const { userId: targetId } = await registerAndGetToken('target-refresh@example.com')
+      await ageSessions(a.userId)
+
+      const refreshed = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Cookie', a.cookie)
+        .expect(200)
+
+      const res = await request(app.getHttpServer())
+        .patch(`/admin/users/${targetId}`)
+        .set('Authorization', `Bearer ${refreshed.body.accessToken}`)
+        .send({ systemRole: SystemRole.SuperAdmin })
+        .expect(403)
+
+      expect(res.body.errorCode).toBe('STEP_UP_REQUIRED')
+    })
+
+    it('legacy token without sid: 200 on listing, 403 STEP_UP_REQUIRED on destructive op', async () => {
+      const a = await makeSuperAdmin('sa-nosid@example.com')
+      const { userId: targetId } = await registerAndGetToken('target-nosid@example.com')
+
+      const legacyToken = signAccessToken(app, {
+        sub: a.userId,
+        email: 'sa-nosid@example.com',
+        systemRole: 'SUPER_ADMIN',
+      })
+
+      await request(app.getHttpServer())
+        .get('/admin/users')
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .expect(200)
+
+      const res = await request(app.getHttpServer())
+        .patch(`/admin/users/${targetId}`)
+        .set('Authorization', `Bearer ${legacyToken}`)
+        .send({ systemRole: SystemRole.SuperAdmin })
+        .expect(403)
+
+      expect(res.body.errorCode).toBe('STEP_UP_REQUIRED')
+    })
+
+    it('non-live session → 403 STEP_UP_REQUIRED before any password check (no oracle)', async () => {
+      const a = await makeSuperAdmin('sa-oracle@example.com')
+      // sid points at a session that does not exist → fail closed regardless of
+      // the password, so step-up cannot be used to probe credentials.
+      const ghostToken = signAccessToken(app, {
+        sub: a.userId,
+        email: 'sa-oracle@example.com',
+        systemRole: 'SUPER_ADMIN',
+        sid: 'ghost-session-id',
+      })
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/step-up')
+        .set('Authorization', `Bearer ${ghostToken}`)
+        .send({ password: PASSWORD })
+        .expect(403)
+
+      expect(res.body.errorCode).toBe('STEP_UP_REQUIRED')
+    })
+
+    it('password-less (OAuth-only) account with a live session → STEP_UP_METHOD_UNAVAILABLE', async () => {
+      const user = await prisma.user.create({
+        data: {
+          email: 'oauth-only@example.com',
+          emailCanonical: 'oauth-only@example.com',
+          systemRole: 'SUPER_ADMIN',
+          passwordHash: null,
+        },
+      })
+      // A real live session so the live-session precheck passes and the flow
+      // reaches the password-less branch.
+      const session = await prisma.session.create({
+        data: {
+          userId: user.id,
+          familyId: 'fam-oauth-only',
+          refreshToken: 'oauth-only-refresh-hash',
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          lastAuthAt: new Date(),
+        },
+      })
+      const token = signAccessToken(app, {
+        sub: user.id,
+        email: user.email,
+        systemRole: 'SUPER_ADMIN',
+        sid: session.id,
+      })
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/step-up')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ password: 'whatever' })
+        .expect(403)
+
+      expect(res.body.errorCode).toBe('STEP_UP_METHOD_UNAVAILABLE')
     })
   })
 })

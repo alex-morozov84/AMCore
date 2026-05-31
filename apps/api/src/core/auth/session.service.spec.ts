@@ -40,6 +40,7 @@ describe('SessionService', () => {
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     revokedAt: null,
     revocationReason: null,
+    lastAuthAt: new Date('2024-01-01'),
     createdAt: new Date(),
   }
 
@@ -105,6 +106,7 @@ describe('SessionService', () => {
           userAgent: 'Mozilla/5.0',
           ipAddress: '192.168.1.1',
           expiresAt,
+          lastAuthAt: expect.any(Date),
         },
       })
 
@@ -133,6 +135,7 @@ describe('SessionService', () => {
           userAgent: undefined,
           ipAddress: undefined,
           expiresAt: expect.any(Date),
+          lastAuthAt: expect.any(Date),
         },
       })
 
@@ -278,10 +281,12 @@ describe('SessionService', () => {
           userAgent: 'Chrome',
           ipAddress: '10.0.0.1',
           expiresAt: expect.any(Date),
+          // Carried forward from the rotated session, NOT renewed (OB-06b).
+          lastAuthAt: mockSession.lastAuthAt,
         },
       })
 
-      expect(result).toBe(newRawToken)
+      expect(result).toEqual({ refreshToken: newRawToken, sessionId: mockSession.id })
     })
 
     it('should throw unauthorized if old session not found', async () => {
@@ -384,6 +389,53 @@ describe('SessionService', () => {
     })
   })
 
+  describe('touchLastAuth (OB-06b)', () => {
+    it('bumps lastAuthAt only for the caller’s own live session and returns count', async () => {
+      mockCtx.prisma.session.updateMany.mockResolvedValue({ count: 1 })
+
+      const count = await sessionService.touchLastAuth('session-1', 'user-1')
+
+      expect(count).toBe(1)
+      expect(mockCtx.prisma.session.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'session-1',
+          userId: 'user-1',
+          revokedAt: null,
+          expiresAt: { gt: expect.any(Date) },
+        },
+        data: { lastAuthAt: expect.any(Date) },
+      })
+    })
+
+    it('returns 0 when no live session matches (revoked / expired / gone)', async () => {
+      mockCtx.prisma.session.updateMany.mockResolvedValue({ count: 0 })
+
+      await expect(sessionService.touchLastAuth('sid', 'user-1')).resolves.toBe(0)
+    })
+  })
+
+  describe('hasLiveSession (OB-06b)', () => {
+    it('returns true for a live session owned by the user', async () => {
+      mockCtx.prisma.session.count.mockResolvedValue(1)
+
+      await expect(sessionService.hasLiveSession('sid', 'user-1')).resolves.toBe(true)
+      expect(mockCtx.prisma.session.count).toHaveBeenCalledWith({
+        where: {
+          id: 'sid',
+          userId: 'user-1',
+          revokedAt: null,
+          expiresAt: { gt: expect.any(Date) },
+        },
+      })
+    })
+
+    it('returns false when none match (revoked / expired / gone / wrong owner)', async () => {
+      mockCtx.prisma.session.count.mockResolvedValue(0)
+
+      await expect(sessionService.hasLiveSession('sid', 'user-1')).resolves.toBe(false)
+    })
+  })
+
   describe('getUserSessions', () => {
     const sessions: Session[] = [
       {
@@ -396,6 +448,7 @@ describe('SessionService', () => {
         expiresAt: new Date(),
         revokedAt: null,
         revocationReason: null,
+        lastAuthAt: new Date('2024-01-01'),
         createdAt: new Date('2024-01-01'),
       },
       {
@@ -408,6 +461,7 @@ describe('SessionService', () => {
         expiresAt: new Date(),
         revokedAt: null,
         revocationReason: null,
+        lastAuthAt: new Date('2024-01-02'),
         createdAt: new Date('2024-01-02'),
       },
     ]
@@ -639,11 +693,12 @@ describe('SessionService', () => {
         refreshToken: 'hash-2',
       })
 
-      const token2 = await sessionService.rotateRefreshToken('hash-1', {
+      const rotated = await sessionService.rotateRefreshToken('hash-1', {
         userId: 'user-123',
       })
 
-      expect(token2).toBe('raw-token-2')
+      expect(rotated.refreshToken).toBe('raw-token-2')
+      expect(rotated.sessionId).toBe(mockSession.id)
 
       // Delete session
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 1 })

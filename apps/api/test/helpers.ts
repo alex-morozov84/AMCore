@@ -1,6 +1,7 @@
 import type { WorkerHost } from '@nestjs/bullmq'
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { INestApplication } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { ThrottlerStorage } from '@nestjs/throttler'
@@ -309,4 +310,14 @@ export async function seedSystemRoles(prisma: PrismaService): Promise<void> {
       { roleId: viewerRole.id, permissionId: readAll.id },
     ],
   })
+}
+
+/**
+ * Sign an access token with an arbitrary payload using the app's configured
+ * JwtService (same secret/expiry as production minting). Used by OB-06b e2e to
+ * craft a legacy token WITHOUT a `sid` claim, or a token for a password-less
+ * (OAuth-only) user, which the normal login flow cannot produce.
+ */
+export function signAccessToken(app: INestApplication, payload: Record<string, unknown>): string {
+  return app.get(JwtService, { strict: false }).sign(payload)
 }

@@ -100,6 +100,15 @@ describe('Organizations (e2e)', () => {
 
       expect(switchRes.body.accessToken).toBeDefined()
       expect(typeof switchRes.body.accessToken).toBe('string')
+
+      // OB-06b regression: the org-context token must PRESERVE the session id
+      // (`sid`), otherwise a switched token looks legacy and loses step-up
+      // capability on @RequireFreshAuth routes.
+      const decodeSid = (t: string) =>
+        (JSON.parse(Buffer.from(t.split('.')[1]!, 'base64url').toString()) as { sid?: string }).sid
+      const originalSid = decodeSid(token)
+      expect(originalSid).toBeDefined()
+      expect(decodeSid(switchRes.body.accessToken)).toBe(originalSid)
     })
 
     it('returns 403 when user is not a member', async () => {

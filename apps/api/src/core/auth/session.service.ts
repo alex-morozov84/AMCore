@@ -54,6 +54,10 @@ export class SessionService {
         userAgent: params.userAgent,
         ipAddress: params.ipAddress,
         expiresAt,
+        // OB-06b / ADR-037: a freshly created session is freshly authenticated
+        // (login / register / OAuth all go through here). Refresh rotation does
+        // NOT use createSession — it carries lastAuthAt forward instead.
+        lastAuthAt: new Date(),
       },
     })
 
@@ -106,13 +110,23 @@ export class SessionService {
     return session
   }
 
-  /** Rotate refresh token (invalidate old, create new) */
-  async rotateRefreshToken(oldHashedToken: string, params: CreateSessionParams): Promise<string> {
+  /**
+   * Rotate refresh token (invalidate old, create new).
+   *
+   * Returns the raw refresh token and the **new** session id so the caller can
+   * mint an access token carrying the rotated `sid` (OB-06b). The new row's
+   * `lastAuthAt` is carried forward from the rotated session — a silent refresh
+   * preserves the step-up freshness window but never renews it (ADR-037).
+   */
+  async rotateRefreshToken(
+    oldHashedToken: string,
+    params: CreateSessionParams
+  ): Promise<{ refreshToken: string; sessionId: string }> {
     const refreshToken = this.tokenService.generateRefreshToken()
     const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
     const expiresAt = this.tokenService.getRefreshTokenExpiration()
 
-    await this.prisma.$transaction(async (tx) => {
+    const sessionId = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.session.findUnique({
         where: { refreshToken: oldHashedToken },
       })
@@ -187,7 +201,7 @@ export class SessionService {
         )
       }
 
-      await tx.session.create({
+      const created = await tx.session.create({
         data: {
           userId: params.userId,
           familyId: existing.familyId,
@@ -195,13 +209,47 @@ export class SessionService {
           userAgent: params.userAgent,
           ipAddress: params.ipAddress,
           expiresAt,
+          // Carry forward, never renew: a silent refresh preserves the step-up
+          // freshness window but does not reset it (OB-06b / ADR-037).
+          lastAuthAt: existing.lastAuthAt,
         },
       })
+
+      return created.id
     })
 
     this.logger.info({ userId: params.userId }, 'Refresh token rotated')
 
-    return refreshToken
+    return { refreshToken, sessionId }
+  }
+
+  /**
+   * Is `sessionId` a live session owned by `userId` (not revoked, not expired)?
+   * Used by step-up to prove the session is valid BEFORE any password work, so
+   * a stolen-but-revoked access token cannot be used as a password oracle
+   * (OB-06b). Same predicate as `touchLastAuth`.
+   */
+  async hasLiveSession(sessionId: string, userId: string): Promise<boolean> {
+    const count = await this.prisma.session.count({
+      where: { id: sessionId, userId, revokedAt: null, expiresAt: { gt: new Date() } },
+    })
+    return count > 0
+  }
+
+  /**
+   * Bump the current session's recent-auth timestamp after a successful
+   * step-up (OB-06b / ADR-037). Scoped to the caller's own live session
+   * (`id` + `userId`, not revoked, not expired) so it touches exactly one row
+   * and never resurrects a revoked/expired session. Returns the affected count
+   * so the caller can fail closed when the session is gone (e.g. revoked by a
+   * Stage 1 role change). Never creates a session or rotates the refresh token.
+   */
+  async touchLastAuth(sessionId: string, userId: string): Promise<number> {
+    const result = await this.prisma.session.updateMany({
+      where: { id: sessionId, userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      data: { lastAuthAt: new Date() },
+    })
+    return result.count
   }
 
   /** Delete session by refresh token hash */

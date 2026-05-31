@@ -343,7 +343,10 @@ describe('AuthController', () => {
       const newRefreshToken = 'new-refresh-token'
       const newAccessToken = 'new-access-token'
 
-      sessionService.rotateRefreshToken.mockResolvedValue(newRefreshToken)
+      sessionService.rotateRefreshToken.mockResolvedValue({
+        refreshToken: newRefreshToken,
+        sessionId: 'session-123',
+      })
       tokenService.generateAccessToken.mockReturnValue(newAccessToken)
 
       const result = await controller.refresh(requestWithUser, mockResponse)
@@ -357,6 +360,7 @@ describe('AuthController', () => {
         sub: mockUser.id,
         email: mockUser.email,
         systemRole: mockUser.systemRole,
+        sid: 'session-123',
       })
       expect(mockResponse.cookie).toHaveBeenCalledWith('refresh_token', newRefreshToken, {
         httpOnly: true,
@@ -643,7 +647,10 @@ describe('AuthController', () => {
         },
       } as Request & { user: { user: User; refreshTokenHash: string } }
 
-      sessionService.rotateRefreshToken.mockResolvedValue('rotated-refresh-token')
+      sessionService.rotateRefreshToken.mockResolvedValue({
+        refreshToken: 'rotated-refresh-token',
+        sessionId: 'session-123',
+      })
       tokenService.generateAccessToken.mockReturnValue('new-access-token')
 
       const refreshResult = await controller.refresh(refreshRequest, mockResponse)

@@ -168,6 +168,26 @@ a fresh login. See ADR-037.
 
 ---
 
+## Step-up re-authentication (OB-06b)
+
+Each session tracks when it was last authenticated (`lastAuthAt`). Destructive
+admin operations — `PATCH /admin/users/:id` and `POST /admin/cleanup` — require
+that timestamp to be recent (within `STEP_UP_MAX_AGE_SECONDS`, default 10
+minutes). If it is stale, the request is rejected with `403 STEP_UP_REQUIRED`.
+
+To refresh it, the user re-enters their password at **`POST /auth/step-up`**.
+This updates **only the current session's** `lastAuthAt` — it does not create a
+new session or rotate the refresh token. Importantly, a silent
+`POST /auth/refresh` **preserves but does not renew** the window: refreshing your
+access token does not count as re-authentication.
+
+OAuth-only accounts (no password) cannot use password step-up and receive
+`403 STEP_UP_METHOD_UNAVAILABLE`. Sessions created before this feature shipped
+have a `NULL` `lastAuthAt` and must re-login (or step up) before performing a
+guarded operation. See ADR-037.
+
+---
+
 ## Nightly cleanup
 
 Expired sessions are cleaned up automatically by a scheduled job that runs every night. The cleanup uses indexed queries (by `expiresAt`) to stay fast even with millions of sessions.

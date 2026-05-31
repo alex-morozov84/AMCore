@@ -179,6 +179,10 @@ export class OrganizationsController {
       systemRole: user.systemRole,
       organizationId: orgId,
       aclVersion,
+      // Preserve the session id so an org-context token keeps step-up
+      // capability (OB-06b) — without it a switched token looks legacy and
+      // fails closed on @RequireFreshAuth routes.
+      sid: user.sid,
     })
     return { accessToken }
   }

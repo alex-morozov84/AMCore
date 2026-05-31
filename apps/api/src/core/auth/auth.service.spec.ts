@@ -3,6 +3,7 @@ import * as argon2 from 'argon2'
 import type { PinoLogger } from 'nestjs-pino'
 
 import type { LoginInput, RegisterInput } from '@amcore/shared'
+import { AuthErrorCode } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
 
@@ -93,6 +94,8 @@ describe('AuthService', () => {
       deleteSession: jest.fn(),
       deleteOtherSessions: jest.fn(),
       cleanupExpired: jest.fn(),
+      touchLastAuth: jest.fn(),
+      hasLiveSession: jest.fn(),
     } as unknown as jest.Mocked<SessionService>
 
     mockEmailService = {
@@ -507,6 +510,96 @@ describe('AuthService', () => {
       await authService.logout(refreshTokenHash)
 
       expect(mockSessionService.deleteByRefreshToken).toHaveBeenCalledWith(refreshTokenHash)
+    })
+  })
+
+  describe('stepUp (OB-06b)', () => {
+    const principal = {
+      type: 'jwt' as const,
+      sub: 'user-123',
+      email: 'test@example.com',
+      systemRole: SystemRole.USER,
+      sid: 'session-123',
+    }
+
+    it('rejects a token without sid (STEP_UP_REQUIRED) without touching the session', async () => {
+      await expect(
+        authService.stepUp({ ...principal, sid: undefined }, 'pw', '1.2.3.4')
+      ).rejects.toMatchObject({ errorCode: AuthErrorCode.STEP_UP_REQUIRED })
+      expect(mockSessionService.hasLiveSession).not.toHaveBeenCalled()
+      expect(mockCtx.prisma.user.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('rejects a non-live session BEFORE any password work (no password oracle)', async () => {
+      // Stolen-but-revoked/expired token: must fail closed before loading the
+      // user, hitting the limiter, or verifying the password.
+      mockSessionService.hasLiveSession.mockResolvedValue(false)
+
+      await expect(authService.stepUp(principal, 'pw', '1.2.3.4')).rejects.toMatchObject({
+        errorCode: AuthErrorCode.STEP_UP_REQUIRED,
+      })
+      expect(mockCtx.prisma.user.findUnique).not.toHaveBeenCalled()
+      expect(mockLoginRateLimiter.check).not.toHaveBeenCalled()
+      expect(argon2.verify).not.toHaveBeenCalled()
+      expect(mockSessionService.touchLastAuth).not.toHaveBeenCalled()
+    })
+
+    it('rejects a password-less (OAuth-only) account with STEP_UP_METHOD_UNAVAILABLE', async () => {
+      mockSessionService.hasLiveSession.mockResolvedValue(true)
+      mockCtx.prisma.user.findUnique.mockResolvedValue({ ...mockUser, passwordHash: null })
+
+      await expect(authService.stepUp(principal, 'pw', '1.2.3.4')).rejects.toMatchObject({
+        errorCode: AuthErrorCode.STEP_UP_METHOD_UNAVAILABLE,
+      })
+      expect(argon2.verify).not.toHaveBeenCalled()
+      expect(mockSessionService.touchLastAuth).not.toHaveBeenCalled()
+    })
+
+    it('rejects a wrong password with INVALID_CREDENTIALS and consumes the limiter', async () => {
+      mockSessionService.hasLiveSession.mockResolvedValue(true)
+      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+      ;(argon2.verify as jest.Mock).mockResolvedValue(false)
+
+      await expect(authService.stepUp(principal, 'wrong', '1.2.3.4')).rejects.toMatchObject({
+        errorCode: AuthErrorCode.INVALID_CREDENTIALS,
+      })
+      expect(mockLoginRateLimiter.check).toHaveBeenCalledWith(mockUser.emailCanonical, '1.2.3.4')
+      expect(mockLoginRateLimiter.consume).toHaveBeenCalledWith(mockUser.emailCanonical, '1.2.3.4')
+      expect(mockSessionService.touchLastAuth).not.toHaveBeenCalled()
+    })
+
+    it('fails closed when the session is revoked between precheck and bump (count 0)', async () => {
+      mockSessionService.hasLiveSession.mockResolvedValue(true)
+      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+      ;(argon2.verify as jest.Mock).mockResolvedValue(true)
+      mockSessionService.touchLastAuth.mockResolvedValue(0)
+
+      await expect(authService.stepUp(principal, 'right', '1.2.3.4')).rejects.toMatchObject({
+        errorCode: AuthErrorCode.STEP_UP_REQUIRED,
+      })
+    })
+
+    it('succeeds: bumps only the current session, resets limiter, returns a fresh sid token', async () => {
+      mockSessionService.hasLiveSession.mockResolvedValue(true)
+      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+      ;(argon2.verify as jest.Mock).mockResolvedValue(true)
+      mockSessionService.touchLastAuth.mockResolvedValue(1)
+      mockTokenService.generateAccessToken.mockReturnValue('fresh-access-token')
+
+      const result = await authService.stepUp(principal, 'right', '1.2.3.4')
+
+      expect(result).toEqual({ accessToken: 'fresh-access-token' })
+      expect(mockSessionService.touchLastAuth).toHaveBeenCalledWith('session-123', 'user-123')
+      expect(mockLoginRateLimiter.reset).toHaveBeenCalledWith(mockUser.emailCanonical, '1.2.3.4')
+      expect(mockTokenService.generateAccessToken).toHaveBeenCalledWith({
+        sub: 'user-123',
+        email: mockUser.email,
+        systemRole: mockUser.systemRole,
+        sid: 'session-123',
+      })
+      // No new session, no rotation.
+      expect(mockSessionService.createSession).not.toHaveBeenCalled()
+      expect(mockSessionService.rotateRefreshToken).not.toHaveBeenCalled()
     })
   })
 

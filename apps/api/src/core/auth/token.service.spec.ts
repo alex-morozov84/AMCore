@@ -67,6 +67,19 @@ describe('TokenService', () => {
       expect(token2).toBe('token-user-2')
       expect(token1).not.toBe(token2)
     })
+
+    it('passes the sid claim straight through to sign (OB-06b)', () => {
+      jwtService.sign.mockReturnValue('signed')
+
+      tokenService.generateAccessToken({
+        sub: 'user-123',
+        email: 'test@example.com',
+        systemRole: SystemRole.User,
+        sid: 'session-abc',
+      })
+
+      expect(jwtService.sign).toHaveBeenCalledWith(expect.objectContaining({ sid: 'session-abc' }))
+    })
   })
 
   describe('verifyAccessToken', () => {

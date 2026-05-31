@@ -8,6 +8,7 @@ import {
   registerSchema,
   resendVerificationSchema,
   resetPasswordSchema,
+  stepUpSchema,
   updateProfileSchema,
   verifyEmailSchema,
 } from '@amcore/shared'
@@ -22,3 +23,4 @@ export class ForgotPasswordDto extends createZodDto(forgotPasswordSchema) {}
 export class ResetPasswordDto extends createZodDto(resetPasswordSchema) {}
 export class VerifyEmailDto extends createZodDto(verifyEmailSchema) {}
 export class ResendVerificationDto extends createZodDto(resendVerificationSchema) {}
+export class StepUpDto extends createZodDto(stepUpSchema) {}

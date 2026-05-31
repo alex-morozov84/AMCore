@@ -78,6 +78,20 @@ export const oauthExchangeRequestSchema = z.object({
 
 export type OAuthExchangeRequest = z.infer<typeof oauthExchangeRequestSchema>
 
+/**
+ * Step-up re-authentication request (OB-06b / ADR-037).
+ *
+ * Just the current password — verified against the authenticated user to
+ * refresh the current session's recent-auth window. `min(1)` only: this
+ * verifies an existing credential, it does not set one, so the registration
+ * complexity rules do not apply.
+ */
+export const stepUpSchema = z.object({
+  password: z.string().min(1),
+})
+
+export type StepUpInput = z.infer<typeof stepUpSchema>
+
 // ===========================================
 // Response Schemas
 // ===========================================

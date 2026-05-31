@@ -27,6 +27,7 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
@@ -87,6 +88,9 @@ export class AdminController {
 
   @Patch('users/:id')
   @ApiOperation({ summary: 'Update user system role — SUPER_ADMIN only' })
+  // OB-06b: destructive privileged op — require a recently re-authenticated
+  // session (step-up) on top of the OB-06a current-role check.
+  @RequireFreshAuth()
   // OB-03: override the global `long` bucket (default 100/min) to
   // 20/min for this privileged operation. Adding a new named
   // bucket in `ThrottlerModule.forRoot` would cap every route in
@@ -105,6 +109,8 @@ export class AdminController {
   @Post('cleanup')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Manually trigger expired records cleanup — SUPER_ADMIN only' })
+  // OB-06b: destructive privileged op — require step-up freshness.
+  @RequireFreshAuth()
   // OB-03: heavy DB sweep — override `long` to 5/min for this
   // handler. Same per-handler-override pattern as above.
   @Throttle({ long: { limit: 5, ttl: 60_000 } })

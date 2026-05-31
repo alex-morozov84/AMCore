@@ -100,6 +100,11 @@ model Session {
   expiresAt    DateTime
   revokedAt    DateTime?
   revocationReason String?
+  // OB-06b / ADR-037: server-side recent-auth timestamp for step-up.
+  // Nullable: pre-migration rows are NULL and fail closed on @RequireFreshAuth.
+  // Set to now() at fresh authentication (login/register/OAuth); carried
+  // forward (never renewed) on refresh rotation; bumped by POST /auth/step-up.
+  lastAuthAt   DateTime?
 
   createdAt DateTime @default(now())
 

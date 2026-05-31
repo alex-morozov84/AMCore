@@ -4,7 +4,7 @@ import * as argon2 from 'argon2'
 import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { LoginInput, RegisterInput, UserResponse } from '@amcore/shared'
+import type { LoginInput, RegisterInput, RequestPrincipal, UserResponse } from '@amcore/shared'
 import { AuthErrorCode } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
@@ -80,17 +80,19 @@ export class AuthService {
       },
     })
 
-    // Generate tokens
+    // Create the session first so the access token can carry its id as `sid`
+    // (OB-06b / ADR-037 step-up freshness).
+    const { session, refreshToken } = await this.sessionService.createSession({
+      userId: user.id,
+      userAgent: requestInfo.userAgent,
+      ipAddress: requestInfo.ipAddress,
+    })
+
     const accessToken = this.tokenService.generateAccessToken({
       sub: user.id,
       email: user.email,
       systemRole: user.systemRole,
-    })
-
-    const { refreshToken } = await this.sessionService.createSession({
-      userId: user.id,
-      userAgent: requestInfo.userAgent,
-      ipAddress: requestInfo.ipAddress,
+      sid: session.id,
     })
 
     // Generate verification token synchronously so the row is committed
@@ -172,17 +174,19 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     })
 
-    // Generate tokens
+    // Create the session first so the access token can carry its id as `sid`
+    // (OB-06b / ADR-037 step-up freshness).
+    const { session, refreshToken } = await this.sessionService.createSession({
+      userId: user.id,
+      userAgent: requestInfo.userAgent,
+      ipAddress: requestInfo.ipAddress,
+    })
+
     const accessToken = this.tokenService.generateAccessToken({
       sub: user.id,
       email: user.email,
       systemRole: user.systemRole,
-    })
-
-    const { refreshToken } = await this.sessionService.createSession({
-      userId: user.id,
-      userAgent: requestInfo.userAgent,
-      ipAddress: requestInfo.ipAddress,
+      sid: session.id,
     })
 
     this.logger.info({ userId: user.id, email: user.email }, 'User logged in successfully')
@@ -198,6 +202,112 @@ export class AuthService {
   async logout(refreshTokenHash: string): Promise<void> {
     await this.sessionService.deleteByRefreshToken(refreshTokenHash)
     this.logger.info('User logged out successfully')
+  }
+
+  /**
+   * Step-up re-authentication (OB-06b / ADR-037).
+   *
+   * Verifies the caller's password and refreshes ONLY the current session's
+   * recent-auth window (`Session.lastAuthAt`). It never creates a session or
+   * rotates the refresh token. Returns a fresh access token carrying the same
+   * `sid`. All "must re-login" outcomes use `403 STEP_UP_REQUIRED`; a wrong
+   * password is `401 INVALID_CREDENTIALS`; a password-less (OAuth-only) account
+   * is `403 STEP_UP_METHOD_UNAVAILABLE`. Shares the login brute-force limiter
+   * (per canonical email + IP), so the controller threads `req.ip`.
+   */
+  async stepUp(
+    principal: RequestPrincipal,
+    password: string,
+    ip: string
+  ): Promise<{ accessToken: string }> {
+    const sid = principal.sid
+    if (!sid) {
+      // Legacy token without a session id — cannot identify the session to bump.
+      throw this.stepUpRequired()
+    }
+
+    // Prove the session is live BEFORE any password work, so a stolen but
+    // already-revoked/expired access token cannot be used as a password oracle.
+    // This precedes the password-less check too: a no-session OAuth-only token
+    // gets STEP_UP_REQUIRED, not STEP_UP_METHOD_UNAVAILABLE.
+    const live = await this.sessionService.hasLiveSession(sid, principal.sub)
+    if (!live) {
+      this.logger.warn(
+        { event: 'auth.step_up.failed', userId: principal.sub, reason: 'no_session' },
+        'Step-up failed: current session not live'
+      )
+      throw this.stepUpRequired()
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: principal.sub } })
+    if (!user) {
+      throw this.stepUpRequired()
+    }
+
+    // OAuth-only accounts have no password; factor-based step-up is future MFA.
+    if (!user.passwordHash) {
+      this.logger.warn(
+        { event: 'auth.step_up.failed', userId: user.id, reason: 'method_unavailable' },
+        'Step-up unavailable: account has no password'
+      )
+      throw new AppException(
+        'Password step-up is not available for this account',
+        HttpStatus.FORBIDDEN,
+        AuthErrorCode.STEP_UP_METHOD_UNAVAILABLE
+      )
+    }
+
+    // Reuse the login brute-force limiter so step-up is not a password oracle.
+    await this.loginRateLimiter.check(user.emailCanonical, ip)
+
+    const valid = await argon2.verify(user.passwordHash, password)
+    if (!valid) {
+      await this.loginRateLimiter.consume(user.emailCanonical, ip)
+      this.logger.warn(
+        { event: 'auth.step_up.failed', userId: user.id, reason: 'invalid_password' },
+        'Step-up failed: invalid password'
+      )
+      throw new AppException(
+        'Invalid password',
+        HttpStatus.UNAUTHORIZED,
+        AuthErrorCode.INVALID_CREDENTIALS
+      )
+    }
+
+    await this.loginRateLimiter.reset(user.emailCanonical, ip)
+
+    // Bump only the current live session. count 0 → session gone (revoked by a
+    // Stage 1 role change, logged out, expired) → must re-login.
+    const touched = await this.sessionService.touchLastAuth(sid, user.id)
+    if (touched === 0) {
+      this.logger.warn(
+        { event: 'auth.step_up.failed', userId: user.id, reason: 'no_session' },
+        'Step-up failed: current session not found'
+      )
+      throw this.stepUpRequired()
+    }
+
+    const accessToken = this.tokenService.generateAccessToken({
+      sub: user.id,
+      email: user.email,
+      systemRole: user.systemRole,
+      sid,
+    })
+
+    this.logger.info(
+      { event: 'auth.step_up.succeeded', userId: user.id, sessionId: sid },
+      'Step-up succeeded'
+    )
+
+    return { accessToken }
+  }
+
+  private stepUpRequired(): AppException {
+    return new AppException(
+      'Step-up authentication required',
+      HttpStatus.FORBIDDEN,
+      AuthErrorCode.STEP_UP_REQUIRED
+    )
   }
 
   /** Get user by ID */

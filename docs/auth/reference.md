@@ -98,6 +98,27 @@ self-check endpoint for integrations.
 
 ---
 
+#### `POST /auth/step-up` 🔑
+
+Re-verify the current password to refresh the **session's** recent-auth window
+(OB-06b). Required before destructive admin operations guarded by step-up
+(`PATCH /admin/users/:id`, `POST /admin/cleanup`) once the window has elapsed
+(`STEP_UP_MAX_AGE_SECONDS`, default 10 min). Does **not** create a new session
+or rotate the refresh token; a silent `POST /auth/refresh` does **not** refresh
+this window.
+
+```json
+{ "password": "current-password" }
+```
+
+**Response** `200`: `{ "accessToken": "..." }` (the session is refreshed
+server-side; the returned token simply carries the same session).
+**Errors:** `401 INVALID_CREDENTIALS` (wrong password),
+`403 STEP_UP_REQUIRED` (no/expired session — re-login),
+`403 STEP_UP_METHOD_UNAVAILABLE` (OAuth-only account with no password).
+
+---
+
 ### Sessions
 
 #### `GET /auth/sessions` 🔑
@@ -424,20 +445,22 @@ Use `errorCode` in your frontend for translations — it's stable across API ver
 
 Returned in the response root `errorCode`:
 
-| Code                            | HTTP | Description                                      |
-| ------------------------------- | ---- | ------------------------------------------------ |
-| `EMAIL_ALREADY_EXISTS`          | 409  | Registration: email already in use               |
-| `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                   |
-| `TOKEN_INVALID`                 | 400  | Reset/verify token: expired, used, or not found  |
-| `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend)         |
-| `SESSION_NOT_FOUND`             | 404  | Refresh: no matching session in DB               |
-| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT                           |
-| `OAUTH_STATE_INVALID`           | 400  | OAuth: state param expired or already consumed   |
-| `OAUTH_PROVIDER_ERROR`          | 502  | OAuth: provider returned an error                |
-| `OAUTH_EMAIL_REQUIRED`          | 400  | OAuth: provider gave no email, can't create user |
-| `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | OAuth: missing env vars for this provider        |
-| `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Link: provider account belongs to another user   |
-| `OAUTH_TICKET_INVALID`          | 401  | OAuth: login ticket exchange failed              |
+| Code                            | HTTP | Description                                                           |
+| ------------------------------- | ---- | --------------------------------------------------------------------- |
+| `EMAIL_ALREADY_EXISTS`          | 409  | Registration: email already in use                                    |
+| `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                                        |
+| `TOKEN_INVALID`                 | 400  | Reset/verify token: expired, used, or not found                       |
+| `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend)                              |
+| `SESSION_NOT_FOUND`             | 404  | Refresh: no matching session in DB                                    |
+| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT                                                |
+| `OAUTH_STATE_INVALID`           | 400  | OAuth: state param expired or already consumed                        |
+| `OAUTH_PROVIDER_ERROR`          | 502  | OAuth: provider returned an error                                     |
+| `OAUTH_EMAIL_REQUIRED`          | 400  | OAuth: provider gave no email, can't create user                      |
+| `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | OAuth: missing env vars for this provider                             |
+| `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Link: provider account belongs to another user                        |
+| `OAUTH_TICKET_INVALID`          | 401  | OAuth: login ticket exchange failed                                   |
+| `STEP_UP_REQUIRED`              | 403  | Destructive admin op needs recent re-auth — call `POST /auth/step-up` |
+| `STEP_UP_METHOD_UNAVAILABLE`    | 403  | Step-up impossible: account has no password (OAuth-only)              |
 
 ### API Key Scope error codes
 

@@ -48,6 +48,9 @@ const envSchema = z
     JWT_ACCESS_EXPIRATION: z.string().default('15m'),
     JWT_REFRESH_EXPIRATION: z.string().default('7d'),
     JWT_REFRESH_DAYS: z.coerce.number().int().min(1).max(365).default(7),
+    // OB-06b / ADR-037: step-up recent-auth window (seconds). Destructive admin
+    // ops require the session to have been (re)authenticated within this window.
+    STEP_UP_MAX_AGE_SECONDS: z.coerce.number().int().min(1).default(600),
     RBAC_ACLV_CACHE_TTL_MS: z.coerce.number().int().min(0).default(0),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(5002),
     CORS_ORIGIN: z

@@ -12,6 +12,7 @@ export {
   verifyEmailSchema,
   resendVerificationSchema,
   oauthExchangeRequestSchema,
+  stepUpSchema,
   // Response schemas
   userResponseSchema,
   authResponseSchema,
@@ -30,6 +31,7 @@ export {
   type VerifyEmailInput,
   type ResendVerificationInput,
   type OAuthExchangeRequest,
+  type StepUpInput,
   type UserResponse,
   type AuthResponse,
   type Session,
