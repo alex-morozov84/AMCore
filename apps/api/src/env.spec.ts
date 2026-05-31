@@ -75,6 +75,7 @@ describe('env validation', () => {
     const env = validate({
       ...baseEnv,
       NODE_ENV: 'production',
+      STORAGE_DRIVER: 'local',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=require',
     })
 
@@ -112,6 +113,7 @@ describe('env validation', () => {
     const env = validate({
       ...baseEnv,
       NODE_ENV: 'production',
+      STORAGE_DRIVER: 'local',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=require',
     })
 
@@ -122,6 +124,7 @@ describe('env validation', () => {
     const env = validate({
       ...baseEnv,
       NODE_ENV: 'production',
+      STORAGE_DRIVER: 'local',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=verify-full',
     })
 
@@ -132,6 +135,7 @@ describe('env validation', () => {
     const env = validate({
       ...baseEnv,
       NODE_ENV: 'production',
+      STORAGE_DRIVER: 'local',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=REQUIRE',
     })
 
@@ -153,8 +157,38 @@ describe('env validation', () => {
       validate({
         ...baseEnv,
         NODE_ENV: 'production',
+        STORAGE_DRIVER: 'local',
         DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=prefer',
       })
     ).toThrow(ZodError)
+  })
+
+  it('defaults the storage driver to memory in test and local in development', () => {
+    expect(validate(baseEnv).STORAGE_DRIVER).toBe('local')
+    expect(validate({ ...baseEnv, NODE_ENV: 'test' }).STORAGE_DRIVER).toBe('memory')
+  })
+
+  it('defaults the storage driver to s3 in production and requires its credentials', () => {
+    expect(() =>
+      validate({
+        ...baseEnv,
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=require',
+      })
+    ).toThrow(ZodError)
+  })
+
+  it('accepts a fully configured s3 storage driver in production', () => {
+    const env = validate({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=require',
+      STORAGE_BUCKET: 'amcore-prod',
+      STORAGE_ACCESS_KEY_ID: 'AKIA_TEST',
+      STORAGE_SECRET_ACCESS_KEY: 'secret-test',
+    })
+
+    expect(env.STORAGE_DRIVER).toBe('s3')
+    expect(env.STORAGE_BUCKET).toBe('amcore-prod')
   })
 })
