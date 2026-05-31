@@ -33,6 +33,9 @@
   },
   "dependencies": {
     "@amcore/shared": "workspace:^",
+    "@aws-sdk/client-s3": "^3.1057.0",
+    "@aws-sdk/lib-storage": "^3.1057.0",
+    "@aws-sdk/s3-request-presigner": "^3.1057.0",
     "@bull-board/api": "^6.20.6",
     "@bull-board/express": "^6.20.6",
     "@bull-board/nestjs": "^6.21.3",
@@ -100,6 +103,7 @@
     "@types/supertest": "^6.0.3",
     "@types/uuid": "^11.0.0",
     "@vitest/ui": "^4.1.5",
+    "aws-sdk-client-mock": "^4.1.0",
     "happy-dom": "^20.8.4",
     "jest": "^30.3.0",
     "jest-mock-extended": "^4.0.0",
