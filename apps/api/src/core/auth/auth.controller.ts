@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import type { User } from '@prisma/client'
 import type { Request, Response } from 'express'
 import { ZodSerializerDto } from 'nestjs-zod'
@@ -227,6 +228,11 @@ export class AuthController {
   @Post('me/avatar')
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
+  // Per-handler throttle (F12): avatar upload runs synchronous sharp decoding of
+  // up to MEDIA_AVATAR_MAX_PIXELS, so narrow the global `long` bucket (100/min)
+  // to 5/min/IP for this heavy, rarely-repeated action. Mirrors the OB-03 admin
+  // throttle pattern.
+  @Throttle({ long: { limit: 5, ttl: 60_000 } })
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: AVATAR_UPLOAD_HARD_LIMIT_BYTES },

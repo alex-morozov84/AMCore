@@ -1,7 +1,19 @@
+import { randomBytes } from 'node:crypto'
+
 import { OUTPUT_EXT } from './media.constants'
 import type { ImageOutputFormat } from './media.types'
 
 import { normalizeObjectKey } from '@/infrastructure/storage'
+
+/**
+ * Generate a per-upload version token for cache-busting derivative keys. base36
+ * time prefix + random hex — key-safe (`[A-Za-z0-9_-]+`), unique per upload, and
+ * roughly sortable. Used as the `v-<version>/` segment so immutable cache headers
+ * are safe and old versions can be swept by prefix.
+ */
+export function generateUploadVersion(): string {
+  return `${Date.now().toString(36)}${randomBytes(4).toString('hex')}`
+}
 
 export interface DerivativeKeyParts {
   /** Preset namespace/prefix, e.g. `avatars`. */

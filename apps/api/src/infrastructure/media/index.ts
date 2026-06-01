@@ -26,7 +26,7 @@ export {
   type SharpProcessorConfig,
   type SourcePolicy,
 } from './media.types'
-export { buildDerivativeKey, type DerivativeKeyParts } from './media-key'
+export { buildDerivativeKey, type DerivativeKeyParts, generateUploadVersion } from './media-key'
 export { AVATAR_DERIVATIVES, AVATAR_SOURCE_POLICY } from './presets/avatar.preset'
 export { MEDIA_PRESETS } from './presets/media-presets'
 export { SharpImageProcessor } from './processors/sharp-image.processor'

@@ -82,7 +82,12 @@ describe('Avatar storage (e2e)', () => {
     await request(app.getHttpServer()).delete('/auth/me/avatar').expect(401)
   })
 
-  it('uploads a validated public avatar and persists avatarUrl', async () => {
+  const avatarUrlPattern = (userId: string): RegExp =>
+    new RegExp(
+      `^https://cdn\\.example\\.test/assets/avatars/${userId}/v-[0-9a-z]+/avatar-256\\.webp$`
+    )
+
+  it('uploads a validated public avatar derivative and persists avatarUrl', async () => {
     const { accessToken, userId } = await registerUser()
 
     const response = await request(app.getHttpServer())
@@ -91,20 +96,35 @@ describe('Avatar storage (e2e)', () => {
       .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
       .expect(201)
 
-    expect(response.body).toEqual({
-      avatarUrl: `https://cdn.example.test/assets/avatars/${userId}`,
-    })
+    expect(response.body.avatarUrl).toMatch(avatarUrlPattern(userId))
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-    expect(user.avatarUrl).toBe(`https://cdn.example.test/assets/avatars/${userId}`)
+    expect(user.avatarUrl).toBe(response.body.avatarUrl)
 
     const profileResponse = await request(app.getHttpServer())
       .get('/auth/me')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200)
-    expect(profileResponse.body.user.avatarUrl).toBe(
-      `https://cdn.example.test/assets/avatars/${userId}`
-    )
+    expect(profileResponse.body.user.avatarUrl).toBe(response.body.avatarUrl)
+  })
+
+  it('re-upload publishes a new versioned URL', async () => {
+    const { accessToken, userId } = await registerUser()
+
+    const first = await request(app.getHttpServer())
+      .post('/auth/me/avatar')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
+      .expect(201)
+
+    const second = await request(app.getHttpServer())
+      .post('/auth/me/avatar')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
+      .expect(201)
+
+    expect(second.body.avatarUrl).toMatch(avatarUrlPattern(userId))
+    expect(second.body.avatarUrl).not.toBe(first.body.avatarUrl)
   })
 
   it('rejects oversized avatars with 413', async () => {
@@ -161,6 +181,25 @@ describe('Avatar storage (e2e)', () => {
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
     expect(user.avatarUrl).toBeNull()
+  })
+
+  it('throttles avatar uploads per IP (F12)', async () => {
+    const { accessToken } = await registerUser()
+
+    // The per-handler override narrows the `long` bucket to 5/min for this route.
+    for (let i = 0; i < 5; i++) {
+      await request(app.getHttpServer())
+        .post('/auth/me/avatar')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
+        .expect(201)
+    }
+
+    await request(app.getHttpServer())
+      .post('/auth/me/avatar')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
+      .expect(429)
   })
 })
 
