@@ -25,6 +25,7 @@ AMCore is a modular web application for personal productivity. The backend is de
 | **Backend**      | NestJS 10, PostgreSQL 16, Prisma 6, Redis, BullMQ                   |
 | **Auth**         | JWT + Refresh Tokens, OAuth 2.0 / OIDC, API Keys                    |
 | **Email**        | Resend, React Email 5, FormatJS i18n                                |
+| **Storage**      | S3-compatible storage, local dev driver, memory test driver         |
 | **Frontend**     | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui                     |
 | **Architecture** | Feature-Sliced Design (FSD)                                         |
 | **Monorepo**     | pnpm workspaces + Turborepo                                         |
@@ -42,7 +43,8 @@ amcore/
 │   ├── eslint-config/
 │   └── typescript-config/
 ├── docs/
-│   └── auth/       # Authentication & authorization documentation
+│   ├── auth/       # Authentication & authorization documentation
+│   └── storage/    # File storage documentation
 └── .github/        # CI, Dependabot, issue/PR templates
 ```
 
@@ -108,6 +110,7 @@ The backend is a fully-featured NestJS starter. Everything below is production-r
 - **Email** — Resend (prod) / Mock (dev), React Email templates, FormatJS i18n (RU/EN), direct send for secret links, BullMQ for non-secret notifications
 - **Queue** — BullMQ, multiple queues, Bull Board at `/admin/queues` (SUPER_ADMIN only)
 - **Cache** — Cache-aside with distributed locking (stampede protection), tag-based invalidation
+- **Storage** — S3-compatible provider abstraction, local filesystem dev driver, in-memory test driver, magic-byte upload validation, signed/public URLs, opt-in health check, avatar upload/delete example
 - **Health Checks** — `/health`, `/health/startup`, `/health/ready`, `/health/live` (Kubernetes-ready)
 - **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys, invites) with multi-instance locking
 
@@ -120,6 +123,7 @@ The backend is a fully-featured NestJS starter. Everything below is production-r
 ### Documentation
 
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
+- [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide
 - [`apps/api/README.md`](apps/api/README.md) — Backend architecture
 

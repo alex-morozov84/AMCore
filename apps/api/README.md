@@ -1,6 +1,6 @@
 # AMCore API
 
-> Production-ready NestJS backend — authentication, RBAC, OAuth, API keys, email, queues, caching.
+> Production-ready NestJS backend — authentication, RBAC, OAuth, API keys, email, queues, caching, storage.
 
 ## Tech Stack
 
@@ -13,6 +13,7 @@
 | **Validation**    | Zod + nestjs-zod                               | Request validation + auto Swagger  |
 | **Auth**          | JWT + Refresh Tokens, OAuth 2.0/OIDC, API Keys | Multi-method authentication        |
 | **Email**         | Resend + React Email + FormatJS                | Transactional emails               |
+| **Storage**       | S3-compatible + local + memory drivers         | File uploads, avatars, signed URLs |
 | **Logging**       | Pino (nestjs-pino)                             | Structured JSON logging            |
 | **API Docs**      | Swagger (OpenAPI)                              | Auto-generated at `/docs`          |
 
@@ -61,6 +62,7 @@ apps/api/src/
 ├── infrastructure/
 │   ├── email/                  # Resend + React Email (direct secret sends + queued notifications)
 │   ├── queue/                  # BullMQ setup + Bull Board
+│   ├── storage/                # S3/local/memory storage providers + validation
 │   └── schedule/               # Nightly cleanup cron
 │
 ├── health/                     # 4 Kubernetes-ready health endpoints
@@ -89,17 +91,19 @@ Cross-module communication: via Redis pub/sub events, never direct DB imports.
 
 ### Email Auth
 
-| Method | Endpoint                    | Auth | Description                                |
-| ------ | --------------------------- | ---- | ------------------------------------------ |
-| `POST` | `/auth/register`            | —    | Register with email + password             |
-| `POST` | `/auth/login`               | —    | Login, returns access token + cookie       |
-| `POST` | `/auth/logout`              | 🍪   | Revoke current session                     |
-| `POST` | `/auth/refresh`             | 🍪   | Rotate refresh token, get new access token |
-| `GET`  | `/auth/me`                  | JWT  | Get current user profile                   |
-| `POST` | `/auth/forgot-password`     | —    | Request password reset email               |
-| `POST` | `/auth/reset-password`      | —    | Set new password with token                |
-| `POST` | `/auth/verify-email`        | —    | Verify email with token                    |
-| `POST` | `/auth/resend-verification` | —    | Resend verification email                  |
+| Method   | Endpoint                    | Auth | Description                                |
+| -------- | --------------------------- | ---- | ------------------------------------------ |
+| `POST`   | `/auth/register`            | —    | Register with email + password             |
+| `POST`   | `/auth/login`               | —    | Login, returns access token + cookie       |
+| `POST`   | `/auth/logout`              | 🍪   | Revoke current session                     |
+| `POST`   | `/auth/refresh`             | 🍪   | Rotate refresh token, get new access token |
+| `GET`    | `/auth/me`                  | JWT  | Get current user profile                   |
+| `POST`   | `/auth/me/avatar`           | JWT  | Upload validated public avatar             |
+| `DELETE` | `/auth/me/avatar`           | JWT  | Delete current avatar                      |
+| `POST`   | `/auth/forgot-password`     | —    | Request password reset email               |
+| `POST`   | `/auth/reset-password`      | —    | Set new password with token                |
+| `POST`   | `/auth/verify-email`        | —    | Verify email with token                    |
+| `POST`   | `/auth/resend-verification` | —    | Resend verification email                  |
 
 ### Sessions
 
@@ -182,6 +186,24 @@ Sensitive fields automatically redacted: passwords, tokens, API keys, cookies, a
 
 Health endpoints bypass rate limiting (`@SkipThrottle`) and are excluded from access logs.
 Readiness disk usage threshold defaults to `HEALTH_DISK_THRESHOLD_PERCENT=0.9`.
+Storage readiness is opt-in via `STORAGE_HEALTH_ENABLED=true`.
+
+## Storage
+
+The storage module is provider-agnostic and private by default.
+
+| Driver   | Use case                             | Public URLs | Signed URLs |
+| -------- | ------------------------------------ | ----------- | ----------- |
+| `memory` | tests                                | no          | no          |
+| `local`  | development                          | optional    | no          |
+| `s3`     | production / S3-compatible providers | yes         | yes         |
+
+Supported S3-compatible targets include AWS S3, Cloudflare R2, DigitalOcean
+Spaces, Yandex Object Storage, and Backblaze B2. Upload validation uses magic
+bytes through `file-type`; client MIME types are never trusted. The shipped
+avatar endpoints are the public-read example consumer.
+
+See [`../../docs/storage/README.md`](../../docs/storage/README.md).
 
 ## Tests
 
@@ -195,6 +217,7 @@ coverage.
 | Organizations + RBAC | ✅                      | ✅  |
 | Admin                | ✅                      | ✅  |
 | API Keys             | ✅                      | ✅  |
+| Storage              | ✅                      | ✅  |
 | Email templates      | Vitest (real rendering) | —   |
 
 ```bash

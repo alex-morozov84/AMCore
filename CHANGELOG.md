@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Storage Service:**
+  - Cloud-agnostic `StorageService` facade with `StorageProvider` contract
+  - Drivers: S3-compatible production provider, local filesystem dev provider, in-memory test provider
+  - S3 compatibility for AWS S3, Cloudflare R2, DigitalOcean Spaces, Yandex Object Storage, and Backblaze B2
+  - AWS SDK checksum mode `WHEN_REQUIRED` for non-AWS compatibility
+  - Public URL and signed URL support with capability checks
+  - Private-by-default uploads; `UploadResult` deliberately carries no guaranteed URL
+  - Object-key guard: traversal, leading slash, backslash, control chars, empty keys, and overlong keys rejected
+  - `deleteMany()` S3 chunking with aggregate partial-failure exception
+  - `FileValidationPipe` with magic-byte validation and presets for avatars, images, and documents
+  - SVG rejected from image presets by default
+  - Opt-in storage readiness check via `STORAGE_HEALTH_ENABLED`
+  - App-mediated download primitive for authorized consumers
+  - `POST /auth/me/avatar` and `DELETE /auth/me/avatar` public-read example consumer
+  - `docs/storage/` user-facing storage guide
 - **OAuth 2.0 / OIDC — Social Login & Account Linking:**
   - `openid-client` v6 (panva) — industry standard, zero transitive deps
   - **Google** provider — OIDC via discovery, PKCE (S256), ID token validation
