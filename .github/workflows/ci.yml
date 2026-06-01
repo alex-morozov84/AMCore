@@ -104,8 +104,8 @@ jobs:
       - name: Run tests
         run: pnpm test
 
-  docker-sharp-smoke:
-    name: Docker sharp smoke
+  docker-image-smoke:
+    name: Docker production image smoke
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
     steps:
@@ -115,22 +115,34 @@ jobs:
       - name: Build production runner image
         run: docker build -f apps/api/Dockerfile -t amcore-api:smoke .
 
-      # Verify native sharp/libvips actually loads AND encodes inside the built
-      # production image — not just `require('sharp')`. Catches a missing/wrong
-      # native binary or a broken codec path that host CI (different platform)
-      # would miss. Runs as the image's non-root user from the production WORKDIR.
-      - name: Run sharp WebP encode smoke inside the image
+      # Verify the self-contained production image (pnpm deploy bundle):
+      # 1. native sharp/libvips loads AND encodes (not just require) — catches a
+      #    missing/wrong native binary or broken codec the host platform hides;
+      # 2. critical runtime deps resolve from the bundle's flat node_modules —
+      #    proves the pnpm-workspace packaging is self-contained;
+      # 3. the generated Prisma client is present.
+      # Runs as the image's non-root user from the production WORKDIR.
+      - name: Smoke-test the built runner image
         run: |
           docker run --rm amcore-api:smoke node -e "
-            require('sharp')({ create: { width: 8, height: 8, channels: 3, background: '#000' } })
+            const sharp = require('sharp');
+            sharp({ create: { width: 8, height: 8, channels: 3, background: '#000' } })
               .webp()
               .toBuffer()
               .then((b) => {
                 if (!b || b.length === 0) throw new Error('empty WebP buffer');
                 console.log('sharp WebP encode OK:', b.length, 'bytes');
+                for (const m of ['@nestjs/core', '@prisma/client', 'argon2', 'bullmq', 'nestjs-pino']) {
+                  require.resolve(m);
+                }
+                console.log('runtime module resolution OK');
+                if (typeof require('@prisma/client').PrismaClient !== 'function') {
+                  throw new Error('Prisma client not generated');
+                }
+                console.log('Prisma client present OK');
               })
               .catch((err) => {
-                console.error('sharp smoke failed:', err);
+                console.error('image smoke failed:', err);
                 process.exit(1);
               });
           "
