@@ -8,6 +8,7 @@ import { STORAGE_PROVIDER } from './storage.constants'
 import { StorageHealthIndicator } from './storage.health'
 import type { StorageProvider } from './storage.interface'
 import { StorageService } from './storage.service'
+import { StorageDownloadService } from './storage-download.service'
 
 import { EnvModule } from '@/env/env.module'
 import { EnvService } from '@/env/env.service'
@@ -15,7 +16,12 @@ import { EnvService } from '@/env/env.service'
 /**
  * Global storage module. The active driver is chosen by `STORAGE_DRIVER`
  * (resolved in env.ts: dev -> local, test -> memory, production -> s3).
- * Exposes `StorageService` (facade) and `StorageHealthIndicator`.
+ * Exposes `StorageService` (facade), `StorageDownloadService` (an unauthorized
+ * download primitive a consumer must guard), and `StorageHealthIndicator`.
+ *
+ * No download controller is registered here: the app-mediated download route is
+ * mounted by an authorized consumer (a later stage), never as a generic
+ * bearer-only `/storage/objects/*` endpoint.
  */
 @Global()
 @Module({})
@@ -33,9 +39,10 @@ export class StorageModule {
           useFactory: (env: EnvService): StorageProvider => createProvider(env),
         },
         StorageService,
+        StorageDownloadService,
         StorageHealthIndicator,
       ],
-      exports: [StorageService, StorageHealthIndicator],
+      exports: [StorageService, StorageDownloadService, StorageHealthIndicator],
     }
   }
 }

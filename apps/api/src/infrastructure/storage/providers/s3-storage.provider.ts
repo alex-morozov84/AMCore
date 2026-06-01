@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
+  type GetObjectCommandOutput,
   HeadObjectCommand,
   ListObjectsV2Command,
   type ObjectIdentifier,
@@ -28,6 +29,7 @@ import {
   type StorageCapabilities,
   type StorageDeleteFailure,
   StorageDeleteManyException,
+  StorageObjectNotFoundError,
   type StorageProvider,
   type UploadInput,
   type UploadResult,
@@ -123,25 +125,25 @@ export class S3StorageProvider implements StorageProvider {
   }
 
   async download(key: string): Promise<Buffer> {
-    const res = await this.client.send(
-      new GetObjectCommand({ Bucket: this.config.bucket, Key: normalizeObjectKey(key) })
-    )
-    if (!res.Body) throw new Error(`Object not found: ${key}`)
+    const res = await this.getObject(key)
     return bufferFromBody(res.Body as unknown as Readable)
   }
 
   async downloadStream(key: string): Promise<Readable> {
-    const res = await this.client.send(
-      new GetObjectCommand({ Bucket: this.config.bucket, Key: normalizeObjectKey(key) })
-    )
-    if (!res.Body) throw new Error(`Object not found: ${key}`)
+    const res = await this.getObject(key)
     return res.Body as unknown as Readable
   }
 
   async getMetadata(key: string): Promise<FileMetadata> {
-    const res = await this.client.send(
-      new HeadObjectCommand({ Bucket: this.config.bucket, Key: normalizeObjectKey(key) })
-    )
+    const objectKey = normalizeObjectKey(key)
+    let res
+    try {
+      res = await this.client.send(
+        new HeadObjectCommand({ Bucket: this.config.bucket, Key: objectKey })
+      )
+    } catch (err) {
+      throw this.mapNotFound(err, key)
+    }
     return {
       contentType: res.ContentType,
       contentLength: res.ContentLength ?? 0,
@@ -286,6 +288,25 @@ export class S3StorageProvider implements StorageProvider {
     const value = requested ?? this.config.signedUrlDefaultTtl
     const max = Math.min(this.config.signedUrlMaxTtl, SIGV4_MAX_TTL_SECONDS)
     return Math.max(1, Math.min(value, max))
+  }
+
+  private async getObject(key: string): Promise<GetObjectCommandOutput> {
+    const objectKey = normalizeObjectKey(key)
+    let res: GetObjectCommandOutput
+    try {
+      res = await this.client.send(
+        new GetObjectCommand({ Bucket: this.config.bucket, Key: objectKey })
+      )
+    } catch (err) {
+      throw this.mapNotFound(err, key)
+    }
+    if (!res.Body) throw new StorageObjectNotFoundError(key)
+    return res
+  }
+
+  /** Rethrow a missing-object error as the typed not-found; pass anything else through. */
+  private mapNotFound(err: unknown, key: string): unknown {
+    return this.isNotFound(err) ? new StorageObjectNotFoundError(key) : err
   }
 
   private isNotFound(err: unknown): boolean {

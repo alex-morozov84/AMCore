@@ -8,19 +8,20 @@ import { Injectable } from '@nestjs/common'
 
 import { normalizeObjectKey } from '../object-key'
 import { DEFAULT_VISIBILITY } from '../storage.constants'
-import type {
-  CopyObjectInput,
-  FileInfo,
-  FileMetadata,
-  ListInput,
-  ListResult,
-  SignedDownloadInput,
-  SignedUploadInput,
-  StorageCapabilities,
-  StorageProvider,
-  UploadInput,
-  UploadResult,
-  Visibility,
+import {
+  type CopyObjectInput,
+  type FileInfo,
+  type FileMetadata,
+  type ListInput,
+  type ListResult,
+  type SignedDownloadInput,
+  type SignedUploadInput,
+  type StorageCapabilities,
+  StorageObjectNotFoundError,
+  type StorageProvider,
+  type UploadInput,
+  type UploadResult,
+  type Visibility,
 } from '../storage.interface'
 
 import { bufferFromBody } from './body.util'
@@ -256,7 +257,7 @@ export class LocalStorageProvider implements StorageProvider {
       throw this.toNotFound(err, key)
     }
     // A prefix directory (created by nested uploads) is not an object.
-    if (!stats.isFile()) throw new Error(`Object not found: ${key}`)
+    if (!stats.isFile()) throw new StorageObjectNotFoundError(key)
     return stats
   }
 
@@ -269,7 +270,7 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   private toNotFound(err: unknown, key: string): Error {
-    return this.isErrno(err, 'ENOENT') ? new Error(`Object not found: ${key}`) : (err as Error)
+    return this.isErrno(err, 'ENOENT') ? new StorageObjectNotFoundError(key) : (err as Error)
   }
 
   private isErrno(err: unknown, code: string): boolean {

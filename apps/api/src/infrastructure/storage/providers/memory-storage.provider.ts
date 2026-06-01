@@ -5,18 +5,19 @@ import { Injectable } from '@nestjs/common'
 
 import { normalizeObjectKey } from '../object-key'
 import { DEFAULT_VISIBILITY } from '../storage.constants'
-import type {
-  CopyObjectInput,
-  FileInfo,
-  FileMetadata,
-  ListInput,
-  ListResult,
-  SignedDownloadInput,
-  SignedUploadInput,
-  StorageCapabilities,
-  StorageProvider,
-  UploadInput,
-  UploadResult,
+import {
+  type CopyObjectInput,
+  type FileInfo,
+  type FileMetadata,
+  type ListInput,
+  type ListResult,
+  type SignedDownloadInput,
+  type SignedUploadInput,
+  type StorageCapabilities,
+  StorageObjectNotFoundError,
+  type StorageProvider,
+  type UploadInput,
+  type UploadResult,
 } from '../storage.interface'
 
 import { bufferFromBody } from './body.util'
@@ -138,7 +139,7 @@ export class MemoryStorageProvider implements StorageProvider {
 
   private require(key: string): StoredObject {
     const object = this.store.get(normalizeObjectKey(key))
-    if (!object) throw new Error(`Object not found: ${key}`)
+    if (!object) throw new StorageObjectNotFoundError(key)
     return object
   }
 

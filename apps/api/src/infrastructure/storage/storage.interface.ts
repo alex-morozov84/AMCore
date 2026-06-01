@@ -162,6 +162,19 @@ export class StorageDeleteManyException extends Error {
   }
 }
 
+/**
+ * Thrown by `download`, `downloadStream`, `getMetadata`, and `copy` (source)
+ * when the object does not exist. Lets callers map a missing object to a 404
+ * without an `exists` preflight (which costs an extra round-trip and can race).
+ * `exists` itself never throws this — it returns `false`.
+ */
+export class StorageObjectNotFoundError extends Error {
+  constructor(readonly key: string) {
+    super(`Object not found: ${key}`)
+    this.name = 'StorageObjectNotFoundError'
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Provider contract
 // ---------------------------------------------------------------------------

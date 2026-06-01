@@ -4,6 +4,7 @@ export { StorageHealthIndicator } from './storage.health'
 export * from './storage.interface'
 export { StorageModule } from './storage.module'
 export { StorageService } from './storage.service'
+export { StorageDownloadService } from './storage-download.service'
 export {
   type FileValidationOptions,
   FileValidationPipe,
