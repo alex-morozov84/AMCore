@@ -124,6 +124,7 @@ The backend is a fully-featured NestJS starter. Everything below is production-r
 
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
+- [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide
 - [`apps/api/README.md`](apps/api/README.md) — Backend architecture
 

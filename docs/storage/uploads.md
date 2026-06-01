@@ -40,7 +40,9 @@ raster images.
 
 ## Avatar Flow
 
-The shipped avatar consumer is the one explicit public-read example:
+The shipped avatar consumer is the one explicit public-read example. As of the
+media-processing arc it runs the validated upload through the
+[Media](../media/README.md) pipeline rather than storing the raw upload.
 
 ```http
 POST /api/v1/auth/me/avatar
@@ -48,30 +50,31 @@ Authorization: Bearer <accessToken>
 Content-Type: multipart/form-data
 ```
 
-The implementation stores the object at:
+The implementation:
 
-```text
-avatars/{userId}
-```
+1. stores the uploaded **original privately** under a per-upload versioned key
+   `avatars/{userId}/v-{version}/original`;
+2. generates public WebP derivatives (`avatar-128/256/512.webp`) under the same
+   `v-{version}/` prefix, with `cacheControl: public, max-age=31536000, immutable`
+   (safe because keys are versioned);
+3. stores the public URL of `avatar-256` in `User.avatarUrl` (unchanged
+   compatibility field) and invalidates the user cache;
+4. best-effort sweeps older versions and the legacy flat `avatars/{userId}`
+   object after the new version is live.
 
-with:
+The HTTP response shape is unchanged: `{ avatarUrl }`.
 
-```ts
-{
-  visibility: 'public-read',
-  cacheControl: 'public, max-age=31536000'
-}
-```
-
-It then stores `storage.getPublicUrl(key)` in `User.avatarUrl` and invalidates
-the user cache.
-
-Delete is idempotent:
+Delete is idempotent and **fail-closed** — it removes every object under
+`avatars/{userId}/` plus the legacy flat object, and clears `avatarUrl` only
+after storage cleanup succeeds:
 
 ```http
 DELETE /api/v1/auth/me/avatar
 Authorization: Bearer <accessToken>
 ```
+
+Avatar uploads are rate-limited per IP (`5/min`) for the synchronous image
+decode. See [Media](../media/README.md) for presets, limits, and security.
 
 ## Private Files
 
