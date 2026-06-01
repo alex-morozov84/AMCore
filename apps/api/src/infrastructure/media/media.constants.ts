@@ -29,3 +29,11 @@ export const OUTPUT_CONTENT_TYPE: Record<ImageOutputFormat, string> = {
   avif: 'image/avif',
   png: 'image/png',
 }
+
+/** File extension used in derivative object keys for each output format. */
+export const OUTPUT_EXT: Record<ImageOutputFormat, string> = {
+  jpeg: 'jpg',
+  webp: 'webp',
+  avif: 'avif',
+  png: 'png',
+}

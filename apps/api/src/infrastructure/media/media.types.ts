@@ -72,7 +72,62 @@ export interface SourcePolicy {
   allowAnimated: boolean
 }
 
-export type MediaErrorCode = 'UNSUPPORTED_IMAGE' | 'IMAGE_TOO_LARGE' | 'DECODE_FAILED'
+// ---------------------------------------------------------------------------
+// Service-level contracts (Stage 2 — MediaService over StorageService)
+// ---------------------------------------------------------------------------
+
+/** Named presets the service knows how to produce. */
+export type MediaPresetName = 'avatar'
+
+/** Static definition of a named derivative set + its source acceptance policy. */
+export interface MediaPreset {
+  name: MediaPresetName
+  /** Object-key namespace/prefix for this preset's outputs, e.g. `avatars`. */
+  keyspace: string
+  derivatives: readonly ImageDerivativeSpec[]
+  sourcePolicy: SourcePolicy
+}
+
+export interface ProcessImageInput {
+  /** Storage key of the already-stored original to derive from. */
+  sourceKey: string
+  /**
+   * Owner/subject scope for derivative keys. This is key-derivation context
+   * ONLY — `MediaService` does not authorize it. Callers must prove the caller
+   * owns `sourceKey`/`ownerId` before invoking.
+   */
+  ownerId: string
+  preset: MediaPresetName
+  /** Visibility for the generated derivatives. Defaults to `private`. */
+  visibility?: 'private' | 'public-read'
+  /** Optional per-upload version segment for cache-busting (Stage 3 avatars). */
+  version?: string
+  /** Optional cache-control for the derivative objects (caller-decided). */
+  cacheControl?: string
+}
+
+export interface ImageDerivativeRecord {
+  name: string
+  key: string
+  /** Public URL — present only for public-read derivatives on a URL-capable driver. */
+  url?: string
+  width: number
+  height: number
+  contentType: string
+  size: number
+}
+
+export interface ProcessImageResult {
+  sourceKey: string
+  derivatives: ImageDerivativeRecord[]
+}
+
+export type MediaErrorCode =
+  | 'UNSUPPORTED_IMAGE'
+  | 'IMAGE_TOO_LARGE'
+  | 'DECODE_FAILED'
+  | 'SOURCE_TOO_LARGE'
+  | 'PUBLIC_URL_UNSUPPORTED'
 
 /**
  * Deterministic media failure. Every case here is unrecoverable (the same bytes
