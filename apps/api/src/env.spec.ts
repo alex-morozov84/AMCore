@@ -191,4 +191,23 @@ describe('env validation', () => {
     expect(env.STORAGE_DRIVER).toBe('s3')
     expect(env.STORAGE_BUCKET).toBe('amcore-prod')
   })
+
+  it('applies media processing defaults', () => {
+    const env = validate(baseEnv)
+    expect(env.MEDIA_MAX_PIXELS).toBe(40000000)
+    expect(env.MEDIA_AVATAR_MAX_PIXELS).toBe(8000000)
+    expect(env.MEDIA_AVATAR_CACHE_CONTROL).toBe('public, max-age=31536000, immutable')
+  })
+
+  it('rejects MEDIA_AVATAR_MAX_PIXELS greater than MEDIA_MAX_PIXELS', () => {
+    expect(() =>
+      validate({ ...baseEnv, MEDIA_MAX_PIXELS: '1000', MEDIA_AVATAR_MAX_PIXELS: '2000' })
+    ).toThrow(ZodError)
+  })
+
+  it('rejects MEDIA_SHARP_LIMIT_INPUT_PIXELS greater than MEDIA_MAX_PIXELS', () => {
+    expect(() =>
+      validate({ ...baseEnv, MEDIA_MAX_PIXELS: '1000', MEDIA_SHARP_LIMIT_INPUT_PIXELS: '2000' })
+    ).toThrow(ZodError)
+  })
 })

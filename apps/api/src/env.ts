@@ -115,6 +115,24 @@ const envSchema = z
     // prefix when using object-scoped S3 credentials, so the probe isn't a
     // false 403. Never needs to exist (a 404 still proves connectivity).
     STORAGE_HEALTH_PROBE_KEY: z.string().min(1).default('__storage_health_check__'),
+    // ---------------------------------------------------------------------
+    // Media processing (image derivatives — see ai/MEDIA_PROCESSING_PLAN.md)
+    // ---------------------------------------------------------------------
+    // Decode-safety limits applied before/around sharp. Source bytes are capped
+    // before download; decoded dimensions/pixels are validated after metadata.
+    // `MEDIA_SHARP_LIMIT_INPUT_PIXELS` is the hard libvips decode guard
+    // (defense-in-depth, not the only check).
+    MEDIA_MAX_SOURCE_BYTES: z.coerce.number().int().min(1).default(5242880),
+    MEDIA_MAX_WIDTH: z.coerce.number().int().min(1).default(8000),
+    MEDIA_MAX_HEIGHT: z.coerce.number().int().min(1).default(8000),
+    MEDIA_MAX_PIXELS: z.coerce.number().int().min(1).default(40000000),
+    MEDIA_SHARP_LIMIT_INPUT_PIXELS: z.coerce.number().int().min(1).default(40000000),
+    // Tighter pixel cap for the synchronous avatar path (F12): an avatar tops out
+    // at 512 px, so 8 MP bounds per-decode memory/CPU under upload bursts.
+    MEDIA_AVATAR_MAX_PIXELS: z.coerce.number().int().min(1).default(8000000),
+    // Cache-control for public avatar derivatives. Keys are per-upload versioned,
+    // so immutable long-lived caching is safe (no stale-on-overwrite).
+    MEDIA_AVATAR_CACHE_CONTROL: z.string().min(1).default('public, max-age=31536000, immutable'),
   })
   .transform((env) => {
     // Locked invariant (Decision C): dev -> local, test -> memory,
@@ -199,6 +217,23 @@ const envSchema = z
         code: 'custom',
         path: ['STORAGE_SIGNED_URL_DEFAULT_TTL'],
         message: 'STORAGE_SIGNED_URL_DEFAULT_TTL must be <= STORAGE_SIGNED_URL_MAX_TTL',
+      })
+    }
+
+    // Media: per-preset and hard decode pixel caps must not exceed the global cap.
+    if (env.MEDIA_AVATAR_MAX_PIXELS > env.MEDIA_MAX_PIXELS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MEDIA_AVATAR_MAX_PIXELS'],
+        message: 'MEDIA_AVATAR_MAX_PIXELS must be <= MEDIA_MAX_PIXELS',
+      })
+    }
+
+    if (env.MEDIA_SHARP_LIMIT_INPUT_PIXELS > env.MEDIA_MAX_PIXELS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MEDIA_SHARP_LIMIT_INPUT_PIXELS'],
+        message: 'MEDIA_SHARP_LIMIT_INPUT_PIXELS must be <= MEDIA_MAX_PIXELS',
       })
     }
 

@@ -1,9 +1,14 @@
 # ===========================================
 # Stage 1: Dependencies
 # ===========================================
-FROM node:20-alpine AS deps
+# Debian slim (glibc), not Alpine (musl): the API depends on `sharp`/libvips for
+# media processing. Slim ships sharp's prebuilt glibc binary with bundled libvips
+# out of the box and matches the glibc CI runners, so production native loading is
+# reproducible. A CI-gated smoke test (.github/workflows/ci.yml) verifies a real
+# sharp WebP encode inside the built runner image.
+FROM node:22-slim AS deps
 
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 WORKDIR /app
 
@@ -20,9 +25,9 @@ RUN pnpm install --frozen-lockfile
 # ===========================================
 # Stage 2: Builder
 # ===========================================
-FROM node:20-alpine AS builder
+FROM node:22-slim AS builder
 
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 WORKDIR /app
 
@@ -50,17 +55,17 @@ RUN pnpm --filter api build
 # ===========================================
 # Stage 3: Production
 # ===========================================
-FROM node:20-alpine AS runner
+FROM node:22-slim AS runner
 
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nestjs
+# Create non-root user (Debian: groupadd/useradd)
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nestjs
 
 # Copy built application
 COPY --from=builder /app/apps/api/dist ./dist
