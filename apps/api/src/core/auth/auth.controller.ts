@@ -10,8 +10,11 @@ import {
   Query,
   Req,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import type { User } from '@prisma/client'
 import type { Request, Response } from 'express'
@@ -29,6 +32,7 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { EnvService } from '../../env/env.service'
 
 import { AuthService } from './auth.service'
+import { AvatarService, type AvatarUploadFile } from './avatar.service'
 import { Auth } from './decorators/auth.decorator'
 import { CurrentUser } from './decorators/current-user.decorator'
 import {
@@ -44,6 +48,8 @@ import { SessionsListResponseDto } from './dto/sessions-list-response.dto'
 import { RefreshTokenGuard } from './guards'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
+
+import { AVATAR_VALIDATION, FileValidationPipe } from '@/infrastructure/storage'
 
 interface AuthResponse {
   user: SharedUserResponse
@@ -62,6 +68,15 @@ interface ProfileResponse {
   user: SharedUserResponse | null
 }
 
+interface AvatarResponse {
+  avatarUrl: string
+}
+
+// Multer hard stop for the avatar upload. Set above AVATAR_VALIDATION.maxSize
+// (2 MB) so the FileValidationPipe produces the clean 413 for files between the
+// preset limit and this cap; this cap is the absolute anti-DoS backstop.
+const AVATAR_UPLOAD_HARD_LIMIT_BYTES = 6 * 1024 * 1024
+
 // Sessions wire shape lives in `@amcore/shared`
 // (`sessionsListResponseSchema`). Local interface removed in OB-05.
 
@@ -70,6 +85,7 @@ interface ProfileResponse {
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly avatarService: AvatarService,
     private readonly sessionService: SessionService,
     private readonly tokenService: TokenService,
     private readonly env: EnvService
@@ -206,6 +222,32 @@ export class AuthController {
   async me(@CurrentUser() user: RequestPrincipal): Promise<ProfileResponse> {
     const profile = await this.authService.getUserById(user.sub)
     return { user: profile }
+  }
+
+  @Post('me/avatar')
+  @Auth(AuthType.Bearer)
+  @ApiBearerAuth()
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: AVATAR_UPLOAD_HARD_LIMIT_BYTES },
+    })
+  )
+  @ApiOperation({ summary: 'Upload current user avatar' })
+  async uploadAvatar(
+    @CurrentUser('sub') userId: string,
+    @UploadedFile(new FileValidationPipe(AVATAR_VALIDATION)) file: AvatarUploadFile
+  ): Promise<AvatarResponse> {
+    const avatarUrl = await this.avatarService.setAvatar(userId, file)
+    return { avatarUrl }
+  }
+
+  @Delete('me/avatar')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Auth(AuthType.Bearer)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete current user avatar' })
+  async deleteAvatar(@CurrentUser('sub') userId: string): Promise<void> {
+    await this.avatarService.removeAvatar(userId)
   }
 
   /**

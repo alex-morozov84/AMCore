@@ -11,6 +11,7 @@ import { ApiKeysModule } from '../api-keys/api-keys.module'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
+import { AvatarService } from './avatar.service'
 import { AbilityFactory } from './casl/ability.factory'
 import { EmailIdentityService } from './email-identity.service'
 import {
@@ -57,6 +58,7 @@ import { UserCacheService } from './user-cache.service'
   controllers: [AuthController, OAuthController],
   providers: [
     AuthService,
+    AvatarService,
     EmailIdentityService,
     LoginRateLimiterService,
     OAuthClientService,

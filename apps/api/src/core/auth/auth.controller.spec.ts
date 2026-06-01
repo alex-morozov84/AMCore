@@ -22,6 +22,7 @@ import { EnvService } from '../../env/env.service'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
+import { AvatarService } from './avatar.service'
 import type {
   ForgotPasswordDto,
   LoginDto,
@@ -37,6 +38,7 @@ import { TokenService } from './token.service'
 describe('AuthController', () => {
   let controller: AuthController
   let authService: jest.Mocked<AuthService>
+  let avatarService: jest.Mocked<AvatarService>
   let sessionService: jest.Mocked<SessionService>
   let tokenService: jest.Mocked<TokenService>
   let envService: jest.Mocked<EnvService>
@@ -118,6 +120,13 @@ describe('AuthController', () => {
           },
         },
         {
+          provide: AvatarService,
+          useValue: {
+            setAvatar: jest.fn(),
+            removeAvatar: jest.fn(),
+          },
+        },
+        {
           provide: TokenService,
           useValue: {
             generateAccessToken: jest.fn(),
@@ -158,6 +167,7 @@ describe('AuthController', () => {
 
     controller = module.get<AuthController>(AuthController)
     authService = module.get(AuthService)
+    avatarService = module.get(AvatarService)
     sessionService = module.get(SessionService)
     tokenService = module.get(TokenService)
     envService = module.get(EnvService)
@@ -400,6 +410,30 @@ describe('AuthController', () => {
       const result = await controller.me(mockPrincipal)
 
       expect(result).toEqual({ user: null })
+    })
+  })
+
+  describe('avatar', () => {
+    const avatarFile = {
+      buffer: Buffer.from('avatar-bytes'),
+      mimetype: 'image/png',
+    }
+
+    it('uploads current user avatar', async () => {
+      avatarService.setAvatar.mockResolvedValue('https://cdn.example.test/avatars/user-123')
+
+      const result = await controller.uploadAvatar(mockUser.id, avatarFile)
+
+      expect(avatarService.setAvatar).toHaveBeenCalledWith(mockUser.id, avatarFile)
+      expect(result).toEqual({ avatarUrl: 'https://cdn.example.test/avatars/user-123' })
+    })
+
+    it('deletes current user avatar', async () => {
+      avatarService.removeAvatar.mockResolvedValue()
+
+      await controller.deleteAvatar(mockUser.id)
+
+      expect(avatarService.removeAvatar).toHaveBeenCalledWith(mockUser.id)
     })
   })
 
