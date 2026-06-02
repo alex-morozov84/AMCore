@@ -29,6 +29,7 @@ import { QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
 import { StorageModule } from './infrastructure/storage'
+import { RedisThrottlerStorage, ThrottlingModule } from './infrastructure/throttling'
 import { PrismaModule } from './prisma'
 import { ShutdownService } from './shutdown.service'
 
@@ -99,26 +100,28 @@ import { ShutdownService } from './shutdown.service'
       }),
     }),
 
-    // Rate limiting
+    // Rate limiting (Redis-backed global throttler — ADR-039)
+    //
+    // Storage is Redis-backed via RedisThrottlerStorage so the short/long
+    // limits are shared across API replicas instead of being process-local.
     //
     // OB-03 note: privileged admin operations override the `long`
     // bucket per-handler via `@Throttle({ long: { ... } })` rather
     // than registering a third global named throttler — a third
-    // named throttler in `forRoot` would apply its default limit to
-    // every route (caught in Stage 7 final-e2e when a 5/min admin
-    // default capped login-burst tests at the global level).
-    ThrottlerModule.forRoot([
-      {
-        name: 'short',
-        ttl: 1000, // 1 second
-        limit: 10, // 10 requests per second
-      },
-      {
-        name: 'long',
-        ttl: 60000, // 1 minute
-        limit: 100, // 100 requests per minute
-      },
-    ]),
+    // named throttler here would apply its default limit to every
+    // route (caught in Stage 7 final-e2e when a 5/min admin default
+    // capped login-burst tests at the global level).
+    ThrottlerModule.forRootAsync({
+      imports: [ThrottlingModule],
+      inject: [RedisThrottlerStorage],
+      useFactory: (storage: RedisThrottlerStorage) => ({
+        throttlers: [
+          { name: 'short', ttl: 1000, limit: 10 }, // 10 requests per second
+          { name: 'long', ttl: 60000, limit: 100 }, // 100 requests per minute
+        ],
+        storage,
+      }),
+    }),
 
     // Database
     PrismaModule,

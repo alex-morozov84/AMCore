@@ -5,6 +5,7 @@ import path from 'node:path'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
+import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -200,6 +201,12 @@ describe('Avatar storage (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
       .expect(429)
+  })
+
+  it('wires the global guard to the Redis-backed throttler storage (ADR-039)', () => {
+    // Guards against a config that builds the storage but fails to pass it to
+    // ThrottlerModule, silently falling back to in-memory (process-local) limits.
+    expect(context.throttlerStorage).toBeInstanceOf(RedisThrottlerStorage)
   })
 })
 

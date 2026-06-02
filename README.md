@@ -1,14 +1,14 @@
 # AMCore
 
 > Modular personal productivity platform — fitness, finance, subscriptions.
-> Built on a production-ready NestJS API starter.
+> Built on a production-oriented NestJS API starter.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](LICENSE)
 [![CI](https://github.com/alex-morozov84/AMCore/actions/workflows/ci.yml/badge.svg)](https://github.com/alex-morozov84/AMCore/actions/workflows/ci.yml)
 
 ## Overview
 
-AMCore is a modular web application for personal productivity. The backend is designed as an exemplary open-source NestJS starter — production-ready, well-tested, and easy to fork.
+AMCore is a modular web application for personal productivity. The backend is designed as an exemplary open-source NestJS starter: strong application/security foundations, broad tests, and an active production-readiness track for deployment and operations.
 
 ### Application Modules
 
@@ -44,13 +44,14 @@ amcore/
 │   └── typescript-config/
 ├── docs/
 │   ├── auth/       # Authentication & authorization documentation
+│   ├── media/      # Image derivative/media processing documentation
 │   └── storage/    # File storage documentation
 └── .github/        # CI, Dependabot, issue/PR templates
 ```
 
 ## API Starter — What's Built
 
-The backend is a fully-featured NestJS starter. Everything below is production-ready with tests.
+The backend is a fully-featured NestJS starter. The application/security baseline below is implemented and tested; operations/deployment hardening is tracked separately before the project restores an unqualified "fully production-ready" claim.
 
 ### Foundation
 
@@ -59,7 +60,7 @@ The backend is a fully-featured NestJS starter. Everything below is production-r
 - 3-layer exception filters (domain → Prisma → HTTP → catch-all)
 - Structured logging with Pino: correlation ID, GDPR IP anonymization, sensitive data redaction
 - Graceful shutdown (SIGTERM/SIGINT, log flush)
-- Global rate limiting (10 req/s + 100 req/min via `@nestjs/throttler`)
+- Global rate limiting (10 req/s + 100 req/min via `@nestjs/throttler`), Redis-backed so limits are shared across API replicas; degrades to local in-memory limits if Redis is unavailable (ADR-039)
 - Helmet, CORS, cookie parser
 - Swagger/OpenAPI at `/docs` (dev only)
 - CI/CD: lint, typecheck, test, build (4 parallel jobs), Dependabot

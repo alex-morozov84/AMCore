@@ -15,6 +15,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 
 import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
+import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
 /**
@@ -44,14 +45,9 @@ export interface E2ETestContext {
   app: INestApplication
   prisma: PrismaService
   cache: Cache
-  throttlerStorage: ThrottlerStorageState
+  throttlerStorage: RedisThrottlerStorage
   postgresContainer: StartedPostgreSqlContainer
   redisContainer: StartedRedisContainer
-}
-
-interface ThrottlerStorageState {
-  storage: Map<string, unknown>
-  timeoutIds: Map<string, NodeJS.Timeout[]>
 }
 
 /**
@@ -116,7 +112,10 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
   // Get Prisma service and cache
   const prisma = app.get(PrismaService)
   const cache = app.get<Cache>(CACHE_MANAGER)
-  const throttlerStorage = app.get<ThrottlerStorageState>(ThrottlerStorage as never)
+  // Resolve via the ThrottlerStorage token (what the guard actually uses), so
+  // the e2e wiring assertion proves the guard is backed by the Redis storage,
+  // not the in-memory fallback.
+  const throttlerStorage = app.get<RedisThrottlerStorage>(ThrottlerStorage as never)
 
   // Run migrations
   await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS core')
@@ -146,7 +145,6 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
  * - Stops containers
  */
 export async function teardownE2ETest(context: E2ETestContext): Promise<void> {
-  resetThrottlerStorage(context.throttlerStorage)
   await closeBullWorkers(context.app)
   await context.app.close()
   await context.redisContainer.stop({ timeout: 10_000 })
@@ -177,7 +175,7 @@ async function closeBullWorker(
 export async function cleanDatabase(
   prisma: PrismaService,
   cache: Cache,
-  throttlerStorage?: ThrottlerStorageState
+  throttlerStorage?: RedisThrottlerStorage
 ): Promise<void> {
   // Delete in correct order (respecting foreign keys)
   await prisma.passwordResetToken.deleteMany()
@@ -200,20 +198,10 @@ export async function cleanDatabase(
     }
   }
 
+  // Scoped throttler cleanup: delete only `throttle:v1:*` keys (never FLUSHDB).
   if (throttlerStorage) {
-    resetThrottlerStorage(throttlerStorage)
+    await throttlerStorage.reset()
   }
-}
-
-function resetThrottlerStorage(throttlerStorage: ThrottlerStorageState): void {
-  throttlerStorage.timeoutIds.forEach((timeouts) => {
-    for (const timeoutId of timeouts) {
-      clearTimeout(timeoutId)
-    }
-  })
-
-  throttlerStorage.timeoutIds.clear()
-  throttlerStorage.storage.clear()
 }
 
 /**
