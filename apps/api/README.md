@@ -255,8 +255,46 @@ OAuth (all optional, provider enabled only when fully configured; partial config
 - Apple: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APPLE_CALLBACK_URL`
 - Telegram: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CALLBACK_URL`
 
+## Deployment & Migrations
+
+Full runbook: [`docs/operations/deployment.md`](../../docs/operations/deployment.md).
+The rationale is recorded internally as ADR-040.
+
+**Migration contract:** the app never migrates itself. Migrations run as a
+**one-shot** `prisma migrate deploy` step from the production image, **before**
+web/worker rollout — never on app startup, never per-replica.
+
+- Local dev (against your dev DB): `pnpm --filter api db:migrate` (`migrate dev`).
+- Production rollout: `pnpm --filter api db:migrate:prod` (`migrate deploy`) on the
+  host, or `./node_modules/.bin/prisma migrate deploy` **inside** the deployed
+  image (it is a single-package bundle — `pnpm --filter` does not apply there).
+- The reference `docker-compose.yml` runs this via a one-shot `migrate` service
+  that gates `api`/`web`.
+
+**The migrate step needs only `DATABASE_URL`** (not JWT/storage/etc.). Use a
+**direct** connection for migrations, not a PgBouncer/pooled endpoint (set
+`MIGRATION_DATABASE_URL` when app traffic is pooled). Note the Prisma CLI does not
+run the app's env validation, so the operator is responsible for using a secured
+URL — production `DATABASE_URL` must include `sslmode=require|verify-full` (ADR-029).
+In the reference `docker-compose.yml` the container's `DATABASE_URL` is rendered
+from `COMPOSE_DATABASE_URL` (default: the bundled `postgres` service), kept
+separate from the host `DATABASE_URL` used by `pnpm dev`.
+
+**Production transition:** dev-friendly compose defaults are local-only. Setting
+`NODE_ENV=production` requires `DATABASE_URL` with `sslmode`, `STORAGE_DRIVER=s3`
+
+- credentials, and a real `JWT_SECRET` ≥ 32 chars.
+
+**Adopting on an existing database:** baseline once with
+`prisma migrate resolve --applied <migration_name>` so Prisma records already-applied
+migrations; this is a one-time adoption step, not part of normal deploys.
+
+**Seeding:** `pnpm --filter api db:seed` is for dev/demo only. There is no implicit
+production seed — production runs `migrate deploy` and nothing else.
+
 ## Documentation
 
+- [`docs/operations/deployment.md`](../../docs/operations/deployment.md) — Deployment & migration runbook
 - [`docs/auth/`](../../docs/auth/README.md) — Complete auth & RBAC guide for developers
 - [`docs/authorization.md`](../../docs/authorization.md) — Authorization concepts
 

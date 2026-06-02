@@ -1,74 +1,62 @@
 # ===========================================
-# Stage 1: Dependencies
+# Base — pinned runtime + package manager
 # ===========================================
-FROM node:20-alpine AS deps
+# Node 22 + pnpm 11.1.2 to match the repo's engines/packageManager (the root
+# package.json's `packageManager` drives the corepack version regardless of what
+# is prepared here, so they must agree — a Node 20 base broke pnpm 11).
+FROM node:22-alpine AS base
 
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 WORKDIR /app
 
-# Copy workspace config
+# ===========================================
+# Build — install (incl. dev) + build, one stage
+# ===========================================
+# A single stage avoids copying per-package `node_modules` across stages: pnpm
+# does not create a `node_modules` for dependency-less workspace packages
+# (e.g. packages/typescript-config), so the old cross-stage COPY failed. The
+# install layer still caches because manifests are copied before sources.
+FROM base AS build
+
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/web/package.json ./apps/web/
 
-# Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# ===========================================
-# Stage 2: Builder
-# ===========================================
-FROM node:20-alpine AS builder
-
-RUN corepack enable && corepack prepare pnpm@9 --activate
-
-WORKDIR /app
-
-# Copy deps
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/typescript-config/node_modules ./packages/typescript-config/node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-
-# Copy source
-COPY packages/typescript-config ./packages/typescript-config
-COPY packages/shared ./packages/shared
+COPY packages ./packages
 COPY apps/web ./apps/web
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 
-# Build shared package
 RUN pnpm --filter @amcore/shared build
 
-# Build Next.js app
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm --filter web build
 
 # ===========================================
-# Stage 3: Production
+# Runner — minimal, self-contained, non-root
 # ===========================================
-FROM node:20-alpine AS runner
-
-WORKDIR /app
+FROM node:22-alpine AS runner
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-# Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy standalone build
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder /app/apps/web/public ./apps/web/public
+# Next standalone output. With outputFileTracingRoot = repo root, the bundle is
+# monorepo-rooted: the server entrypoint is at apps/web/server.js and the traced
+# node_modules (incl. @amcore/shared) sit at the standalone root.
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /app/apps/web/public ./apps/web/public
 
 USER nextjs
 
 EXPOSE 3000
-
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "apps/web/server.js"]

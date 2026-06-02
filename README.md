@@ -22,7 +22,7 @@ AMCore is a modular web application for personal productivity. The backend is de
 
 | Layer            | Technology                                                          |
 | ---------------- | ------------------------------------------------------------------- |
-| **Backend**      | NestJS 10, PostgreSQL 16, Prisma 6, Redis, BullMQ                   |
+| **Backend**      | NestJS 11, PostgreSQL 16, Prisma 7, Redis, BullMQ                   |
 | **Auth**         | JWT + Refresh Tokens, OAuth 2.0 / OIDC, API Keys                    |
 | **Email**        | Resend, React Email 5, FormatJS i18n                                |
 | **Storage**      | S3-compatible storage, local dev driver, memory test driver         |
@@ -127,31 +127,40 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
 - [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide
+- [`docs/operations/deployment.md`](docs/operations/deployment.md) — Deployment & migration runbook
 - [`apps/api/README.md`](apps/api/README.md) — Backend architecture
 
 ## Quick Start
 
 ```bash
-# Prerequisites: Node.js 20+, pnpm 9+, Docker
+# Prerequisites: Node.js 22+, pnpm 11+, Docker (Compose v2.20.2+)
 
 git clone https://github.com/alex-morozov84/AMCore.git
 cd AMCore
+cp .env.example .env          # COMPOSE_PROFILES=local-infra is the default
+```
+
+**Option A — full stack in Docker** (bundled Postgres + Redis, schema migrated for you):
+
+```bash
+docker compose up             # one-shot `migrate` runs, then API + web start
+# API: http://localhost:5002 · Swagger: http://localhost:5002/docs · Web: http://localhost:3000
+```
+
+**Option B — run the app on the host** (hot reload):
+
+```bash
 pnpm install
-
-# Start PostgreSQL + Redis
-docker compose up -d
-
-# Configure environment
-cp .env.example .env
-
-# Run migrations
-pnpm --filter api db:migrate
-
-# Start development
+docker compose up -d postgres redis   # or point DATABASE_URL/REDIS_URL at your own
+pnpm --filter api db:migrate          # prisma migrate dev (LOCAL development only)
 pnpm dev
 ```
 
-API runs at `http://localhost:3001`, Swagger UI at `http://localhost:3001/docs`.
+> Production uses `prisma migrate deploy` as a one-shot step before rollout — never
+> `db:migrate` (which is `migrate dev`). To run the Docker stack against a
+> managed/VPS DB or real S3, set `COMPOSE_PROFILES=` empty plus
+> `COMPOSE_DATABASE_URL` / `COMPOSE_REDIS_URL` (and the S3 vars) in `.env`. See
+> [`docs/operations/deployment.md`](docs/operations/deployment.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
