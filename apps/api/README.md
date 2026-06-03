@@ -292,6 +292,33 @@ migrations; this is a one-time adoption step, not part of normal deploys.
 **Seeding:** `pnpm --filter api db:seed` is for dev/demo only. There is no implicit
 production seed — production runs `migrate deploy` and nothing else.
 
+## Process roles (web / worker)
+
+The same image runs as `PROCESS_ROLE=web | worker | all` (ADR-041): `web` serves
+HTTP and enqueues jobs; `worker` runs BullMQ processors + cron with a health-only
+HTTP surface; `all` (the default) is both in one process. Scale web and worker
+independently from one image — see
+[`docs/operations/deployment.md`](../../docs/operations/deployment.md). Roots:
+`WebModule` / `WorkerModule` / `AppModule` (all), composed from
+`src/app-imports.ts`.
+
+### Adding a module with background work
+
+Keep `web` a pure producer: put the BullMQ `@Processor` (and any `@Cron`) in a
+**worker-only** module imported only by the worker/all roots, and keep the
+producer/service in a module that `web` can import safely.
+
+- Email is the reference: `EmailModule` exports `EmailService` (the producer,
+  imported everywhere); `EmailWorkerModule` provides the `EmailProcessor` (worker
+  only). `@nestjs/bullmq` starts a `Worker` for **any** `@Processor` in the graph,
+  so a processor leaking into `web` via a transitive import would run there too.
+- Cron is gated by the scheduler: `CleanupModule` provides the cron service for
+  the manual admin trigger everywhere, but `@Cron` only fires where
+  `ScheduleModule` (which adds `NestScheduleModule.forRoot()`) is imported —
+  worker/all. Use `SingletonCronRunner` for the Redis-lock "run once per cluster".
+- Wire the worker piece into `workerImports` (and the producer into `coreImports`)
+  in `src/app-imports.ts`, and assert the gating in `test/process-role.e2e-spec.ts`.
+
 ## Documentation
 
 - [`docs/operations/deployment.md`](../../docs/operations/deployment.md) — Deployment & migration runbook

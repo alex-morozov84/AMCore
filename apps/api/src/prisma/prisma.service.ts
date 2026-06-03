@@ -54,7 +54,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       connectionTimeoutMillis: env.get('DATABASE_CONNECT_MS'),
       statement_timeout: env.get('DATABASE_STATEMENT_TIMEOUT_MS'),
       query_timeout: env.get('DATABASE_QUERY_TIMEOUT_MS'),
-      application_name: 'amcore-api',
+      // Role-specific (ADR-029 intent, extended for ADR-041): pg-side pool
+      // pressure is visible per role — `amcore-web` / `amcore-worker` / `amcore-all`.
+      application_name: `amcore-${env.get('PROCESS_ROLE')}`,
     })
     const adapter = new PrismaPg(pool)
     const slowQueryThresholdMs = resolveSlowQueryThresholdMs(

@@ -139,8 +139,55 @@ first, migrate, then remove the old path in a later release.
 `pnpm --filter api db:seed` is dev/demo only. There is no implicit production
 seed; production rollout runs `migrate deploy` and nothing else.
 
+## Process roles: web / worker (ADR-041)
+
+The same image runs as different roles via `PROCESS_ROLE`:
+
+- **`web`** — HTTP API + enqueues jobs; no BullMQ processors, no cron.
+- **`worker`** — BullMQ processors + cron; **health-only** HTTP (no business
+  routes, no Bull Board), so k8s can probe it.
+- **`all`** — both in one process (default; host `pnpm dev` / single-node).
+
+The reference `docker-compose.yml` runs `api` (`PROCESS_ROLE=web`) and a separate
+`worker` (`PROCESS_ROLE=worker`); an email enqueued by the API is processed by the
+worker. Scale them independently — e.g. in Kubernetes, two Deployments from one
+image differing only by `PROCESS_ROLE` (and replica count). The worker listens on
+`API_PORT` for `/api/v1/health/*` only; point its liveness/readiness probe there.
+For a single-process setup, set `PROCESS_ROLE=all` and run no separate worker.
+
+Multi-instance safety is already in place: the nightly cron is Redis-lock-guarded
+(only one replica runs it), the throttler is Redis-backed (ADR-039), and BullMQ
+workers consume one shared queue. Add worker replicas freely.
+
+## Redis production profile
+
+- **`maxmemory-policy noeviction` is mandatory** for the queue Redis — the only
+  policy that keeps BullMQ queues correct (BullMQ docs). The bundled compose Redis
+  sets it; a managed/VPS Redis must be configured the same.
+- Enable **AOF persistence** so queued jobs survive a restart.
+- **Recommended:** a **separate Redis instance** for queues vs cache/throttler in
+  larger deployments (different memory/eviction needs). The starter shares one
+  instance — fine if it is `noeviction` + persistent. Keys are namespaced
+  (`amcore` BullMQ prefix, `throttle:v1:*`, `auth:*`, `rate:*`).
+- Managed Redis: use `rediss://` (TLS) with ACL user/password in `REDIS_URL` /
+  `COMPOSE_REDIS_URL`.
+
+## Database pool sizing
+
+Each process opens its own pool (`DATABASE_POOL_MAX`, default 10). Total
+connections ≈ **(web replicas + worker replicas) × DATABASE_POOL_MAX** — keep it
+under Postgres `max_connections` (with headroom for migrations/admin). Workers are
+usually less DB-bound than web; lower their `DATABASE_POOL_MAX` unless jobs are
+DB-heavy. Each role sets a distinct pg `application_name` (`amcore-web` /
+`amcore-worker` / `amcore-all`) so pool pressure is visible per role in
+`pg_stat_activity`.
+
+> **Producer outage note:** the API enqueues via `queue.add()` on the shared
+> BullMQ connection. `maxRetriesPerRequest` is intentionally left unset (BullMQ's
+> worker connection enforces `null` itself); producer-side fail-fast for a Redis
+> outage is handled at the call site, not by crippling the shared connection.
+
 ## Not covered here
 
-Worker/process-role topology, Redis production HA, queue prefixes, and DB pool
-sizing across web/worker replicas are **Arc 3** (API/worker split + Redis/BullMQ
-production profile). Remote Redis here is just `REDIS_URL`.
+Redis Sentinel/Cluster, autoscaling policy, and sandboxed (CPU-isolated)
+processors are out of scope for this starter — extend per your platform.

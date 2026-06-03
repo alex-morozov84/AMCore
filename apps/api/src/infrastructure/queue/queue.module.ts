@@ -34,7 +34,11 @@ import { EnvService } from '@/env/env.service'
  * is enabled regardless of the flag, so the distinction is moot locally.
  * Documented in `.env.example` and the `env.ts` schema comment.
  */
-const bullBoardEnabled = isBullBoardEnabled(process.env.NODE_ENV, process.env.ENABLE_BULL_BOARD)
+const bullBoardEnabled = isBullBoardEnabled(
+  process.env.NODE_ENV,
+  process.env.ENABLE_BULL_BOARD,
+  process.env.PROCESS_ROLE
+)
 
 const bullBoardImports = bullBoardEnabled
   ? [

@@ -3,7 +3,6 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { EmailService } from './email.service'
 import type { EmailProvider } from './email.types'
-import { EmailProcessor } from './processors/email.processor'
 import { MockEmailProvider } from './providers/mock.provider'
 import { ResendEmailProvider } from './providers/resend.provider'
 
@@ -14,10 +13,14 @@ import { QueueModule, QueueService } from '@/infrastructure/queue'
 /**
  * Email Module
  *
- * Provides email sending functionality with:
+ * Provides email sending functionality (the producer side — `EmailService`):
  * - Template rendering (React Email)
  * - Provider abstraction (Resend/Mock)
- * - Async delivery (BullMQ)
+ * - Async delivery: enqueues onto BullMQ
+ *
+ * The BullMQ consumer (`EmailProcessor`) lives in `EmailWorkerModule`, imported
+ * only by the worker/all process roots (ADR-041). This module is safe to import
+ * from `web` — it never registers a worker.
  */
 @Module({
   imports: [EnvModule, QueueModule],
@@ -51,8 +54,6 @@ import { QueueModule, QueueService } from '@/infrastructure/queue'
         return new EmailService(emailProvider, queueService, env, logger)
       },
     },
-    // BullMQ processor
-    EmailProcessor,
   ],
   exports: [EmailService],
 })

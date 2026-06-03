@@ -18,4 +18,12 @@ describe('isBullBoardEnabled (Bull Board mount gate — EQS-01)', () => {
     expect(isBullBoardEnabled('test', 'false')).toBe(true)
     expect(isBullBoardEnabled(undefined, undefined)).toBe(true)
   })
+
+  it('is never enabled on the worker role, even when otherwise on (ADR-041)', () => {
+    expect(isBullBoardEnabled('development', undefined, 'worker')).toBe(false)
+    expect(isBullBoardEnabled('production', 'true', 'worker')).toBe(false)
+    // web / all (or unset) keep the normal behavior
+    expect(isBullBoardEnabled('development', undefined, 'web')).toBe(true)
+    expect(isBullBoardEnabled('development', undefined, 'all')).toBe(true)
+  })
 })

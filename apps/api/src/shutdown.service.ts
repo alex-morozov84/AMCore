@@ -4,7 +4,9 @@ import { PinoLogger } from 'nestjs-pino'
 
 /**
  * Runs after Nest has closed the app (onModuleDestroy → beforeApplicationShutdown → connections closed).
- * Flushes logs and exits the process, since app.close() does not terminate the Node process.
+ * Flushes buffered logs and lets Node exit naturally after all shutdown hooks
+ * complete. Do not call process.exit() here: BullMQ drains workers in the same
+ * Nest lifecycle phase, and a synchronous exit can cut an in-flight job drain.
  */
 @Injectable()
 export class ShutdownService implements OnApplicationShutdown {
@@ -25,15 +27,7 @@ export class ShutdownService implements OnApplicationShutdown {
       this.logger.info('✅ Application closed successfully')
     } catch (error) {
       this.logger.error({ err: error }, 'Error flushing logs during shutdown')
-      // In tests, don't call process.exit() as it prevents Jest from printing test summary
-      if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
-        process.exit(1)
-      }
-      return
-    }
-    // In tests, don't call process.exit() as it prevents Jest from printing test summary
-    if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
-      process.exit(0)
+      process.exitCode = 1
     }
   }
 }

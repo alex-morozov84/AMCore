@@ -2,23 +2,26 @@ import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 
-import type { RedisLockService } from '../../infrastructure/redis'
 import type { PrismaService } from '../../prisma'
 
 import { CleanupService } from './cleanup.service'
+import type { SingletonCronRunner } from './singleton-cron.runner'
 
 describe('CleanupService', () => {
   let service: CleanupService
   let prisma: DeepMockProxy<PrismaClient>
-  let lock: jest.Mocked<Pick<RedisLockService, 'acquire' | 'release'>>
+  let singletonCron: jest.Mocked<Pick<SingletonCronRunner, 'run'>>
   let mockLogger: jest.Mocked<PinoLogger>
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
-    lock = {
-      acquire: jest.fn().mockResolvedValue('lock-token'),
-      release: jest.fn().mockResolvedValue(undefined),
-    } as jest.Mocked<Pick<RedisLockService, 'acquire' | 'release'>>
+    // Default: behave like the lock was won — execute the task immediately so the
+    // sweep runs. The lock orchestration itself is covered in the runner's spec.
+    singletonCron = {
+      run: jest.fn().mockImplementation(async (_opts, task: () => Promise<void>) => {
+        await task()
+      }),
+    } as jest.Mocked<Pick<SingletonCronRunner, 'run'>>
     mockLogger = {
       setContext: jest.fn(),
       info: jest.fn(),
@@ -28,7 +31,7 @@ describe('CleanupService', () => {
     } as unknown as jest.Mocked<PinoLogger>
     service = new CleanupService(
       prisma as unknown as PrismaService,
-      lock as unknown as RedisLockService,
+      singletonCron as unknown as SingletonCronRunner,
       mockLogger
     )
   })
@@ -148,70 +151,35 @@ describe('CleanupService', () => {
     })
   })
 
-  describe('scheduledCleanup (distributed lock — EQS-05)', () => {
-    it('runs the sweep and releases the lock when acquired', async () => {
+  describe('scheduledCleanup (delegates to the singleton-cron runner — EQS-05)', () => {
+    it('runs the sweep under the cleanup lock key/ttl and logs completion', async () => {
       zeroAll()
-      lock.acquire.mockResolvedValue('lock-token')
 
       await service.scheduledCleanup()
 
-      expect(lock.acquire).toHaveBeenCalledTimes(1)
+      expect(singletonCron.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'schedule.cleanup',
+          lockKey: expect.any(String),
+          ttlMs: expect.any(Number),
+        }),
+        expect.any(Function)
+      )
+      // default runner mock executes the task → the sweep ran + completion logged
       expect(prisma.session.deleteMany).toHaveBeenCalled()
-      expect(lock.release).toHaveBeenCalledWith(expect.any(String), 'lock-token')
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'schedule.cleanup_complete' }),
+        expect.any(String)
+      )
     })
 
-    it('skips the sweep (no run, no release) when the lock is held by another instance', async () => {
-      lock.acquire.mockResolvedValue(null)
+    it('does not run the sweep when the runner skips the task (lock lost / Redis down)', async () => {
+      // Runner did not invoke the task (skip / fail-closed paths are its own spec).
+      singletonCron.run.mockResolvedValueOnce(undefined)
 
       await service.scheduledCleanup()
 
       expect(prisma.session.deleteMany).not.toHaveBeenCalled()
-      expect(lock.release).not.toHaveBeenCalled()
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'schedule.cleanup_skipped' }),
-        expect.any(String)
-      )
-    })
-
-    it('releases the lock and logs a stable event if the run throws unexpectedly', async () => {
-      lock.acquire.mockResolvedValue('lock-token')
-      jest.spyOn(service, 'runCleanup').mockRejectedValue(new Error('boom'))
-
-      await expect(service.scheduledCleanup()).resolves.toBeUndefined()
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'schedule.cleanup_failed' }),
-        expect.any(String)
-      )
-      expect(lock.release).toHaveBeenCalledWith(expect.any(String), 'lock-token')
-    })
-
-    it('fails closed when lock acquisition throws (no run, no rejection)', async () => {
-      zeroAll()
-      lock.acquire.mockRejectedValue(new Error('redis down'))
-
-      await expect(service.scheduledCleanup()).resolves.toBeUndefined()
-
-      expect(prisma.session.deleteMany).not.toHaveBeenCalled()
-      expect(lock.release).not.toHaveBeenCalled()
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'schedule.cleanup_lock_failed' }),
-        expect.any(String)
-      )
-    })
-
-    it('swallows a lock-release failure (logs stable event, no rejection)', async () => {
-      zeroAll()
-      lock.acquire.mockResolvedValue('lock-token')
-      lock.release.mockRejectedValue(new Error('release failed'))
-
-      await expect(service.scheduledCleanup()).resolves.toBeUndefined()
-
-      expect(prisma.session.deleteMany).toHaveBeenCalled() // run still happened
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'schedule.cleanup_lock_release_failed' }),
-        expect.any(String)
-      )
     })
   })
 })

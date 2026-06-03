@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
-import { RedisLockService } from '@/infrastructure/redis'
+import { SingletonCronRunner } from './singleton-cron.runner'
+
 import { PrismaService } from '@/prisma'
 
 /** Record types swept by cleanup; also the identifiers used in `failures`. */
@@ -58,7 +59,7 @@ const CLEANUP_LOCK_TTL_MS = 30 * 60 * 1000
 export class CleanupService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly lock: RedisLockService,
+    private readonly singletonCron: SingletonCronRunner,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(CleanupService.name)
@@ -66,73 +67,26 @@ export class CleanupService {
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async scheduledCleanup(): Promise<void> {
-    // Multi-instance safety (EQS-05): every replica fires this cron at 02:00, so
-    // only the one that wins the lock runs the sweep; the rest no-op. The lock
-    // auto-expires (TTL) so a crashed holder never blocks future runs.
+    // Multi-instance safety (EQS-05): every replica fires this cron at 02:00; the
+    // singleton-cron runner ensures only the lock-winner runs the sweep, the rest
+    // skip, and no error escapes as an unhandled cron rejection. The lock TTL
+    // (`CLEANUP_LOCK_TTL_MS`) outlives a slow sweep but auto-expires on a crash.
     //
     // The manual POST /admin/cleanup path is deliberately NOT lock-guarded — it
     // is an explicit, throttled admin action, and every delete is idempotent
     // (delete-by-expiry), so a manual run overlapping a scheduled run on another
     // instance is harmless.
-    // Fail-closed on the lock acquire itself: a Redis/acquire failure must not
-    // run cleanup AND must not escape as an unhandled cron rejection. Skip this
-    // run; the next nightly run retries.
-    let token: string | null
-    try {
-      token = await this.lock.acquire(CLEANUP_LOCK_KEY, CLEANUP_LOCK_TTL_MS)
-    } catch (error) {
-      this.logger.error(
-        {
-          event: 'schedule.cleanup_lock_failed',
-          error: error instanceof Error ? error.message : 'unknown',
-        },
-        'Scheduled cleanup skipped — lock acquisition failed'
-      )
-      return
-    }
-
-    if (token === null) {
-      this.logger.info(
-        { event: 'schedule.cleanup_skipped' },
-        'Scheduled cleanup skipped — lock held by another instance'
-      )
-      return
-    }
-
-    try {
-      this.logger.info('Starting scheduled cleanup')
-      const result = await this.runCleanup()
-      this.logger.info(
-        { event: 'schedule.cleanup_complete', ...result },
-        'Scheduled cleanup complete'
-      )
-    } catch (error) {
-      // `runCleanup` swallows per-type failures, so reaching here means an
-      // unexpected error (not a single delete). Log a stable event and never let
-      // it surface as an unhandled rejection — the next nightly run retries.
-      this.logger.error(
-        {
-          event: 'schedule.cleanup_failed',
-          error: error instanceof Error ? error.message : 'unknown',
-        },
-        'Scheduled cleanup failed'
-      )
-    } finally {
-      // Releasing must never throw either: a release failure after a successful
-      // (or already-logged) run would surface as an unhandled rejection. Swallow
-      // it — the lock TTL will expire the key regardless.
-      try {
-        await this.lock.release(CLEANUP_LOCK_KEY, token)
-      } catch (error) {
-        this.logger.error(
-          {
-            event: 'schedule.cleanup_lock_release_failed',
-            error: error instanceof Error ? error.message : 'unknown',
-          },
-          'Scheduled cleanup lock release failed (TTL will expire it)'
+    await this.singletonCron.run(
+      { name: 'schedule.cleanup', lockKey: CLEANUP_LOCK_KEY, ttlMs: CLEANUP_LOCK_TTL_MS },
+      async () => {
+        this.logger.info('Starting scheduled cleanup')
+        const result = await this.runCleanup()
+        this.logger.info(
+          { event: 'schedule.cleanup_complete', ...result },
+          'Scheduled cleanup complete'
         )
       }
-    }
+    )
   }
 
   /**

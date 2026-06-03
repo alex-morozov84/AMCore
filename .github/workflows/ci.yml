@@ -102,7 +102,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm test
+        run: |
+          pnpm test
+          pnpm --filter api test:e2e -- process-role.e2e-spec.ts shutdown-drain.e2e-spec.ts
 
   docker-image-smoke:
     name: Docker production image smoke
@@ -120,7 +122,9 @@ jobs:
       #    missing/wrong native binary or broken codec the host platform hides;
       # 2. critical runtime deps resolve from the bundle's flat node_modules —
       #    proves the pnpm-workspace packaging is self-contained;
-      # 3. the generated Prisma client is present.
+      # 3. the generated Prisma client is present;
+      # 4. React email templates render from the production SWC output and
+      #    pnpm deploy bundle (catches missing react/jsx-runtime/react-dom deps).
       # Runs as the image's non-root user from the production WORKDIR.
       - name: Smoke-test the built runner image
         run: |
@@ -140,6 +144,13 @@ jobs:
                   throw new Error('Prisma client not generated');
                 }
                 console.log('Prisma client present OK');
+                const { render } = require('@react-email/render');
+                const { default: WelcomeEmail } = require('./dist/infrastructure/email/templates/welcome.js');
+                return render(WelcomeEmail({ name: 'CI', appName: 'AMCore' }));
+              })
+              .then((html) => {
+                if (!html.includes('CI')) throw new Error('email render output missing expected name');
+                console.log('React email render OK:', html.length, 'bytes');
               })
               .catch((err) => {
                 console.error('image smoke failed:', err);

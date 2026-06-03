@@ -14,6 +14,46 @@
 # Requires Docker Compose v2.20.2+ (depends_on `required:false`,
 # `service_completed_successfully`). Production hardening (sslmode, S3, real JWT
 # secret >= 32 chars) is documented in docs/operations/deployment.md.
+#
+# The `api` (web role) and `worker` (worker role) run the SAME image; PROCESS_ROLE
+# selects behavior (ADR-041). For a single-process setup, set the api's
+# PROCESS_ROLE=all and drop the worker service.
+
+# Shared backend env for `api` + `worker` (the `web` compose service is the
+# Next.js frontend — unrelated to the backend `web` role).
+x-app-env: &app-env
+  NODE_ENV: ${NODE_ENV:-development}
+  API_PORT: 5002
+  # COMPOSE_* are decoupled from the host DATABASE_URL/REDIS_URL (which are for
+  # `pnpm dev`), so a host `.env` can never poison the container config. Unset →
+  # bundled services; set COMPOSE_DATABASE_URL/COMPOSE_REDIS_URL for managed DB/Redis.
+  DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://amcore:amcore@postgres:5432/amcore}
+  REDIS_URL: ${COMPOSE_REDIS_URL:-redis://redis:6379}
+  WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+  # Dev-only secret; production requires a real value >= 32 chars (ADR-029/040).
+  JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-min-32-characters-change-me}
+  # Storage: local by default; set STORAGE_DRIVER=s3 + the vars below for real S3.
+  STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+  STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app/uploads}
+  STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
+  STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-}
+  STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+  STORAGE_BUCKET: ${STORAGE_BUCKET:-}
+  STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-}
+  STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-}
+
+# Health-only Node fetch check (node:22-slim has no wget/curl). Readiness, so
+# web waits for DB/Redis to be usable; the worker uses it for liveness too.
+x-health-ready: &health-ready
+  test:
+    - CMD
+    - node
+    - -e
+    - "fetch('http://localhost:5002/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 20s
 
 services:
   # ---------------------------------------------------------------------------
@@ -40,7 +80,9 @@ services:
   redis:
     image: redis:7-alpine
     profiles: ['local-infra']
-    command: redis-server --appendonly yes
+    # noeviction is mandatory for BullMQ (the only policy that keeps queues
+    # correct — BullMQ docs); appendonly (AOF) persists jobs across restarts.
+    command: redis-server --appendonly yes --maxmemory-policy noeviction
     ports:
       - '6379:6379'
     volumes:
@@ -70,6 +112,7 @@ services:
         required: false
     restart: 'no'
 
+  # API (web role): HTTP only, enqueues jobs. PROCESS_ROLE=web → no processors/cron.
   api:
     build:
       context: .
@@ -77,26 +120,8 @@ services:
     ports:
       - '5002:5002'
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      API_PORT: 5002
-      # COMPOSE_* are decoupled from the host's DATABASE_URL/REDIS_URL (which are
-      # for `pnpm dev` and may point at localhost/a VPS) so a host `.env` can
-      # never poison the container's config. Unset → bundled services; set
-      # COMPOSE_DATABASE_URL/COMPOSE_REDIS_URL to run this stack against managed DB/Redis.
-      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://amcore:amcore@postgres:5432/amcore}
-      REDIS_URL: ${COMPOSE_REDIS_URL:-redis://redis:6379}
-      # Dev-only secret; production requires a real value >= 32 chars (ADR-029/040).
-      JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-min-32-characters-change-me}
-      # Storage: local by default; set STORAGE_DRIVER=s3 + the vars below in .env
-      # to exercise a real S3 bucket from this same stack.
-      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
-      STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app/uploads}
-      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
-      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-}
-      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
-      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
-      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-}
-      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-}
+      <<: *app-env
+      PROCESS_ROLE: web
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -106,18 +131,27 @@ services:
       redis:
         condition: service_healthy
         required: false
-    healthcheck:
-      # node:22-slim has no wget/curl; use Node's built-in fetch. Readiness
-      # (not liveness) so web waits for DB/Redis to be usable.
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://localhost:5002/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
+    healthcheck: *health-ready
+
+  # Worker role: BullMQ processors + cron, health-only HTTP (no published port —
+  # avoids the api's 5002; k8s probes the pod directly). PROCESS_ROLE=worker.
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      <<: *app-env
+      PROCESS_ROLE: worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+        required: false
+    healthcheck: *health-ready
 
   web:
     build:
