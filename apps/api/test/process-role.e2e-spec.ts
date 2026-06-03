@@ -2,24 +2,28 @@ import { SchedulerRegistry } from '@nestjs/schedule'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AppModule } from '../src/app.module'
-import { AdminController } from '../src/core/admin/admin.controller'
-import { AuthController } from '../src/core/auth/auth.controller'
-import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
-import { QueueService } from '../src/infrastructure/queue'
-import { WebModule } from '../src/web.module'
-import { WorkerModule } from '../src/worker.module'
-
 /**
  * Role-composition DI assertions (ADR-041). Lives in the e2e (ESM) project so the
  * full app graph (jose/openid-client) parses. Uses `.compile()` — it resolves the
  * DI graph WITHOUT `onModuleInit`, so no Redis/Postgres connection is made — plus
  * a no-op `PinoLogger` (the real nestjs-pino provider hangs `compile()`).
+ *
+ * App modules are imported dynamically after the test env is set. A static
+ * AppModule/WebModule import evaluates ConfigModule.forRoot() before Jest
+ * `beforeAll`, which fails in CI where no project `.env` exists.
  */
 
 /* eslint jest/expect-expect: ["error", { "assertFunctionNames": ["expect", "present", "absent"] }] */
 
 type Token = any
+
+let AppModule: Token
+let WebModule: Token
+let WorkerModule: Token
+let AdminController: Token
+let AuthController: Token
+let EmailProcessor: Token
+let QueueService: Token
 
 const noopPinoLogger = {
   setContext: () => undefined,
@@ -45,10 +49,26 @@ const absent = (m: TestingModule, token: Token): void =>
   expect(() => m.get(token, { strict: false })).toThrow()
 
 describe('PROCESS_ROLE module composition (ADR-041)', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     process.env.DATABASE_URL ??= 'postgresql://u:p@localhost:5432/test?schema=public'
     process.env.REDIS_URL ??= 'redis://localhost:6379'
     process.env.JWT_SECRET ??= 'test-only-jwt-secret-at-least-32-characters-long'
+
+    const appModule = await import('../src/app.module')
+    const webModule = await import('../src/web.module')
+    const workerModule = await import('../src/worker.module')
+    const adminController = await import('../src/core/admin/admin.controller')
+    const authController = await import('../src/core/auth/auth.controller')
+    const emailProcessor = await import('../src/infrastructure/email/processors/email.processor')
+    const queue = await import('../src/infrastructure/queue')
+
+    AppModule = appModule.AppModule
+    WebModule = webModule.WebModule
+    WorkerModule = workerModule.WorkerModule
+    AdminController = adminController.AdminController
+    AuthController = authController.AuthController
+    EmailProcessor = emailProcessor.EmailProcessor
+    QueueService = queue.QueueService
   })
 
   describe('web', () => {
@@ -57,7 +77,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       m = await compileRole(WebModule)
     }, 60000)
     afterAll(async () => {
-      await m.close()
+      await m?.close()
     })
 
     it('has queue producers and business controllers', () => {
@@ -78,7 +98,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       m = await compileRole(WorkerModule)
     }, 60000)
     afterAll(async () => {
-      await m.close()
+      await m?.close()
     })
 
     it('has the BullMQ processor and the scheduler', () => {
@@ -98,7 +118,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       m = await compileRole(AppModule)
     }, 60000)
     afterAll(async () => {
-      await m.close()
+      await m?.close()
     })
 
     it('composes web + worker: controllers, producer, processor, and scheduler', () => {
