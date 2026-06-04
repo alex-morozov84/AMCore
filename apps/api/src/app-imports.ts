@@ -25,6 +25,7 @@ import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
 import { EmailModule, EmailWorkerModule } from './infrastructure/email'
+import { ObservabilityModule } from './infrastructure/observability'
 import { QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
@@ -99,6 +100,10 @@ export function coreImports(): Imports {
       useFactory: (cls: ClsService, env: EnvService) =>
         createLoggingConfig(cls, env.get('LOG_BODY_MAX_BYTES')),
     }),
+
+    // Metrics/tracing foundation (ADR-042). Provides /metrics and an internal
+    // metrics service for bounded, low-cardinality instrumentation.
+    ObservabilityModule,
 
     RedisModule,
 

@@ -34,6 +34,13 @@ const envSchema = z
     DATABASE_POOL_WAITING_THRESHOLD: z.coerce.number().int().min(0).default(5),
     SLOW_QUERY_THRESHOLD_MS: z.coerce.number().int().min(0).optional(),
     LOG_BODY_MAX_BYTES: z.coerce.number().int().min(0).default(4096),
+    // Prometheus metrics endpoint (ADR-042). Enabled by default; protect with
+    // METRICS_AUTH_TOKEN or block at ingress/network policy if exposed publicly.
+    METRICS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    METRICS_AUTH_TOKEN: optionalEnvString(),
     HEALTH_DISK_THRESHOLD_PERCENT: z.coerce.number().min(0).max(1).default(0.9),
     REDIS_URL: z.url(),
     // Bull Board queue dashboard. Disabled in production unless explicitly

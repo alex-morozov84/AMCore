@@ -128,6 +128,7 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 - [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide
 - [`docs/operations/deployment.md`](docs/operations/deployment.md) — Deployment & migration runbook
+- [`docs/operations/observability.md`](docs/operations/observability.md) — Metrics and tracing guide
 - [`apps/api/README.md`](apps/api/README.md) — Backend architecture
 
 ## Quick Start

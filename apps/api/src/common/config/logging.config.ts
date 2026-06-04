@@ -224,6 +224,8 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
       { path: 'api/v1/health/startup', method: RequestMethod.GET },
       { path: 'api/v1/health/ready', method: RequestMethod.GET },
       { path: 'api/v1/health/live', method: RequestMethod.GET },
+      { path: 'api/v1/metrics', method: RequestMethod.GET },
+      { path: 'metrics', method: RequestMethod.GET },
     ],
   }
 }

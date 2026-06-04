@@ -144,15 +144,16 @@ seed; production rollout runs `migrate deploy` and nothing else.
 The same image runs as different roles via `PROCESS_ROLE`:
 
 - **`web`** — HTTP API + enqueues jobs; no BullMQ processors, no cron.
-- **`worker`** — BullMQ processors + cron; **health-only** HTTP (no business
-  routes, no Bull Board), so k8s can probe it.
+- **`worker`** — BullMQ processors + cron; **health + metrics** HTTP (no
+  business routes, no Bull Board), so k8s can probe and Prometheus can scrape it.
 - **`all`** — both in one process (default; host `pnpm dev` / single-node).
 
 The reference `docker-compose.yml` runs `api` (`PROCESS_ROLE=web`) and a separate
 `worker` (`PROCESS_ROLE=worker`); an email enqueued by the API is processed by the
 worker. Scale them independently — e.g. in Kubernetes, two Deployments from one
 image differing only by `PROCESS_ROLE` (and replica count). The worker listens on
-`API_PORT` for `/api/v1/health/*` only; point its liveness/readiness probe there.
+`API_PORT` for `/api/v1/health/*` and `/api/v1/metrics` only; point its
+liveness/readiness probe to health and Prometheus scrape config to metrics.
 For a single-process setup, set `PROCESS_ROLE=all` and run no separate worker.
 
 Multi-instance safety is already in place: the nightly cron is Redis-lock-guarded

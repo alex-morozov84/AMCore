@@ -295,8 +295,8 @@ production seed — production runs `migrate deploy` and nothing else.
 ## Process roles (web / worker)
 
 The same image runs as `PROCESS_ROLE=web | worker | all` (ADR-041): `web` serves
-HTTP and enqueues jobs; `worker` runs BullMQ processors + cron with a health-only
-HTTP surface; `all` (the default) is both in one process. Scale web and worker
+HTTP and enqueues jobs; `worker` runs BullMQ processors + cron with a health +
+metrics HTTP surface; `all` (the default) is both in one process. Scale web and worker
 independently from one image — see
 [`docs/operations/deployment.md`](../../docs/operations/deployment.md). Roots:
 `WebModule` / `WorkerModule` / `AppModule` (all), composed from
@@ -322,6 +322,7 @@ producer/service in a module that `web` can import safely.
 ## Documentation
 
 - [`docs/operations/deployment.md`](../../docs/operations/deployment.md) — Deployment & migration runbook
+- [`docs/operations/observability.md`](../../docs/operations/observability.md) — Metrics and tracing guide
 - [`docs/auth/`](../../docs/auth/README.md) — Complete auth & RBAC guide for developers
 - [`docs/authorization.md`](../../docs/authorization.md) — Authorization concepts
 
