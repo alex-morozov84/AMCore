@@ -17,12 +17,30 @@ describe('env validation', () => {
       GOOGLE_CLIENT_SECRET: '',
       GOOGLE_CALLBACK_URL: '',
       RESEND_API_KEY: '',
+      WEBHOOK_STRIPE_SECRET: '',
     })
 
     expect(env.GOOGLE_CLIENT_ID).toBeUndefined()
     expect(env.GOOGLE_CLIENT_SECRET).toBeUndefined()
     expect(env.GOOGLE_CALLBACK_URL).toBeUndefined()
     expect(env.RESEND_API_KEY).toBeUndefined()
+    expect(env.WEBHOOK_SECRETS).toEqual({})
+  })
+
+  it('collects dynamic webhook secrets and defaults replay TTL to tolerance', () => {
+    const env = validate({
+      ...baseEnv,
+      WEBHOOK_STRIPE_SECRET: 'whsec_stripe',
+      WEBHOOK_GENERIC_SECRET: 'whsec_generic',
+      WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS: '120',
+    })
+
+    expect(env.WEBHOOK_SECRETS).toEqual({
+      stripe: 'whsec_stripe',
+      generic: 'whsec_generic',
+    })
+    expect(env.WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS).toBe(120)
+    expect(env.WEBHOOK_REPLAY_DEDUPE_TTL_SECONDS).toBe(120)
   })
 
   it('fails when an OAuth provider is only partially configured', () => {

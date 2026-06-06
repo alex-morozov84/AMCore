@@ -13,6 +13,9 @@ const SENSITIVE_HEADERS = new Set([
   'set-cookie',
   'x-api-key',
   'x-auth-token',
+  'stripe-signature',
+  'webhook-signature',
+  'x-hub-signature-256',
 ])
 
 const REDACTED = '[REDACTED]'

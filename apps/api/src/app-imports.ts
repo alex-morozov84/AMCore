@@ -31,6 +31,7 @@ import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
 import { StorageModule } from './infrastructure/storage'
 import { RedisThrottlerStorage, ThrottlingModule } from './infrastructure/throttling'
+import { WebhooksModule } from './infrastructure/webhooks'
 import { PrismaModule } from './prisma'
 import { ShutdownService } from './shutdown.service'
 
@@ -157,6 +158,9 @@ export function coreImports(): Imports {
     // Storage infrastructure (driver selected by STORAGE_DRIVER) — also the
     // StorageHealthIndicator the health controller injects.
     StorageModule.forRoot(),
+
+    // Inbound webhook verification primitives (ADR-044).
+    WebhooksModule,
   ]
 }
 

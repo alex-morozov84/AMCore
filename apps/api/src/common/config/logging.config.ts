@@ -35,6 +35,15 @@ export function truncateBody(body: unknown, maxBytes: number): unknown | Truncat
   }
 }
 
+function serializeRequestBody(
+  url: string | undefined,
+  body: unknown,
+  maxBodyBytes: number
+): unknown | TruncatedBody | '[REDACTED]' {
+  if (url?.includes('/webhooks/')) return '[REDACTED]'
+  return truncateBody(body, maxBodyBytes)
+}
+
 /**
  * Pino logging configuration for nestjs-pino
  * Includes: correlation ID, sensitive data redaction, request/response serializers, GDPR-compliant IP anonymization
@@ -151,6 +160,9 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
           'req.headers.cookie',
           'req.headers["x-api-key"]',
           'req.headers["x-auth-token"]',
+          'req.headers["stripe-signature"]',
+          'req.headers["webhook-signature"]',
+          'req.headers["x-hub-signature-256"]',
 
           // Response tokens
           'res.body.accessToken',
@@ -192,7 +204,7 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
             // Capped to `maxBodyBytes` (env LOG_BODY_MAX_BYTES, default 4096).
             // Under the cap → object passes through so Pino redact paths apply.
             // Over the cap → marker with original size + top-level keys.
-            body: truncateBody(req.raw?.body || req.body, maxBodyBytes),
+            body: serializeRequestBody(req.url, req.raw?.body || req.body, maxBodyBytes),
             remoteAddress: req.socket?.remoteAddress,
             remotePort: req.socket?.remotePort,
           }

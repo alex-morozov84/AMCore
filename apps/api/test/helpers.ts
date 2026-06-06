@@ -27,7 +27,7 @@ import { PrismaService } from '../src/prisma'
  * with no thrown error. Overriding only the logger sidesteps it. This is a
  * test-harness workaround; production logging is unchanged.
  */
-const noopPinoLogger = {
+export const noopPinoLogger = {
   setContext: () => undefined,
   trace: () => undefined,
   debug: () => undefined,
@@ -50,6 +50,18 @@ export interface E2ETestContext {
   redisContainer: StartedRedisContainer
 }
 
+export async function setupE2ETestInfrastructure(): Promise<
+  Pick<E2ETestContext, 'postgresContainer' | 'redisContainer'>
+> {
+  const postgresContainer = await new PostgreSqlContainer('postgres:16-alpine')
+    .withDatabase('amcore_test')
+    .withUsername('test')
+    .withPassword('test')
+    .start()
+  const redisContainer = await new RedisContainer('redis:7-alpine').start()
+  return { postgresContainer, redisContainer }
+}
+
 /**
  * Setup E2E test environment with TestContainers
  * - Starts PostgreSQL and Redis containers
@@ -57,15 +69,7 @@ export interface E2ETestContext {
  * - Runs migrations
  */
 export async function setupE2ETest(): Promise<E2ETestContext> {
-  // Start PostgreSQL container
-  const postgresContainer = await new PostgreSqlContainer('postgres:16-alpine')
-    .withDatabase('amcore_test')
-    .withUsername('test')
-    .withPassword('test')
-    .start()
-
-  // Start Redis container
-  const redisContainer = await new RedisContainer('redis:7-alpine').start()
+  const { postgresContainer, redisContainer } = await setupE2ETestInfrastructure()
 
   // Set environment variables
   const databaseUrl = postgresContainer.getConnectionUri()

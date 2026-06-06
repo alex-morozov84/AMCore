@@ -35,7 +35,7 @@ async function bootstrap(): Promise<void> {
   const role = (process.env.PROCESS_ROLE ?? 'all') as ProcessRole
   const isWorker = role === 'worker'
 
-  const app = await NestFactory.create(rootModuleFor(role), { bufferLogs: true })
+  const app = await NestFactory.create(rootModuleFor(role), { bufferLogs: true, rawBody: true })
   const env = app.get(EnvService)
   const isProduction = env.get('NODE_ENV') === 'production'
 
