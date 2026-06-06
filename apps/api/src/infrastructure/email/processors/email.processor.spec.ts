@@ -22,7 +22,12 @@ describe('EmailProcessor', () => {
   let processor: EmailProcessor
   let emailService: jest.Mocked<EmailService>
   let mockLogger: jest.Mocked<PinoLogger>
-  let metrics: jest.Mocked<Pick<MetricsService, 'incQueueEvent' | 'incRedisClientEvent'>>
+  let metrics: jest.Mocked<
+    Pick<
+      MetricsService,
+      'incQueueEvent' | 'incRedisClientEvent' | 'observeEmailOperation' | 'incEmailDeadLetter'
+    >
+  >
 
   beforeEach(async () => {
     mockLogger = {
@@ -35,6 +40,8 @@ describe('EmailProcessor', () => {
     metrics = {
       incQueueEvent: jest.fn(),
       incRedisClientEvent: jest.fn(),
+      observeEmailOperation: jest.fn(),
+      incEmailDeadLetter: jest.fn(),
     }
 
     const module: TestingModule = await Test.createTestingModule({
@@ -94,15 +101,31 @@ describe('EmailProcessor', () => {
 
       await processor.process(job)
 
-      expect(emailService.renderTemplate).toHaveBeenCalledWith(EmailTemplate.WELCOME, jobData.data)
+      expect(emailService.renderTemplate).toHaveBeenCalledWith(
+        EmailTemplate.WELCOME,
+        jobData.data,
+        'worker'
+      )
 
-      expect(emailService.send).toHaveBeenCalledWith({
-        to: 'test@example.com',
-        subject: 'Welcome',
-        html: '<p>Welcome!</p>',
-        text: 'Welcome!', // EQS-08: plaintext alternative forwarded
-        idempotencyKey: 'email:job-123', // EQS-03: stable across retries
-      })
+      expect(emailService.send).toHaveBeenCalledWith(
+        {
+          to: 'test@example.com',
+          subject: 'Welcome',
+          html: '<p>Welcome!</p>',
+          text: 'Welcome!', // EQS-08: plaintext alternative forwarded
+          idempotencyKey: 'email:job-123', // EQS-03: stable across retries
+        },
+        { template: EmailTemplate.WELCOME, mode: 'worker' }
+      )
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: EmailTemplate.WELCOME,
+          operation: 'process',
+          mode: 'worker',
+          result: 'success',
+        }),
+        expect.any(Number)
+      )
     })
 
     it('should skip unknown job types', async () => {
@@ -117,6 +140,10 @@ describe('EmailProcessor', () => {
 
       expect(emailService.renderTemplate).not.toHaveBeenCalled()
       expect(emailService.send).not.toHaveBeenCalled()
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'process', result: 'discarded' }),
+        expect.any(Number)
+      )
     })
 
     it('discards a secret-bearing job without rendering, sending, or throwing (EQS-02)', async () => {
@@ -196,6 +223,15 @@ describe('EmailProcessor', () => {
       await expect(processor.process(welcomeJob('job-transient'))).rejects.toThrow('rate limited')
       await expect(processor.process(welcomeJob('job-transient'))).rejects.not.toBeInstanceOf(
         UnrecoverableError
+      )
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'process',
+          mode: 'worker',
+          result: 'error',
+          retryable: 'true',
+        }),
+        expect.any(Number)
       )
     })
 
@@ -293,6 +329,7 @@ describe('EmailProcessor', () => {
         expect.stringContaining('dead-lettered')
       )
       expect(metrics.incQueueEvent).toHaveBeenCalledWith('email', 'dead_letter')
+      expect(metrics.incEmailDeadLetter).toHaveBeenCalledWith(EmailTemplate.WELCOME, false)
     })
 
     it('emits a dead-letter error immediately for an UnrecoverableError', () => {
@@ -304,6 +341,7 @@ describe('EmailProcessor', () => {
         expect.any(String)
       )
       expect(metrics.incQueueEvent).toHaveBeenCalledWith('email', 'dead_letter')
+      expect(metrics.incEmailDeadLetter).toHaveBeenCalledWith(EmailTemplate.WELCOME, true)
     })
 
     it('stays silent on a non-terminal (will-retry) failure', () => {
@@ -311,6 +349,7 @@ describe('EmailProcessor', () => {
 
       expect(mockLogger.error).not.toHaveBeenCalled()
       expect(metrics.incQueueEvent).not.toHaveBeenCalled()
+      expect(metrics.incEmailDeadLetter).not.toHaveBeenCalled()
     })
   })
 

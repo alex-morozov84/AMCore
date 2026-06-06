@@ -1,3 +1,5 @@
+import { performance } from 'node:perf_hooks'
+
 import { Inject, Injectable } from '@nestjs/common'
 import { render } from '@react-email/render'
 import { PinoLogger } from 'nestjs-pino'
@@ -24,6 +26,11 @@ import { getPasswordResetSubject, PasswordResetEmail } from './templates/passwor
 import { getWelcomeSubject, WelcomeEmail } from './templates/welcome'
 
 import { EnvService } from '@/env/env.service'
+import {
+  type EmailMetricsMode,
+  type EmailMetricsTemplate,
+  MetricsService,
+} from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { DEFAULT_JOB_OPTIONS } from '@/infrastructure/queue/interfaces/job-options.interface'
 import { QueueService } from '@/infrastructure/queue/queue.service'
@@ -54,7 +61,8 @@ export class EmailService {
     @Inject('EmailProvider') private readonly emailProvider: EmailProvider,
     private readonly queueService: QueueService,
     private readonly env: EnvService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly metrics: MetricsService
   ) {
     this.logger.setContext(EmailService.name)
     this.logger.info(
@@ -66,8 +74,29 @@ export class EmailService {
   /**
    * Send email immediately (synchronous)
    */
-  async send(params: SendEmailParams): Promise<SendEmailResult> {
-    return this.emailProvider.send(params)
+  async send(
+    params: SendEmailParams,
+    context: { template: EmailMetricsTemplate; mode: 'direct' | 'worker' } = {
+      template: 'unknown',
+      mode: 'direct',
+    }
+  ): Promise<SendEmailResult> {
+    const startedAt = performance.now()
+    try {
+      const result = await this.emailProvider.send(params)
+      this.observe(
+        context.template,
+        'send',
+        context.mode,
+        result.success ? 'success' : 'error',
+        result.retryable,
+        startedAt
+      )
+      return result
+    } catch (error) {
+      this.observe(context.template, 'send', context.mode, 'error', undefined, startedAt)
+      throw error
+    }
   }
 
   /**
@@ -79,16 +108,22 @@ export class EmailService {
    * persisted in BullMQ/Redis/Bull Board (EQS-02). Use `sendNow` for those.
    */
   async queue(jobData: SendEmailJobData): Promise<void> {
-    if (!QUEUEABLE_EMAIL_TEMPLATES.has(jobData.template)) {
-      throw new Error(
-        `Refusing to enqueue non-queueable email template "${jobData.template}": ` +
-          'secret-bearing templates must be sent via sendNow (EQS-02)'
-      )
+    const startedAt = performance.now()
+    try {
+      if (!QUEUEABLE_EMAIL_TEMPLATES.has(jobData.template)) {
+        throw new Error(
+          `Refusing to enqueue non-queueable email template "${jobData.template}": ` +
+            'secret-bearing templates must be sent via sendNow (EQS-02)'
+        )
+      }
+
+      await this.queueService.add(QueueName.EMAIL, JobName.SEND_EMAIL, jobData, EMAIL_JOB_OPTIONS)
+      this.observe(jobData.template, 'dispatch', 'queued', 'success', undefined, startedAt)
+      this.logger.info({ template: jobData.template, to: jobData.to }, 'Email queued')
+    } catch (error) {
+      this.observe(jobData.template, 'dispatch', 'queued', 'error', undefined, startedAt)
+      throw error
     }
-
-    await this.queueService.add(QueueName.EMAIL, JobName.SEND_EMAIL, jobData, EMAIL_JOB_OPTIONS)
-
-    this.logger.info({ template: jobData.template, to: jobData.to }, 'Email queued')
   }
 
   /**
@@ -105,8 +140,8 @@ export class EmailService {
     to: string,
     data: RenderableEmailData
   ): Promise<void> {
-    const { html, text, subject } = await this.renderTemplate(template, data)
-    const result = await this.send({ to, subject, html, text })
+    const { html, text, subject } = await this.renderTemplate(template, data, 'direct')
+    const result = await this.send({ to, subject, html, text }, { template, mode: 'direct' })
 
     if (!result.success) {
       throw new Error(result.error || 'Email sending failed')
@@ -174,51 +209,87 @@ export class EmailService {
    */
   async renderTemplate(
     template: EmailTemplate,
-    data: RenderableEmailData
+    data: RenderableEmailData,
+    mode: EmailMetricsMode = 'direct'
   ): Promise<{ html: string; text: string; subject: string }> {
-    const locale: Locale = data.locale || 'ru'
-    let element: Parameters<typeof render>[0]
-    let subject: string
+    const startedAt = performance.now()
+    try {
+      const locale: Locale = data.locale || 'ru'
+      let element: Parameters<typeof render>[0]
+      let subject: string
 
-    switch (template) {
-      case EmailTemplate.WELCOME:
-        element = WelcomeEmail(data as WelcomeEmailData)
-        subject = getWelcomeSubject(locale)
-        break
+      switch (template) {
+        case EmailTemplate.WELCOME:
+          element = WelcomeEmail(data as WelcomeEmailData)
+          subject = getWelcomeSubject(locale)
+          break
 
-      case EmailTemplate.PASSWORD_RESET:
-        element = PasswordResetEmail(data as PasswordResetEmailData)
-        subject = getPasswordResetSubject(locale)
-        break
+        case EmailTemplate.PASSWORD_RESET:
+          element = PasswordResetEmail(data as PasswordResetEmailData)
+          subject = getPasswordResetSubject(locale)
+          break
 
-      case EmailTemplate.EMAIL_VERIFICATION:
-        element = EmailVerificationEmail(data as EmailVerificationData)
-        subject = getEmailVerificationSubject(locale)
-        break
+        case EmailTemplate.EMAIL_VERIFICATION:
+          element = EmailVerificationEmail(data as EmailVerificationData)
+          subject = getEmailVerificationSubject(locale)
+          break
 
-      case EmailTemplate.PASSWORD_CHANGED:
-        element = PasswordChangedEmail(data as PasswordChangedEmailData)
-        subject = getPasswordChangedSubject(locale)
-        break
+        case EmailTemplate.PASSWORD_CHANGED:
+          element = PasswordChangedEmail(data as PasswordChangedEmailData)
+          subject = getPasswordChangedSubject(locale)
+          break
 
-      case EmailTemplate.ORG_INVITE: {
-        const inviteData = data as OrgInviteEmailData
-        element = OrgInviteEmail(inviteData)
-        subject = getOrgInviteSubject(inviteData.orgName, locale)
-        break
+        case EmailTemplate.ORG_INVITE: {
+          const inviteData = data as OrgInviteEmailData
+          element = OrgInviteEmail(inviteData)
+          subject = getOrgInviteSubject(inviteData.orgName, locale)
+          break
+        }
+
+        default:
+          throw new Error(`Unknown template: ${template}`)
       }
 
-      default:
-        throw new Error(`Unknown template: ${template}`)
+      // Render the HTML and a plaintext alternative from the SAME component
+      // (EQS-08). React Email derives the text from the rendered HTML via
+      // html-to-text, so there is no second text source to maintain and no
+      // html/text drift. Multipart html+text improves deliverability and is
+      // readable by text-only/accessibility clients.
+      const [html, text] = await Promise.all([
+        render(element),
+        render(element, { plainText: true }),
+      ])
+      this.observe(template, 'render', mode, 'success', undefined, startedAt)
+      return { html, text, subject }
+    } catch (error) {
+      this.observe(this.metricTemplate(template), 'render', mode, 'error', false, startedAt)
+      throw error
     }
+  }
 
-    // Render the HTML and a plaintext alternative from the SAME component
-    // (EQS-08). React Email derives the text from the rendered HTML via
-    // html-to-text, so there is no second text source to maintain and no
-    // html/text drift. Multipart html+text improves deliverability and is
-    // readable by text-only/accessibility clients.
-    const [html, text] = await Promise.all([render(element), render(element, { plainText: true })])
+  private observe(
+    template: EmailMetricsTemplate,
+    operation: 'dispatch' | 'render' | 'send',
+    mode: EmailMetricsMode,
+    result: 'success' | 'error',
+    retryable: boolean | undefined,
+    startedAt: number
+  ): void {
+    this.metrics.observeEmailOperation(
+      {
+        template,
+        operation,
+        mode,
+        result,
+        retryable: retryable === undefined ? 'unknown' : retryable ? 'true' : 'false',
+      },
+      (performance.now() - startedAt) / 1000
+    )
+  }
 
-    return { html, text, subject }
+  private metricTemplate(template: string): EmailMetricsTemplate {
+    return Object.values(EmailTemplate).includes(template as EmailTemplate)
+      ? (template as EmailMetricsTemplate)
+      : 'unknown'
   }
 }

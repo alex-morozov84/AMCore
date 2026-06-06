@@ -12,4 +12,12 @@ export const METRIC_NAMES = {
   redisClientEventsTotal: 'amcore_redis_client_events_total',
   queueJobs: 'amcore_queue_jobs',
   queueEventsTotal: 'amcore_queue_events_total',
+  cacheOperationsTotal: 'amcore_cache_operations_total',
+  storageOperationsTotal: 'amcore_storage_operations_total',
+  storageOperationDurationSeconds: 'amcore_storage_operation_duration_seconds',
+  mediaOperationsTotal: 'amcore_media_operations_total',
+  mediaOperationDurationSeconds: 'amcore_media_operation_duration_seconds',
+  emailOperationsTotal: 'amcore_email_operations_total',
+  emailOperationDurationSeconds: 'amcore_email_operation_duration_seconds',
+  emailDeadLettersTotal: 'amcore_email_dead_letters_total',
 } as const

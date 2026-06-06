@@ -8,6 +8,7 @@ import { ResendEmailProvider } from './providers/resend.provider'
 
 import { EnvModule } from '@/env/env.module'
 import { EnvService } from '@/env/env.service'
+import { MetricsService, ObservabilityModule } from '@/infrastructure/observability'
 import { QueueModule, QueueService } from '@/infrastructure/queue'
 
 /**
@@ -23,7 +24,7 @@ import { QueueModule, QueueService } from '@/infrastructure/queue'
  * from `web` — it never registers a worker.
  */
 @Module({
-  imports: [EnvModule, QueueModule],
+  imports: [EnvModule, QueueModule, ObservabilityModule],
   providers: [
     // Dynamic provider selection based on env
     {
@@ -44,14 +45,15 @@ import { QueueModule, QueueService } from '@/infrastructure/queue'
     // Email service
     {
       provide: EmailService,
-      inject: ['EmailProvider', QueueService, EnvService, PinoLogger],
+      inject: ['EmailProvider', QueueService, EnvService, PinoLogger, MetricsService],
       useFactory: (
         emailProvider: EmailProvider,
         queueService: QueueService,
         env: EnvService,
-        logger: PinoLogger
+        logger: PinoLogger,
+        metrics: MetricsService
       ) => {
-        return new EmailService(emailProvider, queueService, env, logger)
+        return new EmailService(emailProvider, queueService, env, logger, metrics)
       },
     },
   ],

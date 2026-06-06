@@ -4,6 +4,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
+import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 
 type UserCacheEnvelope =
@@ -46,7 +47,8 @@ export class UserCacheService {
     @Inject(REDIS_CLIENT) private readonly redis: AppRedisClient,
     private readonly lock: RedisLockService,
     private readonly prisma: PrismaService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly prometheus: MetricsService
   ) {
     this.logger.setContext(UserCacheService.name)
   }
@@ -155,6 +157,7 @@ export class UserCacheService {
 
   private async fetchAndCacheUser(userId: string): Promise<User | null> {
     this.metrics.dbQueries++
+    this.prometheus.incCacheOperation('user', 'db_fallback')
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     })
@@ -190,6 +193,7 @@ export class UserCacheService {
   ): Promise<{ found: true; user: User | null } | { found: false }> {
     const raw = await this.redis.get(cacheKey)
     if (raw === null) {
+      this.prometheus.incCacheOperation('user', 'miss')
       return { found: false }
     }
 
@@ -197,10 +201,12 @@ export class UserCacheService {
       const parsed = JSON.parse(raw) as UserCacheEnvelope
 
       if (parsed.kind === 'miss') {
+        this.prometheus.incCacheOperation('user', 'negative_hit')
         return { found: true, user: null }
       }
 
       if (parsed.kind === 'hit' && parsed.user && typeof parsed.user === 'object') {
+        this.prometheus.incCacheOperation('user', 'hit')
         return { found: true, user: this.reviveUser(parsed.user) }
       }
     } catch {
@@ -208,6 +214,8 @@ export class UserCacheService {
     }
 
     await this.redis.del(cacheKey)
+    this.prometheus.incCacheOperation('user', 'corrupt')
+    this.prometheus.incCacheOperation('user', 'miss')
     return { found: false }
   }
 

@@ -6,6 +6,7 @@ import { SharpImageProcessor } from './processors/sharp-image.processor'
 
 import { EnvModule } from '@/env/env.module'
 import { EnvService } from '@/env/env.service'
+import { ObservabilityModule } from '@/infrastructure/observability'
 
 /**
  * Media processing module. Binds the active `ImageProcessor` (sharp, configured
@@ -14,7 +15,7 @@ import { EnvService } from '@/env/env.service'
  * it in a later stage.
  */
 @Module({
-  imports: [EnvModule],
+  imports: [EnvModule, ObservabilityModule],
   providers: [
     {
       provide: IMAGE_PROCESSOR,

@@ -28,6 +28,23 @@ describe('Observability metrics (e2e)', () => {
   })
 
   it('exports metrics and records HTTP RED for 401, 404, and 429 without raw IDs', async () => {
+    const registered = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email: 'metrics@example.com', password: 'StrongP@ss123' })
+      .expect(201)
+    const accessToken = registered.body.accessToken as string
+
+    // First validation falls back to DB and fills the user cache; the second is
+    // a cache hit. Registration also queues the bounded welcome template.
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+
     await request(app.getHttpServer()).get('/auth/me').expect(401)
 
     await request(app.getHttpServer()).get('/organizations/raw-org-id').expect(401)
@@ -53,6 +70,15 @@ describe('Observability metrics (e2e)', () => {
     expect(metrics.text).toContain('amcore_db_pool_connections{state="waiting"')
     expect(metrics.text).toContain('amcore_queue_jobs{queue="default",state="waiting"')
     expect(metrics.text).toContain('amcore_queue_jobs{queue="email",state="waiting"')
+    expect(metrics.text).toContain('# HELP amcore_cache_operations_total')
+    expect(metrics.text).toContain('cache="user",result="db_fallback"')
+    expect(metrics.text).toContain('cache="user",result="hit"')
+    expect(metrics.text).toContain('# HELP amcore_storage_operations_total')
+    expect(metrics.text).toContain('# HELP amcore_media_operations_total')
+    expect(metrics.text).toContain('# HELP amcore_email_operations_total')
+    expect(metrics.text).toContain(
+      'template="welcome",operation="dispatch",mode="queued",result="success"'
+    )
     expect(metrics.text).toContain('status_code="401"')
     expect(metrics.text).toContain('status_code="404"')
     expect(metrics.text).toContain('status_code="429"')

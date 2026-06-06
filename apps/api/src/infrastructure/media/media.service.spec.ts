@@ -4,6 +4,7 @@ import { MediaService } from './media.service'
 import { SharpImageProcessor } from './processors/sharp-image.processor'
 
 import type { EnvService } from '@/env/env.service'
+import type { MetricsService } from '@/infrastructure/observability'
 import type { StorageService } from '@/infrastructure/storage'
 
 const ANIMATED_GIF = Buffer.from(
@@ -55,10 +56,20 @@ const processor = new SharpImageProcessor({
   maxPixels: 40_000_000,
 })
 
+const makeMediaService = (
+  storage: StorageService,
+  env = makeEnv(),
+  metrics = { observeMediaOperation: jest.fn() }
+) => ({
+  service: new MediaService(storage, processor, env, metrics as unknown as MetricsService),
+  metrics,
+})
+
 describe('MediaService.processImageNow', () => {
   it('generates avatar derivatives with deterministic public keys + URLs', async () => {
     const storage = makeStorage({ buffer: await jpeg() })
-    const result = await new MediaService(storage, processor, makeEnv()).processImageNow({
+    const { service, metrics } = makeMediaService(storage)
+    const result = await service.processImageNow({
       sourceKey: 'avatars/u1/original',
       ownerId: 'u1',
       preset: 'avatar',
@@ -83,11 +94,17 @@ describe('MediaService.processImageNow', () => {
       url: 'https://cdn.test/avatars/u1/avatar-512.webp',
     })
     expect(d512.size).toBeGreaterThan(0)
+    expect(metrics.observeMediaOperation).toHaveBeenCalledWith(
+      'avatar',
+      'process',
+      'success',
+      expect.any(Number)
+    )
   })
 
   it('inserts a version segment when one is supplied', async () => {
     const storage = makeStorage({ buffer: await jpeg() })
-    const result = await new MediaService(storage, processor, makeEnv()).processImageNow({
+    const result = await makeMediaService(storage).service.processImageNow({
       sourceKey: 'avatars/u1/original',
       ownerId: 'u1',
       preset: 'avatar',
@@ -99,7 +116,7 @@ describe('MediaService.processImageNow', () => {
 
   it('writes private and omits URLs when visibility is private', async () => {
     const storage = makeStorage({ buffer: await jpeg() })
-    const result = await new MediaService(storage, processor, makeEnv()).processImageNow({
+    const result = await makeMediaService(storage).service.processImageNow({
       sourceKey: 'avatars/u1/original',
       ownerId: 'u1',
       preset: 'avatar',
@@ -111,20 +128,27 @@ describe('MediaService.processImageNow', () => {
 
   it('rejects an oversized source BEFORE downloading (F2)', async () => {
     const storage = makeStorage({ contentLength: 9_000_000 })
+    const { service, metrics } = makeMediaService(storage)
     await expect(
-      new MediaService(storage, processor, makeEnv()).processImageNow({
+      service.processImageNow({
         sourceKey: 'avatars/u1/original',
         ownerId: 'u1',
         preset: 'avatar',
       })
     ).rejects.toMatchObject({ code: 'SOURCE_TOO_LARGE' })
     expect(storage.download).not.toHaveBeenCalled()
+    expect(metrics.observeMediaOperation).toHaveBeenCalledWith(
+      'avatar',
+      'process',
+      'error',
+      expect.any(Number)
+    )
   })
 
   it('fails fast when public-read is requested but the driver has no public URLs', async () => {
     const storage = makeStorage({ publicUrls: false })
     await expect(
-      new MediaService(storage, processor, makeEnv()).processImageNow({
+      makeMediaService(storage).service.processImageNow({
         sourceKey: 'avatars/u1/original',
         ownerId: 'u1',
         preset: 'avatar',
@@ -138,11 +162,7 @@ describe('MediaService.processImageNow', () => {
   it('rejects a source over the preset pixel cap', async () => {
     const storage = makeStorage({ buffer: await png(20, 20) })
     await expect(
-      new MediaService(
-        storage,
-        processor,
-        makeEnv({ MEDIA_AVATAR_MAX_PIXELS: 100 })
-      ).processImageNow({
+      makeMediaService(storage, makeEnv({ MEDIA_AVATAR_MAX_PIXELS: 100 })).service.processImageNow({
         sourceKey: 'avatars/u1/original',
         ownerId: 'u1',
         preset: 'avatar',
@@ -154,7 +174,7 @@ describe('MediaService.processImageNow', () => {
   it('rejects a disallowed source format for the avatar preset (animated gif)', async () => {
     const storage = makeStorage({ buffer: ANIMATED_GIF })
     await expect(
-      new MediaService(storage, processor, makeEnv()).processImageNow({
+      makeMediaService(storage).service.processImageNow({
         sourceKey: 'avatars/u1/original',
         ownerId: 'u1',
         preset: 'avatar',
@@ -167,13 +187,22 @@ describe('MediaService.processImageNow', () => {
 describe('MediaService.deleteDerivatives', () => {
   it('deletes a known set of keys', async () => {
     const storage = makeStorage()
-    await new MediaService(storage, processor, makeEnv()).deleteDerivatives(['a.webp', 'b.webp'])
+    const { service, metrics } = makeMediaService(storage)
+    await service.deleteDerivatives(['a.webp', 'b.webp'])
     expect(storage.deleteMany).toHaveBeenCalledWith(['a.webp', 'b.webp'])
+    expect(metrics.observeMediaOperation).toHaveBeenCalledWith(
+      'avatar',
+      'delete_derivatives',
+      'success',
+      expect.any(Number)
+    )
   })
 
   it('is a no-op for an empty list', async () => {
     const storage = makeStorage()
-    await new MediaService(storage, processor, makeEnv()).deleteDerivatives([])
+    const { service, metrics } = makeMediaService(storage)
+    await service.deleteDerivatives([])
     expect(storage.deleteMany).not.toHaveBeenCalled()
+    expect(metrics.observeMediaOperation).not.toHaveBeenCalled()
   })
 })

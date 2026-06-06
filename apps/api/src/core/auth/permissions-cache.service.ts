@@ -4,6 +4,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
+import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 
 const PERMISSIONS_CACHE_TTL_MS = 3600 * 1000
@@ -35,7 +36,8 @@ export class PermissionsCacheService {
     @Inject(REDIS_CLIENT) private readonly redis: AppRedisClient,
     private readonly lock: RedisLockService,
     private readonly prisma: PrismaService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly prometheus: MetricsService
   ) {
     this.logger.setContext(PermissionsCacheService.name)
   }
@@ -123,6 +125,7 @@ export class PermissionsCacheService {
     aclVersion: number
   ): Promise<Permission[]> {
     this.metrics.dbQueries++
+    this.prometheus.incCacheOperation('permissions', 'db_fallback')
     const permissions = await this.loadPermissionsFromDb(userId, organizationId)
 
     await this.redis.set(
@@ -150,12 +153,14 @@ export class PermissionsCacheService {
   private async readPermissionsCache(cacheKey: string): Promise<Permission[] | null> {
     const raw = await this.redis.get(cacheKey)
     if (raw === null) {
+      this.prometheus.incCacheOperation('permissions', 'miss')
       return null
     }
 
     try {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
+        this.prometheus.incCacheOperation('permissions', 'hit')
         return parsed as Permission[]
       }
     } catch {
@@ -163,6 +168,8 @@ export class PermissionsCacheService {
     }
 
     await this.redis.del(cacheKey)
+    this.prometheus.incCacheOperation('permissions', 'corrupt')
+    this.prometheus.incCacheOperation('permissions', 'miss')
     return null
   }
 

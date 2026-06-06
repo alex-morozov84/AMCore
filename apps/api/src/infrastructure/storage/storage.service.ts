@@ -1,9 +1,11 @@
+import { performance } from 'node:perf_hooks'
 import type { Readable } from 'node:stream'
 
 import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 
 import { AppException } from '../../common/exceptions'
 
+import type { StorageDriver } from './storage.constants'
 import { STORAGE_PROVIDER } from './storage.constants'
 import type {
   CopyObjectInput,
@@ -18,6 +20,9 @@ import type {
   UploadResult,
 } from './storage.interface'
 
+import { EnvService } from '@/env/env.service'
+import { MetricsService, type StorageMetricsOperation } from '@/infrastructure/observability'
+
 /**
  * Facade over the active storage driver (selected by `STORAGE_DRIVER`).
  *
@@ -29,60 +34,70 @@ import type {
  */
 @Injectable()
 export class StorageService {
-  constructor(@Inject(STORAGE_PROVIDER) private readonly provider: StorageProvider) {}
+  private readonly driver: StorageDriver
+
+  constructor(
+    @Inject(STORAGE_PROVIDER) private readonly provider: StorageProvider,
+    env: EnvService,
+    private readonly metrics: MetricsService
+  ) {
+    this.driver = env.get('STORAGE_DRIVER')
+  }
 
   get capabilities(): StorageCapabilities {
     return this.provider.capabilities
   }
 
   upload(input: UploadInput): Promise<UploadResult> {
-    return this.provider.upload(input)
+    return this.track('upload', () => this.provider.upload(input))
   }
 
   download(key: string): Promise<Buffer> {
-    return this.provider.download(key)
+    return this.track('download', () => this.provider.download(key))
   }
 
   downloadStream(key: string): Promise<Readable> {
-    return this.provider.downloadStream(key)
+    return this.track('download_stream', () => this.provider.downloadStream(key))
   }
 
   getMetadata(key: string): Promise<FileMetadata> {
-    return this.provider.getMetadata(key)
+    return this.track('get_metadata', () => this.provider.getMetadata(key))
   }
 
   delete(key: string): Promise<void> {
-    return this.provider.delete(key)
+    return this.track('delete', () => this.provider.delete(key))
   }
 
   deleteMany(keys: string[]): Promise<void> {
-    return this.provider.deleteMany(keys)
+    return this.track('delete_many', () => this.provider.deleteMany(keys))
   }
 
   exists(key: string): Promise<boolean> {
-    return this.provider.exists(key)
+    return this.track('exists', () => this.provider.exists(key))
   }
 
   list(input: ListInput): Promise<ListResult> {
-    return this.provider.list(input)
+    return this.track('list', () => this.provider.list(input))
   }
 
   copy(input: CopyObjectInput): Promise<void> {
-    return this.provider.copy(input)
+    return this.track('copy', () => this.provider.copy(input))
   }
 
   move(input: CopyObjectInput): Promise<void> {
-    return this.provider.move(input)
+    return this.track('move', () => this.provider.move(input))
   }
 
   getSignedDownloadUrl(input: SignedDownloadInput): Promise<string> {
-    this.requireCapability('signedUrls', 'getSignedDownloadUrl')
-    return this.provider.getSignedDownloadUrl(input)
+    return this.trackCapabilityOperation('signed_download_url', 'signedUrls', () =>
+      this.provider.getSignedDownloadUrl(input)
+    )
   }
 
   getSignedUploadUrl(input: SignedUploadInput): Promise<string> {
-    this.requireCapability('signedUrls', 'getSignedUploadUrl')
-    return this.provider.getSignedUploadUrl(input)
+    return this.trackCapabilityOperation('signed_upload_url', 'signedUrls', () =>
+      this.provider.getSignedUploadUrl(input)
+    )
   }
 
   /**
@@ -103,5 +118,50 @@ export class StorageService {
         'STORAGE_CAPABILITY_UNSUPPORTED'
       )
     }
+  }
+
+  private async track<T>(
+    operation: StorageMetricsOperation,
+    action: () => Promise<T>,
+    startedAt = performance.now()
+  ): Promise<T> {
+    try {
+      const result = await action()
+      this.metrics.observeStorageOperation(
+        this.driver,
+        operation,
+        'success',
+        (performance.now() - startedAt) / 1000
+      )
+      return result
+    } catch (error) {
+      this.metrics.observeStorageOperation(
+        this.driver,
+        operation,
+        'error',
+        (performance.now() - startedAt) / 1000
+      )
+      throw error
+    }
+  }
+
+  private trackCapabilityOperation<T>(
+    operation: StorageMetricsOperation,
+    capability: keyof StorageCapabilities,
+    action: () => Promise<T>
+  ): Promise<T> {
+    const startedAt = performance.now()
+    try {
+      this.requireCapability(capability, operation)
+    } catch (error) {
+      this.metrics.observeStorageOperation(
+        this.driver,
+        operation,
+        'error',
+        (performance.now() - startedAt) / 1000
+      )
+      throw error
+    }
+    return this.track(operation, action, startedAt)
   }
 }

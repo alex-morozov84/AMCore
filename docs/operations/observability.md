@@ -53,7 +53,15 @@ AMCore currently exports:
 - `amcore_db_slow_queries_total{role}`;
 - `amcore_redis_client_events_total{client,event,role}`;
 - `amcore_queue_jobs{queue,state,role}`;
-- `amcore_queue_events_total{queue,event,role}`.
+- `amcore_queue_events_total{queue,event,role}`;
+- `amcore_cache_operations_total{cache,result,role}`;
+- `amcore_storage_operations_total{driver,operation,result,role}`;
+- `amcore_storage_operation_duration_seconds{driver,operation,result,role}`;
+- `amcore_media_operations_total{preset,operation,result,role}`;
+- `amcore_media_operation_duration_seconds{preset,operation,result,role}`;
+- `amcore_email_operations_total{template,operation,mode,result,retryable,role}`;
+- `amcore_email_operation_duration_seconds{template,operation,mode,result,role}`;
+- `amcore_email_dead_letters_total{template,unrecoverable,role}`.
 
 HTTP metrics are captured with middleware and `res.on('finish')`, so guard
 rejections and unmatched routes are counted. `/api/v1/metrics` is excluded from
@@ -95,8 +103,53 @@ Queue events are bounded to `job_added`, `redis_error`,
 `redis_reconnecting`, `worker_error`, and `dead_letter`. Job IDs and arbitrary
 job names are never metric labels.
 
-Future Arc 4 stages add cache, storage, media, email-domain metrics, and optional
-OpenTelemetry tracing.
+Cache metrics use `cache=user|permissions` and
+`result=hit|negative_hit|miss|db_fallback|corrupt`. Only the explicit user
+negative-cache envelope emits `negative_hit`; a cached permissions `[]` is a
+normal `hit`. A corrupt entry emits both `corrupt` and `miss` because it is
+deleted and handled as a miss. `db_fallback` counts actual DB loads after cache
+miss or lock contention.
+
+Cache counters are recorded per Redis read, not per request: under cache-stampede
+lock contention a single lookup may re-read the cache several times, so these
+counters can exceed one increment per request. Compute hit ratios from the
+counters themselves (for example `hit / (hit + miss)`) rather than against request
+counts.
+
+Storage metrics are emitted by the `StorageService` facade, so all drivers have
+the same surface:
+
+- `driver=s3|local|memory`;
+- `result=success|error`;
+- bounded operations: `upload`, `download`, `download_stream`, `get_metadata`,
+  `delete`, `delete_many`, `exists`, `list`, `copy`, `move`,
+  `signed_download_url`, and `signed_upload_url`.
+
+The synchronous `getPublicUrl()` constructor is intentionally excluded because
+it performs no I/O. Object keys, buckets, endpoints, and URLs are never labels.
+
+Media metrics currently use `preset=avatar`,
+`operation=process|delete_derivatives`, and `result=success|error`. They measure
+the complete media operation, while the nested storage calls remain visible in
+the storage metrics. Source/derivative keys, owner IDs, dimensions, and error
+messages are not labels.
+
+Email metrics keep phase and delivery semantics separate:
+
+- `operation=dispatch|render|send|process`;
+- `mode=queued|direct|worker`;
+- `result=success|error|discarded`;
+- `retryable=true|false|unknown`;
+- `template=welcome|password-reset|email-verification|password-changed|org-invite|unknown`.
+
+`dispatch/queued` measures enqueueing, `render` and `send` measure their own
+phases, and `process/worker` measures the complete BullMQ attempt. Secret-bearing
+legacy queue jobs and unknown job types are `discarded`, not silently counted as
+success. Terminal failures also increment
+`amcore_email_dead_letters_total{template,unrecoverable}`. Recipient addresses,
+provider IDs, job IDs, payloads, and error messages are never labels.
+
+The remaining Arc 4 stage is optional OpenTelemetry tracing.
 
 ## Label Rules
 

@@ -6,6 +6,7 @@ import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infra
 
 import { UserCacheService } from './user-cache.service'
 
+import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 
 describe('UserCacheService', () => {
@@ -20,6 +21,7 @@ describe('UserCacheService', () => {
     exec: jest.Mock
   }
   let mockLogger: jest.Mocked<PinoLogger>
+  let prometheus: jest.Mocked<Pick<MetricsService, 'incCacheOperation'>>
 
   const mockUser: User = {
     id: 'user-123',
@@ -65,6 +67,7 @@ describe('UserCacheService', () => {
       error: jest.fn(),
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
+    prometheus = { incCacheOperation: jest.fn() }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -91,6 +94,10 @@ describe('UserCacheService', () => {
         {
           provide: PinoLogger,
           useValue: mockLogger,
+        },
+        {
+          provide: MetricsService,
+          useValue: prometheus,
         },
       ],
     }).compile()
@@ -127,6 +134,7 @@ describe('UserCacheService', () => {
       expect(metrics.hits).toBe(1)
       expect(metrics.misses).toBe(0)
       expect(metrics.dbQueries).toBe(0)
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('user', 'hit')
     })
 
     it('should return null from negative cache without querying database', async () => {
@@ -141,6 +149,7 @@ describe('UserCacheService', () => {
       expect(metrics.hits).toBe(1)
       expect(metrics.misses).toBe(0)
       expect(metrics.dbQueries).toBe(0)
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('user', 'negative_hit')
     })
 
     it('should query database and cache hit envelope on cache miss', async () => {
@@ -171,6 +180,8 @@ describe('UserCacheService', () => {
       expect(metrics.hits).toBe(0)
       expect(metrics.misses).toBe(1)
       expect(metrics.dbQueries).toBe(1)
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('user', 'miss')
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('user', 'db_fallback')
     })
 
     it('should cache miss envelope with short TTL when user is not found', async () => {
@@ -200,6 +211,7 @@ describe('UserCacheService', () => {
       expect(result).toEqual(mockUser)
       expect(redis.del).toHaveBeenCalledWith(userKey)
       expect(prisma.user.findUnique).toHaveBeenCalledTimes(1)
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('user', 'corrupt')
     })
 
     it('should wait and retry cache when lock is held by another request', async () => {

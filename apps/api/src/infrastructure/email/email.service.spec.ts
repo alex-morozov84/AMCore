@@ -6,6 +6,7 @@ import type { EmailProvider, SendEmailJobData, WelcomeEmailData } from './email.
 import { EmailTemplate } from './email.types'
 
 import { EnvService } from '@/env/env.service'
+import { MetricsService } from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '@/infrastructure/queue/queue.service'
 
@@ -35,6 +36,7 @@ describe('EmailService', () => {
   let emailProvider: jest.Mocked<EmailProvider>
   let queueService: jest.Mocked<QueueService>
   let mockLogger: jest.Mocked<PinoLogger>
+  let metrics: jest.Mocked<Pick<MetricsService, 'observeEmailOperation'>>
 
   beforeEach(async () => {
     mockLogger = {
@@ -44,6 +46,7 @@ describe('EmailService', () => {
       error: jest.fn(),
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
+    metrics = { observeEmailOperation: jest.fn() }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -69,6 +72,10 @@ describe('EmailService', () => {
         {
           provide: PinoLogger,
           useValue: mockLogger,
+        },
+        {
+          provide: MetricsService,
+          useValue: metrics,
         },
       ],
     }).compile()
@@ -97,6 +104,15 @@ describe('EmailService', () => {
 
       expect(result).toEqual(mockResult)
       expect(emailProvider.send).toHaveBeenCalledWith(params)
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: 'unknown',
+          operation: 'send',
+          mode: 'direct',
+          result: 'success',
+        }),
+        expect.any(Number)
+      )
     })
   })
 
@@ -128,6 +144,15 @@ describe('EmailService', () => {
           removeOnFail: expect.objectContaining({ age: 86400 }),
         })
       )
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: EmailTemplate.WELCOME,
+          operation: 'dispatch',
+          mode: 'queued',
+          result: 'success',
+        }),
+        expect.any(Number)
+      )
     })
 
     it('rejects a non-queueable (secret-bearing) template at runtime (EQS-02)', async () => {
@@ -141,6 +166,15 @@ describe('EmailService', () => {
 
       await expect(service.queue(jobData)).rejects.toThrow(/non-queueable/)
       expect(queueService.add).not.toHaveBeenCalled()
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: EmailTemplate.PASSWORD_RESET,
+          operation: 'dispatch',
+          mode: 'queued',
+          result: 'error',
+        }),
+        expect.any(Number)
+      )
     })
   })
 
@@ -164,6 +198,24 @@ describe('EmailService', () => {
         })
       )
       expect(queueService.add).not.toHaveBeenCalled()
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: EmailTemplate.PASSWORD_RESET,
+          operation: 'render',
+          mode: 'direct',
+          result: 'success',
+        }),
+        expect.any(Number)
+      )
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: EmailTemplate.PASSWORD_RESET,
+          operation: 'send',
+          mode: 'direct',
+          result: 'success',
+        }),
+        expect.any(Number)
+      )
     })
 
     it('throws when the provider reports failure', async () => {
@@ -176,6 +228,16 @@ describe('EmailService', () => {
           expiresIn: '24h',
         })
       ).rejects.toThrow('boom')
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: EmailTemplate.EMAIL_VERIFICATION,
+          operation: 'send',
+          mode: 'direct',
+          result: 'error',
+          retryable: 'unknown',
+        }),
+        expect.any(Number)
+      )
     })
   })
 
@@ -308,6 +370,14 @@ describe('EmailService', () => {
     it('should throw error for unknown template', async () => {
       await expect(service.renderTemplate('unknown' as any, {} as any)).rejects.toThrow(
         'Unknown template'
+      )
+      expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: 'unknown',
+          operation: 'render',
+          result: 'error',
+        }),
+        expect.any(Number)
       )
     })
   })

@@ -12,6 +12,7 @@ import { StorageDownloadService } from './storage-download.service'
 
 import { EnvModule } from '@/env/env.module'
 import { EnvService } from '@/env/env.service'
+import { ObservabilityModule } from '@/infrastructure/observability'
 
 /**
  * Global storage module. The active driver is chosen by `STORAGE_DRIVER`
@@ -31,7 +32,7 @@ export class StorageModule {
       module: StorageModule,
       // TerminusModule provides HealthIndicatorService, which
       // StorageHealthIndicator depends on.
-      imports: [EnvModule, TerminusModule],
+      imports: [EnvModule, TerminusModule, ObservabilityModule],
       providers: [
         {
           provide: STORAGE_PROVIDER,

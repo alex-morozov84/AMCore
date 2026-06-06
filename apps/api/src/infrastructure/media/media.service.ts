@@ -1,3 +1,5 @@
+import { performance } from 'node:perf_hooks'
+
 import { Inject, Injectable } from '@nestjs/common'
 
 import { IMAGE_PROCESSOR } from './media.constants'
@@ -14,6 +16,7 @@ import { MEDIA_PRESETS } from './presets/media-presets'
 import { assertSourceAllowed } from './source-policy'
 
 import { EnvService } from '@/env/env.service'
+import { MetricsService } from '@/infrastructure/observability'
 import { StorageService } from '@/infrastructure/storage'
 
 /**
@@ -29,52 +32,67 @@ export class MediaService {
   constructor(
     private readonly storage: StorageService,
     @Inject(IMAGE_PROCESSOR) private readonly processor: ImageProcessor,
-    private readonly env: EnvService
+    private readonly env: EnvService,
+    private readonly metrics: MetricsService
   ) {}
 
   async processImageNow(input: ProcessImageInput): Promise<ProcessImageResult> {
-    const preset = MEDIA_PRESETS[input.preset]
-    this.assertPublicUrlCapability(input.visibility)
+    const startedAt = performance.now()
+    try {
+      const preset = MEDIA_PRESETS[input.preset]
+      this.assertPublicUrlCapability(input.visibility)
 
-    const buffer = await this.loadValidatedSource(input.sourceKey)
-    const inspection = await this.processor.inspect(buffer)
-    assertSourceAllowed(inspection, preset.sourcePolicy)
-    this.assertPresetPixels(inspection.width * inspection.height, input.preset)
+      const buffer = await this.loadValidatedSource(input.sourceKey)
+      const inspection = await this.processor.inspect(buffer)
+      assertSourceAllowed(inspection, preset.sourcePolicy)
+      this.assertPresetPixels(inspection.width * inspection.height, input.preset)
 
-    const derivatives: ImageDerivativeRecord[] = []
-    for (const spec of preset.derivatives) {
-      const output = await this.processor.process(buffer, spec)
-      const key = buildDerivativeKey({
-        keyspace: preset.keyspace,
-        ownerId: input.ownerId,
-        version: input.version,
-        variant: spec.name,
-        format: spec.format,
-      })
-      await this.storage.upload({
-        key,
-        body: output.buffer,
-        contentType: output.contentType,
-        cacheControl: input.cacheControl,
-        visibility: input.visibility,
-      })
-      derivatives.push({
-        name: spec.name,
-        key,
-        url: input.visibility === 'public-read' ? this.storage.getPublicUrl(key) : undefined,
-        width: output.width,
-        height: output.height,
-        contentType: output.contentType,
-        size: output.size,
-      })
+      const derivatives: ImageDerivativeRecord[] = []
+      for (const spec of preset.derivatives) {
+        const output = await this.processor.process(buffer, spec)
+        const key = buildDerivativeKey({
+          keyspace: preset.keyspace,
+          ownerId: input.ownerId,
+          version: input.version,
+          variant: spec.name,
+          format: spec.format,
+        })
+        await this.storage.upload({
+          key,
+          body: output.buffer,
+          contentType: output.contentType,
+          cacheControl: input.cacheControl,
+          visibility: input.visibility,
+        })
+        derivatives.push({
+          name: spec.name,
+          key,
+          url: input.visibility === 'public-read' ? this.storage.getPublicUrl(key) : undefined,
+          width: output.width,
+          height: output.height,
+          contentType: output.contentType,
+          size: output.size,
+        })
+      }
+      this.observe(input.preset, 'process', 'success', startedAt)
+      return { sourceKey: input.sourceKey, derivatives }
+    } catch (error) {
+      this.observe(input.preset, 'process', 'error', startedAt)
+      throw error
     }
-    return { sourceKey: input.sourceKey, derivatives }
   }
 
   /** Delete a known set of derivative keys. No-op for an empty list. */
-  async deleteDerivatives(keys: string[]): Promise<void> {
+  async deleteDerivatives(keys: string[], preset: MediaPresetName = 'avatar'): Promise<void> {
     if (keys.length === 0) return
-    await this.storage.deleteMany(keys)
+    const startedAt = performance.now()
+    try {
+      await this.storage.deleteMany(keys)
+      this.observe(preset, 'delete_derivatives', 'success', startedAt)
+    } catch (error) {
+      this.observe(preset, 'delete_derivatives', 'error', startedAt)
+      throw error
+    }
   }
 
   /** Fail fast if public-read is requested but the driver can't produce URLs. */
@@ -110,5 +128,19 @@ export class MediaService {
         'IMAGE_TOO_LARGE'
       )
     }
+  }
+
+  private observe(
+    preset: MediaPresetName,
+    operation: 'process' | 'delete_derivatives',
+    result: 'success' | 'error',
+    startedAt: number
+  ): void {
+    this.metrics.observeMediaOperation(
+      preset,
+      operation,
+      result,
+      (performance.now() - startedAt) / 1000
+    )
   }
 }

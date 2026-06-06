@@ -6,6 +6,7 @@ import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infra
 
 import { PermissionsCacheService } from './permissions-cache.service'
 
+import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 
 describe('PermissionsCacheService', () => {
@@ -14,6 +15,7 @@ describe('PermissionsCacheService', () => {
   let lock: jest.Mocked<Pick<RedisLockService, 'acquire' | 'release'>>
   let prisma: PrismaService
   let mockLogger: jest.Mocked<PinoLogger>
+  let prometheus: jest.Mocked<Pick<MetricsService, 'incCacheOperation'>>
 
   const mockPermissions: Permission[] = [
     {
@@ -77,6 +79,7 @@ describe('PermissionsCacheService', () => {
       error: jest.fn(),
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
+    prometheus = { incCacheOperation: jest.fn() }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -107,6 +110,10 @@ describe('PermissionsCacheService', () => {
         {
           provide: PinoLogger,
           useValue: mockLogger,
+        },
+        {
+          provide: MetricsService,
+          useValue: prometheus,
         },
       ],
     }).compile()
@@ -139,6 +146,7 @@ describe('PermissionsCacheService', () => {
       const metrics = service.getMetrics()
       expect(metrics.hits).toBe(1)
       expect(metrics.misses).toBe(0)
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('permissions', 'hit')
     })
 
     it('should treat cached empty permissions array as hit', async () => {
@@ -152,6 +160,8 @@ describe('PermissionsCacheService', () => {
       const metrics = service.getMetrics()
       expect(metrics.hits).toBe(1)
       expect(metrics.misses).toBe(0)
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('permissions', 'hit')
+      expect(prometheus.incCacheOperation).not.toHaveBeenCalledWith('permissions', 'negative_hit')
     })
 
     it('should query database and cache on cache miss', async () => {
@@ -199,6 +209,8 @@ describe('PermissionsCacheService', () => {
       expect(metrics.hits).toBe(0)
       expect(metrics.misses).toBe(1)
       expect(metrics.dbQueries).toBe(1)
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('permissions', 'miss')
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('permissions', 'db_fallback')
     })
 
     it('should return and cache empty array if user is not a member', async () => {
@@ -224,6 +236,7 @@ describe('PermissionsCacheService', () => {
       expect(result).toEqual(mockPermissions)
       expect(redis.del).toHaveBeenCalledWith('auth:perm:v2:org-1:user-1:5')
       expect(prisma.orgMember.findUnique).toHaveBeenCalledTimes(1)
+      expect(prometheus.incCacheOperation).toHaveBeenCalledWith('permissions', 'corrupt')
     })
 
     it('should deduplicate permissions from multiple roles', async () => {

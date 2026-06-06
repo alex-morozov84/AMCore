@@ -1,12 +1,15 @@
+import { performance } from 'node:perf_hooks'
+
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq'
 import { type Job, UnrecoverableError } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
 import { sendEmailJobDataSchema } from '../email.schema'
 import { EmailService } from '../email.service'
-import type { EmailTemplate, SendEmailJobData } from '../email.types'
-import { SECRET_EMAIL_TEMPLATES } from '../email.types'
+import type { SendEmailJobData } from '../email.types'
+import { EmailTemplate, SECRET_EMAIL_TEMPLATES } from '../email.types'
 
+import type { EmailMetricsTemplate } from '@/infrastructure/observability'
 import { MetricsService } from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 
@@ -36,9 +39,30 @@ export class EmailProcessor extends WorkerHost {
   }
 
   async process(job: Job<SendEmailJobData>): Promise<void> {
+    const startedAt = performance.now()
+    const metricTemplate = this.metricTemplate(job.data?.template)
+    try {
+      await this.processJob(job, metricTemplate, startedAt)
+    } catch (error) {
+      this.observeProcess(
+        metricTemplate,
+        'error',
+        error instanceof UnrecoverableError ? false : true,
+        startedAt
+      )
+      throw error
+    }
+  }
+
+  private async processJob(
+    job: Job<SendEmailJobData>,
+    metricTemplate: EmailMetricsTemplate,
+    startedAt: number
+  ): Promise<void> {
     // Only process send-email jobs
     if (job.name !== JobName.SEND_EMAIL) {
       this.logger.warn({ jobName: job.name }, 'Skipped unknown job type')
+      this.observeProcess(metricTemplate, 'discarded', false, startedAt)
       return
     }
 
@@ -63,6 +87,7 @@ export class EmailProcessor extends WorkerHost {
         { jobId: job.id, template, to },
         'Discarded secret-bearing email job (must not be queued — EQS-02)'
       )
+      this.observeProcess(metricTemplate, 'discarded', false, startedAt)
       return
     }
 
@@ -94,7 +119,11 @@ export class EmailProcessor extends WorkerHost {
     // deployed template code + same validated data), so it is unrecoverable.
     let rendered: { html: string; text: string; subject: string }
     try {
-      rendered = await this.emailService.renderTemplate(parsed.data.template, parsed.data.data)
+      rendered = await this.emailService.renderTemplate(
+        parsed.data.template,
+        parsed.data.data,
+        'worker'
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       this.logger.warn(
@@ -106,13 +135,16 @@ export class EmailProcessor extends WorkerHost {
 
     // Send — idempotency-keyed on the job id so a retry after a post-accept blip
     // does not double-send. Classify failure by the provider's `retryable` flag.
-    const result = await this.emailService.send({
-      to: parsed.data.to,
-      subject: rendered.subject,
-      html: rendered.html,
-      text: rendered.text,
-      idempotencyKey: job.id ? `email:${job.id}` : undefined,
-    })
+    const result = await this.emailService.send(
+      {
+        to: parsed.data.to,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+        idempotencyKey: job.id ? `email:${job.id}` : undefined,
+      },
+      { template: parsed.data.template, mode: 'worker' }
+    )
 
     if (!result.success) {
       const message = result.error || 'Email sending failed'
@@ -133,6 +165,7 @@ export class EmailProcessor extends WorkerHost {
     }
 
     this.logger.info({ id: result.id, template, to }, 'Email sent successfully')
+    this.observeProcess(metricTemplate, 'success', undefined, startedAt)
   }
 
   /**
@@ -147,7 +180,9 @@ export class EmailProcessor extends WorkerHost {
     const terminal = error?.name === 'UnrecoverableError' || job.attemptsMade >= maxAttempts
     if (!terminal) return
 
+    const unrecoverable = error?.name === 'UnrecoverableError'
     this.metrics.incQueueEvent(QueueName.EMAIL, 'dead_letter')
+    this.metrics.incEmailDeadLetter(this.metricTemplate(job.data?.template), unrecoverable)
     this.logger.error(
       {
         event: 'email.job.dead_letter',
@@ -155,7 +190,7 @@ export class EmailProcessor extends WorkerHost {
         template: job.data?.template,
         to: job.data?.to,
         attemptsMade: job.attemptsMade,
-        unrecoverable: error?.name === 'UnrecoverableError',
+        unrecoverable,
         error: error?.message,
       },
       'Email job dead-lettered (will not be retried)'
@@ -178,5 +213,30 @@ export class EmailProcessor extends WorkerHost {
       { event: 'queue.worker_error', error: error?.message },
       'Email worker Redis/connection error'
     )
+  }
+
+  private observeProcess(
+    template: EmailMetricsTemplate,
+    result: 'success' | 'error' | 'discarded',
+    retryable: boolean | undefined,
+    startedAt: number
+  ): void {
+    this.metrics.observeEmailOperation(
+      {
+        template,
+        operation: 'process',
+        mode: 'worker',
+        result,
+        retryable: retryable === undefined ? 'unknown' : retryable ? 'true' : 'false',
+      },
+      (performance.now() - startedAt) / 1000
+    )
+  }
+
+  private metricTemplate(template: unknown): EmailMetricsTemplate {
+    return typeof template === 'string' &&
+      Object.values(EmailTemplate).includes(template as EmailTemplate)
+      ? (template as EmailMetricsTemplate)
+      : 'unknown'
   }
 }
