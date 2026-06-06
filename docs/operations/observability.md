@@ -51,7 +51,9 @@ AMCore currently exports:
 - `amcore_db_pool_connections{state,role}`, where
   `state=total|idle|waiting`;
 - `amcore_db_slow_queries_total{role}`;
-- `amcore_redis_client_events_total{client,event,role}`.
+- `amcore_redis_client_events_total{client,event,role}`;
+- `amcore_queue_jobs{queue,state,role}`;
+- `amcore_queue_events_total{queue,event,role}`.
 
 HTTP metrics are captured with middleware and `res.on('finish')`, so guard
 rejections and unmatched routes are counted. `/api/v1/metrics` is excluded from
@@ -66,11 +68,34 @@ Redis labels are bounded:
 - `client=shared|queue_producer|queue_worker|throttler`;
 - `event=error|reconnecting|degraded`.
 
-The shared node-redis client reports verified `error` and `reconnecting` events.
-The throttler reports every Redis fallback as `client=throttler,event=degraded`;
-its log remains debounced independently.
+The shared node-redis and BullMQ clients report only verified events. The
+throttler reports every Redis fallback as `client=throttler,event=degraded`; its
+log remains debounced independently.
 
-Future Arc 4 stages add queue, cache, storage, media, email, and optional
+Queue depth uses these bounded states:
+
+```text
+waiting active delayed completed failed paused prioritized waiting_children
+```
+
+It is exported only from worker-capable module graphs:
+
+- `PROCESS_ROLE=worker`: exported;
+- `PROCESS_ROLE=all`: exported;
+- `PROCESS_ROLE=web`: absent.
+
+Queue depth is shared Redis state, not a per-process value. Never sum it across
+replicas. Use non-additive aggregation:
+
+```promql
+max by(queue, state) (amcore_queue_jobs)
+```
+
+Queue events are bounded to `job_added`, `redis_error`,
+`redis_reconnecting`, `worker_error`, and `dead_letter`. Job IDs and arbitrary
+job names are never metric labels.
+
+Future Arc 4 stages add cache, storage, media, email-domain metrics, and optional
 OpenTelemetry tracing.
 
 ## Label Rules

@@ -7,6 +7,7 @@ import { EmailService } from '../email.service'
 import type { EmailTemplate, SendEmailJobData } from '../email.types'
 import { SECRET_EMAIL_TEMPLATES } from '../email.types'
 
+import { MetricsService } from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 
 /**
@@ -27,7 +28,8 @@ import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.cons
 export class EmailProcessor extends WorkerHost {
   constructor(
     private readonly emailService: EmailService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly metrics: MetricsService
   ) {
     super()
     this.logger.setContext(EmailProcessor.name)
@@ -145,6 +147,7 @@ export class EmailProcessor extends WorkerHost {
     const terminal = error?.name === 'UnrecoverableError' || job.attemptsMade >= maxAttempts
     if (!terminal) return
 
+    this.metrics.incQueueEvent(QueueName.EMAIL, 'dead_letter')
     this.logger.error(
       {
         event: 'email.job.dead_letter',
@@ -169,6 +172,8 @@ export class EmailProcessor extends WorkerHost {
    */
   @OnWorkerEvent('error')
   onError(error: Error): void {
+    this.metrics.incRedisClientEvent('queue_worker', 'error')
+    this.metrics.incQueueEvent(QueueName.EMAIL, 'worker_error')
     this.logger.error(
       { event: 'queue.worker_error', error: error?.message },
       'Email worker Redis/connection error'

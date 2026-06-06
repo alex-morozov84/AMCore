@@ -10,4 +10,6 @@ export const METRIC_NAMES = {
   dbPoolConnections: 'amcore_db_pool_connections',
   dbSlowQueriesTotal: 'amcore_db_slow_queries_total',
   redisClientEventsTotal: 'amcore_redis_client_events_total',
+  queueJobs: 'amcore_queue_jobs',
+  queueEventsTotal: 'amcore_queue_events_total',
 } as const

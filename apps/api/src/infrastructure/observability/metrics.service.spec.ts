@@ -122,10 +122,12 @@ describe('MetricsService', () => {
     service.incDbSlowQuery()
     service.incRedisClientEvent('shared', 'error')
     service.incRedisClientEvent('throttler', 'degraded')
+    service.incQueueEvent('email', 'job_added')
 
     const output = await service.metrics()
     expect(output).toContain(`${METRIC_NAMES.dbSlowQueriesTotal}{role="web"`)
     expect(output).toContain('client="shared",event="error",role="web"')
     expect(output).toContain('client="throttler",event="degraded",role="web"')
+    expect(output).toContain('queue="email",event="job_added",role="web"')
   })
 })

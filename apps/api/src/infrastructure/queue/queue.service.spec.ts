@@ -9,11 +9,14 @@ import { AppException, NotFoundException } from '../../common/exceptions'
 import { QueueName } from './constants/queues.constant'
 import { QueueService } from './queue.service'
 
+import { MetricsService } from '@/infrastructure/observability'
+
 describe('QueueService', () => {
   let service: QueueService
   let defaultQueue: jest.Mocked<Queue>
   let emailQueue: jest.Mocked<Queue>
   let mockLogger: jest.Mocked<PinoLogger>
+  let metrics: jest.Mocked<Pick<MetricsService, 'incQueueEvent' | 'incRedisClientEvent'>>
 
   beforeEach(async () => {
     // Create mock queues. EventEmitter-based so the synchronous `queue.on('error')`
@@ -40,6 +43,10 @@ describe('QueueService', () => {
       error: jest.fn(),
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
+    metrics = {
+      incQueueEvent: jest.fn(),
+      incRedisClientEvent: jest.fn(),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,6 +62,10 @@ describe('QueueService', () => {
         {
           provide: PinoLogger,
           useValue: mockLogger,
+        },
+        {
+          provide: MetricsService,
+          useValue: metrics,
         },
       ],
     }).compile()
@@ -77,6 +88,8 @@ describe('QueueService', () => {
         expect.objectContaining({ event: 'queue.redis_error', queueName: QueueName.EMAIL }),
         expect.any(String)
       )
+      expect(metrics.incRedisClientEvent).toHaveBeenCalledWith('queue_producer', 'error')
+      expect(metrics.incQueueEvent).toHaveBeenCalledWith(QueueName.EMAIL, 'redis_error')
     })
 
     it('returns synchronously without awaiting the (possibly-never-ready) client', () => {
@@ -108,6 +121,8 @@ describe('QueueService', () => {
         expect.objectContaining({ event: 'queue.redis_reconnecting', queueName: QueueName.EMAIL }),
         expect.any(String)
       )
+      expect(metrics.incRedisClientEvent).toHaveBeenCalledWith('queue_producer', 'reconnecting')
+      expect(metrics.incQueueEvent).toHaveBeenCalledWith(QueueName.EMAIL, 'redis_reconnecting')
     })
 
     it('swallows a rejected client without breaking boot', async () => {
@@ -143,6 +158,7 @@ describe('QueueService', () => {
           backoff: { type: 'exponential', delay: 1000 },
         })
       )
+      expect(metrics.incQueueEvent).toHaveBeenCalledWith(QueueName.DEFAULT, 'job_added')
     })
 
     it('should throw NotFoundException for unknown queue', async () => {

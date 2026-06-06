@@ -51,6 +51,8 @@ describe('Observability metrics (e2e)', () => {
     expect(metrics.text).toContain('amcore_db_pool_connections{state="total"')
     expect(metrics.text).toContain('amcore_db_pool_connections{state="idle"')
     expect(metrics.text).toContain('amcore_db_pool_connections{state="waiting"')
+    expect(metrics.text).toContain('amcore_queue_jobs{queue="default",state="waiting"')
+    expect(metrics.text).toContain('amcore_queue_jobs{queue="email",state="waiting"')
     expect(metrics.text).toContain('status_code="401"')
     expect(metrics.text).toContain('status_code="404"')
     expect(metrics.text).toContain('status_code="429"')

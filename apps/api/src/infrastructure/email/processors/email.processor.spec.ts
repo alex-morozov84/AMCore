@@ -8,6 +8,7 @@ import { EmailTemplate } from '../email.types'
 
 import { EmailProcessor } from './email.processor'
 
+import { MetricsService } from '@/infrastructure/observability'
 import { JobName } from '@/infrastructure/queue/constants/queues.constant'
 
 // Mock @formatjs/intl (ESM module)
@@ -21,6 +22,7 @@ describe('EmailProcessor', () => {
   let processor: EmailProcessor
   let emailService: jest.Mocked<EmailService>
   let mockLogger: jest.Mocked<PinoLogger>
+  let metrics: jest.Mocked<Pick<MetricsService, 'incQueueEvent' | 'incRedisClientEvent'>>
 
   beforeEach(async () => {
     mockLogger = {
@@ -30,6 +32,10 @@ describe('EmailProcessor', () => {
       error: jest.fn(),
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
+    metrics = {
+      incQueueEvent: jest.fn(),
+      incRedisClientEvent: jest.fn(),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -44,6 +50,10 @@ describe('EmailProcessor', () => {
         {
           provide: PinoLogger,
           useValue: mockLogger,
+        },
+        {
+          provide: MetricsService,
+          useValue: metrics,
         },
       ],
     }).compile()
@@ -282,6 +292,7 @@ describe('EmailProcessor', () => {
         expect.objectContaining({ event: 'email.job.dead_letter', jobId: 'job-dl' }),
         expect.stringContaining('dead-lettered')
       )
+      expect(metrics.incQueueEvent).toHaveBeenCalledWith('email', 'dead_letter')
     })
 
     it('emits a dead-letter error immediately for an UnrecoverableError', () => {
@@ -292,12 +303,14 @@ describe('EmailProcessor', () => {
         expect.objectContaining({ event: 'email.job.dead_letter', unrecoverable: true }),
         expect.any(String)
       )
+      expect(metrics.incQueueEvent).toHaveBeenCalledWith('email', 'dead_letter')
     })
 
     it('stays silent on a non-terminal (will-retry) failure', () => {
       processor.onFailed(failedJob(1, 3), new Error('transient'))
 
       expect(mockLogger.error).not.toHaveBeenCalled()
+      expect(metrics.incQueueEvent).not.toHaveBeenCalled()
     })
   })
 
@@ -309,6 +322,8 @@ describe('EmailProcessor', () => {
         expect.objectContaining({ event: 'queue.worker_error', error: 'ECONNREFUSED' }),
         expect.stringContaining('worker Redis/connection error')
       )
+      expect(metrics.incRedisClientEvent).toHaveBeenCalledWith('queue_worker', 'error')
+      expect(metrics.incQueueEvent).toHaveBeenCalledWith('email', 'worker_error')
     })
   })
 })

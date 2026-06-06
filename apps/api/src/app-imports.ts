@@ -26,7 +26,7 @@ import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
 import { EmailModule, EmailWorkerModule } from './infrastructure/email'
 import { ObservabilityModule } from './infrastructure/observability'
-import { QueueModule } from './infrastructure/queue'
+import { QueueMetricsModule, QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
 import { StorageModule } from './infrastructure/storage'
@@ -175,7 +175,7 @@ export const webImports: Imports = [
  * scheduler (`NestScheduleModule.forRoot()` lives in ScheduleModule, so `@Cron`
  * jobs only register here).
  */
-export const workerImports: Imports = [EmailWorkerModule, ScheduleModule]
+export const workerImports: Imports = [EmailWorkerModule, QueueMetricsModule, ScheduleModule]
 
 /** Global filters/pipe/interceptor/guard + shutdown — every role. */
 export const appProviders: Provider[] = [

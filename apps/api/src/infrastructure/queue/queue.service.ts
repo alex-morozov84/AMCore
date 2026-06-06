@@ -10,14 +10,17 @@ import type { JobOptions } from './interfaces/job-options.interface'
 import { DEFAULT_JOB_OPTIONS } from './interfaces/job-options.interface'
 import type { IQueueService } from './interfaces/queue.interface'
 
+import { MetricsService } from '@/infrastructure/observability'
+
 @Injectable()
 export class QueueService implements IQueueService, OnModuleInit {
-  private readonly queues = new Map<string, Queue>()
+  private readonly queues = new Map<QueueName, Queue>()
 
   constructor(
     @InjectQueue(QueueName.DEFAULT) defaultQueue: Queue,
     @InjectQueue(QueueName.EMAIL) emailQueue: Queue,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly metrics: MetricsService
   ) {
     this.logger.setContext(QueueService.name)
     // Register all queues for easy access
@@ -50,12 +53,16 @@ export class QueueService implements IQueueService, OnModuleInit {
       // retryStrategy caps the reconnect interval at 2s, so a sustained outage
       // logs at most ~1/2s — no throttle needed.
       queue.on('error', (err: Error) => {
+        this.metrics.incRedisClientEvent('queue_producer', 'error')
+        this.metrics.incQueueEvent(queueName, 'redis_error')
         this.logger.error({ event: 'queue.redis_error', queueName, err }, 'Queue Redis error')
       })
 
       void queue.client
         .then((client) => {
           client.on('reconnecting', () => {
+            this.metrics.incRedisClientEvent('queue_producer', 'reconnecting')
+            this.metrics.incQueueEvent(queueName, 'redis_reconnecting')
             this.logger.warn(
               { event: 'queue.redis_reconnecting', queueName },
               'Queue Redis reconnecting'
@@ -87,13 +94,14 @@ export class QueueService implements IQueueService, OnModuleInit {
 
     const job = await queue.add(jobName, data, mergedOptions)
 
+    this.metrics.incQueueEvent(queueName as QueueName, 'job_added')
     this.logger.info({ jobId: job.id, jobName, queueName }, `Job added to queue "${queueName}"`)
 
     return job as Job<T>
   }
 
   getQueue(queueName: string): Queue | undefined {
-    return this.queues.get(queueName)
+    return this.queues.get(queueName as QueueName)
   }
 
   async removeJob(queueName: string, jobId: string): Promise<void> {

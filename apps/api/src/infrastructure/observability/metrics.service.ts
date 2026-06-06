@@ -18,6 +18,13 @@ type GaugeHandle<T extends string> = Pick<Gauge<T>, 'reset' | 'set'>
 
 export type RedisMetricsClient = 'shared' | 'queue_producer' | 'queue_worker' | 'throttler'
 export type RedisMetricsEvent = 'error' | 'reconnecting' | 'degraded'
+export type QueueMetricsEvent =
+  | 'job_added'
+  | 'redis_error'
+  | 'redis_reconnecting'
+  | 'worker_error'
+  | 'dead_letter'
+export type QueueMetricsQueue = 'default' | 'email'
 
 @Injectable()
 export class MetricsService implements OnModuleDestroy {
@@ -29,6 +36,7 @@ export class MetricsService implements OnModuleDestroy {
   private readonly metricsCollectorErrorsTotal: Counter<'collector'>
   private readonly dbSlowQueriesTotal: Counter<'role'>
   private readonly redisClientEventsTotal: Counter<'client' | 'event' | 'role'>
+  private readonly queueEventsTotal: Counter<'queue' | 'event' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -73,6 +81,10 @@ export class MetricsService implements OnModuleDestroy {
     this.redisClientEventsTotal = this.getOrCreateCounter(METRIC_NAMES.redisClientEventsTotal, {
       help: 'Total Redis client events by bounded client, event, and process role.',
       labelNames: ['client', 'event', 'role'],
+    })
+    this.queueEventsTotal = this.getOrCreateCounter(METRIC_NAMES.queueEventsTotal, {
+      help: 'Total queue events by bounded queue, event, and process role.',
+      labelNames: ['queue', 'event', 'role'],
     })
   }
 
@@ -124,12 +136,19 @@ export class MetricsService implements OnModuleDestroy {
     this.redisClientEventsTotal.inc({ client, event, role: this.role })
   }
 
+  incQueueEvent(queue: QueueMetricsQueue, event: QueueMetricsEvent): void {
+    if (!this.enabled) return
+    this.queueEventsTotal.inc({ queue, event, role: this.role })
+  }
+
   registerGauge<T extends string>(config: {
     name: string
     help: string
     labelNames: T[]
     collect: (gauge: GaugeHandle<T>) => void | Promise<void>
   }): void {
+    // Registration is intentionally first-wins. Reusing a metric name returns
+    // the existing gauge and keeps its original collect callback.
     this.getOrCreateGauge(config.name, {
       help: config.help,
       labelNames: config.labelNames,
