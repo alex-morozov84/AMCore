@@ -3,6 +3,7 @@ import { createClient } from '@redis/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { EnvService } from '../../env/env.service'
+import { MetricsService } from '../observability'
 
 export type AppRedisClient = ReturnType<typeof createClient>
 
@@ -12,7 +13,8 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly env: EnvService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly metrics: MetricsService
   ) {
     this.logger.setContext(RedisConnectionService.name)
     this.redisClient = createClient({
@@ -23,7 +25,11 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
     })
 
     this.redisClient.on('error', (error) => {
+      this.metrics.incRedisClientEvent('shared', 'error')
       this.logger.error({ err: error }, 'Redis client error')
+    })
+    this.redisClient.on('reconnecting', () => {
+      this.metrics.incRedisClientEvent('shared', 'reconnecting')
     })
   }
 

@@ -2,6 +2,7 @@ import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common'
 import { ThrottlerStorage, ThrottlerStorageService } from '@nestjs/throttler'
 import { PinoLogger } from 'nestjs-pino'
 
+import { MetricsService } from '../observability'
 import { REDIS_CLIENT } from '../redis/redis.constants'
 import type { AppRedisClient } from '../redis/redis-connection.service'
 
@@ -37,7 +38,8 @@ export class RedisThrottlerStorage implements ThrottlerStorage, OnApplicationShu
 
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: AppRedisClient,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly metrics: MetricsService
   ) {
     this.logger.setContext(RedisThrottlerStorage.name)
   }
@@ -54,6 +56,7 @@ export class RedisThrottlerStorage implements ThrottlerStorage, OnApplicationShu
         this.incrementRedis(key, ttl, limit, blockDuration, throttlerName)
       )
     } catch (err) {
+      this.metrics.incRedisClientEvent('throttler', 'degraded')
       this.logDegraded(err)
       return this.fallback.increment(key, ttl, limit, blockDuration, throttlerName)
     }

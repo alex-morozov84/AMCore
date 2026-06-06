@@ -2,6 +2,7 @@ import { createClient } from '@redis/client'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { PinoLogger } from 'nestjs-pino'
 
+import type { MetricsService } from '../src/infrastructure/observability'
 import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
 
 type RedisClient = ReturnType<typeof createClient>
@@ -10,6 +11,9 @@ const noopLogger = {
   setContext: () => undefined,
   error: () => undefined,
 } as unknown as PinoLogger
+const noopMetrics = {
+  incRedisClientEvent: () => undefined,
+} as unknown as MetricsService
 
 /**
  * Storage-boundary e2e for the Redis throttler. Uses only a real Redis
@@ -26,7 +30,7 @@ describe('RedisThrottlerStorage (e2e, real Redis)', () => {
     container = await new RedisContainer('redis:7-alpine').start()
     client = createClient({ url: container.getConnectionUrl() })
     await client.connect()
-    storage = new RedisThrottlerStorage(client as never, noopLogger)
+    storage = new RedisThrottlerStorage(client as never, noopLogger, noopMetrics)
   }, 120000)
 
   afterAll(async () => {
@@ -113,7 +117,7 @@ describe('RedisThrottlerStorage (e2e, real Redis)', () => {
   })
 
   it('shares counters across two storage instances over the same Redis', async () => {
-    const second = new RedisThrottlerStorage(client as never, noopLogger)
+    const second = new RedisThrottlerStorage(client as never, noopLogger, noopMetrics)
 
     await storage.increment('shared', 60000, 10, 60000, 'long')
     const fromSecond = await second.increment('shared', 60000, 10, 60000, 'long')

@@ -7,6 +7,7 @@ import { Pool } from 'pg'
 
 import type { Env } from '../env'
 import { EnvService } from '../env/env.service'
+import { MetricsService } from '../infrastructure/observability'
 
 type SlowQueryEvent = {
   query: string
@@ -39,13 +40,26 @@ export function logSlowQuery(
   )
 }
 
+export function handleSlowQuery(
+  event: SlowQueryEvent,
+  thresholdMs: number,
+  logger: Pick<PinoLogger, 'warn'>,
+  metrics: Pick<MetricsService, 'incDbSlowQuery'>
+): void {
+  if (event.duration > thresholdMs) {
+    metrics.incDbSlowQuery()
+  }
+  logSlowQuery(event, thresholdMs, logger)
+}
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly pool: Pool
 
   constructor(
     env: EnvService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly metrics: MetricsService
   ) {
     const pool = new Pool({
       connectionString: env.get('DATABASE_URL'),
@@ -79,7 +93,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       listener: (event: SlowQueryEvent) => void
     ) => void
     subscribeToQueries.call(this, 'query', (event) => {
-      logSlowQuery(event, slowQueryThresholdMs, this.logger)
+      handleSlowQuery(event, slowQueryThresholdMs, this.logger, this.metrics)
     })
   }
 

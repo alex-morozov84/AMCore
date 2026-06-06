@@ -1,5 +1,6 @@
 import { PinoLogger } from 'nestjs-pino'
 
+import type { MetricsService } from '../observability'
 import type { AppRedisClient } from '../redis/redis-connection.service'
 
 import { INCREMENT_SCRIPT, KEY_PREFIX } from './redis-throttler-storage.constants'
@@ -9,15 +10,18 @@ describe('RedisThrottlerStorage', () => {
   let storage: RedisThrottlerStorage
   let redis: jest.Mocked<Pick<AppRedisClient, 'eval'>>
   let logger: jest.Mocked<Pick<PinoLogger, 'setContext' | 'error'>>
+  let metrics: jest.Mocked<Pick<MetricsService, 'incRedisClientEvent'>>
 
   beforeEach(() => {
     redis = { eval: jest.fn() } as jest.Mocked<Pick<AppRedisClient, 'eval'>>
     logger = { setContext: jest.fn(), error: jest.fn() } as jest.Mocked<
       Pick<PinoLogger, 'setContext' | 'error'>
     >
+    metrics = { incRedisClientEvent: jest.fn() }
     storage = new RedisThrottlerStorage(
       redis as unknown as AppRedisClient,
-      logger as unknown as PinoLogger
+      logger as unknown as PinoLogger,
+      metrics as unknown as MetricsService
     )
   })
 
@@ -77,6 +81,7 @@ describe('RedisThrottlerStorage', () => {
       expect(record.totalHits).toBe(1)
       expect(record.isBlocked).toBe(false)
       expect(logger.error).toHaveBeenCalledTimes(1)
+      expect(metrics.incRedisClientEvent).toHaveBeenCalledWith('throttler', 'degraded')
     })
 
     it('falls back when the Redis call exceeds the timeout', async () => {
@@ -89,6 +94,7 @@ describe('RedisThrottlerStorage', () => {
 
       expect(record.totalHits).toBe(1)
       expect(logger.error).toHaveBeenCalledTimes(1)
+      expect(metrics.incRedisClientEvent).toHaveBeenCalledWith('throttler', 'degraded')
     })
 
     it('shares one held fallback instance across degraded calls', async () => {
@@ -100,6 +106,16 @@ describe('RedisThrottlerStorage', () => {
       // A fresh fallback per call would reset to 1 == fail-open.
       expect(first.totalHits).toBe(1)
       expect(second.totalHits).toBe(2)
+    })
+
+    it('counts every fallback even when degraded logs are debounced', async () => {
+      redis.eval.mockRejectedValue(new Error('redis down'))
+
+      await storage.increment('abc', 1000, 10, 1000, 'long')
+      await storage.increment('abc', 1000, 10, 1000, 'long')
+
+      expect(logger.error).toHaveBeenCalledTimes(1)
+      expect(metrics.incRedisClientEvent).toHaveBeenCalledTimes(2)
     })
   })
 })

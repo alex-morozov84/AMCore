@@ -41,21 +41,37 @@ scrape_configs:
 
 ## Current Metrics
 
-Stage 1 exports:
+AMCore currently exports:
 
 - default `prom-client` Node.js/process metrics (`process_*`, `nodejs_*`);
 - `amcore_http_requests_total{method,route,status_code,role}`;
 - `amcore_http_request_duration_seconds{method,route,status_code,role}`;
 - `amcore_http_requests_in_flight{method,route,role}`;
-- `amcore_metrics_collector_errors_total{collector}`.
+- `amcore_metrics_collector_errors_total{collector}`;
+- `amcore_db_pool_connections{state,role}`, where
+  `state=total|idle|waiting`;
+- `amcore_db_slow_queries_total{role}`;
+- `amcore_redis_client_events_total{client,event,role}`.
 
 HTTP metrics are captured with middleware and `res.on('finish')`, so guard
 rejections and unmatched routes are counted. `/api/v1/metrics` is excluded from
 its own HTTP metrics and from request logs. Health routes are excluded from logs
 but included in HTTP metrics.
 
-Future Arc 4 stages add DB, Redis, queue, cache, storage, media, email, and
-optional OpenTelemetry tracing.
+DB pool values are collected at scrape time from the process-local PostgreSQL
+pool. Slow-query metrics intentionally do not include query text or model names.
+
+Redis labels are bounded:
+
+- `client=shared|queue_producer|queue_worker|throttler`;
+- `event=error|reconnecting|degraded`.
+
+The shared node-redis client reports verified `error` and `reconnecting` events.
+The throttler reports every Redis fallback as `client=throttler,event=degraded`;
+its log remains debounced independently.
+
+Future Arc 4 stages add queue, cache, storage, media, email, and optional
+OpenTelemetry tracing.
 
 ## Label Rules
 

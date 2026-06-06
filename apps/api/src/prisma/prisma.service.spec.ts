@@ -1,8 +1,14 @@
 import type { PinoLogger } from 'nestjs-pino'
 
 import { EnvService } from '../env/env.service'
+import { MetricsService } from '../infrastructure/observability'
 
-import { logSlowQuery, PrismaService, resolveSlowQueryThresholdMs } from './prisma.service'
+import {
+  handleSlowQuery,
+  logSlowQuery,
+  PrismaService,
+  resolveSlowQueryThresholdMs,
+} from './prisma.service'
 
 describe('PrismaService slow query logging', () => {
   let logger: Pick<jest.Mocked<PinoLogger>, 'warn'>
@@ -71,6 +77,15 @@ describe('PrismaService slow query logging', () => {
 
     expect(logger.warn).not.toHaveBeenCalled()
   })
+
+  it('increments the metric only when the slow-query threshold is exceeded', () => {
+    const metrics = { incDbSlowQuery: jest.fn() }
+
+    handleSlowQuery({ query: 'SELECT 1', duration: 100 }, 100, logger, metrics)
+    handleSlowQuery({ query: 'SELECT 1', duration: 101 }, 100, logger, metrics)
+
+    expect(metrics.incDbSlowQuery).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('PrismaService constructor', () => {
@@ -87,13 +102,17 @@ describe('PrismaService constructor', () => {
       DATABASE_QUERY_TIMEOUT_MS: 30_000,
       NODE_ENV: 'test',
       SLOW_QUERY_THRESHOLD_MS: 100,
+      PROCESS_ROLE: 'web',
     }
     const env = { get: (key: string) => envValues[key] } as unknown as EnvService
     const logger = {
       setContext: jest.fn(),
       warn: jest.fn(),
     } as unknown as PinoLogger
+    const metrics = {
+      incDbSlowQuery: jest.fn(),
+    } as unknown as MetricsService
 
-    expect(() => new PrismaService(env, logger)).not.toThrow()
+    expect(() => new PrismaService(env, logger, metrics)).not.toThrow()
   })
 })

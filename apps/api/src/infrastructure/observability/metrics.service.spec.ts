@@ -23,6 +23,7 @@ describe('MetricsService', () => {
   }
 
   afterEach(() => {
+    jest.useRealTimers()
     for (const service of services.splice(0)) {
       service.onModuleDestroy()
     }
@@ -64,5 +65,67 @@ describe('MetricsService', () => {
     expect(line).toContain('role="web"')
     expect(line).toContain('service="amcore-api"')
     expect(line?.endsWith(' 1')).toBe(true)
+  })
+
+  it('registers a scrape-time gauge without exposing the registry', async () => {
+    const service = makeService()
+    let value = 3
+
+    service.registerGauge<'state'>({
+      name: 'amcore_test_connections',
+      help: 'Test connections.',
+      labelNames: ['state'],
+      collect: (gauge) => {
+        gauge.reset()
+        gauge.set({ state: 'active' }, value)
+      },
+    })
+
+    expect(await service.metrics()).toMatch(/amcore_test_connections\{[^}]*state="active"[^}]*} 3/)
+
+    value = 7
+    expect(await service.metrics()).toMatch(/amcore_test_connections\{[^}]*state="active"[^}]*} 7/)
+  })
+
+  it('returns collector fallback and counts errors', async () => {
+    const service = makeService()
+
+    const result = await service.withCollectorTimeout(
+      'queue_depth',
+      Promise.reject(new Error('redis down')),
+      []
+    )
+
+    expect(result).toEqual([])
+    expect(await service.metrics()).toContain(
+      `${METRIC_NAMES.metricsCollectorErrorsTotal}{collector="queue_depth"`
+    )
+  })
+
+  it('bounds a stalled collector with a timeout', async () => {
+    jest.useFakeTimers()
+    const service = makeService()
+
+    const pending = service.withCollectorTimeout(
+      'queue_depth',
+      new Promise<number>(() => undefined),
+      0
+    )
+    await jest.advanceTimersByTimeAsync(150)
+
+    await expect(pending).resolves.toBe(0)
+  })
+
+  it('increments bounded DB and Redis event counters', async () => {
+    const service = makeService()
+
+    service.incDbSlowQuery()
+    service.incRedisClientEvent('shared', 'error')
+    service.incRedisClientEvent('throttler', 'degraded')
+
+    const output = await service.metrics()
+    expect(output).toContain(`${METRIC_NAMES.dbSlowQueriesTotal}{role="web"`)
+    expect(output).toContain('client="shared",event="error",role="web"')
+    expect(output).toContain('client="throttler",event="degraded",role="web"')
   })
 })

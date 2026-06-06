@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common'
 import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client'
 
-import { METRIC_NAMES } from './metrics.constants'
+import { METRIC_NAMES, METRICS_COLLECTOR_TIMEOUT_MS } from './metrics.constants'
 
 import { EnvService } from '@/env/env.service'
 
@@ -14,6 +14,11 @@ type HttpLabels = {
 
 type InFlightLabels = Omit<HttpLabels, 'status_code'>
 
+type GaugeHandle<T extends string> = Pick<Gauge<T>, 'reset' | 'set'>
+
+export type RedisMetricsClient = 'shared' | 'queue_producer' | 'queue_worker' | 'throttler'
+export type RedisMetricsEvent = 'error' | 'reconnecting' | 'degraded'
+
 @Injectable()
 export class MetricsService implements OnModuleDestroy {
   private readonly registry = new Registry()
@@ -22,6 +27,8 @@ export class MetricsService implements OnModuleDestroy {
   private readonly httpRequestDurationSeconds: Histogram<keyof HttpLabels>
   private readonly httpRequestsInFlight: Gauge<keyof InFlightLabels>
   private readonly metricsCollectorErrorsTotal: Counter<'collector'>
+  private readonly dbSlowQueriesTotal: Counter<'role'>
+  private readonly redisClientEventsTotal: Counter<'client' | 'event' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -59,6 +66,14 @@ export class MetricsService implements OnModuleDestroy {
         labelNames: ['collector'],
       }
     )
+    this.dbSlowQueriesTotal = this.getOrCreateCounter(METRIC_NAMES.dbSlowQueriesTotal, {
+      help: 'Total slow database queries by process role.',
+      labelNames: ['role'],
+    })
+    this.redisClientEventsTotal = this.getOrCreateCounter(METRIC_NAMES.redisClientEventsTotal, {
+      help: 'Total Redis client events by bounded client, event, and process role.',
+      labelNames: ['client', 'event', 'role'],
+    })
   }
 
   get enabled(): boolean {
@@ -99,6 +114,50 @@ export class MetricsService implements OnModuleDestroy {
     this.metricsCollectorErrorsTotal.inc({ collector })
   }
 
+  incDbSlowQuery(): void {
+    if (!this.enabled) return
+    this.dbSlowQueriesTotal.inc({ role: this.role })
+  }
+
+  incRedisClientEvent(client: RedisMetricsClient, event: RedisMetricsEvent): void {
+    if (!this.enabled) return
+    this.redisClientEventsTotal.inc({ client, event, role: this.role })
+  }
+
+  registerGauge<T extends string>(config: {
+    name: string
+    help: string
+    labelNames: T[]
+    collect: (gauge: GaugeHandle<T>) => void | Promise<void>
+  }): void {
+    this.getOrCreateGauge(config.name, {
+      help: config.help,
+      labelNames: config.labelNames,
+      collect: function () {
+        return config.collect(this)
+      },
+    })
+  }
+
+  async withCollectorTimeout<T>(collector: string, operation: Promise<T>, fallback: T): Promise<T> {
+    let timer: NodeJS.Timeout | undefined
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`metrics collector "${collector}" timed out`)),
+        METRICS_COLLECTOR_TIMEOUT_MS
+      )
+    })
+
+    try {
+      return await Promise.race([operation, timeout])
+    } catch {
+      this.incCollectorError(collector)
+      return fallback
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
   onModuleDestroy(): void {
     this.registry.clear()
   }
@@ -119,7 +178,11 @@ export class MetricsService implements OnModuleDestroy {
 
   private getOrCreateGauge<T extends string>(
     name: string,
-    config: { help: string; labelNames: T[] }
+    config: {
+      help: string
+      labelNames: T[]
+      collect?: (this: Gauge<T>) => void | Promise<void>
+    }
   ): Gauge<T> {
     const existing = this.registry.getSingleMetric(name)
     if (existing) return existing as Gauge<T>
@@ -128,6 +191,7 @@ export class MetricsService implements OnModuleDestroy {
       help: config.help,
       labelNames: config.labelNames,
       registers: [this.registry],
+      collect: config.collect,
     })
   }
 
