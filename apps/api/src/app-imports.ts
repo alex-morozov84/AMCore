@@ -25,6 +25,7 @@ import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
 import { EmailModule, EmailWorkerModule } from './infrastructure/email'
+import { IdempotencyModule } from './infrastructure/idempotency'
 import { ObservabilityModule } from './infrastructure/observability'
 import { QueueMetricsModule, QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
@@ -161,6 +162,9 @@ export function coreImports(): Imports {
 
     // Inbound webhook verification primitives (ADR-044).
     WebhooksModule,
+
+    // HTTP idempotency primitive (ADR-043).
+    IdempotencyModule,
   ]
 }
 

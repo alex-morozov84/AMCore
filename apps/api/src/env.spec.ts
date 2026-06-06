@@ -43,6 +43,15 @@ describe('env validation', () => {
     expect(env.WEBHOOK_REPLAY_DEDUPE_TTL_SECONDS).toBe(120)
   })
 
+  it('applies idempotency defaults', () => {
+    const env = validate(baseEnv)
+
+    expect(env.IDEMPOTENCY_RETENTION_SECONDS).toBe(86400)
+    expect(env.IDEMPOTENCY_LOCK_TTL_SECONDS).toBe(30)
+    expect(env.IDEMPOTENCY_FAIL_MODE).toBe('open')
+    expect(env.IDEMPOTENCY_REDIS_TIMEOUT_MS).toBe(100)
+  })
+
   it('fails when an OAuth provider is only partially configured', () => {
     expect(() =>
       validate({

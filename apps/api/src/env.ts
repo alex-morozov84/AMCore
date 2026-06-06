@@ -54,6 +54,10 @@ const envSchema = z.preprocess(
       WEBHOOK_SECRETS: z.record(z.string(), z.string()).default({}),
       WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS: z.coerce.number().int().min(1).default(300),
       WEBHOOK_REPLAY_DEDUPE_TTL_SECONDS: z.coerce.number().int().min(1).optional(),
+      IDEMPOTENCY_RETENTION_SECONDS: z.coerce.number().int().min(1).default(86400),
+      IDEMPOTENCY_LOCK_TTL_SECONDS: z.coerce.number().int().min(1).default(30),
+      IDEMPOTENCY_FAIL_MODE: z.enum(['open', 'closed']).default('open'),
+      IDEMPOTENCY_REDIS_TIMEOUT_MS: z.coerce.number().int().min(1).default(100),
       // Bull Board queue dashboard. Disabled in production unless explicitly
       // enabled (EQS-01: zero default attack surface). In non-production it is
       // mounted but still protected by SUPER_ADMIN cookie auth. Enum-transform
