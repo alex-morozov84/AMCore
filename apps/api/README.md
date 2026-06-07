@@ -322,6 +322,7 @@ producer/service in a module that `web` can import safely.
 ## Documentation
 
 - [`docs/operations/deployment.md`](../../docs/operations/deployment.md) — Deployment & migration runbook
+- [`docs/operations/audit-log.md`](../../docs/operations/audit-log.md) — Persistent audit log semantics and append-only model
 - [`docs/operations/observability.md`](../../docs/operations/observability.md) — Metrics and tracing guide
 - [`docs/auth/`](../../docs/auth/README.md) — Complete auth & RBAC guide for developers
 - [`docs/authorization.md`](../../docs/authorization.md) — Authorization concepts
