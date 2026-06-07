@@ -30,6 +30,32 @@ enum SystemRole {
   @@schema("core")
 }
 
+enum AuditActorType {
+  USER
+  API_KEY
+  SYSTEM
+
+  @@schema("core")
+}
+
+enum AuditTargetType {
+  USER
+  API_KEY
+  ORG_INVITE
+  ORGANIZATION
+  SESSION
+  CLEANUP
+
+  @@schema("core")
+}
+
+enum AuditCategory {
+  SECURITY
+  BUSINESS
+
+  @@schema("core")
+}
+
 // -----------------------------
 // Models
 // -----------------------------
@@ -364,5 +390,28 @@ model OrgInvite {
   @@index([expiresAt])
   @@index([organizationId, createdAt])
   @@map("org_invites")
+  @@schema("core")
+}
+
+model AuditLog {
+  id             String           @id @default(cuid())
+  createdAt      DateTime         @default(now())
+  actorType      AuditActorType
+  actorId        String?
+  action         String
+  targetType     AuditTargetType?
+  targetId       String?
+  organizationId String?
+  requestId      String?
+  ip             String?
+  category       AuditCategory    @default(SECURITY)
+  metadata       Json
+
+  @@index([createdAt], type: Brin)
+  @@index([createdAt, id])
+  @@index([actorId])
+  @@index([targetId])
+  @@index([organizationId])
+  @@map("audit_log")
   @@schema("core")
 }
