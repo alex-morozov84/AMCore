@@ -6,6 +6,7 @@ import type { LoginInput, RegisterInput } from '@amcore/shared'
 import { AuthErrorCode } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
+import type { AuditLogService } from '../audit'
 
 import { AuthService } from './auth.service'
 import { EmailIdentityService } from './email-identity.service'
@@ -36,6 +37,7 @@ describe('AuthService', () => {
   let mockEnvService: { get: jest.Mock }
   let mockCache: { get: jest.Mock; set: jest.Mock }
   let mockLoginRateLimiter: jest.Mocked<LoginRateLimiterService>
+  let mockAuditLog: jest.Mocked<Pick<AuditLogService, 'record'>>
   let mockLogger: jest.Mocked<PinoLogger>
 
   const mockUser: User = {
@@ -131,6 +133,7 @@ describe('AuthService', () => {
       consume: jest.fn().mockResolvedValue(undefined),
       reset: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<LoginRateLimiterService>
+    mockAuditLog = { record: jest.fn().mockResolvedValue(undefined) }
 
     mockLogger = {
       setContext: jest.fn(),
@@ -150,6 +153,7 @@ describe('AuthService', () => {
       mockUserCacheService as never,
       mockEnvService as never,
       new EmailIdentityService(),
+      mockAuditLog as never,
       mockCache as never,
       mockLoginRateLimiter,
       mockLogger
@@ -565,6 +569,12 @@ describe('AuthService', () => {
       })
       expect(mockLoginRateLimiter.check).toHaveBeenCalledWith(mockUser.emailCanonical, '1.2.3.4')
       expect(mockLoginRateLimiter.consume).toHaveBeenCalledWith(mockUser.emailCanonical, '1.2.3.4')
+      expect(mockAuditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'auth.step_up_failed',
+          actorId: mockUser.id,
+        })
+      )
       expect(mockSessionService.touchLastAuth).not.toHaveBeenCalled()
     })
 
@@ -597,6 +607,12 @@ describe('AuthService', () => {
         systemRole: mockUser.systemRole,
         sid: 'session-123',
       })
+      expect(mockAuditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'auth.step_up_succeeded',
+          actorId: mockUser.id,
+        })
+      )
       // No new session, no rotation.
       expect(mockSessionService.createSession).not.toHaveBeenCalled()
       expect(mockSessionService.rotateRefreshToken).not.toHaveBeenCalled()

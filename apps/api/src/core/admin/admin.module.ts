@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 
 import { CleanupModule } from '../../infrastructure/schedule/cleanup.module'
 import { PrismaModule } from '../../prisma'
+import { AuditModule } from '../audit'
 
 import { AdminController } from './admin.controller'
 import { AdminService } from './admin.service'
@@ -10,7 +11,7 @@ import { AdminService } from './admin.service'
 // POST /admin/cleanup needs CleanupService, but must NOT pull in the scheduler
 // — otherwise the nightly cron would fire in the `web` role too (ADR-041).
 @Module({
-  imports: [PrismaModule, CleanupModule],
+  imports: [PrismaModule, CleanupModule, AuditModule],
   controllers: [AdminController],
   providers: [AdminService],
 })

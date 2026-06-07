@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import type { Prisma } from '@prisma/client'
+import { AuditActorType, AuditTargetType, type Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import {
@@ -15,6 +15,7 @@ import { BusinessRuleViolationException, NotFoundException } from '../../common/
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { CleanupService } from '../../infrastructure/schedule/cleanup.service'
 import { PrismaService } from '../../prisma'
+import { AuditLogService } from '../audit'
 
 type PrismaTx = Prisma.TransactionClient
 
@@ -67,6 +68,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cleanupService: CleanupService,
+    private readonly auditLog: AuditLogService,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(AdminService.name)
@@ -150,6 +152,23 @@ export class AdminService {
         data: { systemRole },
         select: ADMIN_USER_SELECT,
       })
+
+      await this.auditLog.record(
+        {
+          action: 'admin.user.system_role_changed',
+          actorId: actor.sub,
+          actorType: AuditActorType.USER,
+          metadata: {
+            afterSystemRole: updated.systemRole,
+            beforeSystemRole: target.systemRole,
+            pinoEvent: 'auth.admin.system_role_changed',
+          },
+          targetId: id,
+          targetType: AuditTargetType.USER,
+        },
+        { tx }
+      )
+
       return { before: target.systemRole, after: updated.systemRole, row: updated }
     })
 
@@ -178,6 +197,17 @@ export class AdminService {
    */
   async runCleanup(actor: RequestPrincipal): Promise<CleanupResult> {
     const result = await this.cleanupService.runCleanup()
+
+    await this.auditLog.record({
+      action: 'admin.cleanup.executed',
+      actorId: actor.sub,
+      actorType: AuditActorType.USER,
+      metadata: {
+        counts: result,
+        pinoEvent: 'auth.admin.cleanup_executed',
+      },
+      targetType: AuditTargetType.CLEANUP,
+    })
 
     this.logger.info(
       {
@@ -233,6 +263,18 @@ export class AdminService {
   private async revokeTargetSessions(targetUserId: string, actorUserId: string): Promise<void> {
     try {
       const { count } = await this.prisma.session.deleteMany({ where: { userId: targetUserId } })
+      await this.auditLog.record({
+        action: 'admin.user.sessions_revoked',
+        actorId: actorUserId,
+        actorType: AuditActorType.USER,
+        metadata: {
+          count,
+          pinoEvent: 'auth.admin.sessions_revoked',
+          reason: 'system_role_changed',
+        },
+        targetId: targetUserId,
+        targetType: AuditTargetType.USER,
+      })
       this.logger.info(
         { event: 'auth.admin.sessions_revoked', actorUserId, targetUserId, count },
         'Revoked target sessions after system-role change'

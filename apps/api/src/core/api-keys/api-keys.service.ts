@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { Inject, Injectable } from '@nestjs/common'
-import type { Prisma } from '@prisma/client'
+import { AuditActorType, AuditTargetType, type Prisma } from '@prisma/client'
 import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -11,6 +11,7 @@ import type { CreateApiKeyInput } from '@amcore/shared'
 
 import { ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
+import { AuditLogService } from '../audit'
 
 export interface CreateApiKeyResult {
   id: string
@@ -37,6 +38,7 @@ export class ApiKeysService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
+    private readonly auditLog: AuditLogService,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(ApiKeysService.name)
@@ -47,30 +49,52 @@ export class ApiKeysService {
     // member of the bound organization at creation time. Membership is
     // re-verified on each request by ApiKeyGuard (lazy invariant) so a
     // later loss of membership invalidates the credential.
-    const membership = await this.prisma.orgMember.findUnique({
-      where: { userId_organizationId: { userId, organizationId: input.organizationId } },
-      select: { id: true },
-    })
-
-    if (!membership) {
-      throw new ForbiddenException('Not a member of the specified organization')
-    }
-
     const { key, shortToken, longToken } = this.generateKey()
     const salt = randomBytes(16).toString('hex')
     const keyHash = this.hashLongToken(longToken, salt)
 
-    const apiKey = await this.prisma.apiKey.create({
-      data: {
-        name: input.name,
-        shortToken,
-        keyHash,
-        salt,
-        scopes: input.scopes,
-        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
-        userId,
-        organizationId: input.organizationId,
-      },
+    const apiKey = await this.prisma.$transaction(async (tx) => {
+      const membership = await tx.orgMember.findUnique({
+        where: { userId_organizationId: { userId, organizationId: input.organizationId } },
+        select: { id: true },
+      })
+
+      if (!membership) {
+        throw new ForbiddenException('Not a member of the specified organization')
+      }
+
+      const created = await tx.apiKey.create({
+        data: {
+          name: input.name,
+          shortToken,
+          keyHash,
+          salt,
+          scopes: input.scopes,
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+          userId,
+          organizationId: input.organizationId,
+        },
+      })
+
+      await this.auditLog.record(
+        {
+          action: 'api_key.created',
+          actorId: userId,
+          actorType: AuditActorType.USER,
+          metadata: {
+            expiresAt: created.expiresAt?.toISOString() ?? null,
+            name: created.name,
+            pinoEvent: 'api_key.created',
+            scopes: created.scopes,
+          },
+          organizationId: created.organizationId,
+          targetId: created.id,
+          targetType: AuditTargetType.API_KEY,
+        },
+        { tx }
+      )
+
+      return created
     })
 
     this.logger.info(
@@ -121,15 +145,40 @@ export class ApiKeysService {
   }
 
   async revoke(id: string, userId: string): Promise<void> {
-    const deleted = await this.prisma.apiKey.deleteMany({
-      where: { id, userId },
+    const deleted = await this.prisma.$transaction(async (tx) => {
+      const apiKey = await tx.apiKey.findUnique({
+        where: { id },
+        select: { id: true, organizationId: true, userId: true },
+      })
+
+      if (!apiKey || apiKey.userId !== userId) {
+        throw new NotFoundException('API key')
+      }
+
+      const result = await tx.apiKey.deleteMany({
+        where: { id, userId },
+      })
+
+      await this.auditLog.record(
+        {
+          action: 'api_key.revoked',
+          actorId: userId,
+          actorType: AuditActorType.USER,
+          metadata: {
+            pinoEvent: 'api_key.revoked',
+            reason: 'user_revoked',
+          },
+          organizationId: apiKey.organizationId,
+          targetId: id,
+          targetType: AuditTargetType.API_KEY,
+        },
+        { tx }
+      )
+
+      return result
     })
 
-    if (deleted.count === 0) {
-      throw new NotFoundException('API key')
-    }
-
-    this.logger.info({ userId, apiKeyId: id }, 'API key revoked')
+    this.logger.info({ userId, apiKeyId: id, deleted: deleted.count }, 'API key revoked')
   }
 
   async verifyByShortToken(

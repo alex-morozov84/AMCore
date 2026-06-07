@@ -10,6 +10,7 @@ import { BusinessRuleViolationException } from '../../common/exceptions/domain/b
 import type { EnvService } from '../../env/env.service'
 import type { EmailService } from '../../infrastructure/email'
 import type { PrismaService } from '../../prisma'
+import type { AuditLogService } from '../audit'
 import { EmailIdentityService } from '../auth/email-identity.service'
 import type { UserCacheService } from '../auth/user-cache.service'
 
@@ -39,6 +40,7 @@ describe('InviteService', () => {
   let inviteRateLimiter: jest.Mocked<Pick<InviteRateLimiterService, 'check' | 'consume'>>
   let acceptLimiter: jest.Mocked<Pick<InviteAcceptLimiterService, 'check' | 'consume' | 'reset'>>
   let emailService: jest.Mocked<Pick<EmailService, 'sendOrgInviteEmail'>>
+  let auditLog: jest.Mocked<Pick<AuditLogService, 'record'>>
   let env: { get: jest.Mock }
   let logger: jest.Mocked<PinoLogger>
 
@@ -118,6 +120,7 @@ describe('InviteService', () => {
       reset: jest.fn().mockResolvedValue(undefined),
     }
     emailService = { sendOrgInviteEmail: jest.fn().mockResolvedValue(undefined) }
+    auditLog = { record: jest.fn().mockResolvedValue(undefined) }
     env = { get: jest.fn().mockReturnValue('https://app.example.com') }
     logger = {
       setContext: jest.fn(),
@@ -137,6 +140,7 @@ describe('InviteService', () => {
       acceptLimiter as unknown as InviteAcceptLimiterService,
       emailService as unknown as EmailService,
       env as unknown as EnvService,
+      auditLog as unknown as AuditLogService,
       logger
     )
     ;(prisma.$transaction as unknown as jest.Mock).mockImplementation(
@@ -180,6 +184,14 @@ describe('InviteService', () => {
       expect(auditCall).toBeDefined()
       expect(auditCall?.[0]).toEqual(
         expect.objectContaining({ branch: 'pending_known_user', actorCredentialType: 'jwt' })
+      )
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'org.invite_created',
+          organizationId: 'org-1',
+          targetId: 'invite-1',
+        }),
+        expect.objectContaining({ tx: prisma })
       )
     })
 
@@ -230,6 +242,10 @@ describe('InviteService', () => {
       )
       expect(auditCall?.[0]).toEqual(
         expect.objectContaining({ branch: 'noop_already_member', inviteId: null, roleId: null })
+      )
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'org.invite_created' }),
+        expect.objectContaining({ tx: prisma })
       )
     })
 
@@ -323,6 +339,29 @@ describe('InviteService', () => {
       const payload = auditCall?.[0] as { emailHash: string }
       expect(payload.emailHash).toMatch(/^[0-9a-f]{64}$/)
       expect(JSON.stringify(payload)).not.toContain('leak-check@example.com')
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.not.objectContaining({
+            email: expect.anything(),
+            token: expect.anything(),
+          }),
+        }),
+        expect.anything()
+      )
+    })
+
+    it('fails closed when transactional audit insert fails', async () => {
+      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findUnique.mockResolvedValue(memberRole)
+      prisma.user.findUnique.mockResolvedValue(null)
+      prisma.orgInvite.findFirst.mockResolvedValue(null)
+      prisma.orgInvite.create.mockResolvedValue(inviteRow)
+      auditLog.record.mockRejectedValueOnce(new Error('audit down'))
+
+      await expect(
+        service.createInvite('org-1', { email: 'audit@example.com' }, principal)
+      ).rejects.toThrow('audit down')
+      expect(emailService.sendOrgInviteEmail).not.toHaveBeenCalled()
     })
   })
 
@@ -524,6 +563,7 @@ describe('InviteService', () => {
       })
       await expect(service.revokeInvite('org-1', inviteRow.id, principal)).resolves.toBeUndefined()
       expect(prisma.orgInvite.update).not.toHaveBeenCalled()
+      expect(auditLog.record).not.toHaveBeenCalled()
       const auditCall = logger.info.mock.calls.find(
         ([payload]) => (payload as { event?: string }).event === 'org.invite.revoked'
       )
@@ -551,6 +591,13 @@ describe('InviteService', () => {
       )
       expect(auditCall?.[0]).toEqual(
         expect.objectContaining({ actorUserId: principal.sub, inviteId: inviteRow.id })
+      )
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'org.invite_revoked',
+          organizationId: 'org-1',
+          targetId: inviteRow.id,
+        })
       )
     })
 
@@ -705,6 +752,14 @@ describe('InviteService', () => {
           roleId: 'role-member',
           actorUserId: acceptUser.id,
         })
+      )
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'org.invite_accepted',
+          organizationId: 'org-1',
+          targetId: inviteRow.id,
+        }),
+        expect.objectContaining({ tx: prisma })
       )
     })
 

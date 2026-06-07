@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 
 import { HttpStatus, Injectable } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { AuditActorType, AuditTargetType, Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { CreateInviteInput } from '@amcore/shared'
@@ -18,6 +18,7 @@ import { BusinessRuleViolationException } from '../../common/exceptions/domain/b
 import { EnvService } from '../../env/env.service'
 import { EmailService } from '../../infrastructure/email'
 import { PrismaService } from '../../prisma'
+import { AuditLogService } from '../audit'
 import { EmailIdentityService } from '../auth/email-identity.service'
 import { UserCacheService } from '../auth/user-cache.service'
 
@@ -104,6 +105,7 @@ export class InviteService {
     private readonly acceptLimiter: InviteAcceptLimiterService,
     private readonly emailService: EmailService,
     private readonly env: EnvService,
+    private readonly auditLog: AuditLogService,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(InviteService.name)
@@ -126,6 +128,7 @@ export class InviteService {
     await this.inviteRateLimiter.consume(orgId, emailCanonical, principal.sub)
 
     const roleId = dto.roleId ?? (await this.getSystemRoleId('MEMBER'))
+    const emailHash = this.hashEmail(emailCanonical)
 
     const result: CreateInviteResult = await this.prisma.$transaction(async (tx) => {
       await this.acquireXactLock(tx, `org-invite:${orgId}:${emailCanonical}`)
@@ -153,6 +156,23 @@ export class InviteService {
           select: { id: true },
         })
         if (existingMember) {
+          await this.auditLog.record(
+            {
+              action: 'org.invite_created',
+              actorId: principal.sub,
+              actorType: AuditActorType.USER,
+              metadata: {
+                actorCredentialType: principal.type,
+                branch: 'noop_already_member',
+                emailHash,
+                pinoEvent: 'org.invite.created',
+                roleId: null,
+              },
+              organizationId: orgId,
+              targetType: AuditTargetType.ORG_INVITE,
+            },
+            { tx }
+          )
           return {
             branch: 'noop_already_member' as const,
             inviteId: null,
@@ -194,6 +214,24 @@ export class InviteService {
             email: dto.email,
           },
         })
+        await this.auditLog.record(
+          {
+            action: 'org.invite_created',
+            actorId: principal.sub,
+            actorType: AuditActorType.USER,
+            metadata: {
+              actorCredentialType: principal.type,
+              branch: 'rotated_existing',
+              emailHash,
+              pinoEvent: 'org.invite.created',
+              roleId,
+            },
+            organizationId: orgId,
+            targetId: existing.id,
+            targetType: AuditTargetType.ORG_INVITE,
+          },
+          { tx }
+        )
         return {
           branch: 'rotated_existing' as const,
           inviteId: existing.id,
@@ -215,6 +253,26 @@ export class InviteService {
         },
         select: { id: true },
       })
+
+      await this.auditLog.record(
+        {
+          action: 'org.invite_created',
+          actorId: principal.sub,
+          actorType: AuditActorType.USER,
+          metadata: {
+            actorCredentialType: principal.type,
+            branch: targetUser ? 'pending_known_user' : 'pending_new_email',
+            emailHash,
+            pinoEvent: 'org.invite.created',
+            roleId,
+          },
+          organizationId: orgId,
+          targetId: created.id,
+          targetType: AuditTargetType.ORG_INVITE,
+        },
+        { tx }
+      )
+
       return {
         branch: (targetUser ? 'pending_known_user' : 'pending_new_email') as CreateInviteBranch,
         inviteId: created.id,
@@ -321,6 +379,7 @@ export class InviteService {
       select: {
         id: true,
         organizationId: true,
+        emailCanonical: true,
         acceptedAt: true,
         revokedAt: true,
       },
@@ -378,6 +437,20 @@ export class InviteService {
       },
       'Org invite revoked'
     )
+
+    await this.auditLog.record({
+      action: 'org.invite_revoked',
+      actorId: principal.sub,
+      actorType: AuditActorType.USER,
+      metadata: {
+        actorCredentialType: principal.type,
+        emailHash: this.hashEmail(invite.emailCanonical),
+        pinoEvent: 'org.invite.revoked',
+      },
+      organizationId: orgId,
+      targetId: inviteId,
+      targetType: AuditTargetType.ORG_INVITE,
+    })
   }
 
   async acceptInvite(
@@ -481,6 +554,23 @@ export class InviteService {
         await tx.memberRole.create({ data: { memberId: member.id, roleId: assignedRoleId } })
 
         await this.orgsService.bumpAclVersionTx(orgId, tx)
+        await this.auditLog.record(
+          {
+            action: 'org.invite_accepted',
+            actorId: user.id,
+            actorType: AuditActorType.USER,
+            metadata: {
+              actorCredentialType: principal.type,
+              emailHash: this.hashEmail(invite.emailCanonical),
+              pinoEvent: 'org.invite.accepted',
+              roleId: assignedRoleId,
+            },
+            organizationId: orgId,
+            targetId: invite.id,
+            targetType: AuditTargetType.ORG_INVITE,
+          },
+          { tx }
+        )
       })
     } catch (e) {
       // Decision-class failures (the invalidOrExpired re-throw, the

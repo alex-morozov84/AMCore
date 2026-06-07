@@ -9,6 +9,7 @@ import { EmailModule } from '../../infrastructure/email'
 import { MediaModule } from '../../infrastructure/media'
 import { PrismaModule } from '../../prisma'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
+import { AuditModule } from '../audit'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
@@ -45,6 +46,7 @@ import { UserCacheService } from './user-cache.service'
     PassportModule,
     EmailModule,
     ApiKeysModule,
+    AuditModule,
     MediaModule,
     JwtModule.registerAsync({
       imports: [EnvModule],

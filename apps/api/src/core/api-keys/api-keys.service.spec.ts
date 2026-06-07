@@ -3,6 +3,7 @@ import type { Cache } from 'cache-manager'
 import type { PinoLogger } from 'nestjs-pino'
 
 import { ForbiddenException, NotFoundException } from '../../common/exceptions'
+import type { AuditLogService } from '../audit'
 import { createMockContext, type MockContext, mockContextToPrisma } from '../auth/test-context'
 
 import { ApiKeysService } from './api-keys.service'
@@ -11,6 +12,7 @@ describe('ApiKeysService', () => {
   let service: ApiKeysService
   let mockCtx: MockContext
   let mockCache: jest.Mocked<Pick<Cache, 'get' | 'set' | 'del'>>
+  let mockAuditLog: jest.Mocked<Pick<AuditLogService, 'record'>>
   let mockLogger: jest.Mocked<PinoLogger>
 
   const mockApiKey = {
@@ -48,9 +50,18 @@ describe('ApiKeysService', () => {
       error: jest.fn(),
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
+    mockAuditLog = { record: jest.fn().mockResolvedValue(undefined) }
 
     const prisma = mockContextToPrisma(mockCtx)
-    service = new ApiKeysService(prisma, mockCache as unknown as Cache, mockLogger)
+    service = new ApiKeysService(
+      prisma,
+      mockCache as unknown as Cache,
+      mockAuditLog as unknown as AuditLogService,
+      mockLogger
+    )
+    ;(mockCtx.prisma.$transaction as unknown as jest.Mock).mockImplementation(
+      async (cb: (tx: typeof mockCtx.prisma) => Promise<unknown>) => cb(mockCtx.prisma)
+    )
   })
 
   afterEach(() => {
@@ -104,6 +115,14 @@ describe('ApiKeysService', () => {
       const createCall = mockCtx.prisma.apiKey.create.mock.calls[0]![0]!
       expect(createCall.data.organizationId).toBe('org-1')
       expect(result.organizationId).toBe('org-1')
+      expect(mockAuditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'api_key.created',
+          organizationId: 'org-1',
+          targetId: 'key-1',
+        }),
+        expect.objectContaining({ tx: mockCtx.prisma })
+      )
     })
 
     // AK-04 / ADR-033: creator must be a member of the bound organization.
@@ -124,6 +143,14 @@ describe('ApiKeysService', () => {
         where: { userId_organizationId: { userId: 'user-1', organizationId: 'org-1' } },
         select: { id: true },
       })
+    })
+
+    it('fails closed when transactional audit insert fails', async () => {
+      mockMembership(true)
+      mockCtx.prisma.apiKey.create.mockResolvedValue(mockApiKey)
+      mockAuditLog.record.mockRejectedValueOnce(new Error('audit down'))
+
+      await expect(service.create('user-1', validInput)).rejects.toThrow('audit down')
     })
   })
 
@@ -159,6 +186,11 @@ describe('ApiKeysService', () => {
 
   describe('revoke', () => {
     it('should delete when id and userId match', async () => {
+      mockCtx.prisma.apiKey.findUnique.mockResolvedValue({
+        id: 'key-1',
+        organizationId: 'org-1',
+        userId: 'user-1',
+      } as never)
       mockCtx.prisma.apiKey.deleteMany.mockResolvedValue({ count: 1 })
 
       await expect(service.revoke('key-1', 'user-1')).resolves.not.toThrow()
@@ -166,10 +198,18 @@ describe('ApiKeysService', () => {
       expect(mockCtx.prisma.apiKey.deleteMany).toHaveBeenCalledWith({
         where: { id: 'key-1', userId: 'user-1' },
       })
+      expect(mockAuditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'api_key.revoked',
+          organizationId: 'org-1',
+          targetId: 'key-1',
+        }),
+        expect.objectContaining({ tx: mockCtx.prisma })
+      )
     })
 
     it('should throw NotFoundException when not found or not owned by user', async () => {
-      mockCtx.prisma.apiKey.deleteMany.mockResolvedValue({ count: 0 })
+      mockCtx.prisma.apiKey.findUnique.mockResolvedValue(null)
 
       await expect(service.revoke('key-1', 'wrong-user')).rejects.toThrow(NotFoundException)
     })

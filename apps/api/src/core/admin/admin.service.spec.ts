@@ -8,6 +8,7 @@ import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions'
 import type { CleanupService } from '../../infrastructure/schedule/cleanup.service'
 import type { PrismaService } from '../../prisma'
+import type { AuditLogService } from '../audit'
 
 import { AdminService } from './admin.service'
 
@@ -15,6 +16,7 @@ describe('AdminService', () => {
   let service: AdminService
   let prisma: DeepMockProxy<PrismaClient>
   let cleanupService: jest.Mocked<Pick<CleanupService, 'runCleanup'>>
+  let auditLog: jest.Mocked<Pick<AuditLogService, 'record'>>
   let logger: jest.Mocked<PinoLogger>
 
   const createdAt = new Date('2026-05-01T10:00:00.000Z')
@@ -56,6 +58,7 @@ describe('AdminService', () => {
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
     cleanupService = { runCleanup: jest.fn() }
+    auditLog = { record: jest.fn().mockResolvedValue(undefined) }
     logger = {
       setContext: jest.fn(),
       info: jest.fn(),
@@ -66,6 +69,7 @@ describe('AdminService', () => {
     service = new AdminService(
       prisma as unknown as PrismaService,
       cleanupService as unknown as CleanupService,
+      auditLog as unknown as AuditLogService,
       logger
     )
     // Delegate $transaction callbacks to the same prisma mock so test
@@ -174,6 +178,27 @@ describe('AdminService', () => {
           data: { systemRole: SystemRole.SuperAdmin },
         })
       )
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'admin.user.system_role_changed',
+          actorId: actor.sub,
+          targetId: 'user-1',
+        }),
+        expect.objectContaining({ tx: prisma })
+      )
+    })
+
+    it('fails closed when transactional audit insert fails', async () => {
+      const target: User = { ...mockUser, id: 'user-1', systemRole: 'USER' }
+      const updated: User = { ...target, systemRole: 'SUPER_ADMIN' }
+      prisma.user.findUnique.mockResolvedValue(target)
+      prisma.user.update.mockResolvedValue(updated)
+      auditLog.record.mockRejectedValueOnce(new Error('audit down'))
+
+      await expect(
+        service.updateUserSystemRole('user-1', SystemRole.SuperAdmin, actor)
+      ).rejects.toThrow('audit down')
+      expect(prisma.session.deleteMany).not.toHaveBeenCalled()
     })
 
     /** OA-07: update also uses ADMIN_USER_SELECT and returns sanitized shape. */
@@ -411,6 +436,12 @@ describe('AdminService', () => {
 
       expect(result).toEqual(mockResult)
       expect(cleanupService.runCleanup).toHaveBeenCalled()
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'admin.cleanup.executed',
+          actorId: actor.sub,
+        })
+      )
       expect(logger.info).toHaveBeenCalledWith(
         {
           event: 'auth.admin.cleanup_executed',
@@ -425,6 +456,7 @@ describe('AdminService', () => {
       cleanupService.runCleanup.mockRejectedValue(new Error('cleanup failed'))
 
       await expect(service.runCleanup(actor)).rejects.toThrow('cleanup failed')
+      expect(auditLog.record).not.toHaveBeenCalled()
       const auditCalls = logger.info.mock.calls.filter(
         (c) => (c[0] as { event?: string }).event === 'auth.admin.cleanup_executed'
       )

@@ -1,5 +1,6 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { HttpStatus, Inject, Injectable } from '@nestjs/common'
+import { AuditActorType, AuditTargetType } from '@prisma/client'
 import * as argon2 from 'argon2'
 import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
@@ -11,6 +12,7 @@ import { AppException } from '../../common/exceptions'
 import { EnvService } from '../../env/env.service'
 import { EmailService } from '../../infrastructure/email'
 import { PrismaService } from '../../prisma'
+import { AuditLogService } from '../audit'
 
 import { EmailIdentityService } from './email-identity.service'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
@@ -41,6 +43,7 @@ export class AuthService {
     private readonly userCacheService: UserCacheService,
     private readonly env: EnvService,
     private readonly emailIdentity: EmailIdentityService,
+    private readonly auditLog: AuditLogService,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly loginRateLimiter: LoginRateLimiterService,
     private readonly logger: PinoLogger
@@ -222,6 +225,7 @@ export class AuthService {
   ): Promise<{ accessToken: string }> {
     const sid = principal.sid
     if (!sid) {
+      await this.recordStepUp(principal.sub, sid, 'auth.step_up_failed', 'no_session')
       // Legacy token without a session id — cannot identify the session to bump.
       throw this.stepUpRequired()
     }
@@ -232,6 +236,7 @@ export class AuthService {
     // gets STEP_UP_REQUIRED, not STEP_UP_METHOD_UNAVAILABLE.
     const live = await this.sessionService.hasLiveSession(sid, principal.sub)
     if (!live) {
+      await this.recordStepUp(principal.sub, sid, 'auth.step_up_failed', 'no_session')
       this.logger.warn(
         { event: 'auth.step_up.failed', userId: principal.sub, reason: 'no_session' },
         'Step-up failed: current session not live'
@@ -241,11 +246,13 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({ where: { id: principal.sub } })
     if (!user) {
+      await this.recordStepUp(principal.sub, sid, 'auth.step_up_failed', 'no_session')
       throw this.stepUpRequired()
     }
 
     // OAuth-only accounts have no password; factor-based step-up is future MFA.
     if (!user.passwordHash) {
+      await this.recordStepUp(user.id, sid, 'auth.step_up_failed', 'method_unavailable')
       this.logger.warn(
         { event: 'auth.step_up.failed', userId: user.id, reason: 'method_unavailable' },
         'Step-up unavailable: account has no password'
@@ -263,6 +270,7 @@ export class AuthService {
     const valid = await argon2.verify(user.passwordHash, password)
     if (!valid) {
       await this.loginRateLimiter.consume(user.emailCanonical, ip)
+      await this.recordStepUp(user.id, sid, 'auth.step_up_failed', 'invalid_password')
       this.logger.warn(
         { event: 'auth.step_up.failed', userId: user.id, reason: 'invalid_password' },
         'Step-up failed: invalid password'
@@ -280,6 +288,7 @@ export class AuthService {
     // Stage 1 role change, logged out, expired) → must re-login.
     const touched = await this.sessionService.touchLastAuth(sid, user.id)
     if (touched === 0) {
+      await this.recordStepUp(user.id, sid, 'auth.step_up_failed', 'no_session')
       this.logger.warn(
         { event: 'auth.step_up.failed', userId: user.id, reason: 'no_session' },
         'Step-up failed: current session not found'
@@ -293,6 +302,8 @@ export class AuthService {
       systemRole: user.systemRole,
       sid,
     })
+
+    await this.recordStepUp(user.id, sid, 'auth.step_up_succeeded')
 
     this.logger.info(
       { event: 'auth.step_up.succeeded', userId: user.id, sessionId: sid },
@@ -308,6 +319,25 @@ export class AuthService {
       HttpStatus.FORBIDDEN,
       AuthErrorCode.STEP_UP_REQUIRED
     )
+  }
+
+  private async recordStepUp(
+    actorId: string,
+    sessionId: string | undefined,
+    action: 'auth.step_up_failed' | 'auth.step_up_succeeded',
+    reason?: string
+  ): Promise<void> {
+    await this.auditLog.record({
+      action,
+      actorId,
+      actorType: AuditActorType.USER,
+      metadata:
+        action === 'auth.step_up_failed'
+          ? { pinoEvent: 'auth.step_up.failed', reason }
+          : { pinoEvent: 'auth.step_up.succeeded', sessionId },
+      targetId: sessionId ?? null,
+      targetType: AuditTargetType.SESSION,
+    })
   }
 
   /** Get user by ID */
