@@ -1,0 +1,25 @@
+[extend]
+useDefault = true
+
+# Documentation intentionally contains FAKE example tokens. They must follow a
+# placeholder convention so a REAL secret pasted into docs is still caught:
+#   - truncate with `...` (for example `Bearer eyJhbGci...`)
+#   - bracket placeholders (`Bearer <admin token>` / `Bearer {access token}`)
+#   - reuse the canonical fake key
+#     `amcore_live_a1B2c3D4e5F_x9Y8z7W6v5U4t3S2r1Q0p9O8n7M6l5K4`
+# If a new doc example trips gitleaks: first make the example obviously fake per
+# the rules above, then add a narrow regex below only if it is a genuinely new
+# placeholder shape. Never exclude a whole file/path or disable a rule.
+# condition="AND" + paths=docs keeps real secrets in docs detectable.
+[[allowlists]]
+description = "Documentation placeholder tokens and keys"
+condition = "AND"
+paths = ['''docs/.*\.md$''']
+regexTarget = "line"
+regexes = [
+  '''Bearer eyJhbGci\.\.\.''',
+  '''amcore_live_a1B2c3D4e5F_x9Y8z7W6v5U4t3S2r1Q0p9O8n7M6l5K4''',
+  '''\.eyJ[A-Za-z0-9_-]+\.signature\b''',
+  '''Bearer <[^>]+>''',
+  '''Bearer \{[^}]+\}''',
+]
