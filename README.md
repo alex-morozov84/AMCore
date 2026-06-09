@@ -168,6 +168,12 @@ pnpm dev
 > `COMPOSE_DATABASE_URL` / `COMPOSE_REDIS_URL` (and the S3 vars) in `.env`. See
 > [`docs/operations/deployment.md`](docs/operations/deployment.md).
 
+> **Forking this starter?** After cloning, enable the repository protections that
+> don't travel with git — branch rules, secret scanning, push protection — with one
+> command: `bash scripts/setup-repo-security.sh` (needs `gh` + `jq` and repo admin).
+> See [`docs/operations/ci-security.md`](docs/operations/ci-security.md) →
+> _Security setup after forking_.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
 ## Author
