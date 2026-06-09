@@ -1,0 +1,16 @@
+# Force compose to reuse the CI-built API image for migrate/api/worker.
+services:
+  migrate:
+    build: !reset null
+    image: ${AMCORE_API_IMAGE}
+    pull_policy: never
+
+  api:
+    build: !reset null
+    image: ${AMCORE_API_IMAGE}
+    pull_policy: never
+
+  worker:
+    build: !reset null
+    image: ${AMCORE_API_IMAGE}
+    pull_policy: never
