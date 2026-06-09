@@ -37,17 +37,32 @@ of workflow self-hardening to keep the example forkable.
 
 ## Manual Repository Prerequisites
 
-Some controls cannot be enabled from workflow YAML and must be configured in the
-GitHub repository settings:
+Most repository-level controls can be applied as code with:
 
-- **Dependency graph** must be enabled or `dependency-review-action` cannot
-  analyze manifest changes.
-- **GitHub native secret scanning** should be enabled for the repository.
-- **Push protection** should be enabled alongside native secret scanning.
+```bash
+bash ./scripts/setup-repo-security.sh
+```
+
+The script requires:
+
+- repository admin access;
+- authenticated `gh`;
+- `jq`.
+
+It enables dependency graph, native secret scanning, push protection, and
+imports the repository rulesets for `main` and `develop`.
+
+Some controls still remain outside workflow YAML and ruleset JSON:
+
 - **Branch protection** for `main` / `develop` remains a manual repository
-  governance step.
+  governance step until `scripts/setup-repo-security.sh` is run.
 
-These are documented here as operator prerequisites, not automated by CI.
+After a new ruleset is imported, required check contexts only become selectable
+once those checks have run at least once on the repository.
+
+The repository rulesets intentionally use `required_approving_review_count: 0`
+for a solo-maintainer flow: PR-only merges are enforced, but self-merge stays
+possible. Raise this to `1+` when the repository gains a second maintainer.
 
 ## Maintenance Notes
 
