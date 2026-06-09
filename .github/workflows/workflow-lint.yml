@@ -1,0 +1,59 @@
+name: Workflow Lint
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-workflows:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_LINUX_AMD64_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          asset="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$asset" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${asset}"
+          printf '%s  %s\n' "$ACTIONLINT_LINUX_AMD64_SHA256" "$RUNNER_TEMP/$asset" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$asset" -C "$RUNNER_TEMP/bin" actionlint
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install zizmor
+        env:
+          ZIZMOR_VERSION: 1.25.2
+          ZIZMOR_LINUX_X64_SHA256: aa1facd105f0d83fe5c55b1adcd9d7417de5d83aa27471f91dc0b66cf3803577
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          asset="zizmor-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$asset" \
+            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/${asset}"
+          printf '%s  %s\n' "$ZIZMOR_LINUX_X64_SHA256" "$RUNNER_TEMP/$asset" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$asset" -C "$RUNNER_TEMP/bin" zizmor
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Verify action pins
+        run: bash ./scripts/verify-action-pins.sh
+
+      - name: Lint workflows with actionlint
+        run: actionlint
+
+      - name: Audit workflows with zizmor
+        run: zizmor --offline .github/workflows/*.yml
