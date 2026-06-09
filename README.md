@@ -63,7 +63,7 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 - Global rate limiting (10 req/s + 100 req/min via `@nestjs/throttler`), Redis-backed so limits are shared across API replicas; degrades to local in-memory limits if Redis is unavailable (ADR-039)
 - Helmet, CORS, cookie parser
 - Swagger/OpenAPI at `/docs` (dev only)
-- CI/CD: lint, typecheck, test, build (4 parallel jobs), Dependabot
+- CI/CD: lint, typecheck, test, build, boot-smoke, security scans, Dependabot
 
 ### Authentication
 
@@ -132,6 +132,7 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 - [`docs/operations/idempotency.md`](docs/operations/idempotency.md) — HTTP idempotency contract and operations guide
 - [`docs/operations/audit-log.md`](docs/operations/audit-log.md) — Persistent audit log semantics and append-only model
 - [`docs/operations/observability.md`](docs/operations/observability.md) — Metrics and tracing guide
+- [`docs/operations/ci-security.md`](docs/operations/ci-security.md) — CI security automation and manual repo prerequisites
 - [`apps/api/README.md`](apps/api/README.md) — Backend architecture
 
 ## Quick Start
