@@ -18,6 +18,8 @@ paths = ['''docs/.*\.md$''']
 regexTarget = "line"
 regexes = [
   '''Bearer eyJhbGci\.\.\.''',
+  # LEGACY historical (pre-AK-08), needed only for the weekly full-history scan.
+  '''amk_[A-Za-z0-9]+\.\.\.''',
   '''amcore_live_a1B2c3D4e5F_x9Y8z7W6v5U4t3S2r1Q0p9O8n7M6l5K4''',
   '''\.eyJ[A-Za-z0-9_-]+\.signature\b''',
   '''Bearer <[^>]+>''',
