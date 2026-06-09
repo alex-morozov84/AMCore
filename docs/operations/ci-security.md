@@ -35,34 +35,30 @@ of workflow self-hardening to keep the example forkable.
 - **workflow-lint** checks workflow syntax and hardening rules, and verifies
   that every `uses:` pin matches the real tag commit (including annotated tags).
 
-## Manual Repository Prerequisites
+## Security setup after forking
 
-Most repository-level controls can be applied as code with:
+Some protections — branch rulesets, secret scanning, push protection — are
+**repository settings** and do NOT travel with a clone/fork. Enable them with one
+command:
 
-```bash
-bash ./scripts/setup-repo-security.sh
-```
+1. Install the GitHub CLI — `brew install gh` (or see https://cli.github.com).
+2. Sign in with repository **admin** access — `gh auth login`
+   (no manual token needed; the CLI handles it).
+3. Apply the settings — `bash ./scripts/setup-repo-security.sh` (also needs `jq`).
 
-The script requires:
+This enables native **secret scanning** + **push protection**, the **dependency
+graph** + Dependabot alerts, and imports the branch **rulesets** for `main` and
+`develop` (PR-only merges, required status checks, block force-push, restrict
+deletions). It is **idempotent** — safe to re-run.
 
-- repository admin access;
-- authenticated `gh`;
-- `jq`.
+Notes:
 
-It enables dependency graph, native secret scanning, push protection, and
-imports the repository rulesets for `main` and `develop`.
-
-Some controls still remain outside workflow YAML and ruleset JSON:
-
-- **Branch protection** for `main` / `develop` remains a manual repository
-  governance step until `scripts/setup-repo-security.sh` is run.
-
-After a new ruleset is imported, required check contexts only become selectable
-once those checks have run at least once on the repository.
-
-The repository rulesets intentionally use `required_approving_review_count: 0`
-for a solo-maintainer flow: PR-only merges are enforced, but self-merge stays
-possible. Raise this to `1+` when the repository gains a second maintainer.
+- Required status-check contexts only become selectable after those checks have
+  run at least once on the repository, so run the script after CI has run on a
+  push/PR.
+- The rulesets use `required_approving_review_count: 0` for a solo-maintainer flow
+  (PR-only merges enforced, self-merge allowed). Raise it to `1+` in
+  `.github/rulesets/*.json` when the repository gains a second maintainer.
 
 ## Maintenance Notes
 
