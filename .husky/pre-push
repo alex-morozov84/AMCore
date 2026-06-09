@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+set -eu
+
+warn_skip() {
+  echo "pre-push: warning: $1 not installed locally, skipping" >&2
+}
+
+run_check() {
+  name=$1
+  shift
+
+  if ! command -v "$1" >/dev/null 2>&1; then
+    warn_skip "$name"
+    return 0
+  fi
+
+  echo "pre-push: running $name" >&2
+  "$@"
+}
+
+run_check "action pin verifier" bash ./scripts/verify-action-pins.sh
+run_check "actionlint" actionlint
+run_check "zizmor" zizmor --offline .github/workflows/*.yml

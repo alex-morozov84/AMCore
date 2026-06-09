@@ -66,6 +66,28 @@ bash ./scripts/verify-action-pins.sh
 This catches the annotated-tag trap (`refs/tags/vX` object vs
 `refs/tags/vX^{}` commit) that ordinary SHA-format checks do not.
 
+### Optional Local Workflow-Lint Tooling
+
+The repository also ships a convenience `.husky/pre-push` hook that runs:
+
+- `bash ./scripts/verify-action-pins.sh`
+- `actionlint`
+- `zizmor --offline .github/workflows/*.yml`
+
+The hook is **graceful-if-absent**:
+
+- if `actionlint` or `zizmor` is not installed locally, the hook prints a
+  warning and skips that check;
+- CI remains the hard gate via `workflow-lint.yml`.
+
+To opt into the full local loop, install the same tools used in CI:
+
+- `actionlint` `v1.7.12`
+- `zizmor` `v1.25.2`
+
+Install them from their upstream GitHub releases and place the binaries on your
+`PATH`.
+
 ### CLI Tool Versions
 
 Dependabot updates:
