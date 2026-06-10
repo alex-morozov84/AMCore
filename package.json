@@ -48,5 +48,26 @@
     "*.{json,md,yml,yaml}": [
       "prettier --write"
     ]
+  },
+  "pnpm": {
+    "overrides": {
+      "@angular-devkit/core>picomatch": "4.0.4",
+      "@nestjs/config>lodash": "4.17.24",
+      "@swc/cli>minimatch": "9.0.9",
+      "@typescript-eslint/typescript-estree>minimatch>brace-expansion": "5.0.6",
+      "ajv>fast-uri": "3.1.2",
+      "eslint-plugin-import>minimatch": "3.1.5",
+      "eslint-plugin-jsx-a11y>minimatch": "3.1.5",
+      "eslint-plugin-react>minimatch": "3.1.5",
+      "fdir>picomatch": "4.0.4",
+      "node-emoji>lodash": "4.17.24",
+      "path-to-regexp": "8.4.2",
+      "protobufjs": "7.5.6",
+      "redis-info>lodash": "4.17.24",
+      "rollup": "4.59.0",
+      "tinyglobby>picomatch": "4.0.4",
+      "tmp": "0.2.6",
+      "vite": "7.3.2"
+    }
   }
 }
