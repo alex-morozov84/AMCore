@@ -77,7 +77,9 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
 
 **PKCE** (Proof Key for Code Exchange) prevents authorization code interception attacks. The `code_verifier` is never sent to the browser — only the hash goes to the provider.
 
-**State** is a random nonce stored server-side in Redis. It ties the initial request to the callback, preventing CSRF attacks.
+**State** is a one-time server-side nonce stored in Redis. In AMCore it is paired
+with a short-lived browser binding cookie, so the callback is tied both to the
+server-side flow state and to the browser that started the login/link flow.
 
 ---
 
@@ -114,6 +116,10 @@ The access token is returned in the response body and is never placed in a URL.
 The ticket is single-use, stored in Redis under a SHA-256-derived key, and expires
 after 60 seconds. The exchange also requires the `refresh_token` cookie and
 verifies that the ticket is bound to the same session.
+
+See [CSRF Posture](./csrf.md) for the broader bearer-first CSRF policy and why
+OAuth login needs browser-bound state in addition to the server-side `state`
+record.
 
 Production deployments should avoid logging query strings for OAuth callback
 routes, because callback URLs still contain short-lived login tickets.
