@@ -86,7 +86,7 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 - **Apple** — Sign In with Apple, dynamic JWT client secret (P8 key)
 - **Telegram** — OIDC, link-only (no email), phone from ID token
 - Account linking: authenticated users can connect additional providers
-- State + PKCE stored in Redis (TTL 5 min, one-time use, CSRF protection)
+- State + PKCE for OAuth, with server-side state and browser binding for login CSRF protection
 - Provider factory pattern — providers disabled automatically if env vars missing
 
 ### RBAC (Role-Based Access Control)
@@ -125,6 +125,7 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 ### Documentation
 
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
+- [`docs/auth/csrf.md`](docs/auth/csrf.md) — Narrow CSRF posture for cookie-backed browser surfaces
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
 - [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide
