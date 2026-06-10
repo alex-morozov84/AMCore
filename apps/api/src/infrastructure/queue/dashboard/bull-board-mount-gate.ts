@@ -16,3 +16,15 @@ export function isBullBoardEnabled(
   if (processRole === 'worker') return false
   return nodeEnv !== 'production' || enableFlag === 'true'
 }
+
+/**
+ * Bull Board read-only mode (ADR-047). Secure default: the dashboard renders
+ * **read-only** unless an operator explicitly opts into write actions
+ * (retry / promote / clean / remove jobs) with `BULL_BOARD_READ_ONLY=false`.
+ * Fail-safe — any value other than the literal `'false'` (incl. unset) stays
+ * read-only. Read from `process.env` at module-construction time, like the mount
+ * gate, so it cannot rely on `EnvService`/`ConfigModule`.
+ */
+export function isBullBoardReadOnly(readOnlyFlag: string | undefined): boolean {
+  return readOnlyFlag !== 'false'
+}

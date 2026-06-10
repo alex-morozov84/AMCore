@@ -73,6 +73,14 @@ const envSchema = z.preprocess(
         .enum(['true', 'false'])
         .default('false')
         .transform((v) => v === 'true'),
+      // Bull Board read-only mode (ADR-047). Secure default `true`: the dashboard
+      // renders read-only; set `false` only to allow write actions (retry /
+      // promote / clean / remove jobs). Like ENABLE_BULL_BOARD, the queue module
+      // reads this from `process.env` at import time, before ConfigModule.
+      BULL_BOARD_READ_ONLY: z
+        .enum(['true', 'false'])
+        .default('true')
+        .transform((v) => v === 'true'),
       JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
       JWT_ACCESS_EXPIRATION: z.string().default('15m'),
       JWT_REFRESH_EXPIRATION: z.string().default('7d'),
