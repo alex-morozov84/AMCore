@@ -53,6 +53,11 @@ deletions). It is **idempotent** — safe to re-run.
 
 Notes:
 
+- `setup-repo-security.sh`, `verify-action-pins.sh`, and the optional
+  `.husky/pre-push` hook require a Unix-like shell (`bash`/`sh`) on macOS,
+  Linux, or WSL rather than native Windows PowerShell.
+- Install `gh` and `jq` via your OS package manager or from their upstream
+  releases, then ensure they are on your `PATH`.
 - Required status-check contexts only become selectable after those checks have
   run at least once on the repository, so run the script after CI has run on a
   push/PR.
