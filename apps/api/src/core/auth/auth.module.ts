@@ -20,6 +20,7 @@ import {
   AuthenticationGuard,
   FreshAuthGuard,
   JwtAuthGuard,
+  OriginCheckGuard,
   PoliciesGuard,
   RefreshTokenGuard,
   SystemRolesGuard,
@@ -74,6 +75,7 @@ import { UserCacheService } from './user-cache.service'
     TokenManagerService,
     SessionService,
     JwtStrategy,
+    OriginCheckGuard,
     RefreshTokenGuard,
     UserCacheService,
     // RBAC
