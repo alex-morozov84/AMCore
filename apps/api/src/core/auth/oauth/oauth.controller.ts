@@ -9,6 +9,7 @@ import {
   Query,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
@@ -20,6 +21,7 @@ import { EnvService } from '../../../env/env.service'
 import { Auth } from '../decorators/auth.decorator'
 import { CurrentUser } from '../decorators/current-user.decorator'
 import { OAuthExchangeDto } from '../dto'
+import { OriginCheckGuard } from '../guards'
 import { SessionService } from '../session.service'
 import { TokenService } from '../token.service'
 
@@ -120,6 +122,7 @@ export class OAuthController {
   @Post('exchange')
   @HttpCode(HttpStatus.OK)
   @Auth(AuthType.None)
+  @UseGuards(OriginCheckGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Exchange OAuth login ticket for access token' })
   async exchange(

@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
-import type { OAuthTokens, OAuthUserProfile } from '@amcore/shared'
+import { AuthErrorCode, type OAuthTokens, type OAuthUserProfile } from '@amcore/shared'
 
 import { OAuthStateService } from '../src/core/auth/oauth/oauth-state.service'
 import { OAuthProviderFactory } from '../src/core/auth/oauth/providers/oauth-provider.factory'
@@ -48,6 +48,9 @@ function extractTicket(location: string | undefined): string {
   if (!ticket) throw new Error('ticket not found in redirect URL')
   return ticket
 }
+
+const TRUSTED_ORIGIN = process.env.CORS_ORIGIN?.split(',')[0]?.trim() ?? 'http://localhost:3002'
+const FOREIGN_ORIGIN = 'https://evil.example'
 
 describe('OAuth (e2e)', () => {
   let app: INestApplication
@@ -256,6 +259,54 @@ describe('OAuth (e2e)', () => {
         .set('Cookie', refreshCookie)
         .send({ ticket: 'invalid-ticket' })
         .expect(401)
+    })
+
+    it('should reject exchange from a foreign Origin', async () => {
+      const state = 'valid-state-foreign-origin'
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
+
+      const callbackRes = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(302)
+
+      const ticket = extractTicket(callbackRes.headers.location)
+      const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Origin', FOREIGN_ORIGIN)
+        .set('Cookie', refreshCookie)
+        .send({ ticket })
+        .expect(403)
+
+      expect(response.body.errorCode).toBe(AuthErrorCode.AUTH_ORIGIN_REJECTED)
+    })
+
+    it('should allow exchange from a trusted Origin', async () => {
+      const state = 'valid-state-trusted-origin'
+      await stateService.store(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
+
+      const callbackRes = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(302)
+
+      const ticket = extractTicket(callbackRes.headers.location)
+      const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Origin', TRUSTED_ORIGIN)
+        .set('Cookie', refreshCookie)
+        .send({ ticket })
+        .expect(200)
     })
 
     it('should reject missing or already consumed ticket', async () => {

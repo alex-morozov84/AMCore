@@ -1,6 +1,7 @@
 export { AuthenticationGuard } from './authentication.guard'
 export { FreshAuthGuard } from './fresh-auth.guard'
 export { JwtAuthGuard } from './jwt-auth.guard'
+export { OriginCheckGuard } from './origin-check.guard'
 export { PoliciesGuard } from './policies.guard'
 export { RefreshTokenGuard } from './refresh-token.guard'
 export { SystemRolesGuard } from './system-roles.guard'
