@@ -8,7 +8,7 @@ import { QueueName } from './constants/queues.constant'
 import { createBullBoardAuthMiddleware } from './dashboard/bull-board-auth.middleware'
 import { BullBoardAuthModule } from './dashboard/bull-board-auth.module'
 import { BullBoardAuthService } from './dashboard/bull-board-auth.service'
-import { isBullBoardEnabled } from './dashboard/bull-board-mount-gate'
+import { isBullBoardEnabled, isBullBoardReadOnly } from './dashboard/bull-board-mount-gate'
 import { DashboardController } from './dashboard/dashboard.controller'
 import { DEFAULT_JOB_OPTIONS } from './interfaces/job-options.interface'
 import { QueueService } from './queue.service'
@@ -40,6 +40,10 @@ const bullBoardEnabled = isBullBoardEnabled(
   process.env.PROCESS_ROLE
 )
 
+// Secure default: render read-only unless an operator opts into write actions
+// (ADR-047). Read from `process.env` at module-construction, like the mount gate.
+const bullBoardReadOnly = isBullBoardReadOnly(process.env.BULL_BOARD_READ_ONLY)
+
 const bullBoardImports = bullBoardEnabled
   ? [
       // Auth middleware runs before the mounted Bull Board router.
@@ -52,8 +56,16 @@ const bullBoardImports = bullBoardEnabled
           middleware: createBullBoardAuthMiddleware(auth),
         }),
       }),
-      BullBoardModule.forFeature({ name: QueueName.DEFAULT, adapter: BullMQAdapter }),
-      BullBoardModule.forFeature({ name: QueueName.EMAIL, adapter: BullMQAdapter }),
+      BullBoardModule.forFeature({
+        name: QueueName.DEFAULT,
+        adapter: BullMQAdapter,
+        options: { readOnlyMode: bullBoardReadOnly },
+      }),
+      BullBoardModule.forFeature({
+        name: QueueName.EMAIL,
+        adapter: BullMQAdapter,
+        options: { readOnlyMode: bullBoardReadOnly },
+      }),
     ]
   : []
 
