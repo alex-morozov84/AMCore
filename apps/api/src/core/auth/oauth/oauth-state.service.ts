@@ -9,6 +9,13 @@ export interface OAuthStateData {
   codeVerifier: string
   mode: 'login' | 'link'
   userId?: string
+  /**
+   * SHA-256 of the browser-binding nonce (set as a `SameSite=Lax` cookie on the
+   * initiating browser). Required so the callback can prove it runs in the same
+   * browser that started the flow — see {@link hashOAuthStateNonce}. Stored
+   * hashed; the raw nonce never touches Redis.
+   */
+  browserNonceHash: string
 }
 
 /**

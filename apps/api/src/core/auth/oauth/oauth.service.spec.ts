@@ -11,7 +11,13 @@ import { AppException } from '../../../common/exceptions'
 import { EmailIdentityService } from '../email-identity.service'
 
 import { OAuthService } from './oauth.service'
+import { hashOAuthStateNonce } from './oauth-nonce'
 import type { OAuthStateData } from './oauth-state.service'
+
+// Browser-binding nonce the controller would set as the `oauth_state` cookie; the
+// mocked state record stores its hash, so a callback carrying TEST_NONCE is bound.
+const TEST_NONCE = 'browser-binding-nonce'
+const TEST_NONCE_HASH = hashOAuthStateNonce(TEST_NONCE)
 
 const mockUser = (overrides: Partial<User> = {}): User =>
   ({
@@ -99,6 +105,7 @@ describe('OAuthService', () => {
         provider: 'google',
         codeVerifier: 'verifier',
         mode: 'login',
+        browserNonceHash: TEST_NONCE_HASH,
       } as OAuthStateData),
     }
 
@@ -132,9 +139,17 @@ describe('OAuthService', () => {
           provider: 'google',
           codeVerifier: expect.any(String),
           mode: 'login',
+          browserNonceHash: expect.any(String),
         })
       )
       expect(result.url).toContain('accounts.google.com')
+      // Raw nonce is returned to the controller (set as the oauth_state cookie),
+      // never the hash that is persisted with the state.
+      expect(result.browserNonce).toEqual(expect.any(String))
+      expect(stateService.store).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ browserNonceHash: hashOAuthStateNonce(result.browserNonce) })
+      )
     })
 
     it('should throw when provider is not configured', async () => {
@@ -154,7 +169,13 @@ describe('OAuthService', () => {
     it('should return login callback result with refresh token and access claims on success', async () => {
       prisma.user.create.mockResolvedValue(mockUser())
 
-      const result = await service.handleCallback('google', 'code', 'state', requestInfo)
+      const result = await service.handleCallback(
+        'google',
+        'code',
+        'state',
+        TEST_NONCE,
+        requestInfo
+      )
 
       if (result.mode !== 'login') throw new Error('Expected login result')
       expect(result.refreshToken).toBe('refresh-token-raw')
@@ -171,7 +192,7 @@ describe('OAuthService', () => {
       stateService.consume.mockResolvedValue(null)
 
       await expect(
-        service.handleCallback('google', 'code', 'bad-state', requestInfo)
+        service.handleCallback('google', 'code', 'bad-state', TEST_NONCE, requestInfo)
       ).rejects.toMatchObject({
         errorCode: AuthErrorCode.OAUTH_STATE_INVALID,
       })
@@ -185,7 +206,7 @@ describe('OAuthService', () => {
       } as OAuthStateData)
 
       await expect(
-        service.handleCallback('google', 'code', 'state', requestInfo)
+        service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
       ).rejects.toMatchObject({
         errorCode: AuthErrorCode.OAUTH_STATE_INVALID,
       })
@@ -195,10 +216,29 @@ describe('OAuthService', () => {
       mockProvider.getUserProfile.mockResolvedValue({ ...mockProfile, email: null })
 
       await expect(
-        service.handleCallback('google', 'code', 'state', requestInfo)
+        service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
       ).rejects.toMatchObject({
         errorCode: AuthErrorCode.OAUTH_EMAIL_REQUIRED,
       })
+    })
+
+    it('should throw OAUTH_STATE_INVALID when the browser binding nonce is missing', async () => {
+      await expect(
+        service.handleCallback('google', 'code', 'state', undefined, requestInfo)
+      ).rejects.toMatchObject({
+        errorCode: AuthErrorCode.OAUTH_STATE_INVALID,
+      })
+      // Binding fails before the provider code exchange.
+      expect(mockProvider.exchangeCode).not.toHaveBeenCalled()
+    })
+
+    it('should throw OAUTH_STATE_INVALID when the browser binding nonce mismatches', async () => {
+      await expect(
+        service.handleCallback('google', 'code', 'state', 'wrong-nonce', requestInfo)
+      ).rejects.toMatchObject({
+        errorCode: AuthErrorCode.OAUTH_STATE_INVALID,
+      })
+      expect(mockProvider.exchangeCode).not.toHaveBeenCalled()
     })
   })
 
@@ -207,7 +247,13 @@ describe('OAuthService', () => {
       const user = mockUser()
       prisma.oAuthAccount.findUnique.mockResolvedValue({ userId: user.id, user })
 
-      const result = await service.handleCallback('google', 'code', 'state', requestInfo)
+      const result = await service.handleCallback(
+        'google',
+        'code',
+        'state',
+        TEST_NONCE,
+        requestInfo
+      )
 
       expect(prisma.user.create).not.toHaveBeenCalled()
       expect(result.user.id).toBe(user.id)
@@ -219,7 +265,7 @@ describe('OAuthService', () => {
       prisma.user.findUnique.mockResolvedValue(user)
       prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser({ emailVerified: true }))
 
-      await service.handleCallback('google', 'code', 'state', requestInfo)
+      await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { emailCanonical: 'user@example.com' },
@@ -235,7 +281,7 @@ describe('OAuthService', () => {
       prisma.user.findUnique.mockResolvedValue(user)
       prisma.user.findUniqueOrThrow.mockResolvedValue(user)
 
-      await service.handleCallback('google', 'code', 'state', requestInfo)
+      await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { emailCanonical: 'user@example.com' },
@@ -249,7 +295,13 @@ describe('OAuthService', () => {
       prisma.user.findUnique.mockResolvedValue(unverifiedUser)
       prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser({ emailVerified: true }))
 
-      const result = await service.handleCallback('google', 'code', 'state', requestInfo)
+      const result = await service.handleCallback(
+        'google',
+        'code',
+        'state',
+        TEST_NONCE,
+        requestInfo
+      )
 
       expect(prisma.$transaction).toHaveBeenCalled()
       expect(result.user.emailVerified).toBe(true)
@@ -259,7 +311,7 @@ describe('OAuthService', () => {
       prisma.oAuthAccount.findUnique.mockResolvedValue(null)
       prisma.user.findUnique.mockResolvedValue(null)
 
-      await service.handleCallback('google', 'code', 'state', requestInfo)
+      await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
 
       expect(prisma.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -279,7 +331,7 @@ describe('OAuthService', () => {
       const user = mockUser()
       prisma.oAuthAccount.findUnique.mockResolvedValue({ userId: user.id, user })
 
-      await service.handleCallback('google', 'code', 'state', requestInfo)
+      await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
 
       expect(prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -307,6 +359,7 @@ describe('OAuthService', () => {
       codeVerifier: 'verifier',
       mode: 'link',
       userId: 'user-42',
+      browserNonceHash: TEST_NONCE_HASH,
     }
 
     beforeEach(() => {
@@ -323,7 +376,13 @@ describe('OAuthService', () => {
       const user = mockUser()
       prisma.user.findUniqueOrThrow.mockResolvedValue(user)
 
-      const result = await service.handleCallback('telegram', 'code', 'state', requestInfo)
+      const result = await service.handleCallback(
+        'telegram',
+        'code',
+        'state',
+        TEST_NONCE,
+        requestInfo
+      )
 
       expect(result.mode).toBe('link')
       expect(result.user.id).toBe(user.id)
@@ -340,14 +399,14 @@ describe('OAuthService', () => {
       })
 
       await expect(
-        service.handleCallback('telegram', 'code', 'state', requestInfo)
+        service.handleCallback('telegram', 'code', 'state', TEST_NONCE, requestInfo)
       ).rejects.toMatchObject({
         errorCode: AuthErrorCode.OAUTH_ACCOUNT_ALREADY_LINKED,
       })
     })
 
     it('should update phone on user when Telegram provides phone number', async () => {
-      await service.handleCallback('telegram', 'code', 'state', requestInfo)
+      await service.handleCallback('telegram', 'code', 'state', TEST_NONCE, requestInfo)
 
       expect(prisma.$transaction).toHaveBeenCalled()
     })
