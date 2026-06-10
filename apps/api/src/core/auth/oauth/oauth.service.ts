@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common'
 import type { OAuthProvider, User } from '@prisma/client'
-import { randomBytes } from 'crypto'
+import { randomBytes, timingSafeEqual } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { OAuthUserProfile, UserResponse } from '@amcore/shared'
@@ -13,6 +13,7 @@ import { SessionService } from '../session.service'
 import type { AccessTokenPayload } from '../token.service'
 import { UserCacheService } from '../user-cache.service'
 
+import { generateOAuthStateNonce, hashOAuthStateNonce } from './oauth-nonce'
 import { OAuthStateService } from './oauth-state.service'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory'
 
@@ -50,37 +51,49 @@ export class OAuthService {
     this.logger.setContext(OAuthService.name)
   }
 
-  async getAuthorizationURL(providerName: string): Promise<{ url: string }> {
+  async getAuthorizationURL(providerName: string): Promise<{ url: string; browserNonce: string }> {
     const provider = this.providerFactory.get(providerName)
     const state = randomBytes(32).toString('base64url')
     const codeVerifier = randomBytes(32).toString('base64url')
+    const browserNonce = generateOAuthStateNonce()
 
-    await this.stateService.store(state, { provider: providerName, codeVerifier, mode: 'login' })
+    await this.stateService.store(state, {
+      provider: providerName,
+      codeVerifier,
+      mode: 'login',
+      browserNonceHash: hashOAuthStateNonce(browserNonce),
+    })
 
     const url = await provider.getAuthorizationURL(state, codeVerifier)
-    return { url: url.toString() }
+    return { url: url.toString(), browserNonce }
   }
 
-  async getLinkAuthorizationURL(providerName: string, userId: string): Promise<{ url: string }> {
+  async getLinkAuthorizationURL(
+    providerName: string,
+    userId: string
+  ): Promise<{ url: string; browserNonce: string }> {
     const provider = this.providerFactory.get(providerName)
     const state = randomBytes(32).toString('base64url')
     const codeVerifier = randomBytes(32).toString('base64url')
+    const browserNonce = generateOAuthStateNonce()
 
     await this.stateService.store(state, {
       provider: providerName,
       codeVerifier,
       mode: 'link',
       userId,
+      browserNonceHash: hashOAuthStateNonce(browserNonce),
     })
 
     const url = await provider.getAuthorizationURL(state, codeVerifier)
-    return { url: url.toString() }
+    return { url: url.toString(), browserNonce }
   }
 
   async handleCallback(
     providerName: string,
     code: string,
     state: string,
+    browserNonce: string | undefined,
     requestInfo: RequestInfo
   ): Promise<CallbackResult> {
     const stateData = await this.stateService.consume(state)
@@ -91,6 +104,11 @@ export class OAuthService {
         AuthErrorCode.OAUTH_STATE_INVALID
       )
     }
+
+    // Browser binding (login CSRF / session-swap defense): the callback must run
+    // in the same browser that started the flow. Uniform OAUTH_STATE_INVALID so a
+    // missing/mismatched binding is indistinguishable from a bad state.
+    this.assertBrowserBinding(browserNonce, stateData.browserNonceHash)
 
     const provider = this.providerFactory.get(providerName)
     const tokens = await provider.exchangeCode(code, stateData.codeVerifier)
@@ -132,6 +150,26 @@ export class OAuthService {
       sessionId: session.id,
       accessClaims,
     }
+  }
+
+  /**
+   * Constant-time check that the `oauth_state` cookie nonce matches the hash
+   * stored with the state. Throws the uniform `OAUTH_STATE_INVALID` on a missing
+   * or mismatched binding (never leaks which).
+   */
+  private assertBrowserBinding(browserNonce: string | undefined, expectedHash: string): void {
+    const invalid = (): AppException =>
+      new AppException(
+        'Invalid OAuth state',
+        HttpStatus.BAD_REQUEST,
+        AuthErrorCode.OAUTH_STATE_INVALID
+      )
+
+    if (!browserNonce) throw invalid()
+
+    const actual = Buffer.from(hashOAuthStateNonce(browserNonce))
+    const expected = Buffer.from(expectedHash)
+    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw invalid()
   }
 
   private async attachProviderToUser(

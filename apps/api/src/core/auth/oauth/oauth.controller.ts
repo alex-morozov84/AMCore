@@ -45,6 +45,27 @@ export class OAuthController {
     private readonly env: EnvService
   ) {}
 
+  /**
+   * Short-lived browser-binding cookie for the OAuth `state` flow. `SameSite=Lax`
+   * (not Strict) so it survives the provider's cross-site top-level redirect back
+   * to the callback; Strict would drop it and break every OAuth login.
+   */
+  private get stateCookieOptions(): {
+    httpOnly: boolean
+    secure: boolean
+    sameSite: 'lax'
+    path: string
+    maxAge: number
+  } {
+    return {
+      httpOnly: true,
+      secure: this.env.get('NODE_ENV') === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 5 * 60 * 1000, // 5 min — matches the OAuth state TTL
+    }
+  }
+
   @Get('providers')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'List configured OAuth providers' })
@@ -56,7 +77,8 @@ export class OAuthController {
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Redirect to OAuth provider for login' })
   async authorize(@Param('provider') provider: string, @Res() res: Response): Promise<void> {
-    const { url } = await this.oauthService.getAuthorizationURL(provider)
+    const { url, browserNonce } = await this.oauthService.getAuthorizationURL(provider)
+    res.cookie('oauth_state', browserNonce, this.stateCookieOptions)
     res.redirect(url)
   }
 
@@ -68,7 +90,8 @@ export class OAuthController {
     @CurrentUser('sub') userId: string,
     @Res() res: Response
   ): Promise<void> {
-    const { url } = await this.oauthService.getLinkAuthorizationURL(provider, userId)
+    const { url, browserNonce } = await this.oauthService.getLinkAuthorizationURL(provider, userId)
+    res.cookie('oauth_state', browserNonce, this.stateCookieOptions)
     res.redirect(url)
   }
 
@@ -90,10 +113,14 @@ export class OAuthController {
       )
     }
 
-    const result = await this.oauthService.handleCallback(provider, code, state, {
+    const browserNonce = req.cookies?.oauth_state
+    const result = await this.oauthService.handleCallback(provider, code, state, browserNonce, {
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
     })
+
+    // One-time binding nonce: clear it once the callback succeeds.
+    res.clearCookie('oauth_state', { path: '/' })
 
     const frontendUrl = this.env.get('FRONTEND_URL')
 
