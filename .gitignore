@@ -56,7 +56,9 @@ public/workbox-*.js.map
 
 # AI documentation (internal planning, not for public repo)
 ai/
-CLAUDE.md
+# CLAUDE.md is now tracked (a thin @AGENTS.md importer — public, no secrets).
+# The private maintainer overlay lives in CLAUDE.local.md (gitignored).
+CLAUDE.local.md
 
 # Claude Code local agent state (permissions, locks) — never commit
 .claude/

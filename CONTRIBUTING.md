@@ -38,10 +38,10 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) and commitlint.
 
-- **Format:** `type(scope): subject` — scope is optional.
+- **Format:** `type(scope): subject` — **a scope is required** (commitlint blocks a missing scope).
 - **Subject:** lowercase, no period at the end, max 72 characters.
 - **Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-- **Scopes (optional):** `api`, `web`, `shared`, `auth`, `fitness`, `finance`, `subscriptions`, `ci`, `docs`, `deps`.
+- **Scopes:** `api`, `web`, `shared`, `auth`, `fitness`, `finance`, `subscriptions`, `ci`, `docs`, `deps`.
 
 Examples:
 
@@ -51,6 +51,18 @@ fix(web): correct button disabled state
 docs: update quick start env step
 chore: unify github repository url
 ```
+
+## Branching & merging
+
+- `main` and `develop` are **protected — PR-only**; a direct push is rejected.
+  Branch off `develop` and open a PR into `develop`. Releases are a PR
+  `develop → main`.
+- Required CI checks must pass before merge. Merge with **Squash** or **Rebase**
+  only — both branches require linear history (no merge commits).
+- First-time repo-protection setup (these settings do not travel with a fork):
+  `bash scripts/setup-repo-security.sh` — needs `gh` + `jq` and repo admin; see
+  [`docs/operations/ci-security.md`](docs/operations/ci-security.md). The security
+  scripts require a Unix-like shell (macOS/Linux/WSL).
 
 ## Before Submitting a PR
 
