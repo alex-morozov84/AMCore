@@ -63,3 +63,20 @@ OAuth has its own CSRF class: login CSRF / session swapping. A one-time server-s
 `state` value is not enough unless it is also bound to the browser that initiated
 the flow. AMCore therefore binds OAuth login/link state to a short-lived browser
 cookie in addition to the server-side state record.
+
+## Static analysis (CodeQL) false positives
+
+The OAuth browser-binding nonce trips three CodeQL queries that are vetted false
+positives — they are dismissed (reason: _false positive_), not real findings:
+
+- **`js/insufficient-password-hash`** on `hashOAuthStateNonce` — the input is a
+  256-bit cryptographically-random nonce, not a low-entropy password, so a fast
+  SHA-256 is correct (a slow KDF defends only against brute-forcing guessable
+  secrets). Same transform as `refresh-token-hash.ts`.
+- **`js/clear-text-storage-of-sensitive-data`** on the `oauth_state` cookie — storing
+  the raw nonce in the browser cookie _is_ the binding mechanism; the server keeps
+  only its hash. Removing it would delete the protection.
+
+The cookie-hardening queries (`js/client-exposed-cookie`, `js/clear-text-cookie`) are
+_not_ dismissed: the cookie is set with an inline options literal so `httpOnly` and
+`secure` (prod) are statically visible to the analyzer.

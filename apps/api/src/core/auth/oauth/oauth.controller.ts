@@ -46,24 +46,27 @@ export class OAuthController {
   ) {}
 
   /**
-   * Short-lived browser-binding cookie for the OAuth `state` flow. `SameSite=Lax`
-   * (not Strict) so it survives the provider's cross-site top-level redirect back
-   * to the callback; Strict would drop it and break every OAuth login.
+   * Set the short-lived browser-binding cookie for the OAuth `state` flow.
+   *
+   * `SameSite=Lax` (not Strict) so it survives the provider's cross-site
+   * top-level redirect back to the callback; Strict would drop it and break
+   * every OAuth login. The raw nonce is intentionally the cookie value — that
+   * is the browser-binding mechanism itself (the server persists only its
+   * SHA-256 hash; see `oauth-nonce.ts`), the double-submit half a CSRF /
+   * session-swap attacker cannot forge. Options are an inline literal
+   * (mirroring the `refresh_token` cookie below) so the `httpOnly`/`secure`
+   * hardening is statically visible at the sink — CodeQL cannot resolve flags
+   * set via a getter and would otherwise report false `js/client-exposed-cookie`
+   * / `js/clear-text-cookie` alerts.
    */
-  private get stateCookieOptions(): {
-    httpOnly: boolean
-    secure: boolean
-    sameSite: 'lax'
-    path: string
-    maxAge: number
-  } {
-    return {
+  private setStateCookie(res: Response, browserNonce: string): void {
+    res.cookie('oauth_state', browserNonce, {
       httpOnly: true,
       secure: this.env.get('NODE_ENV') === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: 5 * 60 * 1000, // 5 min — matches the OAuth state TTL
-    }
+    })
   }
 
   @Get('providers')
@@ -78,7 +81,7 @@ export class OAuthController {
   @ApiOperation({ summary: 'Redirect to OAuth provider for login' })
   async authorize(@Param('provider') provider: string, @Res() res: Response): Promise<void> {
     const { url, browserNonce } = await this.oauthService.getAuthorizationURL(provider)
-    res.cookie('oauth_state', browserNonce, this.stateCookieOptions)
+    this.setStateCookie(res, browserNonce)
     res.redirect(url)
   }
 
@@ -91,7 +94,7 @@ export class OAuthController {
     @Res() res: Response
   ): Promise<void> {
     const { url, browserNonce } = await this.oauthService.getLinkAuthorizationURL(provider, userId)
-    res.cookie('oauth_state', browserNonce, this.stateCookieOptions)
+    this.setStateCookie(res, browserNonce)
     res.redirect(url)
   }
 
