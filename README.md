@@ -86,7 +86,7 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 - **Apple** — Sign In with Apple, dynamic JWT client secret (P8 key)
 - **Telegram** — OIDC, link-only (no email), phone from ID token
 - Account linking: authenticated users can connect additional providers
-- State + PKCE stored in Redis (TTL 5 min, one-time use, CSRF protection)
+- State + PKCE for OAuth, with server-side state and browser binding for login CSRF protection
 - Provider factory pattern — providers disabled automatically if env vars missing
 
 ### RBAC (Role-Based Access Control)
@@ -102,7 +102,7 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 ### API Keys
 
 - Long-lived scoped tokens for server-to-server access
-- Dual-token format: `amk_{shortToken}_{longToken}` (shortToken plain for O(1) lookup, longToken SHA-256 hashed)
+- Dual-token format: `amcore_live_{shortToken}_{longToken}` (shortToken plain for O(1) lookup, longToken SHA-256 hashed)
 - Scopes: `action:subject` format, intersected with user's org permissions
 - Lazy `lastUsedAt` update via Redis gate (no hot row contention)
 - Nightly cleanup of expired keys
@@ -125,6 +125,7 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 ### Documentation
 
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
+- [`docs/auth/csrf.md`](docs/auth/csrf.md) — Narrow CSRF posture for cookie-backed browser surfaces
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
 - [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide
@@ -171,6 +172,10 @@ pnpm dev
 > **Forking this starter?** After cloning, enable the repository protections that
 > don't travel with git — branch rules, secret scanning, push protection — with one
 > command: `bash scripts/setup-repo-security.sh` (needs `gh` + `jq` and repo admin).
+> These security scripts and the optional `.husky/pre-push` hook require a
+> Unix-like shell (`bash`/`sh`) on macOS, Linux, or WSL rather than native
+> Windows PowerShell; install `gh`/`jq` via your OS package manager or the
+> upstream releases.
 > See [`docs/operations/ci-security.md`](docs/operations/ci-security.md) →
 > _Security setup after forking_.
 

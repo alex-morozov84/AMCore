@@ -38,10 +38,10 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) and commitlint.
 
-- **Format:** `type(scope): subject` — scope is optional.
+- **Format:** `type(scope): subject` — **a scope is required** (commitlint blocks a missing scope).
 - **Subject:** lowercase, no period at the end, max 72 characters.
 - **Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-- **Scopes (optional):** `api`, `web`, `shared`, `auth`, `fitness`, `finance`, `subscriptions`, `ci`, `docs`, `deps`.
+- **Scopes:** `api`, `web`, `shared`, `auth`, `fitness`, `finance`, `subscriptions`, `ci`, `docs`, `deps`.
 
 Examples:
 
@@ -52,6 +52,20 @@ docs: update quick start env step
 chore: unify github repository url
 ```
 
+## Branching & merging
+
+- `main` and `develop` are **protected — PR-only**; a direct push is rejected.
+  Branch off `develop` and open a PR into `develop`. Releases are a PR
+  `develop → main`.
+- Required CI checks must pass before merge. Merge with **Squash** or **Rebase**
+  only — both branches require linear history (no merge commits). Feature PRs into
+  `develop` may use either; **release PRs (`develop → main`) merge with Squash** so
+  already-released commits are not replayed.
+- First-time repo-protection setup (these settings do not travel with a fork):
+  `bash scripts/setup-repo-security.sh` — needs `gh` + `jq` and repo admin; see
+  [`docs/operations/ci-security.md`](docs/operations/ci-security.md). The security
+  scripts require a Unix-like shell (macOS/Linux/WSL).
+
 ## Before Submitting a PR
 
 1. Run `pnpm lint` and `pnpm typecheck` — must pass.
@@ -60,3 +74,13 @@ chore: unify github repository url
 4. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
 
 CI runs the same checks on push; fixing any failures before opening a PR saves time.
+
+## Troubleshooting
+
+- **`pnpm --filter web build` hangs at "Creating an optimized production build…"** —
+  this is a stuck `next build` process holding `apps/web/.next/lock`, not a dependency
+  problem. Kill the stale process and remove the lock:
+  ```bash
+  rm -f apps/web/.next/lock
+  ```
+  then re-run the build. Don't bisect dependencies for this symptom.

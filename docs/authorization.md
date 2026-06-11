@@ -431,6 +431,12 @@ WHERE email = 'admin@yourdomain.com';
 | `GET /api/v1/admin/organizations` | List all organizations (paginated) |
 | `GET /admin/queues`               | Bull Board queue dashboard         |
 
+> **Bull Board** is disabled in production unless `ENABLE_BULL_BOARD=true`, is
+> never mounted on the `worker` role, and requires a SUPER_ADMIN session cookie.
+> It defaults to **read-only** (`BULL_BOARD_READ_ONLY=true`); set it to `false`
+> only if operators need write actions (retry / promote / clean / remove jobs).
+> See [CSRF Posture](./auth/csrf.md) and ADR-047.
+
 ---
 
 ## Reference

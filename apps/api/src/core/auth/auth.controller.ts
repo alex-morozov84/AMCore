@@ -46,7 +46,7 @@ import {
   VerifyEmailDto,
 } from './dto'
 import { SessionsListResponseDto } from './dto/sessions-list-response.dto'
-import { RefreshTokenGuard } from './guards'
+import { OriginCheckGuard, RefreshTokenGuard } from './guards'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 
@@ -154,6 +154,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Auth(AuthType.None)
+  @UseGuards(OriginCheckGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Logout user' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
@@ -170,7 +171,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @Auth(AuthType.None)
-  @UseGuards(RefreshTokenGuard)
+  @UseGuards(OriginCheckGuard, RefreshTokenGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Refresh access token' })
   async refresh(
