@@ -58,7 +58,9 @@ chore: unify github repository url
   Branch off `develop` and open a PR into `develop`. Releases are a PR
   `develop → main`.
 - Required CI checks must pass before merge. Merge with **Squash** or **Rebase**
-  only — both branches require linear history (no merge commits).
+  only — both branches require linear history (no merge commits). Feature PRs into
+  `develop` may use either; **release PRs (`develop → main`) merge with Squash** so
+  already-released commits are not replayed.
 - First-time repo-protection setup (these settings do not travel with a fork):
   `bash scripts/setup-repo-security.sh` — needs `gh` + `jq` and repo admin; see
   [`docs/operations/ci-security.md`](docs/operations/ci-security.md). The security
@@ -72,3 +74,13 @@ chore: unify github repository url
 4. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
 
 CI runs the same checks on push; fixing any failures before opening a PR saves time.
+
+## Troubleshooting
+
+- **`pnpm --filter web build` hangs at "Creating an optimized production build…"** —
+  this is a stuck `next build` process holding `apps/web/.next/lock`, not a dependency
+  problem. Kill the stale process and remove the lock:
+  ```bash
+  rm -f apps/web/.next/lock
+  ```
+  then re-run the build. Don't bisect dependencies for this symptom.

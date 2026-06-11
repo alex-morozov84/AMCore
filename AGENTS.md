@@ -35,7 +35,10 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - **`main` and `develop` are protected — PR-only. A direct push is rejected.**
   Branch off `develop`; open a PR into `develop`. Releases are a PR `develop → main`.
 - **Required CI status checks must pass before merge.** Merge with **Squash** or
-  **Rebase** only — both branches require linear history (no merge commits).
+  **Rebase** only — both branches require linear history (no merge commits). For
+  feature PRs into `develop`, either is fine; **release PRs (`develop → main`) merge
+  with Squash** (the branches diverged in SHA, so Rebase would replay already-released
+  commits).
 - **Conventional Commits, and a scope is REQUIRED** (commitlint blocks a missing
   scope). Form: `type(scope): subject`, subject lowercase. Allowed scopes:
   `api, web, shared, auth, fitness, finance, subscriptions, ci, docs, deps`.
@@ -43,6 +46,10 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   lines, no mention of the tool).
 - Keep changes small and focused: **files < 150 lines, functions < 30 lines**;
   one responsibility per file.
+- **Updating docs is part of "done", not optional.** When a change affects
+  user/contributor-facing behavior or a contract, update the relevant `docs/`,
+  `README.md`, `CONTRIBUTING.md`, and `AGENTS.md` in the same PR. Record significant
+  or architectural choices in an ADR.
 - First-time setup of the repo protections (they do not travel with a fork):
   `bash scripts/setup-repo-security.sh` — see
   `docs/operations/ci-security.md` → _Security setup after forking_. The security
