@@ -35,6 +35,26 @@ of workflow self-hardening to keep the example forkable.
 - **workflow-lint** checks workflow syntax and hardening rules, and verifies
   that every `uses:` pin matches the real tag commit (including annotated tags).
 
+## Handling CodeQL alerts (false positives)
+
+CodeQL is report-only, but new alerts on a PR still need triage — **don't blanket-suppress**.
+
+1. **Real issue → fix in code.** Many cookie/flag findings
+   (`js/client-exposed-cookie`, `js/clear-text-cookie`) fire because the options are set
+   via a getter/helper CodeQL can't resolve through — move them to an **inline literal at
+   the `res.cookie()` call** so `httpOnly`/`secure` are statically visible.
+2. **Vetted false positive → dismiss in the Security tab** (or via the REST API) with reason
+   _false positive_ and a one-line justification. Example: `js/insufficient-password-hash`
+   on a SHA-256 of a **high-entropy random token** is correct — slow KDFs only defend
+   low-entropy _passwords_; a 256-bit random value has no brute-force surface.
+3. **Always record the "why"** next to the code AND in the relevant ADR / feature doc, so
+   the dismissal is reviewable and survives a re-scan.
+
+Inline `// codeql[…]` / `// lgtm` comments are **not** honored by GitHub code scanning
+([github/codeql#11427](https://github.com/github/codeql/issues/11427)) — they do not dismiss
+alerts. Avoid a repo-wide `query-filters` exclusion for a local false positive: it disables
+the query everywhere and hides real future findings.
+
 ## Security setup after forking
 
 Some protections — branch rulesets, secret scanning, push protection — are
