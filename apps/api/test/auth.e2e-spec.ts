@@ -2,6 +2,8 @@ import type { INestApplication } from '@nestjs/common'
 import type { Response } from 'supertest'
 import request from 'supertest'
 
+import { AuthErrorCode } from '@amcore/shared'
+
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import type { PrismaService } from '../src/prisma'
 
@@ -36,6 +38,9 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
   if (!payload) throw new Error('Invalid JWT')
   return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>
 }
+
+const TRUSTED_ORIGIN = process.env.CORS_ORIGIN?.split(',')[0]?.trim() ?? 'http://localhost:3002'
+const FOREIGN_ORIGIN = 'https://evil.example'
 
 describe('Auth (e2e)', () => {
   let app: INestApplication
@@ -338,6 +343,24 @@ describe('Auth (e2e)', () => {
       const sessions = await prisma.session.findMany()
       expect(sessions).toHaveLength(1)
     })
+
+    it('should reject logout from a foreign Origin', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/logout')
+        .set('Origin', FOREIGN_ORIGIN)
+        .set('Cookie', `refresh_token=${refreshToken}`)
+        .expect(403)
+
+      expect(response.body.errorCode).toBe(AuthErrorCode.AUTH_ORIGIN_REJECTED)
+    })
+
+    it('should allow logout from a trusted Origin', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/logout')
+        .set('Origin', TRUSTED_ORIGIN)
+        .set('Cookie', `refresh_token=${refreshToken}`)
+        .expect(204)
+    })
   })
 
   describe('POST /auth/refresh', () => {
@@ -422,6 +445,24 @@ describe('Auth (e2e)', () => {
         .post('/auth/refresh')
         .set('Cookie', `refresh_token=${rotatedRefreshToken}`)
         .expect(401)
+    })
+
+    it('should reject refresh from a foreign Origin', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Origin', FOREIGN_ORIGIN)
+        .set('Cookie', `refresh_token=${refreshToken}`)
+        .expect(403)
+
+      expect(response.body.errorCode).toBe(AuthErrorCode.AUTH_ORIGIN_REJECTED)
+    })
+
+    it('should allow refresh from a trusted Origin', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Origin', TRUSTED_ORIGIN)
+        .set('Cookie', `refresh_token=${refreshToken}`)
+        .expect(200)
     })
   })
 

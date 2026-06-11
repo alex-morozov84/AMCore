@@ -158,12 +158,15 @@ Verification tokens expire after 48 hours and are single-use.
 
 The refresh token lives in a cookie with these flags:
 
-| Flag       | Value                | Why                                               |
-| ---------- | -------------------- | ------------------------------------------------- |
-| `httpOnly` | `true`               | JavaScript cannot read it (XSS protection)        |
-| `secure`   | `true` in production | Only sent over HTTPS                              |
-| `sameSite` | `strict`             | Not sent on cross-site requests (CSRF protection) |
-| `path`     | `/`                  | Available to all paths                            |
-| `maxAge`   | 7 days               | Browser discards it after this                    |
+| Flag       | Value                | Why                                        |
+| ---------- | -------------------- | ------------------------------------------ |
+| `httpOnly` | `true`               | JavaScript cannot read it (XSS protection) |
+| `secure`   | `true` in production | Only sent over HTTPS                       |
+| `sameSite` | `strict`             | Primary CSRF layer for the refresh cookie  |
+| `path`     | `/`                  | Available to all paths                     |
+| `maxAge`   | 7 days               | Browser discards it after this             |
 
 The access token is stored in application memory (never in `localStorage`) and cleared on page close.
+
+See [CSRF Posture](./csrf.md) for the narrow cookie-surface policy, the
+Origin/Referer second layer, and the frontend-agnostic rationale for allow-on-missing.

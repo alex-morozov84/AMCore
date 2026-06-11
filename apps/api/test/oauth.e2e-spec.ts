@@ -1,9 +1,10 @@
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
-import type { OAuthTokens, OAuthUserProfile } from '@amcore/shared'
+import { AuthErrorCode, type OAuthTokens, type OAuthUserProfile } from '@amcore/shared'
 
-import { OAuthStateService } from '../src/core/auth/oauth/oauth-state.service'
+import { hashOAuthStateNonce } from '../src/core/auth/oauth/oauth-nonce'
+import { type OAuthStateData, OAuthStateService } from '../src/core/auth/oauth/oauth-state.service'
 import { OAuthProviderFactory } from '../src/core/auth/oauth/providers/oauth-provider.factory'
 import type { OAuthProvider } from '../src/core/auth/oauth/providers/oauth-provider.interface'
 import type { PrismaService } from '../src/prisma'
@@ -49,6 +50,14 @@ function extractTicket(location: string | undefined): string {
   return ticket
 }
 
+const TRUSTED_ORIGIN = process.env.CORS_ORIGIN?.split(',')[0]?.trim() ?? 'http://localhost:3002'
+const FOREIGN_ORIGIN = 'https://evil.example'
+
+// Browser-binding nonce a real `authorize` step would set as the oauth_state
+// cookie. `seedState` stores its hash; callbacks send the matching cookie.
+const OAUTH_NONCE = 'e2e-oauth-state-nonce'
+const OAUTH_STATE_COOKIE = `oauth_state=${OAUTH_NONCE}`
+
 describe('OAuth (e2e)', () => {
   let app: INestApplication
   let prisma: PrismaService
@@ -78,6 +87,12 @@ describe('OAuth (e2e)', () => {
       createMockProvider()
     )
   })
+
+  // Store OAuth state already bound to OAUTH_NONCE (simulates a real authorize
+  // step). Callbacks must send `OAUTH_STATE_COOKIE` to pass the browser binding.
+  async function seedState(state: string, data: Omit<OAuthStateData, 'browserNonceHash'>) {
+    await stateService.store(state, { ...data, browserNonceHash: hashOAuthStateNonce(OAUTH_NONCE) })
+  }
 
   describe('GET /auth/oauth/providers', () => {
     it('should return list of configured providers', async () => {
@@ -119,9 +134,36 @@ describe('OAuth (e2e)', () => {
         .expect(400)
     })
 
+    it('should reject callback when the browser binding cookie is missing', async () => {
+      // Simulates an attacker-initiated state opened in a victim browser that
+      // never received the oauth_state cookie — login CSRF / session swap.
+      const state = 'valid-state-no-binding'
+      await seedState(state, { provider: 'google', codeVerifier: 'test-verifier', mode: 'login' })
+
+      await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .expect(400)
+
+      // No session/user created when binding fails.
+      expect(await prisma.user.count()).toBe(0)
+      expect(await prisma.session.count()).toBe(0)
+    })
+
+    it('should reject callback when the browser binding cookie mismatches', async () => {
+      const state = 'valid-state-wrong-binding'
+      await seedState(state, { provider: 'google', codeVerifier: 'test-verifier', mode: 'login' })
+
+      await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', 'oauth_state=a-different-browser-nonce')
+        .expect(400)
+
+      expect(await prisma.user.count()).toBe(0)
+    })
+
     it('should create new user and redirect on valid callback', async () => {
       const state = 'valid-state-new-user'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'test-verifier',
         mode: 'login',
@@ -129,6 +171,7 @@ describe('OAuth (e2e)', () => {
 
       const res = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       // Should redirect to frontend with a one-time login ticket, never an access token.
@@ -150,7 +193,7 @@ describe('OAuth (e2e)', () => {
 
     it('should set refresh_token cookie on successful callback', async () => {
       const state = 'valid-state-cookie'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'test-verifier',
         mode: 'login',
@@ -158,6 +201,7 @@ describe('OAuth (e2e)', () => {
 
       const res = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       const cookies = res.headers['set-cookie'] as unknown as string[]
@@ -169,7 +213,7 @@ describe('OAuth (e2e)', () => {
 
     it('should exchange valid ticket with refresh cookie for access token', async () => {
       const state = 'valid-state-exchange'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'test-verifier',
         mode: 'login',
@@ -177,6 +221,7 @@ describe('OAuth (e2e)', () => {
 
       const callbackRes = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       const ticket = extractTicket(callbackRes.headers.location)
@@ -194,7 +239,7 @@ describe('OAuth (e2e)', () => {
 
     it('should reject replay of the same ticket', async () => {
       const state = 'valid-state-ticket-replay'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'test-verifier',
         mode: 'login',
@@ -202,6 +247,7 @@ describe('OAuth (e2e)', () => {
 
       const callbackRes = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       const ticket = extractTicket(callbackRes.headers.location)
@@ -222,7 +268,7 @@ describe('OAuth (e2e)', () => {
 
     it('should reject exchange without refresh cookie', async () => {
       const state = 'valid-state-no-cookie'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'test-verifier',
         mode: 'login',
@@ -230,6 +276,7 @@ describe('OAuth (e2e)', () => {
 
       const callbackRes = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       const ticket = extractTicket(callbackRes.headers.location)
@@ -239,7 +286,7 @@ describe('OAuth (e2e)', () => {
 
     it('should reject invalid ticket', async () => {
       const state = 'valid-state-invalid-ticket'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'test-verifier',
         mode: 'login',
@@ -247,6 +294,7 @@ describe('OAuth (e2e)', () => {
 
       const callbackRes = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
@@ -258,9 +306,9 @@ describe('OAuth (e2e)', () => {
         .expect(401)
     })
 
-    it('should reject missing or already consumed ticket', async () => {
-      const state = 'valid-state-consumed-ticket'
-      await stateService.store(state, {
+    it('should reject exchange from a foreign Origin', async () => {
+      const state = 'valid-state-foreign-origin'
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'test-verifier',
         mode: 'login',
@@ -268,6 +316,57 @@ describe('OAuth (e2e)', () => {
 
       const callbackRes = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
+        .expect(302)
+
+      const ticket = extractTicket(callbackRes.headers.location)
+      const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Origin', FOREIGN_ORIGIN)
+        .set('Cookie', refreshCookie)
+        .send({ ticket })
+        .expect(403)
+
+      expect(response.body.errorCode).toBe(AuthErrorCode.AUTH_ORIGIN_REJECTED)
+    })
+
+    it('should allow exchange from a trusted Origin', async () => {
+      const state = 'valid-state-trusted-origin'
+      await seedState(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
+
+      const callbackRes = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
+        .expect(302)
+
+      const ticket = extractTicket(callbackRes.headers.location)
+      const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/exchange')
+        .set('Origin', TRUSTED_ORIGIN)
+        .set('Cookie', refreshCookie)
+        .send({ ticket })
+        .expect(200)
+    })
+
+    it('should reject missing or already consumed ticket', async () => {
+      const state = 'valid-state-consumed-ticket'
+      await seedState(state, {
+        provider: 'google',
+        codeVerifier: 'test-verifier',
+        mode: 'login',
+      })
+
+      const callbackRes = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       const ticket = extractTicket(callbackRes.headers.location)
@@ -289,24 +388,26 @@ describe('OAuth (e2e)', () => {
     it('should login existing OAuth user without creating duplicate', async () => {
       // First login — creates user
       const state1 = 'valid-state-first'
-      await stateService.store(state1, {
+      await seedState(state1, {
         provider: 'google',
         codeVerifier: 'verifier-1',
         mode: 'login',
       })
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state1}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       // Second login — same OAuth account
       const state2 = 'valid-state-second'
-      await stateService.store(state2, {
+      await seedState(state2, {
         provider: 'google',
         codeVerifier: 'verifier-2',
         mode: 'login',
       })
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state2}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       // Should still have only one user and one OAuth account
@@ -326,13 +427,14 @@ describe('OAuth (e2e)', () => {
 
       // OAuth login with same email — should link, not create new user
       const state = 'valid-state-link'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'verifier',
         mode: 'login',
       })
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       const users = await prisma.user.findMany()
@@ -357,13 +459,14 @@ describe('OAuth (e2e)', () => {
 
       // OAuth login with emailVerified: true — should update user
       const state = 'valid-state-verify'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'verifier',
         mode: 'login',
       })
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       const userAfter = await prisma.user.findUnique({
@@ -384,7 +487,7 @@ describe('OAuth (e2e)', () => {
         .expect(201)
 
       const state = 'valid-state-mixed-case-email'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'verifier',
         mode: 'login',
@@ -392,6 +495,7 @@ describe('OAuth (e2e)', () => {
 
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       const users = await prisma.user.findMany({
@@ -408,7 +512,7 @@ describe('OAuth (e2e)', () => {
       )
 
       const state = 'valid-state-no-email'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'verifier',
         mode: 'login',
@@ -416,13 +520,14 @@ describe('OAuth (e2e)', () => {
 
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(400)
     })
 
     it('should return 400 when state provider does not match URL', async () => {
       // Store state for 'github' but call callback for 'google'
       const state = 'valid-state-mismatch'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'github',
         codeVerifier: 'verifier',
         mode: 'login',
@@ -430,12 +535,13 @@ describe('OAuth (e2e)', () => {
 
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(400)
     })
 
     it('should prevent state replay (one-time use)', async () => {
       const state = 'valid-state-replay'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'verifier',
         mode: 'login',
@@ -444,11 +550,13 @@ describe('OAuth (e2e)', () => {
       // First use — success
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       // Second use — state already consumed
       await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(400)
     })
 
@@ -463,7 +571,7 @@ describe('OAuth (e2e)', () => {
       })
 
       const state = 'valid-state-link-flow'
-      await stateService.store(state, {
+      await seedState(state, {
         provider: 'google',
         codeVerifier: 'verifier',
         mode: 'link',
@@ -472,6 +580,7 @@ describe('OAuth (e2e)', () => {
 
       const res = await request(app.getHttpServer())
         .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
       expect(res.headers.location).toContain('/settings/linked-accounts?linked=google')

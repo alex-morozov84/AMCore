@@ -11,6 +11,7 @@ This guide covers everything — from "how do I log a user in" to "how do I rest
 | Topic                           | What it covers                                                   |
 | ------------------------------- | ---------------------------------------------------------------- |
 | [Concepts](./concepts.md)       | How tokens, sessions, and the security model work                |
+| [CSRF Posture](./csrf.md)       | Which cookie surfaces exist and how CSRF is handled              |
 | [Email Auth](./email-auth.md)   | Register, login, password reset, email verification              |
 | [OAuth](./oauth.md)             | Social login (Google, GitHub, Apple, Telegram) + account linking |
 | [Sessions](./sessions.md)       | Managing active sessions, token rotation, multi-device           |

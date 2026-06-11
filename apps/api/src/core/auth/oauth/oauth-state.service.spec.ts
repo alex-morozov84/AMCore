@@ -6,7 +6,12 @@ describe('OAuthStateService', () => {
   let mockRedis: { getDel: jest.Mock; set: jest.Mock }
 
   const state = 'random-state-abc123'
-  const data: OAuthStateData = { provider: 'google', codeVerifier: 'verifier-xyz', mode: 'login' }
+  const data: OAuthStateData = {
+    provider: 'google',
+    codeVerifier: 'verifier-xyz',
+    mode: 'login',
+    browserNonceHash: 'a'.repeat(64),
+  }
 
   beforeEach(() => {
     mockRedis = {
