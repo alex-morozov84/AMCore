@@ -29,7 +29,7 @@
     "react-hook-form": "^7.71.2",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@amcore/typescript-config": "workspace:*",
