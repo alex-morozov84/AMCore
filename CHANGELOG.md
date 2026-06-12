@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   avatar storage/media/API architecture documentation, and stale version,
   SHA-256, and media module comments.
 
+### Security
+
+- Resolved transitive dependency advisories (`protobufjs`, `tmp`, `fast-uri`,
+  `rollup`, `lodash`, `brace-expansion`, `picomatch`) by materializing pnpm
+  version overrides. The overrides were previously declared under
+  `package.json` `pnpm.overrides`, which pnpm 11 silently ignores; they now live
+  in `pnpm-workspace.yaml` and are reflected in the lockfile. `brace-expansion`
+  is pinned per major line (v1/v5) so the patched v5 is not forced onto v1
+  consumers.
+
 ## [0.1.0] - 2026-06-12
 
 First tagged release and baseline for SemVer versioning. Captures the Track A
