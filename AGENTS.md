@@ -12,8 +12,10 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    and ask the owner to initialize it.
 2. Detect the working-context overlay:
    - **`ai/` directory present** → maintainer copy of the product named in
-     `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/STATUS.md` (current state),
-     `ai/WORKFLOW.md` (working rules), `ai/DECISIONS.md` (ADR index).
+     `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/README.md` (private-repo
+     boundary and document map), `ai/STATUS.md` (current state), `ai/BACKLOG.md`
+     (only unfinished-work queue), `ai/WORKFLOW.md` (working rules), and
+     `ai/DECISIONS.md` (ADR index).
    - **No `ai/` directory** → public contributor/product-fork mode. This file,
      `PROJECT_CONTEXT.md`, `CONTRIBUTING.md`, and public `docs/` are complete; do
      **not** look for private maintainer context.
