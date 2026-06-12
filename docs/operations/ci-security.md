@@ -84,7 +84,8 @@ Three categories:
 > files** — verify the actual state via the GitHub UI / API.
 
 A plain `git clone` of _this_ repo works against the same remote's settings; a **fork** (or a new
-repository) has its **own** external state that starts empty.
+repository) has its **own** external state, which is independently configured and is not
+guaranteed to match upstream (platform/org defaults and fork-network rules may differ).
 
 ## Security setup after forking
 
