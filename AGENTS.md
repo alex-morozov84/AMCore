@@ -32,13 +32,15 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 
 ## How to contribute (workflow)
 
-- **`main` and `develop` are protected — PR-only. A direct push is rejected.**
-  Branch off `develop`; open a PR into `develop`. Releases are a PR `develop → main`.
-- **Required CI status checks must pass before merge.** Merge with **Squash** or
-  **Rebase** only — both branches require linear history (no merge commits). For
-  feature PRs into `develop`, either is fine; **release PRs (`develop → main`) merge
-  with Squash** (the branches diverged in SHA, so Rebase would replay already-released
-  commits).
+- **`main` is the single protected trunk — PR-only. A direct push is rejected.**
+  Branch off `main` (`<type>/<name>`); open a PR into `main`. This is **GitHub Flow** —
+  there is no long-lived `develop` branch.
+- **Required CI status checks must pass before merge. Merge with Squash only** — one PR
+  becomes one linear commit on `main`, and the **PR title becomes the commit message**
+  (so it is CI-validated as a Conventional Commit).
+- **Releases are tags, not a branch merge.** Cut an annotated `vX.Y.Z` tag / GitHub
+  Release from `main`; staging and production are driven by deploy **environments**, not
+  branches. To maintain an older line, branch `release/x.y` from its tag on demand.
 - **Conventional Commits, and a scope is REQUIRED** (commitlint blocks a missing
   scope). Form: `type(scope): subject`, subject lowercase. Allowed scopes:
   `api, web, shared, auth, fitness, finance, subscriptions, ci, docs, deps`.
