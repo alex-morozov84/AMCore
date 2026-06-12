@@ -38,10 +38,10 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) and commitlint.
 
-- **Format:** `type(scope): subject` — **a scope is required** (commitlint blocks a missing scope).
+- **Format:** `type(scope): subject`. **Scope is optional** — add it when the change maps to one clear area, and omit it for cross-cutting changes (e.g. `docs:`, `chore:`).
 - **Subject:** lowercase, no period at the end, max 72 characters.
 - **Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-- **Scopes:** `api`, `web`, `shared`, `auth`, `fitness`, `finance`, `subscriptions`, `ci`, `docs`, `deps`.
+- **Scopes (when present):** `api`, `web`, `shared`, `auth`, `fitness`, `finance`, `subscriptions`, `ci`, `docs`, `deps`.
 
 Examples:
 
