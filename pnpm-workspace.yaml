@@ -16,3 +16,29 @@ allowBuilds:
   sharp: true
   ssh2: true
   unrs-resolver: true
+# Transitive security pins (force a patched version of a sub-dependency until its
+# parent's range catches up). These MUST live here, not in package.json: pnpm 11
+# silently ignores `pnpm.overrides` in package.json (settings moved to this file in
+# pnpm 10.5+). Prune an entry once the parent ships the fix in range.
+overrides:
+  '@angular-devkit/core>picomatch': '4.0.4'
+  '@nestjs/config>lodash': '4.18.1'
+  '@swc/cli>minimatch': '9.0.9'
+  # brace-expansion: patch the vulnerable v1 (<1.1.13) and v5 (<5.0.6) lines only.
+  # Pin per-major — NOT a blanket `minimatch>brace-expansion`, which forces v5 onto
+  # minimatch 3.x (needs the v1 API) → "expand is not a function". v2 has no advisory.
+  'brace-expansion@1': '1.1.15'
+  'brace-expansion@5': '5.0.6'
+  'ajv>fast-uri': '3.1.2'
+  'eslint-plugin-import>minimatch': '3.1.5'
+  'eslint-plugin-jsx-a11y>minimatch': '3.1.5'
+  'eslint-plugin-react>minimatch': '3.1.5'
+  'fdir>picomatch': '4.0.4'
+  'node-emoji>lodash': '4.18.1'
+  'path-to-regexp': '8.4.2'
+  'protobufjs': '7.5.6'
+  'redis-info>lodash': '4.18.1'
+  'rollup': '4.59.0'
+  'tinyglobby>picomatch': '4.0.4'
+  'tmp': '0.2.6'
+  'vite': '7.3.2'
