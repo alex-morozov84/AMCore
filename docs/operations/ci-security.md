@@ -13,6 +13,7 @@ of workflow self-hardening to keep the example forkable.
 | `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                        | gitleaks blocks; OSV is report-only  |
 | `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                               | Trivy report-only; boot-smoke blocks |
 | `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier              | blocking                             |
+| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                   | blocking (squash title = commit msg) |
 
 ## What Each Gate Proves
 
@@ -67,9 +68,11 @@ command:
 3. Apply the settings — `bash ./scripts/setup-repo-security.sh` (also needs `jq`).
 
 This enables native **secret scanning** + **push protection**, the **dependency
-graph** + Dependabot alerts, and imports the branch **rulesets** for `main` and
-`develop` (PR-only merges, required status checks, block force-push, restrict
-deletions). It is **idempotent** — safe to re-run.
+graph** + Dependabot alerts, and imports the **rulesets** for `main` (PR-only,
+**Squash-only** merges, required status checks, block force-push, restrict
+deletions) and for **release tags** (`refs/tags/v*` — block tag update and
+deletion, so published versions are immutable). It is **idempotent** — safe to
+re-run (it also removes the retired `Protect develop` ruleset if present).
 
 Notes:
 

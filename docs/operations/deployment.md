@@ -3,6 +3,30 @@
 How to take AMCore from clone → migrated schema → running app, locally and in
 production. The canonical decision is recorded internally as ADR-040.
 
+## Branch, release & environments model
+
+AMCore uses **GitHub Flow**: a single protected trunk `main`, short-lived PR
+branches, **Squash** merges, and **releases as annotated `vX.Y.Z` tags / GitHub
+Releases**. There is no long-lived `develop` branch (see ADR-048).
+
+Environments are driven by the **deploy pipeline, not by branches** — a branch per
+environment is an anti-pattern:
+
+| Trigger                               | Environment                   |
+| ------------------------------------- | ----------------------------- |
+| PR opened                             | CI checks / ephemeral preview |
+| merge to `main`                       | **staging**                   |
+| push a `vX.Y.Z` tag / publish Release | **production**                |
+
+This is the **reference pattern**: AMCore ships the branch/tag model and the CI
+gates, but the actual staging/production **deploy** wiring (GitHub Environments,
+hosting, secrets) is yours to add. Build the image **once** and promote the **same
+immutable digest** from staging to production — never rebuild from the tag.
+
+To use a previous version, check out its tag (`git checkout v1.2.0`) or fork from it;
+to keep an old line alive with backports, branch `release/1.x` from its tag, only when
+a backport is actually needed.
+
 ## Migration contract
 
 - The app **never migrates itself.** Schema changes are applied by a **one-shot**

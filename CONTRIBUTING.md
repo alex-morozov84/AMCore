@@ -38,10 +38,10 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) and commitlint.
 
-- **Format:** `type(scope): subject` — **a scope is required** (commitlint blocks a missing scope).
+- **Format:** `type(scope): subject`. **Scope is optional** — add it when the change maps to one clear area, and omit it for cross-cutting changes (e.g. `docs:`, `chore:`).
 - **Subject:** lowercase, no period at the end, max 72 characters.
 - **Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-- **Scopes:** `api`, `web`, `shared`, `auth`, `fitness`, `finance`, `subscriptions`, `ci`, `docs`, `deps`.
+- **Scopes (when present):** `api`, `web`, `shared`, `auth`, `fitness`, `finance`, `subscriptions`, `ci`, `docs`, `deps`.
 
 Examples:
 
@@ -54,13 +54,16 @@ chore: unify github repository url
 
 ## Branching & merging
 
-- `main` and `develop` are **protected — PR-only**; a direct push is rejected.
-  Branch off `develop` and open a PR into `develop`. Releases are a PR
-  `develop → main`.
-- Required CI checks must pass before merge. Merge with **Squash** or **Rebase**
-  only — both branches require linear history (no merge commits). Feature PRs into
-  `develop` may use either; **release PRs (`develop → main`) merge with Squash** so
-  already-released commits are not replayed.
+- `main` is the **single protected trunk** (PR-only; a direct push is rejected).
+  Branch off `main` (`<type>/<name>`) and open a PR into `main`. This is **GitHub
+  Flow** — there is no long-lived `develop` branch.
+- Required CI checks must pass before merge. **Merge with Squash** (linear history;
+  one commit per PR). The **PR title becomes the squash commit message**, so it is
+  linted as a Conventional Commit by CI.
+- **Releases are tags.** Cut an annotated `vX.Y.Z` tag / GitHub Release from `main`;
+  staging and production are promoted through deploy **environments**, not branches.
+  To patch an older version, branch `release/x.y` from that tag when a backport is
+  actually needed — no permanent `develop` required.
 - First-time repo-protection setup (these settings do not travel with a fork):
   `bash scripts/setup-repo-security.sh` — needs `gh` + `jq` and repo admin; see
   [`docs/operations/ci-security.md`](docs/operations/ci-security.md). The security

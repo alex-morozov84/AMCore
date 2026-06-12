@@ -1,0 +1,45 @@
+name: PR Title
+
+# Squash-only on `main` means the PR title becomes the squash commit message.
+# commitlint only runs in a local Husky hook, so the GitHub-side squash title is
+# not otherwise validated — this gates it on the same Conventional Commits rules.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-title:
+    name: PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title (Conventional Commits)
+        uses: amannn/action-semantic-pull-request@fdd4d3ddf614fbcd8c29e4b106d3bbe0cb2c605d # v6.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Mirror commitlint.config.js: type-enum, optional scope, lowercase subject.
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^[a-z].+$
+          subjectPatternError: >-
+            The PR title subject must start with a lowercase letter, e.g.
+            "feat(api): add rest timer".
