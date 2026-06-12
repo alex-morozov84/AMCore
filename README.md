@@ -169,15 +169,11 @@ pnpm dev
 > `COMPOSE_DATABASE_URL` / `COMPOSE_REDIS_URL` (and the S3 vars) in `.env`. See
 > [`docs/operations/deployment.md`](docs/operations/deployment.md).
 
-> **Forking this starter?** After cloning, enable the repository protections that
-> don't travel with git — branch rules, secret scanning, push protection — with one
-> command: `bash scripts/setup-repo-security.sh` (needs `gh` + `jq` and repo admin).
-> These security scripts and the optional `.husky/pre-push` hook require a
-> Unix-like shell (`bash`/`sh`) on macOS, Linux, or WSL rather than native
-> Windows PowerShell; install `gh`/`jq` via your OS package manager or the
-> upstream releases.
-> See [`docs/operations/ci-security.md`](docs/operations/ci-security.md) →
-> _Security setup after forking_.
+> **Forking this starter?** Repository files _declare_ the policy; GitHub-side enforcement is
+> separate external state. Apply the supported settings with one command (`gh` + `jq` + repo
+> admin): `bash scripts/setup-repo-security.sh`. Deployment environments and secrets are
+> configured separately. See
+> [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 

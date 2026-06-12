@@ -56,6 +56,37 @@ Inline `// codeql[…]` / `// lgtm` comments are **not** honored by GitHub code 
 alerts. Avoid a repo-wide `query-filters` exclusion for a local false positive: it disables
 the query everywhere and hides real future findings.
 
+## What a fork inherits (and what it doesn't)
+
+A clone or fork receives the repository **files** that _declare_ the intended policy — but
+GitHub-hosted **enforcement is external repository state** that does not travel with git.
+Three categories:
+
+1. **Inherited files** — workflows, `.github/rulesets/*.json`, `scripts/setup-repo-security.sh`,
+   `commitlint.config.js`, `.husky/*`, docs. Present in any clone/fork.
+2. **External GitHub state** — applied rulesets / branch protection, merge methods, secret
+   scanning, required checks, environments, secrets. **Not** inherited; it lives on github.com.
+3. **Activation** — running `setup-repo-security.sh` reconciles the _supported_ settings from
+   the JSON; environments / secrets / deploy credentials are configured separately.
+
+| Capability                                                 | Fork receives        | Active / enforced automatically                                                        |
+| ---------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| Workflows, ruleset JSON, setup script, commitlint config   | Files                | No guarantee                                                                           |
+| GitHub Actions checks                                      | Workflow definitions | Only when Actions / workflow runs are enabled (scheduled runs off by default on forks) |
+| Required checks, squash-only, protected `main` / `v*` tags | Declarative JSON     | No — apply the setup script                                                            |
+| Secret scanning, push protection, dependency alerts        | No                   | Apply the setup script; availability depends on GitHub plan / visibility               |
+| Husky commit hooks                                         | Hook files           | After `pnpm install`; local and bypassable                                             |
+| Environments, secrets, variables, deployment credentials   | No                   | Configure separately; the setup script does not create them                            |
+
+> Repository files **declare** the intended policy. GitHub-hosted enforcement is **external
+> repository state**. Run `setup-repo-security.sh` to reconcile the supported settings; configure
+> deployment environments and secrets separately. **Do not infer live enforcement from tracked
+> files** — verify the actual state via the GitHub UI / API.
+
+A plain `git clone` of _this_ repo works against the same remote's settings; a **fork** (or a new
+repository) has its **own** external state, which is independently configured and is not
+guaranteed to match upstream (platform/org defaults and fork-network rules may differ).
+
 ## Security setup after forking
 
 Some protections — branch rulesets, secret scanning, push protection — are
