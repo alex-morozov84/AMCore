@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in `pnpm-workspace.yaml` and are reflected in the lockfile. `brace-expansion`
   is pinned per major line (v1/v5) so the patched v5 is not forced onto v1
   consumers.
+- Upgraded `next` to 16.2.9 and `next-intl` to 4.13.0, closing the Next.js
+  advisories (middleware/proxy bypass, SSRF, XSS, cache poisoning, DoS) and the
+  `next-intl` open-redirect / prototype-pollution advisories.
+- Bumped `uuid` to 13.0.2 and the `protobufjs` override to 7.5.8 (newer advisory
+  than the previous 7.5.6 pin). Forced the dev-only `uuid@10` (testcontainers)
+  to the patched 11.1.1.
 
 ## [0.1.0] - 2026-06-12
 
