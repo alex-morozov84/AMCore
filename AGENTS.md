@@ -6,13 +6,17 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
 
 ## Operating context (read first)
 
-Two modes — detect which you're in:
-
-- **`ai/` directory present** → the maintainer's copy. ALSO read, in order: `ai/STATUS.md`
-  (current state), `ai/WORKFLOW.md` (working rules), `ai/DECISIONS.md` (ADR index); follow that
-  internal process.
-- **No `ai/` directory** → you're a contributor/forker. This file + the public `docs/` and
-  `CONTRIBUTING.md` are complete; do **not** look for internal context.
+1. Read `PROJECT_CONTEXT.md`. It declares whether this checkout is the AMCore
+   upstream starter or a downstream product. Do not guess from git remotes or names.
+   If the file is missing or still says `upstream-starter` in a product fork, stop
+   and ask the owner to initialize it.
+2. Detect the working-context overlay:
+   - **`ai/` directory present** → maintainer copy of the product named in
+     `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/STATUS.md` (current state),
+     `ai/WORKFLOW.md` (working rules), `ai/DECISIONS.md` (ADR index).
+   - **No `ai/` directory** → public contributor/product-fork mode. This file,
+     `PROJECT_CONTEXT.md`, `CONTRIBUTING.md`, and public `docs/` are complete; do
+     **not** look for private maintainer context.
 
 **Do not infer live enforcement from tracked files** — workflows, `.github/rulesets/*.json` and
 hooks _declare_ the intended policy; GitHub-side enforcement is external repository state applied
@@ -66,7 +70,9 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - **Updating docs is part of "done", not optional.** When a change affects
   user/contributor-facing behavior or a contract, update the relevant `docs/`,
   `README.md`, `CONTRIBUTING.md`, and `AGENTS.md` in the same PR. Record significant
-  or architectural choices in an ADR.
+  or architectural choices in an ADR. Add notable user-facing changes under
+  `CHANGELOG.md` → `[Unreleased]`; ordinary PRs do not create or change release tags.
+  See `CONTRIBUTING.md` → _Changelog & releases_ for the release procedure.
 - First-time setup of the repo protections (they do not travel with a fork):
   `bash scripts/setup-repo-security.sh` — see
   `docs/operations/ci-security.md` → _Security setup after forking_. The security
@@ -95,6 +101,7 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 ## Where the docs are
 
 - `README.md` — overview + Quick Start.
+- `PROJECT_CONTEXT.md` — checkout identity: upstream starter or downstream product.
 - `CONTRIBUTING.md` — contributor process (commands, commit format, PR checklist).
 - `docs/auth/`, `docs/storage/`, `docs/media/` — feature guides.
 - `docs/operations/` — deployment, observability, webhooks, idempotency,
