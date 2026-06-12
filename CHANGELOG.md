@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped `uuid` to 13.0.2 and the `protobufjs` override to 7.5.8 (newer advisory
   than the previous 7.5.6 pin). Forced the dev-only `uuid@10` (testcontainers)
   to the patched 11.1.1.
+- Patched remaining transitive advisories via overrides: `@grpc/grpc-js` 1.14.4,
+  `hono` 4.12.21, `@hono/node-server` 1.19.13, `postcss` 8.5.14, `ws` 8.21.0,
+  `ajv` 8.20.0, `qs` 6.15.2, `esbuild` 0.28.1; and upgraded `turbo` to 2.9.18.
+  Overrides are scoped to the vulnerable major so safe coexisting majors are
+  untouched.
 
 ## [0.1.0] - 2026-06-12
 
