@@ -6,9 +6,9 @@
 
 | Component         | Technology                                     | Purpose                            |
 | ----------------- | ---------------------------------------------- | ---------------------------------- |
-| **Framework**     | NestJS 10                                      | Modular monolith                   |
+| **Framework**     | NestJS 11                                      | Modular monolith                   |
 | **Database**      | PostgreSQL 16                                  | Primary data store (multi-schema)  |
-| **ORM**           | Prisma 6                                       | Type-safe database access          |
+| **ORM**           | Prisma 7                                       | Type-safe database access          |
 | **Cache / Queue** | Redis + BullMQ                                 | Sessions, caching, background jobs |
 | **Validation**    | Zod + nestjs-zod                               | Request validation + auto Swagger  |
 | **Auth**          | JWT + Refresh Tokens, OAuth 2.0/OIDC, API Keys | Multi-method authentication        |
@@ -85,7 +85,11 @@ PostgreSQL uses schema separation for module isolation:
 | `finance`       | wallets, transactions (planned)                                                                                                                                                            |
 | `subscriptions` | services, subscriptions (planned)                                                                                                                                                          |
 
-Cross-module communication: via Redis pub/sub events, never direct DB imports.
+Modules communicate through explicit service/module contracts and shared API
+schemas. PostgreSQL schemas separate ownership, but do not permit direct
+cross-module database access. Redis is shared infrastructure for caches, locks,
+rate limits, idempotency, OAuth state, and BullMQ, not a mandatory module event
+bus.
 
 ## Authentication Endpoints
 

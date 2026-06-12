@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Corrected auth token-verification and password-reset entropy documentation,
+  avatar storage/media/API architecture documentation, and stale version,
+  SHA-256, and media module comments.
+
 ## [0.1.0] - 2026-06-12
 
 First tagged release and baseline for SemVer versioning. Captures the Track A

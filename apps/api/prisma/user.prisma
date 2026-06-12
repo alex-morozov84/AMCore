@@ -164,7 +164,7 @@ model UserSettings {
 model PasswordResetToken {
   id        String   @id @default(cuid())
   userId    String
-  tokenHash String   @unique // bcrypt hash of 64-char token
+  tokenHash String   @unique // SHA-256 hash of a 64-char hex token
   expiresAt DateTime // createdAt + 15 minutes
   used      Boolean  @default(false)
   usedAt    DateTime?
@@ -184,7 +184,7 @@ model PasswordResetToken {
 model EmailVerificationToken {
   id        String   @id @default(cuid())
   userId    String
-  tokenHash String   @unique // bcrypt hash of 64-char token
+  tokenHash String   @unique // SHA-256 hash of a 64-char hex token
   expiresAt DateTime // createdAt + 48 hours
   used      Boolean  @default(false)
   usedAt    DateTime?

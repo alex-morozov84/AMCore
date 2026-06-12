@@ -11,8 +11,7 @@ import { ObservabilityModule } from '@/infrastructure/observability'
 /**
  * Media processing module. Binds the active `ImageProcessor` (sharp, configured
  * from `MEDIA_*` env) and exposes `MediaService`, which composes over the global
- * `StorageService`. Not consumed by any controller yet — the avatar flow wires
- * it in a later stage.
+ * `StorageService`. The current avatar upload flow consumes it synchronously.
  */
 @Module({
   imports: [EnvModule, ObservabilityModule],
