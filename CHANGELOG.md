@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-12
+
+First tagged release — baseline for `release-please`-managed versioning. Captures the
+Track A production-readiness work and the platform foundation built so far.
+
 ### Added
 
 - **Storage Service:**
