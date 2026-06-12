@@ -28,8 +28,7 @@ upsert_ruleset() {
   name=$(jq -r '.name' "$file")
   existing_id=$(
     api "repos/$owner/$repo/rulesets" |
-      jq -r --arg name "$name" '.[] | select(.source_type == "Repository" and .name == $name) | .id' |
-      head -n 1
+      jq -r --arg name "$name" '[.[] | select(.source_type == "Repository" and .name == $name)][0].id // empty'
   )
 
   if [[ -n $existing_id ]]; then
@@ -42,27 +41,30 @@ upsert_ruleset() {
   api --method POST "repos/$owner/$repo/rulesets" --input "$file" >/dev/null
 }
 
-# Delete a repository-owned ruleset by name. Idempotent: tolerates absence so the
-# script stays safe to re-run (e.g. the retired `Protect develop` after migration).
+# Delete every repository-owned ruleset with this name. Idempotent: tolerates
+# absence (and duplicates) so the script stays safe to re-run — e.g. the retired
+# `Protect develop` ruleset after the trunk-based migration (ADR-048).
 delete_ruleset_by_name() {
   local owner=$1
   local repo=$2
   local name=$3
-  local existing_id
+  local ids id
 
-  existing_id=$(
+  ids=$(
     api "repos/$owner/$repo/rulesets" |
-      jq -r --arg name "$name" '.[] | select(.source_type == "Repository" and .name == $name) | .id' |
-      head -n 1
+      jq -r --arg name "$name" '.[] | select(.source_type == "Repository" and .name == $name) | .id'
   )
 
-  if [[ -z $existing_id ]]; then
+  if [[ -z $ids ]]; then
     echo "setup-repo-security: ruleset '$name' already absent"
     return
   fi
 
-  echo "setup-repo-security: deleting obsolete ruleset '$name' ($existing_id)"
-  api --method DELETE "repos/$owner/$repo/rulesets/$existing_id" >/dev/null
+  while IFS= read -r id; do
+    [[ -z $id ]] && continue
+    echo "setup-repo-security: deleting obsolete ruleset '$name' ($id)"
+    api --method DELETE "repos/$owner/$repo/rulesets/$id" >/dev/null
+  done <<<"$ids"
 }
 
 need_cmd gh
@@ -82,6 +84,10 @@ echo "setup-repo-security: applying security settings to $repo_full_name"
 
 api --method PATCH "repos/$owner/$repo" --input - >/dev/null <<'JSON'
 {
+  "allow_squash_merge": true,
+  "allow_merge_commit": false,
+  "allow_rebase_merge": false,
+  "delete_branch_on_merge": true,
   "security_and_analysis": {
     "secret_scanning": {
       "status": "enabled"
@@ -95,7 +101,7 @@ JSON
 
 api --method PUT "repos/$owner/$repo/vulnerability-alerts" >/dev/null
 
-echo "setup-repo-security: ensured dependency graph, vulnerability alerts, secret scanning, and push protection"
+echo "setup-repo-security: ensured squash-only merges + delete-branch-on-merge, dependency graph, vulnerability alerts, secret scanning, and push protection"
 
 upsert_ruleset "$owner" "$repo" "$RULESET_DIR/main.json"
 upsert_ruleset "$owner" "$repo" "$RULESET_DIR/tags-release.json"
