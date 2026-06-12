@@ -4,6 +4,20 @@ Guidance for AI coding agents (and humans) working in this repository. Any agent
 should read this first — it is the cross-tool standard ([agents.md](https://agents.md)).
 Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
 
+## Operating context (read first)
+
+Two modes — detect which you're in:
+
+- **`ai/` directory present** → the maintainer's copy. ALSO read, in order: `ai/STATUS.md`
+  (current state), `ai/WORKFLOW.md` (working rules), `ai/DECISIONS.md` (ADR index); follow that
+  internal process.
+- **No `ai/` directory** → you're a contributor/forker. This file + the public `docs/` and
+  `CONTRIBUTING.md` are complete; do **not** look for internal context.
+
+**Do not infer live enforcement from tracked files** — workflows, `.github/rulesets/*.json` and
+hooks _declare_ the intended policy; GitHub-side enforcement is external repository state applied
+separately (see [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt)).
+
 ## What this is
 
 **AMCore** is a modular personal-productivity platform built on an **exemplary,
@@ -90,20 +104,3 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 
 API: Jest (unit) + Jest/Testcontainers (e2e). Email templates: Vitest. Focus on
 critical paths. See the relevant `docs/` and existing specs for patterns.
-
----
-
-## Maintainer mode (internal)
-
-**If an `ai/` directory exists in this checkout, you are working in the
-maintainer's copy.** It holds private planning/context that is gitignored and does
-NOT ship to forks. In that case, ALSO read, in order:
-
-1. `ai/STATUS.md` — current state: what's done, what's in progress, what's next.
-2. `ai/WORKFLOW.md` — internal working rules (plan-first, review process).
-3. `ai/DECISIONS.md` — Architecture Decision Records (ADRs) index.
-
-and follow that internal process for maintainer work.
-
-**If there is no `ai/` directory, you are a contributor/forker — this file plus
-the public `docs/` and `CONTRIBUTING.md` are complete. Do not look for `ai/`.**

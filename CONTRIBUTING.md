@@ -66,7 +66,7 @@ chore: unify github repository url
   actually needed — no permanent `develop` required.
 - First-time repo-protection setup (these settings do not travel with a fork):
   `bash scripts/setup-repo-security.sh` — needs `gh` + `jq` and repo admin; see
-  [`docs/operations/ci-security.md`](docs/operations/ci-security.md). The security
+  [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt). The security
   scripts require a Unix-like shell (macOS/Linux/WSL).
 
 ## Before Submitting a PR
