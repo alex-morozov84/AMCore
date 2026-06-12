@@ -74,9 +74,32 @@ chore: unify github repository url
 1. Run `pnpm lint` and `pnpm typecheck` — must pass.
 2. Run `pnpm test` — all tests must pass.
 3. Run `pnpm format:check` — or `pnpm format` to fix.
-4. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
+4. Add notable user-facing changes to `CHANGELOG.md` under `[Unreleased]`. Skip
+   internal refactors, tests, and typo-only documentation changes.
+5. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
 
 CI runs the same checks on push; fixing any failures before opening a PR saves time.
+
+## Changelog & releases
+
+Ordinary PRs do not bump the version or create tags. Maintainers release the
+repository as one product; only the root `package.json` version is the release
+version. Private workspace package versions stay unchanged.
+
+Manual release procedure (until release automation is adopted):
+
+1. Create a short-lived release-preparation branch from current `main`.
+2. Choose the next SemVer version. Stay on `0.x` while the public starter
+   contract is still evolving.
+3. Set the root `package.json` version and move `[Unreleased]` entries in
+   `CHANGELOG.md` into `[X.Y.Z] - YYYY-MM-DD`. Restore an empty `[Unreleased]`
+   section and update the comparison links at the bottom.
+4. Open a `chore: release vX.Y.Z` PR into `main`; merge it with Squash after CI.
+5. Tag that exact `main` commit with annotated tag `vX.Y.Z`, push it, then create
+   the matching GitHub Release.
+
+Release tags are immutable: never move, overwrite, or delete an existing `v*`
+tag. See the internal maintainer checklist in `ai/PROCESS.md` when `ai/` exists.
 
 ## Troubleshooting
 

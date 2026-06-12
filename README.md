@@ -9,15 +9,19 @@
 
 ## Overview
 
-AMCore is a modular web application for personal productivity. The backend is designed as an exemplary open-source NestJS starter: strong application/security foundations, broad tests, and an active production-readiness track for deployment and operations.
+AMCore is a modular web application for personal productivity. The backend is
+designed as an exemplary open-source NestJS starter with strong application and
+security foundations, broad tests, and a completed production-readiness baseline.
+Deployment targets and CD environments remain adopter-specific.
 
 ### Application Modules
 
-| Module            | Status     | Description                                         |
-| ----------------- | ---------- | --------------------------------------------------- |
-| **Fitness**       | 🚧 Next    | Workout tracking, exercise library, progress charts |
-| **Finance**       | 📋 Planned | Wallet management, transaction tracking             |
-| **Subscriptions** | 📋 Planned | Subscription monitoring, reminders                  |
+| Module            | Status     | Description                                             |
+| ----------------- | ---------- | ------------------------------------------------------- |
+| **Notifications** | 🚧 Next    | Reusable in-app and delivery-channel notification layer |
+| **Fitness**       | 📋 Planned | Workout tracking, exercise library, progress charts     |
+| **Finance**       | 📋 Planned | Wallet management, transaction tracking                 |
+| **Subscriptions** | 📋 Planned | Subscription monitoring, reminders                      |
 
 ## Tech Stack
 
@@ -52,7 +56,9 @@ amcore/
 
 ## API Starter — What's Built
 
-The backend is a fully-featured NestJS starter. The application/security baseline below is implemented and tested; operations/deployment hardening is tracked separately before the project restores an unqualified "fully production-ready" claim.
+The backend is a fully-featured NestJS starter. The application, security, and
+operations baseline below is implemented and tested. Production deployment still
+requires adopter-owned infrastructure, secrets, environments, and capacity choices.
 
 ### Foundation
 
@@ -64,7 +70,7 @@ The backend is a fully-featured NestJS starter. The application/security baselin
 - Global rate limiting (10 req/s + 100 req/min via `@nestjs/throttler`), Redis-backed so limits are shared across API replicas; degrades to local in-memory limits if Redis is unavailable (ADR-039)
 - Helmet, CORS, cookie parser
 - Swagger/OpenAPI at `/docs` (dev only)
-- CI/CD: lint, typecheck, test, build, boot-smoke, security scans, Dependabot
+- CI: lint, typecheck, test, build, boot-smoke, security scans, Dependabot
 
 ### Authentication
 
@@ -169,10 +175,13 @@ pnpm dev
 > `COMPOSE_DATABASE_URL` / `COMPOSE_REDIS_URL` (and the S3 vars) in `.env`. See
 > [`docs/operations/deployment.md`](docs/operations/deployment.md).
 
-> **Forking this starter?** Repository files _declare_ the policy; GitHub-side enforcement is
-> separate external state. Apply the supported settings with one command (`gh` + `jq` + repo
-> admin): `bash scripts/setup-repo-security.sh`. Deployment environments and secrets are
-> configured separately. See
+> **Building a product from this starter?** First update
+> [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) from `upstream-starter` to
+> `downstream-product` and record the product identity, roadmap location, and upstream-sync
+> policy. Repository files _declare_ the technical policy; GitHub-side enforcement is separate
+> external state. Apply the supported settings with one command (`gh` + `jq` + repo admin):
+> `bash scripts/setup-repo-security.sh`. Deployment environments and secrets are configured
+> separately. See
 > [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.

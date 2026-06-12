@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-06-12
 
-First tagged release — baseline for `release-please`-managed versioning. Captures the
-Track A production-readiness work and the platform foundation built so far.
+First tagged release and baseline for SemVer versioning. Captures the Track A
+production-readiness work and the platform foundation built so far.
 
 ### Added
 
@@ -72,12 +72,12 @@ Track A production-readiness work and the platform foundation built so far.
   - Per-email+IP: 5 failed attempts per 1 hour → 15-minute block
   - Counters reset on successful login
 - **API Key Authentication:**
-  - Dual-token format: `amk_{shortToken}_{longToken}`
+  - Dual-token format: `amcore_live_{shortToken}_{longToken}`
   - `shortToken` stored in plaintext for O(1) DB lookup; `longToken` SHA-256 hashed
   - Scopes: `action:subject` format, effective = user permissions ∩ key scopes
   - Lazy `lastUsedAt` update via Redis gate (avoids hot row contention)
   - `POST/GET/DELETE /api-keys` — user manages own keys
-  - `ApiKeyGuard` — parses `Authorization: Bearer amk_...`, verifies, populates request.user
+  - `ApiKeyGuard` — parses `Authorization: Bearer amcore_live_...`, verifies, populates request.user
   - Expired API keys included in nightly `CleanupService` run
   - 15 unit tests, 7 E2E tests
 - **Scheduled Tasks:**
@@ -111,9 +111,7 @@ Track A production-readiness work and the platform foundation built so far.
   - Testcontainers: real PostgreSQL 16 + Redis 7 per test suite
   - 5 suites: auth (42), organizations (10), admin (7), api-keys (7), oauth (14)
 
-## [0.1.0] - 2026-02-05
-
-### Added
+### Added (initial foundation)
 
 - **Phase 0: Foundation**
   - Monorepo setup with pnpm workspaces + Turborepo
@@ -144,7 +142,7 @@ Track A production-readiness work and the platform foundation built so far.
   - Dependabot for automated dependency updates
   - ESLint + Prettier + Husky + lint-staged + commitlint
 
-## [0.0.1] - 2026-01-27
+## 0.0.1 - 2026-01-27
 
 ### Added
 
@@ -156,5 +154,4 @@ Track A production-readiness work and the platform foundation built so far.
 ---
 
 [unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/alex-morozov84/AMCore/compare/v0.0.1...v0.1.0
-[0.0.1]: https://github.com/alex-morozov84/AMCore/releases/tag/v0.0.1
+[0.1.0]: https://github.com/alex-morozov84/AMCore/releases/tag/v0.1.0
