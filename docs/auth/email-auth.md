@@ -157,7 +157,8 @@ curl -X POST https://api.amcore.dev/api/v1/auth/forgot-password \
 **What happens:**
 
 1. Rate limit is checked (3 requests per canonical email per hour)
-2. If the email exists, a reset token is generated (64 random bytes, SHA-256 hashed for storage)
+2. If the email exists, a reset token is generated (32 random bytes, encoded as
+   64 hexadecimal characters, then SHA-256 hashed for storage)
 3. An email is sent with a link: `https://amcore.dev/reset-password?token={raw_token}`
 4. Token expires in **15 minutes**
 

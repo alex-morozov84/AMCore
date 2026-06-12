@@ -10,7 +10,9 @@ The system uses two tokens that work together. They serve completely different p
 
 ### Access token (JWT)
 
-Think of it as a **day pass**. It's short-lived (15 minutes), self-contained, and fast to verify — the server doesn't need to touch the database to validate it.
+Think of it as a **day pass**. It's short-lived (15 minutes), self-contained,
+and fast to verify. After signature validation, AMCore also resolves the current
+user through its Redis-backed user cache, with a database fallback on cache miss.
 
 ```
 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjbTEyMyIsImVtYWlsIjoiYWxleEBleGFtcGxlLmNvbSIsInN5c3RlbVJvbGUiOiJVU0VSIn0.signature
@@ -30,7 +32,8 @@ Decoded, it looks like:
 }
 ```
 
-The server trusts this token if the signature is valid — no database lookup. That's what makes it fast.
+The token carries the signed claims, while the user lookup rejects tokens whose
+user no longer exists.
 
 ### Refresh token (opaque)
 

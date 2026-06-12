@@ -73,11 +73,14 @@ separately:
 
 For private files, store only the key. Generate signed/app-mediated access at
 read time. For public avatars, AMCore stores `User.avatarUrl` because it is an
-existing public profile field and the key is stable (`avatars/{userId}`).
+existing public profile field. Avatar objects use versioned keys under
+`avatars/{userId}/v-{version}/`, so a newly published URL is immutable and can
+be cached safely.
 
-## Future Media Processing
+## Media Processing
 
-Image resizing, thumbnail generation, AVIF/WebP conversion, EXIF stripping, and
-async derivative jobs are deliberately outside this storage module. They belong
-to the separate Media Processing arc so storage remains provider-agnostic and
-file-type agnostic.
+Image inspection, avatar resizing, WebP derivatives, orientation handling, and
+metadata stripping live in the separate media infrastructure module so storage
+remains provider-agnostic and file-type agnostic. Generic media assets, async
+media workers, AVIF/JPEG fallback variants, and animated-image policy remain
+deferred until a concrete product use case exists.
