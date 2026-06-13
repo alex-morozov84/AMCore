@@ -1,5 +1,11 @@
 {
   "$schema": "https://swc.rs/schema.json",
+  "exclude": [
+    "\\.spec\\.ts$",
+    "-spec\\.ts$",
+    "__tests__",
+    "__mocks__"
+  ],
   "jsc": {
     "target": "es2022",
     "parser": {
