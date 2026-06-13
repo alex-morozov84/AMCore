@@ -16,7 +16,7 @@ import type { Request, Response } from 'express'
 
 import { AuthErrorCode, AuthType, type OAuthExchangeResponse } from '@amcore/shared'
 
-import { AppException } from '../../../common/exceptions'
+import { AppException, NotFoundException } from '../../../common/exceptions'
 import { EnvService } from '../../../env/env.service'
 import { Auth } from '../decorators/auth.decorator'
 import { CurrentUser } from '../decorators/current-user.decorator'
@@ -25,7 +25,14 @@ import { OriginCheckGuard } from '../guards'
 import { SessionService } from '../session.service'
 import { TokenService } from '../token.service'
 
+import { parseAppleUserName } from './apple-user'
 import { OAuthService } from './oauth.service'
+import {
+  clearOAuthBindingCookie,
+  isFormPostProvider,
+  readOAuthBindingNonce,
+  setOAuthBindingCookie,
+} from './oauth-binding-cookie'
 import { OAuthLoginTicketService } from './oauth-login-ticket.service'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory'
 
@@ -45,28 +52,8 @@ export class OAuthController {
     private readonly env: EnvService
   ) {}
 
-  /**
-   * Set the short-lived browser-binding cookie for the OAuth `state` flow.
-   *
-   * `SameSite=Lax` (not Strict) so it survives the provider's cross-site
-   * top-level redirect back to the callback; Strict would drop it and break
-   * every OAuth login. The raw nonce is intentionally the cookie value — that
-   * is the browser-binding mechanism itself (the server persists only its
-   * SHA-256 hash; see `oauth-nonce.ts`), the double-submit half a CSRF /
-   * session-swap attacker cannot forge. Options are an inline literal
-   * (mirroring the `refresh_token` cookie below) so the `httpOnly`/`secure`
-   * hardening is statically visible at the sink — CodeQL cannot resolve flags
-   * set via a getter and would otherwise report false `js/client-exposed-cookie`
-   * / `js/clear-text-cookie` alerts.
-   */
-  private setStateCookie(res: Response, browserNonce: string): void {
-    res.cookie('oauth_state', browserNonce, {
-      httpOnly: true,
-      secure: this.env.get('NODE_ENV') === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 5 * 60 * 1000, // 5 min — matches the OAuth state TTL
-    })
+  private get isProduction(): boolean {
+    return this.env.get('NODE_ENV') === 'production'
   }
 
   @Get('providers')
@@ -81,7 +68,7 @@ export class OAuthController {
   @ApiOperation({ summary: 'Redirect to OAuth provider for login' })
   async authorize(@Param('provider') provider: string, @Res() res: Response): Promise<void> {
     const { url, browserNonce } = await this.oauthService.getAuthorizationURL(provider)
-    this.setStateCookie(res, browserNonce)
+    setOAuthBindingCookie(res, provider, browserNonce, this.isProduction)
     res.redirect(url)
   }
 
@@ -94,19 +81,61 @@ export class OAuthController {
     @Res() res: Response
   ): Promise<void> {
     const { url, browserNonce } = await this.oauthService.getLinkAuthorizationURL(provider, userId)
-    this.setStateCookie(res, browserNonce)
+    setOAuthBindingCookie(res, provider, browserNonce, this.isProduction)
     res.redirect(url)
   }
 
+  /**
+   * Redirect/query providers (Google, GitHub, …) return via a top-level GET.
+   * Apple is form_post-only and must not be accepted here — reject it before any
+   * state/provider-code consumption so the GET transport stays exact.
+   */
   @Get(':provider/callback')
   @Auth(AuthType.None)
-  @ApiOperation({ summary: 'Handle OAuth provider callback' })
-  async callback(
+  @ApiOperation({ summary: 'Handle OAuth provider callback (redirect/query providers)' })
+  async callbackGet(
     @Param('provider') provider: string,
     @Query('code') code: string,
     @Query('state') state: string,
     @Req() req: Request,
     @Res() res: Response
+  ): Promise<void> {
+    if (isFormPostProvider(provider)) throw new NotFoundException('OAuth callback')
+    await this.processCallback(provider, code, state, req, res)
+  }
+
+  /**
+   * Apple uses `response_mode=form_post` — it POSTs `code`/`state` (plus a
+   * `user` JSON with the display name on the FIRST authorization only) as a
+   * cross-site `application/x-www-form-urlencoded` body. Browser binding for
+   * this path rides the `SameSite=None` Apple cookie (see `oauth-binding-cookie.ts`).
+   *
+   * Fail closed for any non-form_post provider: a redirect provider posted here
+   * would otherwise have Apple-only `user` form data applied to it. The
+   * provider check runs BEFORE `user` is parsed or any state is consumed.
+   */
+  @Post(':provider/callback')
+  @Auth(AuthType.None)
+  @ApiOperation({ summary: 'Handle OAuth provider form_post callback (Apple)' })
+  async callbackPost(
+    @Param('provider') provider: string,
+    @Body('code') code: string,
+    @Body('state') state: string,
+    @Body('user') user: string | undefined,
+    @Req() req: Request,
+    @Res() res: Response
+  ): Promise<void> {
+    if (!isFormPostProvider(provider)) throw new NotFoundException('OAuth callback')
+    await this.processCallback(provider, code, state, req, res, parseAppleUserName(user))
+  }
+
+  private async processCallback(
+    provider: string,
+    code: string,
+    state: string,
+    req: Request,
+    res: Response,
+    firstLoginName?: string | null
   ): Promise<void> {
     if (!code || !state) {
       throw new AppException(
@@ -116,14 +145,21 @@ export class OAuthController {
       )
     }
 
-    const browserNonce = req.cookies?.oauth_state
-    const result = await this.oauthService.handleCallback(provider, code, state, browserNonce, {
-      userAgent: req.headers['user-agent'],
-      ipAddress: req.ip,
-    })
+    const browserNonce = readOAuthBindingNonce(req, provider)
+    const result = await this.oauthService.handleCallback(
+      provider,
+      code,
+      state,
+      browserNonce,
+      {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip,
+      },
+      firstLoginName
+    )
 
     // One-time binding nonce: clear it once the callback succeeds.
-    res.clearCookie('oauth_state', { path: '/' })
+    clearOAuthBindingCookie(res, provider)
 
     const frontendUrl = this.env.get('FRONTEND_URL')
 

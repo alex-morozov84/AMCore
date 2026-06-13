@@ -44,7 +44,7 @@ curl -X POST https://api.amcore.dev/api/v1/auth/register \
    exists only in the email link)
 5. A session is created, tokens are issued
 
-**Success response** `200 OK`:
+**Success response** `201 Created`:
 
 ```json
 {
@@ -52,7 +52,6 @@ curl -X POST https://api.amcore.dev/api/v1/auth/register \
     "id": "cm1abc...",
     "email": "alex@example.com",
     "name": "Alex",
-    "systemRole": "USER",
     "emailVerified": false
   },
   "accessToken": "eyJhbGci..."
@@ -99,7 +98,6 @@ curl -X POST https://api.amcore.dev/api/v1/auth/login \
     "id": "cm1abc...",
     "email": "alex@example.com",
     "name": "Alex",
-    "systemRole": "USER",
     "emailVerified": true
   },
   "accessToken": "eyJhbGci..."
@@ -207,7 +205,7 @@ curl -X POST https://api.amcore.dev/api/v1/auth/reset-password \
 
 | Code            | HTTP | When                                      |
 | --------------- | ---- | ----------------------------------------- |
-| `TOKEN_INVALID` | 400  | Token not found, already used, or expired |
+| `TOKEN_INVALID` | 401  | Token not found, already used, or expired |
 
 > **Important:** After a successful reset, the user must log in again on all devices. This is intentional — if the reset was triggered by an attacker, this signs them out.
 
@@ -243,7 +241,7 @@ curl -X POST https://api.amcore.dev/api/v1/auth/verify-email \
 
 | Code            | HTTP | When                                      |
 | --------------- | ---- | ----------------------------------------- |
-| `TOKEN_INVALID` | 400  | Token not found, already used, or expired |
+| `TOKEN_INVALID` | 401  | Token not found, already used, or expired |
 
 ---
 
@@ -278,20 +276,21 @@ curl https://api.amcore.dev/api/v1/auth/me \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
-**Success response** `200 OK`:
+**Success response** `200 OK` (the user is wrapped in a `user` envelope):
 
 ```json
 {
-  "id": "cm1abc...",
-  "email": "alex@example.com",
-  "name": "Alex",
-  "avatarUrl": null,
-  "phone": null,
-  "emailVerified": true,
-  "systemRole": "USER",
-  "locale": "ru",
-  "timezone": "Europe/Moscow",
-  "createdAt": "2024-01-15T10:00:00.000Z",
-  "lastLoginAt": "2024-03-20T08:30:00.000Z"
+  "user": {
+    "id": "cm1abc...",
+    "email": "alex@example.com",
+    "name": "Alex",
+    "avatarUrl": null,
+    "phone": null,
+    "emailVerified": true,
+    "locale": "ru",
+    "timezone": "Europe/Moscow",
+    "createdAt": "2024-01-15T10:00:00.000Z",
+    "lastLoginAt": "2024-03-20T08:30:00.000Z"
+  }
 }
 ```
