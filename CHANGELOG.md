@@ -9,9 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Sign in with Apple now works end-to-end on the web. Apple uses
+  `response_mode=form_post` and POSTs the callback, but only a GET callback
+  existed (the POST 404'd) and the `SameSite=Lax` binding cookie was never sent
+  on Apple's cross-site POST. Added a `POST /auth/oauth/:provider/callback`
+  sharing one handler with the GET path, a dedicated `SameSite=None; Secure`
+  binding cookie scoped to the Apple callback path, and first-login display-name
+  capture from Apple's `user` field. Other providers are unchanged.
 - Corrected auth token-verification and password-reset entropy documentation,
   avatar storage/media/API architecture documentation, and stale version,
   SHA-256, and media module comments.
+- Reconciled `docs/auth/email-auth.md` with runtime: registration returns
+  `201 Created` (not `200`), `GET /auth/me` wraps the user in a `user` envelope,
+  invalid reset/verify tokens return `401` (not `400`), and the response examples
+  no longer show a non-returned `systemRole` field.
 
 ### Changed
 

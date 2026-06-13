@@ -94,7 +94,8 @@ export class OAuthService {
     code: string,
     state: string,
     browserNonce: string | undefined,
-    requestInfo: RequestInfo
+    requestInfo: RequestInfo,
+    firstLoginName?: string | null
   ): Promise<CallbackResult> {
     const stateData = await this.stateService.consume(state)
     if (!stateData || stateData.provider !== providerName) {
@@ -113,6 +114,13 @@ export class OAuthService {
     const provider = this.providerFactory.get(providerName)
     const tokens = await provider.exchangeCode(code, stateData.codeVerifier)
     const profile = await provider.getUserProfile(tokens)
+
+    // Apple sends the display name only in the first-login `form_post` `user`
+    // field, never in the ID token/userinfo. Fold it in (without clobbering a
+    // name the provider did supply) so `createOAuthUser` can persist it.
+    if (firstLoginName && !profile.displayName) {
+      profile.displayName = firstLoginName
+    }
 
     if (stateData.mode === 'link') {
       const user = await this.attachProviderToUser(stateData.userId!, profile, providerName)

@@ -588,4 +588,232 @@ describe('OAuth (e2e)', () => {
       expect(res.headers.location).not.toContain('token=')
     })
   })
+
+  describe('POST /auth/oauth/apple/callback (form_post)', () => {
+    // Apple uses response_mode=form_post: a cross-site POST that does NOT carry
+    // the SameSite=Lax `oauth_state` cookie. Its binding rides a separate
+    // SameSite=None `oauth_state_apple` cookie.
+    const APPLE_STATE_COOKIE = `oauth_state_apple=${OAUTH_NONCE}`
+    const APPLE_USER_FIELD = JSON.stringify({
+      name: { firstName: 'Jane', lastName: 'Appleseed' },
+      email: 'apple-user@example.com',
+    })
+
+    // Real Apple carries no name in userinfo (displayName: null) — the name
+    // arrives only in the first-login `user` form field.
+    function registerAppleProvider() {
+      const provider: OAuthProvider = {
+        name: 'apple',
+        getAuthorizationURL: async (state: string): Promise<URL> =>
+          new URL(`https://appleid.apple.com/auth/authorize?state=${state}`),
+        exchangeCode: async (): Promise<OAuthTokens> => ({ accessToken: 'apple-access-token' }),
+        getUserProfile: async (): Promise<OAuthUserProfile> => ({
+          providerId: 'apple-uid-789',
+          provider: 'apple',
+          email: 'apple-user@example.com',
+          emailVerified: true,
+          displayName: null,
+          avatarUrl: null,
+        }),
+      }
+      ;(providerFactory as unknown as { providers: Map<string, OAuthProvider> }).providers.set(
+        'apple',
+        provider
+      )
+    }
+
+    beforeEach(() => {
+      registerAppleProvider()
+    })
+
+    it('should create the user with the first-login name and redirect with a ticket', async () => {
+      const state = 'apple-state-new-user'
+      await seedState(state, { provider: 'apple', codeVerifier: 'test-verifier', mode: 'login' })
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/oauth/apple/callback')
+        .set('Cookie', APPLE_STATE_COOKIE)
+        .type('form')
+        .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
+        .expect(302)
+
+      expect(res.headers.location).toContain('/auth/callback?ticket=')
+      expect(res.headers.location).not.toContain('token=')
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'apple-user@example.com' },
+        include: { accounts: true },
+      })
+      expect(user).not.toBeNull()
+      expect(user!.name).toBe('Jane Appleseed')
+      expect(user!.accounts[0]!.provider).toBe('APPLE')
+      expect(user!.accounts[0]!.providerAccountId).toBe('apple-uid-789')
+    })
+
+    it('should create the user with a null name when no `user` field is sent', async () => {
+      const state = 'apple-state-no-name'
+      await seedState(state, { provider: 'apple', codeVerifier: 'test-verifier', mode: 'login' })
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/apple/callback')
+        .set('Cookie', APPLE_STATE_COOKIE)
+        .type('form')
+        .send({ code: 'auth-code', state })
+        .expect(302)
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'apple-user@example.com' },
+      })
+      expect(user).not.toBeNull()
+      expect(user!.name).toBeNull()
+    })
+
+    it('should reject the form_post callback when the Apple binding cookie is missing', async () => {
+      const state = 'apple-state-no-binding'
+      await seedState(state, { provider: 'apple', codeVerifier: 'test-verifier', mode: 'login' })
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/apple/callback')
+        .type('form')
+        .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
+        .expect(400)
+
+      expect(await prisma.user.count()).toBe(0)
+    })
+
+    it('should reject the form_post callback when the Apple binding cookie mismatches', async () => {
+      const state = 'apple-state-bad-binding'
+      await seedState(state, { provider: 'apple', codeVerifier: 'test-verifier', mode: 'login' })
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/apple/callback')
+        .set('Cookie', 'oauth_state_apple=a-different-browser-nonce')
+        .type('form')
+        .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
+        .expect(400)
+
+      expect(await prisma.user.count()).toBe(0)
+    })
+
+    it('should reject a replayed state (single-use)', async () => {
+      const state = 'apple-state-replay'
+      await seedState(state, { provider: 'apple', codeVerifier: 'test-verifier', mode: 'login' })
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/apple/callback')
+        .set('Cookie', APPLE_STATE_COOKIE)
+        .type('form')
+        .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
+        .expect(302)
+
+      // Same state again: state is consumed atomically (GETDEL) on first use.
+      await request(app.getHttpServer())
+        .post('/auth/oauth/apple/callback')
+        .set('Cookie', APPLE_STATE_COOKIE)
+        .type('form')
+        .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
+        .expect(400)
+
+      expect(await prisma.user.count()).toBe(1)
+    })
+
+    it('should set only the SameSite=None; Secure Apple binding cookie on authorize', async () => {
+      const res = await request(app.getHttpServer()).get('/auth/oauth/apple').expect(302)
+
+      const cookies = res.headers['set-cookie'] as unknown as string[]
+      const appleCookie = cookies.find((c) => c.startsWith('oauth_state_apple='))
+      expect(appleCookie).toBeDefined()
+      expect(appleCookie).toContain('HttpOnly')
+      expect(appleCookie).toContain('Secure')
+      expect(appleCookie).toContain('SameSite=None')
+      expect(appleCookie).toContain('Path=/api/v1/auth/oauth/apple/callback')
+      expect(appleCookie).toContain('Max-Age=300')
+      // The Lax redirect cookie is never set for the form_post provider.
+      expect(cookies.some((c) => c.startsWith('oauth_state='))).toBe(false)
+    })
+
+    it('should clear the Apple binding cookie (same name + path) on a successful callback', async () => {
+      const state = 'apple-state-clear-cookie'
+      await seedState(state, { provider: 'apple', codeVerifier: 'test-verifier', mode: 'login' })
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/oauth/apple/callback')
+        .set('Cookie', APPLE_STATE_COOKIE)
+        .type('form')
+        .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
+        .expect(302)
+
+      const cookies = res.headers['set-cookie'] as unknown as string[]
+      const cleared = cookies.find((c) => c.startsWith('oauth_state_apple='))
+      expect(cleared).toBeDefined()
+      expect(cleared).toContain('Path=/api/v1/auth/oauth/apple/callback')
+      // Expiry cookie: empty value and/or a past/zero Max-Age/Expires.
+      expect(cleared).toMatch(/oauth_state_apple=;|Expires=Thu, 01 Jan 1970|Max-Age=0/)
+    })
+
+    it('should link Apple via form_post without creating a session or overwriting the name', async () => {
+      const user = await prisma.user.create({
+        data: {
+          email: 'apple-link@example.com',
+          emailCanonical: 'apple-link@example.com',
+          emailVerified: true,
+          name: 'Existing Name',
+        },
+      })
+
+      const state = 'apple-state-link'
+      await seedState(state, {
+        provider: 'apple',
+        codeVerifier: 'test-verifier',
+        mode: 'link',
+        userId: user.id,
+      })
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/oauth/apple/callback')
+        .set('Cookie', APPLE_STATE_COOKIE)
+        .type('form')
+        // A spoofed first-login name must NOT overwrite the existing user's name.
+        .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
+        .expect(302)
+
+      expect(res.headers.location).toContain('/settings/linked-accounts?linked=apple')
+      expect(res.headers.location).not.toContain('ticket=')
+
+      const linked = await prisma.user.findUnique({
+        where: { id: user.id },
+        include: { accounts: true },
+      })
+      expect(linked!.name).toBe('Existing Name')
+      expect(linked!.accounts[0]!.provider).toBe('APPLE')
+      expect(await prisma.session.count()).toBe(0)
+    })
+
+    it('should 404 a POST callback for a redirect provider (transport is Apple-only)', async () => {
+      const state = 'google-post-rejected'
+      await seedState(state, { provider: 'google', codeVerifier: 'test-verifier', mode: 'login' })
+
+      await request(app.getHttpServer())
+        .post('/auth/oauth/google/callback')
+        .set('Cookie', APPLE_STATE_COOKIE)
+        .type('form')
+        .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
+        .expect(404)
+
+      // Fails closed before any state/provider-code consumption — no user created.
+      expect(await prisma.user.count()).toBe(0)
+    })
+
+    it('should 404 a GET callback for Apple (Apple never returns via GET)', async () => {
+      const state = 'apple-get-rejected'
+      await seedState(state, { provider: 'apple', codeVerifier: 'test-verifier', mode: 'login' })
+
+      await request(app.getHttpServer())
+        .get(`/auth/oauth/apple/callback?code=auth-code&state=${state}`)
+        .set('Cookie', APPLE_STATE_COOKIE)
+        .expect(404)
+
+      expect(await prisma.user.count()).toBe(0)
+    })
+  })
 })

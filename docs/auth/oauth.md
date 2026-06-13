@@ -101,9 +101,22 @@ The server redirects to the provider's consent screen. Your frontend just needs 
 
 ## The callback
 
-**Endpoint:** `GET /api/v1/auth/oauth/:provider/callback`
+**Endpoint:** `GET /api/v1/auth/oauth/:provider/callback` (redirect/query providers)
+or `POST /api/v1/auth/oauth/:provider/callback` (Apple `form_post`)
 
 This is only called by the OAuth provider — not by your frontend directly. The backend handles the token exchange and then redirects the browser to your frontend.
+
+Most providers (Google, GitHub, Telegram) return via a top-level **GET** redirect
+with `code`/`state` in the query string. **Apple** uses `response_mode=form_post`
+and **POSTs** `code`/`state` (plus, on first login only, a `user` JSON) as a
+cross-site form body — so the backend exposes both a GET and a POST callback that
+share one handler. A cross-site POST does not carry a `SameSite=Lax` cookie, so the
+Apple browser-binding nonce rides a separate `SameSite=None; Secure` cookie scoped to
+the Apple callback path; all other providers keep the `SameSite=Lax` `oauth_state`
+cookie. Each control does a distinct job: the single-use server-side `state` gives
+request/callback correlation and replay resistance, the **binding cookie ties that
+state to the browser that started the flow** (this is what prevents login-CSRF /
+session-swap), and PKCE — where the provider supports it — protects code redemption.
 
 After a successful login, the frontend receives:
 
@@ -248,9 +261,13 @@ Backend:
 Apple is the most complex provider due to Apple's strict requirements.
 
 - Uses OIDC with PKCE
-- Response mode is `form_post` — Apple POSTs back to the callback (not GET redirect)
+- Response mode is `form_post` — Apple **POSTs** back to the callback (not a GET
+  redirect). The backend handles this on `POST /api/v1/auth/oauth/apple/callback`;
+  browser binding uses a dedicated `SameSite=None; Secure` cookie (see [The callback](#the-callback))
 - The client secret is a JWT that must be **generated dynamically** (not a static string)
-- **Name is only sent on the very first authorization.** If you miss it, it's gone. Store it immediately.
+- **Name is only sent on the very first authorization,** in the form_post `user`
+  field (never in the ID token or userinfo). The backend reads it on first login and
+  stores it as the display name; later logins reuse the stored name.
 - Required env: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APPLE_CALLBACK_URL`
 
 ### Telegram

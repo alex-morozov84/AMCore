@@ -339,6 +339,52 @@ describe('OAuthService', () => {
         })
       )
     })
+
+    // Apple sends the display name only in the first-login form_post `user` field
+    // (provider profile has displayName: null); the controller passes it as
+    // `firstLoginName`. It must fill a missing name but never clobber one the
+    // provider already supplied.
+    it('should use firstLoginName when the provider profile has no displayName', async () => {
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(null)
+      mockProvider.getUserProfile.mockResolvedValue({ ...mockProfile, displayName: null })
+
+      await service.handleCallback(
+        'google',
+        'code',
+        'state',
+        TEST_NONCE,
+        requestInfo,
+        'Jane Appleseed'
+      )
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ name: 'Jane Appleseed' }),
+        })
+      )
+    })
+
+    it('should not overwrite a provider-supplied displayName with firstLoginName', async () => {
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(null)
+      // mockProfile.displayName = 'Test User' (non-null)
+
+      await service.handleCallback(
+        'google',
+        'code',
+        'state',
+        TEST_NONCE,
+        requestInfo,
+        'Spoofed Name'
+      )
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ name: 'Test User' }),
+        })
+      )
+    })
   })
 
   describe('getLinkAuthorizationURL', () => {
