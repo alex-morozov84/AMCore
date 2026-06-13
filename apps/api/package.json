@@ -107,7 +107,6 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.14",
     "@types/supertest": "^6.0.3",
-    "@types/uuid": "^11.0.0",
     "@vitest/ui": "^4.1.8",
     "aws-sdk-client-mock": "^4.1.0",
     "happy-dom": "^20.10.2",

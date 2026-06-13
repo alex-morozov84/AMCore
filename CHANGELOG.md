@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   avatar storage/media/API architecture documentation, and stale version,
   SHA-256, and media module comments.
 
+### Changed
+
+- API production build no longer compiles test artifacts into `dist` (and thus
+  the runtime image): `.swcrc` now excludes `*.spec.ts`, `*-spec.ts`, `__tests__`,
+  and `__mocks__` (SWC ignores the `tsconfig.build.json` excludes). Removed the
+  redundant `@types/uuid` (uuid v13 ships its own types).
+
 ### Security
 
 - Resolved transitive dependency advisories (`protobufjs`, `tmp`, `fast-uri`,
