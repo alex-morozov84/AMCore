@@ -68,6 +68,7 @@ describe('InviteService', () => {
     passwordHash: null,
     name: null,
     avatarUrl: null,
+    avatarGeneration: 0,
     phone: null,
     locale: 'ru',
     timezone: 'Europe/Moscow',
