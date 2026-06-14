@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, HttpCode, HttpStatus, Param, Post } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { ZodSerializerDto } from 'nestjs-zod'
+import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ZodResponse } from 'nestjs-zod'
 
 import {
   Action,
@@ -47,9 +47,12 @@ export class MembersController {
   ) {}
 
   @Post('invite')
-  @HttpCode(HttpStatus.ACCEPTED)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
-  @ZodSerializerDto(InviteResponseDto)
+  @ZodResponse({
+    type: InviteResponseDto,
+    status: 202,
+    description: 'Invite accepted for delivery',
+  })
   @ApiOperation({
     summary:
       'Invite a user by email — ADMIN only. Returns a uniform 202 ' +
@@ -71,6 +74,7 @@ export class MembersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Remove a member from the organization — ADMIN only' })
+  @ApiNoContentResponse({ description: 'Member removed' })
   removeMember(
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,
@@ -83,6 +87,7 @@ export class MembersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Assign a role to a member — ADMIN only' })
+  @ApiNoContentResponse({ description: 'Role assigned' })
   assignRole(
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,
@@ -96,6 +101,7 @@ export class MembersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Remove a role from a member — ADMIN only' })
+  @ApiNoContentResponse({ description: 'Role removed' })
   removeRole(
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,

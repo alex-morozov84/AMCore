@@ -97,3 +97,22 @@ export type ApiKeyListItemResponse = z.infer<typeof apiKeyListItemSchema>
 export const apiKeyListResponseSchema = paginatedResponseSchema(apiKeyListItemSchema)
 
 export type ApiKeyListResponse = z.infer<typeof apiKeyListResponseSchema>
+
+/**
+ * API key creation response (`POST /api-keys`).
+ *
+ * The only endpoint that returns the plaintext `key` — shown once at creation
+ * and never recoverable afterwards (the store keeps a hash). Mirrors
+ * `CreateApiKeyResult` in `apps/api/src/core/api-keys/api-keys.service.ts`.
+ */
+export const createApiKeyResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  key: z.string(),
+  organizationId: z.string(),
+  scopes: z.array(z.string()),
+  expiresAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+})
+
+export type CreateApiKeyResponse = z.infer<typeof createApiKeyResponseSchema>

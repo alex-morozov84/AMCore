@@ -149,11 +149,20 @@ describe('RoleService', () => {
 
     it('creates custom role in the org', async () => {
       prisma.role.findFirst.mockResolvedValue(null)
-      prisma.role.create.mockResolvedValue(mockCustomRole)
+      // Arc C: createRole includes permissions and returns the mapped
+      // OrgRoleResponse (a fresh role has an empty permissions list).
+      prisma.role.create.mockResolvedValue({ ...mockCustomRole, permissions: [] } as never)
 
       const result = await service.createRole('org-1', dto, principal)
 
-      expect(result).toEqual(mockCustomRole)
+      expect(result).toEqual({
+        id: mockCustomRole.id,
+        name: mockCustomRole.name,
+        description: mockCustomRole.description,
+        isSystem: mockCustomRole.isSystem,
+        organizationId: mockCustomRole.organizationId,
+        permissions: [],
+      })
       expect(prisma.role.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ isSystem: false, organizationId: 'org-1' }),
@@ -180,7 +189,11 @@ describe('RoleService', () => {
     it('updates custom role', async () => {
       prisma.role.findFirst.mockResolvedValueOnce(mockCustomRole) // findCustomRole
       prisma.role.findFirst.mockResolvedValueOnce(null) // no name conflict
-      prisma.role.update.mockResolvedValue({ ...mockCustomRole, name: 'Senior Editor' })
+      prisma.role.update.mockResolvedValue({
+        ...mockCustomRole,
+        name: 'Senior Editor',
+        permissions: [],
+      } as never)
 
       const result = await service.updateRole('org-1', 'role-custom', dto, principal)
 

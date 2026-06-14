@@ -1,17 +1,7 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
-import { ZodSerializerDto } from 'nestjs-zod'
+import { ZodResponse } from 'nestjs-zod'
 
 import {
   type AdminOrganizationListResponse,
@@ -33,6 +23,7 @@ import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 import { AdminService } from './admin.service'
 import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto'
 import { AdminUserListResponseDto, AdminUserResponseDto } from './dto/admin-user-response.dto'
+import { CleanupResultDto } from './dto/cleanup-result.dto'
 import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
 
 /**
@@ -80,7 +71,7 @@ export class AdminController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
-  @ZodSerializerDto(AdminUserListResponseDto)
+  @ZodResponse({ type: AdminUserListResponseDto, status: 200, description: 'Paginated users' })
   findAllUsers(@Query() pagination: PaginationQueryDto): Promise<AdminUserListResponse> {
     const { page, limit } = pagination
     return this.adminService.findAllUsers(page, limit)
@@ -97,7 +88,7 @@ export class AdminController {
   // the API at the admin limit (caught in Stage 7 final-e2e), so
   // we narrow the existing `long` bucket per-handler instead.
   @Throttle({ long: { limit: 20, ttl: 60_000 } })
-  @ZodSerializerDto(AdminUserResponseDto)
+  @ZodResponse({ type: AdminUserResponseDto, status: 200, description: 'Updated user' })
   updateUserSystemRole(
     @CurrentUser() actor: RequestPrincipal,
     @Param('id') id: string,
@@ -107,13 +98,13 @@ export class AdminController {
   }
 
   @Post('cleanup')
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Manually trigger expired records cleanup — SUPER_ADMIN only' })
   // OB-06b: destructive privileged op — require step-up freshness.
   @RequireFreshAuth()
   // OB-03: heavy DB sweep — override `long` to 5/min for this
   // handler. Same per-handler-override pattern as above.
   @Throttle({ long: { limit: 5, ttl: 60_000 } })
+  @ZodResponse({ type: CleanupResultDto, status: 200, description: 'Cleanup counts' })
   runCleanup(@CurrentUser() actor: RequestPrincipal): Promise<CleanupResult> {
     return this.adminService.runCleanup(actor)
   }
@@ -135,7 +126,11 @@ export class AdminController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
-  @ZodSerializerDto(AdminOrganizationListResponseDto)
+  @ZodResponse({
+    type: AdminOrganizationListResponseDto,
+    status: 200,
+    description: 'Paginated organizations',
+  })
   findAllOrganizations(
     @Query() pagination: PaginationQueryDto
   ): Promise<AdminOrganizationListResponse> {

@@ -1,4 +1,5 @@
 import { Controller, Get, HttpStatus, Res, UseGuards } from '@nestjs/common'
+import { ApiOkResponse, ApiProduces } from '@nestjs/swagger'
 import { SkipThrottle } from '@nestjs/throttler'
 import type { Response } from 'express'
 
@@ -19,6 +20,11 @@ export class MetricsController {
   constructor(private readonly metrics: MetricsService) {}
 
   @Get()
+  @ApiProduces('text/plain')
+  @ApiOkResponse({
+    description: 'Prometheus metrics exposition',
+    schema: { type: 'string' },
+  })
   async scrape(@Res({ passthrough: true }) res: Response): Promise<string> {
     if (!this.metrics.enabled) {
       throw new AppException('Metrics endpoint is disabled', HttpStatus.NOT_FOUND, 'NOT_FOUND')

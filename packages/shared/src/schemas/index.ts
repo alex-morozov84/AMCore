@@ -25,6 +25,9 @@ export {
   refreshResponseSchema,
   oauthExchangeResponseSchema,
   messageResponseSchema,
+  profileResponseSchema,
+  avatarResponseSchema,
+  oauthProvidersResponseSchema,
   // Types
   type RegisterInput,
   type LoginInput,
@@ -43,6 +46,9 @@ export {
   type RefreshResponse,
   type OAuthExchangeResponse,
   type MessageResponse,
+  type ProfileResponse,
+  type AvatarResponse,
+  type OAuthProvidersResponse,
 } from './auth'
 
 // Organization schemas
@@ -81,11 +87,13 @@ export {
   adminUserListResponseSchema,
   adminOrganizationResponseSchema,
   adminOrganizationListResponseSchema,
+  cleanupResultSchema,
   type UpdateUserSystemRoleInput,
   type AdminUserResponse,
   type AdminUserListResponse,
   type AdminOrganizationResponse,
   type AdminOrganizationListResponse,
+  type CleanupResultResponse,
 } from './admin'
 
 // Pagination schemas
@@ -101,9 +109,11 @@ export {
   createApiKeySchema,
   apiKeyListItemSchema,
   apiKeyListResponseSchema,
+  createApiKeyResponseSchema,
   type CreateApiKeyInput,
   type ApiKeyListItemResponse,
   type ApiKeyListResponse,
+  type CreateApiKeyResponse,
 } from './api-keys'
 
 // Invite schemas (OB-02)

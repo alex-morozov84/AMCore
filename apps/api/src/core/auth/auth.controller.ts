@@ -16,18 +16,29 @@ import {
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
 import type { User } from '@prisma/client'
 import type { Request, Response } from 'express'
-import { ZodSerializerDto } from 'nestjs-zod'
+import { ZodResponse } from 'nestjs-zod'
 
 import {
+  type AuthResponse,
   AuthType,
+  type AvatarResponse,
+  type MessageResponse,
   PAGINATION,
+  type ProfileResponse,
+  type RefreshResponse,
   type RequestPrincipal,
   type SessionsListResponse,
-  type UserResponse as SharedUserResponse,
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
@@ -38,8 +49,13 @@ import { AvatarService, type AvatarUploadFile } from './avatar.service'
 import { Auth } from './decorators/auth.decorator'
 import { CurrentUser } from './decorators/current-user.decorator'
 import {
+  AuthResponseDto,
+  AvatarResponseDto,
   ForgotPasswordDto,
   LoginDto,
+  MessageResponseDto,
+  ProfileResponseDto,
+  RefreshResponseDto,
   RegisterDto,
   ResendVerificationDto,
   ResetPasswordDto,
@@ -54,27 +70,6 @@ import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 
 import { AVATAR_VALIDATION, FileValidationPipe } from '@/infrastructure/storage'
-
-interface AuthResponse {
-  user: SharedUserResponse
-  accessToken: string
-}
-
-interface AcceptedResponse {
-  message: string
-}
-
-interface TokenResponse {
-  accessToken: string
-}
-
-interface ProfileResponse {
-  user: SharedUserResponse | null
-}
-
-interface AvatarResponse {
-  avatarUrl: string
-}
 
 // Multer hard stop for the avatar upload. Set above AVATAR_VALIDATION.maxSize
 // (2 MB) so the FileValidationPipe produces the clean 413 for files between the
@@ -114,6 +109,7 @@ export class AuthController {
   @Post('register')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Register new user' })
+  @ZodResponse({ type: AuthResponseDto, status: 201, description: 'User registered' })
   async register(
     @Body() dto: RegisterDto,
     @Req() req: Request,
@@ -134,9 +130,9 @@ export class AuthController {
   }
 
   @Post('login')
-  @HttpCode(HttpStatus.OK)
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Login user' })
+  @ZodResponse({ type: AuthResponseDto, status: 200, description: 'Login successful' })
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
@@ -161,6 +157,7 @@ export class AuthController {
   @UseGuards(OriginCheckGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Logout user' })
+  @ApiNoContentResponse({ description: 'Logged out' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     const refreshToken = req.cookies?.refresh_token
 
@@ -173,15 +170,15 @@ export class AuthController {
   }
 
   @Post('refresh')
-  @HttpCode(HttpStatus.OK)
   @Auth(AuthType.None)
   @UseGuards(OriginCheckGuard, RefreshTokenGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Refresh access token' })
+  @ZodResponse({ type: RefreshResponseDto, status: 200, description: 'Access token refreshed' })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
-  ): Promise<TokenResponse> {
+  ): Promise<RefreshResponse> {
     const { user, refreshTokenHash } = req.user as unknown as {
       user: User
       refreshTokenHash: string
@@ -225,6 +222,7 @@ export class AuthController {
   @Auth(AuthType.Bearer, AuthType.ApiKey)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
+  @ZodResponse({ type: ProfileResponseDto, status: 200, description: 'Current user profile' })
   async me(@CurrentUser() user: RequestPrincipal): Promise<ProfileResponse> {
     const profile = await this.authService.getUserById(user.sub)
     return { user: profile }
@@ -240,6 +238,7 @@ export class AuthController {
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update current user profile' })
+  @ZodResponse({ type: ProfileResponseDto, status: 200, description: 'Updated user profile' })
   async updateProfile(
     @CurrentUser('sub') userId: string,
     @Body() dto: UpdateProfileDto
@@ -262,6 +261,7 @@ export class AuthController {
     })
   )
   @ApiOperation({ summary: 'Upload current user avatar' })
+  @ZodResponse({ type: AvatarResponseDto, status: 201, description: 'Avatar stored' })
   async uploadAvatar(
     @CurrentUser('sub') userId: string,
     @UploadedFile(new FileValidationPipe(AVATAR_VALIDATION)) file: AvatarUploadFile
@@ -275,6 +275,7 @@ export class AuthController {
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete current user avatar' })
+  @ApiNoContentResponse({ description: 'Avatar removed' })
   async deleteAvatar(@CurrentUser('sub') userId: string): Promise<void> {
     await this.avatarService.removeAvatar(userId)
   }
@@ -287,15 +288,15 @@ export class AuthController {
    * is threaded through for the shared login brute-force limiter.
    */
   @Post('step-up')
-  @HttpCode(HttpStatus.OK)
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Re-verify password to refresh step-up freshness' })
+  @ZodResponse({ type: RefreshResponseDto, status: 200, description: 'Step-up token issued' })
   async stepUp(
     @CurrentUser() principal: RequestPrincipal,
     @Body() dto: StepUpDto,
     @Req() req: Request
-  ): Promise<TokenResponse> {
+  ): Promise<RefreshResponse> {
     return this.authService.stepUp(principal, dto.password, req.ip ?? '')
   }
 
@@ -323,7 +324,7 @@ export class AuthController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
-  @ZodSerializerDto(SessionsListResponseDto)
+  @ZodResponse({ type: SessionsListResponseDto, status: 200, description: 'Active sessions' })
   async sessions(
     @CurrentUser('sub') userId: string,
     @Req() req: Request,
@@ -345,6 +346,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke specific session' })
+  @ApiNoContentResponse({ description: 'Session revoked' })
   async revokeSession(
     @CurrentUser('sub') userId: string,
     @Param('sessionId') sessionId: string
@@ -357,6 +359,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke all sessions except current' })
+  @ApiNoContentResponse({ description: 'Other sessions revoked' })
   async revokeOtherSessions(
     @CurrentUser('sub') userId: string,
     @Req() req: Request
@@ -370,10 +373,10 @@ export class AuthController {
   }
 
   @Post('forgot-password')
-  @HttpCode(HttpStatus.OK)
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Request password reset email' })
-  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<AcceptedResponse> {
+  @ZodResponse({ type: MessageResponseDto, status: 200, description: 'Reset email dispatched' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<MessageResponse> {
     await this.authService.forgotPassword(dto.email)
     // Always return the same message to prevent account enumeration
     return { message: 'If an account with that email exists, a password reset link has been sent.' }
@@ -383,6 +386,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Reset password using token from email' })
+  @ApiNoContentResponse({ description: 'Password reset' })
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
     await this.authService.resetPassword(dto.token, dto.password)
   }
@@ -391,15 +395,20 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Verify email address using token from email' })
+  @ApiNoContentResponse({ description: 'Email verified' })
   async verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
     await this.authService.verifyEmail(dto.token)
   }
 
   @Post('resend-verification')
-  @HttpCode(HttpStatus.OK)
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Resend email verification link' })
-  async resendVerification(@Body() dto: ResendVerificationDto): Promise<AcceptedResponse> {
+  @ZodResponse({
+    type: MessageResponseDto,
+    status: 200,
+    description: 'Verification email dispatched',
+  })
+  async resendVerification(@Body() dto: ResendVerificationDto): Promise<MessageResponse> {
     await this.authService.resendVerificationEmail(dto.email)
     // Always return the same message to prevent account enumeration
     return {

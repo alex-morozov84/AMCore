@@ -9,8 +9,8 @@ import {
   Post,
   Query,
 } from '@nestjs/common'
-import { ApiQuery } from '@nestjs/swagger'
-import { ZodSerializerDto } from 'nestjs-zod'
+import { ApiNoContentResponse, ApiQuery } from '@nestjs/swagger'
+import { ZodResponse } from 'nestjs-zod'
 
 import {
   type ApiKeyListResponse,
@@ -26,6 +26,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { ApiKeysService, type CreateApiKeyResult } from './api-keys.service'
 import { ApiKeyListResponseDto } from './dto/api-key-list-response.dto'
 import { CreateApiKeyDto } from './dto/create-api-key.dto'
+import { CreateApiKeyResponseDto } from './dto/create-api-key-response.dto'
 
 /**
  * Credential management routes are bearer-only.
@@ -47,7 +48,7 @@ export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
+  @ZodResponse({ type: CreateApiKeyResponseDto, status: 201, description: 'API key created' })
   create(
     @CurrentUser() user: RequestPrincipal,
     @Body() dto: CreateApiKeyDto
@@ -71,7 +72,7 @@ export class ApiKeysController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
-  @ZodSerializerDto(ApiKeyListResponseDto)
+  @ZodResponse({ type: ApiKeyListResponseDto, status: 200, description: 'Paginated API keys' })
   findAll(
     @CurrentUser() user: RequestPrincipal,
     @Query() pagination: PaginationQueryDto
@@ -81,6 +82,7 @@ export class ApiKeysController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'API key revoked' })
   revoke(@CurrentUser() user: RequestPrincipal, @Param('id') id: string): Promise<void> {
     return this.apiKeysService.revoke(id, user.sub)
   }

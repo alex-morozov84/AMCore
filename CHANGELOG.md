@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Every public endpoint now documents its success response body and status code
+  in the OpenAPI spec (`/docs`). Responses are declared with `@ZodResponse`, which
+  keeps the runtime serialization, the TypeScript return type, and the generated
+  schema in sync from a single source; a generated-spec test fails if a new
+  handler ships without a typed success response.
 - User locale is now resolved at registration and editable afterwards. `POST
 /auth/register` accepts an optional `locale` (`ru`/`en`) and, when it is
   omitted, negotiates the best supported language from the `Accept-Language`

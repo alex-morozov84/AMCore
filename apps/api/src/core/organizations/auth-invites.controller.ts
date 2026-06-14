@@ -1,7 +1,7 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common'
+import { Body, Controller, Post, Req } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { Request } from 'express'
-import { ZodSerializerDto } from 'nestjs-zod'
+import { ZodResponse } from 'nestjs-zod'
 
 import { type AcceptInviteResponse, AuthType, type RequestPrincipal } from '@amcore/shared'
 
@@ -40,8 +40,7 @@ export class AuthInvitesController {
   constructor(private readonly inviteService: InviteService) {}
 
   @Post('accept')
-  @HttpCode(HttpStatus.OK)
-  @ZodSerializerDto(AcceptInviteResponseDto)
+  @ZodResponse({ type: AcceptInviteResponseDto, status: 200, description: 'Invite accepted' })
   @ApiOperation({
     summary:
       'Accept a pending invite using the raw invite token from the invite ' +

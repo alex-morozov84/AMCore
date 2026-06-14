@@ -1,6 +1,12 @@
 import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Query } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
-import { ZodSerializerDto } from 'nestjs-zod'
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger'
+import { ZodResponse } from 'nestjs-zod'
 
 import {
   Action,
@@ -58,7 +64,11 @@ export class InvitesController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
-  @ZodSerializerDto(InviteListResponseDto)
+  @ZodResponse({
+    type: InviteListResponseDto,
+    status: 200,
+    description: 'Paginated pending invites',
+  })
   listInvites(
     @Param('orgId') orgId: string,
     @CurrentUser() principal: RequestPrincipal,
@@ -77,6 +87,7 @@ export class InvitesController {
       'returns 400 BUSINESS_RULE_VIOLATION (remove the member via ' +
       'DELETE /organizations/:orgId/members/:userId instead).',
   })
+  @ApiNoContentResponse({ description: 'Invite revoked' })
   revokeInvite(
     @Param('orgId') orgId: string,
     @Param('inviteId') inviteId: string,

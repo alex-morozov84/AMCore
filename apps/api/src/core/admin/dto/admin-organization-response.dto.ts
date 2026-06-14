@@ -8,7 +8,7 @@ import {
 /**
  * Admin organization response DTO (OA-08).
  *
- * Used with `@ZodSerializerDto` to strip any field outside the schema
+ * Used with `@ZodResponse` to strip any field outside the schema
  * allowlist from admin responses — paired with the Prisma `select` in
  * `AdminService` to keep `aclVersion` and other internal columns off
  * the wire.
