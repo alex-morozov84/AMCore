@@ -130,6 +130,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 
 ### Documentation
 
+- [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md) — How to add a backend module (boundaries, contracts, process roles, tests)
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
 - [`docs/auth/csrf.md`](docs/auth/csrf.md) — Narrow CSRF posture for cookie-backed browser surfaces
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)

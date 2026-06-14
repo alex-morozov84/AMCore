@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Backend Architecture & Conventions guide
+  (`docs/backend/architecture-and-conventions.md`): the end-to-end recipe for
+  adding a module — boundaries, shared Zod contracts, process-role composition,
+  the external-state fencing pattern, and the required OpenAPI/process-role tests.
 - Explicit request-body size limit of 100 000 bytes (decimal) for JSON and
   urlencoded bodies, applied globally — including raw-body webhook routes — and
   shared by the production and e2e bootstraps so the limit is identical in both.

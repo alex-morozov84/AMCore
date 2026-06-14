@@ -121,17 +121,27 @@ export class MyJobProcessor extends WorkerHost {
 }
 ```
 
-### 3. Register Processor
+### 3. Register Processor in a worker-only module
 
-Add to `QueueModule` providers:
+Do **not** add the processor to `QueueModule` — `QueueModule` is shared
+infrastructure (`coreImports`, every role), and NestJS starts a `Worker` for any
+`@Processor` in the graph, so a processor placed there would also run inside the
+`web` process. Provide it in a **worker-only** module that is imported only via
+`workerImports` (the `EmailWorkerModule` pattern):
 
 ```typescript
+// my-feature-worker.module.ts — imported ONLY in workerImports (app-imports.ts)
 @Module({
-  // ...
-  providers: [QueueService, MyJobProcessor],
+  providers: [MyJobProcessor],
 })
-export class QueueModule {}
+export class MyFeatureWorkerModule {}
 ```
+
+Keep the **producer** (the service that enqueues via `QueueService`) in a module the
+`web` role can import; keep the **consumer** (`MyJobProcessor`) in the worker-only
+module above. See
+[`docs/backend/architecture-and-conventions.md`](../../../../../docs/backend/architecture-and-conventions.md#5-register-in-the-correct-process-role)
+and `src/app-imports.ts`.
 
 ## Adding New Queues
 

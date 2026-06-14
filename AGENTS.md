@@ -105,6 +105,8 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - `README.md` — overview + Quick Start.
 - `PROJECT_CONTEXT.md` — checkout identity: upstream starter or downstream product.
 - `CONTRIBUTING.md` — contributor process (commands, commit format, PR checklist).
+- `docs/backend/architecture-and-conventions.md` — how to add a backend module
+  (boundaries, shared contracts, process roles, required tests).
 - `docs/auth/`, `docs/storage/`, `docs/media/` — feature guides.
 - `docs/operations/` — deployment, observability, webhooks, idempotency,
   audit-log, **ci-security** (CI gates + repo-security setup).

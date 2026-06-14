@@ -29,7 +29,7 @@ apps/api/src/
 │
 ├── core/
 │   ├── auth/                   # Authentication & authorization
-│   │   ├── auth.controller.ts  # 14 endpoints
+│   │   ├── auth.controller.ts  # 16 endpoints
 │   │   ├── auth.service.ts     # Register, login, password reset, email verification
 │   │   ├── session.service.ts  # Session CRUD + rotation
 │   │   ├── token.service.ts    # JWT + refresh token generation
@@ -95,19 +95,21 @@ bus.
 
 ### Email Auth
 
-| Method   | Endpoint                    | Auth | Description                                |
-| -------- | --------------------------- | ---- | ------------------------------------------ |
-| `POST`   | `/auth/register`            | —    | Register with email + password             |
-| `POST`   | `/auth/login`               | —    | Login, returns access token + cookie       |
-| `POST`   | `/auth/logout`              | 🍪   | Revoke current session                     |
-| `POST`   | `/auth/refresh`             | 🍪   | Rotate refresh token, get new access token |
-| `GET`    | `/auth/me`                  | JWT  | Get current user profile                   |
-| `POST`   | `/auth/me/avatar`           | JWT  | Upload validated public avatar             |
-| `DELETE` | `/auth/me/avatar`           | JWT  | Delete current avatar                      |
-| `POST`   | `/auth/forgot-password`     | —    | Request password reset email               |
-| `POST`   | `/auth/reset-password`      | —    | Set new password with token                |
-| `POST`   | `/auth/verify-email`        | —    | Verify email with token                    |
-| `POST`   | `/auth/resend-verification` | —    | Resend verification email                  |
+| Method   | Endpoint                    | Auth | Description                                     |
+| -------- | --------------------------- | ---- | ----------------------------------------------- |
+| `POST`   | `/auth/register`            | —    | Register with email + password                  |
+| `POST`   | `/auth/login`               | —    | Login, returns access token + cookie            |
+| `POST`   | `/auth/logout`              | 🍪   | Revoke current session                          |
+| `POST`   | `/auth/refresh`             | 🍪   | Rotate refresh token, get new access token      |
+| `GET`    | `/auth/me`                  | JWT  | Get current user profile                        |
+| `PATCH`  | `/auth/me`                  | JWT  | Update own profile (name, locale, timezone)     |
+| `POST`   | `/auth/me/avatar`           | JWT  | Upload validated public avatar                  |
+| `DELETE` | `/auth/me/avatar`           | JWT  | Delete current avatar                           |
+| `POST`   | `/auth/step-up`             | JWT  | Re-verify password to refresh step-up freshness |
+| `POST`   | `/auth/forgot-password`     | —    | Request password reset email                    |
+| `POST`   | `/auth/reset-password`      | —    | Set new password with token                     |
+| `POST`   | `/auth/verify-email`        | —    | Verify email with token                         |
+| `POST`   | `/auth/resend-verification` | —    | Resend verification email                       |
 
 ### Sessions
 
@@ -306,25 +308,23 @@ independently from one image — see
 `WebModule` / `WorkerModule` / `AppModule` (all), composed from
 `src/app-imports.ts`.
 
-### Adding a module with background work
+### Adding a module
 
-Keep `web` a pure producer: put the BullMQ `@Processor` (and any `@Cron`) in a
-**worker-only** module imported only by the worker/all roots, and keep the
-producer/service in a module that `web` can import safely.
+The end-to-end recipe for adding a backend module — Prisma + shared contracts +
+DTO/service/controller + process-role composition + the required tests — lives in
+**[`docs/backend/architecture-and-conventions.md`](../../docs/backend/architecture-and-conventions.md)**.
 
-- Email is the reference: `EmailModule` exports `EmailService` (the producer,
-  imported everywhere); `EmailWorkerModule` provides the `EmailProcessor` (worker
-  only). `@nestjs/bullmq` starts a `Worker` for **any** `@Processor` in the graph,
-  so a processor leaking into `web` via a transitive import would run there too.
-- Cron is gated by the scheduler: `CleanupModule` provides the cron service for
-  the manual admin trigger everywhere, but `@Cron` only fires where
-  `ScheduleModule` (which adds `NestScheduleModule.forRoot()`) is imported —
-  worker/all. Use `SingletonCronRunner` for the Redis-lock "run once per cluster".
-- Wire the worker piece into `workerImports` (and the producer into `coreImports`)
-  in `src/app-imports.ts`, and assert the gating in `test/process-role.e2e-spec.ts`.
+In short, for background work: keep `web` a pure producer. Put the BullMQ
+`@Processor` (and any `@Cron`) in a **worker-only** module wired into `workerImports`,
+and keep the producer/service in a module `web` can import safely. `@nestjs/bullmq`
+starts a `Worker` for **any** `@Processor` in the graph, so a processor leaking into
+`web` would run there too. Email is the reference (`EmailModule` producer everywhere,
+`EmailWorkerModule` processor worker-only); `@Cron` only fires where `ScheduleModule`
+is imported (worker/all). Assert the gating in `test/process-role.e2e-spec.ts`.
 
 ## Documentation
 
+- [`docs/backend/architecture-and-conventions.md`](../../docs/backend/architecture-and-conventions.md) — How to add a backend module (boundaries, contracts, process roles, tests)
 - [`docs/operations/deployment.md`](../../docs/operations/deployment.md) — Deployment & migration runbook
 - [`docs/operations/audit-log.md`](../../docs/operations/audit-log.md) — Persistent audit log semantics and append-only model
 - [`docs/operations/observability.md`](../../docs/operations/observability.md) — Metrics and tracing guide
