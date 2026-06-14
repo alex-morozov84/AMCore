@@ -300,7 +300,7 @@ export class AdminService {
 
   /**
    * Sole exit path from admin user reads (OA-07). Converts Prisma
-   * `Date` columns into ISO strings so `@ZodSerializerDto` with
+   * `Date` columns into ISO strings so `@ZodResponse` with
    * `z.iso.datetime()` validates correctly (interceptor runs before
    * Nest's JSON serialization). Mirrors the existing pattern in
    * `auth.service.ts:333-334` and `oauth.service.ts:241-242`.

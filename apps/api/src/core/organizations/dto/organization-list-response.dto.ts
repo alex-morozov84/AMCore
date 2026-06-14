@@ -6,7 +6,7 @@ import { organizationListResponseSchema, roleListResponseSchema } from '@amcore/
  * Paginated list response DTOs for `/organizations` and
  * `/organizations/:id/roles` (ADR-036 / OB-05).
  *
- * Used with `@ZodSerializerDto` so any field outside the canonical
+ * Used with `@ZodResponse` so any field outside the canonical
  * envelope is stripped at the transport layer.
  */
 export class OrganizationListResponseDto extends createZodDto(organizationListResponseSchema) {}

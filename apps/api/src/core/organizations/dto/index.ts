@@ -8,5 +8,11 @@ export {
   InviteListResponseDto,
   InviteResponseDto,
 } from './invite-response.dto'
+export {
+  OrgResponseDto,
+  OrgRoleResponseDto,
+  PermissionResponseDto,
+  SwitchOrgResponseDto,
+} from './organization-response.dto'
 export { UpdateOrganizationDto } from './update-organization.dto'
 export { UpdateRoleDto } from './update-role.dto'

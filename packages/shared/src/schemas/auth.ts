@@ -211,3 +211,31 @@ export const messageResponseSchema = z.object({
 })
 
 export type MessageResponse = z.infer<typeof messageResponseSchema>
+
+/**
+ * Profile response (`GET /auth/me`, `PATCH /auth/me`).
+ *
+ * `user` is nullable: the lookup behind `/auth/me` resolves the principal by
+ * id and can legitimately return null (e.g. the user was deleted while a token
+ * is still live). Distinct from `authResponseSchema`, whose `user` is always
+ * present because it is built from the just-created/authenticated record.
+ */
+export const profileResponseSchema = z.object({
+  user: userResponseSchema.nullable(),
+})
+
+export type ProfileResponse = z.infer<typeof profileResponseSchema>
+
+/** Avatar upload response — the public URL of the stored avatar. */
+export const avatarResponseSchema = z.object({
+  avatarUrl: z.string(),
+})
+
+export type AvatarResponse = z.infer<typeof avatarResponseSchema>
+
+/** OAuth providers list response (`GET /auth/oauth/providers`). */
+export const oauthProvidersResponseSchema = z.object({
+  providers: z.array(z.string()),
+})
+
+export type OAuthProvidersResponse = z.infer<typeof oauthProvidersResponseSchema>

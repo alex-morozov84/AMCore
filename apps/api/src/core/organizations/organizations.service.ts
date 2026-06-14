@@ -32,7 +32,7 @@ export class OrganizationsService {
     private readonly aclVersionService: OrgAclVersionService
   ) {}
 
-  async create(userId: string, dto: CreateOrganizationDto): Promise<Organization> {
+  async create(userId: string, dto: CreateOrganizationDto): Promise<OrgResponse> {
     const slug = dto.slug ?? (await this.generateSlug(dto.name))
 
     if (dto.slug) {
@@ -55,7 +55,7 @@ export class OrganizationsService {
       const org = await tx.organization.create({ data: { name: dto.name, slug } })
       const member = await tx.orgMember.create({ data: { userId, organizationId: org.id } })
       await tx.memberRole.create({ data: { memberId: member.id, roleId: adminRole.id } })
-      return org
+      return this.toOrgResponse(org)
     })
   }
 
@@ -101,7 +101,7 @@ export class OrganizationsService {
     id: string,
     principal: RequestPrincipal,
     ability: AppAbility
-  ): Promise<Organization> {
+  ): Promise<OrgResponse> {
     // OA-03: api_key principals are constrained on two axes; JWT
     // principals fall through both checks and rely on the membership
     // check below.
@@ -144,14 +144,14 @@ export class OrganizationsService {
     // caller has already authenticated as a key bound to a different
     // org.
     if (!org || !member) throw new NotFoundException('Organization', id)
-    return org
+    return this.toOrgResponse(org)
   }
 
   async update(
     id: string,
     principal: RequestPrincipal,
     dto: UpdateOrganizationDto
-  ): Promise<Organization> {
+  ): Promise<OrgResponse> {
     this.assertOrgContext(principal, id)
 
     if (dto.slug) {
@@ -161,7 +161,8 @@ export class OrganizationsService {
       if (existing) throw new ConflictException(`Slug '${dto.slug}' is already taken`)
     }
 
-    return this.prisma.organization.update({ where: { id }, data: dto })
+    const org = await this.prisma.organization.update({ where: { id }, data: dto })
+    return this.toOrgResponse(org)
   }
 
   async remove(id: string, principal: RequestPrincipal): Promise<void> {

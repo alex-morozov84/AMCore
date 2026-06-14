@@ -39,6 +39,17 @@ describe('OrganizationsService', () => {
     updatedAt: new Date(),
   }
 
+  // Arc C: create/findOne/update map Prisma rows to the response shape
+  // (Date → ISO string) before returning, so handlers can `@ZodResponse`.
+  const expectedOrgResponse = {
+    id: mockOrg.id,
+    name: mockOrg.name,
+    slug: mockOrg.slug,
+    aclVersion: mockOrg.aclVersion,
+    createdAt: mockOrg.createdAt.toISOString(),
+    updatedAt: mockOrg.updatedAt.toISOString(),
+  }
+
   const mockRole: Role = {
     id: 'role-admin',
     name: 'ADMIN',
@@ -76,12 +87,13 @@ describe('OrganizationsService', () => {
     it('creates org with auto-generated slug and assigns ADMIN role to creator', async () => {
       prisma.organization.findUnique.mockResolvedValue(null) // slug not taken
       prisma.role.findFirst.mockResolvedValue(mockRole)
-      // $transaction is mocked to return the org — the callback is an implementation detail
-      prisma.$transaction.mockResolvedValue(mockOrg)
+      // $transaction is mocked to return the callback's result — Arc C maps the
+      // created org to the response shape (ISO dates) inside the callback.
+      prisma.$transaction.mockResolvedValue(expectedOrgResponse)
 
       const result = await service.create('user-1', { name: 'Acme Corp' })
 
-      expect(result).toEqual(mockOrg)
+      expect(result).toEqual(expectedOrgResponse)
       expect(prisma.role.findFirst).toHaveBeenCalledWith({
         where: { name: 'ADMIN', isSystem: true, organizationId: null },
       })
@@ -145,7 +157,7 @@ describe('OrganizationsService', () => {
       // JWT path does not consult ability — denyAbility() proves the
       // check is skipped (would otherwise throw).
       const result = await service.findOne('org-1', mockPrincipal, denyAbility())
-      expect(result).toEqual(mockOrg)
+      expect(result).toEqual(expectedOrgResponse)
     })
 
     it('returns org when JWT principal has no org-context but is a member (read does not require /switch)', async () => {
@@ -162,7 +174,7 @@ describe('OrganizationsService', () => {
       // denyAbility() simulates that exactly. The check is skipped
       // for JWT.
       const result = await service.findOne('org-1', noOrgPrincipal, denyAbility())
-      expect(result).toEqual(mockOrg)
+      expect(result).toEqual(expectedOrgResponse)
     })
 
     it('throws NotFoundException when org does not exist', async () => {
@@ -249,7 +261,7 @@ describe('OrganizationsService', () => {
       }
 
       const result = await service.findOne('org-1', apiKeyPrincipal, allowAbility())
-      expect(result).toEqual(mockOrg)
+      expect(result).toEqual(expectedOrgResponse)
     })
   })
 

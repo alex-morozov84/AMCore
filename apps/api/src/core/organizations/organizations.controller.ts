@@ -10,17 +10,24 @@ import {
   Post,
   Query,
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
-import type { Organization } from '@prisma/client'
-import { ZodSerializerDto } from 'nestjs-zod'
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger'
+import { ZodResponse } from 'nestjs-zod'
 
 import {
   Action,
   AuthType,
   type OrganizationListResponse,
+  type OrgResponse,
   PAGINATION,
   type RequestPrincipal,
   Subject,
+  type SwitchOrgResponse,
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
@@ -31,7 +38,12 @@ import { CurrentAbility } from '../auth/decorators/current-ability.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { TokenService } from '../auth/token.service'
 
-import { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
+import {
+  CreateOrganizationDto,
+  OrgResponseDto,
+  SwitchOrgResponseDto,
+  UpdateOrganizationDto,
+} from './dto'
 import { OrganizationListResponseDto } from './dto/organization-list-response.dto'
 import { OrganizationsService } from './organizations.service'
 
@@ -69,10 +81,11 @@ export class OrganizationsController {
   @Post()
   @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'Create a new organization — caller becomes ADMIN' })
+  @ZodResponse({ type: OrgResponseDto, status: 201, description: 'Organization created' })
   create(
     @Body() dto: CreateOrganizationDto,
     @CurrentUser('sub') userId: string
-  ): Promise<Organization> {
+  ): Promise<OrgResponse> {
     return this.orgsService.create(userId, dto)
   }
 
@@ -101,7 +114,11 @@ export class OrganizationsController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
-  @ZodSerializerDto(OrganizationListResponseDto)
+  @ZodResponse({
+    type: OrganizationListResponseDto,
+    status: 200,
+    description: 'Paginated organizations',
+  })
   findAll(
     @CurrentUser('sub') userId: string,
     @Query() pagination: PaginationQueryDto
@@ -125,22 +142,24 @@ export class OrganizationsController {
    */
   @Get(':id')
   @ApiOperation({ summary: 'Get organization details (must be a member)' })
+  @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Organization details' })
   findOne(
     @Param('id') id: string,
     @CurrentUser() principal: RequestPrincipal,
     @CurrentAbility() ability: AppAbility
-  ): Promise<Organization> {
+  ): Promise<OrgResponse> {
     return this.orgsService.findOne(id, principal, ability)
   }
 
   @Patch(':id')
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Update organization — ADMIN only, requires org context in JWT' })
+  @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Updated organization' })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateOrganizationDto,
     @CurrentUser() principal: RequestPrincipal
-  ): Promise<Organization> {
+  ): Promise<OrgResponse> {
     return this.orgsService.update(id, principal, dto)
   }
 
@@ -148,6 +167,7 @@ export class OrganizationsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Delete organization — ADMIN only, requires org context in JWT' })
+  @ApiNoContentResponse({ description: 'Organization deleted' })
   remove(@Param('id') id: string, @CurrentUser() principal: RequestPrincipal): Promise<void> {
     return this.orgsService.remove(id, principal)
   }
@@ -166,12 +186,12 @@ export class OrganizationsController {
    */
   @Post(':id/switch')
   @Auth(AuthType.Bearer)
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get new JWT with this organization context — must be a member' })
+  @ZodResponse({ type: SwitchOrgResponseDto, status: 200, description: 'Org-context access token' })
   async switchOrganization(
     @Param('id') orgId: string,
     @CurrentUser() user: RequestPrincipal
-  ): Promise<{ accessToken: string }> {
+  ): Promise<SwitchOrgResponse> {
     const { aclVersion } = await this.orgsService.getForSwitch(orgId, user.sub)
     const accessToken = this.tokenService.generateAccessToken({
       sub: user.sub,

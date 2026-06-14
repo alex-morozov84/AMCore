@@ -55,3 +55,22 @@ export const adminOrganizationListResponseSchema = paginatedResponseSchema(
 )
 
 export type AdminOrganizationListResponse = z.infer<typeof adminOrganizationListResponseSchema>
+
+/**
+ * Manual cleanup-run result (`POST /admin/cleanup`).
+ *
+ * Per-type counts of expired records swept this run, plus `failures` — the
+ * record types whose delete failed without aborting the others (EQS-04). Wire
+ * shape mirrors `CleanupResult` in `infrastructure/schedule/cleanup.service.ts`.
+ */
+export const cleanupResultSchema = z.object({
+  expiredSessions: z.number().int(),
+  expiredPasswordResetTokens: z.number().int(),
+  expiredEmailVerificationTokens: z.number().int(),
+  expiredApiKeys: z.number().int(),
+  expiredPendingInvites: z.number().int(),
+  staleTerminalInvites: z.number().int(),
+  failures: z.array(z.string()),
+})
+
+export type CleanupResultResponse = z.infer<typeof cleanupResultSchema>

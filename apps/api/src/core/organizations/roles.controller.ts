@@ -10,14 +10,21 @@ import {
   Post,
   Query,
 } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
-import type { Permission, Role } from '@prisma/client'
-import { ZodSerializerDto } from 'nestjs-zod'
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger'
+import { ZodResponse } from 'nestjs-zod'
 
 import {
   Action,
   AuthType,
+  type OrgRoleResponse,
   PAGINATION,
+  type PermissionResponse,
   type RequestPrincipal,
   type RoleListResponse,
   Subject,
@@ -28,7 +35,13 @@ import { Auth } from '../auth/decorators/auth.decorator'
 import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
-import { AssignPermissionDto, CreateRoleDto, UpdateRoleDto } from './dto'
+import {
+  AssignPermissionDto,
+  CreateRoleDto,
+  OrgRoleResponseDto,
+  PermissionResponseDto,
+  UpdateRoleDto,
+} from './dto'
 import { RoleListResponseDto } from './dto/organization-list-response.dto'
 import { RoleService } from './role.service'
 
@@ -70,7 +83,7 @@ export class RolesController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
-  @ZodSerializerDto(RoleListResponseDto)
+  @ZodResponse({ type: RoleListResponseDto, status: 200, description: 'Paginated roles' })
   listRoles(
     @Param('orgId') orgId: string,
     @CurrentUser() principal: RequestPrincipal,
@@ -82,23 +95,25 @@ export class RolesController {
   @Post()
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Create a custom role — ADMIN only' })
+  @ZodResponse({ type: OrgRoleResponseDto, status: 201, description: 'Role created' })
   createRole(
     @Param('orgId') orgId: string,
     @Body() dto: CreateRoleDto,
     @CurrentUser() principal: RequestPrincipal
-  ): Promise<Role> {
+  ): Promise<OrgRoleResponse> {
     return this.roleService.createRole(orgId, dto, principal)
   }
 
   @Patch(':roleId')
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Update a custom role — ADMIN only' })
+  @ZodResponse({ type: OrgRoleResponseDto, status: 200, description: 'Updated role' })
   updateRole(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
     @Body() dto: UpdateRoleDto,
     @CurrentUser() principal: RequestPrincipal
-  ): Promise<Role> {
+  ): Promise<OrgRoleResponse> {
     return this.roleService.updateRole(orgId, roleId, dto, principal)
   }
 
@@ -106,6 +121,7 @@ export class RolesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Delete a custom role — ADMIN only (system roles cannot be deleted)' })
+  @ApiNoContentResponse({ description: 'Role deleted' })
   deleteRole(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
@@ -117,12 +133,13 @@ export class RolesController {
   @Post(':roleId/permissions')
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Assign a CASL permission to a custom role — ADMIN only' })
+  @ZodResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
   assignPermission(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
     @Body() dto: AssignPermissionDto,
     @CurrentUser() principal: RequestPrincipal
-  ): Promise<Permission> {
+  ): Promise<PermissionResponse> {
     return this.roleService.assignPermission(orgId, roleId, dto, principal)
   }
 
@@ -130,6 +147,7 @@ export class RolesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
   @ApiOperation({ summary: 'Remove a permission from a custom role — ADMIN only' })
+  @ApiNoContentResponse({ description: 'Permission removed' })
   removePermission(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,

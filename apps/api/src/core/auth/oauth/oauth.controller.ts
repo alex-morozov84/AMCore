@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  HttpCode,
   HttpStatus,
   Param,
   Post,
@@ -11,16 +10,22 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
+import { ZodResponse } from 'nestjs-zod'
 
-import { AuthErrorCode, AuthType, type OAuthExchangeResponse } from '@amcore/shared'
+import {
+  AuthErrorCode,
+  AuthType,
+  type OAuthExchangeResponse,
+  type OAuthProvidersResponse,
+} from '@amcore/shared'
 
 import { AppException, NotFoundException } from '../../../common/exceptions'
 import { EnvService } from '../../../env/env.service'
 import { Auth } from '../decorators/auth.decorator'
 import { CurrentUser } from '../decorators/current-user.decorator'
-import { OAuthExchangeDto } from '../dto'
+import { OAuthExchangeDto, OAuthExchangeResponseDto, OAuthProvidersResponseDto } from '../dto'
 import { OriginCheckGuard } from '../guards'
 import { negotiateLocale } from '../locale-negotiation'
 import { SessionService } from '../session.service'
@@ -36,10 +41,6 @@ import {
 } from './oauth-binding-cookie'
 import { OAuthLoginTicketService } from './oauth-login-ticket.service'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory'
-
-interface ProvidersResponse {
-  providers: string[]
-}
 
 @ApiTags('oauth')
 @Controller('auth/oauth')
@@ -60,13 +61,19 @@ export class OAuthController {
   @Get('providers')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'List configured OAuth providers' })
-  getProviders(): ProvidersResponse {
+  @ZodResponse({
+    type: OAuthProvidersResponseDto,
+    status: 200,
+    description: 'Configured providers',
+  })
+  getProviders(): OAuthProvidersResponse {
     return { providers: this.providerFactory.getAvailableProviders() }
   }
 
   @Get(':provider')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Redirect to OAuth provider for login' })
+  @ApiResponse({ status: 302, description: 'Redirect to the provider authorization URL' })
   async authorize(
     @Param('provider') provider: string,
     @Req() req: Request,
@@ -85,6 +92,7 @@ export class OAuthController {
   @Get(':provider/link')
   @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'Redirect to OAuth provider to link account' })
+  @ApiResponse({ status: 302, description: 'Redirect to the provider authorization URL' })
   async link(
     @Param('provider') provider: string,
     @CurrentUser('sub') userId: string,
@@ -103,6 +111,10 @@ export class OAuthController {
   @Get(':provider/callback')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Handle OAuth provider callback (redirect/query providers)' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirect to the frontend callback or linked-accounts page',
+  })
   async callbackGet(
     @Param('provider') provider: string,
     @Query('code') code: string,
@@ -127,6 +139,10 @@ export class OAuthController {
   @Post(':provider/callback')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Handle OAuth provider form_post callback (Apple)' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirect to the frontend callback or linked-accounts page',
+  })
   async callbackPost(
     @Param('provider') provider: string,
     @Body('code') code: string,
@@ -196,11 +212,11 @@ export class OAuthController {
   }
 
   @Post('exchange')
-  @HttpCode(HttpStatus.OK)
   @Auth(AuthType.None)
   @UseGuards(OriginCheckGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Exchange OAuth login ticket for access token' })
+  @ZodResponse({ type: OAuthExchangeResponseDto, status: 200, description: 'Access token issued' })
   async exchange(
     @Body() dto: OAuthExchangeDto,
     @Req() req: Request

@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import type { Permission, Prisma, Role } from '@prisma/client'
 
-import type { OrgRoleResponse, RequestPrincipal, RoleListResponse } from '@amcore/shared'
+import type {
+  OrgRoleResponse,
+  PermissionResponse,
+  RequestPrincipal,
+  RoleListResponse,
+} from '@amcore/shared'
 
 import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
@@ -72,19 +77,27 @@ export class RoleService {
       description: row.description,
       isSystem: row.isSystem,
       organizationId: row.organizationId,
-      permissions: row.permissions.map((rp) => ({
-        id: rp.permission.id,
-        action: rp.permission.action,
-        subject: rp.permission.subject,
-        conditions: rp.permission.conditions,
-        fields: rp.permission.fields,
-        inverted: rp.permission.inverted,
-        organizationId: rp.permission.organizationId,
-      })),
+      permissions: row.permissions.map((rp) => this.toPermissionResponse(rp.permission)),
     }
   }
 
-  async createRole(orgId: string, dto: CreateRoleDto, principal: RequestPrincipal): Promise<Role> {
+  private toPermissionResponse(permission: Permission): PermissionResponse {
+    return {
+      id: permission.id,
+      action: permission.action,
+      subject: permission.subject,
+      conditions: permission.conditions,
+      fields: permission.fields,
+      inverted: permission.inverted,
+      organizationId: permission.organizationId,
+    }
+  }
+
+  async createRole(
+    orgId: string,
+    dto: CreateRoleDto,
+    principal: RequestPrincipal
+  ): Promise<OrgRoleResponse> {
     this.assertOrgContext(principal, orgId)
 
     const existing = await this.prisma.role.findFirst({
@@ -93,14 +106,16 @@ export class RoleService {
     if (existing)
       throw new ConflictException(`Role '${dto.name}' already exists in this organization`)
 
-    return this.prisma.role.create({
+    const role = await this.prisma.role.create({
       data: {
         name: dto.name,
         description: dto.description ?? null,
         organizationId: orgId,
         isSystem: false,
       },
+      include: { permissions: { include: { permission: true } } },
     })
+    return this.toOrgRoleResponse(role)
   }
 
   async updateRole(
@@ -108,7 +123,7 @@ export class RoleService {
     roleId: string,
     dto: UpdateRoleDto,
     principal: RequestPrincipal
-  ): Promise<Role> {
+  ): Promise<OrgRoleResponse> {
     this.assertOrgContext(principal, orgId)
     const role = await this.findCustomRole(orgId, roleId)
 
@@ -119,7 +134,12 @@ export class RoleService {
       if (nameConflict) throw new ConflictException(`Role '${dto.name}' already exists`)
     }
 
-    return this.prisma.role.update({ where: { id: roleId }, data: dto })
+    const updated = await this.prisma.role.update({
+      where: { id: roleId },
+      data: dto,
+      include: { permissions: { include: { permission: true } } },
+    })
+    return this.toOrgRoleResponse(updated)
   }
 
   async deleteRole(orgId: string, roleId: string, principal: RequestPrincipal): Promise<void> {
@@ -172,7 +192,7 @@ export class RoleService {
     roleId: string,
     dto: AssignPermissionDto,
     principal: RequestPrincipal
-  ): Promise<Permission> {
+  ): Promise<PermissionResponse> {
     this.assertOrgContext(principal, orgId)
     await this.findCustomRole(orgId, roleId)
 
@@ -197,7 +217,7 @@ export class RoleService {
       return permission
     })
     await this.orgsService.invalidateAclVersion(orgId)
-    return permission
+    return this.toPermissionResponse(permission)
   }
 
   /** Remove a permission from the role and delete the permission record */
