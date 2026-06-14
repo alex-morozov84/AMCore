@@ -68,6 +68,10 @@ model User {
   passwordHash   String?
   name           String?
   avatarUrl      String?
+  // Monotonic fence for avatar mutations: a conditional CAS update (only when the
+  // stored value is older) makes a stale lock holder unable to publish over, or
+  // sweep, a newer concurrent version. See ADR-049.
+  avatarGeneration Int     @default(0)
   phone          String?   @unique
   locale         String    @default("ru")
   timezone       String    @default("Europe/Moscow")

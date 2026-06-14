@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Concurrent avatar uploads/deletes for the same user no longer corrupt storage.
+  A monotonic per-user generation (`User.avatarGeneration`) fences every avatar
+  mutation: the publish/delete is a conditional update that only lands while the
+  stored generation is older, and a mutation only sweeps versions strictly older
+  than its own. So a request that lost the race can neither overwrite the newer
+  `avatarUrl` nor delete the live version — previously one upload's cleanup could
+  delete the version another upload just published, leaving `avatarUrl` pointing at
+  deleted storage. A per-user Redis lock serializes the common case; under
+  contention, a lost race, or a Redis outage the request fails closed with a
+  retriable `503` (`AVATAR_LOCKED`).
 - Sign in with Apple now works end-to-end on the web. Apple uses
   `response_mode=form_post` and POSTs the callback, but only a GET callback
   existed (the POST 404'd) and the `SameSite=Lax` binding cookie was never sent

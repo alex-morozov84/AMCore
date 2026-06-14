@@ -76,6 +76,14 @@ Authorization: Bearer <accessToken>
 Avatar uploads are rate-limited per IP (`5/min`) for the synchronous image
 decode. See [Media](../media/README.md) for presets, limits, and security.
 
+Concurrent avatar mutations for the same user are fenced by a monotonic
+`User.avatarGeneration` (conditional update + generation-bounded sweep), so a
+request that loses the race can neither overwrite nor delete the newer version.
+A per-user Redis lock serializes the common case; under contention, a lost race,
+or a Redis outage the upload/delete **fails closed** with a retriable
+`503 AVATAR_LOCKED` rather than mutating storage unsafely. See
+[Media → Concurrency](../media/README.md#concurrency).
+
 ## Private Files
 
 For private user files, keep `visibility` omitted or set to `private`. Do not

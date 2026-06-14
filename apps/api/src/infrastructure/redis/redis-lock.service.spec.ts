@@ -44,4 +44,43 @@ describe('RedisLockService', () => {
       arguments: ['lock-token'],
     })
   })
+
+  it('acquireBlocking returns the token on the first successful attempt', async () => {
+    redis.set.mockResolvedValueOnce('OK')
+
+    const token = await service.acquireBlocking('lock:key', 5000, { attempts: 3 })
+
+    expect(token).toEqual(expect.any(String))
+    expect(redis.set).toHaveBeenCalledTimes(1)
+  })
+
+  it('acquireBlocking retries then returns null when the lock stays held', async () => {
+    redis.set.mockResolvedValue(null)
+
+    const token = await service.acquireBlocking('lock:key', 5000, {
+      attempts: 3,
+      retryDelayMs: 1,
+    })
+
+    expect(token).toBeNull()
+    expect(redis.set).toHaveBeenCalledTimes(3)
+  })
+
+  it('renew extends the lease only while the token still owns the key', async () => {
+    redis.eval.mockResolvedValueOnce(1)
+
+    const renewed = await service.renew('lock:key', 'lock-token', 5000)
+
+    expect(renewed).toBe(true)
+    expect(redis.eval).toHaveBeenCalledWith(expect.stringContaining('PEXPIRE'), {
+      keys: ['lock:key'],
+      arguments: ['lock-token', '5000'],
+    })
+  })
+
+  it('renew returns false when ownership was lost', async () => {
+    redis.eval.mockResolvedValueOnce(0)
+
+    expect(await service.renew('lock:key', 'lock-token', 5000)).toBe(false)
+  })
 })

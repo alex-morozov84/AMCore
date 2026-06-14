@@ -58,6 +58,27 @@ Per-upload versioned keys let derivatives carry immutable cache headers without
 serving stale content after a re-upload: a new upload publishes a new
 `v-{version}/` URL, and the previous version is swept.
 
+### Concurrency
+
+Concurrent avatar mutations for one user are made safe by a **monotonic generation
+fence in the database**, not by the lock alone (see ADR-049):
+
+- **Generation CAS.** `User.avatarGeneration` increases by one per mutation. The
+  publish (and the delete) is a conditional update that only lands while the stored
+  generation is still older. A request that lost the race to a newer concurrent
+  mutation matches no row and fails closed — it can never overwrite the newer state.
+- **Generation-bounded sweep.** Versions are stored as `v-<generation>-<rand>`, and
+  a mutation only ever deletes versions **strictly older than its own generation**.
+  Since committed generations strictly increase, a request can never delete the
+  current or a newer version — even if its process paused and lost the lock lease.
+
+A per-user **Redis lock** still serializes the common case to avoid duplicate image
+work, but it is best-effort and not relied on for correctness. Under lock
+contention, a lost generation race, or a Redis outage the request **fails closed**
+with a retriable `503` (`errorCode: AVATAR_LOCKED`). A future generic file-upload
+feature with the same single-pointer + sweep pattern should reuse this
+generation-fence approach (and `RedisMutexService` for serialization).
+
 ## Guides
 
 - [Configuration](./configuration.md) — `MEDIA_*` env vars, presets, Next.js consumption.

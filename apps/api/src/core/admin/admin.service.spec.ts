@@ -31,6 +31,7 @@ describe('AdminService', () => {
     passwordHash: 'argon2-hash-should-never-leak',
     name: 'Test User',
     avatarUrl: null,
+    avatarGeneration: 0,
     phone: null,
     locale: 'ru',
     timezone: 'Europe/Moscow',

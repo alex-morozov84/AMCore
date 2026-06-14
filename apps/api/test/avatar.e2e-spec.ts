@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { access, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -83,9 +83,10 @@ describe('Avatar storage (e2e)', () => {
     await request(app.getHttpServer()).delete('/auth/me/avatar').expect(401)
   })
 
+  // Version is rendered `v-<generation>-<rand>` (the monotonic fence prefix).
   const avatarUrlPattern = (userId: string): RegExp =>
     new RegExp(
-      `^https://cdn\\.example\\.test/assets/avatars/${userId}/v-[0-9a-z]+/avatar-256\\.webp$`
+      `^https://cdn\\.example\\.test/assets/avatars/${userId}/v-[0-9]+-[0-9a-z]+/avatar-256\\.webp$`
     )
 
   it('uploads a validated public avatar derivative and persists avatarUrl', async () => {
@@ -182,6 +183,92 @@ describe('Avatar storage (e2e)', () => {
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
     expect(user.avatarUrl).toBeNull()
+  })
+
+  // Resolve the local file backing a public avatar URL so concurrency tests can
+  // assert the surviving DB pointer references storage that actually exists. The
+  // local driver stores object bytes under `<root>/objects/<key>`; the public
+  // base URL maps to that `objects/` mount (see LocalStorageConfig.publicBaseUrl).
+  const STORAGE_PUBLIC_PREFIX = 'https://cdn.example.test/assets/'
+  const STORAGE_OBJECTS_DIR = 'objects'
+  const fileFor = (avatarUrl: string): string =>
+    path.join(storageRoot, STORAGE_OBJECTS_DIR, avatarUrl.slice(STORAGE_PUBLIC_PREFIX.length))
+
+  it('serializes concurrent uploads: the surviving avatarUrl resolves to live storage', async () => {
+    const { accessToken, userId } = await registerUser()
+
+    const upload = (): request.Test =>
+      request(app.getHttpServer())
+        .post('/auth/me/avatar')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
+
+    const [a, b] = await Promise.all([upload(), upload()])
+    expect(a.status).toBe(201)
+    expect(b.status).toBe(201)
+
+    // The DB winner must point to a file that still exists (no cross-version sweep).
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
+    expect(user.avatarUrl).toMatch(avatarUrlPattern(userId))
+    await expect(access(fileFor(user.avatarUrl as string))).resolves.toBeUndefined()
+
+    // The loser's published derivative was swept: exactly one version still has a
+    // live avatar-256 file (empty version dirs may linger — file delete does not
+    // prune them on the local driver; S3 has no directories).
+    const versionDirs = await readdir(
+      path.join(storageRoot, STORAGE_OBJECTS_DIR, 'avatars', userId)
+    )
+    const liveVersions = (
+      await Promise.all(
+        versionDirs.map(async (dir) => {
+          const file = path.join(
+            storageRoot,
+            STORAGE_OBJECTS_DIR,
+            'avatars',
+            userId,
+            dir,
+            'avatar-256.webp'
+          )
+          return access(file).then(
+            () => dir,
+            () => undefined
+          )
+        })
+      )
+    ).filter((dir): dir is string => dir !== undefined)
+    expect(liveVersions).toHaveLength(1)
+    expect(user.avatarUrl).toContain(`/${liveVersions[0]}/`)
+  })
+
+  it('keeps the store consistent under a concurrent upload and delete', async () => {
+    const { accessToken, userId } = await registerUser()
+
+    await request(app.getHttpServer())
+      .post('/auth/me/avatar')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
+      .expect(201)
+
+    await Promise.all([
+      request(app.getHttpServer())
+        .post('/auth/me/avatar')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' }),
+      request(app.getHttpServer())
+        .delete('/auth/me/avatar')
+        .set('Authorization', `Bearer ${accessToken}`),
+    ])
+
+    // Whichever ran last, the invariant holds: a non-null avatarUrl must resolve
+    // to live storage; a null one means the avatar was fully removed.
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
+    const state = user.avatarUrl
+      ? await access(fileFor(user.avatarUrl)).then(
+          () => 'live',
+          () => 'orphaned'
+        )
+      : 'removed'
+    expect(state).not.toBe('orphaned')
   })
 
   it('throttles avatar uploads per IP (F12)', async () => {
