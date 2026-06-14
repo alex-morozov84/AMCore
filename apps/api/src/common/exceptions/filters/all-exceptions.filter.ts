@@ -3,7 +3,9 @@ import { HttpAdapterHost } from '@nestjs/core'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
+import { REQUEST_BODY_LIMIT_BYTES } from '../../../bootstrap/configure-body-parser'
 import { sanitizeHeaders } from '../../utils'
+import { PayloadTooLargeException } from '../domain'
 import type { ErrorResponse } from '../types'
 
 /**
@@ -26,10 +28,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest()
     const response = ctx.getResponse()
 
+    // Translate framework-level errors that are not HttpExceptions (e.g. the
+    // body-parser size error) into domain exceptions before classification.
+    const normalized = this.normalizeException(exception)
+
     // Determine status code
-    const statusCode = this.getStatusCode(exception)
-    const message = this.getErrorMessage(exception)
-    const errorCode = this.getErrorCode(exception)
+    const statusCode = this.getStatusCode(normalized)
+    const message = this.getErrorMessage(normalized)
+    const errorCode = this.getErrorCode(normalized)
 
     // Build error response
     const errorResponse: ErrorResponse = {
@@ -69,6 +75,28 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     // Send response
     httpAdapter.reply(response, errorResponse, statusCode)
+  }
+
+  /**
+   * Translate non-`HttpException` framework errors into domain exceptions so the
+   * rest of the filter classifies them consistently.
+   *
+   * body-parser raises a plain `Error` with `type === 'entity.too.large'` (and a
+   * `.status`/`.statusCode` of 413) when a request body exceeds the configured
+   * limit. Without this the catch-all would report it as 500. Detection keys on
+   * the `type` discriminator, which is stable across body-parser's localized
+   * messages, rather than parsing the message text.
+   */
+  private normalizeException(exception: unknown): unknown {
+    if (
+      exception instanceof Error &&
+      (exception as { type?: unknown }).type === 'entity.too.large'
+    ) {
+      return new PayloadTooLargeException('Request body exceeds the maximum allowed size', {
+        limitBytes: REQUEST_BODY_LIMIT_BYTES,
+      })
+    }
+    return exception
   }
 
   /**

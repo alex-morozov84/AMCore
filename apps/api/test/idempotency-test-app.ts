@@ -1,5 +1,6 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { Provider, Type } from '@nestjs/common'
+import type { NestExpressApplication } from '@nestjs/platform-express'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { ThrottlerStorage } from '@nestjs/throttler'
 import type { Cache } from 'cache-manager'
@@ -8,6 +9,7 @@ import cookieParser from 'cookie-parser'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 
+import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
 import { IdempotencyModule } from '../src/infrastructure/idempotency'
 import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
@@ -37,7 +39,8 @@ export async function setupIdempotencyTestApp(
     .useValue(noopPinoLogger)
     .compile()
 
-  const app = moduleFixture.createNestApplication({ rawBody: true })
+  const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
+  configureBodyParser(app)
   app.use(cookieParser())
   app.useGlobalPipes(new ZodValidationPipe())
   await app.init()

@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core'
+import type { NestExpressApplication } from '@nestjs/platform-express'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
@@ -6,6 +7,7 @@ import { Logger } from 'nestjs-pino'
 import { cleanupOpenApiDoc } from 'nestjs-zod'
 
 import { AppModule } from './app.module'
+import { configureBodyParser } from './bootstrap/configure-body-parser'
 import { EnvService } from './env/env.service'
 import { ShutdownService } from './shutdown.service'
 import { WebModule } from './web.module'
@@ -35,7 +37,10 @@ async function bootstrap(): Promise<void> {
   const role = (process.env.PROCESS_ROLE ?? 'all') as ProcessRole
   const isWorker = role === 'worker'
 
-  const app = await NestFactory.create(rootModuleFor(role), { bufferLogs: true, rawBody: true })
+  const app = await NestFactory.create<NestExpressApplication>(rootModuleFor(role), {
+    bufferLogs: true,
+    rawBody: true,
+  })
   const env = app.get(EnvService)
   const isProduction = env.get('NODE_ENV') === 'production'
 
@@ -45,6 +50,11 @@ async function bootstrap(): Promise<void> {
 
   // Flush buffered logs
   app.flushLogs()
+
+  // Explicit request-body size limit for JSON + urlencoded (keeps webhook
+  // raw-body capture intact). Shared with the e2e bootstrap so the body-size
+  // contract is identical in tests and production.
+  configureBodyParser(app)
 
   // Cookie parser for refresh tokens
   app.use(cookieParser())

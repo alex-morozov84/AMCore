@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Explicit request-body size limit of 100 000 bytes (decimal) for JSON and
+  urlencoded bodies, applied globally — including raw-body webhook routes — and
+  shared by the production and e2e bootstraps so the limit is identical in both.
+  The limit is measured against the decoded body (after any `Content-Encoding`
+  inflation), not the wire size. An oversized body is rejected before route
+  guards run (so a webhook signature is never evaluated for a too-large payload)
+  and surfaces as `413 Payload Too Large` with a stable `PAYLOAD_TOO_LARGE` error
+  code instead of a generic 500. Signature verification is unaffected — the
+  verifier hashes `req.rawBody`, the decoded body buffer; multipart uploads keep
+  their own Multer limit.
 - Every public endpoint now documents its success response body and status code
   in the OpenAPI spec (`/docs`). Responses are declared with `@ZodResponse`, which
   keeps the runtime serialization, the TypeScript return type, and the generated
