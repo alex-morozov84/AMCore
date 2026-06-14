@@ -215,6 +215,30 @@ describe('AllExceptionsFilter', () => {
     process.env.NODE_ENV = originalEnv
   })
 
+  it('maps a body-parser entity.too.large error to 413 PAYLOAD_TOO_LARGE', () => {
+    // Shape of the error body-parser raises when a body exceeds the limit.
+    const exception = Object.assign(new Error('request entity too large'), {
+      type: 'entity.too.large',
+      status: 413,
+      statusCode: 413,
+      expose: true,
+    })
+
+    filter.catch(exception, mockHost)
+
+    expect(mockHttpAdapter.reply).toHaveBeenCalledWith(
+      mockResponse,
+      expect.objectContaining({
+        statusCode: 413,
+        errorCode: 'PAYLOAD_TOO_LARGE',
+      }),
+      413
+    )
+    // A client error (4xx), so it is logged as a warning, never a 5xx error.
+    expect(mockLogger.warn).toHaveBeenCalled()
+    expect(mockLogger.error).not.toHaveBeenCalled()
+  })
+
   it('should handle validation error arrays', () => {
     const exception = new HttpException(
       { message: ['email is required', 'password too short'] },

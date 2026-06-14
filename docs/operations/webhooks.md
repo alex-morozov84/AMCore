@@ -93,12 +93,46 @@ Current replay-ID extraction:
 Webhook routes should use a dedicated `@Throttle(...)` override. Do not use
 `@SkipThrottle()` for webhooks.
 
+## Request body size limit
+
+AMCore applies one explicit request-body size limit globally in the Nest
+bootstrap: **100 000 bytes** (decimal, not 100 KiB) for both JSON and
+urlencoded parsers, including raw-body webhook routes. The limit is centralized
+in `apps/api/src/bootstrap/configure-body-parser.ts` (`REQUEST_BODY_LIMIT_BYTES`)
+and shared by production and the e2e bootstrap so the contract is identical in
+both.
+
+The limit is measured against the **decoded** body — bytes after any
+`Content-Encoding` inflation, not bytes on the wire (`inflate` defaults to true).
+For an uncompressed request the decoded size equals the wire size; for a
+gzip/deflate request the limit bounds the inflated size, so a small compressed
+body that inflates past the limit is still rejected.
+
+Behavior:
+
+- a decoded body of exactly `100 000` bytes is accepted; `100 001` is rejected;
+- an oversized body is rejected by the parser **before** the route's guards run,
+  so a webhook signature is never evaluated for a too-large payload;
+- the rejection surfaces as `413 Payload Too Large` with
+  `errorCode: "PAYLOAD_TOO_LARGE"` (see _Error Contract_ below);
+- signature verification is unaffected: the verifier hashes `req.rawBody`, the
+  decoded (post-inflation) body buffer, and the explicit limit does not change
+  those bytes;
+- multipart uploads are **not** governed by this value; they have their own
+  per-route Multer limit and `FILE_TOO_LARGE` contract.
+
+There is intentionally no separate, larger webhook limit: no current provider
+payload requires one. Raise `REQUEST_BODY_LIMIT_BYTES` only against a measured
+need.
+
 ## Error Contract
 
 The outward HTTP contract is intentionally uniform:
 
 - `401 Unauthorized` for invalid signature, invalid timestamp, or rejected replay
 - `400 Bad Request` for missing configuration or unsupported payload format
+- `413 Payload Too Large` (`PAYLOAD_TOO_LARGE`) when the request body exceeds the
+  global size limit — raised before signature verification
 
 Human-readable messages stay uniform for the `401` cases, but the response keeps
 distinct machine-readable `errorCode` values:

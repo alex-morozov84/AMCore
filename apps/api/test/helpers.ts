@@ -2,6 +2,7 @@ import type { WorkerHost } from '@nestjs/bullmq'
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { INestApplication } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
+import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { ThrottlerStorage } from '@nestjs/throttler'
@@ -14,6 +15,7 @@ import cookieParser from 'cookie-parser'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 
+import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
 import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
 import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
@@ -104,10 +106,12 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
     .useValue(noopPinoLogger)
     .compile()
 
-  // Create app instance
-  const app = moduleFixture.createNestApplication()
+  // Create app instance. `rawBody: true` matches production (main.ts) so the
+  // e2e bootstrap shares one parser contract with prod, not a divergent one.
+  const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
 
   // Apply same configuration as in main.ts
+  configureBodyParser(app)
   app.use(cookieParser())
   app.useGlobalPipes(new ZodValidationPipe())
 
