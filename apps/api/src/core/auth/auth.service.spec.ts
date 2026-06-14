@@ -276,6 +276,50 @@ describe('AuthService', () => {
       expect(lastLoginAt.getTime()).toBeLessThanOrEqual(afterRegister.getTime())
     })
 
+    describe('locale precedence', () => {
+      const setupRegisterMocks = () => {
+        mockCtx.prisma.user.findUnique.mockResolvedValue(null)
+        ;(argon2.hash as jest.Mock).mockResolvedValue('hashed')
+        mockCtx.prisma.user.create.mockResolvedValue(mockUser)
+        mockTokenService.generateAccessToken.mockReturnValue('token')
+        mockSessionService.createSession.mockResolvedValue(
+          mockCreateSessionResult('refresh') as never
+        )
+      }
+
+      it('uses the explicit body locale over the negotiated header', async () => {
+        setupRegisterMocks()
+
+        await authService.register(
+          { ...registerInput, locale: 'en' },
+          { ...requestInfo, acceptedLocale: 'ru' }
+        )
+
+        expect(mockCtx.prisma.user.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ locale: 'en' }),
+        })
+      })
+
+      it('falls back to the negotiated Accept-Language locale when the body omits it', async () => {
+        setupRegisterMocks()
+
+        await authService.register(registerInput, { ...requestInfo, acceptedLocale: 'en' })
+
+        expect(mockCtx.prisma.user.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ locale: 'en' }),
+        })
+      })
+
+      it('omits locale entirely when neither body nor header supplies one (DB default applies)', async () => {
+        setupRegisterMocks()
+
+        await authService.register(registerInput, requestInfo)
+
+        const createArg = mockCtx.prisma.user.create.mock.calls[0]![0]!
+        expect(createArg.data).not.toHaveProperty('locale')
+      })
+    })
+
     /**
      * Regression: register() must generate the verification token in-band so
      * the row is committed before HTTP 201 returns. Earlier code did
@@ -650,6 +694,41 @@ describe('AuthService', () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
 
       const result = await authService.getUserById('user-123')
+
+      expect(result).not.toHaveProperty('passwordHash')
+    })
+  })
+
+  describe('updateProfile', () => {
+    it('writes only the supplied fields and invalidates the user cache', async () => {
+      const updated = { ...mockUser, name: 'Renamed', locale: 'en' }
+      mockCtx.prisma.user.update.mockResolvedValue(updated)
+
+      const result = await authService.updateProfile('user-123', { name: 'Renamed', locale: 'en' })
+
+      expect(mockCtx.prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+        data: { name: 'Renamed', locale: 'en' },
+      })
+      expect(mockUserCacheService.invalidateUser).toHaveBeenCalledWith('user-123')
+      expect(result).toMatchObject({ name: 'Renamed', locale: 'en' })
+    })
+
+    it('does not write fields that were not supplied', async () => {
+      mockCtx.prisma.user.update.mockResolvedValue(mockUser)
+
+      await authService.updateProfile('user-123', { timezone: 'America/New_York' })
+
+      const updateArg = mockCtx.prisma.user.update.mock.calls[0]![0]!
+      expect(updateArg.data).toEqual({ timezone: 'America/New_York' })
+      expect(updateArg.data).not.toHaveProperty('name')
+      expect(updateArg.data).not.toHaveProperty('locale')
+    })
+
+    it('returns the canonical profile shape without passwordHash', async () => {
+      mockCtx.prisma.user.update.mockResolvedValue(mockUser)
+
+      const result = await authService.updateProfile('user-123', { name: 'X' })
 
       expect(result).not.toHaveProperty('passwordHash')
     })

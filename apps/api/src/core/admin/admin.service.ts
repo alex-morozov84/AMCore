@@ -7,6 +7,7 @@ import {
   type AdminOrganizationResponse,
   type AdminUserListResponse,
   type AdminUserResponse,
+  parseSupportedLocale,
   type RequestPrincipal,
   SystemRole,
 } from '@amcore/shared'
@@ -312,7 +313,7 @@ export class AdminService {
       name: row.name,
       avatarUrl: row.avatarUrl,
       phone: row.phone,
-      locale: row.locale,
+      locale: parseSupportedLocale(row.locale),
       timezone: row.timezone,
       systemRole: row.systemRole,
       createdAt: row.createdAt.toISOString(),

@@ -205,6 +205,43 @@ describe('Auth (e2e)', () => {
       expect(sessions).toHaveLength(1)
       expect(sessions[0]!.userAgent).toBeDefined()
     })
+
+    it('seeds locale from Accept-Language when no explicit locale is given', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .set('Accept-Language', 'en-US,en;q=0.9')
+        .send({ email: 'enheader@example.com', password: 'StrongP@ss123' })
+        .expect(201)
+
+      expect(response.body.user.locale).toBe('en')
+    })
+
+    it('prefers an explicit body locale over Accept-Language', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .set('Accept-Language', 'en-US,en;q=0.9')
+        .send({ email: 'bodyru@example.com', password: 'StrongP@ss123', locale: 'ru' })
+        .expect(201)
+
+      expect(response.body.user.locale).toBe('ru')
+    })
+
+    it('falls back to the DB default for an unsupported Accept-Language', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .set('Accept-Language', 'de-DE,de;q=0.9')
+        .send({ email: 'deheader@example.com', password: 'StrongP@ss123' })
+        .expect(201)
+
+      expect(response.body.user.locale).toBe('ru')
+    })
+
+    it('returns 400 for an unsupported body locale', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'badlocale@example.com', password: 'StrongP@ss123', locale: 'de' })
+        .expect(400)
+    })
   })
 
   describe('POST /auth/login', () => {
@@ -506,6 +543,123 @@ describe('Auth (e2e)', () => {
         .expect(401)
 
       expect(response.body.message).toBeDefined()
+    })
+  })
+
+  describe('PATCH /auth/me', () => {
+    let accessToken: string
+
+    beforeEach(async () => {
+      const response = await request(app.getHttpServer()).post('/auth/register').send({
+        email: 'profile@example.com',
+        password: 'MeP@ss123',
+        name: 'Profile User',
+      })
+      accessToken = response.body.accessToken
+    })
+
+    it('updates name, locale, and timezone and persists them', async () => {
+      const response = await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Updated Name', locale: 'en', timezone: 'America/New_York' })
+        .expect(200)
+
+      expect(response.body.user).toMatchObject({
+        name: 'Updated Name',
+        locale: 'en',
+        timezone: 'America/New_York',
+      })
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'profile@example.com' },
+      })
+      expect(user).toMatchObject({
+        name: 'Updated Name',
+        locale: 'en',
+        timezone: 'America/New_York',
+      })
+    })
+
+    it('updates only the supplied field and leaves the rest untouched', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Only Name' })
+        .expect(200)
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'profile@example.com' },
+      })
+      expect(user?.name).toBe('Only Name')
+      expect(user?.locale).toBe('ru') // default preserved
+      expect(user?.timezone).toBe('Europe/Moscow') // default preserved
+    })
+
+    it('returns 400 for an unsupported locale', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ locale: 'de' })
+        .expect(400)
+    })
+
+    it('returns 400 for an invalid IANA timezone', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ timezone: 'Mars/Phobos' })
+        .expect(400)
+    })
+
+    it('returns 400 for a numeric UTC offset (named IANA zone required)', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ timezone: '+01:00' })
+        .expect(400)
+    })
+
+    it('accepts UTC as a named zone', async () => {
+      const response = await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ timezone: 'UTC' })
+        .expect(200)
+
+      expect(response.body.user.timezone).toBe('UTC')
+    })
+
+    it('returns 401 without an access token', async () => {
+      await request(app.getHttpServer()).patch('/auth/me').send({ name: 'X' }).expect(401)
+    })
+
+    // PATCH /auth/me is @Auth(Bearer) only — a valid API key (accepted by GET
+    // /auth/me) must not be able to mutate the profile.
+    it('rejects a valid API key (bearer-only route)', async () => {
+      const orgRes = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Profile AK Org' })
+        .expect(201)
+
+      const keyRes = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Carrier', organizationId: orgRes.body.id, scopes: ['read:User'] })
+        .expect(201)
+      const apiKey = keyRes.body.key as string
+
+      await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .send({ name: 'Should Not Apply' })
+        .expect(401)
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'profile@example.com' },
+      })
+      expect(user?.name).toBe('Profile User')
     })
   })
 

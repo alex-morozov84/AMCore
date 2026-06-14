@@ -3,8 +3,8 @@ import type { OAuthProvider, User } from '@prisma/client'
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { OAuthUserProfile, UserResponse } from '@amcore/shared'
-import { AuthErrorCode } from '@amcore/shared'
+import type { OAuthUserProfile, SupportedLocale, UserResponse } from '@amcore/shared'
+import { AuthErrorCode, parseSupportedLocale } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions'
 import { PrismaService } from '../../../prisma'
@@ -51,7 +51,10 @@ export class OAuthService {
     this.logger.setContext(OAuthService.name)
   }
 
-  async getAuthorizationURL(providerName: string): Promise<{ url: string; browserNonce: string }> {
+  async getAuthorizationURL(
+    providerName: string,
+    locale?: SupportedLocale
+  ): Promise<{ url: string; browserNonce: string }> {
     const provider = this.providerFactory.get(providerName)
     const state = randomBytes(32).toString('base64url')
     const codeVerifier = randomBytes(32).toString('base64url')
@@ -62,6 +65,7 @@ export class OAuthService {
       codeVerifier,
       mode: 'login',
       browserNonceHash: hashOAuthStateNonce(browserNonce),
+      ...(locale ? { locale } : {}),
     })
 
     const url = await provider.getAuthorizationURL(state, codeVerifier)
@@ -136,7 +140,7 @@ export class OAuthService {
       )
     }
 
-    const user = await this.findOrCreateUser(profile, providerName)
+    const user = await this.findOrCreateUser(profile, providerName, stateData.locale)
 
     const accessClaims: AccessTokenPayload = {
       sub: user.id,
@@ -212,7 +216,11 @@ export class OAuthService {
     return this.prisma.user.findUniqueOrThrow({ where: { id: userId } })
   }
 
-  private async findOrCreateUser(profile: OAuthUserProfile, providerName: string): Promise<User> {
+  private async findOrCreateUser(
+    profile: OAuthUserProfile,
+    providerName: string,
+    locale?: SupportedLocale
+  ): Promise<User> {
     const provider = providerName.toUpperCase() as OAuthProvider
 
     const existing = await this.prisma.oAuthAccount.findUnique({
@@ -230,10 +238,12 @@ export class OAuthService {
     const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
     const userByEmail = await this.prisma.user.findUnique({ where: { emailCanonical } })
     if (userByEmail) {
+      // Existing account linked by email — keep its stored locale (D2: never
+      // overwrite an established preference with a browser hint).
       return this.linkAndReturnUser(userByEmail, profile, provider)
     }
 
-    return this.createOAuthUser(profile, provider)
+    return this.createOAuthUser(profile, provider, locale)
   }
 
   private async linkAndReturnUser(
@@ -257,7 +267,11 @@ export class OAuthService {
     return this.prisma.user.findUniqueOrThrow({ where: { id: existingUser.id } })
   }
 
-  private createOAuthUser(profile: OAuthUserProfile, provider: OAuthProvider): Promise<User> {
+  private createOAuthUser(
+    profile: OAuthUserProfile,
+    provider: OAuthProvider,
+    locale?: SupportedLocale
+  ): Promise<User> {
     const email = this.emailIdentity.normalizeForStorage(profile.email!)
     const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
 
@@ -268,6 +282,8 @@ export class OAuthService {
         emailVerified: profile.emailVerified,
         name: profile.displayName,
         avatarUrl: profile.avatarUrl,
+        // Seed from the negotiated locale (D2); omit to take the DB default.
+        ...(locale ? { locale } : {}),
         lastLoginAt: new Date(),
         accounts: { create: { provider, providerAccountId: profile.providerId } },
       },
@@ -282,7 +298,7 @@ export class OAuthService {
       name: user.name,
       avatarUrl: user.avatarUrl,
       phone: user.phone,
-      locale: user.locale,
+      locale: parseSupportedLocale(user.locale),
       timezone: user.timezone,
       createdAt: user.createdAt.toISOString(),
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,

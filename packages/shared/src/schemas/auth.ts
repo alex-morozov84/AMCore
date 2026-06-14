@@ -1,8 +1,50 @@
 import { z } from 'zod'
 
+import { SUPPORTED_LOCALES, type SupportedLocale } from '../constants'
+
 import { paginatedResponseSchema } from './pagination'
 
 export const emailInputSchema = z.string().trim().pipe(z.email())
+
+/**
+ * Supported locale — derived from the single `SUPPORTED_LOCALES` source so
+ * registration, profile update, the user response, and email rendering all
+ * validate against the same set. No hardcoded messages (Zod v4 native i18n).
+ */
+export const supportedLocaleSchema = z.enum(SUPPORTED_LOCALES)
+
+/**
+ * Parse a stored locale string (e.g. the Prisma `User.locale` column) into the
+ * supported set. This is the boundary where a persisted value becomes the typed
+ * public contract: an out-of-contract value throws rather than being silently
+ * blessed, so invalid stored data surfaces instead of disagreeing with email/UI
+ * support. Upstream only ever writes supported locales, so this never throws in
+ * practice; a fork that stores others must extend the contract + migrate.
+ */
+export function parseSupportedLocale(value: string): SupportedLocale {
+  return supportedLocaleSchema.parse(value)
+}
+
+/**
+ * IANA time-zone identifier (e.g. `Europe/Moscow`, `UTC`). Validated structurally
+ * via `Intl.DateTimeFormat`, which throws `RangeError` for an unknown zone — this
+ * keeps the check language-agnostic and avoids shipping a static zone list that
+ * drifts from the runtime's tz database. Available in both Node and the browser.
+ *
+ * Numeric UTC offsets (`+01:00`, `-0500`, `+23`) are rejected even though `Intl`
+ * accepts them: the contract is a named IANA zone for a durable preference, not a
+ * fixed offset that ignores DST. Offset identifiers always begin with `+`/`-`,
+ * while every named zone/alias begins with a letter (`Etc/GMT+5` included).
+ */
+export const timezoneSchema = z.string().refine((tz) => {
+  if (/^[+-]/.test(tz)) return false
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz })
+    return true
+  } catch {
+    return false
+  }
+})
 
 // ===========================================
 // Request Schemas
@@ -13,6 +55,9 @@ export const registerSchema = z.object({
   email: emailInputSchema,
   password: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/),
   name: z.string().min(2).optional(),
+  // Optional explicit locale; when omitted the API falls back to
+  // `Accept-Language` negotiation, then the DB default (see AuthService.register).
+  locale: supportedLocaleSchema.optional(),
 })
 
 export type RegisterInput = z.infer<typeof registerSchema>
@@ -28,8 +73,8 @@ export type LoginInput = z.infer<typeof loginSchema>
 /** Profile update request */
 export const updateProfileSchema = z.object({
   name: z.string().min(2).optional(),
-  locale: z.enum(['ru', 'en']).optional(),
-  timezone: z.string().optional(),
+  locale: supportedLocaleSchema.optional(),
+  timezone: timezoneSchema.optional(),
 })
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
@@ -104,7 +149,10 @@ export const userResponseSchema = z.object({
   name: z.string().nullable(),
   avatarUrl: z.string().nullable(),
   phone: z.string().nullable(),
-  locale: z.string(),
+  // Reuses the single supported-locale source so the public response contract
+  // matches what registration/profile accept (the mapper boundary parses the
+  // stored Prisma string into this set — see AuthService.mapUserToResponse).
+  locale: supportedLocaleSchema,
   timezone: z.string(),
   createdAt: z.iso.datetime(),
   lastLoginAt: z.iso.datetime().nullable(),

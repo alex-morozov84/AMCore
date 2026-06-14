@@ -27,19 +27,32 @@ canonical key.
 ```bash
 curl -X POST https://api.amcore.dev/api/v1/auth/register \
   -H "Content-Type: application/json" \
+  -H "Accept-Language: en" \
   -d '{
     "email": "alex@example.com",
     "password": "my-secure-password",
-    "name": "Alex"
+    "name": "Alex",
+    "locale": "en"
   }'
 ```
+
+`locale` is optional (`ru` or `en`). It sets the new user's interface/email
+language with this precedence:
+
+1. an explicit `locale` in the body, else
+2. the best supported match negotiated from the `Accept-Language` header, else
+3. the column default (`ru`).
+
+An unsupported `Accept-Language` (e.g. `de`) falls through to the default; an
+unsupported body `locale` is a `400` validation error.
 
 **What happens:**
 
 1. Email is trimmed and checked for canonical uniqueness — duplicate emails
    across case variants return `EMAIL_ALREADY_EXISTS`
 2. Password is hashed with Argon2id (~100ms intentionally)
-3. A new user is created with `systemRole: USER` and `emailVerified: false`
+3. A new user is created with `systemRole: USER` and `emailVerified: false`,
+   and the resolved `locale`
 4. A verification email is sent best-effort and never queued (the raw token
    exists only in the email link)
 5. A session is created, tokens are issued
@@ -294,3 +307,43 @@ curl https://api.amcore.dev/api/v1/auth/me \
   }
 }
 ```
+
+`GET /auth/me` accepts both a Bearer JWT and an API key (it is the identity
+self-check endpoint). Updating the profile is Bearer-only — see below.
+
+---
+
+## Updating the current user
+
+**Endpoint:** `PATCH /api/v1/auth/me` (Bearer JWT only)
+
+```bash
+curl -X PATCH https://api.amcore.dev/api/v1/auth/me \
+  -H "Authorization: Bearer eyJhbGci..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Alexander",
+    "locale": "en",
+    "timezone": "America/New_York"
+  }'
+```
+
+All fields are optional; only the fields you send are changed. This is the
+authoritative way to set a stored language preference — once set, it always
+wins over `Accept-Language`.
+
+| Field      | Rules                                    |
+| ---------- | ---------------------------------------- |
+| `name`     | ≥ 2 characters                           |
+| `locale`   | `ru` or `en`                             |
+| `timezone` | a valid IANA zone (e.g. `Europe/Moscow`) |
+
+**Success response** `200 OK`: the full updated profile in the same `{ user }`
+envelope as `GET /auth/me`.
+
+**Errors:**
+
+| Code             | HTTP | When                                             |
+| ---------------- | ---- | ------------------------------------------------ |
+| validation error | 400  | Unsupported `locale` or invalid `timezone`       |
+| `UNAUTHORIZED`   | 401  | Missing/invalid Bearer token (API keys rejected) |

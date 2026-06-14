@@ -163,6 +163,22 @@ describe('OAuthService', () => {
 
       await expect(service.getAuthorizationURL('vk')).rejects.toThrow(AppException)
     })
+
+    it('carries the negotiated locale into the stored state (D2)', async () => {
+      await service.getAuthorizationURL('google', 'en')
+
+      expect(stateService.store).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ locale: 'en' })
+      )
+    })
+
+    it('omits locale from state when none is negotiated', async () => {
+      await service.getAuthorizationURL('google')
+
+      const storeArg = stateService.store.mock.calls[0]![1] as OAuthStateData
+      expect(storeArg).not.toHaveProperty('locale')
+    })
   })
 
   describe('handleCallback', () => {
@@ -384,6 +400,83 @@ describe('OAuthService', () => {
           data: expect.objectContaining({ name: 'Test User' }),
         })
       )
+    })
+
+    // D2: a new OAuth user's locale is seeded from the negotiated language
+    // carried in the one-time state.
+    it('seeds a new OAuth user locale from the negotiated state locale', async () => {
+      stateService.consume.mockResolvedValue({
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+        browserNonceHash: TEST_NONCE_HASH,
+        locale: 'en',
+      } as OAuthStateData)
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(null)
+
+      await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ locale: 'en' }) })
+      )
+    })
+
+    it('omits locale on create when the state carries none (DB default applies)', async () => {
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(null)
+
+      await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
+
+      const createArg = prisma.user.create.mock.calls[0]![0]!
+      expect(createArg.data).not.toHaveProperty('locale')
+    })
+
+    // D2: an already-linked OAuth account keeps its stored preference — the
+    // returning-login path bumps only lastLoginAt and never writes locale.
+    it('retains the stored locale for an already-linked OAuth user', async () => {
+      stateService.consume.mockResolvedValue({
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+        browserNonceHash: TEST_NONCE_HASH,
+        locale: 'en',
+      } as OAuthStateData)
+      const user = mockUser({ locale: 'ru' })
+      prisma.oAuthAccount.findUnique.mockResolvedValue({ userId: user.id, user })
+
+      await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
+
+      expect(prisma.user.create).not.toHaveBeenCalled()
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { lastLoginAt: expect.any(Date) } })
+      )
+      for (const call of prisma.user.update.mock.calls) {
+        expect(call[0]!.data).not.toHaveProperty('locale')
+      }
+    })
+
+    // D2: an existing user found by email keeps its stored preference — the
+    // browser hint never overwrites it (no locale in the link update).
+    it('does not overwrite an existing user locale when linking by email', async () => {
+      stateService.consume.mockResolvedValue({
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+        browserNonceHash: TEST_NONCE_HASH,
+        locale: 'en',
+      } as OAuthStateData)
+      const existing = mockUser({ locale: 'ru' })
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(existing)
+      prisma.user.findUniqueOrThrow.mockResolvedValue(existing)
+
+      await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
+
+      expect(prisma.user.create).not.toHaveBeenCalled()
+      for (const call of prisma.user.update.mock.calls) {
+        expect(call[0]!.data).not.toHaveProperty('locale')
+      }
     })
   })
 

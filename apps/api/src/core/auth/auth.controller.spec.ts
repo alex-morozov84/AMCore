@@ -87,6 +87,8 @@ describe('AuthController', () => {
     headers: { 'user-agent': 'test-agent' },
     ip: '127.0.0.1',
     cookies: {},
+    // Express negotiation helper used by negotiateLocale(); default: no match.
+    acceptsLanguages: jest.fn(() => false),
   } as unknown as Request
 
   const mockResponse = {
@@ -105,6 +107,7 @@ describe('AuthController', () => {
             login: jest.fn(),
             logout: jest.fn(),
             getUserById: jest.fn(),
+            updateProfile: jest.fn(),
             forgotPassword: jest.fn(),
             resetPassword: jest.fn(),
             verifyEmail: jest.fn(),
@@ -240,6 +243,7 @@ describe('AuthController', () => {
         headers: { 'user-agent': 'Mozilla/5.0' },
         ip: '192.168.1.1',
         cookies: {},
+        acceptsLanguages: jest.fn(() => false),
       } as unknown as Request
 
       authService.register.mockResolvedValue({
@@ -253,7 +257,29 @@ describe('AuthController', () => {
       expect(authService.register).toHaveBeenCalledWith(registerDto, {
         userAgent: 'Mozilla/5.0',
         ipAddress: '192.168.1.1',
+        acceptedLocale: undefined,
       })
+    })
+
+    it('passes the negotiated Accept-Language locale to the service', async () => {
+      const localedRequest = {
+        headers: { 'user-agent': 'test-agent', 'accept-language': 'en-US,en;q=0.9' },
+        ip: '127.0.0.1',
+        cookies: {},
+        acceptsLanguages: jest.fn(() => 'en'),
+      } as unknown as Request
+      authService.register.mockResolvedValue({
+        user: mockUserResponse,
+        accessToken: mockAccessToken,
+        refreshToken: mockRefreshToken,
+      })
+
+      await controller.register(registerDto, localedRequest, mockResponse)
+
+      expect(authService.register).toHaveBeenCalledWith(
+        registerDto,
+        expect.objectContaining({ acceptedLocale: 'en' })
+      )
     })
   })
 
@@ -411,6 +437,21 @@ describe('AuthController', () => {
       const result = await controller.me(mockPrincipal)
 
       expect(result).toEqual({ user: null })
+    })
+  })
+
+  describe('updateProfile', () => {
+    it('delegates to the service and returns the wrapped profile', async () => {
+      const updated: UserResponse = { ...mockUserResponse, name: 'Renamed', locale: 'en' }
+      authService.updateProfile.mockResolvedValue(updated)
+
+      const result = await controller.updateProfile(mockUser.id, { name: 'Renamed', locale: 'en' })
+
+      expect(authService.updateProfile).toHaveBeenCalledWith(mockUser.id, {
+        name: 'Renamed',
+        locale: 'en',
+      })
+      expect(result).toEqual({ user: updated })
     })
   })
 
