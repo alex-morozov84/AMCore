@@ -8,7 +8,11 @@
  * @see https://react.email/docs/guides/internationalization/react-intl
  */
 
-export type Locale = 'ru' | 'en'
+import type { SupportedLocale } from '@amcore/shared'
+
+// Email rendering reuses the single shared locale set so a new locale only has
+// to be added in `SUPPORTED_LOCALES` (plus its message block below).
+export type Locale = SupportedLocale
 
 export const emailMessages = {
   ru: {

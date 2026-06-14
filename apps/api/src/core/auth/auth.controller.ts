@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -43,10 +44,12 @@ import {
   ResendVerificationDto,
   ResetPasswordDto,
   StepUpDto,
+  UpdateProfileDto,
   VerifyEmailDto,
 } from './dto'
 import { SessionsListResponseDto } from './dto/sessions-list-response.dto'
 import { OriginCheckGuard, RefreshTokenGuard } from './guards'
+import { negotiateLocale } from './locale-negotiation'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 
@@ -119,6 +122,7 @@ export class AuthController {
     const result = await this.authService.register(dto, {
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
+      acceptedLocale: negotiateLocale(req),
     })
 
     res.cookie('refresh_token', result.refreshToken, this.cookieOptions)
@@ -224,6 +228,24 @@ export class AuthController {
   async me(@CurrentUser() user: RequestPrincipal): Promise<ProfileResponse> {
     const profile = await this.authService.getUserById(user.sub)
     return { user: profile }
+  }
+
+  /**
+   * Partial self-profile update. Bearer-only (unlike `GET /me`, which is also
+   * API-key readable): mutating a user's own name/locale/timezone is an
+   * interactive action, not something an integration credential should perform.
+   * Only the supplied fields change.
+   */
+  @Patch('me')
+  @Auth(AuthType.Bearer)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user profile' })
+  async updateProfile(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: UpdateProfileDto
+  ): Promise<ProfileResponse> {
+    const user = await this.authService.updateProfile(userId, dto)
+    return { user }
   }
 
   @Post('me/avatar')

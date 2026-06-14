@@ -191,6 +191,51 @@ describe('OAuth (e2e)', () => {
       expect(user!.accounts[0]!.providerAccountId).toBe('oauth-uid-123')
     })
 
+    // D2: a new OAuth user's locale is seeded from the Accept-Language sent at
+    // the authorize step, carried through the one-time state into account
+    // creation. Drives the real authorize → cookie → callback path.
+    it('seeds a new OAuth user locale from the authorize-time Accept-Language', async () => {
+      const authorizeRes = await request(app.getHttpServer())
+        .get('/auth/oauth/google')
+        .set('Accept-Language', 'en-US,en;q=0.9')
+        .expect(302)
+
+      const state = new URL(authorizeRes.headers.location!).searchParams.get('state')!
+      const setCookies = authorizeRes.headers['set-cookie'] as unknown as string[]
+      const bindingCookie = setCookies.find((c) => c.startsWith('oauth_state='))!.split(';')[0]!
+
+      await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', bindingCookie)
+        .expect(302)
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'oauth-user@example.com' },
+      })
+      expect(user?.locale).toBe('en')
+    })
+
+    it('falls back to the DB default locale when authorize has no usable Accept-Language', async () => {
+      const authorizeRes = await request(app.getHttpServer())
+        .get('/auth/oauth/google')
+        .set('Accept-Language', 'de-DE,de;q=0.9')
+        .expect(302)
+
+      const state = new URL(authorizeRes.headers.location!).searchParams.get('state')!
+      const setCookies = authorizeRes.headers['set-cookie'] as unknown as string[]
+      const bindingCookie = setCookies.find((c) => c.startsWith('oauth_state='))!.split(';')[0]!
+
+      await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', bindingCookie)
+        .expect(302)
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'oauth-user@example.com' },
+      })
+      expect(user?.locale).toBe('ru')
+    })
+
     it('should set refresh_token cookie on successful callback', async () => {
       const state = 'valid-state-cookie'
       await seedState(state, {

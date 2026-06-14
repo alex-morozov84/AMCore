@@ -22,6 +22,7 @@ import { Auth } from '../decorators/auth.decorator'
 import { CurrentUser } from '../decorators/current-user.decorator'
 import { OAuthExchangeDto } from '../dto'
 import { OriginCheckGuard } from '../guards'
+import { negotiateLocale } from '../locale-negotiation'
 import { SessionService } from '../session.service'
 import { TokenService } from '../token.service'
 
@@ -66,8 +67,17 @@ export class OAuthController {
   @Get(':provider')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Redirect to OAuth provider for login' })
-  async authorize(@Param('provider') provider: string, @Res() res: Response): Promise<void> {
-    const { url, browserNonce } = await this.oauthService.getAuthorizationURL(provider)
+  async authorize(
+    @Param('provider') provider: string,
+    @Req() req: Request,
+    @Res() res: Response
+  ): Promise<void> {
+    // Seed a new OAuth user's locale from the browser's Accept-Language (D2);
+    // carried in the one-time state and applied only on account creation.
+    const { url, browserNonce } = await this.oauthService.getAuthorizationURL(
+      provider,
+      negotiateLocale(req)
+    )
     setOAuthBindingCookie(res, provider, browserNonce, this.isProduction)
     res.redirect(url)
   }

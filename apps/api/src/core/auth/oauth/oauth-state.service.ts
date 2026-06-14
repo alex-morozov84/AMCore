@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 
+import type { SupportedLocale } from '@amcore/shared'
+
 import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis'
 
 const STATE_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -9,6 +11,12 @@ export interface OAuthStateData {
   codeVerifier: string
   mode: 'login' | 'link'
   userId?: string
+  /**
+   * Locale negotiated from `Accept-Language` when the login flow started (D2).
+   * Seeds a newly created OAuth user's locale; never overwrites an existing
+   * user. Absent for link flows (the user already exists).
+   */
+  locale?: SupportedLocale
   /**
    * SHA-256 of the browser-binding nonce (set as a `SameSite=Lax` cookie on the
    * initiating browser). Required so the callback can prove it runs in the same

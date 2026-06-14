@@ -5,8 +5,15 @@ import * as argon2 from 'argon2'
 import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { LoginInput, RegisterInput, RequestPrincipal, UserResponse } from '@amcore/shared'
-import { AuthErrorCode } from '@amcore/shared'
+import type {
+  LoginInput,
+  RegisterInput,
+  RequestPrincipal,
+  SupportedLocale,
+  UpdateProfileInput,
+  UserResponse,
+} from '@amcore/shared'
+import { AuthErrorCode, parseSupportedLocale } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
 import { EnvService } from '../../env/env.service'
@@ -30,6 +37,12 @@ interface AuthResult {
 interface RequestInfo {
   userAgent?: string
   ipAddress?: string
+  /**
+   * Locale negotiated from the request `Accept-Language` header (controller
+   * resolves it via `req.acceptsLanguages`). Used at registration only as a
+   * fallback when the body carries no explicit `locale`.
+   */
+  acceptedLocale?: SupportedLocale
 }
 
 @Injectable()
@@ -72,6 +85,11 @@ export class AuthService {
     // Hash password
     const passwordHash = await argon2.hash(input.password)
 
+    // Locale precedence: explicit body choice → negotiated `Accept-Language` →
+    // omit so the Prisma `User.locale` default applies. An explicit user choice
+    // must never be overridden by the header (MDN Accept-Language guidance).
+    const locale = input.locale ?? requestInfo.acceptedLocale
+
     // Create user
     const user = await this.prisma.user.create({
       data: {
@@ -79,6 +97,7 @@ export class AuthService {
         emailCanonical,
         passwordHash,
         name: input.name,
+        ...(locale ? { locale } : {}),
         lastLoginAt: new Date(),
       },
     })
@@ -346,6 +365,26 @@ export class AuthService {
     return user ? this.mapUserToResponse(user) : null
   }
 
+  /**
+   * Partial profile update (`PATCH /auth/me`). Only the supplied fields are
+   * written; an absent field is left untouched. Invalidates the user cache so a
+   * subsequent authenticated request observes the change, then returns the
+   * canonical profile response.
+   */
+  async updateProfile(userId: string, input: UpdateProfileInput): Promise<UserResponse> {
+    const data: { name?: string; locale?: SupportedLocale; timezone?: string } = {}
+    if (input.name !== undefined) data.name = input.name
+    if (input.locale !== undefined) data.locale = input.locale
+    if (input.timezone !== undefined) data.timezone = input.timezone
+
+    const user = await this.prisma.user.update({ where: { id: userId }, data })
+    await this.userCacheService.invalidateUser(userId)
+
+    this.logger.info({ userId, fields: Object.keys(data) }, 'User profile updated')
+
+    return this.mapUserToResponse(user)
+  }
+
   /** Send password reset email (silent fail for unknown emails) */
   async forgotPassword(email: string): Promise<void> {
     const emailCanonical = this.emailIdentity.canonicalize(email)
@@ -515,7 +554,7 @@ export class AuthService {
       name: user.name,
       avatarUrl: user.avatarUrl,
       phone: user.phone,
-      locale: user.locale,
+      locale: parseSupportedLocale(user.locale),
       timezone: user.timezone,
       createdAt: user.createdAt.toISOString(),
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,

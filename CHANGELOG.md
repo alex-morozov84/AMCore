@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- User locale is now resolved at registration and editable afterwards. `POST
+/auth/register` accepts an optional `locale` (`ru`/`en`) and, when it is
+  omitted, negotiates the best supported language from the `Accept-Language`
+  header before falling back to the default. New OAuth users are seeded the same
+  way from the language negotiated when the login flow started (an existing
+  user's stored preference is never overwritten).
+- `PATCH /auth/me` (Bearer only) to update the current user's `name`, `locale`,
+  and `timezone`. Only supplied fields change; `timezone` is validated as an IANA
+  zone and an explicit stored `locale` always wins over `Accept-Language`
+  thereafter.
+
 ### Fixed
 
 - Concurrent avatar uploads/deletes for the same user no longer corrupt storage.

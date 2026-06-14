@@ -87,3 +87,14 @@ export const AUTH = {
   REFRESH_TOKEN_EXPIRES: '7d',
   COOKIE_NAME: 'refresh_token',
 } as const
+
+// Supported UI/email locales — single source of truth for every locale contract
+// (registration input, profile update, user response, email rendering). Adding a
+// locale here is the only place to extend the set; downstream Zod schemas and the
+// email `Locale` type derive from it. `DEFAULT_LOCALE` mirrors the Prisma
+// `User.locale` column default.
+export const SUPPORTED_LOCALES = ['ru', 'en'] as const
+
+export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
+
+export const DEFAULT_LOCALE: SupportedLocale = 'ru'

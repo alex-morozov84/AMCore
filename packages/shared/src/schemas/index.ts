@@ -2,6 +2,10 @@
 
 // Auth schemas
 export {
+  // Locale contract
+  supportedLocaleSchema,
+  timezoneSchema,
+  parseSupportedLocale,
   // Request schemas
   registerSchema,
   loginSchema,
