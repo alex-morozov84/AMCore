@@ -31,6 +31,7 @@ export const accountProfileUpdatedDefinition: NotificationDefinition<Payload> = 
   category: NotificationCategory.ACCOUNT,
   schemaVersion: 1,
   contentClass: NotificationContentClass.PUBLIC,
+  supportedChannels: [NotificationChannel.IN_APP],
   defaultChannels: [NotificationChannel.IN_APP],
   mandatoryChannels: [],
   externalModeByChannel: {},

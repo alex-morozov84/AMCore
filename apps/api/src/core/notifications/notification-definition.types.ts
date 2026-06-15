@@ -26,6 +26,13 @@ export interface NotificationDefinition<TPayload = unknown> {
   readonly schemaVersion: number
   readonly contentClass: NotificationContentClass
 
+  /**
+   * The full set of channels this definition may EVER be delivered on. Preference
+   * resolution can only enable a channel listed here — a user opt-in cannot select
+   * an unsupported channel the definition can neither render nor safely expose.
+   * Invariant: `mandatoryChannels ⊆ defaultChannels ⊆ supportedChannels`.
+   */
+  readonly supportedChannels: readonly NotificationChannel[]
   /** Channels selected when the user has no explicit preference. */
   readonly defaultChannels: readonly NotificationChannel[]
   /** Channels the user cannot disable. Must be a subset of `defaultChannels`. */
@@ -46,11 +53,11 @@ export interface NotificationDefinition<TPayload = unknown> {
   /**
    * Per-channel allowlisted projection for an external channel resolved to
    * `detailed` (ADR-052: PERSONAL details only via an explicit field-and-channel
-   * allowlist). REQUIRED — validated at registration — for any external channel in
-   * `defaultChannels`/`mandatoryChannels` whose resolved mode is `detailed`. A
-   * `generic` channel never calls this and receives no raw payload. Returning the
-   * fields for that specific channel makes the allowlist provable, instead of one
-   * global projection leaking to every detailed channel.
+   * allowlist). REQUIRED — validated at registration — for any **supported** external
+   * channel whose resolved mode is `detailed` (supported, not just default, because a
+   * user opt-in can enable any supported channel). A `generic` channel never calls
+   * this and receives no raw payload. Returning the fields for that specific channel
+   * makes the allowlist provable, instead of one global projection leaking everywhere.
    */
   projectExternal?(channel: NotificationChannel, payload: TPayload): Record<string, unknown>
 }

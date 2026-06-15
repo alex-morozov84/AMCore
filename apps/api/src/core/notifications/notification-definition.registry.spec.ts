@@ -17,17 +17,21 @@ import type { NotificationDefinition } from './notification-definition.types'
 function makeDefinition(
   overrides: Partial<NotificationDefinition> & { type: string }
 ): NotificationDefinition {
+  const defaultChannels = overrides.defaultChannels ?? [NotificationChannel.IN_APP]
   return {
     category: NotificationCategory.ACCOUNT,
     schemaVersion: 1,
     contentClass: NotificationContentClass.PUBLIC,
-    defaultChannels: [NotificationChannel.IN_APP],
     mandatoryChannels: [],
     externalModeByChannel: {},
     payloadSchema: z.object({}),
     safePayload: () => ({}),
     renderInApp: () => ({ title: 't', body: 'b' }),
     ...overrides,
+    // Default supportedChannels to the (possibly overridden) defaults unless a test
+    // sets them explicitly — keeps the mandatory ⊆ default ⊆ supported invariant valid.
+    defaultChannels,
+    supportedChannels: overrides.supportedChannels ?? defaultChannels,
   }
 }
 
@@ -196,6 +200,25 @@ describe('NotificationDefinitionRegistry', () => {
       })
 
       expect(() => new NotificationDefinitionRegistry([def])).not.toThrow()
+    })
+
+    it('rejects a default channel not in supportedChannels', () => {
+      expectInvalid({
+        type: 'a.unsupported_default',
+        supportedChannels: [NotificationChannel.IN_APP],
+        defaultChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
+      })
+    })
+
+    it('requires projectExternal for a supported detailed channel even when not a default', () => {
+      // The core of the supported-channel invariant: a user opt-in can enable a
+      // SUPPORTED channel that is not a default, so it still needs a projection.
+      expectInvalid({
+        type: 'a.supported_optin',
+        contentClass: NotificationContentClass.PUBLIC,
+        supportedChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
+        defaultChannels: [NotificationChannel.IN_APP],
+      })
     })
   })
 })

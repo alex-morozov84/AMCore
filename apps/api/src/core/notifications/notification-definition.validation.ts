@@ -33,18 +33,23 @@ export function validateDefinition(definition: NotificationDefinition): void {
     fail('SECRET content is forbidden in the notifications subsystem')
   }
 
+  assertChannelSet(definition.supportedChannels, 'supportedChannels', fail)
   assertChannelSet(definition.defaultChannels, 'defaultChannels', fail)
   assertChannelSet(definition.mandatoryChannels, 'mandatoryChannels', fail)
 
+  // mandatory ⊆ default ⊆ supported.
+  const supported = new Set<string>(definition.supportedChannels)
+  for (const channel of definition.defaultChannels) {
+    if (!supported.has(channel)) fail(`default channel "${channel}" is not in supportedChannels`)
+  }
   const defaults = new Set<string>(definition.defaultChannels)
   for (const channel of definition.mandatoryChannels) {
     if (!defaults.has(channel)) fail(`mandatory channel "${channel}" is not in defaultChannels`)
   }
 
-  for (const channel of new Set<string>([
-    ...definition.defaultChannels,
-    ...definition.mandatoryChannels,
-  ])) {
+  // Every supported external channel that resolves to detailed must have a
+  // projection — a user opt-in can enable any supported channel, not only defaults.
+  for (const channel of supported) {
     if (channel === NotificationChannel.IN_APP) continue
     if (resolveExternalMode(definition, channel) === 'detailed' && !definition.projectExternal) {
       fail(
