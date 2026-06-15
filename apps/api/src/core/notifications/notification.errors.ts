@@ -18,3 +18,14 @@ export class DuplicateNotificationDefinitionError extends Error {
     this.name = 'DuplicateNotificationDefinitionError'
   }
 }
+
+/** Thrown at bootstrap when a definition violates a structural invariant. */
+export class InvalidNotificationDefinitionError extends Error {
+  constructor(
+    readonly type: string,
+    readonly reason: string
+  ) {
+    super(`Invalid notification definition "${type}": ${reason}`)
+    this.name = 'InvalidNotificationDefinitionError'
+  }
+}

@@ -13,8 +13,15 @@ import type { NotificationDefinition } from '../notification-definition.types'
  * localized render) without an external channel — external adapters arrive in Arc B+.
  */
 
+/**
+ * Allowlisted, bounded payload: even a trusted internal producer must keep the
+ * durable payload small and predictable (row/queue/log/render cost). `updatedFields`
+ * is an enum of known profile fields, not free-form strings.
+ */
+const PROFILE_FIELDS = ['name', 'email', 'locale', 'timezone', 'avatar', 'phone'] as const
+
 const payloadSchema = z.object({
-  updatedFields: z.array(z.string().min(1)).min(1),
+  updatedFields: z.array(z.enum(PROFILE_FIELDS)).min(1).max(PROFILE_FIELDS.length),
 })
 
 type Payload = z.infer<typeof payloadSchema>

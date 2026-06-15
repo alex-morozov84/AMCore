@@ -7,8 +7,10 @@ import {
 } from './notification.constants'
 import {
   DuplicateNotificationDefinitionError,
+  InvalidNotificationDefinitionError,
   UnknownNotificationTypeError,
 } from './notification.errors'
+import { resolveExternalMode } from './notification-content-policy'
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
 import type { NotificationDefinition } from './notification-definition.types'
 
@@ -114,14 +116,21 @@ describe('NotificationDefinitionRegistry', () => {
       expect(registry.externalMode('p.public', 'email')).toBe('detailed')
     })
 
-    it('defaults SENSITIVE to generic and SECRET to forbidden', () => {
+    it('defaults SENSITIVE to generic external exposure', () => {
       const registry = new NotificationDefinitionRegistry([
         makeDefinition({ type: 'p.sensitive', contentClass: NotificationContentClass.SENSITIVE }),
-        makeDefinition({ type: 'p.secret', contentClass: NotificationContentClass.SECRET }),
       ])
 
       expect(registry.externalMode('p.sensitive', 'email')).toBe('generic')
-      expect(registry.externalMode('p.secret', 'email')).toBe('forbidden')
+    })
+
+    it('resolves SECRET to forbidden (defensive — registration rejects SECRET)', () => {
+      const secret = makeDefinition({
+        type: 'p.secret',
+        contentClass: NotificationContentClass.SECRET,
+      })
+
+      expect(resolveExternalMode(secret, 'email')).toBe('forbidden')
     })
 
     it('honors an explicit per-channel override', () => {
@@ -134,6 +143,59 @@ describe('NotificationDefinitionRegistry', () => {
       ])
 
       expect(registry.externalMode('p.override', NotificationChannel.EMAIL)).toBe('detailed')
+    })
+  })
+
+  describe('definition invariants (registration)', () => {
+    const expectInvalid = (overrides: Partial<NotificationDefinition> & { type: string }): void => {
+      expect(() => new NotificationDefinitionRegistry([makeDefinition(overrides)])).toThrow(
+        InvalidNotificationDefinitionError
+      )
+    }
+
+    it('rejects a malformed type identifier', () => {
+      expectInvalid({ type: 'Bad Type' })
+      expectInvalid({ type: 'a..b' })
+    })
+
+    it('rejects schemaVersion < 1 or non-integer', () => {
+      expectInvalid({ type: 'a.b', schemaVersion: 0 })
+      expectInvalid({ type: 'a.b', schemaVersion: 1.5 })
+    })
+
+    it('rejects a SECRET definition entirely', () => {
+      expectInvalid({ type: 'a.secret', contentClass: NotificationContentClass.SECRET })
+    })
+
+    it('rejects duplicate channels and mandatory outside defaults', () => {
+      expectInvalid({
+        type: 'a.dup',
+        defaultChannels: [NotificationChannel.IN_APP, NotificationChannel.IN_APP],
+      })
+      expectInvalid({
+        type: 'a.mand',
+        defaultChannels: [NotificationChannel.IN_APP],
+        mandatoryChannels: [NotificationChannel.EMAIL],
+      })
+    })
+
+    it('rejects a detailed external channel with no projectExternal', () => {
+      expectInvalid({
+        type: 'a.detailed',
+        contentClass: NotificationContentClass.PUBLIC,
+        defaultChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
+      })
+    })
+
+    it('accepts a detailed external channel when projectExternal is provided', () => {
+      const def = makeDefinition({
+        type: 'a.detailed_ok',
+        contentClass: NotificationContentClass.PUBLIC,
+        defaultChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
+        projectExternal: () => ({}),
+      })
+
+      expect(() => new NotificationDefinitionRegistry([def])).not.toThrow()
     })
   })
 })

@@ -8,6 +8,7 @@ import {
 } from './notification.errors'
 import { resolveExternalMode } from './notification-content-policy'
 import type { NotificationDefinition } from './notification-definition.types'
+import { validateDefinition } from './notification-definition.validation'
 
 /**
  * Registry of code-owned notification definitions (ADR-052). The single lookup
@@ -26,6 +27,7 @@ export class NotificationDefinitionRegistry {
   }
 
   private register(definition: NotificationDefinition): void {
+    validateDefinition(definition)
     if (this.byType.has(definition.type)) {
       throw new DuplicateNotificationDefinitionError(definition.type)
     }
