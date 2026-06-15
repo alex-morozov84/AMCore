@@ -20,6 +20,7 @@ import { anonymizeIp, getClientIp } from './common/utils'
 import { AdminModule } from './core/admin/admin.module'
 import { AuthModule } from './core/auth/auth.module'
 import { NotificationsCoreModule } from './core/notifications/notifications-core.module'
+import { NotificationsWebModule } from './core/notifications/notifications-web.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
 import { validate } from './env'
 import { EnvModule } from './env/env.module'
@@ -182,6 +183,8 @@ export const webImports: Imports = [
   OrganizationsModule,
   // Core: Admin (SUPER_ADMIN only)
   AdminModule,
+  // Notifications HTTP feed (producer/registry come from NotificationsCoreModule).
+  NotificationsWebModule,
 ]
 
 /**
