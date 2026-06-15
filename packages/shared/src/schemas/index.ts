@@ -123,6 +123,8 @@ export {
   notificationCategorySchema,
   notificationTypeSchema,
   notificationActionSchema,
+  notificationActionRouteSchema,
+  NOTIFICATION_ACTION_MAX_PARAMS,
   NOTIFICATION_IDENTIFIER_MAX_LENGTH,
   // Feed (cursor)
   notificationFeedQuerySchema,
@@ -135,6 +137,7 @@ export {
   notificationPreferenceItemSchema,
   notificationPreferencesResponseSchema,
   updateNotificationPreferenceSchema,
+  updateNotificationSettingsSchema,
   notificationCategoryCapabilitySchema,
   notificationCapabilitiesResponseSchema,
   // Realtime (SSE)
@@ -151,6 +154,7 @@ export {
   type NotificationPreferenceItem,
   type NotificationPreferencesResponse,
   type UpdateNotificationPreferenceInput,
+  type UpdateNotificationSettingsInput,
   type NotificationCapabilitiesResponse,
   type NotificationSseReason,
   type NotificationSseEvent,

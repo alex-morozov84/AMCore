@@ -41,12 +41,33 @@ export const notificationTypeSchema = z
   .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/)
 
 /**
- * Safe first-party action descriptor — a route key + bounded string params, never
- * an arbitrary URL. The client resolves `route` to an in-app destination.
+ * Safe first-party action descriptor. `route` is a dotted route KEY the client
+ * maps to an in-app destination — the grammar (no `:`/`/`) makes an arbitrary URL
+ * like `https://evil.example` unrepresentable. Params are bounded in key grammar,
+ * value length, and entry count so the durable/wire payload stays small. This is a
+ * real control, not a prose assertion.
  */
+export const NOTIFICATION_ACTION_MAX_PARAMS = 10
+
+export const notificationActionRouteSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/)
+
 export const notificationActionSchema = z.object({
-  route: z.string().min(1).max(128),
-  params: z.record(z.string(), z.string()).optional(),
+  route: notificationActionRouteSchema,
+  params: z
+    .record(
+      z
+        .string()
+        .min(1)
+        .max(32)
+        .regex(/^[a-z][a-z0-9_]*$/),
+      z.string().max(256)
+    )
+    .refine((value) => Object.keys(value).length <= NOTIFICATION_ACTION_MAX_PARAMS)
+    .optional(),
 })
 
 export type NotificationAction = z.infer<typeof notificationActionSchema>
@@ -154,6 +175,17 @@ export const updateNotificationPreferenceSchema = z.object({
 })
 
 export type UpdateNotificationPreferenceInput = z.infer<typeof updateNotificationPreferenceSchema>
+
+/**
+ * Update the master optional toggle (`UserSettings.notificationsEnabled`), the
+ * top of the resolution order. Distinct from the per-(category, channel) update so
+ * the field exposed in the preferences response is also writable.
+ */
+export const updateNotificationSettingsSchema = z.object({
+  notificationsEnabled: z.boolean(),
+})
+
+export type UpdateNotificationSettingsInput = z.infer<typeof updateNotificationSettingsSchema>
 
 /**
  * Capabilities — the active channels and, per category, its channels and which are
