@@ -18,11 +18,35 @@ function canonicalize(value: unknown): unknown {
   return value
 }
 
-export function notificationFingerprint(
-  type: string,
-  schemaVersion: number,
+export interface NotificationFingerprintInput {
+  type: string
+  category: string
+  schemaVersion: number
   payload: unknown
-): string {
-  const canonical = JSON.stringify({ type, schemaVersion, payload: canonicalize(payload) })
+  /** Validated action descriptor (or null) — an immutable field of the canonical row. */
+  action: unknown
+  /** Immutable canonical context written to the row; part of the dedupe identity. */
+  organizationId: string | null
+  /** Explicit caller event time as ISO, or null — never a generated default, so a
+   *  retry that omits occurredAt still matches a prior one. */
+  occurredAt: string | null
+}
+
+/**
+ * Covers every immutable field persisted on the canonical row (type, category,
+ * version, payload, action, org, explicit event time). Preference-resolved channels
+ * and locale are deliberately excluded — they are snapshot outcomes, not caller
+ * idempotency intent.
+ */
+export function notificationFingerprint(input: NotificationFingerprintInput): string {
+  const canonical = JSON.stringify({
+    type: input.type,
+    category: input.category,
+    schemaVersion: input.schemaVersion,
+    organizationId: input.organizationId,
+    occurredAt: input.occurredAt,
+    action: canonicalize(input.action),
+    payload: canonicalize(input.payload),
+  })
   return createHash('sha256').update(canonical).digest('hex')
 }

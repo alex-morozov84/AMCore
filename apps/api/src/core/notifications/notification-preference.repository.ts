@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common'
-import type { NotificationPreference } from '@prisma/client'
+import type { NotificationPreference, Prisma } from '@prisma/client'
 
 import { PrismaService } from '../../prisma'
+
+/** A Prisma client or an active transaction client. */
+type DbClient = PrismaService | Prisma.TransactionClient
 
 /**
  * Persistence for user notification preferences (a `notifications`-schema table)
@@ -16,12 +19,14 @@ import { PrismaService } from '../../prisma'
 export class NotificationPreferenceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findByUser(userId: string): Promise<NotificationPreference[]> {
-    return this.prisma.notificationPreference.findMany({ where: { userId } })
+  // Reads accept an optional client so a producer can run them inside the caller's
+  // transaction (notifyTx), keeping resolution consistent with that transaction.
+  findByUser(userId: string, client: DbClient = this.prisma): Promise<NotificationPreference[]> {
+    return client.notificationPreference.findMany({ where: { userId } })
   }
 
-  async getMasterToggle(userId: string): Promise<boolean> {
-    const settings = await this.prisma.userSettings.findUnique({
+  async getMasterToggle(userId: string, client: DbClient = this.prisma): Promise<boolean> {
+    const settings = await client.userSettings.findUnique({
       where: { userId },
       select: { notificationsEnabled: true },
     })

@@ -83,12 +83,22 @@ describe('NotificationsService', () => {
   })
 
   it('returns the existing row on an idempotent replay (matching fingerprint)', async () => {
-    const fingerprint = notificationFingerprint('account.test', 1, { value: 'hello' })
+    const fingerprint = notificationFingerprint({
+      type: 'account.test',
+      category: NotificationCategory.ACCOUNT,
+      schemaVersion: 1,
+      payload: { value: 'hello' },
+      action: null,
+      organizationId: null,
+      occurredAt: null,
+    })
     prisma.notification.createManyAndReturn.mockResolvedValue([] as never)
     prisma.notification.findUniqueOrThrow.mockResolvedValue({
       id: 'existing',
       idempotencyFingerprint: fingerprint,
     } as never)
+    // Replay reports the channels actually persisted, queried from the deliveries.
+    prisma.notificationDelivery.findMany.mockResolvedValue([{ channel: 'in_app' }] as never)
 
     const result = await service.notify(VALID_INPUT)
 
@@ -116,15 +126,47 @@ describe('NotificationsService', () => {
     expect(prisma.notification.createManyAndReturn).not.toHaveBeenCalled()
   })
 
-  it('notifyTx writes on the caller transaction without opening its own', async () => {
+  it('rejects an idempotency key that is empty, oversized, or not namespaced', async () => {
+    for (const idempotencyKey of ['', 'x'.repeat(256), 'unnamespaced', 'a b:c', 'ns:bad\u0001']) {
+      await expect(service.notify({ ...VALID_INPUT, idempotencyKey })).rejects.toThrow()
+    }
+    expect(prisma.notification.createManyAndReturn).not.toHaveBeenCalled()
+  })
+
+  it('rejects a definition action that violates the shared action schema', async () => {
+    const badActionDef: NotificationDefinition = {
+      ...testDefinition,
+      type: 'account.bad_action',
+      action: () => ({ route: 'https://evil.example' }),
+    }
+    const localService = new NotificationsService(
+      prisma,
+      new NotificationDefinitionRegistry([badActionDef]),
+      new NotificationPreferenceResolver(),
+      preferences
+    )
+
+    await expect(
+      localService.notify({ ...VALID_INPUT, type: 'account.bad_action' })
+    ).rejects.toThrow()
+    expect(prisma.notification.createManyAndReturn).not.toHaveBeenCalled()
+  })
+
+  it('notifyTx reads and writes on the caller transaction, not the global client', async () => {
     const tx = mockDeep<PrismaService>()
     tx.notification.createManyAndReturn.mockResolvedValue([{ id: 'n2' }] as never)
     tx.notificationDelivery.create.mockResolvedValue({} as never)
+    tx.user.findUnique.mockResolvedValue({ locale: 'ru' } as never)
 
     const result = await service.notifyTx(tx, VALID_INPUT)
 
     expect(result.notificationId).toBe('n2')
     expect(prisma.$transaction).not.toHaveBeenCalled()
     expect(tx.notification.createManyAndReturn).toHaveBeenCalled()
+    // Resolution reads must use the caller transaction's snapshot, not the base client.
+    expect(preferences.getMasterToggle).toHaveBeenCalledWith('user-1', tx)
+    expect(preferences.findByUser).toHaveBeenCalledWith('user-1', tx)
+    expect(tx.user.findUnique).toHaveBeenCalled()
+    expect(prisma.user.findUnique).not.toHaveBeenCalled()
   })
 })

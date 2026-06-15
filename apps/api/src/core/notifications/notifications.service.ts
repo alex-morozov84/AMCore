@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { NotificationDeliveryStatus, type Prisma } from '@prisma/client'
+import { z } from 'zod'
 
-import type { NotificationAction } from '@amcore/shared'
+import { type NotificationAction, notificationActionSchema } from '@amcore/shared'
 
 import { PrismaService } from '../../prisma'
 
@@ -29,6 +30,7 @@ export interface NotifyResult {
   notificationId: string
   /** false on an idempotent replay (same key + fingerprint). */
   created: boolean
+  /** Channels actually persisted as deliveries (not a fresh resolution). */
   channels: NotificationChannel[]
 }
 
@@ -42,6 +44,29 @@ interface NotifyPlan {
 }
 
 const DEFAULT_LOCALE = 'ru'
+
+const NOTIFICATION_IDEMPOTENCY_KEY_MAX = 255
+
+/**
+ * A namespaced occurrence key (ADR-052): a dotted lowercase namespace, a `:`
+ * separator, then a bounded occurrence id with no whitespace/control characters —
+ * e.g. `account.profile_updated:<occurrence-id>`. An unnamespaced bare key is rejected.
+ */
+const NOTIFICATION_IDEMPOTENCY_KEY_GRAMMAR =
+  /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*:[A-Za-z0-9._:-]+$/
+
+/**
+ * Internal contract for producer input not covered by the per-type payload schema:
+ * a non-empty recipient and a bounded, namespaced idempotency key — both reach an
+ * indexed column, so guard them before hashing/writing (cold-review finding 5).
+ */
+const notifyContractSchema = z.object({
+  recipientUserId: z.string().min(1),
+  idempotencyKey: z
+    .string()
+    .max(NOTIFICATION_IDEMPOTENCY_KEY_MAX)
+    .regex(NOTIFICATION_IDEMPOTENCY_KEY_GRAMMAR),
+})
 
 /**
  * Producer for notifications (ADR-052). `notify` owns its transaction; `notifyTx`
@@ -64,25 +89,51 @@ export class NotificationsService {
   ) {}
 
   async notify(input: NotifyInput): Promise<NotifyResult> {
-    const plan = await this.buildPlan(input)
-    return this.prisma.$transaction((tx) => this.write(tx, input, plan))
+    return this.prisma.$transaction((tx) => this.run(tx, input))
   }
 
   async notifyTx(tx: Prisma.TransactionClient, input: NotifyInput): Promise<NotifyResult> {
-    const plan = await this.buildPlan(input)
-    return this.write(tx, input, plan)
+    return this.run(tx, input)
   }
 
-  private async buildPlan(input: NotifyInput): Promise<NotifyPlan> {
+  // Build + write on the SAME client so resolution reads and the inserts share one
+  // transactional snapshot (critical for notifyTx — the caller's transaction).
+  private async run(client: Prisma.TransactionClient, input: NotifyInput): Promise<NotifyResult> {
+    const plan = await this.buildPlan(client, input)
+    return this.write(client, input, plan)
+  }
+
+  private async buildPlan(
+    client: Prisma.TransactionClient,
+    input: NotifyInput
+  ): Promise<NotifyPlan> {
+    notifyContractSchema.parse({
+      recipientUserId: input.recipientUserId,
+      idempotencyKey: input.idempotencyKey,
+    })
+
     const definition = this.registry.get(input.type)
     const payload = definition.payloadSchema.parse(input.payload)
-    const action = definition.action?.(payload) ?? null
-    const fingerprint = notificationFingerprint(input.type, definition.schemaVersion, payload)
+    // Enforce the action contract on the durable boundary, not just by convention.
+    const rawAction = definition.action?.(payload) ?? null
+    const action = rawAction ? notificationActionSchema.parse(rawAction) : null
+    // Fingerprint the immutable dedupe intent: type/version/payload plus org + the
+    // EXPLICIT occurredAt (never the generated default — a retry that omits it must
+    // still match). Reusing a key with a different org/payload/event time is a conflict.
+    const fingerprint = notificationFingerprint({
+      type: input.type,
+      category: definition.category,
+      schemaVersion: definition.schemaVersion,
+      payload,
+      action,
+      organizationId: input.organizationId ?? null,
+      occurredAt: input.occurredAt?.toISOString() ?? null,
+    })
 
     const [masterEnabled, userPreferences, user] = await Promise.all([
-      this.preferences.getMasterToggle(input.recipientUserId),
-      this.preferences.findByUser(input.recipientUserId),
-      this.prisma.user.findUnique({
+      this.preferences.getMasterToggle(input.recipientUserId, client),
+      this.preferences.findByUser(input.recipientUserId, client),
+      client.user.findUnique({
         where: { id: input.recipientUserId },
         select: { locale: true },
       }),
@@ -138,9 +189,16 @@ export class NotificationsService {
       if (existing.idempotencyFingerprint !== plan.fingerprint) {
         throw new NotificationIdempotencyConflictError(input.idempotencyKey)
       }
-      return { notificationId: existing.id, created: false, channels: plan.channels }
+      // Replay: report the channels actually persisted then, not a fresh resolution.
+      return {
+        notificationId: existing.id,
+        created: false,
+        channels: await this.deliveredChannels(client, existing.id),
+      }
     }
 
+    // Arc A materializes only the in-app channel; report what was actually persisted.
+    const channels: NotificationChannel[] = []
     if (plan.channels.includes(NotificationChannel.IN_APP)) {
       await client.notificationDelivery.create({
         data: {
@@ -153,8 +211,20 @@ export class NotificationsService {
           deliveredAt: new Date(),
         },
       })
+      channels.push(NotificationChannel.IN_APP)
     }
 
-    return { notificationId: created.id, created: true, channels: plan.channels }
+    return { notificationId: created.id, created: true, channels }
+  }
+
+  private async deliveredChannels(
+    client: Prisma.TransactionClient,
+    notificationId: string
+  ): Promise<NotificationChannel[]> {
+    const rows = await client.notificationDelivery.findMany({
+      where: { notificationId },
+      select: { channel: true },
+    })
+    return rows.map((row) => row.channel as NotificationChannel)
   }
 }
