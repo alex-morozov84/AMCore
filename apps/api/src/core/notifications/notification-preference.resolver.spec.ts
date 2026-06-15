@@ -24,6 +24,9 @@ function makeDef(overrides: Partial<NotificationDefinition>): NotificationDefini
     payloadSchema: z.object({}),
     safePayload: () => ({}),
     renderInApp: () => ({ title: 't', body: 'b' }),
+    // PUBLIC + supported EMAIL resolves to detailed, so a registration-valid fixture
+    // must provide a projection (the resolver itself ignores it).
+    projectExternal: () => ({}),
     ...overrides,
   }
 }
