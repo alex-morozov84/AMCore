@@ -7,7 +7,11 @@ import {
   UnknownNotificationTypeError,
 } from './notification.errors'
 import { resolveExternalMode } from './notification-content-policy'
-import type { NotificationDefinition } from './notification-definition.types'
+import type {
+  CategoryCapability,
+  NotificationCapabilities,
+  NotificationDefinition,
+} from './notification-definition.types'
 import { validateDefinition } from './notification-definition.validation'
 
 /**
@@ -61,5 +65,45 @@ export class NotificationDefinitionRegistry {
   /** External exposure mode for a definition on a given channel (content policy). */
   externalMode(type: string, channel: string): NotificationExternalMode {
     return resolveExternalMode(this.get(type), channel)
+  }
+
+  /**
+   * Aggregate the active channels and per-category channel sets across all
+   * definitions — the single source for the capabilities and preferences surfaces.
+   * Channel lists are sorted for a deterministic response.
+   */
+  capabilities(): NotificationCapabilities {
+    const all = new Set<string>()
+    const byCategory = new Map<
+      string,
+      { supported: Set<string>; default: Set<string>; mandatory: Set<string> }
+    >()
+
+    for (const definition of this.byType.values()) {
+      const sets = byCategory.get(definition.category) ?? {
+        supported: new Set<string>(),
+        default: new Set<string>(),
+        mandatory: new Set<string>(),
+      }
+      for (const channel of definition.supportedChannels) {
+        sets.supported.add(channel)
+        all.add(channel)
+      }
+      for (const channel of definition.defaultChannels) sets.default.add(channel)
+      for (const channel of definition.mandatoryChannels) sets.mandatory.add(channel)
+      byCategory.set(definition.category, sets)
+    }
+
+    const sorted = (set: Set<string>): string[] => [...set].sort()
+    const categories: CategoryCapability[] = [...byCategory.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([category, sets]) => ({
+        category,
+        supportedChannels: sorted(sets.supported),
+        defaultChannels: sorted(sets.default),
+        mandatoryChannels: sorted(sets.mandatory),
+      }))
+
+    return { channels: sorted(all), categories }
   }
 }

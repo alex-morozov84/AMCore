@@ -54,4 +54,18 @@ describe('NotificationPreferenceRepository', () => {
       })
     })
   })
+
+  describe('setMasterToggle', () => {
+    it('upserts UserSettings.notificationsEnabled', async () => {
+      prisma.userSettings.upsert.mockResolvedValue({} as never)
+
+      await repository.setMasterToggle('user-1', false)
+
+      expect(prisma.userSettings.upsert).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        create: { userId: 'user-1', notificationsEnabled: false },
+        update: { notificationsEnabled: false },
+      })
+    })
+  })
 })

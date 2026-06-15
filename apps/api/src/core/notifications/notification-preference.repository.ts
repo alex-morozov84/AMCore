@@ -45,4 +45,16 @@ export class NotificationPreferenceRepository {
       update: { enabled },
     })
   }
+
+  /**
+   * Write the master toggle. The `UserSettings` row may not exist yet (the table is
+   * otherwise unused), so upsert it; non-notification columns keep their defaults.
+   */
+  async setMasterToggle(userId: string, enabled: boolean): Promise<void> {
+    await this.prisma.userSettings.upsert({
+      where: { userId },
+      create: { userId, notificationsEnabled: enabled },
+      update: { notificationsEnabled: enabled },
+    })
+  }
 }

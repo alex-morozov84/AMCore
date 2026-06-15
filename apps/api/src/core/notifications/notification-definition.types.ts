@@ -14,6 +14,20 @@ export interface RenderedNotificationContent {
   body: string
 }
 
+/** Aggregated, channel-set view of one category across its definitions. */
+export interface CategoryCapability {
+  category: string
+  supportedChannels: string[]
+  defaultChannels: string[]
+  mandatoryChannels: string[]
+}
+
+/** What channels/categories the subsystem currently supports (capabilities surface). */
+export interface NotificationCapabilities {
+  channels: string[]
+  categories: CategoryCapability[]
+}
+
 /**
  * A code-owned notification definition (ADR-052). Each notification type declares
  * its category, payload contract, channel policy, content classification, and how
