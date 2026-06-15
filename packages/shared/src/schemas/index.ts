@@ -116,6 +116,46 @@ export {
   type CreateApiKeyResponse,
 } from './api-keys'
 
+// Notification schemas (Track B — ADR-052 / ADR-053)
+export {
+  // Identifier grammar + action
+  notificationChannelSchema,
+  notificationCategorySchema,
+  notificationTypeSchema,
+  notificationActionSchema,
+  NOTIFICATION_IDENTIFIER_MAX_LENGTH,
+  // Feed (cursor)
+  notificationFeedQuerySchema,
+  cursorResponseSchema,
+  notificationFeedItemSchema,
+  notificationFeedResponseSchema,
+  unreadCountResponseSchema,
+  markAllReadResponseSchema,
+  // Preferences + capabilities
+  notificationPreferenceItemSchema,
+  notificationPreferencesResponseSchema,
+  updateNotificationPreferenceSchema,
+  notificationCategoryCapabilitySchema,
+  notificationCapabilitiesResponseSchema,
+  // Realtime (SSE)
+  NOTIFICATION_SSE_REASONS,
+  notificationSseEventSchema,
+  // Types
+  type NotificationAction,
+  type NotificationFeedQuery,
+  type CursorResponse,
+  type NotificationFeedItem,
+  type NotificationFeedResponse,
+  type UnreadCountResponse,
+  type MarkAllReadResponse,
+  type NotificationPreferenceItem,
+  type NotificationPreferencesResponse,
+  type UpdateNotificationPreferenceInput,
+  type NotificationCapabilitiesResponse,
+  type NotificationSseReason,
+  type NotificationSseEvent,
+} from './notifications'
+
 // Invite schemas (OB-02)
 export {
   createInviteSchema,
