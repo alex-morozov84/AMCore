@@ -29,3 +29,15 @@ export class InvalidNotificationDefinitionError extends Error {
     this.name = 'InvalidNotificationDefinitionError'
   }
 }
+
+/**
+ * Thrown when an idempotency key is reused for a notification with a different
+ * fingerprint (same `(recipientUserId, idempotencyKey)`, different content) — a
+ * caller bug, not a safe replay.
+ */
+export class NotificationIdempotencyConflictError extends Error {
+  constructor(readonly idempotencyKey: string) {
+    super(`Notification idempotency key reused with a different payload: ${idempotencyKey}`)
+    this.name = 'NotificationIdempotencyConflictError'
+  }
+}

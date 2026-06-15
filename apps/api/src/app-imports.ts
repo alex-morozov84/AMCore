@@ -19,6 +19,7 @@ import {
 import { anonymizeIp, getClientIp } from './common/utils'
 import { AdminModule } from './core/admin/admin.module'
 import { AuthModule } from './core/auth/auth.module'
+import { NotificationsCoreModule } from './core/notifications/notifications-core.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
 import { validate } from './env'
 import { EnvModule } from './env/env.module'
@@ -165,6 +166,11 @@ export function coreImports(): Imports {
 
     // HTTP idempotency primitive (ADR-043).
     IdempotencyModule,
+
+    // Notifications producer + definition registry/preferences (ADR-052). The
+    // in-app producer is core; controllers (web) and dispatcher/realtime (worker)
+    // are added in later arcs.
+    NotificationsCoreModule,
   ]
 }
 
