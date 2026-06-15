@@ -102,11 +102,10 @@ export class NotificationFeedService {
   }
 
   private toFeedItem(row: Notification, locale: SupportedLocale): NotificationFeedItem {
-    // Resilient to a stored type whose definition a fork later removed: fall back to a
-    // neutral rendering rather than failing the whole feed.
-    const rendered = this.registry.has(row.type)
-      ? this.registry.get(row.type).renderInApp(row.payload, locale)
-      : { title: row.type, body: '' }
+    // Version-aware, fail-closed per row: unknown type, an unsupported schemaVersion,
+    // an invalid historical payload, or a throwing renderer fall back to a neutral
+    // item — never failing the whole feed page (ADR-052).
+    const rendered = this.registry.renderStored(row.type, row.schemaVersion, row.payload, locale)
 
     return {
       id: row.id,

@@ -35,15 +35,15 @@ export class NotificationPreferenceService {
     const items: NotificationPreferenceItem[] = []
     for (const category of this.registry.capabilities().categories) {
       const mandatory = new Set(category.mandatoryChannels)
-      const defaults = new Set(category.defaultChannels)
       for (const channel of category.supportedChannels) {
-        const isMandatory = mandatory.has(channel)
-        const explicit = storedByKey.get(`${category.category}:${channel}`)
+        const key = `${category.category}:${channel}`
         items.push({
           category: category.category,
           channel,
-          enabled: isMandatory ? true : (explicit ?? defaults.has(channel)),
-          mandatory: isMandatory,
+          // The stored user override, or null when none exists (definition defaults
+          // apply). NOT a computed effective boolean — see ADR-052 preferences model.
+          enabled: storedByKey.has(key) ? (storedByKey.get(key) ?? null) : null,
+          mandatory: mandatory.has(channel),
         })
       }
     }
@@ -58,9 +58,7 @@ export class NotificationPreferenceService {
       categories: capabilities.categories.map((category) => ({
         category: category.category,
         channels: category.supportedChannels,
-        overridableChannels: category.supportedChannels.filter(
-          (channel) => !category.mandatoryChannels.includes(channel)
-        ),
+        overridableChannels: category.overridableChannels,
       })),
     }
   }
@@ -73,8 +71,12 @@ export class NotificationPreferenceService {
     if (!category || !category.supportedChannels.includes(input.channel)) {
       throw new BadRequestException('Unknown notification (category, channel) combination')
     }
-    if (category.mandatoryChannels.includes(input.channel)) {
-      throw new BadRequestException('This channel is mandatory and cannot be changed')
+    // Accept only if the override can affect at least one optional definition; a
+    // channel mandatory in every definition of the category cannot be overridden.
+    if (!category.overridableChannels.includes(input.channel)) {
+      throw new BadRequestException(
+        'This channel is mandatory for every notification in this category and cannot be overridden'
+      )
     }
 
     await this.preferences.upsertPreference(userId, input.category, input.channel, input.enabled)

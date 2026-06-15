@@ -78,7 +78,7 @@ export type NotificationAction = z.infer<typeof notificationActionSchema>
  * shared pagination bounds. No `page`/`total` — unread count is a separate endpoint.
  */
 export const notificationFeedQuerySchema = z.object({
-  cursor: z.string().optional(),
+  cursor: z.string().min(1).max(512).optional(),
   limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).default(PAGINATION.DEFAULT_LIMIT),
 })
 
@@ -147,13 +147,15 @@ export const markAllReadResponseSchema = z.object({
 export type MarkAllReadResponse = z.infer<typeof markAllReadResponseSchema>
 
 /**
- * One preference row in the read response. `mandatory` channels are locked: the
- * client renders them read-only and the server rejects an attempt to disable them.
+ * One preference row in the read response. `enabled` is the stored user override:
+ * `true`/`false`, or `null` when the user has no override and each definition's
+ * default applies. `mandatory` means at least one definition in this category forces
+ * this channel regardless of the override (those deliveries bypass it).
  */
 export const notificationPreferenceItemSchema = z.object({
   category: notificationCategorySchema,
   channel: notificationChannelSchema,
-  enabled: z.boolean(),
+  enabled: z.boolean().nullable(),
   mandatory: z.boolean(),
 })
 

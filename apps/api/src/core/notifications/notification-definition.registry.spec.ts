@@ -111,6 +111,45 @@ describe('NotificationDefinitionRegistry', () => {
     })
   })
 
+  describe('renderStored (version-aware, fail-closed)', () => {
+    const registry = new NotificationDefinitionRegistry()
+
+    it('renders a known type at the matching schemaVersion', () => {
+      expect(
+        registry.renderStored('account.profile_updated', 1, { updatedFields: ['name'] }, 'en').title
+      ).toBe('Profile updated')
+    })
+
+    it('falls back for an unknown type, old version, or invalid payload', () => {
+      expect(registry.renderStored('gone.removed', 1, {}, 'en')).toEqual({
+        title: 'gone.removed',
+        body: '',
+      })
+      expect(
+        registry.renderStored('account.profile_updated', 2, { updatedFields: ['name'] }, 'en')
+      ).toEqual({ title: 'account.profile_updated', body: '' })
+      expect(registry.renderStored('account.profile_updated', 1, { bogus: true }, 'en')).toEqual({
+        title: 'account.profile_updated',
+        body: '',
+      })
+    })
+
+    it('falls back per row when the renderer throws', () => {
+      const throwing = makeDefinition({
+        type: 'account.throwing',
+        renderInApp: () => {
+          throw new Error('broken historical renderer')
+        },
+      })
+      const local = new NotificationDefinitionRegistry([throwing])
+
+      expect(local.renderStored('account.throwing', 1, {}, 'en')).toEqual({
+        title: 'account.throwing',
+        body: '',
+      })
+    })
+  })
+
   describe('externalMode (content policy)', () => {
     it('defaults a PUBLIC definition to detailed external exposure', () => {
       const registry = new NotificationDefinitionRegistry([

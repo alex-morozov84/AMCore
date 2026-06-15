@@ -28,4 +28,18 @@ describe('notification feed cursor', () => {
       )
     ).toThrow(InvalidFeedCursorError)
   })
+
+  it('rejects empty or oversized ids and unexpected payload fields', () => {
+    const token = (payload: object): string =>
+      `v1.${Buffer.from(JSON.stringify(payload)).toString('base64url')}`
+    const createdAt = '2026-06-15T12:34:56.000Z'
+
+    expect(() => decodeFeedCursor(token({ c: createdAt, i: '' }))).toThrow(InvalidFeedCursorError)
+    expect(() => decodeFeedCursor(token({ c: createdAt, i: 'x'.repeat(65) }))).toThrow(
+      InvalidFeedCursorError
+    )
+    expect(() => decodeFeedCursor(token({ c: createdAt, i: 'x', extra: true }))).toThrow(
+      InvalidFeedCursorError
+    )
+  })
 })

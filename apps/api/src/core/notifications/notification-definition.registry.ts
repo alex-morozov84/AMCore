@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
+import type { SupportedLocale } from '@amcore/shared'
+
 import { NOTIFICATION_DEFINITIONS } from './definitions'
 import type { NotificationExternalMode } from './notification.constants'
 import {
@@ -11,6 +13,7 @@ import type {
   CategoryCapability,
   NotificationCapabilities,
   NotificationDefinition,
+  RenderedNotificationContent,
 } from './notification-definition.types'
 import { validateDefinition } from './notification-definition.validation'
 
@@ -76,20 +79,22 @@ export class NotificationDefinitionRegistry {
     const all = new Set<string>()
     const byCategory = new Map<
       string,
-      { supported: Set<string>; default: Set<string>; mandatory: Set<string> }
+      { supported: Set<string>; overridable: Set<string>; mandatory: Set<string> }
     >()
 
     for (const definition of this.byType.values()) {
       const sets = byCategory.get(definition.category) ?? {
         supported: new Set<string>(),
-        default: new Set<string>(),
+        overridable: new Set<string>(),
         mandatory: new Set<string>(),
       }
+      const mandatory = new Set(definition.mandatoryChannels)
       for (const channel of definition.supportedChannels) {
         sets.supported.add(channel)
         all.add(channel)
+        // Optional in THIS definition → a user override can affect it somewhere.
+        if (!mandatory.has(channel)) sets.overridable.add(channel)
       }
-      for (const channel of definition.defaultChannels) sets.default.add(channel)
       for (const channel of definition.mandatoryChannels) sets.mandatory.add(channel)
       byCategory.set(definition.category, sets)
     }
@@ -100,10 +105,40 @@ export class NotificationDefinitionRegistry {
       .map(([category, sets]) => ({
         category,
         supportedChannels: sorted(sets.supported),
-        defaultChannels: sorted(sets.default),
+        overridableChannels: sorted(sets.overridable),
         mandatoryChannels: sorted(sets.mandatory),
       }))
 
     return { channels: sorted(all), categories }
+  }
+
+  /**
+   * Render a STORED notification for the feed, resolved by `(type, schemaVersion)`
+   * and fail-closed PER ROW (ADR-052): an unknown type, a schemaVersion this build no
+   * longer renders, an invalid historical payload, or a throwing renderer all fall
+   * back to a neutral item rather than failing the whole feed page.
+   *
+   * Extension rule: changing a definition's payload schema requires bumping
+   * `schemaVersion` and retaining a renderer/migrator for older versions within the
+   * retention window (a fork adds version-aware rendering here).
+   */
+  renderStored(
+    type: string,
+    schemaVersion: number,
+    payload: unknown,
+    locale: SupportedLocale
+  ): RenderedNotificationContent {
+    const fallback: RenderedNotificationContent = { title: type, body: '' }
+    const definition = this.byType.get(type)
+    if (!definition || definition.schemaVersion !== schemaVersion) return fallback
+
+    const parsed = definition.payloadSchema.safeParse(payload)
+    if (!parsed.success) return fallback
+
+    try {
+      return definition.renderInApp(parsed.data, locale)
+    } catch {
+      return fallback
+    }
   }
 }

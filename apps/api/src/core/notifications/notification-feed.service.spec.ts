@@ -11,6 +11,7 @@ function row(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     id: 'n1',
     type: 'account.profile_updated',
     category: 'account',
+    schemaVersion: 1,
     payload: { updatedFields: ['name'] },
     action: null,
     createdAt: new Date('2026-06-15T10:00:00.000Z'),

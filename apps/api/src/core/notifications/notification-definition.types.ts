@@ -17,8 +17,11 @@ export interface RenderedNotificationContent {
 /** Aggregated, channel-set view of one category across its definitions. */
 export interface CategoryCapability {
   category: string
+  /** Every channel any definition in this category may use. */
   supportedChannels: string[]
-  defaultChannels: string[]
+  /** Channels optional in at least one definition — a user override is meaningful. */
+  overridableChannels: string[]
+  /** Channels mandatory in at least one definition — those deliveries bypass the override. */
   mandatoryChannels: string[]
 }
 

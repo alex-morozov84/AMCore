@@ -22,15 +22,34 @@ describe('NotificationPreferenceService', () => {
     preferences.findByUser.mockResolvedValue([])
   })
 
+  const definition = (
+    type: string,
+    mandatoryChannels: NotificationChannel[]
+  ): NotificationDefinition => ({
+    type,
+    category: NotificationCategory.SECURITY,
+    schemaVersion: 1,
+    contentClass: NotificationContentClass.PUBLIC,
+    supportedChannels: [NotificationChannel.IN_APP],
+    defaultChannels: [NotificationChannel.IN_APP],
+    mandatoryChannels,
+    externalModeByChannel: {},
+    payloadSchema: z.object({}),
+    safePayload: () => ({}),
+    renderInApp: () => ({ title: 't', body: 'b' }),
+  })
+
   describe('getPreferences', () => {
     it('returns the master toggle and per (category, channel) items with defaults', async () => {
       const result = await service.getPreferences('u1')
 
       expect(result.notificationsEnabled).toBe(true)
+      // No stored override → enabled is null (definition defaults apply), not a
+      // computed effective boolean.
       expect(result.preferences).toContainEqual({
         category: NotificationCategory.ACCOUNT,
         channel: NotificationChannel.IN_APP,
-        enabled: true,
+        enabled: null,
         mandatory: false,
       })
     })
@@ -54,6 +73,22 @@ describe('NotificationPreferenceService', () => {
       const account = caps.categories.find((c) => c.category === NotificationCategory.ACCOUNT)
       expect(account?.channels).toContain(NotificationChannel.IN_APP)
       expect(account?.overridableChannels).toContain(NotificationChannel.IN_APP)
+    })
+
+    it('keeps a mixed mandatory/optional category overridable', () => {
+      const local = new NotificationPreferenceService(
+        new NotificationDefinitionRegistry([
+          definition('security.mandatory', [NotificationChannel.IN_APP]),
+          definition('security.optional', []),
+        ]),
+        preferences
+      )
+
+      const security = local
+        .getCapabilities()
+        .categories.find((item) => item.category === NotificationCategory.SECURITY)
+
+      expect(security?.overridableChannels).toContain(NotificationChannel.IN_APP)
     })
   })
 
@@ -80,21 +115,10 @@ describe('NotificationPreferenceService', () => {
     })
 
     it('rejects changing a mandatory channel', async () => {
-      const mandatoryDef: NotificationDefinition = {
-        type: 'security.alert',
-        category: NotificationCategory.SECURITY,
-        schemaVersion: 1,
-        contentClass: NotificationContentClass.PUBLIC,
-        supportedChannels: [NotificationChannel.IN_APP],
-        defaultChannels: [NotificationChannel.IN_APP],
-        mandatoryChannels: [NotificationChannel.IN_APP],
-        externalModeByChannel: {},
-        payloadSchema: z.object({}),
-        safePayload: () => ({}),
-        renderInApp: () => ({ title: 't', body: 'b' }),
-      }
       const local = new NotificationPreferenceService(
-        new NotificationDefinitionRegistry([mandatoryDef]),
+        new NotificationDefinitionRegistry([
+          definition('security.mandatory', [NotificationChannel.IN_APP]),
+        ]),
         preferences
       )
 
@@ -105,6 +129,29 @@ describe('NotificationPreferenceService', () => {
           enabled: false,
         })
       ).rejects.toThrow()
+    })
+
+    it('allows an override when at least one definition in the category is optional', async () => {
+      const local = new NotificationPreferenceService(
+        new NotificationDefinitionRegistry([
+          definition('security.mandatory', [NotificationChannel.IN_APP]),
+          definition('security.optional', []),
+        ]),
+        preferences
+      )
+
+      await local.updatePreference('u1', {
+        category: NotificationCategory.SECURITY,
+        channel: NotificationChannel.IN_APP,
+        enabled: false,
+      })
+
+      expect(preferences.upsertPreference).toHaveBeenCalledWith(
+        'u1',
+        NotificationCategory.SECURITY,
+        NotificationChannel.IN_APP,
+        false
+      )
     })
   })
 
