@@ -192,6 +192,7 @@ Commands are in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#api-specific-test-comm
 
 - Auth, RBAC, OAuth, API keys, sessions — [`docs/auth/`](../auth/README.md),
   [`docs/authorization.md`](../authorization.md)
+- Notifications — in-app feed, preferences, definition registry, transaction-aware producer — [`docs/notifications/`](../notifications/README.md)
 - Storage, uploads, signed URLs — [`docs/storage/`](../storage/README.md)
 - Media / image processing — [`docs/media/`](../media/README.md)
 - Deployment, migrations, process roles — [`docs/operations/deployment.md`](../operations/deployment.md)
