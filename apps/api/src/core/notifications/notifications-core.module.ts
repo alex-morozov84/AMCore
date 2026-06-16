@@ -16,7 +16,15 @@ import { NotificationsService } from './notifications.service'
 @Module({
   imports: [PrismaModule],
   providers: [
-    NotificationDefinitionRegistry,
+    // Default-construct via factory: the registry's `definitions` constructor param
+    // is an Array, which has no DI token — Nest would fail to resolve it. The
+    // factory keeps the shipped `NOTIFICATION_DEFINITIONS` as the implicit default
+    // while leaving tests free to construct with a custom set directly (`new
+    // NotificationDefinitionRegistry([...])`).
+    {
+      provide: NotificationDefinitionRegistry,
+      useFactory: (): NotificationDefinitionRegistry => new NotificationDefinitionRegistry(),
+    },
     NotificationPreferenceResolver,
     NotificationPreferenceRepository,
     NotificationsService,
