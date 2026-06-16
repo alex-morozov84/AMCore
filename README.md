@@ -48,9 +48,10 @@ amcore/
 │   ├── eslint-config/
 │   └── typescript-config/
 ├── docs/
-│   ├── auth/       # Authentication & authorization documentation
-│   ├── media/      # Image derivative/media processing documentation
-│   └── storage/    # File storage documentation
+│   ├── auth/           # Authentication & authorization documentation
+│   ├── notifications/  # Notifications subsystem (in-app feed, preferences, producer)
+│   ├── media/          # Image derivative/media processing documentation
+│   └── storage/        # File storage documentation
 └── .github/        # CI, Dependabot, issue/PR templates
 ```
 
