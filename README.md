@@ -16,12 +16,12 @@ Deployment targets and CD environments remain adopter-specific.
 
 ### Application Modules
 
-| Module            | Status     | Description                                             |
-| ----------------- | ---------- | ------------------------------------------------------- |
-| **Notifications** | 🚧 Next    | Reusable in-app and delivery-channel notification layer |
-| **Fitness**       | 📋 Planned | Workout tracking, exercise library, progress charts     |
-| **Finance**       | 📋 Planned | Wallet management, transaction tracking                 |
-| **Subscriptions** | 📋 Planned | Subscription monitoring, reminders                      |
+| Module            | Status         | Description                                                                                 |
+| ----------------- | -------------- | ------------------------------------------------------------------------------------------- |
+| **Notifications** | 🚧 In progress | Reusable in-app feed + preferences shipped; external channels (email, Telegram) coming next |
+| **Fitness**       | 📋 Planned     | Workout tracking, exercise library, progress charts                                         |
+| **Finance**       | 📋 Planned     | Wallet management, transaction tracking                                                     |
+| **Subscriptions** | 📋 Planned     | Subscription monitoring, reminders                                                          |
 
 ## Tech Stack
 
@@ -48,9 +48,10 @@ amcore/
 │   ├── eslint-config/
 │   └── typescript-config/
 ├── docs/
-│   ├── auth/       # Authentication & authorization documentation
-│   ├── media/      # Image derivative/media processing documentation
-│   └── storage/    # File storage documentation
+│   ├── auth/           # Authentication & authorization documentation
+│   ├── notifications/  # Notifications subsystem (in-app feed, preferences, producer)
+│   ├── media/          # Image derivative/media processing documentation
+│   └── storage/        # File storage documentation
 └── .github/        # CI, Dependabot, issue/PR templates
 ```
 
@@ -133,6 +134,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 - [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md) — How to add a backend module (boundaries, contracts, process roles, tests)
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
 - [`docs/auth/csrf.md`](docs/auth/csrf.md) — Narrow CSRF posture for cookie-backed browser surfaces
+- [`docs/notifications/`](docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract)
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
 - [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide

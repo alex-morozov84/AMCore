@@ -61,20 +61,20 @@ enum AuditCategory {
 // -----------------------------
 
 model User {
-  id             String    @id @default(cuid())
-  email          String
-  emailCanonical String    @unique
-  emailVerified  Boolean   @default(false)
-  passwordHash   String?
-  name           String?
-  avatarUrl      String?
+  id               String  @id @default(cuid())
+  email            String
+  emailCanonical   String  @unique
+  emailVerified    Boolean @default(false)
+  passwordHash     String?
+  name             String?
+  avatarUrl        String?
   // Monotonic fence for avatar mutations: a conditional CAS update (only when the
   // stored value is older) makes a stale lock holder unable to publish over, or
   // sweep, a newer concurrent version. See ADR-049.
   avatarGeneration Int     @default(0)
-  phone          String?   @unique
-  locale         String    @default("ru")
-  timezone       String    @default("Europe/Moscow")
+  phone            String? @unique
+  locale           String  @default("ru")
+  timezone         String  @default("Europe/Moscow")
 
   // Timestamps
   createdAt   DateTime  @default(now())
@@ -82,19 +82,21 @@ model User {
   lastLoginAt DateTime?
 
   // RBAC
-  systemRole  SystemRole @default(USER)
+  systemRole SystemRole @default(USER)
 
   // Relations
-  accounts                 OAuthAccount[]
-  sessions                 Session[]
-  settings                 UserSettings?
-  passwordResetTokens      PasswordResetToken[]
-  emailVerificationTokens  EmailVerificationToken[]
-  memberships              OrgMember[]
-  apiKeys                  ApiKey[]
-  invitesSent              OrgInvite[] @relation("InvitesSent")
-  invitesAccepted          OrgInvite[] @relation("InvitesAccepted")
-  invitesRevoked           OrgInvite[] @relation("InvitesRevoked")
+  accounts                OAuthAccount[]
+  sessions                Session[]
+  settings                UserSettings?
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  memberships             OrgMember[]
+  apiKeys                 ApiKey[]
+  invitesSent             OrgInvite[]              @relation("InvitesSent")
+  invitesAccepted         OrgInvite[]              @relation("InvitesAccepted")
+  invitesRevoked          OrgInvite[]              @relation("InvitesRevoked")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("users")
   @@schema("core")
@@ -121,20 +123,20 @@ model OAuthAccount {
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  familyId     String
-  refreshToken String   @unique // Hashed
-  userAgent    String?
-  ipAddress    String?
-  expiresAt    DateTime
-  revokedAt    DateTime?
+  id               String    @id @default(cuid())
+  userId           String
+  familyId         String
+  refreshToken     String    @unique // Hashed
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
   revocationReason String?
   // OB-06b / ADR-037: server-side recent-auth timestamp for step-up.
   // Nullable: pre-migration rows are NULL and fail closed on @RequireFreshAuth.
   // Set to now() at fresh authentication (login/register/OAuth); carried
   // forward (never renewed) on refresh rotation; bumped by POST /auth/step-up.
-  lastAuthAt   DateTime?
+  lastAuthAt       DateTime?
 
   createdAt DateTime @default(now())
 
@@ -166,11 +168,11 @@ model UserSettings {
 // -----------------------------
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique // SHA-256 hash of a 64-char hex token
+  tokenHash String    @unique // SHA-256 hash of a 64-char hex token
   expiresAt DateTime // createdAt + 15 minutes
-  used      Boolean  @default(false)
+  used      Boolean   @default(false)
   usedAt    DateTime?
 
   createdAt DateTime @default(now())
@@ -186,11 +188,11 @@ model PasswordResetToken {
 }
 
 model EmailVerificationToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique // SHA-256 hash of a 64-char hex token
+  tokenHash String    @unique // SHA-256 hash of a 64-char hex token
   expiresAt DateTime // createdAt + 48 hours
-  used      Boolean  @default(false)
+  used      Boolean   @default(false)
   usedAt    DateTime?
 
   createdAt DateTime @default(now())
@@ -244,11 +246,12 @@ model Organization {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  members     OrgMember[]
-  roles       Role[]
-  permissions Permission[]
-  apiKeys     ApiKey[]
-  invites     OrgInvite[]
+  members       OrgMember[]
+  roles         Role[]
+  permissions   Permission[]
+  apiKeys       ApiKey[]
+  invites       OrgInvite[]
+  notifications Notification[]
 
   @@map("organizations")
   @@schema("core")
@@ -303,12 +306,12 @@ model Role {
 
 model Permission {
   id             String   @id @default(cuid())
-  action         String   // 'create' | 'read' | 'update' | 'delete' | 'manage'
-  subject        String   // 'Contact' | 'User' | 'Organization' | 'all'
-  conditions     Json?    // CASL conditions: { "assignedToId": "${user.id}" }
+  action         String // 'create' | 'read' | 'update' | 'delete' | 'manage'
+  subject        String // 'Contact' | 'User' | 'Organization' | 'all'
+  conditions     Json? // CASL conditions: { "assignedToId": "${user.id}" }
   fields         String[] @default([]) // field-level: [] = all fields
   inverted       Boolean  @default(false) // explicit DENY (use sparingly)
-  organizationId String?  // null = system permission
+  organizationId String? // null = system permission
 
   organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   roles        RolePermission[]
@@ -368,20 +371,20 @@ model RolePermission {
 //     same pair, so legitimate re-invite after a terminal
 //     settle is possible without overwriting history.
 model OrgInvite {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   organizationId   String
   emailCanonical   String
   email            String
   roleId           String?
   invitedById      String?
-  tokenHash        String   @unique
+  tokenHash        String    @unique
   expiresAt        DateTime
   acceptedAt       DateTime?
   acceptedByUserId String?
   revokedAt        DateTime?
   revokedById      String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   role           Role?        @relation(fields: [roleId], references: [id], onDelete: SetNull)

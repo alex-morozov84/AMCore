@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reusable notifications subsystem (in-app surface). Own `notifications`
+  Postgres schema with a canonical per-user `Notification`, per-target
+  `NotificationDelivery`, and immutable `NotificationDeliveryAttempt`;
+  in-app delivery is inserted `DELIVERED` in the same database transaction as
+  the canonical row, so the feed never depends on a worker. Bearer-authenticated
+  HTTP surface for the recipient-scoped feed (cursor `(createdAt DESC, id DESC)`,
+  no `total`), unread count, mark-read / mark-all-read / archive (idempotent),
+  capabilities, per-`(category, channel)` preferences, and the master toggle
+  (`PATCH /notifications/settings`). Internal `NotificationsService.notify()`
+  and transaction-aware `notifyTx(tx, …)` are the only ways to create a
+  notification — there is no public create endpoint. Required namespaced
+  idempotency key with a stored payload fingerprint: a same-key retry with a
+  matching fingerprint replays the existing row, a mismatching fingerprint
+  fails stably. Definitions are code-owned and declare payload schema +
+  default / mandatory channels + content classification + a localized
+  `renderInApp`; titles and bodies are rendered server-side from the structured
+  payload in the recipient's current `User.locale` at feed read time. External
+  channels (email, Telegram), realtime fan-out, and Web Push are future work.
+  Fork-facing guide: [`docs/notifications/README.md`](docs/notifications/README.md).
 - Backend Architecture & Conventions guide
   (`docs/backend/architecture-and-conventions.md`): the end-to-end recipe for
   adding a module — boundaries, shared Zod contracts, process-role composition,

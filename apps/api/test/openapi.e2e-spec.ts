@@ -90,6 +90,16 @@ const EXPECTED: Record<string, Expected> = {
   // invites
   'get /organizations/{orgId}/invites': { status: '200', kind: 'json' },
   'delete /organizations/{orgId}/invites/{inviteId}': { status: '204', kind: 'none' },
+  // notifications (Arc A.6 — feed/preferences/master-toggle)
+  'get /notifications': { status: '200', kind: 'json' },
+  'get /notifications/unread-count': { status: '200', kind: 'json' },
+  'post /notifications/read-all': { status: '200', kind: 'json' },
+  'post /notifications/{id}/read': { status: '204', kind: 'none' },
+  'post /notifications/{id}/archive': { status: '204', kind: 'none' },
+  'get /notifications/capabilities': { status: '200', kind: 'json' },
+  'get /notifications/preferences': { status: '200', kind: 'json' },
+  'put /notifications/preferences': { status: '204', kind: 'none' },
+  'patch /notifications/settings': { status: '204', kind: 'none' },
   // metrics — Prometheus exposition (text, not JSON)
   'get /metrics': { status: '200', kind: 'text' },
 }

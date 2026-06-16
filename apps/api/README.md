@@ -56,8 +56,16 @@ apps/api/src/
 │   │   ├── organizations.controller.ts
 │   │   ├── members.controller.ts
 │   │   └── roles.controller.ts
-│   └── admin/                  # SUPER_ADMIN only
-│       └── admin.controller.ts
+│   ├── admin/                  # SUPER_ADMIN only
+│   │   └── admin.controller.ts
+│   └── notifications/          # In-app feed, preferences, transaction-aware producer
+│       ├── notifications.controller.ts
+│       ├── notification-preferences.controller.ts
+│       ├── notifications.service.ts          # notify() / notifyTx(tx)
+│       ├── notification-feed.service.ts      # cursor feed, mark-read, archive
+│       ├── notification-preference.service.ts
+│       ├── notification-definition.registry.ts
+│       └── definitions/                       # code-owned event definitions
 │
 ├── infrastructure/
 │   ├── email/                  # Resend + React Email (direct secret sends + queued notifications)
@@ -81,6 +89,7 @@ PostgreSQL uses schema separation for module isolation:
 | Schema          | Tables                                                                                                                                                                                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `core`          | users, sessions, oauth_accounts, user_settings, password_reset_tokens, email_verification_tokens, api_keys, organizations, org_members, roles, member_roles, permissions, role_permissions |
+| `notifications` | notifications, notification_deliveries, notification_delivery_attempts, notification_preferences                                                                                           |
 | `fitness`       | exercises, workouts, measurements (coming)                                                                                                                                                 |
 | `finance`       | wallets, transactions (planned)                                                                                                                                                            |
 | `subscriptions` | services, subscriptions (planned)                                                                                                                                                          |
@@ -223,6 +232,7 @@ coverage.
 | Organizations + RBAC | ✅                      | ✅  |
 | Admin                | ✅                      | ✅  |
 | API Keys             | ✅                      | ✅  |
+| Notifications        | ✅                      | ✅  |
 | Storage              | ✅                      | ✅  |
 | Email templates      | Vitest (real rendering) | —   |
 
@@ -330,6 +340,7 @@ is imported (worker/all). Assert the gating in `test/process-role.e2e-spec.ts`.
 - [`docs/operations/observability.md`](../../docs/operations/observability.md) — Metrics and tracing guide
 - [`docs/auth/`](../../docs/auth/README.md) — Complete auth & RBAC guide for developers
 - [`docs/authorization.md`](../../docs/authorization.md) — Authorization concepts
+- [`docs/notifications/`](../../docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract)
 
 ## Contributing
 

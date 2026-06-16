@@ -191,6 +191,12 @@ export async function cleanDatabase(
   await prisma.session.deleteMany()
   await prisma.oAuthAccount.deleteMany()
   await prisma.userSettings.deleteMany()
+  // Notifications schema (children → parents; recipient FK cascades from user, but
+  // delete explicitly to match this helper's FK-order convention).
+  await prisma.notificationDeliveryAttempt.deleteMany()
+  await prisma.notificationDelivery.deleteMany()
+  await prisma.notification.deleteMany()
+  await prisma.notificationPreference.deleteMany()
   await prisma.user.deleteMany()
 
   // Flush Redis directly — cache.clear() with @keyv/redis filters keys by '::' and

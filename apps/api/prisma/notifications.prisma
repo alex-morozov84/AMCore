@@ -1,0 +1,147 @@
+// ===========================================
+// Notifications module schema (Track B — ADR-052)
+// ===========================================
+// Durable notification subsystem. Postgres owns canonical notifications,
+// per-target deliveries, immutable attempts, the retry schedule, and leases.
+// Lease/retry columns (leaseToken, leaseExpiresAt, nextAttemptAt, attemptCount)
+// exist from Arc A but are inert until Arc B wires the durable dispatcher — kept
+// here so Arc B is additive (no claim-mechanism migration/rewrite). Telegram and
+// Web Push models are added later (Arc D / frontend phase), additively.
+
+/// Channel-neutral delivery lifecycle. A Postgres enum is appropriate here: the
+/// lifecycle is complete and shared by every channel (unlike channel/category/type,
+/// which are open bounded strings so new channels stay additive — ADR-052).
+enum NotificationDeliveryStatus {
+  PENDING
+  PROCESSING
+  RETRY_SCHEDULED
+  DELIVERED
+  FAILED
+  SKIPPED
+  CANCELLED
+
+  @@schema("notifications")
+}
+
+/// Outcome of a single delivery attempt (immutable history).
+enum NotificationAttemptOutcome {
+  DELIVERED
+  TRANSIENT_FAILURE
+  PERMANENT_FAILURE
+  ABANDONED
+
+  @@schema("notifications")
+}
+
+/// One immutable canonical event for one recipient; the in-app feed source of
+/// truth. `payload` is language-neutral and carries no live secrets or rendered
+/// text; `action` is a validated first-party descriptor, never an arbitrary URL.
+model Notification {
+  id                     String    @id @default(cuid())
+  recipientUserId        String
+  organizationId         String? // context only in v1, not an org recipient
+  type                   String
+  category               String
+  schemaVersion          Int
+  payload                Json
+  action                 Json?
+  idempotencyKey         String // namespaced occurrence key, required
+  idempotencyFingerprint String
+  occurredAt             DateTime
+  createdAt              DateTime  @default(now())
+  readAt                 DateTime?
+  archivedAt             DateTime?
+
+  recipient    User                   @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  organization Organization?          @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  deliveries   NotificationDelivery[]
+
+  // Dedupe: idempotencyKey is required, so a plain unique (no partial index).
+  @@unique([recipientUserId, idempotencyKey])
+  // Feed keyset cursor (ADR-036 endpoint-local exception): createdAt DESC, id DESC.
+  @@index([recipientUserId, archivedAt, createdAt(sort: Desc), id(sort: Desc)])
+  // Unread-count path.
+  @@index([recipientUserId, readAt, archivedAt])
+  @@map("notifications")
+  @@schema("notifications")
+}
+
+/// One delivery aggregate per (notification, channel, target). Per-target (not
+/// per-channel) so a channel that fans out to many targets (Web Push, later) needs
+/// no state-machine change. The in-app target is inserted DELIVERED in the same
+/// transaction as the Notification; external targets start PENDING.
+model NotificationDelivery {
+  id                  String                     @id @default(cuid())
+  notificationId      String
+  channel             String
+  targetKey           String // stable adapter-owned identity
+  targetRef           String? // durable connection/subscription aggregate ref
+  destinationSnapshot Json? // adapter schema; redacted; no secrets
+  locale              String
+  status              NotificationDeliveryStatus @default(PENDING)
+  availableAt         DateTime                   @default(now()) // policy delay
+  nextAttemptAt       DateTime? // retry schedule (Arc B)
+  attemptCount        Int                        @default(0)
+  maxAttempts         Int
+  leaseToken          String? // Arc B: ownership/CAS token for row state
+  leaseExpiresAt      DateTime?
+  providerMessageId   String?
+  lastErrorCode       String? // bounded/machine-readable
+  terminalReasonCode  String?
+  deliveredAt         DateTime?
+  failedAt            DateTime?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  notification Notification                  @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  attempts     NotificationDeliveryAttempt[]
+
+  @@unique([notificationId, channel, targetKey])
+  @@index([status, availableAt])
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseExpiresAt])
+  @@map("notification_deliveries")
+  @@schema("notifications")
+}
+
+/// Append-only operational history of delivery attempts (ADR-052). No provider
+/// body, destination, payload, token, or arbitrary stack trace is retained.
+model NotificationDeliveryAttempt {
+  id                String                      @id @default(cuid())
+  deliveryId        String
+  attemptNumber     Int
+  leaseToken        String
+  startedAt         DateTime                    @default(now())
+  finishedAt        DateTime?
+  durationMs        Int?
+  outcome           NotificationAttemptOutcome? // null while in-flight
+  errorCode         String? // bounded
+  providerMessageId String?
+
+  delivery NotificationDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  // (deliveryId, attemptNumber) unique already indexes deliveryId (leftmost prefix);
+  // no separate @@index([deliveryId]) needed.
+  @@unique([deliveryId, attemptNumber])
+  @@map("notification_delivery_attempts")
+  @@schema("notifications")
+}
+
+/// Per-user, per-(category, channel) opt-in/out. Absence falls through to the
+/// registry default; `UserSettings.notificationsEnabled` is the master optional
+/// toggle; mandatory definition channels bypass both.
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  category  String
+  channel   String
+  enabled   Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, channel])
+  @@map("notification_preferences")
+  @@schema("notifications")
+}
