@@ -49,6 +49,7 @@ export type EmailMetricsTemplate =
   | 'email-verification'
   | 'password-changed'
   | 'org-invite'
+  | 'notification'
   | 'unknown'
 export type EmailMetricsOperation = 'dispatch' | 'render' | 'send' | 'process'
 export type EmailMetricsMode = 'queued' | 'direct' | 'worker'

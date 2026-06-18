@@ -104,6 +104,20 @@ export interface OrgInviteEmailData {
 }
 
 /**
+ * Generic notification email (ADR-052). The `title`/`body` are already rendered and
+ * localized by the dispatcher per the content policy (detailed vs neutral), so the
+ * template only presents them — it never inspects a raw notification payload.
+ * `actionUrl` (when present) is the trusted app base URL (`FRONTEND_URL`), never an
+ * arbitrary URL from the notification.
+ */
+export interface NotificationEmailData {
+  title: string
+  body: string
+  actionUrl?: string
+  locale?: Locale
+}
+
+/**
  * Template name enum
  */
 export enum EmailTemplate {
@@ -112,6 +126,7 @@ export enum EmailTemplate {
   EMAIL_VERIFICATION = 'email-verification',
   PASSWORD_CHANGED = 'password-changed',
   ORG_INVITE = 'org-invite',
+  NOTIFICATION = 'notification',
 }
 
 /**
@@ -127,6 +142,7 @@ export type RenderableEmailData =
   | EmailVerificationData
   | PasswordChangedEmailData
   | OrgInviteEmailData
+  | NotificationEmailData
 
 /**
  * Templates that may be enqueued (EQS-02, Stage 2).

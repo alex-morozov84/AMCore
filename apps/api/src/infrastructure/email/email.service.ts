@@ -7,6 +7,7 @@ import { PinoLogger } from 'nestjs-pino'
 import type {
   EmailProvider,
   EmailVerificationData,
+  NotificationEmailData,
   OrgInviteEmailData,
   PasswordChangedEmailData,
   PasswordResetEmailData,
@@ -20,6 +21,7 @@ import type {
 import { EmailTemplate, QUEUEABLE_EMAIL_TEMPLATES } from './email.types'
 import type { Locale } from './messages'
 import { EmailVerificationEmail, getEmailVerificationSubject } from './templates/email-verification'
+import { NotificationEmail } from './templates/notification'
 import { getOrgInviteSubject, OrgInviteEmail } from './templates/org-invite'
 import { getPasswordChangedSubject, PasswordChangedEmail } from './templates/password-changed'
 import { getPasswordResetSubject, PasswordResetEmail } from './templates/password-reset'
@@ -243,6 +245,15 @@ export class EmailService {
           const inviteData = data as OrgInviteEmailData
           element = OrgInviteEmail(inviteData)
           subject = getOrgInviteSubject(inviteData.orgName, locale)
+          break
+        }
+
+        case EmailTemplate.NOTIFICATION: {
+          const notificationData = data as NotificationEmailData
+          element = NotificationEmail(notificationData)
+          // The dispatcher already applied the content policy to the title, so it is a
+          // safe subject for both detailed and neutral/generic notifications.
+          subject = notificationData.title
           break
         }
 

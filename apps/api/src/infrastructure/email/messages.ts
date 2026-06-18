@@ -74,6 +74,13 @@ export const emailMessages = {
     'orgInvite.expiresInfo': 'Это приглашение действительно в течение {expiresIn}.',
     'orgInvite.ignoreInfo': 'Если вы не ожидали это приглашение, просто проигнорируйте письмо.',
     'orgInvite.footer': 'С уважением, команда AMCore',
+
+    // Notification Email (generic chrome; title/body are rendered by the dispatcher)
+    'notification.preview': 'Новое уведомление от AMCore',
+    'notification.openButton': 'Открыть AMCore',
+    'notification.genericTitle': 'Новое уведомление',
+    'notification.genericBody': 'У вас новое уведомление. Откройте AMCore, чтобы посмотреть.',
+    'notification.footer': 'С уважением, команда AMCore',
   },
   en: {
     // Welcome Email
@@ -133,5 +140,12 @@ export const emailMessages = {
     'orgInvite.expiresInfo': 'This invitation is valid for {expiresIn}.',
     'orgInvite.ignoreInfo': 'If you were not expecting this invitation, simply ignore this email.',
     'orgInvite.footer': 'Best regards, AMCore team',
+
+    // Notification Email (generic chrome; title/body are rendered by the dispatcher)
+    'notification.preview': 'New notification from AMCore',
+    'notification.openButton': 'Open AMCore',
+    'notification.genericTitle': 'New notification',
+    'notification.genericBody': 'You have a new notification. Open AMCore to view it.',
+    'notification.footer': 'Best regards, AMCore team',
   },
 } as const
