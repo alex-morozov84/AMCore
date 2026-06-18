@@ -65,12 +65,18 @@ export interface NotificationDefinition<TPayload = unknown> {
   /** In-app feed render in the recipient's locale. */
   renderInApp(payload: TPayload, locale: SupportedLocale): RenderedNotificationContent
   /**
-   * Detailed email title/body in the recipient's locale, used ONLY when the content
-   * policy resolves email to `detailed` (PUBLIC, or an explicit per-channel override).
+   * Detailed email title/body in the recipient's locale, rendered ONLY from the
+   * `projectExternal('email', …)` allowlisted projection — never the full payload — so the
+   * external data boundary is enforced, not bypassed (ADR-052). Used only when the content
+   * policy resolves email to `detailed` (PUBLIC, or an explicit per-channel override) AND a
+   * `projectExternal` exists; otherwise the dispatcher sends a neutral generic email.
    * Separate from `renderInApp` because email copy has different length/CTA/sensitivity
-   * constraints. When absent, the dispatcher falls back to a neutral generic email.
+   * constraints.
    */
-  renderEmail?(payload: TPayload, locale: SupportedLocale): RenderedNotificationContent
+  renderEmail?(
+    projection: Record<string, unknown>,
+    locale: SupportedLocale
+  ): RenderedNotificationContent
   /** Optional safe first-party action descriptor (never an arbitrary URL). */
   action?(payload: TPayload): NotificationAction | null
 

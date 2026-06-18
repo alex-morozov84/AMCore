@@ -99,8 +99,10 @@ export class EmailChannelDeliverer implements ChannelDeliverer {
 
   /**
    * Build the localized email content, or a sentinel for a terminal condition. Detailed
-   * content (definition `renderEmail`) is used only when the policy resolves email to
-   * `detailed`; everything else gets a neutral generic body that never reads the payload.
+   * content renders ONLY from the `projectExternal('email', …)` allowlisted projection
+   * (the enforced external data boundary — ADR-052), never the raw payload; everything
+   * else (generic mode, or a detailed definition missing the projection/renderer) gets a
+   * neutral generic body that never touches the payload.
    */
   private resolveContent(
     type: string,
@@ -113,10 +115,12 @@ export class EmailChannelDeliverer implements ChannelDeliverer {
     const mode = resolveExternalMode(definition, NotificationChannel.EMAIL)
     if (mode === 'forbidden') return 'forbidden'
 
-    if (mode === 'detailed' && definition.renderEmail) {
+    if (mode === 'detailed' && definition.renderEmail && definition.projectExternal) {
       const parsed = definition.payloadSchema.safeParse(payload)
       if (!parsed.success) return 'payload_invalid'
-      return definition.renderEmail(parsed.data, locale)
+      // The allowlisted projection is the only data the email renderer may see.
+      const projection = definition.projectExternal(NotificationChannel.EMAIL, parsed.data)
+      return definition.renderEmail(projection, locale)
     }
     return this.genericContent(locale)
   }

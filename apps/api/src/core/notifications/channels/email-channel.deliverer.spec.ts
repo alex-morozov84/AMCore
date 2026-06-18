@@ -37,9 +37,14 @@ const detailedDef: NotificationDefinition = {
   type: 'account.detail',
   contentClass: NotificationContentClass.PUBLIC, // → email detailed
   supportedChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
-  payloadSchema: z.object({ v: z.string() }),
-  projectExternal: () => ({}),
-  renderEmail: () => ({ title: 'Detailed title', body: 'Detailed body' }),
+  payloadSchema: z.object({ v: z.string(), secret: z.string().optional() }),
+  // Allowlist: only `v` crosses the external boundary — `secret` never does.
+  projectExternal: (_channel, payload) => ({ v: (payload as { v: string }).v }),
+  // Renders ONLY from the projection, so it cannot read a non-allowlisted field.
+  renderEmail: (projection) => ({
+    title: `Detailed ${String(projection.v)}`,
+    body: 'Detailed body',
+  }),
 }
 
 const genericDef: NotificationDefinition = {
@@ -103,7 +108,7 @@ describe('EmailChannelDeliverer', () => {
 
     expect(email.renderTemplate).toHaveBeenCalledWith(
       'notification',
-      expect.objectContaining({ title: 'Detailed title', body: 'Detailed body', locale: 'ru' }),
+      expect.objectContaining({ title: 'Detailed x', body: 'Detailed body', locale: 'ru' }),
       'worker'
     )
     expect(email.send).toHaveBeenCalledWith(
@@ -115,6 +120,18 @@ describe('EmailChannelDeliverer', () => {
     )
     expect(email.queue).not.toHaveBeenCalled()
     expect(result).toEqual({ status: 'delivered', providerMessageId: 'prov-1' })
+  })
+
+  it('detailed email renders only from the projectExternal allowlist, never the raw payload', async () => {
+    const deliverer = build([detailedDef])
+    await deliverer.deliver({
+      delivery: claim(),
+      notification: notification({ payload: { v: 'hello', secret: 'leak' } }),
+    })
+    const data = email.renderTemplate.mock.calls[0]![1]
+    // Allowlisted field is rendered; the non-allowlisted `secret` never reaches the email.
+    expect(data).toEqual(expect.objectContaining({ title: 'Detailed hello' }))
+    expect(JSON.stringify(data)).not.toContain('leak')
   })
 
   it('uses neutral generic content for a SENSITIVE definition (never reads the payload)', async () => {
