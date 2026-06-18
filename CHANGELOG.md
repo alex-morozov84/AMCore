@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Durable external notification delivery (notifications Arc B). A worker-only
+  dispatcher drains `PENDING` deliveries with a Postgres `FOR UPDATE SKIP LOCKED`
+  claim, leases each attempt, and owns the retry schedule and immutable attempt
+  history — BullMQ is only a one-attempt wake hint, and a recovery `@Cron` (on
+  every replica, not singleton-locked) drains a delivery whose wake was lost or
+  that came from `notifyTx`. Finalize is a `(id, leaseToken)` compare-and-set, so
+  a stale lease holder can never overwrite newer state; an expired lease is
+  reaped (`ABANDONED` attempt → reschedule or fail). Ships the **email channel**:
+  a worker-only adapter over `EmailService.send()` with a stable provider
+  idempotency key (`notification-delivery:<id>`) that never enqueues the email
+  queue, sent to a **verified** account-email destination only (an unverified
+  address yields a `SKIPPED` delivery, never a retried `PENDING`). Adds a daily
+  worker-only retention sweep (archived −30d, read −90d, unread −180d, finished
+  attempts −30d) that never deletes a notification with an active delivery.
+  First production definition: `account.password_changed` (security; in-app +
+  email, both mandatory).
 - Reusable notifications subsystem (in-app surface). Own `notifications`
   Postgres schema with a canonical per-user `Notification`, per-target
   `NotificationDelivery`, and immutable `NotificationDeliveryAttempt`;
@@ -26,7 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default / mandatory channels + content classification + a localized
   `renderInApp`; titles and bodies are rendered server-side from the structured
   payload in the recipient's current `User.locale` at feed read time. External
-  channels (email, Telegram), realtime fan-out, and Web Push are future work.
+  channels (Telegram), realtime fan-out, and Web Push are future work (email
+  delivery shipped in Arc B above).
   Fork-facing guide: [`docs/notifications/README.md`](docs/notifications/README.md).
 - Backend Architecture & Conventions guide
   (`docs/backend/architecture-and-conventions.md`): the end-to-end recipe for
@@ -58,6 +75,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   zone and an explicit stored `locale` always wins over `Accept-Language`
   thereafter.
 
+### Changed
+
+- Password reset now marks the account email **verified** in the same
+  transaction as the password update: a successful reset proves control of the
+  account mailbox (the single-use token was delivered there and returned), per
+  OWASP Forgot Password / NIST 800-63B. The reset token is also consumed
+  atomically (a guarded conditional update), so two concurrent resets cannot both
+  succeed on one single-use token. The password-changed confirmation is now
+  emitted through the durable notifications subsystem (`account.password_changed`)
+  instead of a one-off queued email; the standalone `PASSWORD_CHANGED` email
+  template/path was retired (`welcome` is now the only queued email template).
+- API production build no longer compiles test artifacts into `dist` (and thus
+  the runtime image): `.swcrc` now excludes `*.spec.ts`, `*-spec.ts`, `__tests__`,
+  and `__mocks__` (SWC ignores the `tsconfig.build.json` excludes). Removed the
+  redundant `@types/uuid` (uuid v13 ships its own types).
+
 ### Fixed
 
 - Concurrent avatar uploads/deletes for the same user no longer corrupt storage.
@@ -84,13 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `201 Created` (not `200`), `GET /auth/me` wraps the user in a `user` envelope,
   invalid reset/verify tokens return `401` (not `400`), and the response examples
   no longer show a non-returned `systemRole` field.
-
-### Changed
-
-- API production build no longer compiles test artifacts into `dist` (and thus
-  the runtime image): `.swcrc` now excludes `*.spec.ts`, `*-spec.ts`, `__tests__`,
-  and `__mocks__` (SWC ignores the `tsconfig.build.json` excludes). Removed the
-  redundant `@types/uuid` (uuid v13 ships its own types).
 
 ### Security
 

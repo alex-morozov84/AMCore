@@ -16,6 +16,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 
 import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
+import { NotificationDispatchProcessor } from '../src/core/notifications/dispatch/notification-dispatch.processor'
 import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
 import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
@@ -163,7 +164,10 @@ export async function teardownE2ETest(context: E2ETestContext): Promise<void> {
 }
 
 async function closeBullWorkers(app: INestApplication): Promise<void> {
-  await Promise.all([closeBullWorker(app, EmailProcessor)])
+  await Promise.all([
+    closeBullWorker(app, EmailProcessor),
+    closeBullWorker(app, NotificationDispatchProcessor),
+  ])
 }
 
 async function closeBullWorker(

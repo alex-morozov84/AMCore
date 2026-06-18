@@ -43,8 +43,15 @@ export class TokenManagerService {
     return { token, expiresAt }
   }
 
-  /** Verify password reset token, return userId and tokenHash on success */
-  async verifyPasswordResetToken(token: string): Promise<{ userId: string; tokenHash: string }> {
+  /**
+   * Verify password reset token, return the row id, userId and tokenHash on success.
+   * The row `id` is a non-secret stable handle for the consumed reset (used as the
+   * `account.password_changed` notification idempotency key — unlike `tokenHash`, it
+   * is safe to embed in notification rows/logs).
+   */
+  async verifyPasswordResetToken(
+    token: string
+  ): Promise<{ id: string; userId: string; tokenHash: string }> {
     const tokenHash = this.hashToken(token)
 
     const record = await this.prisma.passwordResetToken.findUnique({
@@ -60,7 +67,7 @@ export class TokenManagerService {
       )
     }
 
-    return { userId: record.userId, tokenHash }
+    return { id: record.id, userId: record.userId, tokenHash }
   }
 
   /** Mark password reset token as used */

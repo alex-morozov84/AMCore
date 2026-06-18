@@ -406,11 +406,14 @@ options (EQS-06):
 - **Enqueuing a transactional email is best-effort** relative to the primary
   request — a Redis/BullMQ outage must **never** turn a user-facing mutation
   (whose real work already committed) into a 500. `QueueService.add` keeps
-  throwing (it is the low-level primitive); the **caller** decides. Email
-  notification call sites are fire-and-forget (`void send(...).catch(warn)`):
-  e.g. `register`/welcome and `resetPassword`/password-changed. Secret-bearing
-  emails (reset/verification/invite) are sent directly via `EmailService.sendNow`
-  and never touch the queue at all (EQS-02), so an outage cannot affect them.
+  throwing (it is the low-level primitive); the **caller** decides. The one
+  queued email call site is fire-and-forget (`void send(...).catch(warn)`):
+  `register`/welcome. Secret-bearing emails (reset/verification/invite) are sent
+  directly via `EmailService.sendNow` and never touch the queue at all (EQS-02),
+  so an outage cannot affect them. The password-changed alert now flows through
+  the durable notifications subsystem (ADR-052) — its worker-only email adapter
+  calls `EmailService.send()` directly and the recovery poller, not the EMAIL
+  queue, is its outage-recovery path.
 - **Observability** is logged at error level on both connections:
   - producer — `QueueService.onModuleInit` attaches an `error` listener
     **synchronously on the BullMQ `Queue`** (QueueBase re-emits connection

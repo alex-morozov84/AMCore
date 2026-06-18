@@ -997,6 +997,32 @@ describe('Auth (e2e)', () => {
       const sessions = await prisma.session.findMany()
       expect(sessions).toHaveLength(0)
     })
+
+    it('consumes the reset token exactly once under concurrent use', async () => {
+      const { token } = await tokenManager.generatePasswordResetToken(userId)
+
+      // Fire two resets with the SAME token simultaneously. The atomic CAS consumption
+      // must let exactly one win (204) and reject the other (401) — proving single-use
+      // is enforced by the DB, not by the verify-then-update read window.
+      const results = await Promise.all([
+        request(app.getHttpServer())
+          .post('/auth/reset-password')
+          .send({ token, password: newPassword }),
+        request(app.getHttpServer())
+          .post('/auth/reset-password')
+          .send({ token, password: 'OtherP@ss789' }),
+      ])
+
+      const statuses = results.map((r) => r.status).sort()
+      expect(statuses).toEqual([204, 401])
+
+      // The token row is consumed once and a subsequent reuse is still rejected.
+      const reuse = await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token, password: 'ThirdP@ss000' })
+        .expect(401)
+      expect(reuse.body.message).toBeDefined()
+    })
   })
 
   describe('POST /auth/verify-email', () => {

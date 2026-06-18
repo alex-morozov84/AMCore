@@ -21,6 +21,7 @@ import { AdminModule } from './core/admin/admin.module'
 import { AuthModule } from './core/auth/auth.module'
 import { NotificationsCoreModule } from './core/notifications/notifications-core.module'
 import { NotificationsWebModule } from './core/notifications/notifications-web.module'
+import { NotificationsWorkerModule } from './core/notifications/notifications-worker.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
 import { validate } from './env'
 import { EnvModule } from './env/env.module'
@@ -192,7 +193,13 @@ export const webImports: Imports = [
  * scheduler (`NestScheduleModule.forRoot()` lives in ScheduleModule, so `@Cron`
  * jobs only register here).
  */
-export const workerImports: Imports = [EmailWorkerModule, QueueMetricsModule, ScheduleModule]
+export const workerImports: Imports = [
+  EmailWorkerModule,
+  QueueMetricsModule,
+  ScheduleModule,
+  // Notifications dispatcher: BullMQ processor + recovery @Cron + durable state machine.
+  NotificationsWorkerModule,
+]
 
 /** Global filters/pipe/interceptor/guard + shutdown — every role. */
 export const appProviders: Provider[] = [

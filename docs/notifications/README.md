@@ -2,23 +2,28 @@
 
 AMCore ships a reusable, per-user notification subsystem on its own
 `notifications` Postgres schema. The starter exposes the in-app feed,
-preferences, and a transaction-aware internal producer; external delivery
-channels (email, Telegram) and realtime fan-out are additive later-arc work and
-do not change the producer/feed/preferences contract documented here.
+preferences, a transaction-aware internal producer, and a durable worker-driven
+**email** channel (Postgres-owned retry, leases, immutable attempt history, and
+retention). The remaining external channels (Telegram) and realtime fan-out are
+additive later-arc work and do not change the producer/feed/preferences contract
+documented here.
 
 ## What Is Included
 
-| Area           | Built-in behavior                                                                                                                                                                              |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Persistence    | Own `notifications` Postgres schema: canonical `Notification`, per-target `NotificationDelivery`, immutable `NotificationDeliveryAttempt`, `NotificationPreference`.                           |
-| Producer       | `NotificationsService.notify()` (owns its transaction) and `notifyTx(tx, …)` (joins the caller's). **No public create endpoint** — only trusted server code may create a notification.         |
-| In-app channel | Inserted `DELIVERED` in the same database transaction as the canonical row, so the feed never depends on a background worker being healthy.                                                    |
-| Idempotency    | Required namespaced key (`dotted.namespace:occurrence-id`) + payload fingerprint. Same key + same fingerprint = safe replay; same key + different fingerprint = stable conflict.               |
-| Preferences    | Master toggle (`UserSettings.notificationsEnabled`) plus per-`(category, channel)` user override. Mandatory channels bypass the master toggle and are locked in the preferences read response. |
-| Feed           | Cursor pagination by `(createdAt DESC, id DESC)`; no `total`. Unread count is a separate exact endpoint.                                                                                       |
-| i18n           | Structured, language-agnostic payload in the database. `title` / `body` are rendered server-side in the recipient's current `User.locale` at feed read time, never stored as text.             |
-| Capabilities   | `GET /notifications/capabilities` lists only currently active channels and per-category support — no dead enum value is advertised.                                                            |
-| Tests          | Unit + Testcontainers e2e cover the producer, feed, preferences, cursor under concurrent insert, transactional rollback, and idempotency replay/conflict.                                      |
+| Area              | Built-in behavior                                                                                                                                                                                                                                                 |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Persistence       | Own `notifications` Postgres schema: canonical `Notification`, per-target `NotificationDelivery`, immutable `NotificationDeliveryAttempt`, `NotificationPreference`.                                                                                              |
+| Producer          | `NotificationsService.notify()` (owns its transaction) and `notifyTx(tx, …)` (joins the caller's). **No public create endpoint** — only trusted server code may create a notification.                                                                            |
+| In-app channel    | Inserted `DELIVERED` in the same database transaction as the canonical row, so the feed never depends on a background worker being healthy.                                                                                                                       |
+| External dispatch | Worker-only dispatcher (ADR-052): a BullMQ wake job and a `FOR UPDATE SKIP LOCKED` recovery `@Cron` drain due `PENDING` deliveries; Postgres owns the retry schedule, leases, and immutable attempts. A lost wake (or `notifyTx`) is still drained by the poller. |
+| Email channel     | Worker-only adapter over `EmailService.send()` (never the email queue) with a stable provider idempotency key `notification-delivery:<id>`. Verified-destination only.                                                                                            |
+| Retention         | Daily worker-only sweep: archived −30d, read −90d, unread −180d, finished attempts −30d. Never deletes a notification with an active external delivery.                                                                                                           |
+| Idempotency       | Required namespaced key (`dotted.namespace:occurrence-id`) + payload fingerprint. Same key + same fingerprint = safe replay; same key + different fingerprint = stable conflict.                                                                                  |
+| Preferences       | Master toggle (`UserSettings.notificationsEnabled`) plus per-`(category, channel)` user override. Mandatory channels bypass the master toggle and are locked in the preferences read response.                                                                    |
+| Feed              | Cursor pagination by `(createdAt DESC, id DESC)`; no `total`. Unread count is a separate exact endpoint.                                                                                                                                                          |
+| i18n              | Structured, language-agnostic payload in the database. `title` / `body` are rendered server-side in the recipient's current `User.locale` at feed read time, never stored as text.                                                                                |
+| Capabilities      | `GET /notifications/capabilities` lists only currently active channels and per-category support — no dead enum value is advertised.                                                                                                                               |
+| Tests             | Unit + Testcontainers e2e cover the producer, feed, preferences, cursor under concurrent insert, transactional rollback, and idempotency replay/conflict.                                                                                                         |
 
 ## Mental Model
 
@@ -42,7 +47,7 @@ recipient, or delivery channel. The HTTP surface is read/update only.
 | Channel    | Status                                  | Where                                                                                                                                                         |
 | ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `in_app`   | **Shipped**, synchronous-in-transaction | Today.                                                                                                                                                        |
-| `email`    | Planned                                 | Worker-only adapter over [`EmailService.send()`](../../apps/api/src/infrastructure/email/) with a stable provider idempotency key.                            |
+| `email`    | **Shipped**, worker-driven durable      | Worker-only adapter over [`EmailService.send()`](../../apps/api/src/infrastructure/email/) with a stable provider idempotency key; verified-destination only. |
 | `telegram` | Planned                                 | Direct Bot API client, hashed one-time `/start` link tokens, dedicated webhook verifier on top of [`docs/operations/webhooks.md`](../operations/webhooks.md). |
 | `web_push` | Deferred to the frontend phase          | Backend, service worker, VAPID config, and browser permission UX ship together.                                                                               |
 
@@ -92,10 +97,11 @@ In the read response:
 - `mandatory: true` means at least one definition in the category forces this
   channel; the override cannot disable it and a `PUT` is rejected.
 
-The starter ships one informational definition (`account.profile_updated`,
-in-app only), so the only meaningful preference today is the master toggle.
-The resolver is exercised end-to-end as soon as a fork adds a definition with a
-mandatory or externally-defaulted channel.
+The starter ships two definitions: `account.profile_updated` (informational,
+in-app only) and `account.password_changed` (security; in-app **and** email,
+both mandatory). The latter exercises the resolver end-to-end — its email and
+in-app deliveries are locked on in the preferences response and a `PUT` that
+tries to disable either is rejected `400`.
 
 ## Adding a Notification Definition
 
@@ -208,33 +214,82 @@ The check is atomic — implemented as `INSERT … ON CONFLICT DO NOTHING
 RETURNING`, so a conflict never aborts the caller's transaction when using
 `notifyTx`.
 
-## Content Sensitivity (Forward-Looking)
+## External Delivery, Retry, and Recovery
 
-Each definition declares a `contentClass` (`PUBLIC | PERSONAL | SENSITIVE`)
-and a per-channel `externalModeByChannel`
-(`detailed | generic | forbidden`). In the in-app-only starter the
-classification has no externally-visible effect, but it is the contract
-external adapters will read once they ship — `SENSITIVE` definitions default to
-a neutral summary on email/Telegram instead of the full payload.
+External deliveries (email today) are durable and worker-driven (ADR-052).
+`notify()` writes one `PENDING` `NotificationDelivery` per resolved external
+target in the producer transaction, then best-effort enqueues a BullMQ **wake
+job** (`notifications` queue, `attempts: 1`) after commit. `notifyTx` writes the
+same rows but enqueues nothing — the caller owns commit timing.
+
+The worker drains due deliveries with a `FOR UPDATE SKIP LOCKED` claim, so the
+wake job and a recovery `@Cron` (every 30s, on **every** replica, deliberately
+**not** singleton-locked) are both safe and de-duplicated by the database:
+
+- **Postgres owns retry**, not BullMQ. A claim leases the row (`PROCESSING`,
+  2-min TTL), bumps `attemptCount`, and inserts an in-flight attempt. The
+  provider call runs outside any transaction, bounded by a 10s timeout.
+- **Finalize is a CAS** on `(id, status=PROCESSING, leaseToken)` plus the attempt
+  close, in one transaction — a stale lease holder can never overwrite newer
+  state, and a crash can't leave a delivered row with an open attempt.
+- **Transient** failure → `RETRY_SCHEDULED` with exponential backoff
+  (`30s → 60s → 120s → 240s`, cap 15 min, ±20% jitter) until `maxAttempts` (5),
+  then terminal `FAILED` (dead-lettered). **Permanent** failure → terminal
+  `FAILED` immediately (also dead-lettered).
+- A **crashed worker's** expired lease is reclaimed by the reaper: the open
+  attempt is marked `ABANDONED` and the delivery is rescheduled (or failed if the
+  budget is exhausted).
+- A **lost wake** (Redis outage on enqueue) or a `notifyTx` delivery is still
+  found by the recovery poller — at-least-once with provider-side idempotency.
+
+### Email channel
+
+The email adapter (worker-only) renders via the definition and calls
+[`EmailService.send()`](../../apps/api/src/infrastructure/email/) directly with a
+stable idempotency key `notification-delivery:<deliveryId>` — it **never**
+enqueues the email queue (secret-bearing/transactional emails keep their own
+direct paths). Email goes to a **verified destination only**: if the recipient's
+account email is unverified, the email delivery is recorded `SKIPPED`
+(`destination_unverified`), never `PENDING` — the mandatory in-app delivery still
+guarantees the user sees the event. Mail is sent to the produce-time canonical
+verified address snapshot (`targetKey`), not necessarily the display-form
+address.
+
+A successful **password reset** promotes `User.emailVerified = true` in the reset
+transaction (the single-use token, delivered to and returned from the account
+mailbox, proves control of it — OWASP/NIST), so the post-reset
+`account.password_changed` alert is always deliverable by email.
+
+### Retention
+
+A daily worker-only `@Cron` (singleton-locked; a skipped run self-repairs next
+night) batch-deletes aged rows: archived −30d, read −90d, unread −180d, finished
+attempts −30d. It never deletes a notification that still has an active
+(`PENDING`/`PROCESSING`/`RETRY_SCHEDULED`) external delivery. The feed is **not**
+an audit log — durable security events live in `AuditLog` (ADR-045).
+
+## Content Sensitivity
+
+Each definition declares a `contentClass` (`PUBLIC | PERSONAL | SENSITIVE`) and a
+per-channel `externalModeByChannel` (`detailed | generic | forbidden`). On an
+external channel resolved to `detailed`, the adapter renders **only** the
+definition's `projectExternal(channel, payload)` allowlisted projection via
+`renderEmail` — never the raw payload. `PERSONAL`/`SENSITIVE` default to a neutral
+generic summary + a safe first-party action; a definition may explicitly override
+a channel to `detailed` (as `account.password_changed` does for email, projecting
+only the non-secret change time).
 
 Secrets (password-reset tokens, verification tokens, credentials) are
-**forbidden** in the notifications subsystem entirely; they remain in the
-existing direct-email paths and must never appear in a `Notification.payload`,
-a queue job, or a delivery attempt log.
+**forbidden** in the notifications subsystem entirely (`SECRET` content is
+rejected at registration); they remain in the existing direct-email paths and
+must never appear in a `Notification.payload`, a queue job, or a delivery attempt
+log.
 
 ## What's Not in the Starter Yet
 
 These are intentional later-arc deliveries — additive over the
-producer/feed/preferences contract, not gaps in the current scope:
+producer/feed/preferences/dispatch contract, not gaps in the current scope:
 
-- **External-channel dispatch** — worker-driven BullMQ wake jobs, durable retry
-  schedule in Postgres, lease/CAS claim mechanism, immutable attempt history,
-  retention cleanup. The durable schema reserves the columns; no dispatcher
-  runs yet.
-- **Email channel** — synchronous in-process adapter over `EmailService.send()`
-  with a stable provider idempotency key
-  (`notification-delivery:<deliveryId>`). Never enqueues the existing email
-  queue from inside the notification subsystem.
 - **Telegram channel** — direct Bot API client (no framework dependency),
   one-time hashed `/start` link tokens, durable `update_id` deduplication, and
   a dedicated `X-Telegram-Bot-Api-Secret-Token` constant-time verifier on top
@@ -254,10 +309,11 @@ producer/feed/preferences contract, not gaps in the current scope:
 
 ## Tests
 
-| Surface                                                                                                                                                                                                                                                                                                                                  | Where                                                                                                                                                                      |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Definition registry, payload validation, safe projection, preference resolution, idempotency fingerprint, cursor codec, in-app render, producer behavior                                                                                                                                                                                 | Unit specs alongside the module under [`apps/api/src/core/notifications/`](../../apps/api/src/core/notifications/)                                                         |
-| Feed auth/isolation + DESC order + locale render, unread count, mark/archive (idempotent, recipient-scoped), capabilities, preferences read + upsert + unknown-pair / malformed reject, master toggle PATCH, cursor under concurrent insert, `notifyTx` rollback atomicity, same-key dup-fingerprint match / mismatch, OpenAPI inventory | [`apps/api/test/notifications.e2e-spec.ts`](../../apps/api/test/notifications.e2e-spec.ts), [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts) |
+| Surface                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Where                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Definition registry, payload validation, safe projection, preference resolution, idempotency fingerprint, cursor codec, in-app render, producer behavior                                                                                                                                                                                                                                                                                                                                    | Unit specs alongside the module under [`apps/api/src/core/notifications/`](../../apps/api/src/core/notifications/)                                                         |
+| Feed auth/isolation + DESC order + locale render, unread count, mark/archive (idempotent, recipient-scoped), capabilities, preferences read + upsert + unknown-pair / malformed reject, mandatory-channel reject, master toggle PATCH, cursor under concurrent insert, `notifyTx` rollback atomicity, same-key dup-fingerprint match / mismatch, password-reset → `emailVerified` promotion + email delivery materialization, retention by-state + active-delivery guard, OpenAPI inventory | [`apps/api/test/notifications.e2e-spec.ts`](../../apps/api/test/notifications.e2e-spec.ts), [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts) |
+| Durable dispatcher against real Postgres: `FOR UPDATE SKIP LOCKED` disjoint claim, stale-holder CAS rejection, transient/permanent/exhausted attempt history, expired-lease reaper, recovery poller drains a wake-less committed delivery                                                                                                                                                                                                                                                   | [`apps/api/test/notification-dispatch.e2e-spec.ts`](../../apps/api/test/notification-dispatch.e2e-spec.ts)                                                                 |
 
 E2E uses real PostgreSQL + Redis via Testcontainers; no infrastructure is
 mocked. See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for run commands.
@@ -266,6 +322,6 @@ mocked. See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for run commands.
 
 - Backend architecture & conventions — [`docs/backend/architecture-and-conventions.md`](../backend/architecture-and-conventions.md)
 - Webhook verification primitive (used by the future Telegram channel) — [`docs/operations/webhooks.md`](../operations/webhooks.md)
-- Email infrastructure (the future email channel's underlying provider) — [`apps/api/src/infrastructure/email/`](../../apps/api/src/infrastructure/email/)
-- Queue infrastructure (the future dispatcher's wake/execution path) — [`apps/api/src/infrastructure/queue/README.md`](../../apps/api/src/infrastructure/queue/README.md)
+- Email infrastructure (the email channel's underlying provider) — [`apps/api/src/infrastructure/email/`](../../apps/api/src/infrastructure/email/)
+- Queue infrastructure (the dispatcher's wake/execution path) — [`apps/api/src/infrastructure/queue/README.md`](../../apps/api/src/infrastructure/queue/README.md)
 - HTTP idempotency (separate primitive, not used by the producer's own dedupe) — [`docs/operations/idempotency.md`](../operations/idempotency.md)

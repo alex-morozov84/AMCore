@@ -11,20 +11,6 @@ describe('sendEmailJobDataSchema (EQS-07 runtime validation)', () => {
     expect(result.success).toBe(true)
   })
 
-  it('accepts a valid password-changed job', () => {
-    const result = sendEmailJobDataSchema.safeParse({
-      template: EmailTemplate.PASSWORD_CHANGED,
-      to: 'user@example.com',
-      data: {
-        name: 'User',
-        changedAt: new Date().toISOString(),
-        loginUrl: 'https://app/login',
-        supportEmail: 'support@example.com',
-      },
-    })
-    expect(result.success).toBe(true)
-  })
-
   it('rejects a secret-bearing template (not in the queueable union)', () => {
     const result = sendEmailJobDataSchema.safeParse({
       template: EmailTemplate.PASSWORD_RESET,

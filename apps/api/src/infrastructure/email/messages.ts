@@ -49,19 +49,6 @@ export const emailMessages = {
       'Если вы не регистрировались на AMCore, проигнорируйте это письмо.',
     'emailVerification.footer': 'С уважением, команда AMCore',
 
-    // Password Changed Notification
-    'passwordChanged.subject': 'Ваш пароль был изменен',
-    'passwordChanged.preview': 'Ваш пароль был успешно изменен',
-    'passwordChanged.title': 'Пароль изменен',
-    'passwordChanged.greeting': 'Привет, {name}!',
-    'passwordChanged.intro': 'Ваш пароль был успешно изменен {changedAt}.',
-    'passwordChanged.sessionsInfo':
-      'В целях безопасности, все ваши активные сессии были завершены.',
-    'passwordChanged.buttonText': 'Войти',
-    'passwordChanged.securityWarning':
-      'Если это были не вы, немедленно свяжитесь с нами по адресу {supportEmail}',
-    'passwordChanged.footer': 'С уважением, команда AMCore',
-
     // Organization Invite
     'orgInvite.subject': 'Приглашение в организацию {orgName}',
     'orgInvite.preview': '{inviterName} приглашает вас в {orgName} на AMCore',
@@ -74,6 +61,13 @@ export const emailMessages = {
     'orgInvite.expiresInfo': 'Это приглашение действительно в течение {expiresIn}.',
     'orgInvite.ignoreInfo': 'Если вы не ожидали это приглашение, просто проигнорируйте письмо.',
     'orgInvite.footer': 'С уважением, команда AMCore',
+
+    // Notification Email (generic chrome; title/body are rendered by the dispatcher)
+    'notification.preview': 'Новое уведомление от AMCore',
+    'notification.openButton': 'Открыть AMCore',
+    'notification.genericTitle': 'Новое уведомление',
+    'notification.genericBody': 'У вас новое уведомление. Откройте AMCore, чтобы посмотреть.',
+    'notification.footer': 'С уважением, команда AMCore',
   },
   en: {
     // Welcome Email
@@ -109,18 +103,6 @@ export const emailMessages = {
     'emailVerification.ignoreInfo': 'If you did not sign up for AMCore, please ignore this email.',
     'emailVerification.footer': 'Best regards, AMCore team',
 
-    // Password Changed Notification
-    'passwordChanged.subject': 'Your password was changed',
-    'passwordChanged.preview': 'Your password was successfully changed',
-    'passwordChanged.title': 'Password Changed',
-    'passwordChanged.greeting': 'Hi, {name}!',
-    'passwordChanged.intro': 'Your password was successfully changed {changedAt}.',
-    'passwordChanged.sessionsInfo': 'For security, all your active sessions have been logged out.',
-    'passwordChanged.buttonText': 'Log In',
-    'passwordChanged.securityWarning':
-      'If this was not you, please contact us immediately at {supportEmail}',
-    'passwordChanged.footer': 'Best regards, AMCore team',
-
     // Organization Invite
     'orgInvite.subject': 'Invitation to join {orgName}',
     'orgInvite.preview': '{inviterName} invited you to {orgName} on AMCore',
@@ -133,5 +115,12 @@ export const emailMessages = {
     'orgInvite.expiresInfo': 'This invitation is valid for {expiresIn}.',
     'orgInvite.ignoreInfo': 'If you were not expecting this invitation, simply ignore this email.',
     'orgInvite.footer': 'Best regards, AMCore team',
+
+    // Notification Email (generic chrome; title/body are rendered by the dispatcher)
+    'notification.preview': 'New notification from AMCore',
+    'notification.openButton': 'Open AMCore',
+    'notification.genericTitle': 'New notification',
+    'notification.genericBody': 'You have a new notification. Open AMCore to view it.',
+    'notification.footer': 'Best regards, AMCore team',
   },
 } as const

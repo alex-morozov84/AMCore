@@ -1,11 +1,14 @@
 import type { INestApplication } from '@nestjs/common'
+import { NotificationAttemptOutcome, NotificationDeliveryStatus } from '@prisma/client'
 import request from 'supertest'
 
+import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import {
   NotificationCategory,
   NotificationChannel,
 } from '../src/core/notifications/notification.constants'
 import { NotificationIdempotencyConflictError } from '../src/core/notifications/notification.errors'
+import { NotificationRetentionService } from '../src/core/notifications/notification-retention.service'
 import { NotificationsService } from '../src/core/notifications/notifications.service'
 import type { PrismaService } from '../src/prisma'
 
@@ -51,22 +54,27 @@ async function registerUser(
  * Arc A.7 — Testcontainers e2e merge gate for the notifications feed + preferences
  * HTTP surface and the producer's transactional/idempotency guarantees.
  *
- * Out of scope (Arc B+): worker/processor, BullMQ recovery, leases/retries, email
- * adapter, SSE; mandatory-channel preference rejection (no definition currently
- * declares a mandatory channel — the security/email definition arrives in Arc B);
- * full process-role boundary checks (process-role.e2e-spec.ts).
+ * Out of scope (Arc B dispatcher internals): lease/retry/SKIP-LOCKED claim proofs and
+ * the email send delivery state machine (those are the B.7 Testcontainers gate); SSE;
+ * full process-role boundary checks (process-role.e2e-spec.ts). The mandatory-channel
+ * preference rejection and the first external (email) delivery materialization are
+ * covered below via the `account.password_changed` security definition (B.5).
  */
 describe('Notifications (e2e)', () => {
   let app: INestApplication
   let prisma: PrismaService
   let context: E2ETestContext
   let notifications: NotificationsService
+  let tokenManager: TokenManagerService
+  let retention: NotificationRetentionService
 
   beforeAll(async () => {
     context = await setupE2ETest()
     app = context.app
     prisma = context.prisma
     notifications = app.get(NotificationsService, { strict: false })
+    tokenManager = app.get(TokenManagerService, { strict: false })
+    retention = app.get(NotificationRetentionService, { strict: false })
   }, 120000)
 
   afterAll(async () => {
@@ -377,19 +385,25 @@ describe('Notifications (e2e)', () => {
       await request(app.getHttpServer()).get('/notifications/capabilities').expect(401)
     })
 
-    it('returns the active starter capabilities (only the in-app channel)', async () => {
+    it('returns the active starter capabilities (in-app + email; security is mandatory)', async () => {
       const user = await registerUser(app)
       const res = await request(app.getHttpServer())
         .get('/notifications/capabilities')
         .set('Authorization', user.authHeader)
         .expect(200)
       expect(res.body).toEqual({
-        channels: [NotificationChannel.IN_APP],
+        channels: [NotificationChannel.EMAIL, NotificationChannel.IN_APP],
         categories: [
           {
             category: NotificationCategory.ACCOUNT,
             channels: [NotificationChannel.IN_APP],
             overridableChannels: [NotificationChannel.IN_APP],
+          },
+          {
+            // account.password_changed: both channels mandatory → nothing overridable.
+            category: NotificationCategory.SECURITY,
+            channels: [NotificationChannel.EMAIL, NotificationChannel.IN_APP],
+            overridableChannels: [],
           },
         ],
       })
@@ -414,6 +428,19 @@ describe('Notifications (e2e)', () => {
           channel: NotificationChannel.IN_APP,
           enabled: null,
           mandatory: false,
+        },
+        // account.password_changed — both channels mandatory (a security alert).
+        {
+          category: NotificationCategory.SECURITY,
+          channel: NotificationChannel.EMAIL,
+          enabled: null,
+          mandatory: true,
+        },
+        {
+          category: NotificationCategory.SECURITY,
+          channel: NotificationChannel.IN_APP,
+          enabled: null,
+          mandatory: true,
         },
       ])
     })
@@ -480,15 +507,29 @@ describe('Notifications (e2e)', () => {
 
     it('rejects an unknown (category, channel) combination with 400', async () => {
       const user = await registerUser(app)
+      // ACCOUNT supports only in-app (account.profile_updated), so account+email is unknown.
       await request(app.getHttpServer())
         .put('/notifications/preferences')
         .set('Authorization', user.authHeader)
         .send({
-          category: NotificationCategory.SECURITY,
-          channel: NotificationChannel.IN_APP,
+          category: NotificationCategory.ACCOUNT,
+          channel: NotificationChannel.EMAIL,
           enabled: false,
         })
         .expect(400)
+    })
+
+    it('rejects disabling a mandatory security channel with 400', async () => {
+      const user = await registerUser(app)
+      // account.password_changed makes both security channels mandatory — neither the
+      // email nor the in-app delivery of a password-change alert can be silenced.
+      for (const channel of [NotificationChannel.EMAIL, NotificationChannel.IN_APP]) {
+        await request(app.getHttpServer())
+          .put('/notifications/preferences')
+          .set('Authorization', user.authHeader)
+          .send({ category: NotificationCategory.SECURITY, channel, enabled: false })
+          .expect(400)
+      }
     })
 
     it('rejects a malformed body with 400', async () => {
@@ -620,6 +661,179 @@ describe('Notifications (e2e)', () => {
           idempotencyKey,
         })
       ).rejects.toBeInstanceOf(NotificationIdempotencyConflictError)
+    })
+  })
+
+  describe('account.password_changed (password reset → security alert)', () => {
+    it('promotes emailVerified and materializes in-app + email deliveries', async () => {
+      const user = await registerUser(app)
+      // A freshly registered account is unverified — the verified-only email resolver
+      // would otherwise SKIP its email delivery.
+      const before = await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })
+      expect(before.emailVerified).toBe(false)
+
+      // Mint a real reset token (the raw token is normally emailed) and drive the
+      // public reset endpoint.
+      const { token } = await tokenManager.generatePasswordResetToken(user.userId)
+      await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token, password: 'BrandNewP@ss1' })
+        .expect(204)
+
+      // The consumed reset token proves mailbox control → emailVerified is promoted.
+      const after = await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })
+      expect(after.emailVerified).toBe(true)
+
+      // The security notification was produced via the durable subsystem.
+      const notification = await prisma.notification.findFirstOrThrow({
+        where: { recipientUserId: user.userId, type: 'account.password_changed' },
+      })
+      expect(notification.category).toBe(NotificationCategory.SECURITY)
+
+      const deliveries = await prisma.notificationDelivery.findMany({
+        where: { notificationId: notification.id },
+      })
+      const inApp = deliveries.find((d) => d.channel === NotificationChannel.IN_APP)
+      const email = deliveries.find((d) => d.channel === NotificationChannel.EMAIL)
+
+      // In-app is delivered synchronously; the feed never waits on the worker.
+      expect(inApp?.status).toBe('DELIVERED')
+      // The email delivery is materialized as real work (verified destination), NOT
+      // SKIPPED as unverified — proving the in-transaction promotion. It is then drained
+      // by the worker, so accept any live/terminal-success state, just not SKIPPED.
+      expect(email).toBeDefined()
+      expect(email?.status).not.toBe('SKIPPED')
+      expect(email?.terminalReasonCode).not.toBe('destination_unverified')
+    })
+  })
+
+  describe('retention (NotificationRetentionService.runRetention)', () => {
+    const daysAgo = (n: number): Date => new Date(Date.now() - n * 24 * 60 * 60 * 1000)
+
+    let seq = 0
+    async function makeNotification(
+      userId: string,
+      overrides: { createdAt?: Date; readAt?: Date | null; archivedAt?: Date | null } = {}
+    ): Promise<string> {
+      seq += 1
+      const row = await prisma.notification.create({
+        data: {
+          recipientUserId: userId,
+          type: 'account.profile_updated',
+          category: NotificationCategory.ACCOUNT,
+          schemaVersion: 1,
+          payload: { updatedFields: ['name'] },
+          idempotencyKey: `account.profile_updated:retention-${Date.now()}-${seq}`,
+          idempotencyFingerprint: `fp-${Date.now()}-${seq}`,
+          occurredAt: overrides.createdAt ?? new Date(),
+          createdAt: overrides.createdAt ?? new Date(),
+          readAt: overrides.readAt ?? null,
+          archivedAt: overrides.archivedAt ?? null,
+        },
+        select: { id: true },
+      })
+      return row.id
+    }
+
+    it('deletes aged feed rows by state but keeps recent ones and active deliveries', async () => {
+      const user = await registerUser(app)
+
+      const staleArchived = await makeNotification(user.userId, { archivedAt: daysAgo(40) })
+      const staleRead = await makeNotification(user.userId, { readAt: daysAgo(100) })
+      const staleUnread = await makeNotification(user.userId, { createdAt: daysAgo(200) })
+      const recentUnread = await makeNotification(user.userId, { createdAt: daysAgo(5) })
+      const recentlyArchived = await makeNotification(user.userId, { archivedAt: daysAgo(5) })
+
+      // Aged-out by every window, but it still has an active (PENDING) external delivery,
+      // so the cascade must NOT remove it.
+      const archivedButActive = await makeNotification(user.userId, { archivedAt: daysAgo(40) })
+      await prisma.notificationDelivery.create({
+        data: {
+          notificationId: archivedButActive,
+          channel: NotificationChannel.EMAIL,
+          targetKey: user.email,
+          locale: 'ru',
+          status: NotificationDeliveryStatus.PENDING,
+          maxAttempts: 5,
+          // Not due, so the background recovery poller never claims/drains it during the
+          // test — it stays a deterministically "active" PENDING row.
+          availableAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      })
+
+      const result = await retention.runRetention()
+
+      expect(result.archivedNotifications).toBeGreaterThanOrEqual(1)
+      expect(result.readNotifications).toBeGreaterThanOrEqual(1)
+      expect(result.unreadNotifications).toBeGreaterThanOrEqual(1)
+      expect(result.failures).toEqual([])
+
+      const surviving = await prisma.notification.findMany({
+        where: { recipientUserId: user.userId },
+        select: { id: true },
+      })
+      const ids = surviving.map((r) => r.id)
+      expect(ids).not.toContain(staleArchived)
+      expect(ids).not.toContain(staleRead)
+      expect(ids).not.toContain(staleUnread)
+      expect(ids).toContain(recentUnread)
+      expect(ids).toContain(recentlyArchived)
+      // Active external work is never auto-deleted.
+      expect(ids).toContain(archivedButActive)
+    })
+
+    it('prunes finished attempts older than the window but keeps in-flight/recent ones', async () => {
+      const user = await registerUser(app)
+      const notificationId = await makeNotification(user.userId, { createdAt: daysAgo(1) })
+      const delivery = await prisma.notificationDelivery.create({
+        data: {
+          notificationId,
+          channel: NotificationChannel.EMAIL,
+          targetKey: user.email,
+          locale: 'ru',
+          status: NotificationDeliveryStatus.RETRY_SCHEDULED,
+          maxAttempts: 5,
+          // Keep it out of the due-set so the background poller does not re-attempt it
+          // mid-test (we only care about its attempt-history pruning here).
+          availableAt: new Date(Date.now() + 60 * 60 * 1000),
+          nextAttemptAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+        select: { id: true },
+      })
+
+      const oldAttempt = await prisma.notificationDeliveryAttempt.create({
+        data: {
+          deliveryId: delivery.id,
+          attemptNumber: 1,
+          leaseToken: 'lease-old',
+          startedAt: daysAgo(40),
+          finishedAt: daysAgo(40),
+          outcome: NotificationAttemptOutcome.TRANSIENT_FAILURE,
+        },
+        select: { id: true },
+      })
+      const inFlightAttempt = await prisma.notificationDeliveryAttempt.create({
+        data: {
+          deliveryId: delivery.id,
+          attemptNumber: 2,
+          leaseToken: 'lease-live',
+          startedAt: new Date(),
+          finishedAt: null,
+        },
+        select: { id: true },
+      })
+
+      const result = await retention.runRetention()
+      expect(result.finishedAttempts).toBeGreaterThanOrEqual(1)
+
+      const remaining = await prisma.notificationDeliveryAttempt.findMany({
+        where: { deliveryId: delivery.id },
+        select: { id: true },
+      })
+      const ids = remaining.map((r) => r.id)
+      expect(ids).not.toContain(oldAttempt.id)
+      // An in-flight attempt (finishedAt null) is never pruned by age.
+      expect(ids).toContain(inFlightAttempt.id)
     })
   })
 })

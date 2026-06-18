@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { PasswordChangedEmailData, WelcomeEmailData } from './email.types'
+import type { WelcomeEmailData } from './email.types'
 import { EmailTemplate } from './email.types'
 
 /**
@@ -30,29 +30,18 @@ export const welcomeEmailDataSchema = z.object({
   locale: localeSchema.optional(),
 }) satisfies z.ZodType<WelcomeEmailData>
 
-export const passwordChangedEmailDataSchema = z.object({
-  name: z.string(),
-  changedAt: z.string(),
-  loginUrl: z.string(),
-  supportEmail: z.string(),
-  locale: localeSchema.optional(),
-}) satisfies z.ZodType<PasswordChangedEmailData>
-
 /**
  * Discriminated union on `template`. `z.literal(EmailTemplate.X)` keeps the
  * inferred `template` as the enum member, so `SendEmailJobData['template']`
- * equals `QueueableEmailTemplate`.
+ * equals `QueueableEmailTemplate`. `WELCOME` is the only queueable template today
+ * (the password-changed alert moved to the durable notifications subsystem); the
+ * union shape stays so a future queueable template is a one-line addition.
  */
 export const sendEmailJobDataSchema = z.discriminatedUnion('template', [
   z.object({
     template: z.literal(EmailTemplate.WELCOME),
     to: z.email(),
     data: welcomeEmailDataSchema,
-  }),
-  z.object({
-    template: z.literal(EmailTemplate.PASSWORD_CHANGED),
-    to: z.email(),
-    data: passwordChangedEmailDataSchema,
   }),
 ])
 

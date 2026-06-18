@@ -23,6 +23,8 @@ let WorkerModule: Token
 let AdminController: Token
 let AuthController: Token
 let EmailProcessor: Token
+let NotificationDispatchProcessor: Token
+let NotificationRetentionService: Token
 let MetricsService: Token
 let QueueDepthMetricsCollector: Token
 let QueueService: Token
@@ -72,6 +74,10 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const adminController = await import('../src/core/admin/admin.controller')
     const authController = await import('../src/core/auth/auth.controller')
     const emailProcessor = await import('../src/infrastructure/email/processors/email.processor')
+    const dispatchProcessor =
+      await import('../src/core/notifications/dispatch/notification-dispatch.processor')
+    const retentionService =
+      await import('../src/core/notifications/notification-retention.service')
     const observability = await import('../src/infrastructure/observability')
     const queue = await import('../src/infrastructure/queue')
 
@@ -81,6 +87,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     AdminController = adminController.AdminController
     AuthController = authController.AuthController
     EmailProcessor = emailProcessor.EmailProcessor
+    NotificationDispatchProcessor = dispatchProcessor.NotificationDispatchProcessor
+    NotificationRetentionService = retentionService.NotificationRetentionService
     MetricsService = observability.MetricsService
     QueueDepthMetricsCollector = queue.QueueDepthMetricsCollector
     QueueService = queue.QueueService
@@ -103,6 +111,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
 
     it('has NO BullMQ worker and NO scheduler (so @Cron never fires)', () => {
       absent(m, EmailProcessor)
+      absent(m, NotificationDispatchProcessor)
+      absent(m, NotificationRetentionService)
       absent(m, QueueDepthMetricsCollector)
       absent(m, SchedulerRegistry)
     })
@@ -124,6 +134,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
 
     it('has the BullMQ processor and the scheduler', () => {
       present(m, EmailProcessor)
+      present(m, NotificationDispatchProcessor)
+      present(m, NotificationRetentionService)
       present(m, QueueDepthMetricsCollector)
       present(m, SchedulerRegistry)
     })
@@ -153,6 +165,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, AdminController)
       present(m, QueueService)
       present(m, EmailProcessor)
+      present(m, NotificationDispatchProcessor)
+      present(m, NotificationRetentionService)
       present(m, QueueDepthMetricsCollector)
       present(m, SchedulerRegistry)
     })

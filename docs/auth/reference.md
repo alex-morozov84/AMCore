@@ -190,7 +190,10 @@ Revokes all sessions except the current one.
 
 **Response** `204`
 
-Side effects: All sessions revoked.
+Side effects: the token is consumed atomically (single-use, even under concurrent
+requests); all sessions are revoked; the account email is marked **verified**
+(the reset proves control of the mailbox); and a security notification
+(`account.password_changed`, in-app + email) is emitted.
 
 ---
 
@@ -490,13 +493,13 @@ codes live on `errors[i].errorCode`, **not** the top-level `errorCode`
 
 ### Optional (with defaults)
 
-| Variable                          | Default | Description                    |
-| --------------------------------- | ------- | ------------------------------ |
-| `JWT_EXPIRATION`                  | `15m`   | Access token lifetime          |
-| `JWT_REFRESH_DAYS`                | `7`     | Refresh token lifetime in days |
-| `PASSWORD_RESET_EXPIRY_MINUTES`   | `15`    | Reset link lifetime            |
-| `EMAIL_VERIFICATION_EXPIRY_HOURS` | `48`    | Verification link lifetime     |
-| `SUPPORT_EMAIL`                   | —       | Shown in transactional emails  |
+| Variable                          | Default              | Description                                                          |
+| --------------------------------- | -------------------- | -------------------------------------------------------------------- |
+| `JWT_EXPIRATION`                  | `15m`                | Access token lifetime                                                |
+| `JWT_REFRESH_DAYS`                | `7`                  | Refresh token lifetime in days                                       |
+| `PASSWORD_RESET_EXPIRY_MINUTES`   | `15`                 | Reset link lifetime                                                  |
+| `EMAIL_VERIFICATION_EXPIRY_HOURS` | `48`                 | Verification link lifetime                                           |
+| `SUPPORT_EMAIL`                   | `support@amcore.com` | Operator support/contact address (available to transactional emails) |
 
 ### OAuth providers (all optional)
 

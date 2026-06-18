@@ -30,9 +30,9 @@ describe('AuthService', () => {
   let mockEmailService: {
     sendWelcomeEmail: jest.Mock
     sendPasswordResetEmail: jest.Mock
-    sendPasswordChangedEmail: jest.Mock
     sendEmailVerificationEmail: jest.Mock
   }
+  let mockNotifications: { notify: jest.Mock }
   let mockUserCacheService: jest.Mocked<Pick<UserCacheService, 'invalidateUser'>>
   let mockEnvService: { get: jest.Mock }
   let mockCache: { get: jest.Mock; set: jest.Mock }
@@ -104,8 +104,11 @@ describe('AuthService', () => {
     mockEmailService = {
       sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
-      sendPasswordChangedEmail: jest.fn().mockResolvedValue(undefined),
       sendEmailVerificationEmail: jest.fn().mockResolvedValue(undefined),
+    }
+
+    mockNotifications = {
+      notify: jest.fn().mockResolvedValue({ notificationId: 'n-1', created: true, channels: [] }),
     }
 
     mockUserCacheService = {
@@ -157,6 +160,7 @@ describe('AuthService', () => {
       mockAuditLog as never,
       mockCache as never,
       mockLoginRateLimiter,
+      mockNotifications as never,
       mockLogger
     )
 
@@ -808,61 +812,85 @@ describe('AuthService', () => {
   })
 
   describe('resetPassword', () => {
-    it('should reset password and invalidate sessions', async () => {
-      const tokenHash = 'a'.repeat(64)
+    // `consumeCount` is the atomic CAS result: 1 = this call won the single-use token,
+    // 0 = a racing reset already consumed it.
+    const arrangeResetMocks = (consumeCount = 1): void => {
       mockTokenManager.verifyPasswordResetToken.mockResolvedValue({
+        id: 'reset-token-1',
         userId: mockUser.id,
-        tokenHash,
+        tokenHash: 'a'.repeat(64),
       })
       ;(argon2.hash as jest.Mock).mockResolvedValue('new-hashed-password')
       ;(mockCtx.prisma.$transaction as jest.Mock).mockImplementation(
         (fn: (tx: typeof mockCtx.prisma) => Promise<unknown>) => fn(mockCtx.prisma)
       )
-      mockCtx.prisma.passwordResetToken.update.mockResolvedValue({} as never)
+      mockCtx.prisma.passwordResetToken.updateMany.mockResolvedValue({ count: consumeCount })
       mockCtx.prisma.user.update.mockResolvedValue(mockUser)
       mockSessionService.deleteAllByUserId.mockResolvedValue(undefined)
-      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
+    }
+
+    it('should reset password, promote emailVerified, and emit the security notification', async () => {
+      arrangeResetMocks()
 
       await authService.resetPassword('a'.repeat(64), 'NewPassword123')
 
       expect(mockTokenManager.verifyPasswordResetToken).toHaveBeenCalled()
+      // Single-use consumption is an atomic CAS (used:false + not expired), not a blind update.
+      expect(mockCtx.prisma.passwordResetToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: 'reset-token-1', used: false }),
+          data: expect.objectContaining({ used: true }),
+        })
+      )
       expect(mockSessionService.deleteAllByUserId).toHaveBeenCalledWith(mockUser.id)
       expect(mockUserCacheService.invalidateUser).toHaveBeenCalledWith(mockUser.id)
-      expect(mockEmailService.sendPasswordChangedEmail).toHaveBeenCalled()
+      // The reset transaction promotes emailVerified (proves mailbox control).
+      expect(mockCtx.prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockUser.id },
+          data: expect.objectContaining({ emailVerified: true }),
+        })
+      )
+      // The password-changed alert is produced via the durable subsystem, keyed by the
+      // consumed reset-token id (retry-safe, not the secret token hash).
+      expect(mockNotifications.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientUserId: mockUser.id,
+          type: 'account.password_changed',
+          idempotencyKey: 'account.password_changed:reset-token-1',
+        })
+      )
     })
 
-    it('still resolves when the password-changed email enqueue fails (EQS-06)', async () => {
-      const tokenHash = 'a'.repeat(64)
-      mockTokenManager.verifyPasswordResetToken.mockResolvedValue({
-        userId: mockUser.id,
-        tokenHash,
-      })
-      ;(argon2.hash as jest.Mock).mockResolvedValue('new-hashed-password')
-      ;(mockCtx.prisma.$transaction as jest.Mock).mockImplementation(
-        (fn: (tx: typeof mockCtx.prisma) => Promise<unknown>) => fn(mockCtx.prisma)
-      )
-      mockCtx.prisma.passwordResetToken.update.mockResolvedValue({} as never)
-      mockCtx.prisma.user.update.mockResolvedValue(mockUser)
-      mockSessionService.deleteAllByUserId.mockResolvedValue(undefined)
-      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
-      // Simulate a Redis/BullMQ outage on the queued PASSWORD_CHANGED send.
-      mockEmailService.sendPasswordChangedEmail.mockRejectedValue(new Error('Redis down'))
+    it('still resolves when the password-changed notification fails (best-effort)', async () => {
+      arrangeResetMocks()
+      // Simulate a notifications-subsystem hiccup after the reset has committed.
+      mockNotifications.notify.mockRejectedValue(new Error('db down'))
 
-      // Best-effort fire-and-forget: the reset must NOT reject.
+      // Best-effort: the already-committed reset must NOT reject.
       await expect(
         authService.resetPassword('a'.repeat(64), 'NewPassword123')
       ).resolves.toBeUndefined()
 
-      // Password change + session invalidation still happened.
       expect(mockCtx.prisma.user.update).toHaveBeenCalled()
       expect(mockSessionService.deleteAllByUserId).toHaveBeenCalledWith(mockUser.id)
-
-      // The swallowed failure is logged at warn (flush the microtask queue first).
-      await Promise.resolve()
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({ userId: mockUser.id }),
-        expect.stringContaining('Failed to send password changed email')
+        expect.stringContaining('Failed to emit password-changed notification')
       )
+    })
+
+    it('rejects a token already consumed by a racing reset (CAS matched 0 rows)', async () => {
+      arrangeResetMocks(0)
+
+      await expect(authService.resetPassword('a'.repeat(64), 'NewPassword123')).rejects.toThrow(
+        AppException
+      )
+
+      // The losing reset must not change the password, drop sessions, or emit the alert.
+      expect(mockCtx.prisma.user.update).not.toHaveBeenCalled()
+      expect(mockSessionService.deleteAllByUserId).not.toHaveBeenCalled()
+      expect(mockNotifications.notify).not.toHaveBeenCalled()
     })
   })
 

@@ -140,7 +140,7 @@ Email metrics keep phase and delivery semantics separate:
 - `mode=queued|direct|worker`;
 - `result=success|error|discarded`;
 - `retryable=true|false|unknown`;
-- `template=welcome|password-reset|email-verification|password-changed|org-invite|unknown`.
+- `template=welcome|password-reset|email-verification|org-invite|notification|unknown`.
 
 `dispatch/queued` measures enqueueing, `render` and `send` measure their own
 phases, and `process/worker` measures the complete BullMQ attempt. Secret-bearing

@@ -66,6 +66,11 @@ const bullBoardImports = bullBoardEnabled
         adapter: BullMQAdapter,
         options: { readOnlyMode: bullBoardReadOnly },
       }),
+      BullBoardModule.forFeature({
+        name: QueueName.NOTIFICATIONS,
+        adapter: BullMQAdapter,
+        options: { readOnlyMode: bullBoardReadOnly },
+      }),
     ]
   : []
 
@@ -88,7 +93,11 @@ const bullBoardImports = bullBoardEnabled
     }),
 
     // Register all queues
-    BullModule.registerQueue({ name: QueueName.DEFAULT }, { name: QueueName.EMAIL }),
+    BullModule.registerQueue(
+      { name: QueueName.DEFAULT },
+      { name: QueueName.EMAIL },
+      { name: QueueName.NOTIFICATIONS }
+    ),
 
     // Bull Board dashboard — mounted + auth-protected only when enabled.
     ...bullBoardImports,

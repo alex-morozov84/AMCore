@@ -1,8 +1,8 @@
 /**
  * i18n / render-robustness integration tests (EQS-08).
  *
- * Real React Email rendering (no mocks), Vitest + happy-dom. Covers all five
- * templates in both locales and asserts:
+ * Real React Email rendering (no mocks), Vitest + happy-dom. Covers the welcome,
+ * secret-bearing (reset/verification/invite) templates in both locales and asserts:
  *  - non-empty HTML with the expected localized content,
  *  - NO raw message-id leakage (a missing key would render its literal id),
  *  - a non-empty plaintext alternative (`render(node, { plainText: true })`)
@@ -19,7 +19,6 @@ import { emailMessages, type Locale } from '../messages'
 
 import { EmailVerificationEmail } from './email-verification'
 import { OrgInviteEmail } from './org-invite'
-import { PasswordChangedEmail } from './password-changed'
 import { PasswordResetEmail } from './password-reset'
 import { WelcomeEmail } from './welcome'
 
@@ -60,19 +59,6 @@ const cases: RenderCase[] = [
         locale,
       }),
     expect: { ru: 'Подтвердите', en: 'Verify' },
-  },
-  {
-    name: 'password-changed',
-    namespace: 'passwordChanged',
-    build: (locale) =>
-      PasswordChangedEmail({
-        name: 'Иван',
-        changedAt: '2026-05-30',
-        loginUrl: 'https://app.example.com/login',
-        supportEmail: 'support@example.com',
-        locale,
-      }),
-    expect: { ru: 'Пароль изменен', en: 'Password Changed' },
   },
   {
     name: 'org-invite',
