@@ -176,6 +176,9 @@ describe('NotificationsService', () => {
         terminalReasonCode: 'destination_unverified',
       })
     )
+    // SKIPPED is a terminal non-failure — it must not carry failedAt.
+    const emailRow = createManyArg.data.find((d) => d.channel === NotificationChannel.EMAIL)!
+    expect(emailRow).not.toHaveProperty('failedAt')
     // No deliverable external target → no wake.
     expect(queue.add).not.toHaveBeenCalled()
   })

@@ -28,6 +28,15 @@ interface ClaimedRow {
   maxAttempts: number
 }
 
+/** Shape returned by the raw reaper `SELECT ... FOR UPDATE SKIP LOCKED`. */
+interface ReapRow {
+  id: string
+  attemptCount: number
+  maxAttempts: number
+  // A PROCESSING row always carries a lease token (set at claim time).
+  leaseToken: string
+}
+
 /** Fields written when finalizing an attempt row. */
 interface AttemptFinalization {
   outcome: NotificationAttemptOutcome
@@ -113,27 +122,25 @@ export class NotificationDeliveryRepository {
     })
   }
 
-  /** Provider delivered: mark `DELIVERED` (CAS) and close the attempt. */
+  /** Provider delivered: mark `DELIVERED` and close the attempt — atomically. */
   async finalizeDelivered(
     claim: ClaimedDelivery,
     providerMessageId: string | undefined,
     durationMs: number
   ): Promise<FinalizeResult> {
-    const won = await this.casDelivery(claim, {
-      status: NotificationDeliveryStatus.DELIVERED,
-      deliveredAt: new Date(),
-      providerMessageId: providerMessageId ?? null,
-      nextAttemptAt: null,
-      leaseToken: null,
-      leaseExpiresAt: null,
-    })
-    if (!won) return { state: 'lease_lost' }
-    await this.finalizeAttempt(claim, {
-      outcome: NotificationAttemptOutcome.DELIVERED,
-      providerMessageId,
-      durationMs,
-    })
-    return { state: 'delivered' }
+    const won = await this.finalizeInTx(
+      claim,
+      {
+        status: NotificationDeliveryStatus.DELIVERED,
+        deliveredAt: new Date(),
+        providerMessageId: providerMessageId ?? null,
+        nextAttemptAt: null,
+        leaseToken: null,
+        leaseExpiresAt: null,
+      },
+      { outcome: NotificationAttemptOutcome.DELIVERED, providerMessageId, durationMs }
+    )
+    return won ? { state: 'delivered' } : { state: 'lease_lost' }
   }
 
   /** Transient failure: reschedule with backoff if budget remains, else fail (exhausted). */
@@ -143,43 +150,47 @@ export class NotificationDeliveryRepository {
     durationMs: number
   ): Promise<FinalizeResult> {
     const now = new Date()
-    if (claim.attemptNumber >= claim.maxAttempts) {
-      const won = await this.casDelivery(claim, {
-        status: NotificationDeliveryStatus.FAILED,
-        failedAt: now,
-        lastErrorCode: errorCode,
-        terminalReasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
-        leaseToken: null,
-        leaseExpiresAt: null,
-      })
-      if (!won) return { state: 'lease_lost' }
-      await this.finalizeAttempt(claim, {
-        outcome: NotificationAttemptOutcome.TRANSIENT_FAILURE,
-        errorCode,
-        durationMs,
-      })
-      return {
-        state: 'failed',
-        reasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
-        deadLettered: true,
-      }
-    }
-
-    const nextAttemptAt = computeNextAttemptAt(claim.attemptNumber, now)
-    const won = await this.casDelivery(claim, {
-      status: NotificationDeliveryStatus.RETRY_SCHEDULED,
-      nextAttemptAt,
-      lastErrorCode: errorCode,
-      leaseToken: null,
-      leaseExpiresAt: null,
-    })
-    if (!won) return { state: 'lease_lost' }
-    await this.finalizeAttempt(claim, {
+    const attemptFinal: AttemptFinalization = {
       outcome: NotificationAttemptOutcome.TRANSIENT_FAILURE,
       errorCode,
       durationMs,
-    })
-    return { state: 'retry_scheduled', nextAttemptAt }
+    }
+
+    if (claim.attemptNumber >= claim.maxAttempts) {
+      const won = await this.finalizeInTx(
+        claim,
+        {
+          status: NotificationDeliveryStatus.FAILED,
+          failedAt: now,
+          lastErrorCode: errorCode,
+          terminalReasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
+          leaseToken: null,
+          leaseExpiresAt: null,
+        },
+        attemptFinal
+      )
+      return won
+        ? {
+            state: 'failed',
+            reasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
+            deadLettered: true,
+          }
+        : { state: 'lease_lost' }
+    }
+
+    const nextAttemptAt = computeNextAttemptAt(claim.attemptNumber, now)
+    const won = await this.finalizeInTx(
+      claim,
+      {
+        status: NotificationDeliveryStatus.RETRY_SCHEDULED,
+        nextAttemptAt,
+        lastErrorCode: errorCode,
+        leaseToken: null,
+        leaseExpiresAt: null,
+      },
+      attemptFinal
+    )
+    return won ? { state: 'retry_scheduled', nextAttemptAt } : { state: 'lease_lost' }
   }
 
   /** Permanent failure: terminal `FAILED`, never retried. */
@@ -188,132 +199,134 @@ export class NotificationDeliveryRepository {
     errorCode: string,
     durationMs: number
   ): Promise<FinalizeResult> {
-    const won = await this.casDelivery(claim, {
-      status: NotificationDeliveryStatus.FAILED,
-      failedAt: new Date(),
-      lastErrorCode: errorCode,
-      terminalReasonCode: NotificationTerminalReason.PERMANENT_FAILURE,
-      leaseToken: null,
-      leaseExpiresAt: null,
-    })
-    if (!won) return { state: 'lease_lost' }
-    await this.finalizeAttempt(claim, {
-      outcome: NotificationAttemptOutcome.PERMANENT_FAILURE,
-      errorCode,
-      durationMs,
-    })
-    return {
-      state: 'failed',
-      reasonCode: NotificationTerminalReason.PERMANENT_FAILURE,
-      deadLettered: true,
-    }
+    const won = await this.finalizeInTx(
+      claim,
+      {
+        status: NotificationDeliveryStatus.FAILED,
+        failedAt: new Date(),
+        lastErrorCode: errorCode,
+        terminalReasonCode: NotificationTerminalReason.PERMANENT_FAILURE,
+        leaseToken: null,
+        leaseExpiresAt: null,
+      },
+      { outcome: NotificationAttemptOutcome.PERMANENT_FAILURE, errorCode, durationMs }
+    )
+    return won
+      ? {
+          state: 'failed',
+          reasonCode: NotificationTerminalReason.PERMANENT_FAILURE,
+          deadLettered: true,
+        }
+      : { state: 'lease_lost' }
   }
 
   /**
-   * Reclaim deliveries whose `PROCESSING` lease expired (worker crashed/stalled): mark
-   * the open attempt `ABANDONED`, then reschedule (budget left) or fail (exhausted). Each
-   * transition CASes on the expired token, so a row a healthy worker finalized between
-   * the scan and the update is left untouched.
+   * Reclaim deliveries whose `PROCESSING` lease expired (worker crashed/stalled). Locks
+   * the expired rows with `FOR UPDATE SKIP LOCKED` so concurrent reapers and a healthy
+   * worker's finalize CAS serialize on them, then — in the SAME transaction — transitions
+   * the delivery (reschedule if budget remains, else fail) and closes the open attempt
+   * `ABANDONED`. Holding the row lock first is what makes the delivery+attempt update
+   * atomic and prevents a stale holder from corrupting attempt history.
    */
   async reapExpiredLeases(limit: number = NOTIFICATION_REAP_BATCH_LIMIT): Promise<ReapResult> {
-    const now = new Date()
-    const expired = await this.prisma.notificationDelivery.findMany({
-      where: { status: NotificationDeliveryStatus.PROCESSING, leaseExpiresAt: { lt: now } },
-      select: { id: true, leaseToken: true, attemptCount: true, maxAttempts: true },
-      take: limit,
+    return this.prisma.$transaction(async (tx) => {
+      const now = new Date()
+      const expired = await tx.$queryRaw<ReapRow[]>(Prisma.sql`
+        SELECT id, "attemptCount", "maxAttempts", "leaseToken"
+        FROM "notifications"."notification_deliveries"
+        WHERE status = 'PROCESSING'::"notifications"."NotificationDeliveryStatus"
+          AND "leaseExpiresAt" < now()
+        ORDER BY "leaseExpiresAt"
+        FOR UPDATE SKIP LOCKED
+        LIMIT ${limit}
+      `)
+
+      let rescheduled = 0
+      let deadLettered = 0
+
+      for (const delivery of expired) {
+        const exhausted = delivery.attemptCount >= delivery.maxAttempts
+        // We hold the row lock, so a plain id update is safe and final.
+        await tx.notificationDelivery.update({
+          where: { id: delivery.id },
+          data: exhausted
+            ? {
+                status: NotificationDeliveryStatus.FAILED,
+                failedAt: now,
+                lastErrorCode: NotificationErrorCode.LEASE_EXPIRED,
+                terminalReasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
+                leaseToken: null,
+                leaseExpiresAt: null,
+              }
+            : {
+                status: NotificationDeliveryStatus.RETRY_SCHEDULED,
+                nextAttemptAt: computeNextAttemptAt(delivery.attemptCount, now),
+                lastErrorCode: NotificationErrorCode.LEASE_EXPIRED,
+                leaseToken: null,
+                leaseExpiresAt: null,
+              },
+        })
+
+        // Close the in-flight attempt (only the open one — `outcome: null`).
+        await tx.notificationDeliveryAttempt.updateMany({
+          where: {
+            deliveryId: delivery.id,
+            attemptNumber: delivery.attemptCount,
+            leaseToken: delivery.leaseToken,
+            outcome: null,
+          },
+          data: {
+            finishedAt: now,
+            outcome: NotificationAttemptOutcome.ABANDONED,
+            errorCode: NotificationErrorCode.LEASE_EXPIRED,
+          },
+        })
+
+        if (exhausted) deadLettered += 1
+        else rescheduled += 1
+      }
+
+      return { rescheduled, deadLettered }
     })
+  }
 
-    let rescheduled = 0
-    let deadLettered = 0
-
-    for (const delivery of expired) {
-      if (delivery.leaseToken === null) continue
-
-      // Close the in-flight attempt (only the open one — `outcome: null`).
-      await this.prisma.notificationDeliveryAttempt.updateMany({
+  /**
+   * Atomically finalize a claimed delivery: CAS the delivery on `(id, status=PROCESSING,
+   * leaseToken)` and, only if we still own it, close the attempt — both in one
+   * transaction so a crash can never leave a `DELIVERED` row with an `outcome: null`
+   * attempt. Returns false (lease lost) if the CAS matched no row.
+   */
+  private async finalizeInTx(
+    claim: ClaimedDelivery,
+    deliveryData: Prisma.NotificationDeliveryUpdateManyMutationInput,
+    finalization: AttemptFinalization
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.notificationDelivery.updateMany({
         where: {
-          deliveryId: delivery.id,
-          attemptNumber: delivery.attemptCount,
-          leaseToken: delivery.leaseToken,
-          outcome: null,
+          id: claim.id,
+          status: NotificationDeliveryStatus.PROCESSING,
+          leaseToken: claim.leaseToken,
+        },
+        data: deliveryData,
+      })
+      if (count !== 1) return false
+
+      await tx.notificationDeliveryAttempt.updateMany({
+        where: {
+          deliveryId: claim.id,
+          attemptNumber: claim.attemptNumber,
+          leaseToken: claim.leaseToken,
         },
         data: {
-          finishedAt: now,
-          outcome: NotificationAttemptOutcome.ABANDONED,
-          errorCode: NotificationErrorCode.LEASE_EXPIRED,
+          finishedAt: new Date(),
+          outcome: finalization.outcome,
+          errorCode: finalization.errorCode ?? null,
+          providerMessageId: finalization.providerMessageId ?? null,
+          durationMs: finalization.durationMs ?? null,
         },
       })
-
-      const where = {
-        id: delivery.id,
-        status: NotificationDeliveryStatus.PROCESSING,
-        leaseToken: delivery.leaseToken,
-      }
-
-      if (delivery.attemptCount >= delivery.maxAttempts) {
-        const { count } = await this.prisma.notificationDelivery.updateMany({
-          where,
-          data: {
-            status: NotificationDeliveryStatus.FAILED,
-            failedAt: now,
-            lastErrorCode: NotificationErrorCode.LEASE_EXPIRED,
-            terminalReasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
-            leaseToken: null,
-            leaseExpiresAt: null,
-          },
-        })
-        if (count === 1) deadLettered += 1
-      } else {
-        const { count } = await this.prisma.notificationDelivery.updateMany({
-          where,
-          data: {
-            status: NotificationDeliveryStatus.RETRY_SCHEDULED,
-            nextAttemptAt: computeNextAttemptAt(delivery.attemptCount, now),
-            lastErrorCode: NotificationErrorCode.LEASE_EXPIRED,
-            leaseToken: null,
-            leaseExpiresAt: null,
-          },
-        })
-        if (count === 1) rescheduled += 1
-      }
-    }
-
-    return { rescheduled, deadLettered }
-  }
-
-  /** Optimistic CAS on `(id, leaseToken)` while still `PROCESSING`; true if we won. */
-  private async casDelivery(
-    claim: ClaimedDelivery,
-    data: Prisma.NotificationDeliveryUpdateManyMutationInput
-  ): Promise<boolean> {
-    const { count } = await this.prisma.notificationDelivery.updateMany({
-      where: {
-        id: claim.id,
-        status: NotificationDeliveryStatus.PROCESSING,
-        leaseToken: claim.leaseToken,
-      },
-      data,
-    })
-    return count === 1
-  }
-
-  private async finalizeAttempt(
-    claim: ClaimedDelivery,
-    finalization: AttemptFinalization
-  ): Promise<void> {
-    await this.prisma.notificationDeliveryAttempt.updateMany({
-      where: {
-        deliveryId: claim.id,
-        attemptNumber: claim.attemptNumber,
-        leaseToken: claim.leaseToken,
-      },
-      data: {
-        finishedAt: new Date(),
-        outcome: finalization.outcome,
-        errorCode: finalization.errorCode ?? null,
-        providerMessageId: finalization.providerMessageId ?? null,
-        durationMs: finalization.durationMs ?? null,
-      },
+      return true
     })
   }
 }

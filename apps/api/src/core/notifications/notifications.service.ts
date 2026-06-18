@@ -69,6 +69,16 @@ interface InternalNotifyResult {
 
 const DEFAULT_LOCALE = 'ru'
 
+/**
+ * Canonical channel order (the `NotificationChannel` enum declaration order) applied to
+ * every returned channel list, so the created-path result and an idempotent-replay
+ * result (queried from the DB in any order) report the same deterministic sequence.
+ */
+const CHANNEL_ORDER: readonly NotificationChannel[] = Object.values(NotificationChannel)
+function sortByChannelOrder(channels: NotificationChannel[]): NotificationChannel[] {
+  return [...channels].sort((a, b) => CHANNEL_ORDER.indexOf(a) - CHANNEL_ORDER.indexOf(b))
+}
+
 const NOTIFICATION_IDEMPOTENCY_KEY_MAX = 255
 
 /**
@@ -325,7 +335,8 @@ export class NotificationsService {
           locale: plan.locale,
           status: skipped ? NotificationDeliveryStatus.SKIPPED : NotificationDeliveryStatus.PENDING,
           maxAttempts: NOTIFICATION_EXTERNAL_MAX_ATTEMPTS,
-          ...(skipped ? { terminalReasonCode: target.skipReasonCode, failedAt: new Date() } : {}),
+          // SKIPPED is a terminal non-failure: record the reason, but no failedAt.
+          ...(skipped ? { terminalReasonCode: target.skipReasonCode } : {}),
         })
         if (!skipped) hasPendingExternal = true
         persisted.add(channel)
@@ -340,8 +351,7 @@ export class NotificationsService {
       result: {
         notificationId: created.id,
         created: true,
-        // Deterministic order: the definition's channel order, filtered to persisted.
-        channels: plan.channels.filter((channel) => persisted.has(channel)),
+        channels: sortByChannelOrder(plan.channels.filter((channel) => persisted.has(channel))),
       },
       hasPendingExternal,
     }
@@ -351,14 +361,13 @@ export class NotificationsService {
     client: Prisma.TransactionClient,
     notificationId: string
   ): Promise<NotificationChannel[]> {
-    // Deterministic order once a notification has >1 delivery (A.5 carry-forward):
-    // distinct channels, sorted by the channel identifier.
+    // Deterministic order once a notification has >1 delivery (A.5 carry-forward) AND
+    // identical to the created-path order, so a replay reports the same sequence.
     const rows = await client.notificationDelivery.findMany({
       where: { notificationId },
       select: { channel: true },
       distinct: ['channel'],
-      orderBy: { channel: 'asc' },
     })
-    return rows.map((row) => row.channel as NotificationChannel)
+    return sortByChannelOrder(rows.map((row) => row.channel as NotificationChannel))
   }
 }
