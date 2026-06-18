@@ -423,20 +423,25 @@ export class AuthService {
 
   /** Reset password using token */
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    const {
-      id: resetTokenId,
-      userId,
-      tokenHash,
-    } = await this.tokenManager.verifyPasswordResetToken(token)
+    // Early resolve + reject for a plainly invalid/expired/used token (saves an argon2
+    // hash on garbage). NOT the single-use guard — that is the atomic CAS below.
+    const { id: resetTokenId, userId } = await this.tokenManager.verifyPasswordResetToken(token)
 
     const passwordHash = await argon2.hash(newPassword)
     const changedAt = new Date()
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.passwordResetToken.update({
-        where: { tokenHash },
+    const consumed = await this.prisma.$transaction(async (tx) => {
+      // Atomic single-use consumption (closes the verify→update TOCTOU). The CAS
+      // predicate (`used: false` + not expired) re-evaluates under the row lock, so two
+      // concurrent resets serialize: the first matches 1 row and consumes the token; the
+      // second, after the first commits, matches 0 and is rejected. This keeps the reset
+      // — and the `account.password_changed:<id>` idempotency key — genuinely one per
+      // consumed token, not merely one sequentially.
+      const { count } = await tx.passwordResetToken.updateMany({
+        where: { id: resetTokenId, used: false, expiresAt: { gt: changedAt } },
         data: { used: true, usedAt: changedAt },
       })
+      if (count !== 1) return false
 
       await tx.user.update({
         where: { id: userId },
@@ -447,7 +452,17 @@ export class AuthService {
         // even for a previously unverified account.
         data: { passwordHash, emailVerified: true },
       })
+      return true
     })
+
+    if (!consumed) {
+      // A racing reset won the token between verify and the CAS — reject this one.
+      throw new AppException(
+        'Invalid or expired token',
+        HttpStatus.UNAUTHORIZED,
+        AuthErrorCode.TOKEN_INVALID
+      )
+    }
 
     await this.sessionService.deleteAllByUserId(userId)
     await this.userCacheService.invalidateUser(userId)

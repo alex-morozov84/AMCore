@@ -812,7 +812,9 @@ describe('AuthService', () => {
   })
 
   describe('resetPassword', () => {
-    const arrangeResetMocks = (): void => {
+    // `consumeCount` is the atomic CAS result: 1 = this call won the single-use token,
+    // 0 = a racing reset already consumed it.
+    const arrangeResetMocks = (consumeCount = 1): void => {
       mockTokenManager.verifyPasswordResetToken.mockResolvedValue({
         id: 'reset-token-1',
         userId: mockUser.id,
@@ -822,7 +824,7 @@ describe('AuthService', () => {
       ;(mockCtx.prisma.$transaction as jest.Mock).mockImplementation(
         (fn: (tx: typeof mockCtx.prisma) => Promise<unknown>) => fn(mockCtx.prisma)
       )
-      mockCtx.prisma.passwordResetToken.update.mockResolvedValue({} as never)
+      mockCtx.prisma.passwordResetToken.updateMany.mockResolvedValue({ count: consumeCount })
       mockCtx.prisma.user.update.mockResolvedValue(mockUser)
       mockSessionService.deleteAllByUserId.mockResolvedValue(undefined)
     }
@@ -833,6 +835,13 @@ describe('AuthService', () => {
       await authService.resetPassword('a'.repeat(64), 'NewPassword123')
 
       expect(mockTokenManager.verifyPasswordResetToken).toHaveBeenCalled()
+      // Single-use consumption is an atomic CAS (used:false + not expired), not a blind update.
+      expect(mockCtx.prisma.passwordResetToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: 'reset-token-1', used: false }),
+          data: expect.objectContaining({ used: true }),
+        })
+      )
       expect(mockSessionService.deleteAllByUserId).toHaveBeenCalledWith(mockUser.id)
       expect(mockUserCacheService.invalidateUser).toHaveBeenCalledWith(mockUser.id)
       // The reset transaction promotes emailVerified (proves mailbox control).
@@ -869,6 +878,19 @@ describe('AuthService', () => {
         expect.objectContaining({ userId: mockUser.id }),
         expect.stringContaining('Failed to emit password-changed notification')
       )
+    })
+
+    it('rejects a token already consumed by a racing reset (CAS matched 0 rows)', async () => {
+      arrangeResetMocks(0)
+
+      await expect(authService.resetPassword('a'.repeat(64), 'NewPassword123')).rejects.toThrow(
+        AppException
+      )
+
+      // The losing reset must not change the password, drop sessions, or emit the alert.
+      expect(mockCtx.prisma.user.update).not.toHaveBeenCalled()
+      expect(mockSessionService.deleteAllByUserId).not.toHaveBeenCalled()
+      expect(mockNotifications.notify).not.toHaveBeenCalled()
     })
   })
 
