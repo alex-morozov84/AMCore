@@ -47,11 +47,12 @@ interface AttemptFinalization {
 
 /**
  * Durable delivery state machine (ADR-052). Postgres owns claiming, leasing, the retry
- * schedule, and attempt history. The only raw SQL is the `FOR UPDATE SKIP LOCKED` claim
- * (Prisma has no high-level equivalent); every finalize/reap transition is an optimistic
- * CAS via `updateMany` keyed by `(id, leaseToken)`, so a stale lease holder can never
- * overwrite newer state. No provider I/O happens here — the dispatcher does that between
- * `claimDueBatch` and the finalize call.
+ * schedule, and attempt history. Raw SQL is used only where Prisma has no high-level
+ * equivalent — the `FOR UPDATE SKIP LOCKED` claim and the matching reaper lock; every
+ * finalize/reap transition then CASes (or updates under the held row lock) keyed by
+ * `(id, leaseToken)`, so a stale lease holder can never overwrite newer state, and the
+ * delivery + attempt updates are always one transaction. No provider I/O happens here —
+ * the dispatcher does that between `claimDueBatch` and the finalize call.
  */
 @Injectable()
 export class NotificationDeliveryRepository {

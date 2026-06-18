@@ -29,6 +29,12 @@ export const NOTIFICATION_CLAIM_BATCH_LIMIT = 50
 /** Max expired-lease rows reaped per pass (bounded, like the claim). */
 export const NOTIFICATION_REAP_BATCH_LIMIT = 50
 
+/**
+ * Upper bound on claim batches drained per dispatch invocation, so a single wake/cron
+ * run cannot loop unbounded under a large backlog (the next run continues the drain).
+ */
+export const NOTIFICATION_MAX_DRAIN_CYCLES = 20
+
 /** Exponential backoff schedule for `RETRY_SCHEDULED` (Postgres owns the schedule). */
 export const NOTIFICATION_BACKOFF_BASE_MS = 30 * 1000 // 30 s → 60 → 120 → 240
 export const NOTIFICATION_BACKOFF_CAP_MS = 15 * 60 * 1000 // 15 min
@@ -52,8 +58,11 @@ export const NotificationTerminalReason = {
 export const NotificationErrorCode = {
   LEASE_EXPIRED: 'lease_expired',
   NO_ADAPTER: 'no_adapter',
+  NOTIFICATION_MISSING: 'notification_missing',
   PROVIDER_TRANSIENT: 'provider_transient',
   PROVIDER_PERMANENT: 'provider_permanent',
+  PROVIDER_TIMEOUT: 'provider_timeout',
+  PROVIDER_ERROR: 'provider_error',
 } as const
 
 /**
