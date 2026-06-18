@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
+import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import {
   NotificationCategory,
   NotificationChannel,
@@ -51,22 +52,25 @@ async function registerUser(
  * Arc A.7 — Testcontainers e2e merge gate for the notifications feed + preferences
  * HTTP surface and the producer's transactional/idempotency guarantees.
  *
- * Out of scope (Arc B+): worker/processor, BullMQ recovery, leases/retries, email
- * adapter, SSE; mandatory-channel preference rejection (no definition currently
- * declares a mandatory channel — the security/email definition arrives in Arc B);
- * full process-role boundary checks (process-role.e2e-spec.ts).
+ * Out of scope (Arc B dispatcher internals): lease/retry/SKIP-LOCKED claim proofs and
+ * the email send delivery state machine (those are the B.7 Testcontainers gate); SSE;
+ * full process-role boundary checks (process-role.e2e-spec.ts). The mandatory-channel
+ * preference rejection and the first external (email) delivery materialization are
+ * covered below via the `account.password_changed` security definition (B.5).
  */
 describe('Notifications (e2e)', () => {
   let app: INestApplication
   let prisma: PrismaService
   let context: E2ETestContext
   let notifications: NotificationsService
+  let tokenManager: TokenManagerService
 
   beforeAll(async () => {
     context = await setupE2ETest()
     app = context.app
     prisma = context.prisma
     notifications = app.get(NotificationsService, { strict: false })
+    tokenManager = app.get(TokenManagerService, { strict: false })
   }, 120000)
 
   afterAll(async () => {
@@ -377,19 +381,25 @@ describe('Notifications (e2e)', () => {
       await request(app.getHttpServer()).get('/notifications/capabilities').expect(401)
     })
 
-    it('returns the active starter capabilities (only the in-app channel)', async () => {
+    it('returns the active starter capabilities (in-app + email; security is mandatory)', async () => {
       const user = await registerUser(app)
       const res = await request(app.getHttpServer())
         .get('/notifications/capabilities')
         .set('Authorization', user.authHeader)
         .expect(200)
       expect(res.body).toEqual({
-        channels: [NotificationChannel.IN_APP],
+        channels: [NotificationChannel.EMAIL, NotificationChannel.IN_APP],
         categories: [
           {
             category: NotificationCategory.ACCOUNT,
             channels: [NotificationChannel.IN_APP],
             overridableChannels: [NotificationChannel.IN_APP],
+          },
+          {
+            // account.password_changed: both channels mandatory → nothing overridable.
+            category: NotificationCategory.SECURITY,
+            channels: [NotificationChannel.EMAIL, NotificationChannel.IN_APP],
+            overridableChannels: [],
           },
         ],
       })
@@ -414,6 +424,19 @@ describe('Notifications (e2e)', () => {
           channel: NotificationChannel.IN_APP,
           enabled: null,
           mandatory: false,
+        },
+        // account.password_changed — both channels mandatory (a security alert).
+        {
+          category: NotificationCategory.SECURITY,
+          channel: NotificationChannel.EMAIL,
+          enabled: null,
+          mandatory: true,
+        },
+        {
+          category: NotificationCategory.SECURITY,
+          channel: NotificationChannel.IN_APP,
+          enabled: null,
+          mandatory: true,
         },
       ])
     })
@@ -480,15 +503,29 @@ describe('Notifications (e2e)', () => {
 
     it('rejects an unknown (category, channel) combination with 400', async () => {
       const user = await registerUser(app)
+      // ACCOUNT supports only in-app (account.profile_updated), so account+email is unknown.
       await request(app.getHttpServer())
         .put('/notifications/preferences')
         .set('Authorization', user.authHeader)
         .send({
-          category: NotificationCategory.SECURITY,
-          channel: NotificationChannel.IN_APP,
+          category: NotificationCategory.ACCOUNT,
+          channel: NotificationChannel.EMAIL,
           enabled: false,
         })
         .expect(400)
+    })
+
+    it('rejects disabling a mandatory security channel with 400', async () => {
+      const user = await registerUser(app)
+      // account.password_changed makes both security channels mandatory — neither the
+      // email nor the in-app delivery of a password-change alert can be silenced.
+      for (const channel of [NotificationChannel.EMAIL, NotificationChannel.IN_APP]) {
+        await request(app.getHttpServer())
+          .put('/notifications/preferences')
+          .set('Authorization', user.authHeader)
+          .send({ category: NotificationCategory.SECURITY, channel, enabled: false })
+          .expect(400)
+      }
     })
 
     it('rejects a malformed body with 400', async () => {
@@ -620,6 +657,49 @@ describe('Notifications (e2e)', () => {
           idempotencyKey,
         })
       ).rejects.toBeInstanceOf(NotificationIdempotencyConflictError)
+    })
+  })
+
+  describe('account.password_changed (password reset → security alert)', () => {
+    it('promotes emailVerified and materializes in-app + email deliveries', async () => {
+      const user = await registerUser(app)
+      // A freshly registered account is unverified — the verified-only email resolver
+      // would otherwise SKIP its email delivery.
+      const before = await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })
+      expect(before.emailVerified).toBe(false)
+
+      // Mint a real reset token (the raw token is normally emailed) and drive the
+      // public reset endpoint.
+      const { token } = await tokenManager.generatePasswordResetToken(user.userId)
+      await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token, password: 'BrandNewP@ss1' })
+        .expect(204)
+
+      // The consumed reset token proves mailbox control → emailVerified is promoted.
+      const after = await prisma.user.findUniqueOrThrow({ where: { id: user.userId } })
+      expect(after.emailVerified).toBe(true)
+
+      // The security notification was produced via the durable subsystem.
+      const notification = await prisma.notification.findFirstOrThrow({
+        where: { recipientUserId: user.userId, type: 'account.password_changed' },
+      })
+      expect(notification.category).toBe(NotificationCategory.SECURITY)
+
+      const deliveries = await prisma.notificationDelivery.findMany({
+        where: { notificationId: notification.id },
+      })
+      const inApp = deliveries.find((d) => d.channel === NotificationChannel.IN_APP)
+      const email = deliveries.find((d) => d.channel === NotificationChannel.EMAIL)
+
+      // In-app is delivered synchronously; the feed never waits on the worker.
+      expect(inApp?.status).toBe('DELIVERED')
+      // The email delivery is materialized as real work (verified destination), NOT
+      // SKIPPED as unverified — proving the in-transaction promotion. It is then drained
+      // by the worker, so accept any live/terminal-success state, just not SKIPPED.
+      expect(email).toBeDefined()
+      expect(email?.status).not.toBe('SKIPPED')
+      expect(email?.terminalReasonCode).not.toBe('destination_unverified')
     })
   })
 })

@@ -9,7 +9,6 @@ import type {
   EmailVerificationData,
   NotificationEmailData,
   OrgInviteEmailData,
-  PasswordChangedEmailData,
   PasswordResetEmailData,
   RenderableEmailData,
   RenderableEmailTemplate,
@@ -23,7 +22,6 @@ import type { Locale } from './messages'
 import { EmailVerificationEmail, getEmailVerificationSubject } from './templates/email-verification'
 import { NotificationEmail } from './templates/notification'
 import { getOrgInviteSubject, OrgInviteEmail } from './templates/org-invite'
-import { getPasswordChangedSubject, PasswordChangedEmail } from './templates/password-changed'
 import { getPasswordResetSubject, PasswordResetEmail } from './templates/password-reset'
 import { getWelcomeSubject, WelcomeEmail } from './templates/welcome'
 
@@ -182,17 +180,6 @@ export class EmailService {
   }
 
   /**
-   * Send password changed notification email
-   */
-  async sendPasswordChangedEmail(email: string, data: PasswordChangedEmailData): Promise<void> {
-    await this.queue({
-      template: EmailTemplate.PASSWORD_CHANGED,
-      to: email,
-      data,
-    })
-  }
-
-  /**
    * Send organization invite email (OB-02).
    *
    * Dispatched by `InviteService.createInvite` after the invite row is
@@ -234,11 +221,6 @@ export class EmailService {
         case EmailTemplate.EMAIL_VERIFICATION:
           element = EmailVerificationEmail(data as EmailVerificationData)
           subject = getEmailVerificationSubject(locale)
-          break
-
-        case EmailTemplate.PASSWORD_CHANGED:
-          element = PasswordChangedEmail(data as PasswordChangedEmailData)
-          subject = getPasswordChangedSubject(locale)
           break
 
         case EmailTemplate.ORG_INVITE: {

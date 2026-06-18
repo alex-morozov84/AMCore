@@ -75,14 +75,6 @@ export interface EmailVerificationData {
   locale?: Locale
 }
 
-export interface PasswordChangedEmailData {
-  name: string
-  changedAt: string
-  loginUrl: string
-  supportEmail: string
-  locale?: Locale
-}
-
 /**
  * Org invite email data (OB-02).
  *
@@ -124,7 +116,6 @@ export enum EmailTemplate {
   WELCOME = 'welcome',
   PASSWORD_RESET = 'password-reset',
   EMAIL_VERIFICATION = 'email-verification',
-  PASSWORD_CHANGED = 'password-changed',
   ORG_INVITE = 'org-invite',
   NOTIFICATION = 'notification',
 }
@@ -140,7 +131,6 @@ export type RenderableEmailData =
   | WelcomeEmailData
   | PasswordResetEmailData
   | EmailVerificationData
-  | PasswordChangedEmailData
   | OrgInviteEmailData
   | NotificationEmailData
 
@@ -154,13 +144,16 @@ export type RenderableEmailData =
  * `SendEmailJobData` to this union makes "secrets are never enqueued" a
  * compile-time guarantee; `EmailService.queue` re-checks it at runtime for
  * callers that bypass TypeScript. See ADR-016 amendment 2026-05-29.
+ *
+ * `WELCOME` is the only enqueued template: the password-changed alert now flows
+ * through the durable notifications subsystem (ADR-052), whose worker-only email
+ * adapter calls `EmailService.send()` directly and never touches the EMAIL queue.
  */
-export type QueueableEmailTemplate = EmailTemplate.WELCOME | EmailTemplate.PASSWORD_CHANGED
+export type QueueableEmailTemplate = EmailTemplate.WELCOME
 
 /** Runtime allowlist mirroring `QueueableEmailTemplate` for the `queue()` guard. */
 export const QUEUEABLE_EMAIL_TEMPLATES: ReadonlySet<EmailTemplate> = new Set([
   EmailTemplate.WELCOME,
-  EmailTemplate.PASSWORD_CHANGED,
 ])
 
 /**

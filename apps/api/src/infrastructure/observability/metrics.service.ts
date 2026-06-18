@@ -47,7 +47,6 @@ export type EmailMetricsTemplate =
   | 'welcome'
   | 'password-reset'
   | 'email-verification'
-  | 'password-changed'
   | 'org-invite'
   | 'notification'
   | 'unknown'

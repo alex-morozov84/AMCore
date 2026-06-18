@@ -20,6 +20,7 @@ import { EnvService } from '../../env/env.service'
 import { EmailService } from '../../infrastructure/email'
 import { PrismaService } from '../../prisma'
 import { AuditLogService } from '../audit'
+import { NotificationsService } from '../notifications/notifications.service'
 
 import { EmailIdentityService } from './email-identity.service'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
@@ -59,6 +60,7 @@ export class AuthService {
     private readonly auditLog: AuditLogService,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly loginRateLimiter: LoginRateLimiterService,
+    private readonly notifications: NotificationsService,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(AuthService.name)
@@ -421,45 +423,55 @@ export class AuthService {
 
   /** Reset password using token */
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    const { userId, tokenHash } = await this.tokenManager.verifyPasswordResetToken(token)
+    const {
+      id: resetTokenId,
+      userId,
+      tokenHash,
+    } = await this.tokenManager.verifyPasswordResetToken(token)
 
     const passwordHash = await argon2.hash(newPassword)
+    const changedAt = new Date()
 
     await this.prisma.$transaction(async (tx) => {
       await tx.passwordResetToken.update({
         where: { tokenHash },
-        data: { used: true, usedAt: new Date() },
+        data: { used: true, usedAt: changedAt },
       })
 
       await tx.user.update({
         where: { id: userId },
-        data: { passwordHash },
+        // Promote emailVerified: the reset token was delivered to and returned from
+        // the account email, proving control of that mailbox (OWASP Forgot Password /
+        // NIST 800-63B). This is done in the reset transaction so the verified-only
+        // notification-email resolver materializes the password-changed alert below
+        // even for a previously unverified account.
+        data: { passwordHash, emailVerified: true },
       })
     })
 
     await this.sessionService.deleteAllByUserId(userId)
     await this.userCacheService.invalidateUser(userId)
 
-    const user = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (user) {
-      // Best-effort, fire-and-forget (EQS-06 / OD-5): the password change is
-      // already committed above. PASSWORD_CHANGED is queued, so a Redis/BullMQ
-      // outage here must not 500 a successful reset (and `void` avoids blocking
-      // the response on a stalled `add()`). Mirrors the register/welcome path.
-      void this.emailService
-        .sendPasswordChangedEmail(user.email, {
-          name: user.name ?? user.email,
-          changedAt: new Date().toISOString(),
-          loginUrl: `${this.env.get('FRONTEND_URL')}/login`,
-          supportEmail: this.env.get('SUPPORT_EMAIL'),
-          locale: user.locale as 'ru' | 'en',
-        })
-        .catch((err: unknown) =>
-          this.logger.warn(
-            { userId, err: err instanceof Error ? err.message : 'unknown' },
-            'Failed to send password changed email'
-          )
-        )
+    // Security alert via the durable notifications subsystem (ADR-052): in-app + email,
+    // both mandatory (the user cannot silence a password-change alert). Emitted AFTER
+    // the reset commit via notify() — its own transaction + immediate best-effort
+    // dispatch wake — so a notification write can never roll back the committed reset,
+    // and the resolver reads the just-committed emailVerified=true. The idempotency key
+    // is the consumed reset-token id (one alert per reset, retry-safe; not a secret).
+    // Best-effort: a notifications-subsystem hiccup must not 500 an already-committed
+    // reset — the recovery poller still drains any committed pending email delivery.
+    try {
+      await this.notifications.notify({
+        recipientUserId: userId,
+        type: 'account.password_changed',
+        payload: { changedAt: changedAt.toISOString() },
+        idempotencyKey: `account.password_changed:${resetTokenId}`,
+      })
+    } catch (err) {
+      this.logger.warn(
+        { userId, err: err instanceof Error ? err.message : 'unknown' },
+        'Failed to emit password-changed notification'
+      )
     }
 
     this.logger.info({ userId }, 'Password reset successfully')

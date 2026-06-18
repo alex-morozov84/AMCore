@@ -10,6 +10,7 @@ import { MediaModule } from '../../infrastructure/media'
 import { PrismaModule } from '../../prisma'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
 import { AuditModule } from '../audit'
+import { NotificationsCoreModule } from '../notifications/notifications-core.module'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
@@ -49,6 +50,7 @@ import { UserCacheService } from './user-cache.service'
     ApiKeysModule,
     AuditModule,
     MediaModule,
+    NotificationsCoreModule,
     JwtModule.registerAsync({
       imports: [EnvModule],
       inject: [EnvService],
