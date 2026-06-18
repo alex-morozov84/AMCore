@@ -1,4 +1,5 @@
 import { NotificationChannel } from '../notification.constants'
+import { NotificationTerminalReason } from '../notification-dispatch.constants'
 
 import type {
   ChannelTargetResolver,
@@ -7,7 +8,7 @@ import type {
 } from './channel-target-resolver.types'
 
 /** Bounded terminal reason: the account email is not a usable notification target. */
-export const EMAIL_SKIP_UNVERIFIED = 'destination_unverified'
+export const EMAIL_SKIP_UNVERIFIED = NotificationTerminalReason.DESTINATION_UNVERIFIED
 
 /**
  * Redact an address for the durable `destinationSnapshot` (no full address at rest):
