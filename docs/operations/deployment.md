@@ -180,9 +180,15 @@ image differing only by `PROCESS_ROLE` (and replica count). The worker listens o
 liveness/readiness probe to health and Prometheus scrape config to metrics.
 For a single-process setup, set `PROCESS_ROLE=all` and run no separate worker.
 
-Multi-instance safety is already in place: the nightly cron is Redis-lock-guarded
-(only one replica runs it), the throttler is Redis-backed (ADR-039), and BullMQ
-workers consume one shared queue. Add worker replicas freely.
+Multi-instance safety is already in place, and the two cron flavors are
+deliberate. The nightly **cleanup** and **notification-retention** sweeps are
+Redis-lock-guarded (only one replica runs each; a skipped run self-repairs the
+next night). The **notification-dispatch recovery** cron is the exception: it runs
+on **every** worker replica and is _not_ lock-guarded — that is intentional
+(`SingletonCronRunner` is fail-closed on a Redis hiccup, exactly when recovery is
+needed), and Postgres `FOR UPDATE SKIP LOCKED` is the coordinator, so replicas
+drain disjoint rows without double-sending. The throttler is Redis-backed
+(ADR-039) and BullMQ workers consume one shared queue. Add worker replicas freely.
 
 ## Redis production profile
 

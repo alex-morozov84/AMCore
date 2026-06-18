@@ -16,12 +16,12 @@ Deployment targets and CD environments remain adopter-specific.
 
 ### Application Modules
 
-| Module            | Status         | Description                                                                                 |
-| ----------------- | -------------- | ------------------------------------------------------------------------------------------- |
-| **Notifications** | 🚧 In progress | Reusable in-app feed + preferences shipped; external channels (email, Telegram) coming next |
-| **Fitness**       | 📋 Planned     | Workout tracking, exercise library, progress charts                                         |
-| **Finance**       | 📋 Planned     | Wallet management, transaction tracking                                                     |
-| **Subscriptions** | 📋 Planned     | Subscription monitoring, reminders                                                          |
+| Module            | Status         | Description                                                                                     |
+| ----------------- | -------------- | ----------------------------------------------------------------------------------------------- |
+| **Notifications** | 🚧 In progress | In-app feed + preferences + durable email dispatch shipped; Telegram and realtime fan-out later |
+| **Fitness**       | 📋 Planned     | Workout tracking, exercise library, progress charts                                             |
+| **Finance**       | 📋 Planned     | Wallet management, transaction tracking                                                         |
+| **Subscriptions** | 📋 Planned     | Subscription monitoring, reminders                                                              |
 
 ## Tech Stack
 
@@ -49,7 +49,7 @@ amcore/
 │   └── typescript-config/
 ├── docs/
 │   ├── auth/           # Authentication & authorization documentation
-│   ├── notifications/  # Notifications subsystem (in-app feed, preferences, producer)
+│   ├── notifications/  # Notifications subsystem (in-app feed, durable email dispatch, preferences)
 │   ├── media/          # Image derivative/media processing documentation
 │   └── storage/        # File storage documentation
 └── .github/        # CI, Dependabot, issue/PR templates
@@ -116,12 +116,13 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 
 ### Infrastructure
 
-- **Email** — Resend (prod) / Mock (dev), React Email templates, FormatJS i18n (RU/EN), direct send for secret links, BullMQ for non-secret notifications
+- **Email** — Resend (prod) / Mock (dev), React Email templates, FormatJS i18n (RU/EN), direct send for secret links, BullMQ for the queued welcome email; the notifications subsystem delivers its own email channel durably (see below)
 - **Queue** — BullMQ, multiple queues, Bull Board at `/admin/queues` (SUPER_ADMIN only)
 - **Cache** — Cache-aside with distributed locking (stampede protection), tag-based invalidation
 - **Storage** — S3-compatible provider abstraction, local filesystem dev driver, in-memory test driver, magic-byte upload validation, signed/public URLs, opt-in health check, avatar upload/delete example
 - **Health Checks** — `/health`, `/health/startup`, `/health/ready`, `/health/live` (Kubernetes-ready)
-- **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys, invites) with multi-instance locking
+- **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys, invites) and notification retention at 03:00 UTC, both with multi-instance locking; plus a notification-dispatch recovery poller that runs on every worker replica (coordinated by Postgres `SKIP LOCKED`, not a lock)
+- **Notifications** — durable per-user subsystem: in-app feed + preferences and a worker-driven email channel with Postgres-owned retry/leases/attempt history (see [`docs/notifications/`](docs/notifications/README.md))
 
 ### Tests
 
