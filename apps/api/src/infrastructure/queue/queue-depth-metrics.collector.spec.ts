@@ -54,6 +54,14 @@ describe('QueueDepthMetricsCollector', () => {
           }),
         },
       ],
+      [
+        QueueName.NOTIFICATIONS,
+        {
+          getJobCounts: jest.fn().mockResolvedValue({
+            waiting: 1,
+          }),
+        },
+      ],
     ])
     const queueService = {
       getQueue: jest.fn((name: QueueName) => queues.get(name)),

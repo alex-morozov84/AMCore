@@ -1,8 +1,10 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
+import type { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
 
 import type { PrismaService } from '../../prisma'
 
+import { ChannelTargetResolverRegistry } from './channels/channel-target-resolver.registry'
 import {
   NotificationCategory,
   NotificationChannel,
@@ -15,6 +17,8 @@ import { notificationFingerprint } from './notification-fingerprint'
 import { NotificationPreferenceRepository } from './notification-preference.repository'
 import { NotificationPreferenceResolver } from './notification-preference.resolver'
 import { NotificationsService, type NotifyInput } from './notifications.service'
+
+import type { QueueService } from '@/infrastructure/queue/queue.service'
 
 const testDefinition: NotificationDefinition = {
   type: 'account.test',
@@ -30,6 +34,17 @@ const testDefinition: NotificationDefinition = {
   renderInApp: () => ({ title: 't', body: 'b' }),
 }
 
+/** A definition that also delivers on email — exercises external target resolution.
+ * SENSITIVE → generic external mode, so no `projectExternal` is required (B.1 tests
+ * delivery materialization, not rendering). */
+const emailDefinition: NotificationDefinition = {
+  ...testDefinition,
+  type: 'account.email_test',
+  contentClass: NotificationContentClass.SENSITIVE,
+  supportedChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
+  defaultChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
+}
+
 const VALID_INPUT: NotifyInput = {
   recipientUserId: 'user-1',
   type: 'account.test',
@@ -40,21 +55,34 @@ const VALID_INPUT: NotifyInput = {
 describe('NotificationsService', () => {
   let prisma: DeepMockProxy<PrismaService>
   let preferences: DeepMockProxy<NotificationPreferenceRepository>
+  let queue: DeepMockProxy<QueueService>
+  let logger: DeepMockProxy<PinoLogger>
   let service: NotificationsService
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>()
     preferences = mockDeep<NotificationPreferenceRepository>()
+    queue = mockDeep<QueueService>()
+    logger = mockDeep<PinoLogger>()
     service = new NotificationsService(
       prisma,
       new NotificationDefinitionRegistry([testDefinition]),
       new NotificationPreferenceResolver(),
-      preferences
+      preferences,
+      // In-app-only test definition → no external resolver is exercised; empty registry.
+      new ChannelTargetResolverRegistry([]),
+      queue,
+      logger
     )
 
     preferences.getMasterToggle.mockResolvedValue(true)
     preferences.findByUser.mockResolvedValue([])
-    prisma.user.findUnique.mockResolvedValue({ locale: 'ru' } as never)
+    prisma.user.findUnique.mockResolvedValue({
+      locale: 'ru',
+      email: 'u@example.com',
+      emailCanonical: 'u@example.com',
+      emailVerified: true,
+    } as never)
     // Run the transaction callback against the same mock client. Cast the impl —
     // $transaction's array/callback overload union is not worth modelling in a mock.
     prisma.$transaction.mockImplementation(((cb: (tx: PrismaService) => Promise<unknown>) =>
@@ -63,7 +91,7 @@ describe('NotificationsService', () => {
 
   it('creates the notification and an in-app delivery, returning created=true', async () => {
     prisma.notification.createManyAndReturn.mockResolvedValue([{ id: 'n1' }] as never)
-    prisma.notificationDelivery.create.mockResolvedValue({} as never)
+    prisma.notificationDelivery.createMany.mockResolvedValue({ count: 1 } as never)
 
     const result = await service.notify(VALID_INPUT)
 
@@ -72,14 +100,84 @@ describe('NotificationsService', () => {
       created: true,
       channels: [NotificationChannel.IN_APP],
     })
-    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        notificationId: 'n1',
-        channel: NotificationChannel.IN_APP,
-        targetKey: 'feed',
-        status: 'DELIVERED',
-      }),
+    expect(prisma.notificationDelivery.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          notificationId: 'n1',
+          channel: NotificationChannel.IN_APP,
+          targetKey: 'feed',
+          status: 'DELIVERED',
+        }),
+      ],
     })
+    // In-app-only notification → no external PENDING delivery → no dispatch wake.
+    expect(queue.add).not.toHaveBeenCalled()
+  })
+
+  it('materializes a PENDING email delivery and wakes the dispatcher (verified recipient)', async () => {
+    const emailService = new NotificationsService(
+      prisma,
+      new NotificationDefinitionRegistry([emailDefinition]),
+      new NotificationPreferenceResolver(),
+      preferences,
+      new ChannelTargetResolverRegistry(), // default registry → real EmailTargetResolver
+      queue,
+      logger
+    )
+    prisma.notification.createManyAndReturn.mockResolvedValue([{ id: 'n1' }] as never)
+    prisma.notificationDelivery.createMany.mockResolvedValue({ count: 2 } as never)
+
+    const result = await emailService.notify({ ...VALID_INPUT, type: 'account.email_test' })
+
+    expect(result.channels).toEqual([NotificationChannel.IN_APP, NotificationChannel.EMAIL])
+    const createManyArg = prisma.notificationDelivery.createMany.mock.calls[0]![0] as {
+      data: Array<{ channel: string; status: string; targetKey: string }>
+    }
+    expect(createManyArg.data).toEqual([
+      expect.objectContaining({ channel: NotificationChannel.IN_APP, status: 'DELIVERED' }),
+      expect.objectContaining({
+        channel: NotificationChannel.EMAIL,
+        status: 'PENDING',
+        targetKey: 'u@example.com',
+      }),
+    ])
+    // Fresh external PENDING delivery → exactly one best-effort dispatch wake.
+    expect(queue.add).toHaveBeenCalledTimes(1)
+  })
+
+  it('writes a SKIPPED email delivery and does not wake for an unverified recipient', async () => {
+    const emailService = new NotificationsService(
+      prisma,
+      new NotificationDefinitionRegistry([emailDefinition]),
+      new NotificationPreferenceResolver(),
+      preferences,
+      new ChannelTargetResolverRegistry(),
+      queue,
+      logger
+    )
+    prisma.user.findUnique.mockResolvedValue({
+      locale: 'ru',
+      email: 'u@example.com',
+      emailCanonical: 'u@example.com',
+      emailVerified: false,
+    } as never)
+    prisma.notification.createManyAndReturn.mockResolvedValue([{ id: 'n1' }] as never)
+    prisma.notificationDelivery.createMany.mockResolvedValue({ count: 2 } as never)
+
+    await emailService.notify({ ...VALID_INPUT, type: 'account.email_test' })
+
+    const createManyArg = prisma.notificationDelivery.createMany.mock.calls[0]![0] as {
+      data: Array<{ channel: string; status: string; terminalReasonCode?: string }>
+    }
+    expect(createManyArg.data).toContainEqual(
+      expect.objectContaining({
+        channel: NotificationChannel.EMAIL,
+        status: 'SKIPPED',
+        terminalReasonCode: 'destination_unverified',
+      })
+    )
+    // No deliverable external target → no wake.
+    expect(queue.add).not.toHaveBeenCalled()
   })
 
   it('returns the existing row on an idempotent replay (matching fingerprint)', async () => {
@@ -107,7 +205,8 @@ describe('NotificationsService', () => {
       created: false,
       channels: [NotificationChannel.IN_APP],
     })
-    expect(prisma.notificationDelivery.create).not.toHaveBeenCalled()
+    expect(prisma.notificationDelivery.createMany).not.toHaveBeenCalled()
+    expect(queue.add).not.toHaveBeenCalled()
   })
 
   it('throws on idempotency-key reuse with a different fingerprint', async () => {
@@ -143,7 +242,10 @@ describe('NotificationsService', () => {
       prisma,
       new NotificationDefinitionRegistry([badActionDef]),
       new NotificationPreferenceResolver(),
-      preferences
+      preferences,
+      new ChannelTargetResolverRegistry([]),
+      queue,
+      logger
     )
 
     await expect(
@@ -155,8 +257,13 @@ describe('NotificationsService', () => {
   it('notifyTx reads and writes on the caller transaction, not the global client', async () => {
     const tx = mockDeep<PrismaService>()
     tx.notification.createManyAndReturn.mockResolvedValue([{ id: 'n2' }] as never)
-    tx.notificationDelivery.create.mockResolvedValue({} as never)
-    tx.user.findUnique.mockResolvedValue({ locale: 'ru' } as never)
+    tx.notificationDelivery.createMany.mockResolvedValue({ count: 1 } as never)
+    tx.user.findUnique.mockResolvedValue({
+      locale: 'ru',
+      email: 'u@example.com',
+      emailCanonical: 'u@example.com',
+      emailVerified: true,
+    } as never)
 
     const result = await service.notifyTx(tx, VALID_INPUT)
 

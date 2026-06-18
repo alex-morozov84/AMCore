@@ -24,7 +24,7 @@ export type QueueMetricsEvent =
   | 'redis_reconnecting'
   | 'worker_error'
   | 'dead_letter'
-export type QueueMetricsQueue = 'default' | 'email'
+export type QueueMetricsQueue = 'default' | 'email' | 'notifications'
 export type CacheMetricsCache = 'user' | 'permissions'
 export type CacheMetricsResult = 'hit' | 'negative_hit' | 'miss' | 'db_fallback' | 'corrupt'
 export type StorageMetricsDriver = 's3' | 'local' | 'memory'
