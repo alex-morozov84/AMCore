@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
+import { NotificationAttemptOutcome, NotificationDeliveryStatus } from '@prisma/client'
 import request from 'supertest'
 
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
@@ -7,6 +8,7 @@ import {
   NotificationChannel,
 } from '../src/core/notifications/notification.constants'
 import { NotificationIdempotencyConflictError } from '../src/core/notifications/notification.errors'
+import { NotificationRetentionService } from '../src/core/notifications/notification-retention.service'
 import { NotificationsService } from '../src/core/notifications/notifications.service'
 import type { PrismaService } from '../src/prisma'
 
@@ -64,6 +66,7 @@ describe('Notifications (e2e)', () => {
   let context: E2ETestContext
   let notifications: NotificationsService
   let tokenManager: TokenManagerService
+  let retention: NotificationRetentionService
 
   beforeAll(async () => {
     context = await setupE2ETest()
@@ -71,6 +74,7 @@ describe('Notifications (e2e)', () => {
     prisma = context.prisma
     notifications = app.get(NotificationsService, { strict: false })
     tokenManager = app.get(TokenManagerService, { strict: false })
+    retention = app.get(NotificationRetentionService, { strict: false })
   }, 120000)
 
   afterAll(async () => {
@@ -700,6 +704,136 @@ describe('Notifications (e2e)', () => {
       expect(email).toBeDefined()
       expect(email?.status).not.toBe('SKIPPED')
       expect(email?.terminalReasonCode).not.toBe('destination_unverified')
+    })
+  })
+
+  describe('retention (NotificationRetentionService.runRetention)', () => {
+    const daysAgo = (n: number): Date => new Date(Date.now() - n * 24 * 60 * 60 * 1000)
+
+    let seq = 0
+    async function makeNotification(
+      userId: string,
+      overrides: { createdAt?: Date; readAt?: Date | null; archivedAt?: Date | null } = {}
+    ): Promise<string> {
+      seq += 1
+      const row = await prisma.notification.create({
+        data: {
+          recipientUserId: userId,
+          type: 'account.profile_updated',
+          category: NotificationCategory.ACCOUNT,
+          schemaVersion: 1,
+          payload: { updatedFields: ['name'] },
+          idempotencyKey: `account.profile_updated:retention-${Date.now()}-${seq}`,
+          idempotencyFingerprint: `fp-${Date.now()}-${seq}`,
+          occurredAt: overrides.createdAt ?? new Date(),
+          createdAt: overrides.createdAt ?? new Date(),
+          readAt: overrides.readAt ?? null,
+          archivedAt: overrides.archivedAt ?? null,
+        },
+        select: { id: true },
+      })
+      return row.id
+    }
+
+    it('deletes aged feed rows by state but keeps recent ones and active deliveries', async () => {
+      const user = await registerUser(app)
+
+      const staleArchived = await makeNotification(user.userId, { archivedAt: daysAgo(40) })
+      const staleRead = await makeNotification(user.userId, { readAt: daysAgo(100) })
+      const staleUnread = await makeNotification(user.userId, { createdAt: daysAgo(200) })
+      const recentUnread = await makeNotification(user.userId, { createdAt: daysAgo(5) })
+      const recentlyArchived = await makeNotification(user.userId, { archivedAt: daysAgo(5) })
+
+      // Aged-out by every window, but it still has an active (PENDING) external delivery,
+      // so the cascade must NOT remove it.
+      const archivedButActive = await makeNotification(user.userId, { archivedAt: daysAgo(40) })
+      await prisma.notificationDelivery.create({
+        data: {
+          notificationId: archivedButActive,
+          channel: NotificationChannel.EMAIL,
+          targetKey: user.email,
+          locale: 'ru',
+          status: NotificationDeliveryStatus.PENDING,
+          maxAttempts: 5,
+          // Not due, so the background recovery poller never claims/drains it during the
+          // test — it stays a deterministically "active" PENDING row.
+          availableAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      })
+
+      const result = await retention.runRetention()
+
+      expect(result.archivedNotifications).toBeGreaterThanOrEqual(1)
+      expect(result.readNotifications).toBeGreaterThanOrEqual(1)
+      expect(result.unreadNotifications).toBeGreaterThanOrEqual(1)
+      expect(result.failures).toEqual([])
+
+      const surviving = await prisma.notification.findMany({
+        where: { recipientUserId: user.userId },
+        select: { id: true },
+      })
+      const ids = surviving.map((r) => r.id)
+      expect(ids).not.toContain(staleArchived)
+      expect(ids).not.toContain(staleRead)
+      expect(ids).not.toContain(staleUnread)
+      expect(ids).toContain(recentUnread)
+      expect(ids).toContain(recentlyArchived)
+      // Active external work is never auto-deleted.
+      expect(ids).toContain(archivedButActive)
+    })
+
+    it('prunes finished attempts older than the window but keeps in-flight/recent ones', async () => {
+      const user = await registerUser(app)
+      const notificationId = await makeNotification(user.userId, { createdAt: daysAgo(1) })
+      const delivery = await prisma.notificationDelivery.create({
+        data: {
+          notificationId,
+          channel: NotificationChannel.EMAIL,
+          targetKey: user.email,
+          locale: 'ru',
+          status: NotificationDeliveryStatus.RETRY_SCHEDULED,
+          maxAttempts: 5,
+          // Keep it out of the due-set so the background poller does not re-attempt it
+          // mid-test (we only care about its attempt-history pruning here).
+          availableAt: new Date(Date.now() + 60 * 60 * 1000),
+          nextAttemptAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+        select: { id: true },
+      })
+
+      const oldAttempt = await prisma.notificationDeliveryAttempt.create({
+        data: {
+          deliveryId: delivery.id,
+          attemptNumber: 1,
+          leaseToken: 'lease-old',
+          startedAt: daysAgo(40),
+          finishedAt: daysAgo(40),
+          outcome: NotificationAttemptOutcome.TRANSIENT_FAILURE,
+        },
+        select: { id: true },
+      })
+      const inFlightAttempt = await prisma.notificationDeliveryAttempt.create({
+        data: {
+          deliveryId: delivery.id,
+          attemptNumber: 2,
+          leaseToken: 'lease-live',
+          startedAt: new Date(),
+          finishedAt: null,
+        },
+        select: { id: true },
+      })
+
+      const result = await retention.runRetention()
+      expect(result.finishedAttempts).toBeGreaterThanOrEqual(1)
+
+      const remaining = await prisma.notificationDeliveryAttempt.findMany({
+        where: { deliveryId: delivery.id },
+        select: { id: true },
+      })
+      const ids = remaining.map((r) => r.id)
+      expect(ids).not.toContain(oldAttempt.id)
+      // An in-flight attempt (finishedAt null) is never pruned by age.
+      expect(ids).toContain(inFlightAttempt.id)
     })
   })
 })
