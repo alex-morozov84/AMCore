@@ -50,7 +50,7 @@ overrides:
   # @grpc/grpc-js + hono ship via @nestjs/terminus and the prisma CLI (@prisma/dev);
   # patched in place rather than trimmed from the image.
   '@grpc/grpc-js': '1.14.4'
-  'hono': '4.12.21'
+  'hono': '4.12.25'
   '@hono/node-server': '1.19.13'
   # Scope to the vulnerable major so safe coexisting majors are left alone.
   'postcss@8': '8.5.14'
@@ -59,4 +59,17 @@ overrides:
   'qs@6': '6.15.2'
   # build-only (vite/tsup/tsx); advisory is a dev-server CORS issue, not shipped.
   'esbuild': '0.28.1'
-  'vite': '7.3.2'
+  'vite': '7.3.5'
+  # 2026-06-20 advisory batch (all transitive; new versions stay in parent range).
+  # runtime: @nestjs/platform-express > multer; axios > form-data.
+  'multer': '2.2.0'
+  'form-data': '4.0.6'
+  # dev/build-only: testcontainers > undici; @swc/cli + @nestjs/cli > piscina;
+  # @babel/core via eslint-plugin-react-compiler + babel transforms.
+  'undici': '7.28.0'
+  'piscina': '4.9.3'
+  '@babel/core': '7.29.6'
+  # js-yaml DoS (GHSA-h67p-54hq-rp68): fix the 4.x line (commitlint et al.) only.
+  # The 3.x consumer (@istanbuljs/load-nyc-config, dev coverage) uses the removed
+  # 3.x safeLoad API, so it cannot take 4.2.0; its residual is dev/trusted-config.
+  'js-yaml@4': '4.2.0'

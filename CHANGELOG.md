@@ -120,6 +120,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Resolved the 2026-06-20 transitive-advisory batch via `pnpm-workspace.yaml`
+  overrides, all within the parents' declared ranges: `multer` 2.2.0
+  (`@nestjs/platform-express`), `form-data` 4.0.6 (`axios`), `hono` 4.12.25,
+  `vite` 7.3.5, and the dev/build-only `undici` 7.28.0 (`testcontainers`),
+  `piscina` 4.9.3 (`@swc/cli` / `@nestjs/cli`), `@babel/core` 7.29.6. `js-yaml`
+  is pinned to 4.2.0 on the 4.x line only (GHSA-h67p-54hq-rp68); the dev-only 3.x
+  consumer (`@istanbuljs/load-nyc-config`, coverage tooling) predates the 4.x API
+  and parses only trusted project config.
 - Bumped the `protobufjs` override to 7.6.3 and `tmp` to 0.2.7, closing three
   transitive advisories (two high, one medium). `protobufjs` stays on the 7.x
   line its parents require (`@nestjs/terminus` > `@grpc/grpc-js`, and the dev-only
