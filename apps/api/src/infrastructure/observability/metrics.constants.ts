@@ -20,4 +20,7 @@ export const METRIC_NAMES = {
   emailOperationsTotal: 'amcore_email_operations_total',
   emailOperationDurationSeconds: 'amcore_email_operation_duration_seconds',
   emailDeadLettersTotal: 'amcore_email_dead_letters_total',
+  notificationRealtimePublishTotal: 'amcore_notification_realtime_publish_total',
+  notificationRealtimeConnections: 'amcore_notification_realtime_connections',
+  notificationRealtimeEventsTotal: 'amcore_notification_realtime_events_total',
 } as const

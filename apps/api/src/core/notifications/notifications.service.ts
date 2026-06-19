@@ -22,6 +22,7 @@ import type { DispatchDueJob } from './notification-dispatch.schema'
 import { notificationFingerprint } from './notification-fingerprint'
 import { NotificationPreferenceRepository } from './notification-preference.repository'
 import { NotificationPreferenceResolver } from './notification-preference.resolver'
+import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '@/infrastructure/queue/queue.service'
@@ -122,6 +123,7 @@ export class NotificationsService {
     private readonly preferences: NotificationPreferenceRepository,
     private readonly targetResolvers: ChannelTargetResolverRegistry,
     private readonly queue: QueueService,
+    private readonly realtime: NotificationRealtimePublisher,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(NotificationsService.name)
@@ -131,6 +133,13 @@ export class NotificationsService {
     const { result, hasPendingExternal } = await this.prisma.$transaction((tx) =>
       this.run(tx, input)
     )
+    // Best-effort realtime feed hint (ADR-053), fired independently of the wake and
+    // never awaited: only when a NEW in-app delivery was created (an external-only
+    // notification does not touch the feed; a replay re-hints nothing). The client
+    // repairs any missed hint on its next refetch.
+    if (result.created && result.channels.includes(NotificationChannel.IN_APP)) {
+      void this.realtime.publish(input.recipientUserId, 'created', result.notificationId)
+    }
     // Wake the dispatcher only AFTER commit, and only for fresh external work.
     // Best-effort: a Redis/queue outage here must not fail a committed notification —
     // the worker recovery poller discovers the PENDING delivery regardless (ADR-052).

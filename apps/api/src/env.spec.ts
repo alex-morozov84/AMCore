@@ -52,6 +52,57 @@ describe('env validation', () => {
     expect(env.IDEMPOTENCY_REDIS_TIMEOUT_MS).toBe(100)
   })
 
+  it('applies realtime notification defaults', () => {
+    const env = validate(baseEnv)
+
+    expect(env.NOTIFICATIONS_REALTIME_NAMESPACE).toBe('')
+    expect(env.NOTIFICATIONS_REALTIME_HEARTBEAT_MS).toBe(20000)
+    expect(env.NOTIFICATIONS_REALTIME_MAX_PER_USER).toBe(5)
+    expect(env.NOTIFICATIONS_REALTIME_MAX_CONNECTIONS).toBe(10000)
+    expect(env.NOTIFICATIONS_REALTIME_QUEUE_DEPTH).toBe(16)
+    expect(env.NOTIFICATIONS_REALTIME_MAX_STREAM_LIFETIME_MS).toBe(3600000)
+    expect(env.NOTIFICATIONS_REALTIME_PUBLISH_TIMEOUT_MS).toBe(1000)
+    expect(env.NOTIFICATIONS_REALTIME_MAX_INFLIGHT_PUBLISH).toBe(1000)
+  })
+
+  it('coerces realtime numeric overrides and accepts a namespace', () => {
+    const env = validate({
+      ...baseEnv,
+      NOTIFICATIONS_REALTIME_NAMESPACE: 'staging',
+      NOTIFICATIONS_REALTIME_HEARTBEAT_MS: '15000',
+      NOTIFICATIONS_REALTIME_MAX_PER_USER: '3',
+    })
+
+    expect(env.NOTIFICATIONS_REALTIME_NAMESPACE).toBe('staging')
+    expect(env.NOTIFICATIONS_REALTIME_HEARTBEAT_MS).toBe(15000)
+    expect(env.NOTIFICATIONS_REALTIME_MAX_PER_USER).toBe(3)
+  })
+
+  it('rejects a realtime namespace with illegal characters', () => {
+    expect(() =>
+      validate({ ...baseEnv, NOTIFICATIONS_REALTIME_NAMESPACE: 'Staging Prod' })
+    ).toThrow(ZodError)
+  })
+
+  it.each([
+    ['NOTIFICATIONS_REALTIME_HEARTBEAT_MS', '999'],
+    ['NOTIFICATIONS_REALTIME_HEARTBEAT_MS', '60001'],
+    ['NOTIFICATIONS_REALTIME_MAX_PER_USER', '0'],
+    ['NOTIFICATIONS_REALTIME_MAX_PER_USER', '101'],
+    ['NOTIFICATIONS_REALTIME_MAX_CONNECTIONS', '0'],
+    ['NOTIFICATIONS_REALTIME_MAX_CONNECTIONS', '1000001'],
+    ['NOTIFICATIONS_REALTIME_QUEUE_DEPTH', '0'],
+    ['NOTIFICATIONS_REALTIME_QUEUE_DEPTH', '1001'],
+    ['NOTIFICATIONS_REALTIME_MAX_STREAM_LIFETIME_MS', '999'],
+    ['NOTIFICATIONS_REALTIME_MAX_STREAM_LIFETIME_MS', '86400001'],
+    ['NOTIFICATIONS_REALTIME_PUBLISH_TIMEOUT_MS', '0'],
+    ['NOTIFICATIONS_REALTIME_PUBLISH_TIMEOUT_MS', '30001'],
+    ['NOTIFICATIONS_REALTIME_MAX_INFLIGHT_PUBLISH', '0'],
+    ['NOTIFICATIONS_REALTIME_MAX_INFLIGHT_PUBLISH', '100001'],
+  ])('rejects realtime %s=%s outside its range', (key, value) => {
+    expect(() => validate({ ...baseEnv, [key]: value })).toThrow(ZodError)
+  })
+
   it('fails when an OAuth provider is only partially configured', () => {
     expect(() =>
       validate({

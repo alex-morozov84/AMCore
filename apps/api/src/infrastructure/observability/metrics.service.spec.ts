@@ -131,6 +131,40 @@ describe('MetricsService', () => {
     expect(output).toContain('queue="email",event="job_added",role="web"')
   })
 
+  it('records realtime notification publish outcomes with bounded labels', async () => {
+    const service = makeService()
+
+    service.incNotificationRealtimePublish('published')
+    service.incNotificationRealtimePublish('failed')
+    service.incNotificationRealtimePublish('dropped')
+
+    const output = await service.metrics()
+    expect(output).toContain(
+      `${METRIC_NAMES.notificationRealtimePublishTotal}{outcome="published",role="web"`
+    )
+    expect(output).toContain('outcome="failed",role="web"')
+    expect(output).toContain('outcome="dropped",role="web"')
+  })
+
+  it('tracks the realtime connections gauge and bounded stream events', async () => {
+    const service = makeService()
+
+    service.incNotificationRealtimeConnections()
+    service.incNotificationRealtimeConnections()
+    service.decNotificationRealtimeConnections()
+    service.incNotificationRealtimeEvent('rejected_user')
+
+    const output = await service.metrics()
+    // 2 opened − 1 closed → gauge at 1 for this role.
+    expect(output).toContain(`${METRIC_NAMES.notificationRealtimeConnections}{role="web"`)
+    expect(output).toMatch(
+      new RegExp(`${METRIC_NAMES.notificationRealtimeConnections}\\{role="web"[^}]*\\} 1`)
+    )
+    expect(output).toContain(
+      `${METRIC_NAMES.notificationRealtimeEventsTotal}{event="rejected_user",role="web"`
+    )
+  })
+
   it('records bounded cache, storage, media, and email metrics', async () => {
     const service = makeService()
 

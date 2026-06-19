@@ -43,6 +43,31 @@ describe('JwtStrategy', () => {
     expect(principal.sid).toBeUndefined()
   })
 
+  it('carries the exp claim into the principal for SSE stream bounding (ADR-053)', async () => {
+    getUser.mockResolvedValue({ id: 'user-1' })
+
+    const principal = await strategy.validate({
+      sub: 'user-1',
+      email: 'a@example.com',
+      systemRole: SystemRole.User,
+      exp: 1_900_000_000,
+    })
+
+    expect(principal.exp).toBe(1_900_000_000)
+  })
+
+  it('leaves exp undefined when the token lacks the claim', async () => {
+    getUser.mockResolvedValue({ id: 'user-1' })
+
+    const principal = await strategy.validate({
+      sub: 'user-1',
+      email: 'a@example.com',
+      systemRole: SystemRole.User,
+    })
+
+    expect(principal.exp).toBeUndefined()
+  })
+
   it('rejects when the user no longer exists', async () => {
     getUser.mockResolvedValue(null)
 

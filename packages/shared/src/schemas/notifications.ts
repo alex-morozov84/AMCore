@@ -213,14 +213,24 @@ export type NotificationCapabilitiesResponse = z.infer<
  * Realtime SSE invalidation event (ADR-053) — a disposable hint carrying no
  * rendered content or destination. The client refetches the durable feed/unread
  * state by reason; a missed event is repaired on the next reconnect.
+ *
+ * Reasons map 1:1 onto the producer/feed publish points: `created` (new
+ * notification), `read` (single mark-read), `unread_changed` (mark-all-read /
+ * bulk unread change), `archived` (archive). `eventId` is a disposable
+ * dedupe/correlation id, never a feed identity or replay cursor; `notificationId`
+ * is present only for single-notification hints, absent for aggregate ones like
+ * `unread_changed`. Fields are bounded and the object is `.strict()` because this
+ * value crosses the Redis Pub/Sub and SSE wire boundary.
  */
 export const NOTIFICATION_SSE_REASONS = ['created', 'read', 'archived', 'unread_changed'] as const
 
-export const notificationSseEventSchema = z.object({
-  eventId: z.string(),
-  reason: z.enum(NOTIFICATION_SSE_REASONS),
-  notificationId: z.string().optional(),
-})
+export const notificationSseEventSchema = z
+  .object({
+    eventId: z.string().min(1).max(64),
+    reason: z.enum(NOTIFICATION_SSE_REASONS),
+    notificationId: z.string().min(1).max(64).optional(),
+  })
+  .strict()
 
 export type NotificationSseReason = (typeof NOTIFICATION_SSE_REASONS)[number]
 export type NotificationSseEvent = z.infer<typeof notificationSseEventSchema>

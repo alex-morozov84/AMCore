@@ -17,6 +17,7 @@ import { notificationFingerprint } from './notification-fingerprint'
 import { NotificationPreferenceRepository } from './notification-preference.repository'
 import { NotificationPreferenceResolver } from './notification-preference.resolver'
 import { NotificationsService, type NotifyInput } from './notifications.service'
+import type { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
 import type { QueueService } from '@/infrastructure/queue/queue.service'
 
@@ -45,6 +46,14 @@ const emailDefinition: NotificationDefinition = {
   defaultChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
 }
 
+/** External-only: no IN_APP channel, so the feed never gains a row → no realtime hint. */
+const emailOnlyDefinition: NotificationDefinition = {
+  ...emailDefinition,
+  type: 'account.email_only_test',
+  supportedChannels: [NotificationChannel.EMAIL],
+  defaultChannels: [NotificationChannel.EMAIL],
+}
+
 const VALID_INPUT: NotifyInput = {
   recipientUserId: 'user-1',
   type: 'account.test',
@@ -56,6 +65,7 @@ describe('NotificationsService', () => {
   let prisma: DeepMockProxy<PrismaService>
   let preferences: DeepMockProxy<NotificationPreferenceRepository>
   let queue: DeepMockProxy<QueueService>
+  let realtime: DeepMockProxy<NotificationRealtimePublisher>
   let logger: DeepMockProxy<PinoLogger>
   let service: NotificationsService
 
@@ -63,6 +73,7 @@ describe('NotificationsService', () => {
     prisma = mockDeep<PrismaService>()
     preferences = mockDeep<NotificationPreferenceRepository>()
     queue = mockDeep<QueueService>()
+    realtime = mockDeep<NotificationRealtimePublisher>()
     logger = mockDeep<PinoLogger>()
     service = new NotificationsService(
       prisma,
@@ -72,6 +83,7 @@ describe('NotificationsService', () => {
       // In-app-only test definition → no external resolver is exercised; empty registry.
       new ChannelTargetResolverRegistry([]),
       queue,
+      realtime,
       logger
     )
 
@@ -112,6 +124,8 @@ describe('NotificationsService', () => {
     })
     // In-app-only notification → no external PENDING delivery → no dispatch wake.
     expect(queue.add).not.toHaveBeenCalled()
+    // A new in-app delivery exists → a best-effort realtime feed hint is published.
+    expect(realtime.publish).toHaveBeenCalledWith('user-1', 'created', 'n1')
   })
 
   it('materializes a PENDING email delivery and wakes the dispatcher (verified recipient)', async () => {
@@ -122,6 +136,7 @@ describe('NotificationsService', () => {
       preferences,
       new ChannelTargetResolverRegistry(), // default registry → real EmailTargetResolver
       queue,
+      realtime,
       logger
     )
     prisma.notification.createManyAndReturn.mockResolvedValue([{ id: 'n1' }] as never)
@@ -143,6 +158,34 @@ describe('NotificationsService', () => {
     ])
     // Fresh external PENDING delivery → exactly one best-effort dispatch wake.
     expect(queue.add).toHaveBeenCalledTimes(1)
+    // In-app delivery exists alongside email → the feed hint is still published.
+    expect(realtime.publish).toHaveBeenCalledWith('user-1', 'created', 'n1')
+  })
+
+  it('does not publish a realtime hint for an external-only notification', async () => {
+    const externalOnlyService = new NotificationsService(
+      prisma,
+      new NotificationDefinitionRegistry([emailOnlyDefinition]),
+      new NotificationPreferenceResolver(),
+      preferences,
+      new ChannelTargetResolverRegistry(),
+      queue,
+      realtime,
+      logger
+    )
+    prisma.notification.createManyAndReturn.mockResolvedValue([{ id: 'n1' }] as never)
+    prisma.notificationDelivery.createMany.mockResolvedValue({ count: 1 } as never)
+
+    const result = await externalOnlyService.notify({
+      ...VALID_INPUT,
+      type: 'account.email_only_test',
+    })
+
+    // EMAIL-only → no in-app delivery → the feed never changed → no realtime hint,
+    // but the dispatcher is still woken for the PENDING external delivery.
+    expect(result.channels).toEqual([NotificationChannel.EMAIL])
+    expect(realtime.publish).not.toHaveBeenCalled()
+    expect(queue.add).toHaveBeenCalledTimes(1)
   })
 
   it('writes a SKIPPED email delivery and does not wake for an unverified recipient', async () => {
@@ -153,6 +196,7 @@ describe('NotificationsService', () => {
       preferences,
       new ChannelTargetResolverRegistry(),
       queue,
+      realtime,
       logger
     )
     prisma.user.findUnique.mockResolvedValue({
@@ -210,6 +254,8 @@ describe('NotificationsService', () => {
     })
     expect(prisma.notificationDelivery.createMany).not.toHaveBeenCalled()
     expect(queue.add).not.toHaveBeenCalled()
+    // An idempotent replay must not re-hint the feed.
+    expect(realtime.publish).not.toHaveBeenCalled()
   })
 
   it('throws on idempotency-key reuse with a different fingerprint', async () => {
@@ -248,6 +294,7 @@ describe('NotificationsService', () => {
       preferences,
       new ChannelTargetResolverRegistry([]),
       queue,
+      realtime,
       logger
     )
 
@@ -278,5 +325,7 @@ describe('NotificationsService', () => {
     expect(preferences.findByUser).toHaveBeenCalledWith('user-1', tx)
     expect(tx.user.findUnique).toHaveBeenCalled()
     expect(prisma.user.findUnique).not.toHaveBeenCalled()
+    // notifyTx never publishes — the caller owns commit timing; resync/poller cover it.
+    expect(realtime.publish).not.toHaveBeenCalled()
   })
 })

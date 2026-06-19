@@ -16,8 +16,26 @@ type InFlightLabels = Omit<HttpLabels, 'status_code'>
 
 type GaugeHandle<T extends string> = Pick<Gauge<T>, 'reset' | 'set'>
 
-export type RedisMetricsClient = 'shared' | 'queue_producer' | 'queue_worker' | 'throttler'
+export type RedisMetricsClient =
+  | 'shared'
+  | 'queue_producer'
+  | 'queue_worker'
+  | 'throttler'
+  | 'notif_subscriber'
 export type RedisMetricsEvent = 'error' | 'reconnecting' | 'degraded'
+
+/** Outcome of a best-effort realtime publish (ADR-053). */
+export type NotificationRealtimePublishOutcome = 'published' | 'failed' | 'dropped'
+
+/** Bounded realtime SSE stream/subscriber event (ADR-053). */
+export type NotificationRealtimeStreamEvent =
+  | 'received'
+  | 'routed'
+  | 'no_local_target'
+  | 'invalid_envelope'
+  | 'rejected_global'
+  | 'rejected_user'
+  | 'slow_close'
 export type QueueMetricsEvent =
   | 'job_added'
   | 'redis_error'
@@ -83,6 +101,9 @@ export class MetricsService implements OnModuleDestroy {
     'template' | 'operation' | 'mode' | 'result' | 'role'
   >
   private readonly emailDeadLettersTotal: Counter<'template' | 'unrecoverable' | 'role'>
+  private readonly notificationRealtimePublishTotal: Counter<'outcome' | 'role'>
+  private readonly notificationRealtimeConnections: Gauge<'role'>
+  private readonly notificationRealtimeEventsTotal: Counter<'event' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -176,6 +197,27 @@ export class MetricsService implements OnModuleDestroy {
       help: 'Total terminal email dead letters by template, unrecoverable classification, and process role.',
       labelNames: ['template', 'unrecoverable', 'role'],
     })
+    this.notificationRealtimePublishTotal = this.getOrCreateCounter(
+      METRIC_NAMES.notificationRealtimePublishTotal,
+      {
+        help: 'Total realtime notification publishes by outcome (published/failed/dropped) and process role.',
+        labelNames: ['outcome', 'role'],
+      }
+    )
+    this.notificationRealtimeConnections = this.getOrCreateGauge(
+      METRIC_NAMES.notificationRealtimeConnections,
+      {
+        help: 'Currently open realtime notification SSE streams on this process, by role.',
+        labelNames: ['role'],
+      }
+    )
+    this.notificationRealtimeEventsTotal = this.getOrCreateCounter(
+      METRIC_NAMES.notificationRealtimeEventsTotal,
+      {
+        help: 'Total realtime notification stream/subscriber events by bounded event and process role.',
+        labelNames: ['event', 'role'],
+      }
+    )
   }
 
   get enabled(): boolean {
@@ -224,6 +266,26 @@ export class MetricsService implements OnModuleDestroy {
   incRedisClientEvent(client: RedisMetricsClient, event: RedisMetricsEvent): void {
     if (!this.enabled) return
     this.redisClientEventsTotal.inc({ client, event, role: this.role })
+  }
+
+  incNotificationRealtimePublish(outcome: NotificationRealtimePublishOutcome): void {
+    if (!this.enabled) return
+    this.notificationRealtimePublishTotal.inc({ outcome, role: this.role })
+  }
+
+  incNotificationRealtimeConnections(): void {
+    if (!this.enabled) return
+    this.notificationRealtimeConnections.inc({ role: this.role })
+  }
+
+  decNotificationRealtimeConnections(): void {
+    if (!this.enabled) return
+    this.notificationRealtimeConnections.dec({ role: this.role })
+  }
+
+  incNotificationRealtimeEvent(event: NotificationRealtimeStreamEvent): void {
+    if (!this.enabled) return
+    this.notificationRealtimeEventsTotal.inc({ event, role: this.role })
   }
 
   incQueueEvent(queue: QueueMetricsQueue, event: QueueMetricsEvent): void {
