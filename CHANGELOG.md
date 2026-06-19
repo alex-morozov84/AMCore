@@ -120,6 +120,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Closed two code-scanning findings on the security tooling rather than the app.
+  `yaml` is pinned to 2.8.3 on the 2.x line (CVE-2026-33532 stack-overflow DoS;
+  `lint-staged` still resolved 2.8.2, dev-only). The production Docker **runner**
+  stage no longer inherits Corepack/pnpm (`FROM node:22-slim` instead of `base`):
+  the container only runs `node dist/main.js`, and the one-shot migration runs the
+  Prisma binary from the self-contained bundle, so pnpm is never used at runtime.
+  This removes Corepack's bundled `undici` (CVE-2026-12151) from the shipped image
+  and trims its attack surface. Verified on the built image: no Corepack pnpm
+  cache, no runnable pnpm, and no `undici` package present.
 - Resolved the 2026-06-20 transitive-advisory batch via `pnpm-workspace.yaml`
   overrides, all within the parents' declared ranges: `multer` 2.2.0
   (`@nestjs/platform-express`), `form-data` 4.0.6 (`axios`), `hono` 4.12.25,

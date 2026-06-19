@@ -70,6 +70,11 @@ overrides:
   'piscina': '4.9.3'
   '@babel/core': '7.29.6'
   # js-yaml DoS (GHSA-h67p-54hq-rp68): fix the 4.x line (commitlint et al.) only.
-  # The 3.x consumer (@istanbuljs/load-nyc-config, dev coverage) uses the removed
-  # 3.x safeLoad API, so it cannot take 4.2.0; its residual is dev/trusted-config.
+  # The 3.x consumer (@istanbuljs/load-nyc-config, dev jest-coverage) hard-pins
+  # js-yaml ^3.13.1 and is its own unmaintained latest release, and 3.x has no
+  # patch, so it cannot take 4.2.0; the residual is dev-only (alert #108 dismissed
+  # as not-used: no .nycrc.yml exists, so its js-yaml branch never runs).
   'js-yaml@4': '4.2.0'
+  # `yaml` (NOT js-yaml) DoS via deeply-nested flow sequences (CVE-2026-33532);
+  # dev-only (lint-staged still resolves 2.8.2). Patched in 2.8.3.
+  'yaml@2': '2.8.3'

@@ -60,7 +60,15 @@ RUN cd /prod/api && ./node_modules/.bin/prisma generate
 # ===========================================
 # Runner — minimal, self-contained, non-root
 # ===========================================
-FROM base AS runner
+# Deliberately NOT `FROM base`: the runner must not inherit Corepack/pnpm. The
+# container only runs `node dist/main.js` (and the one-shot migrate runs
+# `./node_modules/.bin/prisma migrate deploy` from the self-contained bundle), so
+# pnpm is never invoked at runtime. Shipping Corepack's bundled pnpm would also
+# drag its vulnerable bundled `undici` into the image (CVE-2026-12151) and bloat
+# the attack surface for no runtime benefit.
+FROM node:22-slim AS runner
+
+WORKDIR /app
 
 ENV NODE_ENV=production
 
