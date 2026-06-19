@@ -36,13 +36,17 @@ overrides:
   'fdir>picomatch': '4.0.4'
   'node-emoji>lodash': '4.18.1'
   'path-to-regexp': '8.4.2'
-  'protobufjs': '7.5.8'
+  # Reachable at runtime via @nestjs/terminus > @grpc/grpc-js (and dev via
+  # testcontainers > dockerode). Stay on the 7.x line the parents require
+  # (^7.5.3 / ^7.2.5); 7.6.3 patches alerts #105 (med) and #106 (high).
+  'protobufjs': '7.6.3'
   # dev-only (testcontainers > dockerode); patched only in the 11.x line.
   'uuid@10': '11.1.1'
   'redis-info>lodash': '4.18.1'
   'rollup': '4.59.0'
   'tinyglobby>picomatch': '4.0.4'
-  'tmp': '0.2.6'
+  # dev-only (testcontainers > dockerode); 0.2.7 patches alert #104 (high).
+  'tmp': '0.2.7'
   # @grpc/grpc-js + hono ship via @nestjs/terminus and the prisma CLI (@prisma/dev);
   # patched in place rather than trimmed from the image.
   '@grpc/grpc-js': '1.14.4'

@@ -120,6 +120,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Bumped the `protobufjs` override to 7.6.3 and `tmp` to 0.2.7, closing three
+  transitive advisories (two high, one medium). `protobufjs` stays on the 7.x
+  line its parents require (`@nestjs/terminus` > `@grpc/grpc-js`, and the dev-only
+  `testcontainers` > `dockerode`); `tmp` is dev-only via `testcontainers`.
 - Resolved transitive dependency advisories (`protobufjs`, `tmp`, `fast-uri`,
   `rollup`, `lodash`, `brace-expansion`, `picomatch`) by materializing pnpm
   version overrides. The overrides were previously declared under
