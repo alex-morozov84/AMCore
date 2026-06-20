@@ -58,9 +58,11 @@ apps/api/src/
 │   │   └── roles.controller.ts
 │   ├── admin/                  # SUPER_ADMIN only
 │   │   └── admin.controller.ts
-│   └── notifications/          # In-app feed, preferences, transaction-aware producer
+│   └── notifications/          # In-app feed, preferences, producer, realtime SSE
 │       ├── notifications.controller.ts
 │       ├── notification-preferences.controller.ts
+│       ├── notification-stream.controller.ts  # GET /notifications/stream (SSE, ADR-053)
+│       ├── realtime/                          # publisher + subscriber + hub + stream writer
 │       ├── notifications.service.ts          # notify() / notifyTx(tx)
 │       ├── notification-feed.service.ts      # cursor feed, mark-read, archive
 │       ├── notification-preference.service.ts
@@ -340,7 +342,7 @@ is imported (worker/all). Assert the gating in `test/process-role.e2e-spec.ts`.
 - [`docs/operations/observability.md`](../../docs/operations/observability.md) — Metrics and tracing guide
 - [`docs/auth/`](../../docs/auth/README.md) — Complete auth & RBAC guide for developers
 - [`docs/authorization.md`](../../docs/authorization.md) — Authorization concepts
-- [`docs/notifications/`](../../docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract)
+- [`docs/notifications/`](../../docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email delivery, realtime SSE stream)
 
 ## Contributing
 

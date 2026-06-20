@@ -12,6 +12,7 @@ export interface RequestPrincipal {
   scopes?: string[] // API key only: ['contact:read', 'deal:create']
   // undefined = no restriction (JWT users)
   sid?: string // JWT only: session id, for @RequireFreshAuth step-up checks (OB-06b)
+  exp?: number // JWT only: access-token expiry (epoch seconds); bounds long-lived SSE streams (ADR-053)
 }
 // Effective permissions = userRolePermissions ∩ scopes (Auth0 validated pattern)
 // JWT:     scopes = undefined → full role permissions

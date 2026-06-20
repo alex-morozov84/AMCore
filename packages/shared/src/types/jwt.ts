@@ -12,4 +12,9 @@ export interface JwtPayload {
   // Session.lastAuthAt. Optional — legacy tokens lack it and fail closed on
   // step-up routes only.
   sid?: string
+  // Standard JWT expiry claim (epoch seconds). Set by `jsonwebtoken` from the
+  // sign `expiresIn` option, so it is not passed at sign time but is present on
+  // the verified payload. Typed here so `JwtStrategy.validate` can carry it into
+  // the principal to bound long-lived SSE streams (ADR-053).
+  exp?: number
 }

@@ -25,6 +25,10 @@ let AuthController: Token
 let EmailProcessor: Token
 let NotificationDispatchProcessor: Token
 let NotificationRetentionService: Token
+let NotificationRealtimePublisher: Token
+let NotificationRealtimeSubscriber: Token
+let NotificationRealtimeHub: Token
+let NotificationStreamController: Token
 let MetricsService: Token
 let QueueDepthMetricsCollector: Token
 let QueueService: Token
@@ -78,6 +82,13 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       await import('../src/core/notifications/dispatch/notification-dispatch.processor')
     const retentionService =
       await import('../src/core/notifications/notification-retention.service')
+    const realtimePublisher =
+      await import('../src/core/notifications/realtime/notification-realtime.publisher')
+    const realtimeSubscriber =
+      await import('../src/core/notifications/realtime/notification-realtime.subscriber')
+    const realtimeHub = await import('../src/core/notifications/realtime/notification-realtime.hub')
+    const streamController =
+      await import('../src/core/notifications/notification-stream.controller')
     const observability = await import('../src/infrastructure/observability')
     const queue = await import('../src/infrastructure/queue')
 
@@ -89,6 +100,10 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     EmailProcessor = emailProcessor.EmailProcessor
     NotificationDispatchProcessor = dispatchProcessor.NotificationDispatchProcessor
     NotificationRetentionService = retentionService.NotificationRetentionService
+    NotificationRealtimePublisher = realtimePublisher.NotificationRealtimePublisher
+    NotificationRealtimeSubscriber = realtimeSubscriber.NotificationRealtimeSubscriber
+    NotificationRealtimeHub = realtimeHub.NotificationRealtimeHub
+    NotificationStreamController = streamController.NotificationStreamController
     MetricsService = observability.MetricsService
     QueueDepthMetricsCollector = queue.QueueDepthMetricsCollector
     QueueService = queue.QueueService
@@ -115,6 +130,13 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, NotificationRetentionService)
       absent(m, QueueDepthMetricsCollector)
       absent(m, SchedulerRegistry)
+    })
+
+    it('has the realtime publisher, subscriber, hub, and SSE stream route (ADR-053)', () => {
+      present(m, NotificationRealtimePublisher)
+      present(m, NotificationRealtimeSubscriber)
+      present(m, NotificationRealtimeHub)
+      present(m, NotificationStreamController)
     })
 
     it('does not register the shared queue-depth gauge', async () => {
@@ -149,6 +171,13 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, AuthController)
       absent(m, AdminController)
     })
+
+    it('may publish realtime hints but holds NO subscriber, hub, or stream route', () => {
+      present(m, NotificationRealtimePublisher)
+      absent(m, NotificationRealtimeSubscriber)
+      absent(m, NotificationRealtimeHub)
+      absent(m, NotificationStreamController)
+    })
   })
 
   describe('all', () => {
@@ -169,6 +198,13 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, NotificationRetentionService)
       present(m, QueueDepthMetricsCollector)
       present(m, SchedulerRegistry)
+    })
+
+    it('composes the realtime publisher, subscriber, hub, and stream route', () => {
+      present(m, NotificationRealtimePublisher)
+      present(m, NotificationRealtimeSubscriber)
+      present(m, NotificationRealtimeHub)
+      present(m, NotificationStreamController)
     })
 
     it('registers the shared queue-depth gauge', async () => {

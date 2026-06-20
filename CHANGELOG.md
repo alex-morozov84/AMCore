@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Realtime in-app notification stream (notifications Arc C). A bearer-authenticated
+  Server-Sent Events endpoint `GET /notifications/stream` pushes a content-free hint
+  (`created` / `read` / `archived` / `unread_changed`) whenever the recipient's feed
+  changes, so a client refreshes without polling — Postgres stays the source of truth
+  and every event means "refetch". Cross-replica fan-out runs over an environment- and
+  version-namespaced Redis Pub/Sub channel with one dedicated subscriber per web
+  replica and **no sticky sessions**; delivery is at-most-once and a dropped hint is
+  recovered by the next reconnect refetch. The endpoint is a manual bounded writer (not
+  `@Sse`): admission is enforced before any bytes (per-user cap → 429, global
+  per-process cap → 503), the stream closes at access-token expiry (bounded by a server
+  cap), a slow consumer is disconnected on write-buffer overflow, and the access token
+  is sent via the `Authorization` header (never the URL). Tunable via
+  `NOTIFICATIONS_REALTIME_*` env vars — deployments sharing one Redis must set a distinct
+  `NOTIFICATIONS_REALTIME_NAMESPACE`. No JS client ships (`apps/web` stays a stub); the
+  documented client contract and proxy/HTTP-2 guidance are in
+  [`docs/notifications/README.md`](docs/notifications/README.md) and
+  [`docs/operations/deployment.md`](docs/operations/deployment.md).
 - Durable external notification delivery (notifications Arc B). A worker-only
   dispatcher drains `PENDING` deliveries with a Postgres `FOR UPDATE SKIP LOCKED`
   claim, leases each attempt, and owns the retry schedule and immutable attempt

@@ -327,3 +327,31 @@ export async function seedSystemRoles(prisma: PrismaService): Promise<void> {
 export function signAccessToken(app: INestApplication, payload: Record<string, unknown>): string {
   return app.get(JwtService, { strict: false }).sign(payload)
 }
+
+/**
+ * Boot a second WEB-role app on the SAME testcontainers as an existing E2E context,
+ * listening on an ephemeral loopback port. Real SSE needs a real socket — supertest's
+ * in-memory agent does not deliver incremental `text/event-stream` chunks (ADR-053
+ * Arc C gate). The caller must already have set DATABASE_URL/REDIS_URL (e.g. via
+ * `setupE2ETest`) so WebModule's dynamic import reads the testcontainer URLs
+ * (Gotcha #1). Tear down with `closeWebAppContext` BEFORE stopping the shared
+ * containers. Bound to 127.0.0.1 to avoid IPv6 `[::1]` fetch quirks.
+ */
+export async function startWebAppContext(): Promise<{
+  app: NestExpressApplication
+  baseUrl: string
+}> {
+  const { WebModule } = await import('../src/web.module')
+  const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [WebModule] })
+    .overrideProvider(PinoLogger)
+    .useValue(noopPinoLogger)
+    .compile()
+  const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
+  configureBodyParser(app)
+  app.use(cookieParser())
+  app.useGlobalPipes(new ZodValidationPipe())
+  await app.init()
+  await app.listen(0, '127.0.0.1')
+  const address = app.getHttpServer().address() as { port: number }
+  return { app, baseUrl: `http://127.0.0.1:${address.port}` }
+}

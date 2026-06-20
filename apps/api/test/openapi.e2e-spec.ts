@@ -21,7 +21,7 @@ import { setupE2ETest, teardownE2ETest } from './helpers'
  * Terminus health probes (`/health*`) document 200/503 via `@ApiResponse`
  * without a body schema by design and are the one justified exclusion.
  */
-type BodyKind = 'json' | 'none' | 'redirect' | 'text'
+type BodyKind = 'json' | 'none' | 'redirect' | 'text' | 'stream'
 interface Expected {
   status: string
   kind: BodyKind
@@ -100,6 +100,8 @@ const EXPECTED: Record<string, Expected> = {
   'get /notifications/preferences': { status: '200', kind: 'json' },
   'put /notifications/preferences': { status: '204', kind: 'none' },
   'patch /notifications/settings': { status: '204', kind: 'none' },
+  // notifications realtime (Arc C — SSE stream, text/event-stream not JSON)
+  'get /notifications/stream': { status: '200', kind: 'stream' },
   // metrics — Prometheus exposition (text, not JSON)
   'get /metrics': { status: '200', kind: 'text' },
 }
@@ -138,6 +140,9 @@ describe('OpenAPI success surface (e2e)', () => {
       ?.schema
   const textSchema = (response: Record<string, unknown> | undefined): object | undefined =>
     (response?.content as Record<string, { schema?: object }> | undefined)?.['text/plain']?.schema
+  const eventStreamSchema = (response: Record<string, unknown> | undefined): object | undefined =>
+    (response?.content as Record<string, { schema?: object }> | undefined)?.['text/event-stream']
+      ?.schema
   const nonEmpty = (schema: object | undefined): boolean =>
     !!schema && Object.keys(schema).length > 0
 
@@ -198,6 +203,11 @@ describe('OpenAPI success surface (e2e)', () => {
         case 'text':
           if (!nonEmpty(textSchema(response))) {
             violations.push(`${key}: ${code} has no text/plain body schema`)
+          }
+          break
+        case 'stream':
+          if (!nonEmpty(eventStreamSchema(response))) {
+            violations.push(`${key}: ${code} has no text/event-stream body schema`)
           }
           break
         case 'none':

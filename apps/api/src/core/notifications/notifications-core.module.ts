@@ -7,15 +7,17 @@ import { NotificationDefinitionRegistry } from './notification-definition.regist
 import { NotificationPreferenceRepository } from './notification-preference.repository'
 import { NotificationPreferenceResolver } from './notification-preference.resolver'
 import { NotificationsService } from './notifications.service'
+import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
 import { QueueModule } from '@/infrastructure/queue'
 
 /**
- * Notifications core (ADR-052): the definition registry, preference resolver/repo,
- * produce-time channel target resolvers, and the `NotificationsService` producer. No
- * controller, processor, cron, or realtime — those belong to the web/worker modules.
- * Imported by every process role via `coreImports()`. `QueueModule` supplies the
- * `QueueService` the producer uses to best-effort wake the dispatcher.
+ * Notifications core (ADR-052/053): the definition registry, preference resolver/repo,
+ * produce-time channel target resolvers, the `NotificationsService` producer, and the
+ * realtime `NotificationRealtimePublisher` (every role may publish a hint). No
+ * controller, processor, cron, SSE route, or Pub/Sub subscriber — those belong to the
+ * web/worker modules. Imported by every process role via `coreImports()`. `QueueModule`
+ * supplies the `QueueService` the producer uses to best-effort wake the dispatcher.
  */
 @Module({
   imports: [PrismaModule, QueueModule],
@@ -36,8 +38,14 @@ import { QueueModule } from '@/infrastructure/queue'
     },
     NotificationPreferenceResolver,
     NotificationPreferenceRepository,
+    NotificationRealtimePublisher,
     NotificationsService,
   ],
-  exports: [NotificationsService, NotificationDefinitionRegistry, NotificationPreferenceRepository],
+  exports: [
+    NotificationsService,
+    NotificationDefinitionRegistry,
+    NotificationPreferenceRepository,
+    NotificationRealtimePublisher,
+  ],
 })
 export class NotificationsCoreModule {}

@@ -13,6 +13,7 @@ import { PrismaService } from '../../prisma'
 
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
 import { decodeFeedCursor, encodeFeedCursor } from './notification-feed-cursor'
+import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
 export interface FeedQuery {
   cursor?: string
@@ -28,7 +29,8 @@ export interface FeedQuery {
 export class NotificationFeedService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly registry: NotificationDefinitionRegistry
+    private readonly registry: NotificationDefinitionRegistry,
+    private readonly realtime: NotificationRealtimePublisher
   ) {}
 
   async getFeed(userId: string, query: FeedQuery): Promise<NotificationFeedResponse> {
@@ -72,10 +74,12 @@ export class NotificationFeedService {
 
   async markRead(userId: string, notificationId: string): Promise<void> {
     // Scoped to the recipient and idempotent: a foreign or already-read id is a no-op.
-    await this.prisma.notification.updateMany({
+    const { count } = await this.prisma.notification.updateMany({
       where: { id: notificationId, recipientUserId: userId, readAt: null },
       data: { readAt: new Date() },
     })
+    // Realtime hint only on a real state change (ADR-053); a no-op makes no noise.
+    if (count > 0) void this.realtime.publish(userId, 'read', notificationId)
   }
 
   async markAllRead(userId: string): Promise<number> {
@@ -83,14 +87,17 @@ export class NotificationFeedService {
       where: { recipientUserId: userId, readAt: null, archivedAt: null },
       data: { readAt: new Date() },
     })
+    // Aggregate hint (no single id) for cross-device/tab unread sync, only if any row changed.
+    if (count > 0) void this.realtime.publish(userId, 'unread_changed')
     return count
   }
 
   async archive(userId: string, notificationId: string): Promise<void> {
-    await this.prisma.notification.updateMany({
+    const { count } = await this.prisma.notification.updateMany({
       where: { id: notificationId, recipientUserId: userId, archivedAt: null },
       data: { archivedAt: new Date() },
     })
+    if (count > 0) void this.realtime.publish(userId, 'archived', notificationId)
   }
 
   private async recipientLocale(userId: string): Promise<SupportedLocale> {

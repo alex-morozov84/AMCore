@@ -5,6 +5,7 @@ import type { PrismaService } from '../../prisma'
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
 import { NotificationFeedService } from './notification-feed.service'
 import { decodeFeedCursor } from './notification-feed-cursor'
+import type { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
 function row(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -23,11 +24,13 @@ function row(overrides: Record<string, unknown> = {}): Record<string, unknown> {
 
 describe('NotificationFeedService', () => {
   let prisma: DeepMockProxy<PrismaService>
+  let realtime: DeepMockProxy<NotificationRealtimePublisher>
   let service: NotificationFeedService
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>()
-    service = new NotificationFeedService(prisma, new NotificationDefinitionRegistry())
+    realtime = mockDeep<NotificationRealtimePublisher>()
+    service = new NotificationFeedService(prisma, new NotificationDefinitionRegistry(), realtime)
     prisma.user.findUnique.mockResolvedValue({ locale: 'en' } as never)
   })
 
@@ -96,7 +99,7 @@ describe('NotificationFeedService', () => {
       })
     })
 
-    it('marks one read scoped to the recipient and unread state', async () => {
+    it('marks one read scoped to the recipient and unread state, then hints', async () => {
       prisma.notification.updateMany.mockResolvedValue({ count: 1 } as never)
 
       await service.markRead('user-1', 'n1')
@@ -105,15 +108,32 @@ describe('NotificationFeedService', () => {
         where: { id: 'n1', recipientUserId: 'user-1', readAt: null },
         data: { readAt: expect.any(Date) },
       })
+      expect(realtime.publish).toHaveBeenCalledWith('user-1', 'read', 'n1')
     })
 
-    it('returns how many were marked all-read', async () => {
+    it('does not hint when mark-read is a no-op (already read / foreign id)', async () => {
+      prisma.notification.updateMany.mockResolvedValue({ count: 0 } as never)
+
+      await service.markRead('user-1', 'n1')
+
+      expect(realtime.publish).not.toHaveBeenCalled()
+    })
+
+    it('returns how many were marked all-read and hints an aggregate change', async () => {
       prisma.notification.updateMany.mockResolvedValue({ count: 4 } as never)
 
       expect(await service.markAllRead('user-1')).toBe(4)
+      expect(realtime.publish).toHaveBeenCalledWith('user-1', 'unread_changed')
     })
 
-    it('archives scoped to the recipient', async () => {
+    it('does not hint when mark-all-read changes nothing', async () => {
+      prisma.notification.updateMany.mockResolvedValue({ count: 0 } as never)
+
+      expect(await service.markAllRead('user-1')).toBe(0)
+      expect(realtime.publish).not.toHaveBeenCalled()
+    })
+
+    it('archives scoped to the recipient, then hints', async () => {
       prisma.notification.updateMany.mockResolvedValue({ count: 1 } as never)
 
       await service.archive('user-1', 'n1')
@@ -122,6 +142,15 @@ describe('NotificationFeedService', () => {
         where: { id: 'n1', recipientUserId: 'user-1', archivedAt: null },
         data: { archivedAt: expect.any(Date) },
       })
+      expect(realtime.publish).toHaveBeenCalledWith('user-1', 'archived', 'n1')
+    })
+
+    it('does not hint when archive is a no-op (already archived / foreign id)', async () => {
+      prisma.notification.updateMany.mockResolvedValue({ count: 0 } as never)
+
+      await service.archive('user-1', 'n1')
+
+      expect(realtime.publish).not.toHaveBeenCalled()
     })
   })
 })
