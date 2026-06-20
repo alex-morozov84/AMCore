@@ -5,6 +5,7 @@ import { PrismaModule } from '../../prisma'
 import { NotificationFeedService } from './notification-feed.service'
 import { NotificationPreferenceService } from './notification-preference.service'
 import { NotificationPreferencesController } from './notification-preferences.controller'
+import { NotificationStreamController } from './notification-stream.controller'
 import { NotificationsController } from './notifications.controller'
 import { NotificationsCoreModule } from './notifications-core.module'
 import { NotificationRealtimeHub } from './realtime/notification-realtime.hub'
@@ -20,7 +21,11 @@ import { NotificationRealtimeSubscriber } from './realtime/notification-realtime
  */
 @Module({
   imports: [PrismaModule, NotificationsCoreModule],
-  controllers: [NotificationsController, NotificationPreferencesController],
+  controllers: [
+    NotificationsController,
+    NotificationPreferencesController,
+    NotificationStreamController,
+  ],
   providers: [
     NotificationFeedService,
     NotificationPreferenceService,
