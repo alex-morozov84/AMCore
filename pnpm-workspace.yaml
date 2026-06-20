@@ -36,17 +36,21 @@ overrides:
   'fdir>picomatch': '4.0.4'
   'node-emoji>lodash': '4.18.1'
   'path-to-regexp': '8.4.2'
-  'protobufjs': '7.5.8'
+  # Reachable at runtime via @nestjs/terminus > @grpc/grpc-js (and dev via
+  # testcontainers > dockerode). Stay on the 7.x line the parents require
+  # (^7.5.3 / ^7.2.5); 7.6.3 patches alerts #105 (med) and #106 (high).
+  'protobufjs': '7.6.3'
   # dev-only (testcontainers > dockerode); patched only in the 11.x line.
   'uuid@10': '11.1.1'
   'redis-info>lodash': '4.18.1'
   'rollup': '4.59.0'
   'tinyglobby>picomatch': '4.0.4'
-  'tmp': '0.2.6'
+  # dev-only (testcontainers > dockerode); 0.2.7 patches alert #104 (high).
+  'tmp': '0.2.7'
   # @grpc/grpc-js + hono ship via @nestjs/terminus and the prisma CLI (@prisma/dev);
   # patched in place rather than trimmed from the image.
   '@grpc/grpc-js': '1.14.4'
-  'hono': '4.12.21'
+  'hono': '4.12.25'
   '@hono/node-server': '1.19.13'
   # Scope to the vulnerable major so safe coexisting majors are left alone.
   'postcss@8': '8.5.14'
@@ -55,4 +59,22 @@ overrides:
   'qs@6': '6.15.2'
   # build-only (vite/tsup/tsx); advisory is a dev-server CORS issue, not shipped.
   'esbuild': '0.28.1'
-  'vite': '7.3.2'
+  'vite': '7.3.5'
+  # 2026-06-20 advisory batch (all transitive; new versions stay in parent range).
+  # runtime: @nestjs/platform-express > multer; axios > form-data.
+  'multer': '2.2.0'
+  'form-data': '4.0.6'
+  # dev/build-only: testcontainers > undici; @swc/cli + @nestjs/cli > piscina;
+  # @babel/core via eslint-plugin-react-compiler + babel transforms.
+  'undici': '7.28.0'
+  'piscina': '4.9.3'
+  '@babel/core': '7.29.6'
+  # js-yaml DoS (GHSA-h67p-54hq-rp68): fix the 4.x line (commitlint et al.) only.
+  # The 3.x consumer (@istanbuljs/load-nyc-config, dev jest-coverage) hard-pins
+  # js-yaml ^3.13.1 and is its own unmaintained latest release, and 3.x has no
+  # patch, so it cannot take 4.2.0; the residual is dev-only (alert #108 dismissed
+  # as not-used: no .nycrc.yml exists, so its js-yaml branch never runs).
+  'js-yaml@4': '4.2.0'
+  # `yaml` (NOT js-yaml) DoS via deeply-nested flow sequences (CVE-2026-33532);
+  # dev-only (lint-staged still resolves 2.8.2). Patched in 2.8.3.
+  'yaml@2': '2.8.3'
