@@ -209,8 +209,19 @@ off` on the stream location (and never gzip a `text/event-stream`).
 - **No sticky sessions needed.** Any replica can serve any user — a hint published
   on one replica fans out via Redis Pub/Sub to all. **When several environments
   share one Redis, give each a distinct `NOTIFICATIONS_REALTIME_NAMESPACE`** so
-  their channels do not collide. Tune `NOTIFICATIONS_REALTIME_MAX_CONNECTIONS`
-  below the process file-descriptor ulimit.
+  their channels do not collide.
+- **Size the global connection cap to the process, not the cluster.**
+  `NOTIFICATIONS_REALTIME_MAX_CONNECTIONS` defaults to **10000** per process. Each
+  open stream costs roughly one file descriptor plus a small fixed buffer (the
+  per-connection queue is bounded at `NOTIFICATIONS_REALTIME_QUEUE_DEPTH`, default 16
+  small frames — on the order of tens of KB, not megabytes), so 10000 streams is
+  ~hundreds of MB of socket/queue overhead — comfortable for a typical container.
+  The hard constraint is the **file-descriptor ulimit**: keep the cap **below**
+  `RLIMIT_NOFILE` minus headroom for DB/Redis pools and inbound HTTP (e.g. with the
+  common `nofile=65536`, 10000 leaves ample room). Raise it only after raising the
+  ulimit and confirming the per-connection memory fits the container's limit;
+  lower it for small instances. The cap is per replica — total fan-out scales by
+  adding replicas, not by raising this number past the FD budget.
 - **Recovery is the client's refetch.** Delivery is at-most-once; a dropped hint
   (Redis blip, restart) is recovered when the client reconnects and refetches the
   feed — nothing is replayed server-side.

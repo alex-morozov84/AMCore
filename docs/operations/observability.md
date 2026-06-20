@@ -160,8 +160,10 @@ Realtime notification (SSE) metrics are bounded and carry no user/IP/event IDs:
 
 `rejected_global` (503) and `rejected_user` (429) split the admission rejections;
 `slow_close` counts slow consumers disconnected on write-buffer overflow;
-`startup_failure` counts a stream that failed to start after admission (the
-response is already committed, so it is torn down quietly rather than erroring).
+`startup_failure` counts a stream that failed to start after admission (flushing the
+headers or writing the ready frame threw); it is torn down quietly rather than
+rethrown, because once admitted the response may already be an SSE commitment and an
+exception filter must not try to write a JSON error onto a sent/ended response.
 The dedicated Pub/Sub subscriber connection is classified distinctly in the Redis
 client-event metric (e.g. `notif-subscriber`).
 

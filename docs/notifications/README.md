@@ -305,7 +305,11 @@ recovered by the next reconnect refetch, never replayed.
 `Last-Event-ID` replay):
 
 ```jsonc
-{ "eventId": "…", "reason": "created" | "read" | "archived" | "unread_changed", "notificationId": "…?" }
+{
+  "eventId": "evt_...", // dedupe/correlation only — never a feed identity or replay cursor
+  "reason": "created", // one of: created | read | archived | unread_changed
+  "notificationId": "ntf_...", // present for item-scoped reasons; omitted for unread_changed
+}
 ```
 
 `eventId` is for client-side dedupe/correlation only; `notificationId` is present
@@ -324,6 +328,9 @@ The reason is telemetry/optimization metadata — treat **every** event as "refe
   expiry (bounded by a server cap) — refresh the token and reconnect.
 - **Treat a heartbeat timeout > the server interval as a dead connection** and
   reconnect; the server sends `:`-comment heartbeats (default every 20s).
+- **Abort the reader on teardown.** Open the stream with an `AbortController` and
+  call `abort()` on unmount / page-unload / before every reconnect, then cancel the
+  response reader — otherwise the fetch stream and its socket leak across reconnects.
 - A Redis outage degrades realtime to "updates appear on your next refetch"; the
   feed is always correct without it.
 
