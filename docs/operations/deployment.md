@@ -211,17 +211,19 @@ off` on the stream location (and never gzip a `text/event-stream`).
   share one Redis, give each a distinct `NOTIFICATIONS_REALTIME_NAMESPACE`** so
   their channels do not collide.
 - **Size the global connection cap to the process, not the cluster.**
-  `NOTIFICATIONS_REALTIME_MAX_CONNECTIONS` defaults to **10000** per process. Each
-  open stream costs roughly one file descriptor plus a small fixed buffer (the
-  per-connection queue is bounded at `NOTIFICATIONS_REALTIME_QUEUE_DEPTH`, default 16
-  small frames — on the order of tens of KB, not megabytes), so 10000 streams is
-  ~hundreds of MB of socket/queue overhead — comfortable for a typical container.
-  The hard constraint is the **file-descriptor ulimit**: keep the cap **below**
-  `RLIMIT_NOFILE` minus headroom for DB/Redis pools and inbound HTTP (e.g. with the
-  common `nofile=65536`, 10000 leaves ample room). Raise it only after raising the
-  ulimit and confirming the per-connection memory fits the container's limit;
-  lower it for small instances. The cap is per replica — total fan-out scales by
-  adding replicas, not by raising this number past the FD budget.
+  `NOTIFICATIONS_REALTIME_MAX_CONNECTIONS` defaults to **10000** per process — a
+  **configurable safety ceiling, not a validated capacity target**. It bounds two
+  independent budgets you must size for your instance: **file descriptors** (≈1 FD
+  per stream, plus Node's libuv overhead) and **memory** (per-connection socket
+  buffers plus the bounded write queue, `NOTIFICATIONS_REALTIME_QUEUE_DEPTH` × frame
+  size). The hard floor is the **FD ulimit**: keep the cap below `RLIMIT_NOFILE`
+  minus headroom for the DB/Redis pools and inbound HTTP. The memory cost per stream
+  is **runtime- and workload-dependent — load-test and measure RSS at your target
+  concurrency** rather than trusting a rule of thumb, especially on small (256–512 MB)
+  containers, where 10000 streams will likely exhaust memory long before the FD
+  limit; set the cap to the measured value with margin. The cap is per replica —
+  scale total fan-out by adding replicas, not by raising this number past the
+  measured per-instance budget.
 - **Recovery is the client's refetch.** Delivery is at-most-once; a dropped hint
   (Redis blip, restart) is recovered when the client reconnects and refetches the
   feed — nothing is replayed server-side.

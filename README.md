@@ -49,7 +49,7 @@ amcore/
 │   └── typescript-config/
 ├── docs/
 │   ├── auth/           # Authentication & authorization documentation
-│   ├── notifications/  # Notifications subsystem (in-app feed, durable email dispatch, preferences)
+│   ├── notifications/  # Notifications subsystem (in-app feed, durable email dispatch, realtime SSE, preferences)
 │   ├── media/          # Image derivative/media processing documentation
 │   └── storage/        # File storage documentation
 └── .github/        # CI, Dependabot, issue/PR templates
