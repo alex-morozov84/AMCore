@@ -36,6 +36,7 @@ export type NotificationRealtimeStreamEvent =
   | 'rejected_global'
   | 'rejected_user'
   | 'slow_close'
+  | 'startup_failure'
 export type QueueMetricsEvent =
   | 'job_added'
   | 'redis_error'

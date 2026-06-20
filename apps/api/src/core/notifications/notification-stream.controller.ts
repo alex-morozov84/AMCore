@@ -1,6 +1,7 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
+import { PinoLogger } from 'nestjs-pino'
 
 import { AuthType, type RequestPrincipal } from '@amcore/shared'
 
@@ -41,8 +42,11 @@ export class NotificationStreamController {
   constructor(
     private readonly hub: NotificationRealtimeHub,
     private readonly env: EnvService,
-    private readonly metrics: MetricsService
-  ) {}
+    private readonly metrics: MetricsService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(NotificationStreamController.name)
+  }
 
   @Get('stream')
   @ApiOperation({
@@ -84,12 +88,14 @@ export class NotificationStreamController {
       // Register-in-hub happened above; only now flush headers + the ready frame.
       res.writeHead(HttpStatus.OK, SSE_HEADERS)
       connection.open()
-    } catch {
+    } catch (err) {
       // The response is now committed to an SSE stream: headers were (or were being)
       // flushed and `close()` ends it. Do NOT rethrow — an exception filter would try
       // to write a JSON error onto a sent/ended response (ERR_HTTP_HEADERS_SENT).
-      // Tear the registration down quietly so the gauge/admission stay balanced; the
-      // client reconnects and resyncs.
+      // Record the failure (bounded metric + structured log, no user id per ADR-053)
+      // and tear the registration down quietly; the client reconnects and resyncs.
+      this.metrics.incNotificationRealtimeEvent('startup_failure')
+      this.logger.warn({ err }, 'Notification SSE stream failed to start after admission')
       connection.close('client')
     }
   }

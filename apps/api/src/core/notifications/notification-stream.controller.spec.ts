@@ -18,6 +18,7 @@ describe('NotificationStreamController', () => {
   let hub: { register: jest.Mock }
   let metrics: { incNotificationRealtimeEvent: jest.Mock }
   let env: { get: jest.Mock }
+  let logger: { setContext: jest.Mock; warn: jest.Mock }
   let res: { once: jest.Mock; writeHead: jest.Mock; end: jest.Mock; headersSent: boolean }
   let closeListener: (() => void) | undefined
   let controller: NotificationStreamController
@@ -53,7 +54,13 @@ describe('NotificationStreamController', () => {
     hub = { register: jest.fn(() => ({ ok: true, connection })) }
     metrics = { incNotificationRealtimeEvent: jest.fn() }
     env = { get: jest.fn(() => CAP_MS) }
-    controller = new NotificationStreamController(hub as never, env as never, metrics as never)
+    logger = { setContext: jest.fn(), warn: jest.fn() }
+    controller = new NotificationStreamController(
+      hub as never,
+      env as never,
+      metrics as never,
+      logger as never
+    )
   })
 
   describe('fail-closed expiry', () => {
@@ -145,6 +152,9 @@ describe('NotificationStreamController', () => {
     expect(res.headersSent).toBe(true)
     expect(connection.close).toHaveBeenCalledWith('client')
     expect(res.end).toHaveBeenCalled()
+    // The swallowed failure is still observable: bounded metric + structured log.
+    expect(metrics.incNotificationRealtimeEvent).toHaveBeenCalledWith('startup_failure')
+    expect(logger.warn).toHaveBeenCalledTimes(1)
   })
 
   it('tears down without rethrowing when writeHead itself fails', () => {
