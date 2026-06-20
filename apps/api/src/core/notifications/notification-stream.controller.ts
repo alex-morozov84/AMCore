@@ -84,10 +84,13 @@ export class NotificationStreamController {
       // Register-in-hub happened above; only now flush headers + the ready frame.
       res.writeHead(HttpStatus.OK, SSE_HEADERS)
       connection.open()
-    } catch (error) {
-      // Roll the registration back so the gauge and admission stay balanced.
+    } catch {
+      // The response is now committed to an SSE stream: headers were (or were being)
+      // flushed and `close()` ends it. Do NOT rethrow — an exception filter would try
+      // to write a JSON error onto a sent/ended response (ERR_HTTP_HEADERS_SENT).
+      // Tear the registration down quietly so the gauge/admission stay balanced; the
+      // client reconnects and resyncs.
       connection.close('client')
-      throw error
     }
   }
 
