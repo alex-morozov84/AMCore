@@ -16,12 +16,12 @@ Deployment targets and CD environments remain adopter-specific.
 
 ### Application Modules
 
-| Module            | Status         | Description                                                                                     |
-| ----------------- | -------------- | ----------------------------------------------------------------------------------------------- |
-| **Notifications** | 🚧 In progress | In-app feed + preferences + durable email dispatch shipped; Telegram and realtime fan-out later |
-| **Fitness**       | 📋 Planned     | Workout tracking, exercise library, progress charts                                             |
-| **Finance**       | 📋 Planned     | Wallet management, transaction tracking                                                         |
-| **Subscriptions** | 📋 Planned     | Subscription monitoring, reminders                                                              |
+| Module            | Status         | Description                                                                                       |
+| ----------------- | -------------- | ------------------------------------------------------------------------------------------------- |
+| **Notifications** | 🚧 In progress | In-app feed + preferences + durable email dispatch + realtime SSE fan-out shipped; Telegram later |
+| **Fitness**       | 📋 Planned     | Workout tracking, exercise library, progress charts                                               |
+| **Finance**       | 📋 Planned     | Wallet management, transaction tracking                                                           |
+| **Subscriptions** | 📋 Planned     | Subscription monitoring, reminders                                                                |
 
 ## Tech Stack
 
@@ -122,7 +122,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 - **Storage** — S3-compatible provider abstraction, local filesystem dev driver, in-memory test driver, magic-byte upload validation, signed/public URLs, opt-in health check, avatar upload/delete example
 - **Health Checks** — `/health`, `/health/startup`, `/health/ready`, `/health/live` (Kubernetes-ready)
 - **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys, invites) and notification retention at 03:00 UTC, both with multi-instance locking; plus a notification-dispatch recovery poller that runs on every worker replica (coordinated by Postgres `SKIP LOCKED`, not a lock)
-- **Notifications** — durable per-user subsystem: in-app feed + preferences and a worker-driven email channel with Postgres-owned retry/leases/attempt history (see [`docs/notifications/`](docs/notifications/README.md))
+- **Notifications** — durable per-user subsystem: in-app feed + preferences, a worker-driven email channel with Postgres-owned retry/leases/attempt history, and a bearer-authenticated realtime SSE stream (`GET /notifications/stream`) fanned out cross-replica via Redis Pub/Sub with no sticky sessions (see [`docs/notifications/`](docs/notifications/README.md))
 
 ### Tests
 

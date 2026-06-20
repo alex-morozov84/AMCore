@@ -58,9 +58,11 @@ apps/api/src/
 │   │   └── roles.controller.ts
 │   ├── admin/                  # SUPER_ADMIN only
 │   │   └── admin.controller.ts
-│   └── notifications/          # In-app feed, preferences, transaction-aware producer
+│   └── notifications/          # In-app feed, preferences, producer, realtime SSE
 │       ├── notifications.controller.ts
 │       ├── notification-preferences.controller.ts
+│       ├── notification-stream.controller.ts  # GET /notifications/stream (SSE, ADR-053)
+│       ├── realtime/                          # publisher + subscriber + hub + stream writer
 │       ├── notifications.service.ts          # notify() / notifyTx(tx)
 │       ├── notification-feed.service.ts      # cursor feed, mark-read, archive
 │       ├── notification-preference.service.ts

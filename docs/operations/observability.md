@@ -149,6 +149,22 @@ success. Terminal failures also increment
 `amcore_email_dead_letters_total{template,unrecoverable}`. Recipient addresses,
 provider IDs, job IDs, payloads, and error messages are never labels.
 
+Realtime notification (SSE) metrics are bounded and carry no user/IP/event IDs:
+
+- `amcore_notification_realtime_connections{role}` — gauge of currently-open SSE
+  streams on the process;
+- `amcore_notification_realtime_publish_total{outcome,role}` —
+  `outcome=published|failed|dropped` (`dropped` = the in-flight publish cap was hit);
+- `amcore_notification_realtime_events_total{event,role}` —
+  `event=received|routed|no_local_target|invalid_envelope|rejected_global|rejected_user|slow_close|startup_failure`.
+
+`rejected_global` (503) and `rejected_user` (429) split the admission rejections;
+`slow_close` counts slow consumers disconnected on write-buffer overflow;
+`startup_failure` counts a stream that failed to start after admission (the
+response is already committed, so it is torn down quietly rather than erroring).
+The dedicated Pub/Sub subscriber connection is classified distinctly in the Redis
+client-event metric (e.g. `notif-subscriber`).
+
 The remaining Arc 4 stage is optional OpenTelemetry tracing.
 
 ## Label Rules

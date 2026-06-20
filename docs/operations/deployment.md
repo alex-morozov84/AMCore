@@ -190,6 +190,31 @@ needed), and Postgres `FOR UPDATE SKIP LOCKED` is the coordinator, so replicas
 drain disjoint rows without double-sending. The throttler is Redis-backed
 (ADR-039) and BullMQ workers consume one shared queue. Add worker replicas freely.
 
+## Realtime SSE (`GET /notifications/stream`) behind a proxy
+
+The SSE stream (ADR-053) is long-lived and must not be buffered or timed out by an
+intermediary:
+
+- **Disable response buffering.** The app sends `X-Accel-Buffering: no` and
+  `Cache-Control: no-cache, no-transform`; honor them. For NGINX, `proxy_buffering
+off` on the stream location (and never gzip a `text/event-stream`).
+- **Read timeout > heartbeat.** The server heartbeats every
+  `NOTIFICATIONS_REALTIME_HEARTBEAT_MS` (default 20s); set the proxy read timeout
+  comfortably above it (NGINX `proxy_read_timeout` default is 60s — fine for 20s).
+- **Prefer HTTP/2 at the ingress.** HTTP/1.x browsers cap concurrent connections
+  per origin (~6), which the per-tab streams would consume; HTTP/2 multiplexes them.
+- **Rate-limit at the ingress, not the app.** The app enforces only a per-user cap
+  (429) and a global per-process cap (503); real client-IP / cluster-wide limiting
+  belongs at the trusted proxy (the app does not trust `X-Forwarded-For`).
+- **No sticky sessions needed.** Any replica can serve any user — a hint published
+  on one replica fans out via Redis Pub/Sub to all. **When several environments
+  share one Redis, give each a distinct `NOTIFICATIONS_REALTIME_NAMESPACE`** so
+  their channels do not collide. Tune `NOTIFICATIONS_REALTIME_MAX_CONNECTIONS`
+  below the process file-descriptor ulimit.
+- **Recovery is the client's refetch.** Delivery is at-most-once; a dropped hint
+  (Redis blip, restart) is recovered when the client reconnects and refetches the
+  feed — nothing is replayed server-side.
+
 ## Redis production profile
 
 - **`maxmemory-policy noeviction` is mandatory** for the queue Redis — the only

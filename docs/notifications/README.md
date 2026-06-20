@@ -73,6 +73,7 @@ fails CI if a new handler ships without one (or with the wrong status).
 | `GET`   | `/notifications/preferences`  | `{ notificationsEnabled, preferences: [{ category, channel, enabled, mandatory }] }`.                                |
 | `PUT`   | `/notifications/preferences`  | `204`. Upsert one `(category, channel)` override. `400` for unknown pair or a channel mandatory across the category. |
 | `PATCH` | `/notifications/settings`     | `204`. Master toggle write (`{ notificationsEnabled: boolean }`).                                                    |
+| `GET`   | `/notifications/stream`       | `text/event-stream`. Realtime feed-change hints (SSE) — see [Realtime stream](#realtime-stream-sse) below.           |
 
 Cursor pagination is the documented endpoint-local exception to the project's
 default offset envelope — the feed is append-heavy and offset semantics would
@@ -285,6 +286,58 @@ rejected at registration); they remain in the existing direct-email paths and
 must never appear in a `Notification.payload`, a queue job, or a delivery attempt
 log.
 
+## Realtime stream (SSE)
+
+`GET /notifications/stream` is a bearer-authenticated [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
+stream that pushes a **content-free hint** whenever the recipient's feed changes
+(create / read / mark-all-read / archive). It exists so a client can refresh
+without polling; it is **not** a delivery channel. Postgres remains the source of
+truth — every event simply means _"refetch the feed and unread count"_.
+
+How it works (ADR-053): each web replica runs one dedicated Redis Pub/Sub
+subscriber on an environment- and version-namespaced channel; a hint published
+after a committed change fans out to every replica, and each routes it to that
+user's locally-held streams (a process-local hub). There are **no sticky
+sessions** and **at-most-once** semantics — a hint dropped during a Redis blip is
+recovered by the next reconnect refetch, never replayed.
+
+**Event payload** (`data:` only; no `id:`/`event:` wire fields, so no
+`Last-Event-ID` replay):
+
+```jsonc
+{ "eventId": "…", "reason": "created" | "read" | "archived" | "unread_changed", "notificationId": "…?" }
+```
+
+`eventId` is for client-side dedupe/correlation only; `notificationId` is present
+for item-scoped reasons and absent for aggregate ones (e.g. `unread_changed`).
+The reason is telemetry/optimization metadata — treat **every** event as "refetch".
+
+**Client contract** (no JS client ships in the starter — `apps/web` is a stub):
+
+- **Use a fetch-stream reader, not the `EventSource` API.** `EventSource` cannot
+  set an `Authorization` header, and the token must **never** go in the URL/query
+  (it would leak into logs/proxies) — send `Authorization: Bearer <accessToken>`.
+- **On (re)connect, establish the stream first, _then_ refetch** the feed + unread
+  count. This closes the subscribe-vs-snapshot race (a change between your snapshot
+  and your subscription would otherwise be missed).
+- **Reconnect with jittered exponential backoff.** The stream closes at access-token
+  expiry (bounded by a server cap) — refresh the token and reconnect.
+- **Treat a heartbeat timeout > the server interval as a dead connection** and
+  reconnect; the server sends `:`-comment heartbeats (default every 20s).
+- A Redis outage degrades realtime to "updates appear on your next refetch"; the
+  feed is always correct without it.
+
+**Limits & failure modes:** the per-user stream cap returns **429**, the global
+per-process cap returns **503** (both before any stream bytes). Network/IP rate
+limiting is delegated to a trusted ingress (the app does not trust
+`X-Forwarded-For`). Overflowing a slow consumer's write buffer disconnects it so
+it reconnects and resyncs. Operators tune the stream via the
+`NOTIFICATIONS_REALTIME_*` env vars (see [`.env.example`](../../.env.example));
+**deployments that share one Redis must set a distinct
+`NOTIFICATIONS_REALTIME_NAMESPACE`** per environment, or their channels collide.
+Proxy/buffering/HTTP-2 guidance is in
+[`docs/operations/deployment.md`](../operations/deployment.md).
+
 ## What's Not in the Starter Yet
 
 These are intentional later-arc deliveries — additive over the
@@ -294,10 +347,6 @@ producer/feed/preferences/dispatch contract, not gaps in the current scope:
   one-time hashed `/start` link tokens, durable `update_id` deduplication, and
   a dedicated `X-Telegram-Bot-Api-Secret-Token` constant-time verifier on top
   of [`docs/operations/webhooks.md`](../operations/webhooks.md).
-- **Realtime fan-out** — SSE delivery with a dedicated Redis Pub/Sub
-  subscriber per replica, environment-namespaced events, no sticky sessions,
-  at-most-once semantics (the durable feed and reconnect refetch are the
-  recovery path).
 - **Web Push** — deferred to the frontend phase; the backend channel and the
   client service worker / browser permission UX ship together.
 - **Organization recipients and policy** — organization fan-out, org-level
@@ -309,11 +358,12 @@ producer/feed/preferences/dispatch contract, not gaps in the current scope:
 
 ## Tests
 
-| Surface                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Where                                                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Definition registry, payload validation, safe projection, preference resolution, idempotency fingerprint, cursor codec, in-app render, producer behavior                                                                                                                                                                                                                                                                                                                                    | Unit specs alongside the module under [`apps/api/src/core/notifications/`](../../apps/api/src/core/notifications/)                                                         |
-| Feed auth/isolation + DESC order + locale render, unread count, mark/archive (idempotent, recipient-scoped), capabilities, preferences read + upsert + unknown-pair / malformed reject, mandatory-channel reject, master toggle PATCH, cursor under concurrent insert, `notifyTx` rollback atomicity, same-key dup-fingerprint match / mismatch, password-reset → `emailVerified` promotion + email delivery materialization, retention by-state + active-delivery guard, OpenAPI inventory | [`apps/api/test/notifications.e2e-spec.ts`](../../apps/api/test/notifications.e2e-spec.ts), [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts) |
-| Durable dispatcher against real Postgres: `FOR UPDATE SKIP LOCKED` disjoint claim, stale-holder CAS rejection, transient/permanent/exhausted attempt history, expired-lease reaper, recovery poller drains a wake-less committed delivery                                                                                                                                                                                                                                                   | [`apps/api/test/notification-dispatch.e2e-spec.ts`](../../apps/api/test/notification-dispatch.e2e-spec.ts)                                                                 |
+| Surface                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Where                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Definition registry, payload validation, safe projection, preference resolution, idempotency fingerprint, cursor codec, in-app render, producer behavior                                                                                                                                                                                                                                                                                                                                    | Unit specs alongside the module under [`apps/api/src/core/notifications/`](../../apps/api/src/core/notifications/)                                                                                     |
+| Feed auth/isolation + DESC order + locale render, unread count, mark/archive (idempotent, recipient-scoped), capabilities, preferences read + upsert + unknown-pair / malformed reject, mandatory-channel reject, master toggle PATCH, cursor under concurrent insert, `notifyTx` rollback atomicity, same-key dup-fingerprint match / mismatch, password-reset → `emailVerified` promotion + email delivery materialization, retention by-state + active-delivery guard, OpenAPI inventory | [`apps/api/test/notifications.e2e-spec.ts`](../../apps/api/test/notifications.e2e-spec.ts), [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts)                             |
+| Durable dispatcher against real Postgres: `FOR UPDATE SKIP LOCKED` disjoint claim, stale-holder CAS rejection, transient/permanent/exhausted attempt history, expired-lease reaper, recovery poller drains a wake-less committed delivery                                                                                                                                                                                                                                                   | [`apps/api/test/notification-dispatch.e2e-spec.ts`](../../apps/api/test/notification-dispatch.e2e-spec.ts)                                                                                             |
+| Realtime SSE fan-out across **two web app contexts** on one Redis+Postgres: a real `notify()` committed on A and a worker-equivalent direct publish both reach the recipient's stream on B, per-user isolation, bearer required (no URL token), exact streaming headers; plus role composition (publisher every role; subscriber/hub/route web+all only)                                                                                                                                    | [`apps/api/test/notifications-realtime.e2e-spec.ts`](../../apps/api/test/notifications-realtime.e2e-spec.ts), [`apps/api/test/process-role.e2e-spec.ts`](../../apps/api/test/process-role.e2e-spec.ts) |
 
 E2E uses real PostgreSQL + Redis via Testcontainers; no infrastructure is
 mocked. See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for run commands.
