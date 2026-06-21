@@ -16,12 +16,12 @@ Deployment targets and CD environments remain adopter-specific.
 
 ### Application Modules
 
-| Module            | Status         | Description                                                                                       |
-| ----------------- | -------------- | ------------------------------------------------------------------------------------------------- |
-| **Notifications** | 🚧 In progress | In-app feed + preferences + durable email dispatch + realtime SSE fan-out shipped; Telegram later |
-| **Fitness**       | 📋 Planned     | Workout tracking, exercise library, progress charts                                               |
-| **Finance**       | 📋 Planned     | Wallet management, transaction tracking                                                           |
-| **Subscriptions** | 📋 Planned     | Subscription monitoring, reminders                                                                |
+| Module            | Status         | Description                                                                                  |
+| ----------------- | -------------- | -------------------------------------------------------------------------------------------- |
+| **Notifications** | 🚧 In progress | In-app feed + preferences + durable email & Telegram dispatch + realtime SSE fan-out shipped |
+| **Fitness**       | 📋 Planned     | Workout tracking, exercise library, progress charts                                          |
+| **Finance**       | 📋 Planned     | Wallet management, transaction tracking                                                      |
+| **Subscriptions** | 📋 Planned     | Subscription monitoring, reminders                                                           |
 
 ## Tech Stack
 
@@ -49,7 +49,7 @@ amcore/
 │   └── typescript-config/
 ├── docs/
 │   ├── auth/           # Authentication & authorization documentation
-│   ├── notifications/  # Notifications subsystem (in-app feed, durable email dispatch, realtime SSE, preferences)
+│   ├── notifications/  # Notifications subsystem (in-app feed, durable email & Telegram dispatch, realtime SSE, preferences)
 │   ├── media/          # Image derivative/media processing documentation
 │   └── storage/        # File storage documentation
 └── .github/        # CI, Dependabot, issue/PR templates
@@ -122,7 +122,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 - **Storage** — S3-compatible provider abstraction, local filesystem dev driver, in-memory test driver, magic-byte upload validation, signed/public URLs, opt-in health check, avatar upload/delete example
 - **Health Checks** — `/health`, `/health/startup`, `/health/ready`, `/health/live` (Kubernetes-ready)
 - **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys, invites) and notification retention at 03:00 UTC, both with multi-instance locking; plus a notification-dispatch recovery poller that runs on every worker replica (coordinated by Postgres `SKIP LOCKED`, not a lock)
-- **Notifications** — durable per-user subsystem: in-app feed + preferences, a worker-driven email channel with Postgres-owned retry/leases/attempt history, and a bearer-authenticated realtime SSE stream (`GET /notifications/stream`) fanned out cross-replica via Redis Pub/Sub with no sticky sessions (see [`docs/notifications/`](docs/notifications/README.md))
+- **Notifications** — durable per-user subsystem: in-app feed + preferences, worker-driven email **and Telegram** channels with Postgres-owned retry/leases/attempt history (Telegram adds a `/start` deep-link + secret-header webhook + durable `update_id` dedupe), and a bearer-authenticated realtime SSE stream (`GET /notifications/stream`) fanned out cross-replica via Redis Pub/Sub with no sticky sessions (see [`docs/notifications/`](docs/notifications/README.md))
 
 ### Tests
 
@@ -135,7 +135,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 - [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md) — How to add a backend module (boundaries, contracts, process roles, tests)
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
 - [`docs/auth/csrf.md`](docs/auth/csrf.md) — Narrow CSRF posture for cookie-backed browser surfaces
-- [`docs/notifications/`](docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email delivery, realtime SSE stream)
+- [`docs/notifications/`](docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email & Telegram delivery, realtime SSE stream)
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
 - [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide

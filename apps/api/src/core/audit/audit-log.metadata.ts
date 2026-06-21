@@ -33,6 +33,9 @@ const specs: Record<AuditAction, MetadataSpec> = {
   'org.invite_accepted': { actorCredentialType: true, roleId: true },
   'org.invite_created': { actorCredentialType: true, branch: true, roleId: true },
   'org.invite_revoked': { actorCredentialType: true },
+  // No metadata — the security event is bounded to actor + target; no chat/user id or token.
+  'telegram.connection_linked': {},
+  'telegram.connection_unlinked': {},
 }
 
 export function sanitizeAuditMetadata(

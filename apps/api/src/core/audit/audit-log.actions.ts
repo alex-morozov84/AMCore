@@ -9,6 +9,8 @@ export const AUDIT_ACTIONS = [
   'org.invite_accepted',
   'org.invite_created',
   'org.invite_revoked',
+  'telegram.connection_linked',
+  'telegram.connection_unlinked',
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]

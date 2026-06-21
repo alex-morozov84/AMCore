@@ -1,0 +1,70 @@
+// ===========================================
+// Telegram channel schema (Track B — Arc D, additive over ADR-052)
+// ===========================================
+// Telegram = third v1 external channel. Outbound via a worker-only ChannelDeliverer
+// drained by the same PG-owned dispatcher (no state-machine change). Inbound linking
+// via a `/start` deep link + a constant-time secret-header webhook with durable
+// `update_id` dedupe. Identifiers are decimal strings (Telegram ids exceed 32-bit and
+// JSON-safe handling is clearer without Prisma BigInt at the API edge). These models
+// live on the `notifications` database schema (own file to keep each module < 150 lines).
+
+/// Lifecycle of a linked Telegram chat. A Postgres enum is appropriate: the set is
+/// complete. No soft `REVOKED` — explicit unlink hard-deletes the row (the AuditLog
+/// retains the security event), so a unique `chatId` never blocks legitimate relinking.
+/// `BLOCKED` is set by the deliverer on a permanent destination error (resource-visible
+/// fence) and yields `SKIPPED telegram_destination_unavailable` on later resolution.
+enum TelegramConnectionStatus {
+  ACTIVE
+  BLOCKED
+
+  @@schema("notifications")
+}
+
+/// One linked Telegram chat per user (v1: at most one connection per user). Each
+/// successful link/relink creates a **new** row (delete-then-insert), so a fresh `id`
+/// is the natural generation fence: a late-finishing old leased send (its `targetRef`
+/// = the prior id) cannot block or disable a freshly relinked connection (ADR-049).
+model TelegramConnection {
+  id             String                   @id @default(cuid())
+  userId         String                   @unique // v1: one connection per user
+  chatId         String                   @unique // Bot API chat id; the delivery targetKey
+  telegramUserId String                   @unique // == chatId in a private chat; explicit for forward compat
+  status         TelegramConnectionStatus @default(ACTIVE)
+  linkedAt       DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("telegram_connections")
+  @@schema("notifications")
+}
+
+/// One-time, hashed deep-link token (mirrors password-reset token hygiene). The raw
+/// token lives only inside the one-time deep-link URL; only `tokenHash` is at rest.
+/// Consumed atomically (SELECT … FOR UPDATE then set `consumedAt`) in the bind tx.
+model TelegramLinkToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique // sha256(raw)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("telegram_link_tokens")
+  @@schema("notifications")
+}
+
+/// Durable inbound-update dedupe — Telegram retries webhook delivery until 2xx, so a
+/// side effect (account linking) must run exactly once. `insert-on-conflict-do-nothing`
+/// on `updateId` = the dedupe. The wire value is validated `Number.isSafeInteger` and
+/// converted to `BigInt` only at the repository boundary (never JSON-serialized).
+model TelegramUpdateReceipt {
+  updateId   BigInt   @id // Telegram update_id
+  receivedAt DateTime @default(now())
+
+  @@map("telegram_update_receipts")
+  @@schema("notifications")
+}

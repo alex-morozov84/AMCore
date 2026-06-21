@@ -21,10 +21,11 @@ Nest bootstrap, so webhook guards verify `req.rawBody` directly.
 
 ## Built-in Providers
 
-AMCore currently wires two provider names into `@VerifyWebhook(provider)`:
+AMCore currently wires three provider names into `@VerifyWebhook(provider)`:
 
 - `stripe`
 - `generic`
+- `telegram`
 
 ### `stripe`
 
@@ -43,7 +44,24 @@ The generic HMAC verifier implementation also supports a GitHub-style raw-body
 provider is currently wired to the standard `webhook-id` /
 `webhook-timestamp` / `webhook-signature` header set.
 
-All signature comparisons use a constant-time comparison helper.
+### `telegram`
+
+A different verifier **family** (Arc D): Telegram provides **no body signature and no
+timestamp**. `setWebhook(secret_token=…)` makes Telegram attach a static shared secret in
+the `X-Telegram-Bot-Api-Secret-Token` header on every POST; the verifier compares it to
+`WEBHOOK_TELEGRAM_SECRET` in constant time. A missing / array / non-string header is a
+uniform `401`.
+
+- header: `X-Telegram-Bot-Api-Secret-Token`
+- format: the raw secret (`1–256` of `A-Za-z0-9_-`), no signature, no timestamp
+
+**Replay/dedupe is owned by the handler, not the primitive**, for Telegram: its
+`update_id` can outlive any Redis TTL, so the provider's `replayId` returns `undefined`
+(the Redis dedupe layer is a deliberate no-op) and the `/webhooks/telegram` handler dedupes
+durably on `update_id` in Postgres (effect-once). The webhook route is excluded from the
+client OpenAPI surface.
+
+All signature/secret comparisons use a constant-time comparison helper.
 
 ## Environment
 
@@ -52,6 +70,7 @@ Webhook verification is opt-in per provider secret:
 ```dotenv
 WEBHOOK_STRIPE_SECRET=""
 WEBHOOK_GENERIC_SECRET=""
+WEBHOOK_TELEGRAM_SECRET=""   # 1–256 of A-Za-z0-9_- (Telegram secret_token grammar)
 WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS=300
 WEBHOOK_REPLAY_DEDUPE_TTL_SECONDS=300
 ```
@@ -87,6 +106,9 @@ Current replay-ID extraction:
 
 - `stripe`: request body field `id`
 - `generic`: `webhook-id` header
+- `telegram`: none — `replayId` is `undefined`; the handler owns durable `update_id`
+  dedupe in Postgres (a TTL-bounded Redis hint is not authoritative for a linking side
+  effect).
 
 ## Throttling
 

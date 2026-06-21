@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Telegram notification channel (notifications Arc D). A third external channel
+  alongside in-app and email. A bearer user issues a one-time deep link
+  (`POST /notifications/telegram/link`), opens the bot and presses **Start**; an inbound
+  webhook (`POST /webhooks/telegram`, authenticated by a constant-time
+  `X-Telegram-Bot-Api-Secret-Token` header — a new verifier family on the ADR-044
+  primitive) binds the chat to the account in one transaction with durable `update_id`
+  dedupe (effect-once), a one-time hashed token consumed only on a fully successful bind,
+  and never silently moving a chat owned by another account. `GET /notifications/telegram/
+connection` reports status; `DELETE …/connection` unlinks (cancelling pending
+  deliveries). Outbound delivery is drained by the existing worker-only dispatcher through
+  a direct Bot API client (plain text, no `parse_mode`); an unlinked user is an observable
+  `SKIPPED telegram_not_linked` (never a retry storm), a blocked/chat-not-found destination
+  fences the connection, and a `429 retry_after` is honored as a retry **floor** (clamped
+  to 24h, never the 15-min cap). Opt-in via config; `apps/web` stays a stub (the deep link
+  is returned as a string). Deploy registers the webhook once with
+  `node dist/cli/telegram-setup.js`. See
+  [`docs/notifications/README.md`](docs/notifications/README.md),
+  [`docs/operations/webhooks.md`](docs/operations/webhooks.md), and
+  [`docs/operations/deployment.md`](docs/operations/deployment.md).
+
 - Realtime in-app notification stream (notifications Arc C). A bearer-authenticated
   Server-Sent Events endpoint `GET /notifications/stream` pushes a content-free hint
   (`created` / `read` / `archived` / `unread_changed`) whenever the recipient's feed
@@ -58,9 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fails stably. Definitions are code-owned and declare payload schema +
   default / mandatory channels + content classification + a localized
   `renderInApp`; titles and bodies are rendered server-side from the structured
-  payload in the recipient's current `User.locale` at feed read time. External
-  channels (Telegram), realtime fan-out, and Web Push are future work (email
-  delivery shipped in Arc B above).
+  payload in the recipient's current `User.locale` at feed read time. (Email
+  delivery shipped in Arc B, realtime SSE fan-out in Arc C, and the Telegram
+  channel in Arc D — all above; Web Push and the triggered follow-ons remain
+  future work.)
   Fork-facing guide: [`docs/notifications/README.md`](docs/notifications/README.md).
 - Backend Architecture & Conventions guide
   (`docs/backend/architecture-and-conventions.md`): the end-to-end recipe for
@@ -94,6 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `account.password_changed` security alert now also delivers to Telegram for a
+  linked user (Arc D), as an **optional, non-mandatory** default channel — generic
+  plain-text, disableable in preferences, and a no-op (`SKIPPED`) for an unlinked user.
+  In-app and email remain mandatory and unchanged.
 - Password reset now marks the account email **verified** in the same
   transaction as the password update: a successful reset proves control of the
   account mailbox (the single-use token was delivered there and returned), per

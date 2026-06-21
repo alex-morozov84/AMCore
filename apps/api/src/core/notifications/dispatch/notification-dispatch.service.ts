@@ -128,7 +128,12 @@ export class NotificationDispatchService {
       case 'delivered':
         return this.repository.finalizeDelivered(claim, result.providerMessageId, durationMs)
       case 'transient':
-        return this.repository.finalizeTransient(claim, result.errorCode, durationMs)
+        return this.repository.finalizeTransient(
+          claim,
+          result.errorCode,
+          durationMs,
+          result.retryAfterMs
+        )
       case 'permanent':
         return this.repository.finalizePermanent(claim, result.errorCode, durationMs)
     }

@@ -24,6 +24,8 @@ describe('sanitizeHeaders', () => {
       'set-cookie': 'session=secret',
       'x-api-key': 'amcore_live_x_y',
       'x-auth-token': 'leaked',
+      'stripe-signature': 't=1,v1=abc',
+      'x-telegram-bot-api-secret-token': 'tg-secret',
     })
     expect(result).toEqual({
       authorization: '[REDACTED]',
@@ -32,6 +34,8 @@ describe('sanitizeHeaders', () => {
       'set-cookie': '[REDACTED]',
       'x-api-key': '[REDACTED]',
       'x-auth-token': '[REDACTED]',
+      'stripe-signature': '[REDACTED]',
+      'x-telegram-bot-api-secret-token': '[REDACTED]',
     })
   })
 

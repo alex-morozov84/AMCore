@@ -198,6 +198,33 @@ describe('HealthController', () => {
     })
   })
 
+  describe('HEALTH_MEMORY_HEAP_BYTES override', () => {
+    it('passes the configured byte ceiling to both readiness and liveness checks', async () => {
+      const override = 8 * 1024 * 1024 * 1024
+      env.get.mockImplementation((key: string) =>
+        key === 'HEALTH_MEMORY_HEAP_BYTES'
+          ? override
+          : key === 'HEALTH_DISK_THRESHOLD_PERCENT'
+            ? 0.9
+            : undefined
+      )
+      memoryIndicator.checkHeap.mockResolvedValue({ memory_heap: { status: 'up' } } as any)
+      prismaIndicator.isHealthy.mockResolvedValue({ database: { status: 'up' } } as any)
+      redisIndicator.isHealthy.mockResolvedValue({ redis: { status: 'up' } } as any)
+      diskIndicator.checkStorage.mockResolvedValue({ disk: { status: 'up' } } as any)
+      healthCheckService.check.mockImplementation(async (indicators) => {
+        await Promise.all(indicators.map((indicator) => indicator()))
+        return { status: 'ok' } as any
+      })
+
+      await controller.ready()
+      await controller.live()
+
+      expect(memoryIndicator.checkHeap).toHaveBeenCalledWith('memory_heap', override)
+      expect(memoryIndicator.checkHeap).not.toHaveBeenCalledWith('memory_heap', 1024 * 1024 * 1024)
+    })
+  })
+
   describe('storage health (opt-in)', () => {
     const runReadiness = async (): Promise<void> => {
       prismaIndicator.isHealthy.mockResolvedValue({ database: { status: 'up' } } as any)

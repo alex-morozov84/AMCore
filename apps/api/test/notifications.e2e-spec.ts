@@ -385,25 +385,34 @@ describe('Notifications (e2e)', () => {
       await request(app.getHttpServer()).get('/notifications/capabilities').expect(401)
     })
 
-    it('returns the active starter capabilities (in-app + email; security is mandatory)', async () => {
+    it('returns the active starter capabilities (incl. Telegram; security in-app+email mandatory)', async () => {
       const user = await registerUser(app)
       const res = await request(app.getHttpServer())
         .get('/notifications/capabilities')
         .set('Authorization', user.authHeader)
         .expect(200)
       expect(res.body).toEqual({
-        channels: [NotificationChannel.EMAIL, NotificationChannel.IN_APP],
+        channels: [
+          NotificationChannel.EMAIL,
+          NotificationChannel.IN_APP,
+          NotificationChannel.TELEGRAM,
+        ],
         categories: [
           {
+            // account.profile_updated (in_app) + account.telegram_linked (in_app, telegram).
             category: NotificationCategory.ACCOUNT,
-            channels: [NotificationChannel.IN_APP],
-            overridableChannels: [NotificationChannel.IN_APP],
+            channels: [NotificationChannel.IN_APP, NotificationChannel.TELEGRAM],
+            overridableChannels: [NotificationChannel.IN_APP, NotificationChannel.TELEGRAM],
           },
           {
-            // account.password_changed: both channels mandatory → nothing overridable.
+            // account.password_changed: in_app+email mandatory; telegram optional (Arc D).
             category: NotificationCategory.SECURITY,
-            channels: [NotificationChannel.EMAIL, NotificationChannel.IN_APP],
-            overridableChannels: [],
+            channels: [
+              NotificationChannel.EMAIL,
+              NotificationChannel.IN_APP,
+              NotificationChannel.TELEGRAM,
+            ],
+            overridableChannels: [NotificationChannel.TELEGRAM],
           },
         ],
       })
@@ -429,7 +438,13 @@ describe('Notifications (e2e)', () => {
           enabled: null,
           mandatory: false,
         },
-        // account.password_changed — both channels mandatory (a security alert).
+        {
+          category: NotificationCategory.ACCOUNT,
+          channel: NotificationChannel.TELEGRAM,
+          enabled: null,
+          mandatory: false,
+        },
+        // account.password_changed — in_app + email mandatory (a security alert)…
         {
           category: NotificationCategory.SECURITY,
           channel: NotificationChannel.EMAIL,
@@ -441,6 +456,13 @@ describe('Notifications (e2e)', () => {
           channel: NotificationChannel.IN_APP,
           enabled: null,
           mandatory: true,
+        },
+        // …with Telegram an optional (non-mandatory) default (Arc D).
+        {
+          category: NotificationCategory.SECURITY,
+          channel: NotificationChannel.TELEGRAM,
+          enabled: null,
+          mandatory: false,
         },
       ])
     })

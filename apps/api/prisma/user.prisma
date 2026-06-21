@@ -45,6 +45,7 @@ enum AuditTargetType {
   ORGANIZATION
   SESSION
   CLEANUP
+  TELEGRAM_CONNECTION
 
   @@schema("core")
 }
@@ -97,6 +98,8 @@ model User {
   invitesRevoked          OrgInvite[]              @relation("InvitesRevoked")
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  telegramConnection      TelegramConnection?
+  telegramLinkTokens      TelegramLinkToken[]
 
   @@map("users")
   @@schema("core")

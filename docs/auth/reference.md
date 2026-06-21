@@ -193,7 +193,8 @@ Revokes all sessions except the current one.
 Side effects: the token is consumed atomically (single-use, even under concurrent
 requests); all sessions are revoked; the account email is marked **verified**
 (the reset proves control of the mailbox); and a security notification
-(`account.password_changed`, in-app + email) is emitted.
+(`account.password_changed`) is emitted — mandatory in-app + email, plus generic
+Telegram for a linked/enabled destination (optional, non-mandatory; Arc D).
 
 ---
 

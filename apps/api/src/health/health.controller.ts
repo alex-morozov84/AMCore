@@ -139,8 +139,13 @@ export class HealthController {
     // No external dependencies - keep it FAST!
     return this.health.check([
       // Just check memory isn't completely exhausted
-      () => this.memory.checkHeap('memory_heap', 1536 * 1024 * 1024), // 1.5GB (high threshold)
+      () => this.memory.checkHeap('memory_heap', this.heapThresholdBytes(1536 * 1024 * 1024)), // 1.5GB
     ])
+  }
+
+  /** Heap ceiling for the memory check — an env override (e2e) wins over the hardcoded default. */
+  private heapThresholdBytes(fallback: number): number {
+    return this.env.get('HEALTH_MEMORY_HEAP_BYTES') ?? fallback
   }
 
   private getReadinessChecks(): HealthIndicatorFunction[] {
@@ -152,7 +157,7 @@ export class HealthController {
           thresholdPercent: this.env.get('HEALTH_DISK_THRESHOLD_PERCENT'),
           path: '/',
         }),
-      () => this.memory.checkHeap('memory_heap', 1024 * 1024 * 1024),
+      () => this.memory.checkHeap('memory_heap', this.heapThresholdBytes(1024 * 1024 * 1024)),
     ]
 
     // Opt-in (Decision B): storage is not on the core request hot path, so it

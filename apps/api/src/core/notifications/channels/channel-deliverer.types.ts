@@ -16,7 +16,16 @@ export interface DeliveryContext {
  */
 export type DeliveryResult =
   | { status: 'delivered'; providerMessageId?: string }
-  | { status: 'transient'; errorCode: string }
+  | {
+      status: 'transient'
+      errorCode: string
+      /**
+       * Optional provider-requested retry **floor** in ms (e.g. Telegram `retry_after`).
+       * The dispatcher schedules `max(normalBackoff, now + retryAfterMs)`, clamped by a
+       * dedicated defensive max — never below the normal backoff, never the 15-min cap.
+       */
+      retryAfterMs?: number
+    }
   | { status: 'permanent'; errorCode: string }
 
 /**

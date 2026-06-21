@@ -25,7 +25,8 @@
     "db:migrate:prod": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "telegram:setup": "tsx src/cli/telegram-setup.ts"
   },
   "prisma": {
     "schema": "./prisma",

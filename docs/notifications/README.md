@@ -2,22 +2,23 @@
 
 AMCore ships a reusable, per-user notification subsystem on its own
 `notifications` Postgres schema. The starter exposes the in-app feed,
-preferences, a transaction-aware internal producer, and a durable worker-driven
-**email** channel (Postgres-owned retry, leases, immutable attempt history, and
-retention). The remaining external channels (Telegram) and realtime fan-out are
-additive later-arc work and do not change the producer/feed/preferences contract
-documented here.
+preferences, a transaction-aware internal producer, durable worker-driven
+**email** and **Telegram** channels (Postgres-owned retry, leases, immutable
+attempt history, and retention), and a realtime **SSE** fan-out (ADR-053). Each
+external channel and the realtime transport are purely additive over the
+producer/feed/preferences contract documented here. Web Push remains future work.
 
 ## What Is Included
 
 | Area              | Built-in behavior                                                                                                                                                                                                                                                 |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Persistence       | Own `notifications` Postgres schema: canonical `Notification`, per-target `NotificationDelivery`, immutable `NotificationDeliveryAttempt`, `NotificationPreference`.                                                                                              |
+| Persistence       | Own `notifications` Postgres schema: canonical `Notification`, per-target `NotificationDelivery`, immutable `NotificationDeliveryAttempt`, `NotificationPreference`, plus the Telegram `TelegramConnection` / `TelegramLinkToken` / `TelegramUpdateReceipt`.      |
 | Producer          | `NotificationsService.notify()` (owns its transaction) and `notifyTx(tx, …)` (joins the caller's). **No public create endpoint** — only trusted server code may create a notification.                                                                            |
 | In-app channel    | Inserted `DELIVERED` in the same database transaction as the canonical row, so the feed never depends on a background worker being healthy.                                                                                                                       |
 | External dispatch | Worker-only dispatcher (ADR-052): a BullMQ wake job and a `FOR UPDATE SKIP LOCKED` recovery `@Cron` drain due `PENDING` deliveries; Postgres owns the retry schedule, leases, and immutable attempts. A lost wake (or `notifyTx`) is still drained by the poller. |
 | Email channel     | Worker-only adapter over `EmailService.send()` (never the email queue) with a stable provider idempotency key `notification-delivery:<id>`. Verified-destination only.                                                                                            |
-| Retention         | Daily worker-only sweep: archived −30d, read −90d, unread −180d, finished attempts −30d. Never deletes a notification with an active external delivery.                                                                                                           |
+| Telegram channel  | Worker-only direct Bot API client (plain text); bearer link/status/unlink + an `AuthType.None` secret-header webhook (durable `update_id` dedupe). Unlinked → `SKIPPED telegram_not_linked`; a permanent destination error fences the connection `BLOCKED`.       |
+| Retention         | Daily worker-only sweep: archived −30d, read −90d, unread −180d, finished attempts −30d, Telegram link tokens/update receipts −30d. Never deletes a notification with an active external delivery.                                                                |
 | Idempotency       | Required namespaced key (`dotted.namespace:occurrence-id`) + payload fingerprint. Same key + same fingerprint = safe replay; same key + different fingerprint = stable conflict.                                                                                  |
 | Preferences       | Master toggle (`UserSettings.notificationsEnabled`) plus per-`(category, channel)` user override. Mandatory channels bypass the master toggle and are locked in the preferences read response.                                                                    |
 | Feed              | Cursor pagination by `(createdAt DESC, id DESC)`; no `total`. Unread count is a separate exact endpoint.                                                                                                                                                          |
@@ -44,12 +45,12 @@ recipient, or delivery channel. The HTTP surface is read/update only.
 
 ## Channel Scope
 
-| Channel    | Status                                  | Where                                                                                                                                                         |
-| ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `in_app`   | **Shipped**, synchronous-in-transaction | Today.                                                                                                                                                        |
-| `email`    | **Shipped**, worker-driven durable      | Worker-only adapter over [`EmailService.send()`](../../apps/api/src/infrastructure/email/) with a stable provider idempotency key; verified-destination only. |
-| `telegram` | Planned                                 | Direct Bot API client, hashed one-time `/start` link tokens, dedicated webhook verifier on top of [`docs/operations/webhooks.md`](../operations/webhooks.md). |
-| `web_push` | Deferred to the frontend phase          | Backend, service worker, VAPID config, and browser permission UX ship together.                                                                               |
+| Channel    | Status                                  | Where                                                                                                                                                                                                                                    |
+| ---------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `in_app`   | **Shipped**, synchronous-in-transaction | Today.                                                                                                                                                                                                                                   |
+| `email`    | **Shipped**, worker-driven durable      | Worker-only adapter over [`EmailService.send()`](../../apps/api/src/infrastructure/email/) with a stable provider idempotency key; verified-destination only.                                                                            |
+| `telegram` | **Shipped**, worker-driven durable      | Direct Bot API client, hashed one-time `/start` link tokens, secret-header webhook verifier on [`docs/operations/webhooks.md`](../operations/webhooks.md). Link flow + delivery taxonomy in [Telegram channel](#telegram-channel) below. |
+| `web_push` | Deferred to the frontend phase          | Backend, service worker, VAPID config, and browser permission UX ship together.                                                                                                                                                          |
 
 The durable model already reserves the dispatcher's lease/retry/attempt columns
 so adding a worker-driven channel is purely additive — no claim-mechanism or
@@ -62,18 +63,25 @@ schema is typed via `@ZodResponse`; the OpenAPI completeness test in
 [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts)
 fails CI if a new handler ships without one (or with the wrong status).
 
-| Method  | Path                          | Description                                                                                                          |
-| ------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `GET`   | `/notifications`              | Cursor-paginated feed. Query: `?cursor=&limit=`. Body: `{ data, nextCursor, hasMore }`. Excludes archived.           |
-| `GET`   | `/notifications/unread-count` | `{ unread }`. Excludes read **and** archived.                                                                        |
-| `POST`  | `/notifications/read-all`     | `{ updated: N }`. Idempotent; archived rows are never marked read.                                                   |
-| `POST`  | `/notifications/:id/read`     | `204`. Idempotent; a foreign or non-existent id is a recipient-scoped no-op (no information leak).                   |
-| `POST`  | `/notifications/:id/archive`  | `204`. Idempotent; archived rows drop out of feed and unread count.                                                  |
-| `GET`   | `/notifications/capabilities` | Active channels and per-category supported / overridable channels.                                                   |
-| `GET`   | `/notifications/preferences`  | `{ notificationsEnabled, preferences: [{ category, channel, enabled, mandatory }] }`.                                |
-| `PUT`   | `/notifications/preferences`  | `204`. Upsert one `(category, channel)` override. `400` for unknown pair or a channel mandatory across the category. |
-| `PATCH` | `/notifications/settings`     | `204`. Master toggle write (`{ notificationsEnabled: boolean }`).                                                    |
-| `GET`   | `/notifications/stream`       | `text/event-stream`. Realtime feed-change hints (SSE) — see [Realtime stream](#realtime-stream-sse) below.           |
+| Method   | Path                                 | Description                                                                                                          |
+| -------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/notifications`                     | Cursor-paginated feed. Query: `?cursor=&limit=`. Body: `{ data, nextCursor, hasMore }`. Excludes archived.           |
+| `GET`    | `/notifications/unread-count`        | `{ unread }`. Excludes read **and** archived.                                                                        |
+| `POST`   | `/notifications/read-all`            | `{ updated: N }`. Idempotent; archived rows are never marked read.                                                   |
+| `POST`   | `/notifications/:id/read`            | `204`. Idempotent; a foreign or non-existent id is a recipient-scoped no-op (no information leak).                   |
+| `POST`   | `/notifications/:id/archive`         | `204`. Idempotent; archived rows drop out of feed and unread count.                                                  |
+| `GET`    | `/notifications/capabilities`        | Active channels and per-category supported / overridable channels.                                                   |
+| `GET`    | `/notifications/preferences`         | `{ notificationsEnabled, preferences: [{ category, channel, enabled, mandatory }] }`.                                |
+| `PUT`    | `/notifications/preferences`         | `204`. Upsert one `(category, channel)` override. `400` for unknown pair or a channel mandatory across the category. |
+| `PATCH`  | `/notifications/settings`            | `204`. Master toggle write (`{ notificationsEnabled: boolean }`).                                                    |
+| `GET`    | `/notifications/stream`              | `text/event-stream`. Realtime feed-change hints (SSE) — see [Realtime stream](#realtime-stream-sse) below.           |
+| `POST`   | `/notifications/telegram/link`       | `201 { url, expiresAt }`. Issues a one-time `t.me/<bot>?start=<token>` deep link (Arc D).                            |
+| `GET`    | `/notifications/telegram/connection` | `200 { connected, status, linkedAt }`. Current Telegram connection status (no chat/user id).                         |
+| `DELETE` | `/notifications/telegram/connection` | `204`. Unlink (hard-delete) and cancel the connection's due deliveries. Idempotent.                                  |
+
+The inbound `POST /webhooks/telegram` is **not** in this bearer table: it is `AuthType.None` +
+secret-header verified (see [`docs/operations/webhooks.md`](../operations/webhooks.md)) and is
+deliberately excluded from the client OpenAPI document.
 
 Cursor pagination is the documented endpoint-local exception to the project's
 default offset envelope — the feed is append-heavy and offset semantics would
@@ -98,11 +106,12 @@ In the read response:
 - `mandatory: true` means at least one definition in the category forces this
   channel; the override cannot disable it and a `PUT` is rejected.
 
-The starter ships two definitions: `account.profile_updated` (informational,
-in-app only) and `account.password_changed` (security; in-app **and** email,
-both mandatory). The latter exercises the resolver end-to-end — its email and
-in-app deliveries are locked on in the preferences response and a `PUT` that
-tries to disable either is rejected `400`.
+The starter ships three definitions: `account.profile_updated` (informational,
+in-app only), `account.telegram_linked` (a non-mandatory link confirmation —
+in-app + generic Telegram), and `account.password_changed` (security; in-app **and** email
+mandatory, plus optional-default generic Telegram). The latter exercises the resolver
+end-to-end — its email and in-app deliveries are locked on in the preferences response and a
+`PUT` that tries to disable either is rejected `400`, while Telegram stays user-overridable.
 
 ## Adding a Notification Definition
 
@@ -261,11 +270,40 @@ transaction (the single-use token, delivered to and returned from the account
 mailbox, proves control of it — OWASP/NIST), so the post-reset
 `account.password_changed` alert is always deliverable by email.
 
+### Telegram channel
+
+Telegram is the third external channel (Arc D), opt-in via config (see
+[`docs/operations/webhooks.md`](../operations/webhooks.md) and `.env.example`). It is
+**additive** over the same resolver/dispatcher contracts — no state-machine change.
+
+**Linking (bearer).** `POST /notifications/telegram/link` returns a one-time
+`https://t.me/<bot>?start=<token>` deep link (`{ url, expiresAt }`). The raw token is
+returned only inside that URL; only its SHA-256 is stored. The user opens the bot and
+presses **Start**; Telegram calls `POST /webhooks/telegram` (authenticated by the
+constant-time `X-Telegram-Bot-Api-Secret-Token` header), and the chat binds to the
+account in **one transaction**: a durable `update_id` receipt makes the bind effect-once
+under Telegram's retries, the one-time token is consumed **only** on a fully successful
+bind, and a chat already owned by a different account is **never** silently moved.
+`GET /notifications/telegram/connection` → `{ connected, status, linkedAt }`;
+`DELETE /notifications/telegram/connection` unlinks (hard-delete) and cancels the
+connection's pending deliveries.
+
+**Delivery (worker).** A linked `ACTIVE` connection → `PENDING` telegram delivery drained
+by the dispatcher through a direct Bot API client (**plain text, no `parse_mode`** — no
+detailed definition ships today, so content is the neutral generic summary). Outcomes:
+no connection → `SKIPPED telegram_not_linked`; a fenced connection → `SKIPPED
+telegram_destination_unavailable` (distinct, observable); a `403`/chat-not-found/migrated
+destination error → terminal `FAILED` **and** the connection is fenced to `BLOCKED` (the
+user must relink); a `429 retry_after` is honored as a retry **floor** over the normal
+backoff (clamped to 24h, never the 15-min cap). No chat/user id, provider text, or token
+ever appears in an attempt code or log.
+
 ### Retention
 
 A daily worker-only `@Cron` (singleton-locked; a skipped run self-repairs next
 night) batch-deletes aged rows: archived −30d, read −90d, unread −180d, finished
-attempts −30d. It never deletes a notification that still has an active
+attempts −30d, and expired/consumed Telegram link tokens + old update receipts −30d. It
+never deletes a notification that still has an active
 (`PENDING`/`PROCESSING`/`RETRY_SCHEDULED`) external delivery. The feed is **not**
 an audit log — durable security events live in `AuditLog` (ADR-045).
 
@@ -350,10 +388,6 @@ Proxy/buffering/HTTP-2 guidance is in
 These are intentional later-arc deliveries — additive over the
 producer/feed/preferences/dispatch contract, not gaps in the current scope:
 
-- **Telegram channel** — direct Bot API client (no framework dependency),
-  one-time hashed `/start` link tokens, durable `update_id` deduplication, and
-  a dedicated `X-Telegram-Bot-Api-Secret-Token` constant-time verifier on top
-  of [`docs/operations/webhooks.md`](../operations/webhooks.md).
 - **Web Push** — deferred to the frontend phase; the backend channel and the
   client service worker / browser permission UX ship together.
 - **Organization recipients and policy** — organization fan-out, org-level
@@ -371,6 +405,7 @@ producer/feed/preferences/dispatch contract, not gaps in the current scope:
 | Feed auth/isolation + DESC order + locale render, unread count, mark/archive (idempotent, recipient-scoped), capabilities, preferences read + upsert + unknown-pair / malformed reject, mandatory-channel reject, master toggle PATCH, cursor under concurrent insert, `notifyTx` rollback atomicity, same-key dup-fingerprint match / mismatch, password-reset → `emailVerified` promotion + email delivery materialization, retention by-state + active-delivery guard, OpenAPI inventory | [`apps/api/test/notifications.e2e-spec.ts`](../../apps/api/test/notifications.e2e-spec.ts), [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts)                             |
 | Durable dispatcher against real Postgres: `FOR UPDATE SKIP LOCKED` disjoint claim, stale-holder CAS rejection, transient/permanent/exhausted attempt history, expired-lease reaper, recovery poller drains a wake-less committed delivery                                                                                                                                                                                                                                                   | [`apps/api/test/notification-dispatch.e2e-spec.ts`](../../apps/api/test/notification-dispatch.e2e-spec.ts)                                                                                             |
 | Realtime SSE fan-out across **two web app contexts** on one Redis+Postgres: a real `notify()` committed on A and a worker-equivalent direct publish both reach the recipient's stream on B, per-user isolation, bearer required (no URL token), exact streaming headers; plus role composition (publisher every role; subscriber/hub/route web+all only)                                                                                                                                    | [`apps/api/test/notifications-realtime.e2e-spec.ts`](../../apps/api/test/notifications-realtime.e2e-spec.ts), [`apps/api/test/process-role.e2e-spec.ts`](../../apps/api/test/process-role.e2e-spec.ts) |
+| Telegram against real Postgres + a fake Bot API server: secret-header auth, the atomic receipt/consume/bind transaction, durable replay dedupe, the R6 same-chat race convergence, the R5 relink fence, the bearer link → bind → status → unlink-cancellation lifecycle, and the delivery taxonomy (DELIVERED / `SKIPPED telegram_not_linked` / 429-floor / 403-block)                                                                                                                      | [`apps/api/test/telegram-webhook.e2e-spec.ts`](../../apps/api/test/telegram-webhook.e2e-spec.ts), [`apps/api/test/telegram-delivery.e2e-spec.ts`](../../apps/api/test/telegram-delivery.e2e-spec.ts)   |
 
 E2E uses real PostgreSQL + Redis via Testcontainers; no infrastructure is
 mocked. See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for run commands.
@@ -378,7 +413,7 @@ mocked. See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) for run commands.
 ## See Also
 
 - Backend architecture & conventions — [`docs/backend/architecture-and-conventions.md`](../backend/architecture-and-conventions.md)
-- Webhook verification primitive (used by the future Telegram channel) — [`docs/operations/webhooks.md`](../operations/webhooks.md)
+- Webhook verification primitive (the Telegram secret-header provider builds on it) — [`docs/operations/webhooks.md`](../operations/webhooks.md)
 - Email infrastructure (the email channel's underlying provider) — [`apps/api/src/infrastructure/email/`](../../apps/api/src/infrastructure/email/)
 - Queue infrastructure (the dispatcher's wake/execution path) — [`apps/api/src/infrastructure/queue/README.md`](../../apps/api/src/infrastructure/queue/README.md)
 - HTTP idempotency (separate primitive, not used by the producer's own dedupe) — [`docs/operations/idempotency.md`](../operations/idempotency.md)

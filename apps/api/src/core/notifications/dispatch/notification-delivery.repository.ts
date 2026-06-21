@@ -12,7 +12,7 @@ import {
   NotificationTerminalReason,
 } from '../notification-dispatch.constants'
 
-import { computeNextAttemptAt } from './notification-backoff'
+import { applyRetryAfterFloor, computeNextAttemptAt } from './notification-backoff'
 import type { ClaimedDelivery, FinalizeResult, ReapResult } from './notification-dispatch.types'
 
 /** Shape returned by the raw claim `UPDATE ... RETURNING`. */
@@ -144,11 +144,16 @@ export class NotificationDeliveryRepository {
     return won ? { state: 'delivered' } : { state: 'lease_lost' }
   }
 
-  /** Transient failure: reschedule with backoff if budget remains, else fail (exhausted). */
+  /**
+   * Transient failure: reschedule with backoff if budget remains, else fail (exhausted).
+   * `retryAfterMs` is an optional provider-requested floor applied over the normal backoff
+   * (corr. E) — the next attempt is the later of the two, clamped to the 24h defensive max.
+   */
   async finalizeTransient(
     claim: ClaimedDelivery,
     errorCode: string,
-    durationMs: number
+    durationMs: number,
+    retryAfterMs?: number
   ): Promise<FinalizeResult> {
     const now = new Date()
     const attemptFinal: AttemptFinalization = {
@@ -179,7 +184,11 @@ export class NotificationDeliveryRepository {
         : { state: 'lease_lost' }
     }
 
-    const nextAttemptAt = computeNextAttemptAt(claim.attemptNumber, now)
+    const nextAttemptAt = applyRetryAfterFloor(
+      computeNextAttemptAt(claim.attemptNumber, now),
+      retryAfterMs,
+      now
+    )
     const won = await this.finalizeInTx(
       claim,
       {
