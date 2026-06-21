@@ -77,6 +77,19 @@ export interface NotificationDefinition<TPayload = unknown> {
     projection: Record<string, unknown>,
     locale: SupportedLocale
   ): RenderedNotificationContent
+  /**
+   * Detailed Telegram title/body in the recipient's locale, rendered ONLY from the
+   * `projectExternal('telegram', …)` allowlisted projection — never the full payload (Arc D, the
+   * same external-boundary rule as `renderEmail`). Used only when the content policy resolves
+   * Telegram to `detailed` AND a `projectExternal` exists; otherwise the deliverer sends a neutral
+   * generic, plain-text message (no `parse_mode`). No shipped definition opts into detailed Telegram
+   * today, so the SENSITIVE `account.password_changed` stays generic — this seam keeps the channel
+   * additive for a future PUBLIC/PERSONAL definition.
+   */
+  renderTelegram?(
+    projection: Record<string, unknown>,
+    locale: SupportedLocale
+  ): RenderedNotificationContent
   /** Optional safe first-party action descriptor (never an arbitrary URL). */
   action?(payload: TPayload): NotificationAction | null
 

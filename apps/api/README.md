@@ -58,11 +58,14 @@ apps/api/src/
 │   │   └── roles.controller.ts
 │   ├── admin/                  # SUPER_ADMIN only
 │   │   └── admin.controller.ts
-│   └── notifications/          # In-app feed, preferences, producer, realtime SSE
+│   └── notifications/          # In-app feed, preferences, producer, realtime SSE, channels
 │       ├── notifications.controller.ts
 │       ├── notification-preferences.controller.ts
 │       ├── notification-stream.controller.ts  # GET /notifications/stream (SSE, ADR-053)
 │       ├── realtime/                          # publisher + subscriber + hub + stream writer
+│       ├── channels/                          # email + telegram (core resolver / worker deliverer)
+│       │   └── telegram/                      # web link/webhook controllers + worker Bot client (ADR-041 split)
+│       ├── dispatch/                          # worker-only durable dispatcher + delivery repository
 │       ├── notifications.service.ts          # notify() / notifyTx(tx)
 │       ├── notification-feed.service.ts      # cursor feed, mark-read, archive
 │       ├── notification-preference.service.ts
@@ -91,7 +94,7 @@ PostgreSQL uses schema separation for module isolation:
 | Schema          | Tables                                                                                                                                                                                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `core`          | users, sessions, oauth_accounts, user_settings, password_reset_tokens, email_verification_tokens, api_keys, organizations, org_members, roles, member_roles, permissions, role_permissions |
-| `notifications` | notifications, notification_deliveries, notification_delivery_attempts, notification_preferences                                                                                           |
+| `notifications` | notifications, notification_deliveries, notification_delivery_attempts, notification_preferences, telegram_connections, telegram_link_tokens, telegram_update_receipts                     |
 | `fitness`       | exercises, workouts, measurements (coming)                                                                                                                                                 |
 | `finance`       | wallets, transactions (planned)                                                                                                                                                            |
 | `subscriptions` | services, subscriptions (planned)                                                                                                                                                          |
@@ -194,14 +197,18 @@ Sensitive fields automatically redacted: passwords, tokens, API keys, cookies, a
 
 ## Health Checks
 
-| Endpoint              | Checks                            | Use case        |
-| --------------------- | --------------------------------- | --------------- |
-| `GET /health`         | DB + Redis + disk + memory 300 MB | General         |
-| `GET /health/startup` | DB + Redis                        | Startup probe   |
-| `GET /health/ready`   | DB + Redis + disk + memory 1 GB   | Readiness probe |
-| `GET /health/live`    | Memory 1.5 GB only                | Liveness probe  |
+| Endpoint              | Checks                          | Use case              |
+| --------------------- | ------------------------------- | --------------------- |
+| `GET /health`         | DB + Redis + disk + memory 1 GB | General (= readiness) |
+| `GET /health/startup` | DB + Redis                      | Startup probe         |
+| `GET /health/ready`   | DB + Redis + disk + memory 1 GB | Readiness probe       |
+| `GET /health/live`    | Memory 1.5 GB only              | Liveness probe        |
 
 Health endpoints bypass rate limiting (`@SkipThrottle`) and are excluded from access logs.
+The `memory_heap` ceiling defaults to **1 GiB** (readiness/general) and **1.5 GiB** (liveness);
+set `HEALTH_MEMORY_HEAP_BYTES` (bytes) to override **both** — the e2e harness raises it because a
+single serial Jest process accumulates every suite's heap. `HEALTH_DISK_THRESHOLD_PERCENT` tunes the
+readiness disk check.
 Readiness disk usage threshold defaults to `HEALTH_DISK_THRESHOLD_PERCENT=0.9`.
 Storage readiness is opt-in via `STORAGE_HEALTH_ENABLED=true`.
 
@@ -271,7 +278,14 @@ OAuth (all optional, provider enabled only when fully configured; partial config
 - Google: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
 - GitHub: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`
 - Apple: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APPLE_CALLBACK_URL`
-- Telegram: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CALLBACK_URL`
+- Telegram **OAuth login**: `TELEGRAM_BOT_TOKEN` (+ `TELEGRAM_CALLBACK_URL` — a callback requires a token, but a token alone does not require a callback)
+
+The Telegram **notifications channel** is independently optional but shares `TELEGRAM_BOT_TOKEN`. It
+is enabled when a channel field is set, and then requires the full trio
+`TELEGRAM_BOT_TOKEN` + `TELEGRAM_BOT_USERNAME` + `WEBHOOK_TELEGRAM_SECRET` (so a token alone stays
+valid for OAuth/login). Register the webhook once per deploy with
+`node dist/cli/telegram-setup.js` (see [`docs/operations/deployment.md`](../../docs/operations/deployment.md)
+and [`docs/operations/webhooks.md`](../../docs/operations/webhooks.md)).
 
 ## Deployment & Migrations
 
@@ -342,7 +356,7 @@ is imported (worker/all). Assert the gating in `test/process-role.e2e-spec.ts`.
 - [`docs/operations/observability.md`](../../docs/operations/observability.md) — Metrics and tracing guide
 - [`docs/auth/`](../../docs/auth/README.md) — Complete auth & RBAC guide for developers
 - [`docs/authorization.md`](../../docs/authorization.md) — Authorization concepts
-- [`docs/notifications/`](../../docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email delivery, realtime SSE stream)
+- [`docs/notifications/`](../../docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email & Telegram delivery, realtime SSE stream)
 
 ## Contributing
 

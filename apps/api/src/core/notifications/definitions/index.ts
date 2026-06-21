@@ -2,6 +2,7 @@ import type { NotificationDefinition } from '../notification-definition.types'
 
 import { accountPasswordChangedDefinition } from './account-password-changed.definition'
 import { accountProfileUpdatedDefinition } from './account-profile-updated.definition'
+import { accountTelegramLinkedDefinition } from './account-telegram-linked.definition'
 
 /**
  * The starter notification definitions registered at bootstrap. Forks add their
@@ -12,4 +13,5 @@ import { accountProfileUpdatedDefinition } from './account-profile-updated.defin
 export const NOTIFICATION_DEFINITIONS: readonly NotificationDefinition[] = [
   accountProfileUpdatedDefinition,
   accountPasswordChangedDefinition,
+  accountTelegramLinkedDefinition,
 ]

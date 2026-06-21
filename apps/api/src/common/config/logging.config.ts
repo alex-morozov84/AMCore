@@ -163,6 +163,7 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
           'req.headers["stripe-signature"]',
           'req.headers["webhook-signature"]',
           'req.headers["x-hub-signature-256"]',
+          'req.headers["x-telegram-bot-api-secret-token"]',
 
           // Response tokens
           'res.body.accessToken',

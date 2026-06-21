@@ -2,6 +2,7 @@ import {
   NOTIFICATION_BACKOFF_BASE_MS,
   NOTIFICATION_BACKOFF_CAP_MS,
   NOTIFICATION_BACKOFF_JITTER,
+  NOTIFICATION_RETRY_AFTER_MAX_MS,
 } from '../notification-dispatch.constants'
 
 /**
@@ -19,4 +20,24 @@ export function computeNextAttemptAt(attemptCount: number, now: Date = new Date(
   const jitterFactor = 1 + (Math.random() * 2 - 1) * NOTIFICATION_BACKOFF_JITTER
   const delay = Math.round(capped * jitterFactor)
   return new Date(now.getTime() + delay)
+}
+
+/**
+ * Apply a provider-requested retry **floor** to the computed backoff (corr. E). The next
+ * attempt is the LATER of the normal jittered backoff and `now + retryAfterMs`, so we never
+ * retry before the provider's requested delay, and never earlier than the normal schedule.
+ * The floor is clamped to `NOTIFICATION_RETRY_AFTER_MAX_MS` (24h) so a corrupt value can't
+ * park a row indefinitely. `undefined`/non-positive → the plain backoff.
+ */
+export function applyRetryAfterFloor(
+  backoffAt: Date,
+  retryAfterMs: number | undefined,
+  now: Date = new Date()
+): Date {
+  if (retryAfterMs === undefined || !Number.isFinite(retryAfterMs) || retryAfterMs <= 0) {
+    return backoffAt
+  }
+  const clamped = Math.min(retryAfterMs, NOTIFICATION_RETRY_AFTER_MAX_MS)
+  const floorAt = new Date(now.getTime() + clamped)
+  return floorAt > backoffAt ? floorAt : backoffAt
 }

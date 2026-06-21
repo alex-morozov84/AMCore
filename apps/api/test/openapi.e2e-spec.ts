@@ -100,6 +100,10 @@ const EXPECTED: Record<string, Expected> = {
   'get /notifications/preferences': { status: '200', kind: 'json' },
   'put /notifications/preferences': { status: '204', kind: 'none' },
   'patch /notifications/settings': { status: '204', kind: 'none' },
+  // notifications Telegram linking (Arc D — the webhook route is @ApiExcludeEndpoint, not here)
+  'post /notifications/telegram/link': { status: '201', kind: 'json' },
+  'get /notifications/telegram/connection': { status: '200', kind: 'json' },
+  'delete /notifications/telegram/connection': { status: '204', kind: 'none' },
   // notifications realtime (Arc C — SSE stream, text/event-stream not JSON)
   'get /notifications/stream': { status: '200', kind: 'stream' },
   // metrics — Prometheus exposition (text, not JSON)

@@ -11,13 +11,21 @@ describe('accountPasswordChangedDefinition', () => {
     expect(() => validateDefinition(def)).not.toThrow()
   })
 
-  it('makes both in-app and email mandatory (a security alert is not silenceable)', () => {
+  it('keeps in-app and email mandatory, with Telegram an optional default (Arc D)', () => {
     expect(def.mandatoryChannels).toEqual([NotificationChannel.IN_APP, NotificationChannel.EMAIL])
-    expect(def.defaultChannels).toEqual([NotificationChannel.IN_APP, NotificationChannel.EMAIL])
+    expect(def.defaultChannels).toEqual([
+      NotificationChannel.IN_APP,
+      NotificationChannel.EMAIL,
+      NotificationChannel.TELEGRAM,
+    ])
+    expect(def.supportedChannels).toContain(NotificationChannel.TELEGRAM)
+    // Telegram is NOT mandatory — a user can disable it.
+    expect(def.mandatoryChannels).not.toContain(NotificationChannel.TELEGRAM)
   })
 
-  it('resolves email to detailed external exposure', () => {
+  it('resolves email to detailed but keeps Telegram generic plain-text', () => {
     expect(resolveExternalMode(def, NotificationChannel.EMAIL)).toBe('detailed')
+    expect(resolveExternalMode(def, NotificationChannel.TELEGRAM)).toBe('generic')
   })
 
   it('accepts a valid ISO datetime payload and rejects a malformed one', () => {

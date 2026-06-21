@@ -40,9 +40,21 @@ export const accountPasswordChangedDefinition: NotificationDefinition<Payload> =
   // and the only projected field is the non-secret change time. The class still keeps
   // any future channel without an explicit override on the conservative `generic` path.
   contentClass: NotificationContentClass.SENSITIVE,
-  supportedChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
-  defaultChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
-  // Both channels are mandatory — a security alert must not be silenceable.
+  // Telegram is an optional-default channel (Arc D): a linked user gets the alert there too, but
+  // it stays generic plain-text (no override) and NON-mandatory — the user can disable it, and an
+  // unlinked destination is a `SKIPPED telegram_not_linked`, never a retry storm.
+  supportedChannels: [
+    NotificationChannel.IN_APP,
+    NotificationChannel.EMAIL,
+    NotificationChannel.TELEGRAM,
+  ],
+  defaultChannels: [
+    NotificationChannel.IN_APP,
+    NotificationChannel.EMAIL,
+    NotificationChannel.TELEGRAM,
+  ],
+  // IN_APP + EMAIL are mandatory — a security alert must not be silenceable on those; Telegram is
+  // a best-effort addition only.
   mandatoryChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
   externalModeByChannel: { [NotificationChannel.EMAIL]: 'detailed' },
   payloadSchema,

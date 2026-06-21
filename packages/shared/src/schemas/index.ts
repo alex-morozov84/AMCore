@@ -160,6 +160,16 @@ export {
   type NotificationSseEvent,
 } from './notifications'
 
+// Telegram linking schemas (Track B — Arc D)
+export {
+  telegramConnectionStatusSchema,
+  telegramLinkResponseSchema,
+  telegramConnectionResponseSchema,
+  type TelegramConnectionStatusValue,
+  type TelegramLinkResponse,
+  type TelegramConnectionResponse,
+} from './telegram'
+
 // Invite schemas (OB-02)
 export {
   createInviteSchema,

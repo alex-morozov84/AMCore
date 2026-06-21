@@ -5,6 +5,8 @@ import { PrismaModule } from '../../prisma'
 import { CHANNEL_DELIVERERS, ChannelDelivererRegistry } from './channels/channel-deliverer.registry'
 import type { ChannelDeliverer } from './channels/channel-deliverer.types'
 import { EmailChannelDeliverer } from './channels/email-channel.deliverer'
+import { TelegramBotApiClient } from './channels/telegram/telegram-bot-api.client'
+import { TelegramChannelDeliverer } from './channels/telegram/telegram-channel.deliverer'
 import { NotificationDeliveryRepository } from './dispatch/notification-delivery.repository'
 import { NotificationDispatchProcessor } from './dispatch/notification-dispatch.processor'
 import { NotificationDispatchService } from './dispatch/notification-dispatch.service'
@@ -35,10 +37,15 @@ import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.ru
   providers: [
     NotificationDeliveryRepository,
     EmailChannelDeliverer,
+    TelegramBotApiClient,
+    TelegramChannelDeliverer,
     {
       provide: CHANNEL_DELIVERERS,
-      useFactory: (email: EmailChannelDeliverer): ChannelDeliverer[] => [email],
-      inject: [EmailChannelDeliverer],
+      useFactory: (
+        email: EmailChannelDeliverer,
+        telegram: TelegramChannelDeliverer
+      ): ChannelDeliverer[] => [email, telegram],
+      inject: [EmailChannelDeliverer, TelegramChannelDeliverer],
     },
     ChannelDelivererRegistry,
     NotificationDispatchService,

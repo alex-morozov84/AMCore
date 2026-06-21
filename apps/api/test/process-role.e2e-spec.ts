@@ -32,6 +32,10 @@ let NotificationStreamController: Token
 let MetricsService: Token
 let QueueDepthMetricsCollector: Token
 let QueueService: Token
+let TelegramController: Token
+let TelegramWebhookController: Token
+let TelegramChannelDeliverer: Token
+let TelegramBotApiClient: Token
 
 const noopPinoLogger = {
   setContext: () => undefined,
@@ -91,6 +95,14 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       await import('../src/core/notifications/notification-stream.controller')
     const observability = await import('../src/infrastructure/observability')
     const queue = await import('../src/infrastructure/queue')
+    const tgController =
+      await import('../src/core/notifications/channels/telegram/telegram.controller')
+    const tgWebhookController =
+      await import('../src/core/notifications/channels/telegram/telegram-webhook.controller')
+    const tgDeliverer =
+      await import('../src/core/notifications/channels/telegram/telegram-channel.deliverer')
+    const tgClient =
+      await import('../src/core/notifications/channels/telegram/telegram-bot-api.client')
 
     AppModule = appModule.AppModule
     WebModule = webModule.WebModule
@@ -107,6 +119,10 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     MetricsService = observability.MetricsService
     QueueDepthMetricsCollector = queue.QueueDepthMetricsCollector
     QueueService = queue.QueueService
+    TelegramController = tgController.TelegramController
+    TelegramWebhookController = tgWebhookController.TelegramWebhookController
+    TelegramChannelDeliverer = tgDeliverer.TelegramChannelDeliverer
+    TelegramBotApiClient = tgClient.TelegramBotApiClient
   })
 
   describe('web', () => {
@@ -143,6 +159,13 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       const output = await m.get(MetricsService, { strict: false }).metrics()
       expect(output).not.toContain('amcore_queue_jobs')
     })
+
+    it('has the Telegram linking surface but NOT the worker-only Bot client/deliverer (Arc D)', () => {
+      present(m, TelegramController)
+      present(m, TelegramWebhookController)
+      absent(m, TelegramChannelDeliverer)
+      absent(m, TelegramBotApiClient)
+    })
   })
 
   describe('worker', () => {
@@ -178,6 +201,13 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, NotificationRealtimeHub)
       absent(m, NotificationStreamController)
     })
+
+    it('has the Telegram Bot client + deliverer but NOT the web link/webhook controllers (Arc D)', () => {
+      present(m, TelegramChannelDeliverer)
+      present(m, TelegramBotApiClient)
+      absent(m, TelegramController)
+      absent(m, TelegramWebhookController)
+    })
   })
 
   describe('all', () => {
@@ -210,6 +240,13 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     it('registers the shared queue-depth gauge', async () => {
       const output = await m.get(MetricsService, { strict: false }).metrics()
       expect(output).toContain('amcore_queue_jobs{queue="default",state="waiting"')
+    })
+
+    it('composes the full Telegram surface — link/webhook controllers AND Bot client/deliverer', () => {
+      present(m, TelegramController)
+      present(m, TelegramWebhookController)
+      present(m, TelegramChannelDeliverer)
+      present(m, TelegramBotApiClient)
     })
   })
 })

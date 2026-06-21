@@ -1,5 +1,11 @@
 import { z } from 'zod'
 
+import {
+  DEFAULT_TELEGRAM_API_BASE_URL,
+  TELEGRAM_BOT_USERNAME_PATTERN,
+  TELEGRAM_WEBHOOK_SECRET_PATTERN,
+} from './core/notifications/channels/telegram/telegram.constants'
+
 const optionalEnvString = (): z.ZodPipe<
   z.ZodTransform<unknown, unknown>,
   z.ZodOptional<z.ZodString>
@@ -14,6 +20,19 @@ const optionalEnvUrl = (): z.ZodPipe<z.ZodTransform<unknown, unknown>, z.ZodOpti
     (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
     z.url().optional()
   )
+
+// A Telegram bot username (Arc D). Normalizes a leading `@` away and treats empty as unset;
+// validates the public-username grammar (5–32 of A-Za-z0-9_). Used to build the `t.me/<name>`
+// deep link and the `/start@<name>` command grammar.
+const optionalTelegramUsername = (): z.ZodPipe<
+  z.ZodTransform<unknown, unknown>,
+  z.ZodOptional<z.ZodString>
+> =>
+  z.preprocess((value) => {
+    if (typeof value !== 'string') return value
+    const normalized = value.trim().replace(/^@/, '')
+    return normalized === '' ? undefined : normalized
+  }, z.string().regex(TELEGRAM_BOT_USERNAME_PATTERN, 'must be 5–32 chars of A-Za-z0-9_').optional())
 
 const envSchema = z.preprocess(
   (raw) => {
@@ -50,6 +69,11 @@ const envSchema = z.preprocess(
         .transform((v) => v === 'true'),
       METRICS_AUTH_TOKEN: optionalEnvString(),
       HEALTH_DISK_THRESHOLD_PERCENT: z.coerce.number().min(0).max(1).default(0.9),
+      // Optional override of the liveness/readiness heap ceiling (bytes). Unset → the
+      // hardcoded production defaults. The e2e harness sets it high because a single
+      // `jest --runInBand` process accumulates every suite's heap (a test artifact, not
+      // a production signal).
+      HEALTH_MEMORY_HEAP_BYTES: z.coerce.number().int().min(1).optional(),
       REDIS_URL: z.url(),
       WEBHOOK_SECRETS: z.record(z.string(), z.string()).default({}),
       WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS: z.coerce.number().int().min(1).default(300),
@@ -149,6 +173,13 @@ const envSchema = z.preprocess(
       APPLE_CALLBACK_URL: optionalEnvUrl(),
       TELEGRAM_BOT_TOKEN: optionalEnvString(),
       TELEGRAM_CALLBACK_URL: optionalEnvUrl(),
+      // Telegram notifications channel (Arc D). Username builds the deep link; the API base
+      // URL is overridable for the fake-server e2e (default = the public Bot API).
+      TELEGRAM_BOT_USERNAME: optionalTelegramUsername(),
+      TELEGRAM_API_BASE_URL: z.url().default(DEFAULT_TELEGRAM_API_BASE_URL),
+      // Public URL of the `/webhooks/telegram` endpoint, used only by the `telegram:setup`
+      // deploy script's `setWebhook` call (not at runtime).
+      TELEGRAM_WEBHOOK_URL: optionalEnvUrl(),
       // Email Service
       EMAIL_PROVIDER: z.enum(['resend', 'mock']).default('mock'),
       RESEND_API_KEY: optionalEnvString(),
@@ -263,7 +294,65 @@ const envSchema = z.preprocess(
         'APPLE_PRIVATE_KEY',
         'APPLE_CALLBACK_URL',
       ])
-      requireAllIfAny('Telegram OAuth', ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CALLBACK_URL'])
+      // Telegram OAuth login and the notifications channel are INDEPENDENTLY optional but
+      // share TELEGRAM_BOT_TOKEN. OAuth login: a callback URL requires a token, but a token
+      // alone does NOT force a callback (token-only / channel-only is valid).
+      if (env.TELEGRAM_CALLBACK_URL !== undefined && env.TELEGRAM_BOT_TOKEN === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['TELEGRAM_BOT_TOKEN'],
+          message: 'TELEGRAM_BOT_TOKEN is required when TELEGRAM_CALLBACK_URL is set',
+        })
+      }
+
+      // Telegram webhook secret grammar (Arc D): `setWebhook(secret_token=…)` is echoed in the
+      // `X-Telegram-Bot-Api-Secret-Token` header. Validate the official grammar/length when
+      // present so a malformed secret fails fast at config load, not at the first webhook.
+      const telegramWebhookSecret = env.WEBHOOK_SECRETS.telegram
+      if (
+        telegramWebhookSecret !== undefined &&
+        !TELEGRAM_WEBHOOK_SECRET_PATTERN.test(telegramWebhookSecret)
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['WEBHOOK_SECRETS', 'telegram'],
+          message: 'WEBHOOK_TELEGRAM_SECRET must be 1–256 characters of A-Za-z0-9_-',
+        })
+      }
+
+      // Telegram notifications channel (Arc D, corr. F / R3): channel-gated, NOT a flat
+      // requireAllIfAny over the token. The channel is *enabled* iff a channel-specific field
+      // is present (bot username OR webhook secret); when enabled, require the full trio
+      // (token + username + secret). So TELEGRAM_BOT_TOKEN alone stays valid (OAuth/token-only)
+      // and never forces the channel fields.
+      const telegramChannelEnabled =
+        env.TELEGRAM_BOT_USERNAME !== undefined || telegramWebhookSecret !== undefined
+      if (telegramChannelEnabled) {
+        if (env.TELEGRAM_BOT_TOKEN === undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['TELEGRAM_BOT_TOKEN'],
+            message:
+              'TELEGRAM_BOT_TOKEN is required when the Telegram notifications channel is enabled',
+          })
+        }
+        if (env.TELEGRAM_BOT_USERNAME === undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['TELEGRAM_BOT_USERNAME'],
+            message:
+              'TELEGRAM_BOT_USERNAME is required when the Telegram notifications channel is enabled',
+          })
+        }
+        if (telegramWebhookSecret === undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['WEBHOOK_SECRETS', 'telegram'],
+            message:
+              'WEBHOOK_TELEGRAM_SECRET is required when the Telegram notifications channel is enabled',
+          })
+        }
+      }
 
       if (env.EMAIL_PROVIDER === 'resend' && !env.RESEND_API_KEY) {
         ctx.addIssue({

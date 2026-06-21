@@ -88,7 +88,23 @@ describe('NotificationDispatchService', () => {
     expect(repository.finalizeTransient).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'd1' }),
       'provider_transient',
-      expect.any(Number)
+      expect.any(Number),
+      undefined
+    )
+  })
+
+  it('threads a provider retryAfterMs floor through to finalizeTransient', async () => {
+    deliver.mockResolvedValue({
+      status: 'transient',
+      errorCode: 'telegram_rate_limited',
+      retryAfterMs: 30_000,
+    })
+    await drainOnce(makeClaim('d1'))
+    expect(repository.finalizeTransient).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'd1' }),
+      'telegram_rate_limited',
+      expect.any(Number),
+      30_000
     )
   })
 
@@ -109,7 +125,8 @@ describe('NotificationDispatchService', () => {
     expect(repository.finalizeTransient).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'd1' }),
       'provider_error',
-      expect.any(Number)
+      expect.any(Number),
+      undefined
     )
   })
 

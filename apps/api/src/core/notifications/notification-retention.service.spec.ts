@@ -44,6 +44,8 @@ describe('NotificationRetentionService', () => {
         .mockResolvedValueOnce(5) // read
         .mockResolvedValueOnce(7) // unread
         .mockResolvedValueOnce(2) // finished attempts
+        .mockResolvedValueOnce(4) // telegram link tokens
+        .mockResolvedValueOnce(6) // telegram update receipts
 
       const result = await service.runRetention()
 
@@ -52,8 +54,22 @@ describe('NotificationRetentionService', () => {
         readNotifications: 5,
         unreadNotifications: 7,
         finishedAttempts: 2,
+        telegramLinkTokens: 4,
+        telegramUpdateReceipts: 6,
         failures: [],
       })
+    })
+
+    it('prunes telegram tokens (expired/consumed only) and update receipts by age', async () => {
+      prisma.$executeRaw.mockResolvedValue(0)
+
+      await service.runRetention()
+
+      const texts = prisma.$executeRaw.mock.calls.map(([sql]) => sqlText(sql as Prisma.Sql))
+      const tokenDelete = texts.find((t) => t.includes('"telegram_link_tokens"'))
+      const receiptDelete = texts.find((t) => t.includes('"telegram_update_receipts"'))
+      expect(tokenDelete).toContain('"consumedAt" IS NOT NULL OR "expiresAt"')
+      expect(receiptDelete).toContain('"receivedAt" <')
     })
 
     it('never deletes a notification that still has an active external delivery', async () => {
@@ -79,8 +95,8 @@ describe('NotificationRetentionService', () => {
       const result = await service.runRetention()
 
       expect(result.archivedNotifications).toBe(500)
-      // 4 first-pass calls + 1 extra archived pass that drains to 0.
-      expect(prisma.$executeRaw).toHaveBeenCalledTimes(5)
+      // 6 first-pass calls + 1 extra archived pass that drains to 0.
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(7)
     })
 
     it('isolates a per-bucket failure: keeps other counts, records it, never throws', async () => {

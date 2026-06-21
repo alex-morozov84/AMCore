@@ -1,7 +1,14 @@
-import type { Prisma } from '@prisma/client'
+import type { Prisma, TelegramConnectionStatus } from '@prisma/client'
 
 import type { NotificationChannel } from '../notification.constants'
 import type { NotificationDefinition } from '../notification-definition.types'
+
+/** Telegram connection facts (Arc D), loaded only when a definition supports the channel. */
+export interface TargetRecipientTelegram {
+  connectionId: string
+  chatId: string
+  status: TelegramConnectionStatus
+}
 
 /**
  * Recipient facts a target resolver may read. Loaded once by the producer inside its
@@ -13,6 +20,8 @@ export interface TargetRecipient {
   emailCanonical: string
   emailVerified: boolean
   locale: string
+  /** Present (or explicitly `null`) only when the definition supports the Telegram channel. */
+  telegram?: TargetRecipientTelegram | null
 }
 
 /** Inputs available when resolving an external channel's delivery targets. */

@@ -83,6 +83,11 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
   // Keep readiness e2e deterministic on developer machines where the root
   // APFS volume may legitimately report >90% used.
   process.env.HEALTH_DISK_THRESHOLD_PERCENT = '0.99'
+  // A single `jest --runInBand` process holds every prior suite's heap, so by the time the
+  // health suite runs the process heap can exceed the production 1–1.5GB ceiling and flake the
+  // memory_heap probe to 503. Raise the ceiling well above any e2e process — a test artifact,
+  // not a production signal (the production defaults are unchanged when this is unset).
+  process.env.HEALTH_MEMORY_HEAP_BYTES = String(8 * 1024 * 1024 * 1024)
   // E2E_DATABASE_URL: escape hatch consumed by prisma.config.ts to defeat
   // Prisma CLI's `.env` auto-load (which otherwise overrides DATABASE_URL back
   // to whatever sits in .env). Not used by application code.

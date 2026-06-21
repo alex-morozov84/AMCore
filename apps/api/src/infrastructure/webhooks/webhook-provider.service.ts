@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common'
 
 import { GenericHmacWebhookVerifier } from './generic-hmac.webhook-verifier'
 import { StripeStyleWebhookVerifier } from './stripe-style.webhook-verifier'
+import { TelegramSecretTokenVerifier } from './telegram-secret-token.webhook-verifier'
 import type {
   GenericHmacWebhookOptions,
   ResolvedWebhookProvider,
@@ -26,13 +27,29 @@ export class WebhookProviderService {
   constructor(
     private readonly env: EnvService,
     private readonly stripe: StripeStyleWebhookVerifier,
-    private readonly generic: GenericHmacWebhookVerifier
+    private readonly generic: GenericHmacWebhookVerifier,
+    private readonly telegram: TelegramSecretTokenVerifier
   ) {}
 
   resolve(provider: WebhookProvider): ResolvedWebhookProvider {
     const secret = this.env.get('WEBHOOK_SECRETS')[provider]
     if (provider === 'stripe') return stripeProvider(secret, this.stripe)
+    if (provider === 'telegram') return telegramProvider(secret, this.telegram)
     return genericProvider(secret, this.generic)
+  }
+}
+
+function telegramProvider(
+  secret: string | undefined,
+  verifier: TelegramSecretTokenVerifier
+): ResolvedWebhookProvider {
+  return {
+    provider: 'telegram',
+    secret,
+    verify: (input: WebhookVerificationInput) => verifier.verify(input),
+    // Durable `update_id` dedupe in the handler (D.6) is authoritative; the Redis layer
+    // is a no-op for Telegram (Telegram retries can outlive any TTL).
+    replayId: () => undefined,
   }
 }
 

@@ -16,6 +16,7 @@ const SENSITIVE_HEADERS = new Set([
   'stripe-signature',
   'webhook-signature',
   'x-hub-signature-256',
+  'x-telegram-bot-api-secret-token',
 ])
 
 const REDACTED = '[REDACTED]'

@@ -4,13 +4,17 @@ import type { NotificationChannel } from '../notification.constants'
 
 import type { ChannelTargetResolver } from './channel-target-resolver.types'
 import { EmailTargetResolver } from './email-target.resolver'
+import { TelegramTargetResolver } from './telegram/telegram-target.resolver'
 
 /**
  * External channel target resolvers active in this build (in-app is excluded — it is
  * materialized `DELIVERED` inline by the producer and has no external target). Telegram
  * joins in Arc D, Web Push in the frontend phase — each is purely additive here.
  */
-const DEFAULT_TARGET_RESOLVERS: readonly ChannelTargetResolver[] = [new EmailTargetResolver()]
+const DEFAULT_TARGET_RESOLVERS: readonly ChannelTargetResolver[] = [
+  new EmailTargetResolver(),
+  new TelegramTargetResolver(),
+]
 
 /**
  * Produce-time channel target resolver registry (core role). Keyed by channel id; the

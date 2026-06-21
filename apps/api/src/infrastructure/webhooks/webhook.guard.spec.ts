@@ -48,6 +48,29 @@ describe('WebhookGuard', () => {
       status: 401,
     })
   })
+
+  it('passes a valid Telegram webhook with no replay id (durable DB dedupe owns it)', async () => {
+    reflector.getAllAndOverride = jest.fn().mockReturnValue('telegram')
+    const env = {
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'WEBHOOK_SECRETS') return { telegram: 'tg-secret' }
+        return 300
+      }),
+    }
+    const providers = {
+      resolve: jest.fn().mockReturnValue({
+        secret: 'tg-secret',
+        verify: () => ({ ok: true }),
+        replayId: () => undefined, // Redis layer is a no-op for Telegram
+      }),
+    }
+    // Mirror WebhookReplayService: a missing event id passes (no Redis call).
+    const replay = { checkAndMark: jest.fn(async (_p: string, id?: string) => id === undefined) }
+    const guard = new WebhookGuard(reflector, env as never, providers as never, replay as never)
+
+    await expect(canActivate(guard)).resolves.toBe(true)
+    expect(replay.checkAndMark).toHaveBeenCalledWith('telegram', undefined, 300)
+  })
 })
 
 function canActivate(guard: WebhookGuard): Promise<boolean> {

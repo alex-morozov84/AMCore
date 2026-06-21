@@ -41,6 +41,14 @@ export const NOTIFICATION_BACKOFF_CAP_MS = 15 * 60 * 1000 // 15 min
 export const NOTIFICATION_BACKOFF_JITTER = 0.2 // ±20% full jitter
 
 /**
+ * Defensive max for a provider-requested retry **floor** (e.g. Telegram `retry_after`). A
+ * legitimate flood-wait can be minutes; we honor it as a floor over the normal backoff, but
+ * clamp a corrupt/absurd value so a row never parks indefinitely. Deliberately NOT the
+ * 15-min normal-backoff cap (corr. E) — that would retry before the provider's requested delay.
+ */
+export const NOTIFICATION_RETRY_AFTER_MAX_MS = 24 * 60 * 60 * 1000 // 24 h
+
+/**
  * Bounded terminal reasons (`NotificationDelivery.terminalReasonCode`). Machine-readable,
  * never a provider body or free text.
  */

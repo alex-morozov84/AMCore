@@ -213,7 +213,10 @@ export class NotificationsService {
       occurredAt: input.occurredAt?.toISOString() ?? null,
     })
 
-    const [masterEnabled, userPreferences, user] = await Promise.all([
+    // One extra indexed lookup, only when the definition can target Telegram — so an
+    // unrelated notification never queries the connection table (Arc D).
+    const supportsTelegram = definition.supportedChannels.includes(NotificationChannel.TELEGRAM)
+    const [masterEnabled, userPreferences, user, telegram] = await Promise.all([
       this.preferences.getMasterToggle(input.recipientUserId, client),
       this.preferences.findByUser(input.recipientUserId, client),
       client.user.findUnique({
@@ -221,6 +224,12 @@ export class NotificationsService {
         // email/emailVerified feed external target resolution (e.g. email channel).
         select: { locale: true, email: true, emailCanonical: true, emailVerified: true },
       }),
+      supportsTelegram
+        ? client.telegramConnection.findUnique({
+            where: { userId: input.recipientUserId },
+            select: { id: true, chatId: true, status: true },
+          })
+        : Promise.resolve(null),
     ])
 
     const channels = this.resolver.resolve(definition, { masterEnabled, userPreferences })
@@ -239,6 +248,9 @@ export class NotificationsService {
             emailCanonical: user.emailCanonical,
             emailVerified: user.emailVerified,
             locale,
+            telegram: telegram
+              ? { connectionId: telegram.id, chatId: telegram.chatId, status: telegram.status }
+              : null,
           }
         : null,
     }

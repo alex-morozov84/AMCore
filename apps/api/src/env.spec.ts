@@ -43,6 +43,34 @@ describe('env validation', () => {
     expect(env.WEBHOOK_REPLAY_DEDUPE_TTL_SECONDS).toBe(120)
   })
 
+  // The webhook secret grammar is validated within a full channel config (token + username),
+  // so these isolate the grammar check from the channel-gating below.
+  const telegramChannelBase = {
+    TELEGRAM_BOT_TOKEN: '123456:bot-token',
+    TELEGRAM_BOT_USERNAME: 'amcore_bot',
+  }
+
+  it('accepts a Telegram webhook secret in the official grammar', () => {
+    const env = validate({
+      ...baseEnv,
+      ...telegramChannelBase,
+      WEBHOOK_TELEGRAM_SECRET: 'aB0_-Zz9',
+    })
+    expect(env.WEBHOOK_SECRETS).toEqual({ telegram: 'aB0_-Zz9' })
+  })
+
+  it('rejects a Telegram webhook secret outside the A-Za-z0-9_- grammar', () => {
+    expect(() =>
+      validate({ ...baseEnv, ...telegramChannelBase, WEBHOOK_TELEGRAM_SECRET: 'bad secret!' })
+    ).toThrow(ZodError)
+  })
+
+  it('rejects a Telegram webhook secret longer than 256 chars', () => {
+    expect(() =>
+      validate({ ...baseEnv, ...telegramChannelBase, WEBHOOK_TELEGRAM_SECRET: 'a'.repeat(257) })
+    ).toThrow(ZodError)
+  })
+
   it('applies idempotency defaults', () => {
     const env = validate(baseEnv)
 
@@ -134,6 +162,108 @@ describe('env validation', () => {
     expect(env.GOOGLE_CLIENT_ID).toBe('google-client-id')
     expect(env.EMAIL_PROVIDER).toBe('resend')
     expect(env.RESEND_API_KEY).toBe('re_test_key_123')
+  })
+
+  describe('Telegram OAuth + notifications channel gating (Arc D)', () => {
+    const TOKEN = '123456:bot-token'
+    const USERNAME = 'amcore_bot'
+    const SECRET = 'aB0_-Zz9'
+
+    it('accepts no Telegram config at all', () => {
+      expect(validate(baseEnv).TELEGRAM_BOT_TOKEN).toBeUndefined()
+    })
+
+    it('accepts the bot token alone (OAuth/token-only mode — no callback, no channel)', () => {
+      const env = validate({ ...baseEnv, TELEGRAM_BOT_TOKEN: TOKEN })
+      expect(env.TELEGRAM_BOT_TOKEN).toBe(TOKEN)
+      expect(env.TELEGRAM_API_BASE_URL).toBe('https://api.telegram.org')
+    })
+
+    it('accepts the OAuth pair (token + callback)', () => {
+      const env = validate({
+        ...baseEnv,
+        TELEGRAM_BOT_TOKEN: TOKEN,
+        TELEGRAM_CALLBACK_URL: 'https://app.example/auth/telegram/callback',
+      })
+      expect(env.TELEGRAM_CALLBACK_URL).toBe('https://app.example/auth/telegram/callback')
+    })
+
+    it('rejects a callback without a token', () => {
+      expect(() =>
+        validate({ ...baseEnv, TELEGRAM_CALLBACK_URL: 'https://app.example/cb' })
+      ).toThrow(ZodError)
+    })
+
+    it('accepts the full notifications trio and normalizes a leading @ in the username', () => {
+      const env = validate({
+        ...baseEnv,
+        TELEGRAM_BOT_TOKEN: TOKEN,
+        TELEGRAM_BOT_USERNAME: `@${USERNAME}`,
+        WEBHOOK_TELEGRAM_SECRET: SECRET,
+      })
+      expect(env.TELEGRAM_BOT_USERNAME).toBe(USERNAME)
+      expect(env.WEBHOOK_SECRETS).toEqual({ telegram: SECRET })
+    })
+
+    it('rejects the channel enabled by username but missing token/secret', () => {
+      expect(() => validate({ ...baseEnv, TELEGRAM_BOT_USERNAME: USERNAME })).toThrow(ZodError)
+    })
+
+    it('rejects the channel enabled by secret but missing token/username', () => {
+      expect(() => validate({ ...baseEnv, WEBHOOK_TELEGRAM_SECRET: SECRET })).toThrow(ZodError)
+    })
+
+    it('rejects the partial trio token+username (missing secret)', () => {
+      expect(() =>
+        validate({ ...baseEnv, TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_BOT_USERNAME: USERNAME })
+      ).toThrow(ZodError)
+    })
+
+    it('rejects the partial trio token+secret (missing username)', () => {
+      expect(() =>
+        validate({ ...baseEnv, TELEGRAM_BOT_TOKEN: TOKEN, WEBHOOK_TELEGRAM_SECRET: SECRET })
+      ).toThrow(ZodError)
+    })
+
+    it('rejects the partial trio username+secret (missing token)', () => {
+      expect(() =>
+        validate({ ...baseEnv, TELEGRAM_BOT_USERNAME: USERNAME, WEBHOOK_TELEGRAM_SECRET: SECRET })
+      ).toThrow(ZodError)
+    })
+
+    it('rejects a malformed bot username', () => {
+      expect(() =>
+        validate({
+          ...baseEnv,
+          TELEGRAM_BOT_TOKEN: TOKEN,
+          TELEGRAM_BOT_USERNAME: 'no',
+          WEBHOOK_TELEGRAM_SECRET: SECRET,
+        })
+      ).toThrow(ZodError)
+    })
+
+    it('accepts both features together (OAuth callback + notifications channel)', () => {
+      const env = validate({
+        ...baseEnv,
+        TELEGRAM_BOT_TOKEN: TOKEN,
+        TELEGRAM_CALLBACK_URL: 'https://app.example/cb',
+        TELEGRAM_BOT_USERNAME: USERNAME,
+        WEBHOOK_TELEGRAM_SECRET: SECRET,
+      })
+      expect(env.TELEGRAM_BOT_USERNAME).toBe(USERNAME)
+    })
+  })
+
+  it('leaves HEALTH_MEMORY_HEAP_BYTES unset by default and accepts a positive integer', () => {
+    expect(validate(baseEnv).HEALTH_MEMORY_HEAP_BYTES).toBeUndefined()
+    expect(
+      validate({ ...baseEnv, HEALTH_MEMORY_HEAP_BYTES: '8589934592' }).HEALTH_MEMORY_HEAP_BYTES
+    ).toBe(8589934592)
+  })
+
+  it('rejects a non-positive HEALTH_MEMORY_HEAP_BYTES', () => {
+    expect(() => validate({ ...baseEnv, HEALTH_MEMORY_HEAP_BYTES: '0' })).toThrow(ZodError)
+    expect(() => validate({ ...baseEnv, HEALTH_MEMORY_HEAP_BYTES: '-1' })).toThrow(ZodError)
   })
 
   it('applies database pool defaults', () => {

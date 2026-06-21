@@ -54,6 +54,15 @@ const emailOnlyDefinition: NotificationDefinition = {
   defaultChannels: [NotificationChannel.EMAIL],
 }
 
+/** Supports the Telegram channel — exercises the conditional connection fact-load (Arc D). */
+const telegramDefinition: NotificationDefinition = {
+  ...testDefinition,
+  type: 'account.telegram_test',
+  contentClass: NotificationContentClass.SENSITIVE,
+  supportedChannels: [NotificationChannel.IN_APP, NotificationChannel.TELEGRAM],
+  defaultChannels: [NotificationChannel.IN_APP, NotificationChannel.TELEGRAM],
+}
+
 const VALID_INPUT: NotifyInput = {
   recipientUserId: 'user-1',
   type: 'account.test',
@@ -185,6 +194,51 @@ describe('NotificationsService', () => {
     // but the dispatcher is still woken for the PENDING external delivery.
     expect(result.channels).toEqual([NotificationChannel.EMAIL])
     expect(realtime.publish).not.toHaveBeenCalled()
+    expect(queue.add).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not query the Telegram connection for a definition that does not support it', async () => {
+    prisma.notification.createManyAndReturn.mockResolvedValue([{ id: 'n1' }] as never)
+    prisma.notificationDelivery.createMany.mockResolvedValue({ count: 1 } as never)
+
+    await service.notify(VALID_INPUT)
+
+    expect(prisma.telegramConnection.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('materializes a PENDING Telegram delivery for an ACTIVE linked connection', async () => {
+    const telegramService = new NotificationsService(
+      prisma,
+      new NotificationDefinitionRegistry([telegramDefinition]),
+      new NotificationPreferenceResolver(),
+      preferences,
+      new ChannelTargetResolverRegistry(), // default registry → real TelegramTargetResolver
+      queue,
+      realtime,
+      logger
+    )
+    prisma.telegramConnection.findUnique.mockResolvedValue({
+      id: 'conn-1',
+      chatId: '999000',
+      status: 'ACTIVE',
+    } as never)
+    prisma.notification.createManyAndReturn.mockResolvedValue([{ id: 'n1' }] as never)
+    prisma.notificationDelivery.createMany.mockResolvedValue({ count: 2 } as never)
+
+    const result = await telegramService.notify({ ...VALID_INPUT, type: 'account.telegram_test' })
+
+    expect(result.channels).toEqual([NotificationChannel.IN_APP, NotificationChannel.TELEGRAM])
+    const createManyArg = prisma.notificationDelivery.createMany.mock.calls[0]![0] as {
+      data: Array<{ channel: string; status: string; targetKey: string; targetRef?: string }>
+    }
+    expect(createManyArg.data).toContainEqual(
+      expect.objectContaining({
+        channel: NotificationChannel.TELEGRAM,
+        status: 'PENDING',
+        targetKey: '999000',
+        targetRef: 'conn-1',
+      })
+    )
     expect(queue.add).toHaveBeenCalledTimes(1)
   })
 

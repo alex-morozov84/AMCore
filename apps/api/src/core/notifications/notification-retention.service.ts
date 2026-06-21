@@ -17,6 +17,11 @@ const RETENTION_ARCHIVED_DAYS = 30
 const RETENTION_READ_DAYS = 90
 const RETENTION_UNREAD_DAYS = 180
 const RETENTION_FINISHED_ATTEMPTS_DAYS = 30
+// Telegram link tokens / update receipts: a chosen 30-day bounded recovery/dedupe window
+// (an operational default, not an asserted provider guarantee). v1 effects are additionally
+// idempotent — one-time tokens + durable `update_id` dedupe — and the token sweep is guarded
+// to expired/consumed rows, so pruning these bounded tables is safe (Arc D).
+const RETENTION_TELEGRAM_DAYS = 30
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /**
@@ -40,12 +45,16 @@ export type RetentionBucket =
   | 'readNotifications'
   | 'unreadNotifications'
   | 'finishedAttempts'
+  | 'telegramLinkTokens'
+  | 'telegramUpdateReceipts'
 
 export interface NotificationRetentionResult {
   archivedNotifications: number
   readNotifications: number
   unreadNotifications: number
   finishedAttempts: number
+  telegramLinkTokens: number
+  telegramUpdateReceipts: number
   /** Buckets whose delete failed this run; empty on full success. Never throws. */
   failures: RetentionBucket[]
 }
@@ -96,6 +105,7 @@ export class NotificationRetentionService {
     const readCutoff = cutoff(RETENTION_READ_DAYS)
     const unreadCutoff = cutoff(RETENTION_UNREAD_DAYS)
     const attemptsCutoff = cutoff(RETENTION_FINISHED_ATTEMPTS_DAYS)
+    const telegramCutoff = cutoff(RETENTION_TELEGRAM_DAYS)
 
     const tasks: { bucket: RetentionBucket; run: () => Promise<number> }[] = [
       {
@@ -117,6 +127,11 @@ export class NotificationRetentionService {
             AND n."readAt" IS NULL AND n."createdAt" < ${unreadCutoff}`),
       },
       { bucket: 'finishedAttempts', run: () => this.deleteFinishedAttempts(attemptsCutoff) },
+      { bucket: 'telegramLinkTokens', run: () => this.deleteTelegramLinkTokens(telegramCutoff) },
+      {
+        bucket: 'telegramUpdateReceipts',
+        run: () => this.deleteTelegramUpdateReceipts(telegramCutoff),
+      },
     ]
 
     const settled = await Promise.allSettled(tasks.map((task) => task.run()))
@@ -126,6 +141,8 @@ export class NotificationRetentionService {
       readNotifications: 0,
       unreadNotifications: 0,
       finishedAttempts: 0,
+      telegramLinkTokens: 0,
+      telegramUpdateReceipts: 0,
       failures: [],
     }
 
@@ -180,6 +197,39 @@ export class NotificationRetentionService {
         WHERE id IN (
           SELECT id FROM "notifications"."notification_delivery_attempts"
           WHERE "finishedAt" IS NOT NULL AND "finishedAt" < ${cutoff}
+          LIMIT ${limit}
+        )
+      `
+    )
+  }
+
+  /**
+   * Prune one-time link tokens past the window. Guarded to expired/consumed rows so a
+   * still-bindable token is never swept (the token TTL is far shorter than the window,
+   * so this is defense-in-depth, not the primary bound).
+   */
+  private deleteTelegramLinkTokens(cutoff: Date): Promise<number> {
+    return this.deleteInBatches(
+      (limit) => Prisma.sql`
+        DELETE FROM "notifications"."telegram_link_tokens"
+        WHERE id IN (
+          SELECT id FROM "notifications"."telegram_link_tokens"
+          WHERE "createdAt" < ${cutoff}
+            AND ("consumedAt" IS NOT NULL OR "expiresAt" < ${cutoff})
+          LIMIT ${limit}
+        )
+      `
+    )
+  }
+
+  /** Prune durable `update_id` dedupe receipts older than the window. */
+  private deleteTelegramUpdateReceipts(cutoff: Date): Promise<number> {
+    return this.deleteInBatches(
+      (limit) => Prisma.sql`
+        DELETE FROM "notifications"."telegram_update_receipts"
+        WHERE "updateId" IN (
+          SELECT "updateId" FROM "notifications"."telegram_update_receipts"
+          WHERE "receivedAt" < ${cutoff}
           LIMIT ${limit}
         )
       `

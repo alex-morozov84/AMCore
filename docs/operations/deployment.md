@@ -130,6 +130,25 @@ docker run --rm -e DATABASE_URL="postgresql://…?sslmode=require" \
   <amcore-api-image> ./node_modules/.bin/prisma migrate deploy
 ```
 
+## Telegram webhook registration (one-shot, optional)
+
+If the Telegram notification channel is enabled (`TELEGRAM_BOT_TOKEN` +
+`TELEGRAM_BOT_USERNAME` + `WEBHOOK_TELEGRAM_SECRET` set — see
+[`webhooks.md`](webhooks.md)), register the webhook **once per deploy** (not at replica
+startup) with the same production image — plain Node, no pnpm/tsx:
+
+```bash
+# Same image as the Deployment; needs TELEGRAM_BOT_TOKEN, WEBHOOK_TELEGRAM_SECRET,
+# TELEGRAM_WEBHOOK_URL (the public URL of POST /webhooks/telegram). Optional:
+# TELEGRAM_DROP_PENDING=true to drop the backlog. Prints no token/secret.
+docker run --rm -e TELEGRAM_BOT_TOKEN=… -e WEBHOOK_TELEGRAM_SECRET=… \
+  -e TELEGRAM_WEBHOOK_URL="https://api.example.com/webhooks/telegram" \
+  <amcore-api-image> node dist/cli/telegram-setup.js
+```
+
+It calls `setWebhook` with the secret and `allowed_updates:['message']`. **Secret
+rotation:** set a new `WEBHOOK_TELEGRAM_SECRET`, redeploy, then re-run this command.
+
 ## Production environment requirements
 
 The dev-friendly compose defaults are local-only. With `NODE_ENV=production` the

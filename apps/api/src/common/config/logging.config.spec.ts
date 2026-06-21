@@ -32,6 +32,9 @@ describe('createLoggingConfig', () => {
         '*.resetUrl',
         '*.verificationUrl',
         '*.acceptUrl',
+        // Webhook secret headers (Arc D — Telegram secret-header verifier)
+        'req.headers["stripe-signature"]',
+        'req.headers["x-telegram-bot-api-secret-token"]',
       ])
     )
   })

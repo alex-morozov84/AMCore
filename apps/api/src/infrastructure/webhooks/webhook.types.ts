@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from 'node:http'
 
-export type WebhookProvider = 'stripe' | 'generic'
+export type WebhookProvider = 'stripe' | 'generic' | 'telegram'
 
 export type WebhookFailureReason =
   | 'WEBHOOK_SIGNATURE_INVALID'
