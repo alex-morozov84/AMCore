@@ -1,0 +1,129 @@
+// ===========================================
+// AI capability layer — admin-managed catalog (Track C — ADR-054, Arc A)
+// ===========================================
+// DB-backed, admin-manageable provider/model catalog (owner R6/R7). Adding a
+// provider/model is a catalog row + key, not a code change — except the adapter for
+// a genuinely new provider *family*, which is deliberate code. Lives on the `ai`
+// Postgres schema (ADR-003). Arc A ships persistence + contracts only; no runtime
+// provider call until Arc B. Catalog runtime/cache and the gateway arrive in Arc B.
+
+/// Provider adapter family. A Postgres enum is appropriate here: the set is closed and
+/// each value is code-bound to one gateway adapter (DB-level integrity matters for an
+/// admin-editable, security-sensitive routing discriminator). This is unlike notification
+/// channel/category, which are an open runtime registry → bounded strings (ADR-052).
+/// `OPENAI_COMPATIBLE` absorbs the long tail (any OpenAI-shaped endpoint); `MOCK` is the
+/// deterministic, key-less dev/test provider mirroring the email Mock provider.
+enum AiProviderType {
+  ANTHROPIC
+  OPENAI
+  OPENROUTER
+  OPENAI_COMPATIBLE
+  YANDEX_AI_STUDIO
+  MOCK
+
+  @@schema("ai")
+}
+
+/// One configured provider. `credentialSlot` is a **logical credential slot id**, never a raw
+/// env var name and never the secret. Arc B resolves it through a CODE-OWNED allowlist keyed by
+/// provider `type` (e.g. `default` → the type's canonical `AI_<TYPE>_API_KEY`); an unknown slot
+/// fails closed. It is NEVER used as a direct `process.env[value]` index, so a hostile/misused
+/// catalog row cannot point at an unrelated secret (e.g. `JWT_SECRET`) (review finding, A.1).
+/// `config` is a non-secret snapshot (e.g. a Yandex folder/project id reference);
+/// `dataRetentionClass` is a bounded string (additive across providers), not an enum.
+model AiProvider {
+  id                 String         @id @default(cuid())
+  slug               String         @unique // stable catalog id, e.g. `anthropic-default`
+  type               AiProviderType
+  displayName        String
+  baseUrl            String? // adapter base-URL override; null = adapter default
+  enabled            Boolean        @default(false)
+  dataRetentionClass String         @default("provider_default") // bounded grammar, no secrets
+  credentialSlot     String? // logical slot id, resolved via a code-owned allowlist; never a raw env name
+  config             Json? // non-secret provider config snapshot (e.g. Yandex folder ref)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  models AiModel[]
+
+  @@map("ai_providers")
+  @@schema("ai")
+}
+
+/// One logical model row. Requests name a model by its logical `slug`; the gateway resolves
+/// it to `providerModelName` (e.g. `claude-opus-4-8`, `gpt://<folder_id>/yandexgpt`).
+/// `capabilities` is a validated capability map (text/tools/vision/pdf/streaming/structured
+/// output) — an open additive axis kept as JSON, never an enum. Exactly one row should carry
+/// `isDefault = true` (the seeded Claude default); enforced by the seed/admin contract.
+model AiModel {
+  id                String    @id @default(cuid())
+  providerId        String
+  slug              String    @unique // logical model id used by requests, e.g. `claude-default`
+  providerModelName String // wire model name/URI passed to the provider
+  displayName       String
+  enabled           Boolean   @default(false)
+  isDefault         Boolean   @default(false)
+  priority          Int       @default(0) // routing/default-selection priority
+  capabilities      Json // { text, tools, vision, pdf, streaming, structuredOutput, ... }
+  contextLimit      Int? // max input tokens, if known
+  maxOutputTokens   Int? // provider output cap, if known
+  priceSnapshot     Json? // non-authoritative price metadata snapshot
+  deprecatedAt      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  provider AiProvider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  policy   AiModelPolicy?
+
+  @@index([providerId])
+  @@index([enabled, priority])
+  @@map("ai_models")
+  @@schema("ai")
+}
+
+/// Per-model routing & privacy policy (one row per model in v1). `allowedUseCases` is a
+/// bounded-string set (additive); `flags` carries provider-specific knobs such as OpenRouter
+/// `data_collection`/ZDR. `dataRetentionRequired` lets a fork forbid models that retain data.
+model AiModelPolicy {
+  id                    String   @id @default(cuid())
+  modelId               String   @unique
+  allowedUseCases       String[] // bounded identifiers; empty = unrestricted
+  maxTokens             Int? // policy cap independent of the model's own limit
+  dataRetentionRequired Boolean  @default(false) // require zero-data-retention routing
+  fallbackEligible      Boolean  @default(true)
+  flags                 Json? // provider-specific policy flags (e.g. { dataCollection: false })
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  model AiModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("ai_model_policies")
+  @@schema("ai")
+}
+
+/// Named, versioned assistant config (the prompt-version store, basic form). Each
+/// `(slug, version)` is one immutable config; a new version is a new row. `systemPrompt` is
+/// the assistant's trusted instruction text (distinct from untrusted user/tool content at the
+/// gateway trust boundary, Arc D). `modelSelection` names the logical model + fallbacks;
+/// `allowedModalities`/`toolAllowlist` are bounded-string sets. Exercised from Arc F.
+model AiAssistant {
+  id                String   @id @default(cuid())
+  slug              String // name; stable across versions
+  version           Int      @default(1)
+  displayName       String
+  enabled           Boolean  @default(false)
+  systemPrompt      String? // trusted instruction text
+  modelSelection    Json // { modelSlug, fallback: [...] }
+  allowedModalities String[] // bounded: text/image/pdf
+  toolAllowlist     String[] // stable tool ids
+  guardrailPolicy   Json? // guardrail knobs (Arc D)
+  budgetClass       String? // bounded default budget class
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  conversations AiConversation[]
+
+  @@unique([slug, version])
+  @@map("ai_assistants")
+  @@schema("ai")
+}

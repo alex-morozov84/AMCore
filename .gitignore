@@ -54,8 +54,10 @@ public/workbox-*.js
 public/sw.js.map
 public/workbox-*.js.map
 
-# AI documentation (internal planning, not for public repo)
-ai/
+# Private maintainer overlay repo (internal planning, not for public repo).
+# Anchored to the repo root so it only ignores the top-level `ai/` repository —
+# NOT public `ai/` subdirectories like `docs/ai/` or `apps/api/src/core/ai/`.
+/ai/
 # CLAUDE.md is now tracked (a thin @AGENTS.md importer — public, no secrets).
 # The private maintainer overlay lives in CLAUDE.local.md (gitignored).
 CLAUDE.local.md

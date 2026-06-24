@@ -123,6 +123,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 - **Health Checks** — `/health`, `/health/startup`, `/health/ready`, `/health/live` (Kubernetes-ready)
 - **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys, invites) and notification retention at 03:00 UTC, both with multi-instance locking; plus a notification-dispatch recovery poller that runs on every worker replica (coordinated by Postgres `SKIP LOCKED`, not a lock)
 - **Notifications** — durable per-user subsystem: in-app feed + preferences, worker-driven email **and Telegram** channels with Postgres-owned retry/leases/attempt history (Telegram adds a `/start` deep-link + secret-header webhook + durable `update_id` dedupe), and a bearer-authenticated realtime SSE stream (`GET /notifications/stream`) fanned out cross-replica via Redis Pub/Sub with no sticky sessions (see [`docs/notifications/`](docs/notifications/README.md))
+- **AI Capability Layer** _(foundational)_ — a provider-agnostic AI control plane on its own `ai` Postgres schema: a DB-backed admin-manageable catalog (Anthropic/Claude default + OpenAI/OpenRouter/Yandex/OpenAI-compatible/mock), durable runs, a usage/cost ledger, and the persistence + shared contracts for conversations, the self-hosted tool loop, human takeover, and multimodal artifacts. First arc ships schema + contracts only; the runtime gateway, run worker, guardrails, tools, takeover, and multimodal routing land in later arcs (see [`docs/ai/`](docs/ai/README.md))
 
 ### Tests
 
@@ -136,6 +137,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
 - [`docs/auth/csrf.md`](docs/auth/csrf.md) — Narrow CSRF posture for cookie-backed browser surfaces
 - [`docs/notifications/`](docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email & Telegram delivery, realtime SSE stream)
+- [`docs/ai/`](docs/ai/README.md) — AI capability layer guide (provider-agnostic catalog, durable runs, usage ledger, persistence + contracts; runtime arcs in progress)
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
 - [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide

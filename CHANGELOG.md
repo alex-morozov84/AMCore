@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI capability layer — foundation (Track C, Arc A). A provider-agnostic AI control plane
+  on its own `ai` Postgres schema. This first arc ships **persistence and shared contracts
+  only — no runtime provider call yet**. Persistence: a DB-backed, admin-manageable catalog
+  (`AiProvider` / `AiModel` / `AiModelPolicy` / `AiAssistant`) where provider `type` is a
+  closed enum but capabilities/modalities are open bounded strings, and a provider references
+  a logical `credentialSlot` (resolved through a code-owned allowlist, never a raw env name —
+  no secret is stored); durable `AiConversation` (with a monotonic takeover fence) /
+  `AiMessage` transcript; `AiRun` (a Postgres-owned state machine with inert lease/retry
+  columns reused from the notification durability pattern) / `AiRunStep`; `AiToolInvocation` /
+  `AiApproval` for the self-hosted tool loop + human-in-the-loop; `AiArtifact` (multimodal,
+  trust-tagged); and `AiUsageLedger` (an authoritative snapshot/no-FK accounting record that
+  survives user/org/model deletion). Shared Zod contracts (`ai-common`, `ai-enums`,
+  `ai-catalog`, `ai-assistants`, `ai-runs`) cover the catalog admin surface, the bounded
+  capability map, a precision-safe decimal-string cost, lowercase wire enums, and the
+  multimodal content-part contract. `db:seed` seeds the intended shape (enabled `mock` +
+  Claude default + disabled OpenAI/OpenRouter/Yandex/OpenAI-compatible examples) so a fork
+  sees it without live keys. The runtime gateway, durable run worker, guardrails, tool loop,
+  human takeover, and multimodal routing land in later arcs. See
+  [`docs/ai/README.md`](docs/ai/README.md). Also fixes the Prisma 7 seed-client construction
+  (driver adapter) so `db:seed` runs.
+
 - Telegram notification channel (notifications Arc D). A third external channel
   alongside in-app and email. A bearer user issues a one-time deep link
   (`POST /notifications/telegram/link`), opens the bot and presses **Start**; an inbound

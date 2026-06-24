@@ -20,4 +20,9 @@ export default defineConfig({
   datasource: {
     url: databaseUrl,
   },
+  // Prisma 7 reads the seed command from here (not the legacy package.json `prisma.seed`),
+  // so `prisma db seed` / `pnpm --filter api db:seed` runs the TypeScript seed via tsx.
+  migrations: {
+    seed: 'tsx prisma/seed.ts',
+  },
 })
