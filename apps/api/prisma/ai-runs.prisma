@@ -1,0 +1,93 @@
+// ===========================================
+// AI capability layer — durable runs (Track C — ADR-054, Arc A)
+// ===========================================
+// Postgres-owned run state machine + append-only step trail (ADR-052 pattern). The
+// lease/retry columns on AiRun are laid here but INERT until Arc C wires the durable
+// worker (claim/CAS/recovery) — so Arc C is additive (no claim-mechanism migration),
+// exactly as notifications laid lease columns inert in its Arc A.
+
+/// Durable run state machine (ADR-052 pattern). Complete lifecycle → enum.
+enum AiRunStatus {
+  QUEUED
+  RUNNING
+  WAITING_APPROVAL
+  WAITING_HUMAN
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
+
+  @@schema("ai")
+}
+
+/// Append-only run-step kinds (the auditable iteration trail; no content/secrets stored).
+enum AiRunStepType {
+  PROVIDER_CALL
+  GUARDRAIL_CHECK
+  TOOL_INVOCATION
+  OUTPUT_VALIDATION
+  REFUSAL
+  FINALIZATION
+
+  @@schema("ai")
+}
+
+/// Durable generation run. Lease/retry columns follow ADR-052 and are INERT until Arc C.
+/// `modelSnapshot`/`budgetSnapshot` freeze the resolved model/budget at creation.
+model AiRun {
+  id                      String      @id @default(cuid())
+  conversationId          String
+  status                  AiRunStatus @default(QUEUED)
+  modelSnapshot           Json
+  budgetSnapshot          Json?
+  idempotencyKey          String? // idempotent run creation (Arc C)
+  availableAt             DateTime    @default(now())
+  deadlineAt              DateTime?
+  cancellationRequestedAt DateTime?
+  attemptCount            Int         @default(0)
+  maxAttempts             Int         @default(1)
+  nextAttemptAt           DateTime? // PG-owned retry schedule (Arc C)
+  leaseToken              String? // worker ownership/CAS token (Arc C)
+  leaseExpiresAt          DateTime?
+  errorCode               String? // bounded/machine-readable
+  terminalReasonCode      String?
+  startedAt               DateTime?
+  finishedAt              DateTime?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  conversation    AiConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  steps           AiRunStep[]
+  toolInvocations AiToolInvocation[]
+  messages        AiMessage[]
+  approvals       AiApproval[]
+  artifacts       AiArtifact[]
+
+  @@unique([conversationId, idempotencyKey])
+  @@index([conversationId])
+  @@index([status, availableAt])
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseExpiresAt])
+  @@map("ai_runs")
+  @@schema("ai")
+}
+
+/// Append-only per-iteration record. `detail` is bounded and carries no prompt/response
+/// content, destination, or secret (ADR-042 no-content telemetry).
+model AiRunStep {
+  id         String        @id @default(cuid())
+  runId      String
+  stepNumber Int
+  type       AiRunStepType
+  detail     Json? // bounded; no content/secrets
+  errorCode  String?
+  startedAt  DateTime      @default(now())
+  finishedAt DateTime?
+  durationMs Int?
+
+  run AiRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, stepNumber])
+  @@map("ai_run_steps")
+  @@schema("ai")
+}

@@ -206,6 +206,21 @@ export async function cleanDatabase(
   await prisma.notificationDelivery.deleteMany()
   await prisma.notification.deleteMany()
   await prisma.notificationPreference.deleteMany()
+  // AI schema (Track C — ADR-054): children → parents. Usage ledger is FK-less (snapshot);
+  // conversation/run/etc cascade from user, but delete explicitly to match this helper's
+  // FK-order convention. Catalog (assistant/model/provider) is user-independent.
+  await prisma.aiUsageLedger.deleteMany()
+  await prisma.aiToolInvocation.deleteMany()
+  await prisma.aiRunStep.deleteMany()
+  await prisma.aiArtifact.deleteMany()
+  await prisma.aiApproval.deleteMany()
+  await prisma.aiMessage.deleteMany()
+  await prisma.aiRun.deleteMany()
+  await prisma.aiConversation.deleteMany()
+  await prisma.aiAssistant.deleteMany()
+  await prisma.aiModelPolicy.deleteMany()
+  await prisma.aiModel.deleteMany()
+  await prisma.aiProvider.deleteMany()
   await prisma.user.deleteMany()
 
   // Flush Redis directly — cache.clear() with @keyv/redis filters keys by '::' and

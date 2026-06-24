@@ -1,0 +1,102 @@
+// ===========================================
+// AI capability layer — tools & approvals (Track C — ADR-054, Arc A)
+// ===========================================
+// Self-hosted tool loop (owner R3) + human-in-the-loop approvals (owner R5 / OWASP
+// LLM01). Persisted now, exercised from Arc E/F. Tools execute host-side under existing
+// RBAC/audit/fences; no product tools ship this track.
+
+/// Tool-invocation lifecycle (Arc E). `AWAITING_APPROVAL` pauses on the HITL gate.
+enum AiToolInvocationStatus {
+  REQUESTED
+  AWAITING_APPROVAL
+  APPROVED
+  REJECTED
+  EXECUTING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+
+  @@schema("ai")
+}
+
+/// Tool risk class — drives the approval requirement (least-privilege, LLM01).
+enum AiToolRiskClass {
+  SAFE
+  SENSITIVE
+  DESTRUCTIVE
+
+  @@schema("ai")
+}
+
+/// What a human-in-the-loop approval gates.
+enum AiApprovalKind {
+  TOOL_INVOCATION
+  HANDOFF
+  SENSITIVE_ACTION
+
+  @@schema("ai")
+}
+
+/// Approval decision lifecycle.
+enum AiApprovalState {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+
+  @@schema("ai")
+}
+
+/// One self-hosted tool invocation (Arc E). `argsSnapshot`/`resultSummary` are validated and
+/// redacted — no secrets. Sensitive/destructive tools require an `AiApproval` before execution.
+model AiToolInvocation {
+  id            String                 @id @default(cuid())
+  runId         String
+  toolId        String // stable code-owned tool id
+  status        AiToolInvocationStatus @default(REQUESTED)
+  riskClass     AiToolRiskClass        @default(SAFE)
+  approvalId    String?
+  argsSnapshot  Json? // validated + redacted
+  resultSummary Json? // bounded; no secrets
+  errorCode     String?
+  durationMs    Int?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  run      AiRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  approval AiApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+
+  @@index([runId])
+  @@index([approvalId])
+  @@map("ai_tool_invocations")
+  @@schema("ai")
+}
+
+/// Human-in-the-loop approval record (Arc E/F). `decidedBy` is the operator; SetNull so the
+/// record survives operator deletion. Belongs to a run and/or conversation.
+model AiApproval {
+  id              String          @id @default(cuid())
+  conversationId  String?
+  runId           String?
+  kind            AiApprovalKind
+  state           AiApprovalState @default(PENDING)
+  requestedReason String? // bounded
+  decidedById     String?
+  decidedAt       DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  conversation    AiConversation?    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  run             AiRun?             @relation(fields: [runId], references: [id], onDelete: Cascade)
+  decidedBy       User?              @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+  toolInvocations AiToolInvocation[]
+
+  @@index([conversationId])
+  @@index([runId])
+  @@index([state])
+  @@map("ai_approvals")
+  @@schema("ai")
+}

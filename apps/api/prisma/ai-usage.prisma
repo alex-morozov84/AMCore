@@ -1,0 +1,38 @@
+// ===========================================
+// AI capability layer — usage & cost ledger (Track C — ADR-054, Arc A)
+// ===========================================
+// Authoritative post-call usage/cost record. Part of the first migration even though
+// budget *enforcement* matures across arcs — the accounting source of truth must exist
+// from the start.
+//
+// Accounting-record pattern (matches `AuditLog`): every subject reference is a SNAPSHOT
+// string with NO foreign key, so the ledger survives user/org/API-key/run/model deletion.
+// A cascade FK on `userId` would let a user deletion erase the authoritative cost history —
+// exactly what an accounting/abuse/billing ledger must NOT permit (review finding, A.1).
+
+model AiUsageLedger {
+  id                    String   @id @default(cuid())
+  runId                 String? // snapshot; no FK by design
+  conversationId        String? // snapshot; no FK by design
+  userId                String? // snapshot; no FK by design (survives user deletion)
+  organizationId        String? // snapshot; no FK by design
+  apiKeyId              String? // snapshot; no FK by design
+  modelSlug             String // logical model snapshot
+  inputTokens           Int      @default(0)
+  outputTokens          Int      @default(0)
+  reasoningTokens       Int      @default(0)
+  cacheReadTokens       Int      @default(0)
+  cacheWriteTokens      Int      @default(0)
+  toolCalls             Int      @default(0)
+  estimatedCost         Decimal? @db.Decimal(18, 8)
+  currency              String? // ISO 4217, snapshot
+  providerReportedUsage Json?
+  usageVersion          Int      @default(1)
+  createdAt             DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([runId])
+  @@map("ai_usage_ledger")
+  @@schema("ai")
+}

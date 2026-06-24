@@ -100,6 +100,8 @@ model User {
   notificationPreferences NotificationPreference[]
   telegramConnection      TelegramConnection?
   telegramLinkTokens      TelegramLinkToken[]
+  aiConversations         AiConversation[]
+  aiApprovalsDecided      AiApproval[]
 
   @@map("users")
   @@schema("core")
@@ -249,12 +251,13 @@ model Organization {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  members       OrgMember[]
-  roles         Role[]
-  permissions   Permission[]
-  apiKeys       ApiKey[]
-  invites       OrgInvite[]
-  notifications Notification[]
+  members         OrgMember[]
+  roles           Role[]
+  permissions     Permission[]
+  apiKeys         ApiKey[]
+  invites         OrgInvite[]
+  notifications   Notification[]
+  aiConversations AiConversation[]
 
   @@map("organizations")
   @@schema("core")

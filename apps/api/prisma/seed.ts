@@ -1,7 +1,17 @@
 /* eslint-disable no-console */
+import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient, type Role } from '@prisma/client'
+import { config } from 'dotenv'
+import { Pool } from 'pg'
 
-const prisma = new PrismaClient()
+import { seedAiCatalog } from './seed-ai-catalog'
+
+// Prisma 7 requires a driver adapter; mirror prisma.config.ts so `prisma db seed`
+// (and a standalone `tsx prisma/seed.ts`) resolve `DATABASE_URL` and connect.
+config({ path: '../../.env' })
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) })
 
 async function findOrCreateRole(name: string, description: string): Promise<Role> {
   const existing = await prisma.role.findFirst({
@@ -13,6 +23,9 @@ async function findOrCreateRole(name: string, description: string): Promise<Role
 
 async function main(): Promise<void> {
   console.log('Seeding system roles and permissions...')
+
+  // 0. AI catalog (idempotent upsert; independent of the permission guard below)
+  await seedAiCatalog(prisma)
 
   // 1. Find or create system roles
   const [adminRole, memberRole, viewerRole] = await Promise.all([
@@ -69,4 +82,7 @@ main()
     console.error(e)
     process.exit(1)
   })
-  .finally(() => prisma.$disconnect())
+  .finally(async () => {
+    await prisma.$disconnect()
+    await pool.end()
+  })

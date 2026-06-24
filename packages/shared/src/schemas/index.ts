@@ -170,6 +170,100 @@ export {
   type TelegramConnectionResponse,
 } from './telegram'
 
+// AI capability layer schemas (Track C — ADR-054)
+export {
+  // Primitives
+  AI_IDENTIFIER_MAX_LENGTH,
+  AI_SLUG_MAX_LENGTH,
+  aiIdentifierSchema,
+  aiSlugSchema,
+  AI_PROVIDER_TYPES,
+  aiProviderTypeSchema,
+  AI_CAPABILITIES,
+  AI_CAPABILITY_MAX_ENTRIES,
+  aiCapabilityMapSchema,
+  AI_MODALITIES,
+  aiModalitySchema,
+  aiDecimalStringSchema,
+  AI_CONFIG_MAX_KEYS,
+  aiConfigObjectSchema,
+  type AiProviderTypeValue,
+  type AiCapabilityMap,
+  type AiConfigObject,
+} from './ai-common'
+
+export {
+  // Wire lifecycle enums
+  aiRunStatusSchema,
+  aiConversationStateSchema,
+  aiConversationControlSchema,
+  aiMessageRoleSchema,
+  aiAuthorTypeSchema,
+  aiToolRiskClassSchema,
+  aiToolInvocationStatusSchema,
+  aiApprovalKindSchema,
+  aiApprovalStateSchema,
+  aiArtifactKindSchema,
+  aiArtifactTrustLevelSchema,
+  type AiRunStatusValue,
+} from './ai-enums'
+
+export {
+  // Catalog (provider / model / policy)
+  aiDisplayNameSchema,
+  aiProviderResponseSchema,
+  createAiProviderSchema,
+  updateAiProviderSchema,
+  aiModelResponseSchema,
+  createAiModelSchema,
+  updateAiModelSchema,
+  aiModelPolicyResponseSchema,
+  updateAiModelPolicySchema,
+  type AiProviderResponse,
+  type CreateAiProviderInput,
+  type UpdateAiProviderInput,
+  type AiModelResponse,
+  type CreateAiModelInput,
+  type UpdateAiModelInput,
+  type AiModelPolicyResponse,
+  type UpdateAiModelPolicyInput,
+} from './ai-catalog'
+
+export {
+  // Assistant configs
+  aiModelSelectionSchema,
+  AI_SYSTEM_PROMPT_MAX_LENGTH,
+  aiAssistantResponseSchema,
+  createAiAssistantSchema,
+  type AiModelSelection,
+  type AiAssistantResponse,
+  type CreateAiAssistantInput,
+} from './ai-assistants'
+
+export {
+  // Durable runs / conversations / messages / artifacts / usage
+  AI_TEXT_PART_MAX_LENGTH,
+  AI_MESSAGE_MAX_PARTS,
+  aiMessageContentPartSchema,
+  aiMessageContentSchema,
+  aiConversationResponseSchema,
+  createAiConversationSchema,
+  aiMessageResponseSchema,
+  aiRunResponseSchema,
+  createAiRunSchema,
+  aiArtifactResponseSchema,
+  aiUsageSummarySchema,
+  type AiMessageContentPart,
+  type AiMessageContent,
+  type AiConversationResponse,
+  type CreateAiConversationInput,
+  type AiMessageResponse,
+  type AiRunResponse,
+  type CreateAiRunInput,
+  type AiArtifactResponse,
+  type AiUsageSummary,
+} from './ai-runs'
+
 // Invite schemas (OB-02)
 export {
   createInviteSchema,

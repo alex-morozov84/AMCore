@@ -1,0 +1,50 @@
+// ===========================================
+// AI capability layer — multimodal artifacts (Track C — ADR-054, Arc A)
+// ===========================================
+// Storage-backed input/output artifacts (owner R3 multimodal). Persisted now, validated
+// and routed by capability in Arc G. `trustLevel` gates promotion to instructions (LLM01).
+
+/// Artifact kind (multimodal foundation, Arc G).
+enum AiArtifactKind {
+  FILE
+  IMAGE
+  PDF
+  GENERATED_IMAGE
+  TOOL_RESULT
+
+  @@schema("ai")
+}
+
+/// Trust level: external files and tool results are UNTRUSTED and never promoted to
+/// instructions at the gateway trust boundary (LLM01, Arc D).
+enum AiArtifactTrustLevel {
+  TRUSTED
+  UNTRUSTED
+
+  @@schema("ai")
+}
+
+/// Storage-backed multimodal input/output (Arc G). Nullable conversation/run so a
+/// pre-conversation upload can exist; SetNull retains the row for storage GC after its
+/// context is deleted. `messageId` is a snapshot (no FK by design).
+model AiArtifact {
+  id             String               @id @default(cuid())
+  conversationId String?
+  runId          String?
+  messageId      String? // snapshot; no FK by design
+  kind           AiArtifactKind
+  contentType    String
+  sizeBytes      Int
+  hash           String // sha256 of the bytes
+  storageKey     String
+  trustLevel     AiArtifactTrustLevel @default(UNTRUSTED)
+  createdAt      DateTime             @default(now())
+
+  conversation AiConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  run          AiRun?          @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId])
+  @@index([runId])
+  @@map("ai_artifacts")
+  @@schema("ai")
+}

@@ -1,0 +1,100 @@
+// ===========================================
+// AI capability layer — conversations & transcript (Track C — ADR-054, Arc A)
+// ===========================================
+// Durable conversation + message transcript (owner R5). The control-ownership columns
+// (`state`, `controlledBy`, `ownershipGeneration`) are laid here but INERT until Arc F
+// wires human takeover — so takeover is additive (no ownership-mechanism migration),
+// mirroring the Track B Arc A discipline. Runtime models split across `ai-*.prisma`.
+
+/// Conversation control-ownership lifecycle (R5). `PAUSED_FOR_HUMAN` and `controlledBy`
+/// are exercised from Arc F; laid now so takeover is additive.
+enum AiConversationState {
+  ACTIVE
+  PAUSED_FOR_HUMAN
+  CLOSED
+
+  @@schema("ai")
+}
+
+/// Who owns the conversation turn. Transitions go through the monotonic
+/// `ownershipGeneration` fence (ADR-049) so a stale bot run cannot write after takeover.
+enum AiConversationControl {
+  BOT
+  HUMAN
+
+  @@schema("ai")
+}
+
+/// LLM message role (the cross-provider common denominator).
+enum AiMessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+  TOOL
+
+  @@schema("ai")
+}
+
+/// Who actually produced a message — distinct from `role` so a human operator turn
+/// ASSISTANT-rendered to the model is still attributable (R5).
+enum AiAuthorType {
+  USER
+  ASSISTANT
+  OPERATOR
+  SYSTEM
+
+  @@schema("ai")
+}
+
+/// One durable conversation. `ownershipGeneration` is the monotonic takeover fence (ADR-049).
+/// `organizationId` is context only in v1 (not an org-shared inbox).
+model AiConversation {
+  id                  String                @id @default(cuid())
+  ownerUserId         String
+  organizationId      String?
+  assistantId         String?
+  title               String?
+  state               AiConversationState   @default(ACTIVE)
+  controlledBy        AiConversationControl @default(BOT)
+  ownershipGeneration Int                   @default(0)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  closedAt            DateTime?
+
+  owner        User          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  assistant    AiAssistant?  @relation(fields: [assistantId], references: [id], onDelete: SetNull)
+  messages     AiMessage[]
+  runs         AiRun[]
+  approvals    AiApproval[]
+  artifacts    AiArtifact[]
+
+  @@index([ownerUserId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([organizationId])
+  @@map("ai_conversations")
+  @@schema("ai")
+}
+
+/// Durable transcript message. `content` is structured parts (text / image ref / tool call),
+/// never an opaque blob of provider output. `authorUserId` is an attribution snapshot (no FK,
+/// so it survives operator deletion). `redactionMeta` records classification, not content.
+model AiMessage {
+  id             String        @id @default(cuid())
+  conversationId String
+  runId          String?
+  sequence       Int // monotonic order within the conversation
+  role           AiMessageRole
+  authorType     AiAuthorType
+  authorUserId   String? // attribution snapshot; no FK by design
+  content        Json
+  redactionMeta  Json?
+  createdAt      DateTime      @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  run          AiRun?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, sequence])
+  @@index([runId])
+  @@map("ai_messages")
+  @@schema("ai")
+}
