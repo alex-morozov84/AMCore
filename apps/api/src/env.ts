@@ -243,6 +243,25 @@ const envSchema = z.preprocess(
       // Cache-control for public avatar derivatives. Keys are per-upload versioned,
       // so immutable long-lived caching is safe (no stale-on-overwrite).
       MEDIA_AVATAR_CACHE_CONTROL: z.string().min(1).default('public, max-age=31536000, immutable'),
+      // ---------------------------------------------------------------------
+      // AI capability layer (Track C — ADR-054). The provider/model catalog is
+      // DB-backed (admin-managed); only the SECRETS live in env. A catalog row's
+      // `credentialSlot` is mapped to one of these fixed keys through a code-owned
+      // per-type allowlist (`credential-resolver.ts`) — a slot value NEVER indexes
+      // `process.env` directly. An enabled provider with no key is gated out at
+      // runtime (the gateway falls back to the key-less `mock` provider), so these
+      // stay optional with no `superRefine` force.
+      ANTHROPIC_API_KEY: optionalEnvString(),
+      OPENAI_API_KEY: optionalEnvString(),
+      OPENROUTER_API_KEY: optionalEnvString(),
+      YANDEX_API_KEY: optionalEnvString(),
+      AI_OPENAI_COMPATIBLE_API_KEY: optionalEnvString(),
+      // Per-request gateway bound (ms) applied to every provider call. Capped at 5 min so a
+      // typo can't allow day-long calls (a long generation streams within this bound).
+      AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1).max(300000).default(60000),
+      // Bounded Redis TTL for the catalog snapshot cache (seconds). Capped at 1h so an admin
+      // catalog change can never stay stale longer than that even on a typo.
+      AI_CATALOG_CACHE_TTL_SECONDS: z.coerce.number().int().min(1).max(3600).default(300),
     })
     .transform((env) => {
       // Locked invariant (Decision C): dev -> local, test -> memory,

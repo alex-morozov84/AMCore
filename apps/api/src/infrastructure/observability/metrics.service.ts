@@ -44,7 +44,16 @@ export type QueueMetricsEvent =
   | 'worker_error'
   | 'dead_letter'
 export type QueueMetricsQueue = 'default' | 'email' | 'notifications'
-export type CacheMetricsCache = 'user' | 'permissions'
+export type CacheMetricsCache = 'user' | 'permissions' | 'ai_catalog'
+export type AiMetricsProvider =
+  | 'anthropic'
+  | 'openai'
+  | 'openrouter'
+  | 'openai_compatible'
+  | 'yandex_ai_studio'
+  | 'mock'
+export type AiMetricsOperation = 'text' | 'object'
+export type AiMetricsTokenDirection = 'input' | 'output'
 export type CacheMetricsResult = 'hit' | 'negative_hit' | 'miss' | 'db_fallback' | 'corrupt'
 export type StorageMetricsDriver = 's3' | 'local' | 'memory'
 export type StorageMetricsOperation =
@@ -105,6 +114,8 @@ export class MetricsService implements OnModuleDestroy {
   private readonly notificationRealtimePublishTotal: Counter<'outcome' | 'role'>
   private readonly notificationRealtimeConnections: Gauge<'role'>
   private readonly notificationRealtimeEventsTotal: Counter<'event' | 'role'>
+  private readonly aiGenerationsTotal: Counter<'provider' | 'operation' | 'result' | 'role'>
+  private readonly aiTokensTotal: Counter<'provider' | 'direction' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -219,6 +230,14 @@ export class MetricsService implements OnModuleDestroy {
         labelNames: ['event', 'role'],
       }
     )
+    this.aiGenerationsTotal = this.getOrCreateCounter(METRIC_NAMES.aiGenerationsTotal, {
+      help: 'Total AI generations by provider type, operation, result, and process role. No prompt/response content is ever a label.',
+      labelNames: ['provider', 'operation', 'result', 'role'],
+    })
+    this.aiTokensTotal = this.getOrCreateCounter(METRIC_NAMES.aiTokensTotal, {
+      help: 'Total AI tokens by provider type, direction (input/output), and process role.',
+      labelNames: ['provider', 'direction', 'role'],
+    })
   }
 
   get enabled(): boolean {
@@ -297,6 +316,24 @@ export class MetricsService implements OnModuleDestroy {
   incCacheOperation(cache: CacheMetricsCache, result: CacheMetricsResult): void {
     if (!this.enabled) return
     this.cacheOperationsTotal.inc({ cache, result, role: this.role })
+  }
+
+  incAiGeneration(
+    provider: AiMetricsProvider,
+    operation: AiMetricsOperation,
+    result: MetricsResult
+  ): void {
+    if (!this.enabled) return
+    this.aiGenerationsTotal.inc({ provider, operation, result, role: this.role })
+  }
+
+  incAiTokens(
+    provider: AiMetricsProvider,
+    direction: AiMetricsTokenDirection,
+    count: number
+  ): void {
+    if (!this.enabled || count <= 0) return
+    this.aiTokensTotal.inc({ provider, direction, role: this.role }, count)
   }
 
   observeStorageOperation(

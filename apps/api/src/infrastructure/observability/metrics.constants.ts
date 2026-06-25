@@ -23,4 +23,6 @@ export const METRIC_NAMES = {
   notificationRealtimePublishTotal: 'amcore_notification_realtime_publish_total',
   notificationRealtimeConnections: 'amcore_notification_realtime_connections',
   notificationRealtimeEventsTotal: 'amcore_notification_realtime_events_total',
+  aiGenerationsTotal: 'amcore_ai_generations_total',
+  aiTokensTotal: 'amcore_ai_tokens_total',
 } as const

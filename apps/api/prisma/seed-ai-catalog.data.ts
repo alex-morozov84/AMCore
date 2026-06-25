@@ -50,7 +50,9 @@ export const AI_CATALOG_SEED: SeedProvider[] = [
         displayName: 'Mock model',
         enabled: true,
         isDefault: false,
-        capabilities: { text: true, tools: true, streaming: true, structured_output: true },
+        // The key-less mock generates deterministic text only; it does not synthesize
+        // arbitrary structured output, so `structured_output` is intentionally absent.
+        capabilities: { text: true, tools: true, streaming: true },
       },
     ],
   },
