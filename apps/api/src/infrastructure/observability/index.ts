@@ -1,5 +1,8 @@
 export { METRIC_NAMES } from './metrics.constants'
 export type {
+  AiMetricsOperation,
+  AiMetricsProvider,
+  AiMetricsTokenDirection,
   EmailMetricsMode,
   EmailMetricsTemplate,
   StorageMetricsOperation,

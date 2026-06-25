@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI capability layer — runtime gateway (Track C, Arc B). A provider-agnostic `ModelGateway`
+  over the Vercel AI SDK backed by the DB-backed catalog registry. `generateText` runs
+  non-streaming text over the resolved model — an explicit slug or the **credential-gated
+  default** (the `isDefault` model when its provider has a key, else the key-less `mock`, so a
+  fresh fork works out of the box). `generateObject` adds **capability-gated** structured output
+  validated against a Zod schema (real `response_format: json_schema` for OpenAI-compatible
+  providers). Ships a deterministic `mock` plus two SDK adapters: Anthropic, and one
+  OpenAI-compatible adapter serving OpenAI, OpenRouter, Yandex AI Studio, and any compatible
+  endpoint — **per-family base URL and auth are code-owned** (Yandex uses an `Api-Key` header) and
+  a catalog `baseUrl` is honored only for the generic compatible type, so a tampered row cannot
+  redirect a credential. A row's logical `credentialSlot` resolves to a fixed env key through a
+  code-owned allowlist (never a raw `process.env` index). Provider failures normalize to a bounded
+  machine-readable taxonomy with a `retryable` flag (the SDK's own retry is disabled — retry is
+  Postgres-owned at the durable-run layer). Each successful generation appends an `AiUsageLedger`
+  row and increments content-free metrics (`amcore_ai_generations_total`, `amcore_ai_tokens_total`);
+  no prompt/response content, model slug, or credential is ever a metric label or log field. New
+  env: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `YANDEX_API_KEY`,
+  `AI_OPENAI_COMPATIBLE_API_KEY`, `AI_REQUEST_TIMEOUT_MS`, `AI_CATALOG_CACHE_TTL_SECONDS` (all
+  optional). The gateway is not yet exposed over HTTP — the run worker and run API arrive in a later
+  arc. See [`docs/ai/README.md`](docs/ai/README.md).
+
 - AI capability layer — foundation (Track C, Arc A). A provider-agnostic AI control plane
   on its own `ai` Postgres schema. This first arc ships **persistence and shared contracts
   only — no runtime provider call yet**. Persistence: a DB-backed, admin-manageable catalog

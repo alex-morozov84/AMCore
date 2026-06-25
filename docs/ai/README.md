@@ -8,12 +8,14 @@ of an AI assistant, **not** an applied product bot: like the notification
 subsystem, the reusable core ships here and applied assistants are deferred
 consumers.
 
-> **Status — foundational (Track C, arc-phased).** This first arc (Arc A) ships
-> the **persistence schema and the shared API contracts only — no runtime provider
-> call yet**. The gateway, durable run worker, guardrails, tool loop, human
-> takeover, and multimodal routing land in later arcs (B–G), each additive over the
-> contracts documented here. Sections below marked _(later arc)_ describe the
-> intended shape the schema and contracts are built to support.
+> **Status — foundational (Track C, arc-phased).** Arc A shipped the persistence
+> schema and shared contracts; **Arc B adds the runtime `ModelGateway` and catalog
+> registry** — provider-agnostic text generation and structured output over a
+> DB-backed catalog, with usage accounting and content-free metrics. The gateway is
+> **not yet wired to an HTTP surface**: the durable run worker, run API, guardrails,
+> tool loop, human takeover, and multimodal routing land in later arcs (C–G), each
+> additive over what is documented here. Sections marked _(later arc)_ describe the
+> intended shape those arcs build toward.
 
 ## Design Principles
 
@@ -75,6 +77,51 @@ Pagination, streaming-event, tool-invocation, and approval request contracts are
 deliberately deferred to the arcs that ship those endpoints — they are not
 speculated here.
 
+## Runtime: ModelGateway + Catalog Registry (shipped — Arc B)
+
+The `ModelGateway` (`apps/api/src/infrastructure/ai/gateway/`) is AMCore's provider-agnostic
+generation seam. It is **not yet exposed over HTTP** — Arc C adds the durable run worker and run
+API that call it. What it provides today:
+
+- **`generateText(request)`** — non-streaming text over the resolved model. `request.modelSlug`
+  selects a catalog model; omitted, the **credential-gated default** is used (the `isDefault`
+  model if its provider has a key, else the key-less `mock`).
+- **`generateObject(request, schema)`** — structured output validated against a Zod schema,
+  **capability-gated**: the model must declare `structured_output` and its adapter must support it
+  (the key-less mock does not). For OpenAI-compatible providers this sends a real
+  `response_format: json_schema`, not a degraded JSON mode.
+- **DB-backed registry** (`registry/`) — resolves the admin catalog into secret-free shapes with a
+  bounded Redis snapshot cache (`AI_CATALOG_CACHE_TTL_SECONDS`) + explicit invalidation. Every row
+  is re-validated against the bounded shared schemas before use; a structurally bad row is skipped.
+- **Providers** (`gateway/providers/`) — a deterministic key-less `mock` plus two SDK-backed
+  adapters over the Vercel AI SDK: Anthropic, and one OpenAI-compatible adapter serving OpenAI,
+  OpenRouter, Yandex AI Studio, and any compatible endpoint. **Per-family base URL and auth are
+  code-owned** (Yandex uses `Authorization: Api-Key …`); a catalog `baseUrl` is honored **only** for
+  the generic `openai_compatible` type, so a tampered row can never redirect a credential.
+- **Credential resolution** — a catalog row's logical `credentialSlot` is mapped to a fixed env key
+  through a code-owned per-type allowlist; a slot value never indexes the environment directly.
+- **Bounded error taxonomy** — every failure is normalized to a machine-readable code
+  (`model_not_found`, `model_not_configured`, `provider_timeout`, `provider_unavailable`,
+  `provider_rejected`, `content_filtered`, `capability_unsupported`, `output_validation_failed`)
+  with a `retryable` flag; raw provider errors never surface. The SDK's own retry is disabled —
+  retry is Postgres-owned at the durable-run layer (Arc C).
+- **Usage + telemetry** — each successful generation appends an `AiUsageLedger` row (token counts +
+  attribution snapshot; best-effort, never breaks the result) and increments content-free metrics
+  (`amcore_ai_generations_total`, `amcore_ai_tokens_total`). No prompt/response content, model slug,
+  or credential is ever a metric label or a log field; the SDK's OpenTelemetry hook is left off.
+
+### Configuration
+
+Secrets only — the catalog itself is DB-backed. All are optional; an enabled provider with no key
+is gated out at runtime and the gateway falls back to `mock`.
+
+| Env var                                                                                     | Purpose                                                     |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`                                                                         | Anthropic / Claude (the default provider)                   |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `YANDEX_API_KEY` / `AI_OPENAI_COMPATIBLE_API_KEY` | the OpenAI-shaped families (disabled examples by default)   |
+| `AI_REQUEST_TIMEOUT_MS`                                                                     | per-request provider-call bound (default 60000, max 300000) |
+| `AI_CATALOG_CACHE_TTL_SECONDS`                                                              | catalog snapshot cache TTL (default 300, max 3600)          |
+
 ## Seeded Catalog
 
 `pnpm --filter api db:seed` (idempotent) seeds the intended configuration shape so
@@ -82,21 +129,20 @@ a fresh fork sees it without live keys:
 
 - **`mock`** — enabled, key-less, deterministic (the dev/test provider).
 - **`anthropic`** — enabled; **`claude-default` (`claude-opus-4-8`) is the default
-  model**. The gateway will gate it on a real key and fall back to `mock` when none
-  is configured _(later arc)_.
+  model**. The gateway gates it on a real key and falls back to `mock` when none is
+  configured.
 - **`openai` / `openrouter` / `local-openai-compatible` / `yandex-ai-studio`** —
   disabled examples showing how to wire each family (enable one by adding a key/config).
 
 ## Coming in Later Arcs
 
-| Arc | Adds _(later arc)_                                                                                                                                                                                                                            |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B   | `ModelGateway` over the Vercel AI SDK + the DB-backed catalog runtime: non-streaming text, structured output, error taxonomy, usage capture, no-content logging; mock + Anthropic + OpenAI-compatible/OpenRouter + Yandex sync-text adapters. |
-| C   | Durable run worker (BullMQ wake + Postgres claim/lease/recovery), run create/fetch/list/cancel HTTP surface, SSE run-status stream (reusing the realtime fan-out).                                                                            |
-| D   | Guardrail baseline: the structural trust-boundary prompt builder, input/output guards, and an adversarial prompt-injection corpus.                                                                                                            |
-| E   | Self-hosted tool loop with per-tool Zod schemas, allowlists, risk classes, and human-in-the-loop approvals (no product tools).                                                                                                                |
-| F   | Assistant registry admin contract + human takeover / operator review (transcript, take/release control).                                                                                                                                      |
-| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing.                                                                                                                                                 |
+| Arc | Adds _(later arc)_                                                                                                                                                 |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C   | Durable run worker (BullMQ wake + Postgres claim/lease/recovery), run create/fetch/list/cancel HTTP surface, SSE run-status stream (reusing the realtime fan-out). |
+| D   | Guardrail baseline: the structural trust-boundary prompt builder, input/output guards, and an adversarial prompt-injection corpus.                                 |
+| E   | Self-hosted tool loop with per-tool Zod schemas, allowlists, risk classes, and human-in-the-loop approvals (no product tools).                                     |
+| F   | Assistant registry admin contract + human takeover / operator review (transcript, take/release control).                                                           |
+| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing.                                                                      |
 
 ## See Also
 
