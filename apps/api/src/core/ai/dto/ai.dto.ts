@@ -2,6 +2,9 @@ import { createZodDto } from 'nestjs-zod'
 
 import {
   aiConversationResponseSchema,
+  aiRunCancelResponseSchema,
+  aiRunListQuerySchema,
+  aiRunPageSchema,
   aiRunResponseSchema,
   createAiConversationSchema,
   createAiRunSchema,
@@ -16,3 +19,6 @@ export class CreateAiConversationDto extends createZodDto(createAiConversationSc
 export class AiConversationResponseDto extends createZodDto(aiConversationResponseSchema) {}
 export class CreateAiRunDto extends createZodDto(createAiRunSchema) {}
 export class AiRunResponseDto extends createZodDto(aiRunResponseSchema) {}
+export class AiRunListQueryDto extends createZodDto(aiRunListQuerySchema) {}
+export class AiRunPageDto extends createZodDto(aiRunPageSchema) {}
+export class AiRunCancelResponseDto extends createZodDto(aiRunCancelResponseSchema) {}

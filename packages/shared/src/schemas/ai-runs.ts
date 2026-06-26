@@ -10,6 +10,9 @@ import {
   aiRunStatusSchema,
 } from './ai-enums'
 import { aiDecimalStringSchema, aiSlugSchema } from './ai-common'
+import { type CursorResponse, cursorResponseSchema } from './pagination'
+
+import { PAGINATION } from '../constants'
 
 /**
  * AI capability layer — durable run/conversation read contracts (Track C — ADR-054, Arc A).
@@ -110,6 +113,33 @@ export const createAiRunSchema = z.object({
   idempotencyKey: z.string().min(1).max(128).nullish(),
 })
 export type CreateAiRunInput = z.infer<typeof createAiRunSchema>
+
+/**
+ * Keyset (cursor) run list (Track C — ADR-054, Arc C.2; ADR-036 endpoint-local exception). Scoped
+ * to the caller and optionally to one conversation; `cursor` is an opaque versioned token encoding
+ * the last `(createdAt, id)`, ordered `(createdAt DESC, id DESC)`. `limit` reuses the shared bounds.
+ */
+export const aiRunListQuerySchema = z.object({
+  conversationId: z.string().min(1).max(64).optional(),
+  cursor: z.string().min(1).max(512).optional(),
+  limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).default(PAGINATION.DEFAULT_LIMIT),
+})
+export type AiRunListQuery = z.infer<typeof aiRunListQuerySchema>
+
+export const aiRunPageSchema = cursorResponseSchema(aiRunResponseSchema)
+export type AiRunPage = CursorResponse<AiRunResponse>
+
+/**
+ * Cancel result. Cancellation is cooperative: a `queued` run becomes terminal `cancelled`
+ * immediately, a `running` run records the request (`cancellationRequested: true`) for the worker
+ * to honor, and a terminal run is an idempotent no-op. `status` is the run's status after the call.
+ */
+export const aiRunCancelResponseSchema = z.object({
+  id: z.string(),
+  status: aiRunStatusSchema,
+  cancellationRequested: z.boolean(),
+})
+export type AiRunCancelResponse = z.infer<typeof aiRunCancelResponseSchema>
 
 // ----- Artifact (multimodal projection) -----
 

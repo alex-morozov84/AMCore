@@ -100,8 +100,10 @@ export {
 export {
   paginationQuerySchema,
   paginatedResponseSchema,
+  cursorResponseSchema,
   type PaginationQuery,
   type PaginatedResponse,
+  type CursorResponse,
 } from './pagination'
 
 // API Keys schemas
@@ -128,7 +130,6 @@ export {
   NOTIFICATION_IDENTIFIER_MAX_LENGTH,
   // Feed (cursor)
   notificationFeedQuerySchema,
-  cursorResponseSchema,
   notificationFeedItemSchema,
   notificationFeedResponseSchema,
   unreadCountResponseSchema,
@@ -146,7 +147,6 @@ export {
   // Types
   type NotificationAction,
   type NotificationFeedQuery,
-  type CursorResponse,
   type NotificationFeedItem,
   type NotificationFeedResponse,
   type UnreadCountResponse,
@@ -253,6 +253,9 @@ export {
   aiMessageResponseSchema,
   aiRunResponseSchema,
   createAiRunSchema,
+  aiRunListQuerySchema,
+  aiRunPageSchema,
+  aiRunCancelResponseSchema,
   aiArtifactResponseSchema,
   aiUsageSummarySchema,
   type AiMessageContentPart,
@@ -262,6 +265,9 @@ export {
   type AiMessageResponse,
   type AiRunResponse,
   type CreateAiRunInput,
+  type AiRunListQuery,
+  type AiRunPage,
+  type AiRunCancelResponse,
   type AiArtifactResponse,
   type AiUsageSummary,
 } from './ai-runs'

@@ -110,7 +110,9 @@ const EXPECTED: Record<string, Expected> = {
   'post /ai/conversations': { status: '201', kind: 'json' },
   'get /ai/conversations/{id}': { status: '200', kind: 'json' },
   'post /ai/runs': { status: '201', kind: 'json' },
+  'get /ai/runs': { status: '200', kind: 'json' },
   'get /ai/runs/{id}': { status: '200', kind: 'json' },
+  'post /ai/runs/{id}/cancel': { status: '200', kind: 'json' },
   // metrics — Prometheus exposition (text, not JSON)
   'get /metrics': { status: '200', kind: 'text' },
 }

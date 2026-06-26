@@ -8,6 +8,9 @@ import { DEFAULT_JOB_OPTIONS } from '@/infrastructure/queue/interfaces/job-optio
  */
 export const AI_RUN_DEFAULT_MAX_ATTEMPTS = 3
 
+/** Bounded, machine-readable terminal reason for a user-requested cancellation (no content). */
+export const AI_RUN_CANCELLED_BY_USER = 'cancelled_by_user'
+
 /**
  * Wake-job options for the `AI_RUNS` queue (ADR-052 pattern). A single attempt: the wake is only a
  * hint to drain due runs — Postgres `FOR UPDATE SKIP LOCKED` is the real dedupe and the recovery
