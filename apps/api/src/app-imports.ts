@@ -18,6 +18,7 @@ import {
 } from './common/exceptions/filters'
 import { anonymizeIp, getClientIp } from './common/utils'
 import { AdminModule } from './core/admin/admin.module'
+import { AiWebModule } from './core/ai/ai-web.module'
 import { AuthModule } from './core/auth/auth.module'
 import { NotificationsCoreModule } from './core/notifications/notifications-core.module'
 import { NotificationsWebModule } from './core/notifications/notifications-web.module'
@@ -27,6 +28,7 @@ import { validate } from './env'
 import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
+import { AiCatalogModule } from './infrastructure/ai/ai-catalog.module'
 import { EmailModule, EmailWorkerModule } from './infrastructure/email'
 import { IdempotencyModule } from './infrastructure/idempotency'
 import { ObservabilityModule } from './infrastructure/observability'
@@ -173,6 +175,12 @@ export function coreImports(): Imports {
     // in-app producer is core; controllers (web) and dispatcher/realtime (worker)
     // are added in later arcs.
     NotificationsCoreModule,
+
+    // AI catalog registry (Track C — ADR-054). The web-safe half of the AI engine:
+    // the secret-free model registry only. The provider-call seam (ModelGateway +
+    // adapters) lives in the worker-only AiGatewayModule (wired in Arc C.4), so the
+    // web DI graph never gains provider-call capability.
+    AiCatalogModule,
   ]
 }
 
@@ -186,6 +194,8 @@ export const webImports: Imports = [
   AdminModule,
   // Notifications HTTP feed (producer/registry come from NotificationsCoreModule).
   NotificationsWebModule,
+  // AI conversation + durable-run producer/read HTTP surface (Track C — ADR-054).
+  AiWebModule,
 ]
 
 /**

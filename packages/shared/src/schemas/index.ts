@@ -206,6 +206,8 @@ export {
   aiArtifactKindSchema,
   aiArtifactTrustLevelSchema,
   type AiRunStatusValue,
+  type AiConversationStateValue,
+  type AiConversationControlValue,
 } from './ai-enums'
 
 export {

@@ -24,6 +24,8 @@ export type AiRunStatusValue = z.infer<typeof aiRunStatusSchema>
 /** Conversation control-ownership (projection of the Prisma enums). */
 export const aiConversationStateSchema = z.enum(['active', 'paused_for_human', 'closed'])
 export const aiConversationControlSchema = z.enum(['bot', 'human'])
+export type AiConversationStateValue = z.infer<typeof aiConversationStateSchema>
+export type AiConversationControlValue = z.infer<typeof aiConversationControlSchema>
 
 /** Transcript message vocabulary. */
 export const aiMessageRoleSchema = z.enum(['system', 'user', 'assistant', 'tool'])

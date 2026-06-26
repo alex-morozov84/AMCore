@@ -43,7 +43,7 @@ export type QueueMetricsEvent =
   | 'redis_reconnecting'
   | 'worker_error'
   | 'dead_letter'
-export type QueueMetricsQueue = 'default' | 'email' | 'notifications'
+export type QueueMetricsQueue = 'default' | 'email' | 'notifications' | 'ai-runs'
 export type CacheMetricsCache = 'user' | 'permissions' | 'ai_catalog'
 export type AiMetricsProvider =
   | 'anthropic'

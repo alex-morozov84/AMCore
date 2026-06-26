@@ -16,6 +16,7 @@ describe('QueueService', () => {
   let defaultQueue: jest.Mocked<Queue>
   let emailQueue: jest.Mocked<Queue>
   let notificationsQueue: jest.Mocked<Queue>
+  let aiRunsQueue: jest.Mocked<Queue>
   let mockLogger: jest.Mocked<PinoLogger>
   let metrics: jest.Mocked<Pick<MetricsService, 'incQueueEvent' | 'incRedisClientEvent'>>
 
@@ -38,6 +39,7 @@ describe('QueueService', () => {
     defaultQueue = createMockQueue()
     emailQueue = createMockQueue()
     notificationsQueue = createMockQueue()
+    aiRunsQueue = createMockQueue()
     mockLogger = {
       setContext: jest.fn(),
       info: jest.fn(),
@@ -64,6 +66,10 @@ describe('QueueService', () => {
         {
           provide: getQueueToken(QueueName.NOTIFICATIONS),
           useValue: notificationsQueue,
+        },
+        {
+          provide: getQueueToken(QueueName.AI_RUNS),
+          useValue: aiRunsQueue,
         },
         {
           provide: PinoLogger,
