@@ -280,8 +280,13 @@ describe('AiRunExecutorService', () => {
   })
 
   describe('realtime status hint (C.5)', () => {
+    // The hint is fire-and-forget (detached in `execute`'s finally), so its DB read + publish settle
+    // on later microtasks; flush them before asserting the detached work ran.
+    const flush = () => new Promise((resolve) => setImmediate(resolve))
+
     it('publishes a content-free hint with the committed status + owner after a successful attempt', async () => {
       await executor.execute(claim())
+      await flush()
       // Owner + run id + lowercase status + the single bounded reason — no prompt/response/slug.
       expect(publisher.publish).toHaveBeenCalledWith('u1', 'run-1', 'completed', 'status_changed')
       expect(publisher.publish).toHaveBeenCalledTimes(1)
@@ -296,12 +301,21 @@ describe('AiRunExecutorService', () => {
         conversation: { ownerUserId: 'u1' },
       } as never)
       await executor.execute(claim())
+      await flush()
       expect(publisher.publish).toHaveBeenCalledWith('u1', 'run-1', 'failed', 'status_changed')
+    })
+
+    it('does not block the attempt on the publish (fire-and-forget: never awaits Redis)', async () => {
+      // A publish that never settles must not delay execute() — the worker moves on immediately.
+      publisher.publish.mockReturnValue(new Promise<void>(() => {}))
+      await expect(executor.execute(claim())).resolves.toBeUndefined()
+      expect(repository.finalizeCompleted).toHaveBeenCalledTimes(1)
     })
 
     it('never lets a hint failure escape or affect the run outcome', async () => {
       publisher.publish.mockRejectedValue(new Error('redis down'))
       await expect(executor.execute(claim())).resolves.toBeUndefined()
+      await flush()
       expect(repository.finalizeCompleted).toHaveBeenCalledTimes(1)
     })
 
@@ -314,6 +328,7 @@ describe('AiRunExecutorService', () => {
         } as never)
         .mockResolvedValueOnce(null as never)
       await executor.execute(claim())
+      await flush()
       expect(publisher.publish).not.toHaveBeenCalled()
     })
   })

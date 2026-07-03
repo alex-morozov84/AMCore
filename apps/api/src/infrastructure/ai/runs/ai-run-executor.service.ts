@@ -68,15 +68,19 @@ export class AiRunExecutorService {
   /**
    * Run one attempt of a claimed run to a terminal transition (or leave it non-terminal to retry),
    * then emit a single best-effort, content-free status hint reflecting the run's committed status
-   * (Arc C.5). The hint is published in a `finally` so every path — success, retry, terminal
-   * failure, pre-flight short-circuit, lease loss — signals the client to refetch; a publish never
-   * affects the durable outcome (status-only SSE is at-most-once, Postgres is recovery).
+   * (Arc C.5). The hint is fired in a `finally` so every path — success, retry, terminal failure,
+   * pre-flight short-circuit, lease loss — signals the client to refetch; a publish never affects
+   * the durable outcome (status-only SSE is at-most-once, Postgres is recovery).
    */
   async execute(claim: ClaimedRun): Promise<void> {
     try {
       await this.runAttempt(claim)
     } finally {
-      await this.publishStatusHint(claim.id)
+      // Fire-and-forget: the durable transition is already committed, so the worker must NOT block
+      // on Redis for a best-effort hint — a written publish can stay pending on a half-open socket
+      // (see AiRunRealtimePublisher), and awaiting it would tie the worker up past the run's end.
+      // `publishStatusHint` is internally catch-all, so the detached promise never rejects.
+      void this.publishStatusHint(claim.id)
     }
   }
 
