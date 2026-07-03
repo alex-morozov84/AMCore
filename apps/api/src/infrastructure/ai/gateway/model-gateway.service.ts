@@ -15,7 +15,6 @@ import {
   type AiProviderAdapter,
   type AiTextResult,
   type AiUsage,
-  type AiUsageContext,
 } from './ai-gateway.types'
 import { AiCredentialResolver } from './credential-resolver'
 
@@ -69,7 +68,7 @@ export class ModelGateway {
     const { model, adapter, call } = await this.prepare(request)
     try {
       const result = await adapter.generateText(call)
-      await this.settle(model, 'text', result.usage, request.context)
+      await this.settle(model, 'text', result.usage, request)
       return result
     } catch (error) {
       this.recordFailure(model, 'text')
@@ -87,7 +86,7 @@ export class ModelGateway {
     }
     try {
       const result = await adapter.generateObject(call, schema)
-      await this.settle(model, 'object', result.usage, request.context)
+      await this.settle(model, 'object', result.usage, request)
       return result
     } catch (error) {
       this.recordFailure(model, 'object')
@@ -95,18 +94,23 @@ export class ModelGateway {
     }
   }
 
-  /** Record usage + success metrics after a generation (accounting never breaks the result). */
+  /**
+   * Record success metrics after a generation, and the best-effort usage ledger row **unless** the
+   * caller opted out (`recordUsage: false`) to own the durable write itself (Arc C executor).
+   * Accounting never breaks the result; metrics always count every provider call.
+   */
   private async settle(
     model: ResolvedAiModel,
     operation: AiMetricsOperation,
     usage: AiUsage,
-    context: AiUsageContext | undefined
+    request: AiGenerateRequest
   ): Promise<void> {
     const provider = providerLabel(model)
     this.metrics.incAiGeneration(provider, operation, 'success')
     this.metrics.incAiTokens(provider, 'input', usage.inputTokens)
     this.metrics.incAiTokens(provider, 'output', usage.outputTokens)
-    await this.usageLedger.record({ modelSlug: model.slug, usage, context })
+    if (request.recordUsage === false) return
+    await this.usageLedger.record({ modelSlug: model.slug, usage, context: request.context })
   }
 
   private recordFailure(model: ResolvedAiModel, operation: AiMetricsOperation): void {

@@ -36,6 +36,14 @@ export interface AiGenerateRequest {
   messages: AiGenerateMessage[]
   maxOutputTokens?: number
   context?: AiUsageContext
+  /**
+   * Whether the gateway records the best-effort `AiUsageLedger` row itself (default `true`, the
+   * Arc B behavior). The Arc C durable executor sets this `false` and writes a run-attributed
+   * ledger row **inside its finalization transaction** — so the authoritative usage row is
+   * exactly-once by the same CAS as the run outcome, and a provider call whose finalize is rolled
+   * back (recovery retries) does not leave an orphan ledger row. Metrics still count every call.
+   */
+  recordUsage?: boolean
 }
 
 /** Provider-reported (or estimated) token usage, normalized across adapters. */

@@ -17,6 +17,12 @@ export const AI_RUN_CLAIM_BATCH_LIMIT = 20
 /** Max expired-lease runs reaped per pass, and overdue-deadline runs expired per pass. */
 export const AI_RUN_REAP_BATCH_LIMIT = 20
 
+/**
+ * Max claim→execute batches a single drain pass runs before yielding (a wake/recovery tick).
+ * Bounds one drain so a large backlog cannot monopolize a worker; the next tick continues it.
+ */
+export const AI_RUN_MAX_DRAIN_CYCLES = 5
+
 /** Exponential backoff schedule for a re-queued retry (Postgres owns the schedule). */
 export const AI_RUN_BACKOFF_BASE_MS = 30 * 1000 // 30 s → 60 → 120 → 240
 export const AI_RUN_BACKOFF_CAP_MS = 15 * 60 * 1000 // 15 min
@@ -37,9 +43,24 @@ export const AiRunTerminalReason = {
   ATTEMPTS_EXHAUSTED: 'attempts_exhausted',
   DEADLINE_EXCEEDED: 'deadline_exceeded',
   PERMANENT_FAILURE: 'permanent_failure',
+  /** A cooperative user cancel observed by the executor mid-run. Mirrors the producer's value. */
+  CANCELLED_BY_USER: 'cancelled_by_user',
 } as const
 
-/** Bounded run-attempt/transition error codes (`AiRun.errorCode`), distinct from the reason. */
+/**
+ * Bounded run-attempt/transition error codes (`AiRun.errorCode`), distinct from the reason. Every
+ * value is machine-readable and content-free — never a prompt, provider body, or free text. The
+ * gateway's own taxonomy (`AiGatewayException.code`) supplies the codes for provider-call failures;
+ * these cover executor-side pre-flight/finalization faults.
+ */
 export const AiRunErrorCode = {
   LEASE_EXPIRED: 'lease_expired',
+  /** The frozen `modelSnapshot` did not carry a usable `modelSlug`. */
+  MODEL_SNAPSHOT_INVALID: 'model_snapshot_invalid',
+  /** The run's own input turn (`AiMessage.runId = run.id`) was absent. */
+  INPUT_MISSING: 'input_missing',
+  /** The input turn carried no text part (Arc C is text-only). */
+  NO_INPUT_TEXT: 'no_input_text',
+  /** An unexpected non-gateway error around the provider call; retried defensively. */
+  UNKNOWN_ERROR: 'unknown_error',
 } as const

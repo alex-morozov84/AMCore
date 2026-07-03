@@ -29,6 +29,7 @@ import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
 import { AiCatalogModule } from './infrastructure/ai/ai-catalog.module'
+import { AiWorkerModule } from './infrastructure/ai/ai-worker.module'
 import { EmailModule, EmailWorkerModule } from './infrastructure/email'
 import { IdempotencyModule } from './infrastructure/idempotency'
 import { ObservabilityModule } from './infrastructure/observability'
@@ -209,6 +210,9 @@ export const workerImports: Imports = [
   ScheduleModule,
   // Notifications dispatcher: BullMQ processor + recovery @Cron + durable state machine.
   NotificationsWorkerModule,
+  // AI run worker (Track C — ADR-054): durable executor + BullMQ processor + recovery @Cron.
+  // Imports the worker-only AiGatewayModule, so provider-call capability stays off the web graph.
+  AiWorkerModule,
 ]
 
 /** Global filters/pipe/interceptor/guard + shutdown — every role. */
