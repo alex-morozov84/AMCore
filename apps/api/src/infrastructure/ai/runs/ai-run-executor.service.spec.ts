@@ -1,5 +1,6 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
+import type { AiRunRealtimePublisher } from '../../../core/ai/realtime/ai-run-realtime.publisher'
 import { AiGatewayException } from '../gateway/ai-gateway.error'
 import type { AiTextResult } from '../gateway/ai-gateway.types'
 import type { ModelGateway } from '../gateway/model-gateway.service'
@@ -11,11 +12,11 @@ import { AiRunExecutorService } from './ai-run-executor.service'
 import type { PrismaService } from '@/prisma'
 
 /**
- * Unit tests for the durable AI run executor (Track C — ADR-054, Arc C.4). Focus: the pre-flight
+ * Unit tests for the durable AI run executor (Track C — ADR-054, Arc C.4/C.5). Focus: the pre-flight
  * short-circuits (cancel/deadline/bad input never call the provider), the exactly-one provider
- * call, the single finalization transaction, and the at-least-once recovery property (provider
+ * call, the single finalization transaction, the at-least-once recovery property (provider
  * succeeds, finalize fails, recovery retries → one terminal message + one ledger row, provider
- * possibly invoked twice).
+ * possibly invoked twice), and the best-effort content-free status hint (C.5).
  */
 
 function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
@@ -46,6 +47,7 @@ describe('AiRunExecutorService', () => {
   let prisma: DeepMockProxy<PrismaService>
   let gateway: { generateText: jest.Mock }
   let repository: DeepMockProxy<AiRunRepository>
+  let publisher: { publish: jest.Mock }
   let executor: AiRunExecutorService
 
   const logger = { setContext: jest.fn(), warn: jest.fn(), error: jest.fn() }
@@ -55,17 +57,22 @@ describe('AiRunExecutorService', () => {
     prisma = mockDeep<PrismaService>()
     gateway = { generateText: jest.fn() }
     repository = mockDeep<AiRunRepository>()
+    publisher = { publish: jest.fn().mockResolvedValue(undefined) }
     executor = new AiRunExecutorService(
       prisma,
       gateway as unknown as ModelGateway,
       repository,
+      publisher as unknown as AiRunRealtimePublisher,
       logger as never
     )
 
-    // Happy pre-flight defaults; individual tests override.
+    // Happy pre-flight defaults; individual tests override. The single object satisfies both the
+    // pre-flight read (cancellation/deadline) and the post-attempt status-hint read (status + owner).
     prisma.aiRun.findUnique.mockResolvedValue({
       cancellationRequestedAt: null,
       deadlineAt: null,
+      status: 'COMPLETED',
+      conversation: { ownerUserId: 'u1' },
     } as never)
     prisma.aiConversation.findUnique.mockResolvedValue({
       ownerUserId: 'u1',
@@ -269,6 +276,45 @@ describe('AiRunExecutorService', () => {
         expect.objectContaining({ event: 'ai.run.finalize_lease_lost' }),
         expect.any(String)
       )
+    })
+  })
+
+  describe('realtime status hint (C.5)', () => {
+    it('publishes a content-free hint with the committed status + owner after a successful attempt', async () => {
+      await executor.execute(claim())
+      // Owner + run id + lowercase status + the single bounded reason — no prompt/response/slug.
+      expect(publisher.publish).toHaveBeenCalledWith('u1', 'run-1', 'completed', 'status_changed')
+      expect(publisher.publish).toHaveBeenCalledTimes(1)
+    })
+
+    it('still publishes the current status when the attempt failed permanently', async () => {
+      gateway.generateText.mockRejectedValue(AiGatewayException.providerRejected('MOCK'))
+      prisma.aiRun.findUnique.mockResolvedValue({
+        cancellationRequestedAt: null,
+        deadlineAt: null,
+        status: 'FAILED',
+        conversation: { ownerUserId: 'u1' },
+      } as never)
+      await executor.execute(claim())
+      expect(publisher.publish).toHaveBeenCalledWith('u1', 'run-1', 'failed', 'status_changed')
+    })
+
+    it('never lets a hint failure escape or affect the run outcome', async () => {
+      publisher.publish.mockRejectedValue(new Error('redis down'))
+      await expect(executor.execute(claim())).resolves.toBeUndefined()
+      expect(repository.finalizeCompleted).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not publish when the run row vanished (hard-deleted mid-attempt)', async () => {
+      // Pre-flight passes with the seeded object; the post-attempt hint read returns null.
+      prisma.aiRun.findUnique
+        .mockResolvedValueOnce({
+          cancellationRequestedAt: null,
+          deadlineAt: null,
+        } as never)
+        .mockResolvedValueOnce(null as never)
+      await executor.execute(claim())
+      expect(publisher.publish).not.toHaveBeenCalled()
     })
   })
 })

@@ -4,6 +4,9 @@ import { Injectable } from '@nestjs/common'
 import { AiAuthorType, AiMessageRole, AiRunStepType, Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
+import type { AiRunSseReason, AiRunStatusValue } from '@amcore/shared'
+
+import { AiRunRealtimePublisher } from '../../../core/ai/realtime/ai-run-realtime.publisher'
 import { AiGatewayException } from '../gateway/ai-gateway.error'
 import type { AiGenerateMessage, AiTextResult } from '../gateway/ai-gateway.types'
 import { ModelGateway } from '../gateway/model-gateway.service'
@@ -13,6 +16,9 @@ import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun } from './ai-run-dispatch.types'
 
 import { PrismaService } from '@/prisma'
+
+/** The single bounded realtime reason (Track C — ADR-054, Arc C.5); no content ever rides it. */
+const RUN_STATUS_CHANGED: AiRunSseReason = 'status_changed'
 
 /** Thrown inside the finalize transaction when the CAS finds no row → roll back the transcript. */
 class RunLeaseLostError extends Error {}
@@ -53,13 +59,28 @@ export class AiRunExecutorService {
     private readonly prisma: PrismaService,
     private readonly gateway: ModelGateway,
     private readonly repository: AiRunRepository,
+    private readonly publisher: AiRunRealtimePublisher,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(AiRunExecutorService.name)
   }
 
-  /** Run one attempt of a claimed run to a terminal transition (or leave it non-terminal to retry). */
+  /**
+   * Run one attempt of a claimed run to a terminal transition (or leave it non-terminal to retry),
+   * then emit a single best-effort, content-free status hint reflecting the run's committed status
+   * (Arc C.5). The hint is published in a `finally` so every path — success, retry, terminal
+   * failure, pre-flight short-circuit, lease loss — signals the client to refetch; a publish never
+   * affects the durable outcome (status-only SSE is at-most-once, Postgres is recovery).
+   */
   async execute(claim: ClaimedRun): Promise<void> {
+    try {
+      await this.runAttempt(claim)
+    } finally {
+      await this.publishStatusHint(claim.id)
+    }
+  }
+
+  private async runAttempt(claim: ClaimedRun): Promise<void> {
     const plan = await this.preflight(claim)
     // A null plan means pre-flight already reached a terminal/handled state (cancel, deadline,
     // bad snapshot, missing input) or the lease was lost — nothing more to do this attempt.
@@ -80,6 +101,29 @@ export class AiRunExecutorService {
       return
     }
     await this.finalizeSuccess(claim, plan, result, Math.round(performance.now() - startedAt))
+  }
+
+  /**
+   * Publish the run's current committed status as a content-free hint (best-effort). Reads the
+   * status + owner in one query; never throws (a hint failure must not affect execution) and never
+   * carries a prompt/response/model slug — only the run id, the lowercase status, and the reason.
+   */
+  private async publishStatusHint(runId: string): Promise<void> {
+    try {
+      const run = await this.prisma.aiRun.findUnique({
+        where: { id: runId },
+        select: { status: true, conversation: { select: { ownerUserId: true } } },
+      })
+      if (!run) return
+      await this.publisher.publish(
+        run.conversation.ownerUserId,
+        runId,
+        run.status.toLowerCase() as AiRunStatusValue,
+        RUN_STATUS_CHANGED
+      )
+    } catch {
+      // Best-effort: the client repairs a missed hint on its next reconnect/refetch.
+    }
   }
 
   /**

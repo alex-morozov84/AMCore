@@ -22,6 +22,7 @@ export type RedisMetricsClient =
   | 'queue_worker'
   | 'throttler'
   | 'notif_subscriber'
+  | 'ai_run_subscriber'
 export type RedisMetricsEvent = 'error' | 'reconnecting' | 'degraded'
 
 /** Outcome of a best-effort realtime publish (ADR-053). */
@@ -29,6 +30,20 @@ export type NotificationRealtimePublishOutcome = 'published' | 'failed' | 'dropp
 
 /** Bounded realtime SSE stream/subscriber event (ADR-053). */
 export type NotificationRealtimeStreamEvent =
+  | 'received'
+  | 'routed'
+  | 'no_local_target'
+  | 'invalid_envelope'
+  | 'rejected_global'
+  | 'rejected_user'
+  | 'slow_close'
+  | 'startup_failure'
+
+/** Outcome of a best-effort AI run-status realtime publish (Track C — ADR-054, Arc C.5). */
+export type AiRunRealtimePublishOutcome = 'published' | 'failed' | 'dropped'
+
+/** Bounded AI run-status realtime SSE stream/subscriber event (Track C — ADR-054, Arc C.5). */
+export type AiRunRealtimeStreamEvent =
   | 'received'
   | 'routed'
   | 'no_local_target'
@@ -116,6 +131,9 @@ export class MetricsService implements OnModuleDestroy {
   private readonly notificationRealtimeEventsTotal: Counter<'event' | 'role'>
   private readonly aiGenerationsTotal: Counter<'provider' | 'operation' | 'result' | 'role'>
   private readonly aiTokensTotal: Counter<'provider' | 'direction' | 'role'>
+  private readonly aiRunRealtimePublishTotal: Counter<'outcome' | 'role'>
+  private readonly aiRunRealtimeConnections: Gauge<'role'>
+  private readonly aiRunRealtimeEventsTotal: Counter<'event' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -238,6 +256,21 @@ export class MetricsService implements OnModuleDestroy {
       help: 'Total AI tokens by provider type, direction (input/output), and process role.',
       labelNames: ['provider', 'direction', 'role'],
     })
+    this.aiRunRealtimePublishTotal = this.getOrCreateCounter(
+      METRIC_NAMES.aiRunRealtimePublishTotal,
+      {
+        help: 'Total AI run-status realtime publishes by outcome (published/failed/dropped) and process role.',
+        labelNames: ['outcome', 'role'],
+      }
+    )
+    this.aiRunRealtimeConnections = this.getOrCreateGauge(METRIC_NAMES.aiRunRealtimeConnections, {
+      help: 'Currently open AI run-status SSE streams on this process, by role.',
+      labelNames: ['role'],
+    })
+    this.aiRunRealtimeEventsTotal = this.getOrCreateCounter(METRIC_NAMES.aiRunRealtimeEventsTotal, {
+      help: 'Total AI run-status realtime stream/subscriber events by bounded event and process role.',
+      labelNames: ['event', 'role'],
+    })
   }
 
   get enabled(): boolean {
@@ -306,6 +339,26 @@ export class MetricsService implements OnModuleDestroy {
   incNotificationRealtimeEvent(event: NotificationRealtimeStreamEvent): void {
     if (!this.enabled) return
     this.notificationRealtimeEventsTotal.inc({ event, role: this.role })
+  }
+
+  incAiRunRealtimePublish(outcome: AiRunRealtimePublishOutcome): void {
+    if (!this.enabled) return
+    this.aiRunRealtimePublishTotal.inc({ outcome, role: this.role })
+  }
+
+  incAiRunRealtimeConnections(): void {
+    if (!this.enabled) return
+    this.aiRunRealtimeConnections.inc({ role: this.role })
+  }
+
+  decAiRunRealtimeConnections(): void {
+    if (!this.enabled) return
+    this.aiRunRealtimeConnections.dec({ role: this.role })
+  }
+
+  incAiRunRealtimeEvent(event: AiRunRealtimeStreamEvent): void {
+    if (!this.enabled) return
+    this.aiRunRealtimeEventsTotal.inc({ event, role: this.role })
   }
 
   incQueueEvent(queue: QueueMetricsQueue, event: QueueMetricsEvent): void {

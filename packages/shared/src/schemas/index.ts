@@ -256,6 +256,8 @@ export {
   aiRunListQuerySchema,
   aiRunPageSchema,
   aiRunCancelResponseSchema,
+  AI_RUN_SSE_REASONS,
+  aiRunSseEventSchema,
   aiArtifactResponseSchema,
   aiUsageSummarySchema,
   type AiMessageContentPart,
@@ -268,6 +270,8 @@ export {
   type AiRunListQuery,
   type AiRunPage,
   type AiRunCancelResponse,
+  type AiRunSseReason,
+  type AiRunSseEvent,
   type AiArtifactResponse,
   type AiUsageSummary,
 } from './ai-runs'

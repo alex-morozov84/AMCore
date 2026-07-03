@@ -7,6 +7,7 @@ import { AiRunDispatchService } from './runs/ai-run-dispatch.service'
 import { AiRunExecutorService } from './runs/ai-run-executor.service'
 import { AiRunRecoveryService } from './runs/ai-run-recovery.service'
 
+import { AiRealtimeModule } from '@/core/ai/realtime/ai-realtime.module'
 import { PrismaModule } from '@/prisma'
 
 /**
@@ -20,10 +21,11 @@ import { PrismaModule } from '@/prisma'
  * run the processor or cron: the ADR-041 process-role boundary is enforced by DI, not convention.
  * The `QueueName.AI_RUNS` queue itself is registered globally in `QueueModule` (a producer for web,
  * a consumer here); `PrismaService`/`MetricsService` are global and `PinoLogger` comes from the root
- * logger module.
+ * logger module. `AiRealtimeModule` supplies the content-free `AiRunRealtimePublisher` the executor
+ * uses to emit status hints (the SSE receive side is web-only, in `AiWebModule`).
  */
 @Module({
-  imports: [AiGatewayModule, PrismaModule],
+  imports: [AiGatewayModule, PrismaModule, AiRealtimeModule],
   providers: [
     AiRunRepository,
     AiRunExecutorService,
