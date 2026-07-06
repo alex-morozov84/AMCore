@@ -1,6 +1,8 @@
-import { z, type ZodTypeAny } from 'zod'
+import { z } from 'zod'
 
 import { PAGINATION } from '../constants'
+
+import { type CursorResponse, cursorResponseSchema } from './pagination'
 
 /**
  * Notification API contracts (Track B — ADR-052 / ADR-053).
@@ -83,29 +85,6 @@ export const notificationFeedQuerySchema = z.object({
 })
 
 export type NotificationFeedQuery = z.infer<typeof notificationFeedQuerySchema>
-
-/**
- * Cursor (keyset) response envelope. Distinct from the offset
- * `paginatedResponseSchema` (ADR-036): append-heavy feeds use `nextCursor`/`hasMore`.
- */
-export const cursorResponseSchema = <T extends ZodTypeAny>(
-  item: T
-): z.ZodObject<{
-  data: z.ZodArray<T>
-  nextCursor: z.ZodNullable<z.ZodString>
-  hasMore: z.ZodBoolean
-}> =>
-  z.object({
-    data: z.array(item),
-    nextCursor: z.string().nullable(),
-    hasMore: z.boolean(),
-  })
-
-export type CursorResponse<T> = {
-  data: T[]
-  nextCursor: string | null
-  hasMore: boolean
-}
 
 /**
  * Feed item. `title`/`body` are rendered server-side in the user's current locale

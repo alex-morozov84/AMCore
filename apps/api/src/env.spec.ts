@@ -131,6 +131,42 @@ describe('env validation', () => {
     expect(() => validate({ ...baseEnv, [key]: value })).toThrow(ZodError)
   })
 
+  it('applies realtime AI run defaults', () => {
+    const env = validate(baseEnv)
+
+    expect(env.AI_REALTIME_NAMESPACE).toBe('')
+    expect(env.AI_REALTIME_HEARTBEAT_MS).toBe(20000)
+    expect(env.AI_REALTIME_MAX_PER_USER).toBe(5)
+    expect(env.AI_REALTIME_MAX_CONNECTIONS).toBe(10000)
+    expect(env.AI_REALTIME_QUEUE_DEPTH).toBe(16)
+    expect(env.AI_REALTIME_MAX_STREAM_LIFETIME_MS).toBe(3600000)
+    expect(env.AI_REALTIME_PUBLISH_TIMEOUT_MS).toBe(1000)
+    expect(env.AI_REALTIME_MAX_INFLIGHT_PUBLISH).toBe(1000)
+  })
+
+  it('rejects an AI realtime namespace with illegal characters', () => {
+    expect(() => validate({ ...baseEnv, AI_REALTIME_NAMESPACE: 'Staging Prod' })).toThrow(ZodError)
+  })
+
+  it.each([
+    ['AI_REALTIME_HEARTBEAT_MS', '999'],
+    ['AI_REALTIME_HEARTBEAT_MS', '60001'],
+    ['AI_REALTIME_MAX_PER_USER', '0'],
+    ['AI_REALTIME_MAX_PER_USER', '101'],
+    ['AI_REALTIME_MAX_CONNECTIONS', '0'],
+    ['AI_REALTIME_MAX_CONNECTIONS', '1000001'],
+    ['AI_REALTIME_QUEUE_DEPTH', '0'],
+    ['AI_REALTIME_QUEUE_DEPTH', '1001'],
+    ['AI_REALTIME_MAX_STREAM_LIFETIME_MS', '999'],
+    ['AI_REALTIME_MAX_STREAM_LIFETIME_MS', '86400001'],
+    ['AI_REALTIME_PUBLISH_TIMEOUT_MS', '0'],
+    ['AI_REALTIME_PUBLISH_TIMEOUT_MS', '30001'],
+    ['AI_REALTIME_MAX_INFLIGHT_PUBLISH', '0'],
+    ['AI_REALTIME_MAX_INFLIGHT_PUBLISH', '100001'],
+  ])('rejects AI realtime %s=%s outside its range', (key, value) => {
+    expect(() => validate({ ...baseEnv, [key]: value })).toThrow(ZodError)
+  })
+
   it('fails when an OAuth provider is only partially configured', () => {
     expect(() =>
       validate({

@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI capability layer — durable runs + run API (Track C, Arc C). Wires the `ModelGateway` into a
+  worker-only durable run engine and a bearer-authenticated HTTP surface. **Process roles
+  (ADR-041):** the **web** role creates/reads runs and hosts the SSE stream; the **worker** role is
+  the only one that calls a provider — `ModelGateway`, the SDK adapters, the executor, the BullMQ
+  processor, and the recovery cron are absent from the web DI graph (enforced by a process-role e2e
+  gate). **Durability (ADR-052 pattern):** BullMQ is a wake hint; Postgres owns the run state
+  machine, the 10-minute lease, the retry schedule (`maxAttempts` = 3, exponential backoff + jitter;
+  the gateway `retryable` flag decides retry vs terminal, SDK retry stays disabled), and a
+  per-replica recovery cron + expired-lease reaper (a lost wake is still drained). A claimed run
+  runs one `generateText` call, then finalizes the assistant `AiMessage` + bounded `AiRunStep`s + a
+  run-attributed `AiUsageLedger` row + the terminal-status CAS in **one transaction** — so the
+  provider effect is **at-least-once** but the durable outcome is **exactly-once** (success is never
+  faked without a durable transcript + ledger). Endpoints (bearer, owner-scoped by
+  `conversation.ownerUserId`, 404 on not-owned): `POST /ai/conversations`, `GET
+/ai/conversations/:id`, `POST /ai/runs` (idempotent on `(conversationId, idempotencyKey)`), `GET
+/ai/runs/:id`, `GET /ai/runs` (keyset cursor, newest first), `POST /ai/runs/:id/cancel`
+  (cooperative), and `GET /ai/runs/:id/stream` — a **status-only** SSE stream (ADR-053 primitives,
+  AI-scoped copy) that emits content-free `{ eventId, runId, status, reason }` hints to **refetch**
+  the run; **not token streaming**, at-most-once across replicas via Redis Pub/Sub, no sticky
+  sessions. New env (all optional): `AI_REALTIME_NAMESPACE`, `AI_REALTIME_HEARTBEAT_MS`,
+  `AI_REALTIME_MAX_PER_USER`, `AI_REALTIME_MAX_CONNECTIONS`, `AI_REALTIME_QUEUE_DEPTH`,
+  `AI_REALTIME_MAX_STREAM_LIFETIME_MS`, `AI_REALTIME_PUBLISH_TIMEOUT_MS`,
+  `AI_REALTIME_MAX_INFLIGHT_PUBLISH`. New content-free metrics: `amcore_ai_run_realtime_connections`,
+  `amcore_ai_run_realtime_publish_total`, `amcore_ai_run_realtime_events_total`. See
+  [`docs/ai/README.md`](docs/ai/README.md).
+
 - AI capability layer — runtime gateway (Track C, Arc B). A provider-agnostic `ModelGateway`
   over the Vercel AI SDK backed by the DB-backed catalog registry. `generateText` runs
   non-streaming text over the resolved model — an explicit slug or the **credential-gated

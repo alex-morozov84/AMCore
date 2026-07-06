@@ -10,6 +10,9 @@ import {
   aiRunStatusSchema,
 } from './ai-enums'
 import { aiDecimalStringSchema, aiSlugSchema } from './ai-common'
+import { type CursorResponse, cursorResponseSchema } from './pagination'
+
+import { PAGINATION } from '../constants'
 
 /**
  * AI capability layer — durable run/conversation read contracts (Track C — ADR-054, Arc A).
@@ -110,6 +113,62 @@ export const createAiRunSchema = z.object({
   idempotencyKey: z.string().min(1).max(128).nullish(),
 })
 export type CreateAiRunInput = z.infer<typeof createAiRunSchema>
+
+/**
+ * Keyset (cursor) run list (Track C — ADR-054, Arc C.2; ADR-036 endpoint-local exception). Scoped
+ * to the caller and optionally to one conversation; `cursor` is an opaque versioned token encoding
+ * the last `(createdAt, id)`, ordered `(createdAt DESC, id DESC)`. `limit` reuses the shared bounds.
+ */
+export const aiRunListQuerySchema = z.object({
+  conversationId: z.string().min(1).max(64).optional(),
+  cursor: z.string().min(1).max(512).optional(),
+  limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).default(PAGINATION.DEFAULT_LIMIT),
+})
+export type AiRunListQuery = z.infer<typeof aiRunListQuerySchema>
+
+export const aiRunPageSchema = cursorResponseSchema(aiRunResponseSchema)
+export type AiRunPage = CursorResponse<AiRunResponse>
+
+/**
+ * Cancel result. Cancellation is cooperative: a `queued` run becomes terminal `cancelled`
+ * immediately, a `running` run records the request (`cancellationRequested: true`) for the worker
+ * to honor, and a terminal run is an idempotent no-op. `status` is the run's status after the call.
+ */
+export const aiRunCancelResponseSchema = z.object({
+  id: z.string(),
+  status: aiRunStatusSchema,
+  cancellationRequested: z.boolean(),
+})
+export type AiRunCancelResponse = z.infer<typeof aiRunCancelResponseSchema>
+
+// ----- Run status SSE stream (status-only realtime hint) -----
+
+/**
+ * Why a run stream hint fired (Track C — ADR-054, Arc C.5; ADR-053 status-only SSE). Bounded and
+ * content-free: `status_changed` covers every durable run-status transition the worker publishes.
+ * The set is fixed now so the wire contract stays stable; new hint kinds are additive.
+ */
+export const AI_RUN_SSE_REASONS = ['status_changed'] as const
+export type AiRunSseReason = (typeof AI_RUN_SSE_REASONS)[number]
+
+/**
+ * Realtime run-status hint (ADR-053 pattern). A disposable, **content-free** signal that a run's
+ * durable status changed — it carries NO prompt, response, token chunk, provider body, model slug,
+ * user id, or credential. The client treats it as "refetch this run" and reads authoritative state
+ * from `GET /ai/runs/:id`; Postgres is the source of truth, so a missed event is repaired on the
+ * next reconnect/refetch (at-most-once transport). `eventId` is a disposable dedupe/correlation id,
+ * never a cursor. `status` is the run's lifecycle status after the change (the same lowercase set
+ * the run response uses). `.strict()` because this value crosses the Redis Pub/Sub + SSE boundary.
+ */
+export const aiRunSseEventSchema = z
+  .object({
+    eventId: z.string().min(1).max(64),
+    runId: z.string().min(1).max(64),
+    status: aiRunStatusSchema,
+    reason: z.enum(AI_RUN_SSE_REASONS),
+  })
+  .strict()
+export type AiRunSseEvent = z.infer<typeof aiRunSseEventSchema>
 
 // ----- Artifact (multimodal projection) -----
 

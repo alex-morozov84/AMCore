@@ -46,3 +46,28 @@ export type PaginatedResponse<T> = {
   page: number
   limit: number
 }
+
+/**
+ * Keyset (cursor) response envelope (ADR-036). Distinct from the offset
+ * `paginatedResponseSchema`: append-heavy, ordered surfaces (notification feed, AI run list) page
+ * forward with an opaque `nextCursor` + `hasMore`, never offsets. Generic so each surface supplies
+ * its own item schema; it lives here so no feature schema depends on another for the envelope.
+ */
+export const cursorResponseSchema = <T extends ZodTypeAny>(
+  item: T
+): z.ZodObject<{
+  data: z.ZodArray<T>
+  nextCursor: z.ZodNullable<z.ZodString>
+  hasMore: z.ZodBoolean
+}> =>
+  z.object({
+    data: z.array(item),
+    nextCursor: z.string().nullable(),
+    hasMore: z.boolean(),
+  })
+
+export type CursorResponse<T> = {
+  data: T[]
+  nextCursor: string | null
+  hasMore: boolean
+}

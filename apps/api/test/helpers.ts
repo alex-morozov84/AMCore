@@ -17,6 +17,7 @@ import { ZodValidationPipe } from 'nestjs-zod'
 
 import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
 import { NotificationDispatchProcessor } from '../src/core/notifications/dispatch/notification-dispatch.processor'
+import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
 import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
@@ -172,6 +173,7 @@ async function closeBullWorkers(app: INestApplication): Promise<void> {
   await Promise.all([
     closeBullWorker(app, EmailProcessor),
     closeBullWorker(app, NotificationDispatchProcessor),
+    closeBullWorker(app, AiRunDispatchProcessor),
   ])
 }
 

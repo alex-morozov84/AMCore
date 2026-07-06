@@ -167,6 +167,25 @@ exception filter must not try to write a JSON error onto a sent/ended response.
 The dedicated Pub/Sub subscriber connection is classified distinctly in the Redis
 client-event metric (e.g. `notif-subscriber`).
 
+AI generation metrics (Track C) are bounded and carry no prompt/response content,
+model slug, or credential as a label:
+
+- `amcore_ai_generations_total{provider,operation,result}` — `provider` is the
+  lowercase provider _type_ (`anthropic|openai|…|mock`), `operation=text|object`,
+  `result=success|error`;
+- `amcore_ai_tokens_total{provider,direction}` — `direction=input|output`.
+
+The AI run **status-only** SSE stream (Arc C) mirrors the notification realtime
+metrics, still carrying no user/IP/run/event IDs:
+
+- `amcore_ai_run_realtime_connections{role}` — gauge of currently-open AI run SSE
+  streams on the process;
+- `amcore_ai_run_realtime_publish_total{outcome,role}` —
+  `outcome=published|failed|dropped`;
+- `amcore_ai_run_realtime_events_total{event,role}` — same bounded `event` set as the
+  notification stream. The dedicated Pub/Sub subscriber is classified as
+  `ai-run-subscriber` in the Redis client-event metric.
+
 The remaining Arc 4 stage is optional OpenTelemetry tracing.
 
 ## Label Rules

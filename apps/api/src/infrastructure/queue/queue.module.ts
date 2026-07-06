@@ -96,7 +96,8 @@ const bullBoardImports = bullBoardEnabled
     BullModule.registerQueue(
       { name: QueueName.DEFAULT },
       { name: QueueName.EMAIL },
-      { name: QueueName.NOTIFICATIONS }
+      { name: QueueName.NOTIFICATIONS },
+      { name: QueueName.AI_RUNS }
     ),
 
     // Bull Board dashboard — mounted + auth-protected only when enabled.

@@ -106,6 +106,15 @@ const EXPECTED: Record<string, Expected> = {
   'delete /notifications/telegram/connection': { status: '204', kind: 'none' },
   // notifications realtime (Arc C — SSE stream, text/event-stream not JSON)
   'get /notifications/stream': { status: '200', kind: 'stream' },
+  // ai (Track C — ADR-054, Arc C: conversation + durable-run create/fetch)
+  'post /ai/conversations': { status: '201', kind: 'json' },
+  'get /ai/conversations/{id}': { status: '200', kind: 'json' },
+  'post /ai/runs': { status: '201', kind: 'json' },
+  'get /ai/runs': { status: '200', kind: 'json' },
+  'get /ai/runs/{id}': { status: '200', kind: 'json' },
+  'post /ai/runs/{id}/cancel': { status: '200', kind: 'json' },
+  // ai realtime (Arc C — status-only SSE stream, text/event-stream not JSON)
+  'get /ai/runs/{id}/stream': { status: '200', kind: 'stream' },
   // metrics — Prometheus exposition (text, not JSON)
   'get /metrics': { status: '200', kind: 'text' },
 }

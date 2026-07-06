@@ -1,16 +1,15 @@
-import type { NotificationSseEvent } from '@amcore/shared'
-
 /**
- * Minimal fetch-based SSE reader for the Arc C realtime e2e gate. A real socket is
- * required — supertest's in-memory agent does not deliver incremental
- * `text/event-stream` chunks. Parses `data:` frames into events and skips `:`
- * heartbeat/ready comment frames; `next()` is bounded so a missing event fails fast
- * instead of hanging the suite.
+ * Minimal fetch-based SSE reader for the Arc C realtime e2e gates (notifications + AI runs). A real
+ * socket is required — supertest's in-memory agent does not deliver incremental `text/event-stream`
+ * chunks. Parses `data:` frames into events and skips `:` heartbeat/ready comment frames; `next()`
+ * is bounded so a missing event fails fast instead of hanging the suite. Generic over the event
+ * shape — defaults to a loose record, so each consumer can pin its own event type (e.g.
+ * `SseClient.open<AiRunSseEvent>(...)`).
  */
-export class SseClient {
-  private readonly events: NotificationSseEvent[] = []
+export class SseClient<T = Record<string, unknown>> {
+  private readonly events: T[] = []
   private readonly waiters: Array<{
-    resolve: (e: NotificationSseEvent) => void
+    resolve: (e: T) => void
     reject: (e: Error) => void
     timer: ReturnType<typeof setTimeout>
   }> = []
@@ -22,10 +21,13 @@ export class SseClient {
     readonly response: Response
   ) {}
 
-  static async open(url: string, headers: Record<string, string>): Promise<SseClient> {
+  static async open<T = Record<string, unknown>>(
+    url: string,
+    headers: Record<string, string>
+  ): Promise<SseClient<T>> {
     const controller = new AbortController()
     const response = await fetch(url, { headers, signal: controller.signal })
-    const client = new SseClient(controller, response)
+    const client = new SseClient<T>(controller, response)
     if (response.body) void client.pump(response.body.getReader())
     return client
   }
@@ -56,7 +58,7 @@ export class SseClient {
       .map((line) => line.slice('data:'.length).trim())
       .join('')
     if (data.length === 0) return // a `:` heartbeat/ready comment frame
-    const event = JSON.parse(data) as NotificationSseEvent
+    const event = JSON.parse(data) as T
     const waiter = this.waiters.shift()
     if (waiter) {
       clearTimeout(waiter.timer)
@@ -67,7 +69,7 @@ export class SseClient {
   }
 
   /** Resolve the next data event, or reject after `timeoutMs` (no silent waiting). */
-  next(timeoutMs = 5000): Promise<NotificationSseEvent> {
+  next(timeoutMs = 5000): Promise<T> {
     const buffered = this.events.shift()
     if (buffered) return Promise.resolve(buffered)
     return new Promise((resolve, reject) => {

@@ -20,6 +20,7 @@ export class QueueService implements IQueueService, OnModuleInit {
     @InjectQueue(QueueName.DEFAULT) defaultQueue: Queue,
     @InjectQueue(QueueName.EMAIL) emailQueue: Queue,
     @InjectQueue(QueueName.NOTIFICATIONS) notificationsQueue: Queue,
+    @InjectQueue(QueueName.AI_RUNS) aiRunsQueue: Queue,
     private readonly logger: PinoLogger,
     private readonly metrics: MetricsService
   ) {
@@ -28,6 +29,7 @@ export class QueueService implements IQueueService, OnModuleInit {
     this.queues.set(QueueName.DEFAULT, defaultQueue)
     this.queues.set(QueueName.EMAIL, emailQueue)
     this.queues.set(QueueName.NOTIFICATIONS, notificationsQueue)
+    this.queues.set(QueueName.AI_RUNS, aiRunsQueue)
 
     this.logger.info({ count: this.queues.size }, `Initialized ${this.queues.size} queues`)
   }
