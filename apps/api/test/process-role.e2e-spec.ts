@@ -36,6 +36,15 @@ let TelegramController: Token
 let TelegramWebhookController: Token
 let TelegramChannelDeliverer: Token
 let TelegramBotApiClient: Token
+// AI capability layer (Track C — ADR-054, Arc C)
+let ModelGateway: Token
+let AiRunExecutorService: Token
+let AiRunDispatchProcessor: Token
+let AiRunRecoveryService: Token
+let AiRunRealtimePublisher: Token
+let AiRunRealtimeSubscriber: Token
+let AiRunRealtimeHub: Token
+let AiRunStreamController: Token
 
 const noopPinoLogger = {
   setContext: () => undefined,
@@ -103,6 +112,14 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       await import('../src/core/notifications/channels/telegram/telegram-channel.deliverer')
     const tgClient =
       await import('../src/core/notifications/channels/telegram/telegram-bot-api.client')
+    const modelGateway = await import('../src/infrastructure/ai/gateway/model-gateway.service')
+    const aiExecutor = await import('../src/infrastructure/ai/runs/ai-run-executor.service')
+    const aiProcessor = await import('../src/infrastructure/ai/runs/ai-run-dispatch.processor')
+    const aiRecovery = await import('../src/infrastructure/ai/runs/ai-run-recovery.service')
+    const aiPublisher = await import('../src/core/ai/realtime/ai-run-realtime.publisher')
+    const aiSubscriber = await import('../src/core/ai/realtime/ai-run-realtime.subscriber')
+    const aiHub = await import('../src/core/ai/realtime/ai-run-realtime.hub')
+    const aiStreamController = await import('../src/core/ai/realtime/ai-run-stream.controller')
 
     AppModule = appModule.AppModule
     WebModule = webModule.WebModule
@@ -123,6 +140,14 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     TelegramWebhookController = tgWebhookController.TelegramWebhookController
     TelegramChannelDeliverer = tgDeliverer.TelegramChannelDeliverer
     TelegramBotApiClient = tgClient.TelegramBotApiClient
+    ModelGateway = modelGateway.ModelGateway
+    AiRunExecutorService = aiExecutor.AiRunExecutorService
+    AiRunDispatchProcessor = aiProcessor.AiRunDispatchProcessor
+    AiRunRecoveryService = aiRecovery.AiRunRecoveryService
+    AiRunRealtimePublisher = aiPublisher.AiRunRealtimePublisher
+    AiRunRealtimeSubscriber = aiSubscriber.AiRunRealtimeSubscriber
+    AiRunRealtimeHub = aiHub.AiRunRealtimeHub
+    AiRunStreamController = aiStreamController.AiRunStreamController
   })
 
   describe('web', () => {
@@ -166,6 +191,20 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, TelegramChannelDeliverer)
       absent(m, TelegramBotApiClient)
     })
+
+    it('has the AI SSE stream, hub, and subscriber but NO provider I/O or worker (Track C)', () => {
+      // Receive side is web-only.
+      present(m, AiRunStreamController)
+      present(m, AiRunRealtimeHub)
+      present(m, AiRunRealtimeSubscriber)
+      // Provider-call capability + the durable worker never enter the web DI graph.
+      absent(m, ModelGateway)
+      absent(m, AiRunExecutorService)
+      absent(m, AiRunDispatchProcessor)
+      absent(m, AiRunRecoveryService)
+      // The publisher is worker-only (only the worker emits run-status hints in Arc C).
+      absent(m, AiRunRealtimePublisher)
+    })
   })
 
   describe('worker', () => {
@@ -208,6 +247,19 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, TelegramController)
       absent(m, TelegramWebhookController)
     })
+
+    it('has provider I/O + the durable AI worker but NO SSE stream/hub/subscriber (Track C)', () => {
+      // The worker is the only role that calls providers and runs the durable executor/recovery.
+      present(m, ModelGateway)
+      present(m, AiRunExecutorService)
+      present(m, AiRunDispatchProcessor)
+      present(m, AiRunRecoveryService)
+      // It publishes run-status hints, but hosts no SSE receive side.
+      present(m, AiRunRealtimePublisher)
+      absent(m, AiRunStreamController)
+      absent(m, AiRunRealtimeHub)
+      absent(m, AiRunRealtimeSubscriber)
+    })
   })
 
   describe('all', () => {
@@ -247,6 +299,17 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, TelegramWebhookController)
       present(m, TelegramChannelDeliverer)
       present(m, TelegramBotApiClient)
+    })
+
+    it('composes both AI sides — provider I/O + worker AND the SSE stream/hub/subscriber (Track C)', () => {
+      present(m, ModelGateway)
+      present(m, AiRunExecutorService)
+      present(m, AiRunDispatchProcessor)
+      present(m, AiRunRecoveryService)
+      present(m, AiRunRealtimePublisher)
+      present(m, AiRunStreamController)
+      present(m, AiRunRealtimeHub)
+      present(m, AiRunRealtimeSubscriber)
     })
   })
 })

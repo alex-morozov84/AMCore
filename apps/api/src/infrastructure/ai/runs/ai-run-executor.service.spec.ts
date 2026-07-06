@@ -307,7 +307,7 @@ describe('AiRunExecutorService', () => {
 
     it('does not block the attempt on the publish (fire-and-forget: never awaits Redis)', async () => {
       // A publish that never settles must not delay execute() — the worker moves on immediately.
-      publisher.publish.mockReturnValue(new Promise<void>(() => {}))
+      publisher.publish.mockReturnValue(new Promise<void>(() => undefined))
       await expect(executor.execute(claim())).resolves.toBeUndefined()
       expect(repository.finalizeCompleted).toHaveBeenCalledTimes(1)
     })
