@@ -90,10 +90,15 @@ describe('AI run realtime SSE (e2e)', () => {
     await teardownE2ETest(context)
   }, 120000)
 
-  afterEach(async () => {
-    for (const client of open.splice(0)) client.close()
+  // Self-contained per-test setup: reset + reseed BEFORE each test so any test (focused run or
+  // reorder) resolves the mock default via a fresh catalog, independent of sibling ordering.
+  beforeEach(async () => {
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     await seedAiCatalog(prisma)
+  })
+
+  afterEach(() => {
+    for (const client of open.splice(0)) client.close()
   })
 
   it('requires a bearer token (401 without an Authorization header)', async () => {
