@@ -209,10 +209,14 @@ needed), and Postgres `FOR UPDATE SKIP LOCKED` is the coordinator, so replicas
 drain disjoint rows without double-sending. The throttler is Redis-backed
 (ADR-039) and BullMQ workers consume one shared queue. Add worker replicas freely.
 
-## Realtime SSE (`GET /notifications/stream`) behind a proxy
+## Realtime SSE behind a proxy
 
-The SSE stream (ADR-053) is long-lived and must not be buffered or timed out by an
-intermediary:
+Two long-lived SSE endpoints share the same rules and must not be buffered or timed
+out by an intermediary: `GET /notifications/stream` (ADR-053) and the AI run
+**status-only** stream `GET /ai/runs/:id/stream` (Track C — the same primitives,
+governed by the parallel `AI_REALTIME_*` knobs; e.g. `AI_REALTIME_HEARTBEAT_MS`,
+`AI_REALTIME_MAX_CONNECTIONS`, `AI_REALTIME_NAMESPACE`). The guidance below is written
+for the notification stream; apply it identically to the AI run stream.
 
 - **Disable response buffering.** The app sends `X-Accel-Buffering: no` and
   `Cache-Control: no-cache, no-transform`; honor them. For NGINX, `proxy_buffering

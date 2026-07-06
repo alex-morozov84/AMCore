@@ -9,11 +9,11 @@ subsystem, the reusable core ships here and applied assistants are deferred
 consumers.
 
 > **Status — foundational (Track C, arc-phased).** Arc A shipped the persistence
-> schema and shared contracts; **Arc B adds the runtime `ModelGateway` and catalog
-> registry** — provider-agnostic text generation and structured output over a
-> DB-backed catalog, with usage accounting and content-free metrics. The gateway is
-> **not yet wired to an HTTP surface**: the durable run worker, run API, guardrails,
-> tool loop, human takeover, and multimodal routing land in later arcs (C–G), each
+> schema and shared contracts; Arc B added the runtime `ModelGateway` and catalog
+> registry; **Arc C wires the durable run worker and the run HTTP surface** — bearer
+> conversation/run create/fetch/list/cancel plus a status-only SSE stream, executed by
+> a worker-only durable engine (BullMQ wake + Postgres claim/lease/recovery). Guardrails,
+> the tool loop, human takeover, and multimodal routing land in later arcs (D–G), each
 > additive over what is documented here. Sections marked _(later arc)_ describe the
 > intended shape those arcs build toward.
 
@@ -80,8 +80,8 @@ speculated here.
 ## Runtime: ModelGateway + Catalog Registry (shipped — Arc B)
 
 The `ModelGateway` (`apps/api/src/infrastructure/ai/gateway/`) is AMCore's provider-agnostic
-generation seam. It is **not yet exposed over HTTP** — Arc C adds the durable run worker and run
-API that call it. What it provides today:
+generation seam. It is **worker-only** — the durable run worker (Arc C, below) is its sole caller,
+so provider-call capability never enters the web DI graph. What it provides:
 
 - **`generateText(request)`** — non-streaming text over the resolved model. `request.modelSlug`
   selects a catalog model; omitted, the **credential-gated default** is used (the `isDefault`
@@ -122,6 +122,88 @@ is gated out at runtime and the gateway falls back to `mock`.
 | `AI_REQUEST_TIMEOUT_MS`                                                                     | per-request provider-call bound (default 60000, max 300000) |
 | `AI_CATALOG_CACHE_TTL_SECONDS`                                                              | catalog snapshot cache TTL (default 300, max 3600)          |
 
+## Durable Runs + Run API (shipped — Arc C)
+
+Arc C wires the gateway into a **durable run engine** and a bearer-authenticated HTTP surface. A run
+is a Postgres-owned unit of work: the **web** role creates and reads it; the **worker** role executes
+it (the only role that calls a provider). It reuses the notification durability pattern (ADR-052) —
+BullMQ is a wake hint, Postgres owns the claim, lease, retry schedule, and recovery.
+
+### Run lifecycle
+
+```
+QUEUED ──claim(SKIP LOCKED)──▶ RUNNING ──finalize(CAS)──▶ COMPLETED
+   │                              │                  └────▶ FAILED       (permanent provider error / exhausted)
+   │                              ├──────────────────────▶ CANCELLED    (cooperative cancel observed)
+   │                              └──────────────────────▶ EXPIRED      (deadline passed)
+   └── retry (transient error / lost lease) ── nextAttemptAt ──▶ QUEUED
+```
+
+- **Create** persists the user turn (`AiMessage` bound to the run by `runId`) and a `QUEUED` `AiRun`
+  in one transaction, freezes a **secret-free model snapshot** (the credential-gated default →
+  `mock` without a key), and fires a best-effort post-commit wake. Creation is idempotent on
+  `(conversationId, idempotencyKey)`.
+- **Execute** (worker) claims a due run under `FOR UPDATE SKIP LOCKED`, leases it (10-min TTL),
+  loads the run's own input turn, resolves the model from the frozen `modelSnapshot.modelSlug`
+  (never the current default), calls `generateText` **exactly once**, and finalizes in **one
+  transaction**: the assistant `AiMessage` + bounded `AiRunStep`s + a run-attributed `AiUsageLedger`
+  row + the terminal-status CAS.
+- **Recover** — a per-replica `@Cron` (not Redis-locked; the DB claim is the mutex) drains due runs
+  even if a wake was lost, and a reaper reclaims leases from crashed workers.
+
+**Retry is Postgres-owned** (`maxAttempts` = 3, exponential backoff with jitter; the gateway
+`retryable` flag decides retry vs terminal; the SDK's own retry stays disabled). **Cancellation is
+cooperative**: a `QUEUED` run cancels immediately (terminal), a `RUNNING` run records the request and
+the executor honors it before the provider call.
+
+**At-least-once provider effect, exactly-once durable outcome.** If a provider call succeeds but the
+finalize transaction fails, the run is left non-terminal — recovery retries and may call the provider
+again. The durable outcome (assistant turn + ledger + terminal status) is exactly-once because it
+shares one CAS transaction; success is never faked without a durable transcript + ledger.
+
+### HTTP surface (bearer, owner-scoped by `conversation.ownerUserId`)
+
+| Method + path               | Purpose                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| `POST /ai/conversations`    | Create a conversation.                                                         |
+| `GET /ai/conversations/:id` | Fetch an owned conversation.                                                   |
+| `POST /ai/runs`             | Queue a run on a conversation (idempotent; the worker executes it).            |
+| `GET /ai/runs/:id`          | Fetch an owned run's status.                                                   |
+| `GET /ai/runs`              | Keyset-paginated owned runs (`?conversationId=&cursor=&limit=`, newest first). |
+| `POST /ai/runs/:id/cancel`  | Cooperatively cancel an owned run.                                             |
+| `GET /ai/runs/:id/stream`   | **Status-only** SSE stream of run-status hints (see below).                    |
+
+A missing or not-owned conversation/run is a `404` so existence never leaks.
+
+### Status-only SSE run stream
+
+`GET /ai/runs/:id/stream` is an AI-scoped copy of the realtime primitives (ADR-053): a dedicated
+Redis Pub/Sub subscriber per web replica → a process-local hub → a manually-written bounded
+`text/event-stream`. The worker publishes a **content-free** hint on each status change; the event
+carries only `{ eventId, runId, status, reason }` — **no prompt, response, token chunk, provider
+body, model slug, or credential**.
+
+- **This is not token streaming.** The event is a signal to **refetch** `GET /ai/runs/:id`; Postgres
+  is the source of truth. Token streaming is deferred.
+- **At-most-once** across replicas (Redis Pub/Sub, no sticky sessions); a missed hint is repaired on
+  the client's next reconnect/refetch. The stream closes at the bearer token's expiry (bounded by a
+  hard server cap), and admission enforces per-user (`429`) and global (`503`) caps before any bytes.
+
+### Configuration (Arc C)
+
+Realtime knobs (all optional; an AI-scoped copy of the notification realtime knobs):
+
+| Env var                                                               | Purpose                                                   |
+| --------------------------------------------------------------------- | --------------------------------------------------------- |
+| `AI_REALTIME_NAMESPACE`                                               | channel namespace (isolate deployments on one Redis)      |
+| `AI_REALTIME_HEARTBEAT_MS` / `AI_REALTIME_MAX_STREAM_LIFETIME_MS`     | keepalive interval / hard stream-lifetime cap             |
+| `AI_REALTIME_MAX_PER_USER` / `AI_REALTIME_MAX_CONNECTIONS`            | per-user (429) / global (503) SSE caps                    |
+| `AI_REALTIME_QUEUE_DEPTH`                                             | per-connection write buffer before a slow consumer is cut |
+| `AI_REALTIME_PUBLISH_TIMEOUT_MS` / `AI_REALTIME_MAX_INFLIGHT_PUBLISH` | best-effort publish bounds                                |
+
+Content-free run metrics: `amcore_ai_run_realtime_connections`, `amcore_ai_run_realtime_publish_total`,
+`amcore_ai_run_realtime_events_total` (see [`docs/operations/observability.md`](../operations/observability.md)).
+
 ## Seeded Catalog
 
 `pnpm --filter api db:seed` (idempotent) seeds the intended configuration shape so
@@ -136,13 +218,12 @@ a fresh fork sees it without live keys:
 
 ## Coming in Later Arcs
 
-| Arc | Adds _(later arc)_                                                                                                                                                 |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C   | Durable run worker (BullMQ wake + Postgres claim/lease/recovery), run create/fetch/list/cancel HTTP surface, SSE run-status stream (reusing the realtime fan-out). |
-| D   | Guardrail baseline: the structural trust-boundary prompt builder, input/output guards, and an adversarial prompt-injection corpus.                                 |
-| E   | Self-hosted tool loop with per-tool Zod schemas, allowlists, risk classes, and human-in-the-loop approvals (no product tools).                                     |
-| F   | Assistant registry admin contract + human takeover / operator review (transcript, take/release control).                                                           |
-| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing.                                                                      |
+| Arc | Adds _(later arc)_                                                                                                                 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| D   | Guardrail baseline: the structural trust-boundary prompt builder, input/output guards, and an adversarial prompt-injection corpus. |
+| E   | Self-hosted tool loop with per-tool Zod schemas, allowlists, risk classes, and human-in-the-loop approvals (no product tools).     |
+| F   | Assistant registry admin contract + human takeover / operator review (transcript, take/release control).                           |
+| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing.                                      |
 
 ## See Also
 

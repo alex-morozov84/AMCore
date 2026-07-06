@@ -58,6 +58,10 @@ apps/api/src/
 │   │   └── roles.controller.ts
 │   ├── admin/                  # SUPER_ADMIN only
 │   │   └── admin.controller.ts
+│   ├── ai/                     # Track C: AI HTTP surface (web) — conversation/run + status-only SSE
+│   │   ├── conversations/                     # POST/GET /ai/conversations
+│   │   ├── runs/                              # /ai/runs create/fetch/list/cancel + run producer
+│   │   └── realtime/                          # AI run SSE: publisher + subscriber + hub + stream writer
 │   └── notifications/          # In-app feed, preferences, producer, realtime SSE, channels
 │       ├── notifications.controller.ts
 │       ├── notification-preferences.controller.ts
@@ -73,6 +77,7 @@ apps/api/src/
 │       └── definitions/                       # code-owned event definitions
 │
 ├── infrastructure/
+│   ├── ai/                     # Track C: worker-only ModelGateway + SDK adapters + durable run engine
 │   ├── email/                  # Resend + React Email (direct secret sends + queued notifications)
 │   ├── queue/                  # BullMQ setup + Bull Board
 │   ├── storage/                # S3/local/memory storage providers + validation
@@ -242,6 +247,7 @@ coverage.
 | Admin                | ✅                      | ✅  |
 | API Keys             | ✅                      | ✅  |
 | Notifications        | ✅                      | ✅  |
+| AI runs (Track C)    | ✅                      | ✅  |
 | Storage              | ✅                      | ✅  |
 | Email templates      | Vitest (real rendering) | —   |
 
@@ -357,6 +363,7 @@ is imported (worker/all). Assert the gating in `test/process-role.e2e-spec.ts`.
 - [`docs/auth/`](../../docs/auth/README.md) — Complete auth & RBAC guide for developers
 - [`docs/authorization.md`](../../docs/authorization.md) — Authorization concepts
 - [`docs/notifications/`](../../docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email & Telegram delivery, realtime SSE stream)
+- [`docs/ai/`](../../docs/ai/README.md) — AI capability layer (provider-agnostic catalog, worker-only `ModelGateway`, durable runs + run API + status-only SSE, usage ledger)
 
 ## Contributing
 
