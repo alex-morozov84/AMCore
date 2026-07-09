@@ -1,7 +1,13 @@
+import { AiRunStepType } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
+import {
+  AI_RUN_GUARDRAIL_REFUSAL_CLASSIFICATION,
+  AI_RUN_GUARDRAIL_REFUSAL_MESSAGE,
+  AiRunTerminalReason,
+} from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
-import type { ClaimedRun } from './ai-run-dispatch.types'
+import type { ClaimedRun, GuardrailRefusalInput } from './ai-run-dispatch.types'
 
 import type { PrismaService } from '@/prisma'
 
@@ -81,6 +87,148 @@ describe('AiRunRepository', () => {
             errorCode: null,
             terminalReasonCode: 'cancelled_by_user',
           }),
+        })
+      )
+    })
+  })
+
+  describe('finalizeRefusal (Arc D guardrail block)', () => {
+    function refusal(over: Partial<GuardrailRefusalInput> = {}): GuardrailRefusalInput {
+      return {
+        reasonCode: AiRunTerminalReason.GUARDRAIL_INPUT_BLOCKED,
+        checkStepType: AiRunStepType.GUARDRAIL_CHECK,
+        categories: [{ category: 'envelope_marker_abuse', count: 1 }],
+        ...over,
+      }
+    }
+
+    beforeEach(() => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'conv-1' }] as never)
+      prisma.aiMessage.aggregate.mockResolvedValue({ _max: { sequence: 0 } } as never)
+      prisma.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 0 } } as never)
+      prisma.aiMessage.create.mockResolvedValue({} as never)
+      prisma.aiRunStep.createMany.mockResolvedValue({ count: 2 } as never)
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
+    })
+
+    it('CAS win → terminal FAILED (non-retryable) with the guardrail terminalReasonCode', async () => {
+      await expect(repo.finalizeRefusal(claim(), refusal())).resolves.toBe(true)
+      expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'run-1', status: 'RUNNING', leaseToken: 'lease-abc' },
+          data: expect.objectContaining({
+            status: 'FAILED',
+            errorCode: 'guardrail_blocked',
+            terminalReasonCode: 'guardrail_input_blocked',
+            leaseToken: null,
+            leaseExpiresAt: null,
+          }),
+        })
+      )
+      // Terminal, never re-queued: no QUEUED transition and no nextAttemptAt is scheduled.
+      expect(prisma.aiRun.updateMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'QUEUED' }) })
+      )
+    })
+
+    it('persists a canned, content-free refusal turn as ASSISTANT / authorType SYSTEM', async () => {
+      await repo.finalizeRefusal(claim(), refusal())
+      expect(prisma.aiMessage.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            runId: 'run-1',
+            role: 'ASSISTANT',
+            authorType: 'SYSTEM',
+            content: [{ type: 'text', text: AI_RUN_GUARDRAIL_REFUSAL_MESSAGE }],
+            redactionMeta: { classification: AI_RUN_GUARDRAIL_REFUSAL_CLASSIFICATION },
+          }),
+        })
+      )
+    })
+
+    it('writes a content-free check step (bounded categories) + a REFUSAL step', async () => {
+      await repo.finalizeRefusal(claim(), refusal())
+      const [{ data }] = prisma.aiRunStep.createMany.mock.calls.at(-1) as unknown as [
+        { data: { type: string; detail?: unknown; errorCode?: string }[] },
+      ]
+      expect(data.map((s) => s.type)).toEqual(['GUARDRAIL_CHECK', 'REFUSAL'])
+      expect(data[0]!.detail).toEqual({
+        categories: [{ category: 'envelope_marker_abuse', count: 1 }],
+      })
+      expect(data[1]!.errorCode).toBe('guardrail_input_blocked')
+      // No prompt/output/marker/snippet ever rides the step detail.
+      expect(JSON.stringify(data)).not.toContain('amcore:user-data-')
+    })
+
+    it('locks the conversation FOR UPDATE before allocating the refusal sequence', async () => {
+      await repo.finalizeRefusal(claim(), refusal())
+      const lockOrder = prisma.$queryRaw.mock.invocationCallOrder[0]
+      const seqOrder = prisma.aiMessage.aggregate.mock.invocationCallOrder[0]
+      expect(lockOrder).toBeLessThan(seqOrder as number)
+    })
+
+    it('omits step detail when no categories are supplied', async () => {
+      await repo.finalizeRefusal(claim(), refusal({ categories: [] }))
+      const [{ data }] = prisma.aiRunStep.createMany.mock.calls.at(-1) as unknown as [
+        { data: { detail?: unknown }[] },
+      ]
+      expect(data[0]!.detail).toBeUndefined()
+    })
+
+    it('defensively drops malicious/invalid categories (marker, snippet, bad count) from detail', async () => {
+      await repo.finalizeRefusal(
+        claim(),
+        refusal({
+          categories: [
+            { category: 'amcore:user-data-abc123', count: 1 }, // marker value -> invalid grammar
+            { category: 'ignore all previous instructions', count: 1 }, // snippet -> spaces invalid
+            { category: 'ENVELOPE_MARKER_ABUSE', count: 1 }, // uppercase -> invalid
+            { category: 'instruction_override', count: 0 }, // non-positive count -> dropped
+            { category: 'system_prompt_probe', count: 2 }, // valid -> survives
+          ],
+        })
+      )
+      const [{ data }] = prisma.aiRunStep.createMany.mock.calls.at(-1) as unknown as [
+        { data: { detail?: unknown }[] },
+      ]
+      expect(data[0]!.detail).toEqual({
+        categories: [{ category: 'system_prompt_probe', count: 2 }],
+      })
+      // The marker value and the prompt snippet never reach the durable step detail.
+      const serialized = JSON.stringify(data)
+      expect(serialized).not.toContain('amcore:user-data-')
+      expect(serialized).not.toContain('ignore all previous instructions')
+    })
+
+    it('caps the persisted category list length defensively', async () => {
+      const many = Array.from({ length: 30 }, (_, i) => ({ category: `cat_${i}`, count: 1 }))
+      await repo.finalizeRefusal(claim(), refusal({ categories: many }))
+      const [{ data }] = prisma.aiRunStep.createMany.mock.calls.at(-1) as unknown as [
+        { data: { detail?: { categories: unknown[] } }[] },
+      ]
+      expect(data[0]!.detail!.categories).toHaveLength(16)
+    })
+
+    it('CAS loss → returns false (message + steps + terminal update roll back together)', async () => {
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 0 } as never)
+      await expect(repo.finalizeRefusal(claim(), refusal())).resolves.toBe(false)
+    })
+
+    it('records the output-block reason + OUTPUT_VALIDATION check step', async () => {
+      await repo.finalizeRefusal(
+        claim(),
+        refusal({
+          reasonCode: AiRunTerminalReason.GUARDRAIL_OUTPUT_BLOCKED,
+          checkStepType: AiRunStepType.OUTPUT_VALIDATION,
+        })
+      )
+      const [{ data }] = prisma.aiRunStep.createMany.mock.calls.at(-1) as unknown as [
+        { data: { type: string }[] },
+      ]
+      expect(data.map((s) => s.type)).toEqual(['OUTPUT_VALIDATION', 'REFUSAL'])
+      expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ terminalReasonCode: 'guardrail_output_blocked' }),
         })
       )
     })

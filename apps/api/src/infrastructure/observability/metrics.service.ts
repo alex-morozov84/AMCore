@@ -69,6 +69,8 @@ export type AiMetricsProvider =
   | 'mock'
 export type AiMetricsOperation = 'text' | 'object'
 export type AiMetricsTokenDirection = 'input' | 'output'
+export type AiMetricsGuardrailStage = 'input' | 'output'
+export type AiMetricsGuardrailVerdict = 'allow' | 'flag' | 'block'
 export type CacheMetricsResult = 'hit' | 'negative_hit' | 'miss' | 'db_fallback' | 'corrupt'
 export type StorageMetricsDriver = 's3' | 'local' | 'memory'
 export type StorageMetricsOperation =
@@ -131,6 +133,7 @@ export class MetricsService implements OnModuleDestroy {
   private readonly notificationRealtimeEventsTotal: Counter<'event' | 'role'>
   private readonly aiGenerationsTotal: Counter<'provider' | 'operation' | 'result' | 'role'>
   private readonly aiTokensTotal: Counter<'provider' | 'direction' | 'role'>
+  private readonly aiGuardrailChecksTotal: Counter<'stage' | 'verdict' | 'role'>
   private readonly aiRunRealtimePublishTotal: Counter<'outcome' | 'role'>
   private readonly aiRunRealtimeConnections: Gauge<'role'>
   private readonly aiRunRealtimeEventsTotal: Counter<'event' | 'role'>
@@ -255,6 +258,10 @@ export class MetricsService implements OnModuleDestroy {
     this.aiTokensTotal = this.getOrCreateCounter(METRIC_NAMES.aiTokensTotal, {
       help: 'Total AI tokens by provider type, direction (input/output), and process role.',
       labelNames: ['provider', 'direction', 'role'],
+    })
+    this.aiGuardrailChecksTotal = this.getOrCreateCounter(METRIC_NAMES.aiGuardrailChecksTotal, {
+      help: 'Total AI guardrail checks by stage (input/output), verdict (allow/flag/block), and process role. No prompt/output content, marker, or category value is ever a label.',
+      labelNames: ['stage', 'verdict', 'role'],
     })
     this.aiRunRealtimePublishTotal = this.getOrCreateCounter(
       METRIC_NAMES.aiRunRealtimePublishTotal,
@@ -387,6 +394,15 @@ export class MetricsService implements OnModuleDestroy {
   ): void {
     if (!this.enabled || count <= 0) return
     this.aiTokensTotal.inc({ provider, direction, role: this.role }, count)
+  }
+
+  /**
+   * Count one AI guardrail check (Arc D). Only the low-cardinality `stage`/`verdict` (+ process
+   * role) are labels — never a prompt/output snippet, the boundary marker, or a category value.
+   */
+  incAiGuardrailCheck(stage: AiMetricsGuardrailStage, verdict: AiMetricsGuardrailVerdict): void {
+    if (!this.enabled) return
+    this.aiGuardrailChecksTotal.inc({ stage, verdict, role: this.role })
   }
 
   observeStorageOperation(

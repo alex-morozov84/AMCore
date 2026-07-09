@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI capability layer — prompt-injection guardrail baseline (Track C, Arc D). Defense-in-depth
+  containment per OWASP LLM01, applied by the worker around every run: a **structural trust boundary**
+  (a code-owned trusted `system` instruction + the untrusted user turn JSON-encoded in a salted
+  `<amcore:user-data-{nonce}>` container with `<`/`>`/`&` escaped, so a forged closing marker can
+  never appear as a token; the nonce is collision-hardening, not a secret; provider-agnostic
+  `system`+`messages` only), deterministic **low-false-positive input/output guards**, and a **safe
+  refusal**. The input guard is gated by `AI_GUARDRAIL_INPUT_MODE` (`off` | `flag` default | `block`)
+  and hard-blocks only an attack on AMCore's own envelope/markers — generic jailbreak phrasing merely
+  flags, so a benign prompt that discusses/quotes injection is never blocked; the output guard (always
+  on) discards a leaked/disclosing model output before persistence; oversized input
+  (`AI_GUARDRAIL_MAX_INPUT_CHARS`) is refused. A guardrail block is a terminal, non-retryable `FAILED`
+  run with a bounded `terminalReasonCode` (`guardrail_input_blocked` / `guardrail_output_blocked` /
+  `guardrail_input_too_large`) plus a fixed canned refusal turn (`role=ASSISTANT`, author `SYSTEM`,
+  redaction-classified) and content-free `GUARDRAIL_CHECK`/`OUTPUT_VALIDATION`/`REFUSAL` steps. A
+  small, in-repo, license-clean adversarial corpus drives the guards as a **regression signal, not a
+  security guarantee** — prompt injection is mitigated and contained, never eliminated; indirect
+  injection via tools/files is deferred to later arcs that reuse this boundary. Content-free telemetry
+  adds `amcore_ai_guardrail_checks_total{stage,verdict,role}` (no prompt/output/marker/category ever a
+  label). New env: `AI_GUARDRAIL_INPUT_MODE`, `AI_GUARDRAIL_MAX_INPUT_CHARS`.
 - AI capability layer — durable runs + run API (Track C, Arc C). Wires the `ModelGateway` into a
   worker-only durable run engine and a bearer-authenticated HTTP surface. **Process roles
   (ADR-041):** the **web** role creates/reads runs and hosts the SSE stream; the **worker** role is

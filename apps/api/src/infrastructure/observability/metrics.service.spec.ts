@@ -165,6 +165,26 @@ describe('MetricsService', () => {
     )
   })
 
+  it('records AI guardrail checks with only bounded stage/verdict/role labels', async () => {
+    const service = makeService()
+
+    service.incAiGuardrailCheck('input', 'flag')
+    service.incAiGuardrailCheck('input', 'block')
+    service.incAiGuardrailCheck('output', 'allow')
+
+    const output = await service.metrics()
+    expect(output).toContain(
+      `${METRIC_NAMES.aiGuardrailChecksTotal}{stage="input",verdict="flag",role="web"`
+    )
+    expect(output).toContain('stage="input",verdict="block",role="web"')
+    expect(output).toContain('stage="output",verdict="allow",role="web"')
+    // Only the three bounded labels — no category/reason/marker label ever appears.
+    const line = output
+      .split('\n')
+      .find((l) => l.startsWith(`${METRIC_NAMES.aiGuardrailChecksTotal}{stage="input"`))
+    expect(line).not.toMatch(/category=|reason=|marker=/)
+  })
+
   it('records bounded cache, storage, media, and email metrics', async () => {
     const service = makeService()
 

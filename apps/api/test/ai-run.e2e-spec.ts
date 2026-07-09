@@ -142,7 +142,11 @@ describe('AI run durable worker (e2e)', () => {
       const assistant = await prisma.aiMessage.findFirstOrThrow({
         where: { runId, role: AiMessageRole.ASSISTANT },
       })
-      expect(assistant.content).toEqual([{ type: 'text', text: '[mock:mock] hello' }])
+      // Arc D: the worker sends the user turn through the structural trust boundary, and the mock
+      // answers the INNER user text (not the wrapper), so the assistant turn is the clean echo and
+      // carries no boundary marker (which would otherwise trip the output guard).
+      const assistantPart = (assistant.content as { type: string; text: string }[])[0]!
+      expect(assistantPart).toEqual({ type: 'text', text: '[mock:mock] hello' })
 
       const steps = await prisma.aiRunStep.findMany({
         where: { runId },

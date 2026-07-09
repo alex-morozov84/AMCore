@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import type { AiRunStepType, Prisma } from '@prisma/client'
 
 /**
  * A run atomically claimed for one execution attempt: leased (`RUNNING`), its `attemptCount` already
@@ -31,4 +31,23 @@ export type RunRetryOutcome =
 export interface RunReapResult {
   rescheduled: number
   failed: number
+}
+
+/** One content-free guard finding recorded on a refusal check step (bounded code + count only). */
+export interface GuardrailStepCategory {
+  category: string
+  count: number
+}
+
+/**
+ * Inputs to `AiRunRepository.finalizeRefusal` (Track C — ADR-054 / ADR-055, Arc D). Every field is
+ * bounded and content-free; the detectors that populate them are wired in Arc D.4.
+ */
+export interface GuardrailRefusalInput {
+  /** Bounded terminal reason (e.g. `AiRunTerminalReason.GUARDRAIL_INPUT_BLOCKED`). */
+  reasonCode: string
+  /** The guard-stage step type: `GUARDRAIL_CHECK` for input, `OUTPUT_VALIDATION` for output. */
+  checkStepType: AiRunStepType
+  /** Content-free findings for the check step's `detail` (bounded category codes + counts only). */
+  categories?: GuardrailStepCategory[]
 }

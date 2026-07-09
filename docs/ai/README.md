@@ -10,12 +10,12 @@ consumers.
 
 > **Status — foundational (Track C, arc-phased).** Arc A shipped the persistence
 > schema and shared contracts; Arc B added the runtime `ModelGateway` and catalog
-> registry; **Arc C wires the durable run worker and the run HTTP surface** — bearer
-> conversation/run create/fetch/list/cancel plus a status-only SSE stream, executed by
-> a worker-only durable engine (BullMQ wake + Postgres claim/lease/recovery). Guardrails,
-> the tool loop, human takeover, and multimodal routing land in later arcs (D–G), each
-> additive over what is documented here. Sections marked _(later arc)_ describe the
-> intended shape those arcs build toward.
+> registry; Arc C wired the durable run worker and the run HTTP surface (bearer
+> conversation/run create/fetch/list/cancel plus a status-only SSE stream); **Arc D adds
+> the prompt-injection guardrail baseline** — a structural trust boundary, input/output
+> guards, safe refusals, and an adversarial corpus gate. The tool loop, human takeover,
+> and multimodal routing land in later arcs (E–G), each additive over what is documented
+> here. Sections marked _(later arc)_ describe the intended shape those arcs build toward.
 
 ## Design Principles
 
@@ -204,6 +204,54 @@ Realtime knobs (all optional; an AI-scoped copy of the notification realtime kno
 Content-free run metrics: `amcore_ai_run_realtime_connections`, `amcore_ai_run_realtime_publish_total`,
 `amcore_ai_run_realtime_events_total` (see [`docs/operations/observability.md`](../operations/observability.md)).
 
+## Guardrails: prompt-injection containment (shipped — Arc D)
+
+Arc D adds the reusable guardrail baseline the worker applies around **every** run. It follows
+OWASP LLM01 defense-in-depth: the **primary** control is structural, backed by deterministic
+low-false-positive guards and a safe refusal. It is **mitigated and contained, never eliminated** —
+and it is the primitive the tool (Arc E) and multimodal (Arc G) arcs reuse to mark tool results and
+files as untrusted.
+
+- **Structural trust boundary (primary).** The worker never concatenates user text into the
+  instruction channel. It puts a code-owned trusted instruction in `system` and wraps the untrusted
+  user turn as a **JSON-encoded, salted `<amcore:user-data-{nonce}>` container**, escaping every
+  `<`/`>`/`&` so a forged closing marker can never appear as a literal token. The nonce is
+  collision-hardening / a leak canary, **not** a secret. The shape is provider-agnostic (`system` +
+  `messages`) — no provider-specific blocks.
+- **Input guard (deterministic, low-FP).** Scans the untrusted text → `allow | flag | block`.
+  Gated by `AI_GUARDRAIL_INPUT_MODE`: `off` disables it; `flag` (default) records/counts findings but
+  never blocks; `block` hard-blocks **only** an attack on AMCore's own envelope/markers. Generic
+  jailbreak / "ignore previous instructions" phrasing only **flags** — a prompt that merely discusses
+  or quotes an injection technique is never hard-blocked.
+- **Output guard (always on).** Runs on the complete model output **before persistence**; a boundary/
+  preamble-marker leak or a self-disclosure of hidden instructions is **discarded** (never persisted)
+  and the run refuses.
+- **Oversize (always on).** Input past `AI_GUARDRAIL_MAX_INPUT_CHARS` is refused
+  (`guardrail_input_too_large`), independent of the input mode.
+- **Safe refusal.** A guardrail block is a **terminal, non-retryable `FAILED`** run with a bounded
+  `terminalReasonCode` (`guardrail_input_blocked` / `guardrail_output_blocked` /
+  `guardrail_input_too_large`) surfaced by `GET /ai/runs/:id`, plus a fixed canned assistant-visible
+  refusal turn (`role=ASSISTANT`, author `SYSTEM`, redaction-classified — so it is attributably not a
+  model generation) and content-free `GUARDRAIL_CHECK`/`OUTPUT_VALIDATION`/`REFUSAL` steps.
+- **Adversarial corpus gate.** A small, in-repo, license-clean corpus (attack + benign + multilingual)
+  drives the guards as a **regression signal, not a proof of completeness or a security guarantee**.
+  It is not a vendored external dataset.
+- **Content-free telemetry.** No prompt/output content or boundary marker is ever logged, stored, or
+  put in a metric label. Step detail records only **bounded category codes + counts** (defensively
+  sanitized to a strict grammar at the DB write boundary), and the counter
+  `amcore_ai_guardrail_checks_total{stage,verdict,role}` carries only bounded labels — a category
+  value is never a metric label.
+
+**Not claimed:** model-level jailbreak robustness (that is the provider's alignment), and indirect
+injection via tools/files (addressed by Arcs E/G, which reuse this boundary).
+
+### Configuration (Arc D)
+
+| Env var                        | Purpose                                                                          |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `AI_GUARDRAIL_INPUT_MODE`      | input-guard mode: `off` \| `flag` (default) \| `block`                           |
+| `AI_GUARDRAIL_MAX_INPUT_CHARS` | max characters of untrusted user text before a run is refused (default `100000`) |
+
 ## Seeded Catalog
 
 `pnpm --filter api db:seed` (idempotent) seeds the intended configuration shape so
@@ -218,12 +266,11 @@ a fresh fork sees it without live keys:
 
 ## Coming in Later Arcs
 
-| Arc | Adds _(later arc)_                                                                                                                 |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| D   | Guardrail baseline: the structural trust-boundary prompt builder, input/output guards, and an adversarial prompt-injection corpus. |
-| E   | Self-hosted tool loop with per-tool Zod schemas, allowlists, risk classes, and human-in-the-loop approvals (no product tools).     |
-| F   | Assistant registry admin contract + human takeover / operator review (transcript, take/release control).                           |
-| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing.                                      |
+| Arc | Adds _(later arc)_                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------ |
+| E   | Self-hosted tool loop with per-tool Zod schemas, allowlists, risk classes, and human-in-the-loop approvals (no product tools). |
+| F   | Assistant registry admin contract + human takeover / operator review (transcript, take/release control).                       |
+| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing.                                  |
 
 ## See Also
 

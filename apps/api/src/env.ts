@@ -284,6 +284,13 @@ const envSchema = z.preprocess(
       // Bounded Redis TTL for the catalog snapshot cache (seconds). Capped at 1h so an admin
       // catalog change can never stay stale longer than that even on a typo.
       AI_CATALOG_CACHE_TTL_SECONDS: z.coerce.number().int().min(1).max(3600).default(300),
+      // Arc D input guardrail enforcement mode. `off` disables the heuristic input scan; `flag`
+      // (default) records/counts findings but never blocks; `block` hard-blocks only AMCore
+      // envelope/marker abuse. The structural trust boundary + output guard run regardless.
+      AI_GUARDRAIL_INPUT_MODE: z.enum(['off', 'flag', 'block']).default('flag'),
+      // Max characters of untrusted user text before a run is refused (guardrail_input_too_large).
+      // Always enforced (independent of the input mode). Bounded so a typo can't disable the cap.
+      AI_GUARDRAIL_MAX_INPUT_CHARS: z.coerce.number().int().min(1).max(1_000_000).default(100000),
     })
     .transform((env) => {
       // Locked invariant (Decision C): dev -> local, test -> memory,

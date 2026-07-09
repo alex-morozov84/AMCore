@@ -1,5 +1,7 @@
 export { METRIC_NAMES } from './metrics.constants'
 export type {
+  AiMetricsGuardrailStage,
+  AiMetricsGuardrailVerdict,
   AiMetricsOperation,
   AiMetricsProvider,
   AiMetricsTokenDirection,
