@@ -63,10 +63,26 @@ describe('MockAiAdapter', () => {
     ).rejects.toBeInstanceOf(AiGatewayException)
   })
 
-  it('matches sentinels as substrings so they fire inside the Arc D trust-boundary envelope', async () => {
+  it('reads the inner text of the Arc D trust-boundary envelope and does not echo the marker', async () => {
+    const wrapped = '<amcore:user-data-xyz>\n{"text":"hello world"}\n</amcore:user-data-xyz>'
+    const result = await adapter.generateText(
+      call({ messages: [{ role: 'user', content: wrapped }] })
+    )
+    expect(result.text).toBe('[mock:mock] hello world')
+    expect(result.text).not.toContain('amcore:user-data-')
+  })
+
+  it('fires a sentinel carried inside the envelope (read from the inner text)', async () => {
     const wrapped = '<amcore:user-data-xyz>\n{"text":"__mock_error__"}\n</amcore:user-data-xyz>'
     await expect(
       adapter.generateText(call({ messages: [{ role: 'user', content: wrapped }] }))
     ).rejects.toThrow('mock adapter forced failure')
+  })
+
+  it('emits a boundary-marker-bearing output on the __mock_leak__ sentinel', async () => {
+    const result = await adapter.generateText(
+      call({ messages: [{ role: 'user', content: '__mock_leak__' }] })
+    )
+    expect(result.text).toContain('amcore:user-data-')
   })
 })

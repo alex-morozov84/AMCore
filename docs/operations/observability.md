@@ -173,7 +173,10 @@ model slug, or credential as a label:
 - `amcore_ai_generations_total{provider,operation,result}` — `provider` is the
   lowercase provider _type_ (`anthropic|openai|…|mock`), `operation=text|object`,
   `result=success|error`;
-- `amcore_ai_tokens_total{provider,direction}` — `direction=input|output`.
+- `amcore_ai_tokens_total{provider,direction}` — `direction=input|output`;
+- `amcore_ai_guardrail_checks_total{stage,verdict,role}` — Arc D guardrail checks:
+  `stage=input|output`, `verdict=allow|flag|block`. Only these bounded labels — no
+  prompt/output content, boundary marker, or category value is ever a label.
 
 The AI run **status-only** SSE stream (Arc C) mirrors the notification realtime
 metrics, still carrying no user/IP/run/event IDs:
