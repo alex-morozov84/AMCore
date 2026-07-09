@@ -140,9 +140,23 @@ describe('AiRunExecutorService', () => {
       expect(prisma.aiMessage.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { runId: 'run-1', role: 'USER' } })
       )
+      // Arc D: the untrusted turn is handed to the gateway inside the salted, JSON-encoded trust
+      // boundary (not raw), and a trusted `system` instruction is present.
       expect(gateway.generateText).toHaveBeenCalledWith(
-        expect.objectContaining({ messages: [{ role: 'user', content: 'hi there' }] })
+        expect.objectContaining({
+          system: expect.stringContaining('UNTRUSTED'),
+          messages: [
+            expect.objectContaining({
+              role: 'user',
+              content: expect.stringContaining('amcore:user-data-'),
+            }),
+          ],
+        })
       )
+      const [{ messages }] = gateway.generateText.mock.calls.at(-1) as [
+        { messages: { content: string }[] },
+      ]
+      expect(messages[0]!.content).toContain(JSON.stringify({ text: 'hi there' }))
     })
   })
 

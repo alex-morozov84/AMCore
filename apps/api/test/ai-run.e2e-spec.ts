@@ -142,7 +142,14 @@ describe('AI run durable worker (e2e)', () => {
       const assistant = await prisma.aiMessage.findFirstOrThrow({
         where: { runId, role: AiMessageRole.ASSISTANT },
       })
-      expect(assistant.content).toEqual([{ type: 'text', text: '[mock:mock] hello' }])
+      // Arc D: the worker now sends the user turn through the structural trust boundary, so the mock
+      // echoes the salted, JSON-encoded envelope (not the raw input). Assert the envelope shipped and
+      // the original input is carried as JSON-encoded data inside it.
+      const assistantPart = (assistant.content as { type: string; text: string }[])[0]!
+      expect(assistantPart.type).toBe('text')
+      expect(assistantPart.text).toContain('[mock:mock]')
+      expect(assistantPart.text).toContain('amcore:user-data-')
+      expect(assistantPart.text).toContain(JSON.stringify({ text: 'hello' }))
 
       const steps = await prisma.aiRunStep.findMany({
         where: { runId },

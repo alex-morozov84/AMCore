@@ -23,8 +23,10 @@ export class MockAiAdapter implements AiProviderAdapter {
   async generateText(call: AiAdapterCall): Promise<AiTextResult> {
     const lastUser = [...call.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
 
-    if (lastUser === '__mock_error__') throw new Error('mock adapter forced failure')
-    if (lastUser === '__mock_refusal__') {
+    // Sentinels are matched as substrings so they still fire when the user turn is wrapped by the
+    // Arc D trust-boundary envelope (the mock stays agnostic of that envelope's format).
+    if (lastUser.includes('__mock_error__')) throw new Error('mock adapter forced failure')
+    if (lastUser.includes('__mock_refusal__')) {
       throw AiGatewayException.contentFiltered(call.model.provider.type)
     }
 

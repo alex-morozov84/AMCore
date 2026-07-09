@@ -10,6 +10,7 @@ import { AiRunRealtimePublisher } from '../../../core/ai/realtime/ai-run-realtim
 import { AiGatewayException } from '../gateway/ai-gateway.error'
 import type { AiGenerateMessage, AiTextResult } from '../gateway/ai-gateway.types'
 import { ModelGateway } from '../gateway/model-gateway.service'
+import { buildTrustBoundaryRequest } from '../guardrails/trust-boundary.builder'
 
 import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
@@ -32,6 +33,9 @@ interface RunAttribution {
 /** Everything the provider call + finalization needs, resolved during pre-flight. */
 interface RunPlan {
   modelSlug: string
+  /** Trusted instruction channel (Arc D structural trust boundary). */
+  system: string
+  /** The untrusted user turn, JSON-encoded inside the salted boundary container (Arc D). */
   messages: AiGenerateMessage[]
   attribution: RunAttribution
 }
@@ -44,8 +48,10 @@ interface RunPlan {
  *
  * Per attempt it (1) honors a cancellation/deadline observed *before* the call — no provider I/O
  * then, (2) resolves the model from the run's frozen `modelSnapshot.modelSlug` (never the current
- * default), (3) loads the run's OWN input turn via `AiMessage.runId` (not by sequence), (4) calls
- * `ModelGateway.generateText` **exactly once**, then (5) finalizes in ONE transaction: assistant
+ * default), (3) loads the run's OWN input turn via `AiMessage.runId` (not by sequence), assembles it
+ * through the Arc D structural trust boundary (untrusted user text JSON-encoded in a salted container
+ * + a trusted `system` instruction), (4) calls `ModelGateway.generateText` **exactly once**, then
+ * (5) finalizes in ONE transaction: assistant
  * message + bounded steps + a run-attributed `AiUsageLedger` row + terminal `COMPLETED` CAS.
  *
  * At-least-once provider effect: if the provider succeeds but the finalize transaction fails, the
@@ -97,6 +103,7 @@ export class AiRunExecutorService {
       // in the finalize transaction below, not best-effort here, so it cannot orphan on rollback.
       result = await this.gateway.generateText({
         modelSlug: plan.modelSlug,
+        system: plan.system,
         messages: plan.messages,
         recordUsage: false,
       })
@@ -187,9 +194,15 @@ export class AiRunExecutorService {
       return null
     }
 
+    // Arc D structural trust boundary: the untrusted user text is JSON-encoded inside a salted
+    // container in the `user` turn, and a code-owned trusted instruction goes in `system`. The
+    // input/output guards + oversize enforcement wire in over this shape in Arc D.4.
+    const boundary = buildTrustBoundaryRequest({ untrustedUserText: inputText })
+
     return {
       modelSlug,
-      messages: [{ role: 'user', content: inputText }],
+      system: boundary.system,
+      messages: boundary.messages,
       attribution: {
         userId: conversation.ownerUserId,
         organizationId: conversation.organizationId,

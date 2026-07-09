@@ -62,4 +62,11 @@ describe('MockAiAdapter', () => {
       adapter.generateText(call({ messages: [{ role: 'user', content: '__mock_refusal__' }] }))
     ).rejects.toBeInstanceOf(AiGatewayException)
   })
+
+  it('matches sentinels as substrings so they fire inside the Arc D trust-boundary envelope', async () => {
+    const wrapped = '<amcore:user-data-xyz>\n{"text":"__mock_error__"}\n</amcore:user-data-xyz>'
+    await expect(
+      adapter.generateText(call({ messages: [{ role: 'user', content: wrapped }] }))
+    ).rejects.toThrow('mock adapter forced failure')
+  })
 })
