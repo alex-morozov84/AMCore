@@ -1,19 +1,58 @@
 import { randomUUID } from 'node:crypto'
 
 import { Injectable } from '@nestjs/common'
-import { AiRunStatus, Prisma } from '@prisma/client'
+import { AiAuthorType, AiMessageRole, AiRunStatus, AiRunStepType, Prisma } from '@prisma/client'
 
 import {
   AI_RUN_CLAIM_BATCH_LIMIT,
+  AI_RUN_GUARDRAIL_CATEGORY_CODE,
+  AI_RUN_GUARDRAIL_MAX_CATEGORIES,
+  AI_RUN_GUARDRAIL_REFUSAL_CLASSIFICATION,
+  AI_RUN_GUARDRAIL_REFUSAL_MESSAGE,
   AI_RUN_LEASE_TTL_MS,
   AI_RUN_REAP_BATCH_LIMIT,
   AiRunErrorCode,
   AiRunTerminalReason,
 } from './ai-run.constants'
 import { applyRunRetryAfterFloor, computeNextRunAttemptAt } from './ai-run-backoff'
-import type { ClaimedRun, RunReapResult, RunRetryOutcome } from './ai-run-dispatch.types'
+import type {
+  ClaimedRun,
+  GuardrailRefusalInput,
+  GuardrailStepCategory,
+  RunReapResult,
+  RunRetryOutcome,
+} from './ai-run-dispatch.types'
 
 import { PrismaService } from '@/prisma'
+
+/** Thrown inside `finalizeRefusal`'s transaction when the CAS matches no row → roll everything back. */
+class RunLeaseLostError extends Error {}
+
+/**
+ * Defensively normalize caller-supplied guardrail categories before they are persisted into
+ * `AiRunStep.detail` — the finalizer does not trust its caller for its own content-free guarantee.
+ * Only entries whose `category` matches the bounded code grammar and whose `count` is a positive
+ * safe integer survive; the list is capped. So a snippet, marker value, whitespace, oversized
+ * string, or bad count can never reach the durable step detail even if a future caller passes one.
+ */
+function sanitizeGuardrailCategories(
+  categories: GuardrailStepCategory[] | undefined
+): GuardrailStepCategory[] {
+  if (!Array.isArray(categories)) return []
+  const clean: GuardrailStepCategory[] = []
+  for (const entry of categories) {
+    if (clean.length >= AI_RUN_GUARDRAIL_MAX_CATEGORIES) break
+    if (
+      typeof entry?.category !== 'string' ||
+      !AI_RUN_GUARDRAIL_CATEGORY_CODE.test(entry.category)
+    ) {
+      continue
+    }
+    if (!Number.isSafeInteger(entry.count) || entry.count <= 0) continue
+    clean.push({ category: entry.category, count: entry.count })
+  }
+  return clean
+}
 
 /** Shape returned by the raw claim `UPDATE ... RETURNING`. */
 interface ClaimedRow {
@@ -149,6 +188,57 @@ export class AiRunRepository {
       leaseToken: null,
       leaseExpiresAt: null,
     })
+  }
+
+  /**
+   * Guardrail refusal (Track C — ADR-054 / ADR-055, Arc D): CAS `RUNNING` → terminal **`FAILED`**,
+   * **non-retryable**, plus a fixed safe transcript turn — all in ONE self-contained transaction so
+   * a lost lease rolls back the message + steps + terminal update together (the same safety property
+   * as the executor's success finalizer). Writes, in order: a content-free check step
+   * (`GUARDRAIL_CHECK`/`OUTPUT_VALIDATION` with bounded category counts), a `REFUSAL` step, a canned
+   * assistant-visible refusal message (`role=ASSISTANT`, `authorType=SYSTEM`, redaction-classified —
+   * so it is attributably NOT a model generation even though the run is `FAILED`), and the CAS. It
+   * locks the conversation + allocates a sequence exactly like the success finalizer so the refusal
+   * turn cannot collide on `@@unique(conversationId, sequence)`. Nothing here carries prompt/output
+   * content, the boundary marker, or a snippet — only bounded reason/category codes. Returns whether
+   * the CAS won (false = lease lost, everything rolled back).
+   */
+  async finalizeRefusal(claim: ClaimedRun, refusal: GuardrailRefusalInput): Promise<boolean> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.lockConversation(tx, claim.conversationId)
+        const sequence = await this.nextSequence(tx, claim.conversationId)
+        await tx.aiMessage.create({
+          data: {
+            conversationId: claim.conversationId,
+            runId: claim.id,
+            sequence,
+            role: AiMessageRole.ASSISTANT,
+            authorType: AiAuthorType.SYSTEM,
+            content: [
+              { type: 'text', text: AI_RUN_GUARDRAIL_REFUSAL_MESSAGE },
+            ] as unknown as Prisma.InputJsonValue,
+            redactionMeta: {
+              classification: AI_RUN_GUARDRAIL_REFUSAL_CLASSIFICATION,
+            } satisfies Prisma.InputJsonValue,
+          },
+        })
+        await this.writeRefusalSteps(tx, claim.id, refusal)
+        const won = await this.cas(tx, claim, {
+          status: AiRunStatus.FAILED,
+          finishedAt: new Date(),
+          errorCode: AiRunErrorCode.GUARDRAIL_BLOCKED,
+          terminalReasonCode: refusal.reasonCode,
+          leaseToken: null,
+          leaseExpiresAt: null,
+        })
+        if (!won) throw new RunLeaseLostError()
+      })
+      return true
+    } catch (error) {
+      if (error instanceof RunLeaseLostError) return false
+      throw error
+    }
   }
 
   /**
@@ -295,5 +385,61 @@ export class AiRunRepository {
       data,
     })
     return count === 1
+  }
+
+  /**
+   * Append the two content-free refusal steps: the guard-stage check (bounded category counts only)
+   * and the terminal `REFUSAL` marker. No prompt/output/marker/snippet is ever placed in `detail`.
+   */
+  private async writeRefusalSteps(
+    tx: Prisma.TransactionClient,
+    runId: string,
+    refusal: GuardrailRefusalInput
+  ): Promise<void> {
+    const base = await this.nextStepNumber(tx, runId)
+    const categories = sanitizeGuardrailCategories(refusal.categories)
+    const detail =
+      categories.length > 0 ? ({ categories } as unknown as Prisma.InputJsonValue) : undefined
+    await tx.aiRunStep.createMany({
+      data: [
+        { runId, stepNumber: base, type: refusal.checkStepType, detail, finishedAt: new Date() },
+        {
+          runId,
+          stepNumber: base + 1,
+          type: AiRunStepType.REFUSAL,
+          errorCode: refusal.reasonCode,
+          finishedAt: new Date(),
+        },
+      ],
+    })
+  }
+
+  /** Row-lock the conversation so the refusal turn serializes against concurrent appends. */
+  private async lockConversation(
+    tx: Prisma.TransactionClient,
+    conversationId: string
+  ): Promise<void> {
+    await tx.$queryRaw(Prisma.sql`
+      SELECT id FROM "ai"."ai_conversations" WHERE id = ${conversationId} FOR UPDATE
+    `)
+  }
+
+  private async nextSequence(
+    tx: Prisma.TransactionClient,
+    conversationId: string
+  ): Promise<number> {
+    const { _max } = await tx.aiMessage.aggregate({
+      where: { conversationId },
+      _max: { sequence: true },
+    })
+    return (_max.sequence ?? -1) + 1
+  }
+
+  private async nextStepNumber(tx: Prisma.TransactionClient, runId: string): Promise<number> {
+    const { _max } = await tx.aiRunStep.aggregate({
+      where: { runId },
+      _max: { stepNumber: true },
+    })
+    return (_max.stepNumber ?? 0) + 1
   }
 }

@@ -45,6 +45,14 @@ export const AiRunTerminalReason = {
   PERMANENT_FAILURE: 'permanent_failure',
   /** A cooperative user cancel observed by the executor mid-run. Mirrors the producer's value. */
   CANCELLED_BY_USER: 'cancelled_by_user',
+  /**
+   * Arc D guardrail refusals (terminal, **non-retryable**). Set as `terminalReasonCode` so the wire
+   * (`toAiRunResponse`) lets a client distinguish a policy refusal from an engine failure. The
+   * detectors that pick which reason applies are wired in Arc D.4.
+   */
+  GUARDRAIL_INPUT_BLOCKED: 'guardrail_input_blocked',
+  GUARDRAIL_OUTPUT_BLOCKED: 'guardrail_output_blocked',
+  GUARDRAIL_INPUT_TOO_LARGE: 'guardrail_input_too_large',
 } as const
 
 /**
@@ -63,4 +71,25 @@ export const AiRunErrorCode = {
   NO_INPUT_TEXT: 'no_input_text',
   /** An unexpected non-gateway error around the provider call; retried defensively. */
   UNKNOWN_ERROR: 'unknown_error',
+  /** A guardrail blocked the run (input/output/oversize); the specific reason is terminalReasonCode. */
+  GUARDRAIL_BLOCKED: 'guardrail_blocked',
 } as const
+
+/**
+ * Fixed, content-free refusal turn persisted when a guardrail blocks a run (Arc D). It is a constant
+ * string only — it never reflects the user's input or the model's output.
+ */
+export const AI_RUN_GUARDRAIL_REFUSAL_MESSAGE = "I can't help with that request."
+
+/** `AiMessage.redactionMeta.classification` marking a canned guardrail-refusal assistant turn. */
+export const AI_RUN_GUARDRAIL_REFUSAL_CLASSIFICATION = 'guardrail_refusal'
+
+/**
+ * Bounded grammar for a guardrail finding category code persisted on a refusal check step. The
+ * finalizer enforces this **defensively** (it does not trust the caller), so a snippet, marker
+ * value, whitespace, or long string can never reach `AiRunStep.detail` — only a short lowercase code.
+ */
+export const AI_RUN_GUARDRAIL_CATEGORY_CODE = /^[a-z][a-z0-9_]{0,63}$/
+
+/** Defensive cap on distinct guardrail categories recorded on one refusal check step. */
+export const AI_RUN_GUARDRAIL_MAX_CATEGORIES = 16
