@@ -5,8 +5,6 @@ import { AiAuthorType, AiMessageRole, AiRunStatus, AiRunStepType, Prisma } from 
 
 import {
   AI_RUN_CLAIM_BATCH_LIMIT,
-  AI_RUN_GUARDRAIL_CATEGORY_CODE,
-  AI_RUN_GUARDRAIL_MAX_CATEGORIES,
   AI_RUN_GUARDRAIL_REFUSAL_CLASSIFICATION,
   AI_RUN_GUARDRAIL_REFUSAL_MESSAGE,
   AI_RUN_LEASE_TTL_MS,
@@ -18,41 +16,15 @@ import { applyRunRetryAfterFloor, computeNextRunAttemptAt } from './ai-run-backo
 import type {
   ClaimedRun,
   GuardrailRefusalInput,
-  GuardrailStepCategory,
   RunReapResult,
   RunRetryOutcome,
 } from './ai-run-dispatch.types'
+import { sanitizeGuardrailCategories } from './guardrail-step-detail'
 
 import { PrismaService } from '@/prisma'
 
 /** Thrown inside `finalizeRefusal`'s transaction when the CAS matches no row → roll everything back. */
 class RunLeaseLostError extends Error {}
-
-/**
- * Defensively normalize caller-supplied guardrail categories before they are persisted into
- * `AiRunStep.detail` — the finalizer does not trust its caller for its own content-free guarantee.
- * Only entries whose `category` matches the bounded code grammar and whose `count` is a positive
- * safe integer survive; the list is capped. So a snippet, marker value, whitespace, oversized
- * string, or bad count can never reach the durable step detail even if a future caller passes one.
- */
-function sanitizeGuardrailCategories(
-  categories: GuardrailStepCategory[] | undefined
-): GuardrailStepCategory[] {
-  if (!Array.isArray(categories)) return []
-  const clean: GuardrailStepCategory[] = []
-  for (const entry of categories) {
-    if (clean.length >= AI_RUN_GUARDRAIL_MAX_CATEGORIES) break
-    if (
-      typeof entry?.category !== 'string' ||
-      !AI_RUN_GUARDRAIL_CATEGORY_CODE.test(entry.category)
-    ) {
-      continue
-    }
-    if (!Number.isSafeInteger(entry.count) || entry.count <= 0) continue
-    clean.push({ category: entry.category, count: entry.count })
-  }
-  return clean
-}
 
 /** Shape returned by the raw claim `UPDATE ... RETURNING`. */
 interface ClaimedRow {

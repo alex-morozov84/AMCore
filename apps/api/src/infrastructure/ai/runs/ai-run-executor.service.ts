@@ -10,12 +10,17 @@ import { AiRunRealtimePublisher } from '../../../core/ai/realtime/ai-run-realtim
 import { AiGatewayException } from '../gateway/ai-gateway.error'
 import type { AiGenerateMessage, AiTextResult } from '../gateway/ai-gateway.types'
 import { ModelGateway } from '../gateway/model-gateway.service'
+import { scanInput } from '../guardrails/input-guard'
+import { scanOutput } from '../guardrails/output-guard'
 import { buildTrustBoundaryRequest } from '../guardrails/trust-boundary.builder'
 
 import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
-import type { ClaimedRun } from './ai-run-dispatch.types'
+import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
+import { sanitizeGuardrailCategories } from './guardrail-step-detail'
 
+import { EnvService } from '@/env/env.service'
+import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 
 /** The single bounded realtime reason (Track C — ADR-054, Arc C.5); no content ever rides it. */
@@ -37,6 +42,14 @@ interface RunPlan {
   system: string
   /** The untrusted user turn, JSON-encoded inside the salted boundary container (Arc D). */
   messages: AiGenerateMessage[]
+  /** This run's boundary marker — handed to the output guard to detect leakage (Arc D). */
+  marker: string
+  /**
+   * Content-free findings from an input guard `flag` (Arc D). Recorded as a `GUARDRAIL_CHECK` step
+   * INSIDE the success finalize transaction (never a separate pre-provider write) — empty when the
+   * input allowed or the guard is `off`.
+   */
+  inputFlagCategories: GuardrailStepCategory[]
   attribution: RunAttribution
 }
 
@@ -48,9 +61,11 @@ interface RunPlan {
  *
  * Per attempt it (1) honors a cancellation/deadline observed *before* the call — no provider I/O
  * then, (2) resolves the model from the run's frozen `modelSnapshot.modelSlug` (never the current
- * default), (3) loads the run's OWN input turn via `AiMessage.runId` (not by sequence), assembles it
- * through the Arc D structural trust boundary (untrusted user text JSON-encoded in a salted container
- * + a trusted `system` instruction), (4) calls `ModelGateway.generateText` **exactly once**, then
+ * default), (3) loads the run's OWN input turn via `AiMessage.runId` (not by sequence), enforces the
+ * Arc D guardrails — oversize + input guard (mode-gated) refuse before any provider call, then
+ * assembles the structural trust boundary (untrusted text JSON-encoded in a salted container + a
+ * trusted `system` instruction), (4) calls `ModelGateway.generateText` **exactly once** and runs the
+ * output guard on the complete result (a leak/disclosure discards it for a safe refusal), then
  * (5) finalizes in ONE transaction: assistant
  * message + bounded steps + a run-attributed `AiUsageLedger` row + terminal `COMPLETED` CAS.
  *
@@ -66,6 +81,8 @@ export class AiRunExecutorService {
     private readonly gateway: ModelGateway,
     private readonly repository: AiRunRepository,
     private readonly publisher: AiRunRealtimePublisher,
+    private readonly env: EnvService,
+    private readonly metrics: MetricsService,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(AiRunExecutorService.name)
@@ -111,6 +128,20 @@ export class AiRunExecutorService {
       await this.finalizeError(claim, error)
       return
     }
+
+    // Output guard (Arc D, always enforced — never gated by input mode). Runs on the COMPLETE output
+    // before persistence; a block discards the raw output and finalizes a safe refusal instead.
+    const outputVerdict = scanOutput(result.text, { marker: plan.marker })
+    this.metrics.incAiGuardrailCheck('output', outputVerdict.verdict)
+    if (outputVerdict.verdict === 'block') {
+      await this.repository.finalizeRefusal(claim, {
+        reasonCode: AiRunTerminalReason.GUARDRAIL_OUTPUT_BLOCKED,
+        checkStepType: AiRunStepType.OUTPUT_VALIDATION,
+        categories: outputVerdict.categories,
+      })
+      return
+    }
+
     await this.finalizeSuccess(claim, plan, result, Math.round(performance.now() - startedAt))
   }
 
@@ -194,15 +225,45 @@ export class AiRunExecutorService {
       return null
     }
 
+    // Oversize is a structural bound — ALWAYS enforced (independent of the input guard mode).
+    const maxInputChars = this.env.get('AI_GUARDRAIL_MAX_INPUT_CHARS')
+    if (inputText.length > maxInputChars) {
+      await this.repository.finalizeRefusal(claim, {
+        reasonCode: AiRunTerminalReason.GUARDRAIL_INPUT_TOO_LARGE,
+        checkStepType: AiRunStepType.GUARDRAIL_CHECK,
+      })
+      return null
+    }
+
+    // Input guard (Arc D, heuristic — gated by AI_GUARDRAIL_INPUT_MODE). `off` skips it entirely;
+    // otherwise scan + count. Only `block` mode + a `block` verdict refuses (envelope/marker abuse);
+    // a `flag` is carried into the plan and recorded inside the success finalize tx.
+    let inputFlagCategories: GuardrailStepCategory[] = []
+    const mode = this.env.get('AI_GUARDRAIL_INPUT_MODE')
+    if (mode !== 'off') {
+      const verdict = scanInput(inputText)
+      this.metrics.incAiGuardrailCheck('input', verdict.verdict)
+      if (mode === 'block' && verdict.verdict === 'block') {
+        await this.repository.finalizeRefusal(claim, {
+          reasonCode: AiRunTerminalReason.GUARDRAIL_INPUT_BLOCKED,
+          checkStepType: AiRunStepType.GUARDRAIL_CHECK,
+          categories: verdict.categories,
+        })
+        return null
+      }
+      if (verdict.verdict === 'flag') inputFlagCategories = verdict.categories
+    }
+
     // Arc D structural trust boundary: the untrusted user text is JSON-encoded inside a salted
-    // container in the `user` turn, and a code-owned trusted instruction goes in `system`. The
-    // input/output guards + oversize enforcement wire in over this shape in Arc D.4.
-    const boundary = buildTrustBoundaryRequest({ untrustedUserText: inputText })
+    // container in the `user` turn, and a code-owned trusted instruction goes in `system`.
+    const boundary = buildTrustBoundaryRequest({ untrustedUserText: inputText, maxInputChars })
 
     return {
       modelSlug,
       system: boundary.system,
       messages: boundary.messages,
+      marker: boundary.marker,
+      inputFlagCategories,
       attribution: {
         userId: conversation.ownerUserId,
         organizationId: conversation.organizationId,
@@ -240,7 +301,7 @@ export class AiRunExecutorService {
             content: [{ type: 'text', text: result.text }] as unknown as Prisma.InputJsonValue,
           },
         })
-        await this.writeSteps(tx, claim.id, result, providerDurationMs)
+        await this.writeSteps(tx, claim.id, result, providerDurationMs, plan.inputFlagCategories)
         await tx.aiUsageLedger.create({
           data: {
             runId: claim.id,
@@ -303,35 +364,53 @@ export class AiRunExecutorService {
     await this.repository.finalizeRetry(this.prisma, claim, AiRunErrorCode.UNKNOWN_ERROR)
   }
 
-  /** Two bounded, content-free steps: the provider call and the finalization marker. */
+  /**
+   * Bounded, content-free step trail for a successful run: an optional input `GUARDRAIL_CHECK`
+   * (only when the input guard flagged — written HERE, in the finalize tx, not as a separate
+   * pre-provider write), then the provider call and the finalization marker. The check step carries
+   * only bounded category codes + counts.
+   */
   private async writeSteps(
     tx: Prisma.TransactionClient,
     runId: string,
     result: AiTextResult,
-    providerDurationMs: number
+    providerDurationMs: number,
+    inputFlagCategories: GuardrailStepCategory[]
   ): Promise<void> {
-    const base = await this.nextStepNumber(tx, runId)
-    await tx.aiRunStep.createMany({
-      data: [
-        {
-          runId,
-          stepNumber: base,
-          type: AiRunStepType.PROVIDER_CALL,
-          detail: {
-            finishReason: result.finishReason,
-            providerType: result.providerType,
-          } satisfies Prisma.InputJsonValue,
-          durationMs: providerDurationMs,
-          finishedAt: new Date(),
-        },
-        {
-          runId,
-          stepNumber: base + 1,
-          type: AiRunStepType.FINALIZATION,
-          finishedAt: new Date(),
-        },
-      ],
-    })
+    let stepNumber = await this.nextStepNumber(tx, runId)
+    const steps: Prisma.AiRunStepCreateManyInput[] = []
+    // Sanitize at THIS write boundary too (not only in finalizeRefusal) so the content-free
+    // invariant holds on every guardrail step-detail persistence path (Arc D.4 review).
+    const flagged = sanitizeGuardrailCategories(inputFlagCategories)
+    if (flagged.length > 0) {
+      steps.push({
+        runId,
+        stepNumber: stepNumber++,
+        type: AiRunStepType.GUARDRAIL_CHECK,
+        detail: { categories: flagged } as unknown as Prisma.InputJsonValue,
+        finishedAt: new Date(),
+      })
+    }
+    steps.push(
+      {
+        runId,
+        stepNumber: stepNumber++,
+        type: AiRunStepType.PROVIDER_CALL,
+        detail: {
+          finishReason: result.finishReason,
+          providerType: result.providerType,
+        } satisfies Prisma.InputJsonValue,
+        durationMs: providerDurationMs,
+        finishedAt: new Date(),
+      },
+      {
+        runId,
+        stepNumber: stepNumber++,
+        type: AiRunStepType.FINALIZATION,
+        finishedAt: new Date(),
+      }
+    )
+    await tx.aiRunStep.createMany({ data: steps })
   }
 
   /** Row-lock the conversation so concurrent transcript appends serialize (mirrors the producer). */
