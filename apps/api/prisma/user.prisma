@@ -46,6 +46,9 @@ enum AuditTargetType {
   SESSION
   CLEANUP
   TELEGRAM_CONNECTION
+  AI_RUN
+  AI_TOOL_INVOCATION
+  AI_APPROVAL
 
   @@schema("core")
 }

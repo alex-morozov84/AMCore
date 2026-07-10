@@ -185,6 +185,44 @@ describe('MetricsService', () => {
     expect(line).not.toMatch(/category=|reason=|marker=/)
   })
 
+  it('records AI tool-invocation, approval, and loop-step metrics with only bounded labels', async () => {
+    const service = makeService()
+
+    service.incAiToolInvocation('current_time', 'safe', 'succeeded')
+    service.incAiApproval('tool_invocation', 'pending')
+    service.observeAiToolLoopSteps('completed', 3)
+
+    const output = await service.metrics()
+    expect(output).toContain(
+      `${METRIC_NAMES.aiToolInvocationsTotal}{tool_id="current_time",risk_class="safe",outcome="succeeded",role="web"`
+    )
+    expect(output).toContain(
+      `${METRIC_NAMES.aiApprovalsTotal}{kind="tool_invocation",state="pending",role="web"`
+    )
+    // Histograms render default labels before observe-time labels, so match by content, not order.
+    const countLine = output
+      .split('\n')
+      .find((l) => l.startsWith(`${METRIC_NAMES.aiToolLoopSteps}_count`))
+    expect(countLine).toContain('outcome="completed"')
+    expect(countLine).toContain('role="web"')
+    expect(countLine?.endsWith(' 1')).toBe(true)
+    // No args/result/prompt or run/user id ever appears as a label.
+    const line = output
+      .split('\n')
+      .find((l) => l.startsWith(`${METRIC_NAMES.aiToolInvocationsTotal}{`))
+    expect(line).not.toMatch(/args=|result=|prompt=|run_id=|user_id=/)
+  })
+
+  it('coerces an out-of-grammar tool id to a bounded fallback label', async () => {
+    const service = makeService()
+
+    service.incAiToolInvocation('Bad-Tool-Id', 'safe', 'failed')
+
+    const output = await service.metrics()
+    expect(output).toContain('tool_id="unknown",risk_class="safe",outcome="failed",role="web"')
+    expect(output).not.toContain('tool_id="Bad-Tool-Id"')
+  })
+
   it('records bounded cache, storage, media, and email metrics', async () => {
     const service = makeService()
 
