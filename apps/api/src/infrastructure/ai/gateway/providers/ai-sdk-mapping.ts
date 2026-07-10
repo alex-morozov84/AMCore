@@ -1,25 +1,38 @@
 import type { AiProviderType } from '@prisma/client'
 import {
   APICallError,
-  type GenerateTextResult,
   type LanguageModelUsage,
+  type ModelMessage,
   NoObjectGeneratedError,
+  tool,
+  type ToolSet,
   TypeValidationError,
 } from 'ai'
 
 import { AiGatewayException } from '../ai-gateway.error'
-import type { AiAdapterCall, AiFinishReason, AiTextResult, AiUsage } from '../ai-gateway.types'
+import type {
+  AiAdapterCall,
+  AiFinishReason,
+  AiGatewayTool,
+  AiGenerateMessage,
+  AiTextResult,
+  AiToolCall,
+  AiUsage,
+} from '../ai-gateway.types'
 
 /**
  * Mapping helpers between the Vercel AI SDK and AMCore's own gateway contracts (Track C —
- * ADR-054, Arc B). The SDK is an implementation detail: its result/error/finish-reason types
- * never leak past this boundary — adapters return our `AiTextResult` and throw our bounded
- * `AiGatewayException`. No prompt/response content or credential is ever read into a log or error.
+ * ADR-054, Arc B; tool calling added in Arc E). The SDK is an implementation detail: its
+ * result/error/message types never leak past this boundary — adapters speak AMCore's
+ * `AiGenerateMessage`/`AiTextResult` and throw our bounded `AiGatewayException`. The tool mapping is
+ * provider-agnostic: tools and tool-call/tool-result turns are expressed in the SDK's neutral
+ * message parts, never a provider-specific block. No prompt/response content or credential is logged.
  */
 
 function mapFinishReason(reason: string): AiFinishReason {
   if (reason === 'stop') return 'stop'
   if (reason === 'length') return 'length'
+  if (reason === 'tool-calls') return 'tool_calls'
   return 'other'
 }
 
@@ -30,9 +43,31 @@ export function mapUsage(usage: LanguageModelUsage): AiUsage {
   return { inputTokens, outputTokens, totalTokens: usage.totalTokens ?? inputTokens + outputTokens }
 }
 
+/** A structural view of one SDK tool call — the fields we normalize (SDK adds provider extras). */
+interface RawToolCall {
+  toolCallId: string
+  toolName: string
+  input: unknown
+}
+
+/** Normalize the SDK's typed tool calls into our bounded, provider-agnostic `AiToolCall[]`. */
+export function mapToolCalls(calls: readonly RawToolCall[] | undefined): AiToolCall[] {
+  if (calls === undefined) return []
+  return calls.map((call) => ({
+    toolCallId: call.toolCallId,
+    toolName: call.toolName,
+    input: call.input,
+  }))
+}
+
 /** Map a successful SDK text result; a provider safety refusal becomes a `content_filtered` error. */
 export function mapTextResult(
-  result: Pick<GenerateTextResult<never, never>, 'text' | 'finishReason' | 'usage'>,
+  result: {
+    text: string
+    finishReason: string
+    usage: LanguageModelUsage
+    toolCalls?: readonly RawToolCall[]
+  },
   call: AiAdapterCall
 ): AiTextResult {
   const providerType = call.model.provider.type
@@ -42,10 +77,62 @@ export function mapTextResult(
   return {
     text: result.text,
     finishReason: mapFinishReason(result.finishReason),
+    toolCalls: mapToolCalls(result.toolCalls),
     usage: mapUsage(result.usage),
     modelSlug: call.model.slug,
     providerType,
   }
+}
+
+/**
+ * Convert AMCore's provider-agnostic turns into SDK `ModelMessage`s. A user/assistant text turn maps
+ * to a plain message; an assistant tool-call turn maps to `tool-call` content parts; a tool-result
+ * turn maps to a `tool` message with `tool-result` parts whose text output is sent as
+ * `{ type: 'text' }`. This is the only place tool turns take SDK shape — kept neutral across providers.
+ */
+export function toModelMessages(messages: AiGenerateMessage[]): ModelMessage[] {
+  return messages.map((message): ModelMessage => {
+    if (message.role === 'user') return { role: 'user', content: message.content }
+    if (message.role === 'tool') {
+      return {
+        role: 'tool',
+        content: message.toolResults.map((result) => ({
+          type: 'tool-result',
+          toolCallId: result.toolCallId,
+          toolName: result.toolName,
+          output: { type: 'text', value: result.output },
+        })),
+      }
+    }
+    if ('toolCalls' in message) {
+      return {
+        role: 'assistant',
+        content: message.toolCalls.map((call) => ({
+          type: 'tool-call',
+          toolCallId: call.toolCallId,
+          toolName: call.toolName,
+          input: call.input,
+        })),
+      }
+    }
+    return { role: 'assistant', content: message.content }
+  })
+}
+
+/**
+ * Build the SDK `ToolSet` for one step from AMCore tool descriptors. Each tool is registered with its
+ * description + Zod input schema and **no `execute`** — so the SDK returns the model's tool calls
+ * unexecuted (invariant 1); the worker loop validates and runs them host-side.
+ */
+export function toSdkTools(tools: AiGatewayTool[]): ToolSet {
+  const set: ToolSet = {}
+  for (const descriptor of tools) {
+    set[descriptor.name] = tool({
+      description: descriptor.description,
+      inputSchema: descriptor.parameters,
+    })
+  }
+  return set
 }
 
 function isAbortError(error: unknown): boolean {

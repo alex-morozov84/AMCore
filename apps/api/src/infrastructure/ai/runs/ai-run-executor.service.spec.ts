@@ -48,6 +48,7 @@ function textResult(over: Partial<AiTextResult> = {}): AiTextResult {
   return {
     text: 'hello',
     finishReason: 'stop',
+    toolCalls: [],
     usage: { inputTokens: 1, outputTokens: 2, totalTokens: 3 },
     modelSlug: 'claude-default',
     providerType: 'MOCK' as AiTextResult['providerType'],

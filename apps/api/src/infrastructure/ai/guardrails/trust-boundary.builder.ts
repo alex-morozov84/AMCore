@@ -1,7 +1,5 @@
 import { randomBytes } from 'node:crypto'
 
-import type { AiGenerateMessage } from '../gateway/ai-gateway.types'
-
 import { DEFAULT_GUARD_INSTRUCTION } from './default-instruction'
 import {
   GUARDRAIL_BOUNDARY_TAG_PREFIX,
@@ -28,8 +26,12 @@ export interface TrustBoundaryInput {
 export interface TrustBoundaryResult {
   /** Trusted instruction + the structural-boundary policy referencing this run's marker. */
   system: string
-  /** The gateway `messages`: a single user turn carrying the JSON-encoded untrusted envelope. */
-  messages: AiGenerateMessage[]
+  /**
+   * The gateway `messages`: always a single `user` turn carrying the JSON-encoded untrusted
+   * envelope. Narrowed to the user variant (assignable to `AiGenerateMessage[]`) so the boundary
+   * never emits a tool/assistant turn — the loop assembles those from the persisted transcript.
+   */
+  messages: Array<{ role: 'user'; content: string }>
   /** The per-run boundary marker tag name (a canary for the output guard; NOT a secret). */
   marker: string
   /** Whether `untrustedUserText` exceeded `maxInputChars` (executor turns this terminal in D.4). */

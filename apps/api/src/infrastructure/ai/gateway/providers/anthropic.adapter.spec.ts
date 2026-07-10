@@ -1,4 +1,5 @@
 import { AiProviderType } from '@prisma/client'
+import { z } from 'zod'
 
 import type { AiAdapterCall } from '../ai-gateway.types'
 
@@ -89,6 +90,36 @@ describe('AnthropicAdapter', () => {
 
     expect(fetchImpl.calls[0]!.url).toContain('https://api.anthropic.com/v1/messages')
     expect(fetchImpl.calls[0]!.url).not.toContain('evil.example')
+  })
+
+  it('round-trips a tool call provider-agnostically: maps a tool_use block to toolCalls (Arc E)', async () => {
+    const toolUse = {
+      id: 'msg_2',
+      type: 'message',
+      role: 'assistant',
+      model: 'claude-opus-4-8',
+      content: [{ type: 'tool_use', id: 'toolu_1', name: 'current_time', input: {} }],
+      stop_reason: 'tool_use',
+      stop_sequence: null,
+      usage: { input_tokens: 10, output_tokens: 5 },
+    }
+    const adapter = new AnthropicAdapter(fakeFetch(toolUse))
+
+    const result = await adapter.generateText({
+      ...call(),
+      tools: [
+        {
+          name: 'current_time',
+          description: 'Returns the time.',
+          parameters: z.object({}).strict(),
+        },
+      ],
+    })
+
+    expect(result.finishReason).toBe('tool_calls')
+    expect(result.toolCalls).toEqual([
+      { toolCallId: 'toolu_1', toolName: 'current_time', input: {} },
+    ])
   })
 
   it('normalizes a 5xx to a retryable provider_unavailable', async () => {
