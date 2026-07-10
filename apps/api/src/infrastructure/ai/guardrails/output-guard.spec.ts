@@ -8,13 +8,23 @@ describe('scanOutput (Arc D output guard)', () => {
   describe('block tier — any finding is terminal', () => {
     it('blocks output that echoes the run boundary marker (passed via context)', () => {
       const marker = 'amcore:user-data-abc123'
-      const result = scanOutput(`Your text was inside <${marker}> ... </${marker}>.`, { marker })
+      const result = scanOutput(`Your text was inside <${marker}> ... </${marker}>.`, {
+        markers: [marker],
+      })
       expect(result.verdict).toBe('block')
       expect(result.categories.map((c) => c.category)).toContain(CAT.BOUNDARY_MARKER_LEAK)
     })
 
     it('blocks output that echoes the generic marker prefix even without context', () => {
       expect(scanOutput('the wrapper was amcore:user-data-zzz').verdict).toBe('block')
+    })
+
+    it('detects leakage of every active marker in the list, not only the first (Arc E)', () => {
+      // A non-prefixed marker proves the list itself is scanned (independent of the generic prefix).
+      const result = scanOutput('output mentions custom-boundary-xyz', {
+        markers: ['amcore:user-data-u1', 'custom-boundary-xyz'],
+      })
+      expect(result.verdict).toBe('block')
     })
 
     it('blocks output that reproduces a preamble sentinel', () => {
@@ -54,7 +64,7 @@ describe('scanOutput (Arc D output guard)', () => {
   describe('content-free result', () => {
     it('returns only bounded output categories and never leaks the marker value', () => {
       const marker = 'amcore:user-data-distinctive-9f3a'
-      const result = scanOutput(`leaked <${marker}>`, { marker })
+      const result = scanOutput(`leaked <${marker}>`, { markers: [marker] })
       for (const hit of result.categories) expect(BOUNDED.has(hit.category)).toBe(true)
       expect(JSON.stringify(result)).not.toContain('distinctive-9f3a')
     })

@@ -131,7 +131,7 @@ export class AiRunExecutorService {
 
     // Output guard (Arc D, always enforced — never gated by input mode). Runs on the COMPLETE output
     // before persistence; a block discards the raw output and finalizes a safe refusal instead.
-    const outputVerdict = scanOutput(result.text, { marker: plan.marker })
+    const outputVerdict = scanOutput(result.text, { markers: [plan.marker] })
     this.metrics.incAiGuardrailCheck('output', outputVerdict.verdict)
     if (outputVerdict.verdict === 'block') {
       await this.repository.finalizeRefusal(claim, {

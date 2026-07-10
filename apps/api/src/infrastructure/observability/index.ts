@@ -1,10 +1,15 @@
 export { METRIC_NAMES } from './metrics.constants'
 export type {
+  AiMetricsApprovalKind,
+  AiMetricsApprovalState,
   AiMetricsGuardrailStage,
   AiMetricsGuardrailVerdict,
   AiMetricsOperation,
   AiMetricsProvider,
   AiMetricsTokenDirection,
+  AiMetricsToolLoopOutcome,
+  AiMetricsToolOutcome,
+  AiMetricsToolRiskClass,
   EmailMetricsMode,
   EmailMetricsTemplate,
   StorageMetricsOperation,

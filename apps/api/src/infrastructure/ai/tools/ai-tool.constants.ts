@@ -25,6 +25,20 @@ export function toolIdempotencyKey(invocationId: string): string {
 }
 
 /**
+ * Bounded, machine-readable per-invocation error codes (`AiToolInvocation.errorCode`) — never a tool
+ * payload, args, result, or free text. The loop maps these to a run terminal reason (Arc E.4).
+ */
+export const AiToolErrorCode = {
+  /** The model requested a tool not registered or not on the conversation allowlist. */
+  TOOL_NOT_ALLOWED: 'tool_not_allowed',
+  /** The model's tool arguments failed the tool's Zod parameter schema. */
+  TOOL_ARGS_INVALID: 'tool_args_invalid',
+  /** The tool's `execute` threw or exceeded `AI_TOOL_EXECUTION_TIMEOUT_MS`. */
+  TOOL_EXECUTION_FAILED: 'tool_execution_failed',
+} as const
+export type AiToolErrorCodeValue = (typeof AiToolErrorCode)[keyof typeof AiToolErrorCode]
+
+/**
  * Code-owned risk → approval policy (Arc E). Only SAFE tools run without a human-in-the-loop
  * approval; SENSITIVE and DESTRUCTIVE tools always require one. The policy is code-owned, never
  * model- or catalog-supplied, so a hostile catalog/model cannot downgrade a tool's risk.

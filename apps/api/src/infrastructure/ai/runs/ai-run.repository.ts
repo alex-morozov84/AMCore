@@ -105,6 +105,20 @@ export class AiRunRepository {
     }))
   }
 
+  /**
+   * Extend the lease on a still-owned `RUNNING` run (Arc E bounded loop, whose steps can outlast the
+   * initial lease). CAS on `(id, status=RUNNING, leaseToken)` so a worker that already lost the lease
+   * cannot renew it; returns false when the lease was reclaimed (the loop must then stop).
+   */
+  async renewLease(claim: ClaimedRun): Promise<boolean> {
+    const leaseExpiresAt = new Date(Date.now() + AI_RUN_LEASE_TTL_MS)
+    const { count } = await this.prisma.aiRun.updateMany({
+      where: { id: claim.id, status: AiRunStatus.RUNNING, leaseToken: claim.leaseToken },
+      data: { leaseExpiresAt },
+    })
+    return count === 1
+  }
+
   /** Run completed: CAS `RUNNING` → terminal `COMPLETED`. */
   finalizeCompleted(tx: Prisma.TransactionClient, claim: ClaimedRun): Promise<boolean> {
     return this.cas(tx, claim, {

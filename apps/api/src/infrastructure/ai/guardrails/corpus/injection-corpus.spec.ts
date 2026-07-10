@@ -48,7 +48,8 @@ describe('injection corpus (Arc D.2 seed regression fixture)', () => {
 
   describe('OUTPUT_CORPUS via scanOutput', () => {
     it.each(OUTPUT_CORPUS.map((c) => [c.id, c] as const))('%s', (_id, testCase) => {
-      const result = scanOutput(testCase.text, { marker: markerFor(testCase.text) })
+      const activeMarker = markerFor(testCase.text)
+      const result = scanOutput(testCase.text, { markers: activeMarker ? [activeMarker] : [] })
       const acceptable = testCase.expect === 'not_block' ? ['allow', 'flag'] : [testCase.expect]
       expect(acceptable).toContain(result.verdict)
       assertContentFree(result, testCase.text)

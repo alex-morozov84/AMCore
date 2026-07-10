@@ -53,6 +53,18 @@ export const AiRunTerminalReason = {
   GUARDRAIL_INPUT_BLOCKED: 'guardrail_input_blocked',
   GUARDRAIL_OUTPUT_BLOCKED: 'guardrail_output_blocked',
   GUARDRAIL_INPUT_TOO_LARGE: 'guardrail_input_too_large',
+  /**
+   * Arc E bounded tool loop terminal reasons (non-retryable). The loop hit its step bound, the model
+   * broke the one-call-per-step contract, requested a tool it may not use, produced invalid tool
+   * arguments, a tool failed host-side, or requested an approval-gated tool before Arc E.5 wires the
+   * durable park (the E.4 placeholder — E.5 parks to WAITING_APPROVAL instead of failing).
+   */
+  TOOL_LOOP_EXHAUSTED: 'tool_loop_exhausted',
+  TOO_MANY_TOOL_CALLS: 'too_many_tool_calls',
+  TOOL_NOT_ALLOWED: 'tool_not_allowed',
+  TOOL_ARGS_INVALID: 'tool_args_invalid',
+  TOOL_EXECUTION_FAILED: 'tool_execution_failed',
+  TOOL_APPROVAL_REQUIRED: 'tool_approval_required',
 } as const
 
 /**
