@@ -72,6 +72,12 @@ export const AiRunTerminalReason = {
   TOOL_APPROVAL_REQUIRED: 'tool_approval_required',
   /** The approval TTL elapsed before the owner decided (Arc E.5); the run fails non-retryably. */
   APPROVAL_EXPIRED: 'approval_expired',
+  /**
+   * A human took control of the conversation (ADR-049 fence, Arc F): the run's `ownershipGeneration`
+   * snapshot no longer matches the conversation, so the worker abandons it terminally as `CANCELLED`
+   * without writing a stale bot turn. Distinct from a user-requested cancel.
+   */
+  SUPERSEDED_BY_HUMAN: 'superseded_by_human',
 } as const
 
 /**

@@ -3,7 +3,11 @@ import type { PinoLogger } from 'nestjs-pino'
 
 import type { CreateAiRunInput } from '@amcore/shared'
 
-import { NotFoundException, ServiceUnavailableException } from '../../../common/exceptions'
+import {
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '../../../common/exceptions'
 
 import { AiRunProducerService } from './ai-run-producer.service'
 
@@ -67,7 +71,9 @@ describe('AiRunProducerService', () => {
     registry.resolveDefaultModel.mockResolvedValue(DEFAULT_MODEL)
     prisma.$transaction.mockImplementation(((cb: (tx: PrismaService) => Promise<unknown>) =>
       cb(prisma)) as never)
-    prisma.$queryRaw.mockResolvedValue([{ ownerUserId: 'user-1' }] as never)
+    prisma.$queryRaw.mockResolvedValue([
+      { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE' },
+    ] as never)
     prisma.aiMessage.aggregate.mockResolvedValue({ _max: { sequence: null } } as never)
     prisma.aiRun.create.mockResolvedValue(fakeRun() as never)
   })
@@ -110,6 +116,37 @@ describe('AiRunProducerService', () => {
     expect(JSON.stringify(snapshot)).not.toContain('credentialSlot')
     expect(JSON.stringify(snapshot)).not.toContain('baseUrl')
     expect(createArg?.data.maxAttempts).toBe(3)
+  })
+
+  it('freezes the conversation ownershipGeneration onto the run (ADR-049 fence, Arc F)', async () => {
+    // The FOR UPDATE lock returns the conversation's current generation; the run snapshots it.
+    prisma.$queryRaw.mockResolvedValue([
+      { ownershipGeneration: 7, controlledBy: 'BOT', state: 'ACTIVE' },
+    ] as never)
+
+    await service.create('user-1', INPUT)
+
+    const createArg = prisma.aiRun.create.mock.calls[0]?.[0]
+    expect(createArg?.data.ownershipGeneration).toBe(7)
+  })
+
+  it('rejects a new run while a human holds the conversation (409, ADR-049 fence, Arc F)', async () => {
+    prisma.$queryRaw.mockResolvedValue([
+      { ownershipGeneration: 1, controlledBy: 'HUMAN', state: 'PAUSED_FOR_HUMAN' },
+    ] as never)
+
+    await expect(service.create('user-1', INPUT)).rejects.toBeInstanceOf(ConflictException)
+    expect(prisma.aiRun.create).not.toHaveBeenCalled()
+    expect(prisma.aiMessage.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects a new run on a closed conversation (409)', async () => {
+    prisma.$queryRaw.mockResolvedValue([
+      { ownershipGeneration: 0, controlledBy: 'BOT', state: 'CLOSED' },
+    ] as never)
+
+    await expect(service.create('user-1', INPUT)).rejects.toBeInstanceOf(ConflictException)
+    expect(prisma.aiRun.create).not.toHaveBeenCalled()
   })
 
   it('is idempotent: an existing (conversationId, idempotencyKey) run is replayed, not re-created', async () => {

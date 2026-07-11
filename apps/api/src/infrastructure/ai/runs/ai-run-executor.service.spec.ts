@@ -30,6 +30,7 @@ function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
     attemptNumber: 1,
     maxAttempts: 3,
     deadlineAt: null,
+    ownershipGeneration: 0,
     leaseToken: 'lease-abc',
     ...overrides,
   }
@@ -89,6 +90,9 @@ describe('AiRunExecutorService', () => {
     prisma.aiConversation.findUnique.mockResolvedValue({
       ownerUserId: 'u1',
       organizationId: null,
+      ownershipGeneration: 0,
+      controlledBy: 'BOT',
+      state: 'ACTIVE',
       assistant: null,
     } as never)
     prisma.aiMessage.findFirst.mockResolvedValue({
@@ -116,6 +120,9 @@ describe('AiRunExecutorService', () => {
       prisma.aiConversation.findUnique.mockResolvedValue({
         ownerUserId: 'u1',
         organizationId: 'org-9',
+        ownershipGeneration: 0,
+        controlledBy: 'BOT',
+        state: 'ACTIVE',
         assistant: { toolAllowlist: ['current_time'] },
       } as never)
       await executor.execute(claim())
@@ -253,6 +260,26 @@ describe('AiRunExecutorService', () => {
         expect.anything(),
         'no_input_text'
       )
+    })
+
+    it('supersedes (no loop, no spend) when a human took over since the run was queued', async () => {
+      // The conversation generation moved past the run's snapshot (0) — the ADR-049 fence fires.
+      prisma.aiConversation.findUnique.mockResolvedValue({
+        ownerUserId: 'u1',
+        organizationId: null,
+        ownershipGeneration: 1,
+        controlledBy: 'HUMAN',
+        state: 'PAUSED_FOR_HUMAN',
+        assistant: null,
+      } as never)
+      await executor.execute(claim())
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(repository.finalizeSuperseded).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({ id: 'run-1' })
+      )
+      // No provider I/O and no input-guard work happened on a taken-over conversation.
+      expect(metrics.incAiGuardrailCheck).not.toHaveBeenCalled()
     })
   })
 

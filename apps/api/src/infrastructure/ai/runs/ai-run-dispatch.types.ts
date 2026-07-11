@@ -16,6 +16,12 @@ export interface ClaimedRun {
   attemptNumber: number
   maxAttempts: number
   deadlineAt: Date | null
+  /**
+   * The owning conversation's `ownershipGeneration` frozen at run creation (ADR-049 fence, Arc F).
+   * Every durable transcript write re-checks it under lock; a mismatch means a human took over and
+   * the run is abandoned `CANCELLED`/`superseded_by_human` without writing.
+   */
+  ownershipGeneration: number
   /** Batch lease token; every finalizer CAS keys on `(id, status=RUNNING, leaseToken)`. */
   leaseToken: string
 }

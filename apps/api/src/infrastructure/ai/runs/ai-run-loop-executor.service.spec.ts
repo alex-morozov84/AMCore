@@ -46,6 +46,7 @@ function claim(over: Partial<ClaimedRun> = {}): ClaimedRun {
     attemptNumber: 1,
     maxAttempts: 3,
     deadlineAt: null,
+    ownershipGeneration: 0,
     leaseToken: 'lease-abc',
     ...over,
   }
@@ -128,7 +129,15 @@ describe('AiRunLoopExecutor', () => {
     prisma.aiRunStep.count.mockResolvedValue(0 as never)
     prisma.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 0 } } as never)
     prisma.aiMessage.aggregate.mockResolvedValue({ _max: { sequence: 0 } } as never)
-    prisma.$queryRaw.mockResolvedValue([{ id: 'conv-1' }] as never)
+    // The loop-top + in-tx ownership fence reads the conversation; default to fresh, bot-owned, active.
+    prisma.aiConversation.findUnique.mockResolvedValue({
+      ownershipGeneration: 0,
+      controlledBy: 'BOT',
+      state: 'ACTIVE',
+    } as never)
+    prisma.$queryRaw.mockResolvedValue([
+      { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE' },
+    ] as never)
     prisma.$transaction.mockImplementation(((cb: (tx: PrismaService) => Promise<unknown>) =>
       cb(prisma)) as never)
 
@@ -666,6 +675,70 @@ describe('AiRunLoopExecutor', () => {
         expect.any(String)
       )
       expect(metrics.observeAiToolLoopSteps).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('ownership fence (ADR-049, Arc F)', () => {
+    it('supersedes at the loop top — no provider call — when a human took over mid-loop', async () => {
+      // The non-locking loop-top read sees the generation moved / control HUMAN.
+      prisma.aiConversation.findUnique.mockResolvedValue({
+        ownershipGeneration: 2,
+        controlledBy: 'HUMAN',
+        state: 'PAUSED_FOR_HUMAN',
+      } as never)
+
+      await loop.run(claim(), plan())
+
+      expect(gateway.generateText).not.toHaveBeenCalled()
+      expect(repository.finalizeSuperseded).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({ id: 'run-1' })
+      )
+    })
+
+    it('abandons the run superseded (no assistant turn, no COMPLETED) when takeover lands during the final write', async () => {
+      // Loop-top read passes (fresh), but the in-tx FOR UPDATE fence sees the generation moved — the
+      // success transaction rolls back and the run is CANCELLED/superseded instead of COMPLETED.
+      prisma.$queryRaw.mockResolvedValue([
+        { ownershipGeneration: 1, controlledBy: 'HUMAN', state: 'ACTIVE' },
+      ] as never)
+
+      await loop.run(claim(), plan())
+
+      expect(gateway.generateText).toHaveBeenCalledTimes(1)
+      expect(prisma.aiMessage.create).not.toHaveBeenCalled()
+      expect(repository.finalizeCompleted).not.toHaveBeenCalled()
+      expect(repository.finalizeSuperseded).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({ id: 'run-1' })
+      )
+    })
+
+    it('abandons superseded (not FAILED) when takeover lands during a policy-fail provider call', async () => {
+      // > 1 tool call → the loop would normally FAIL too_many_tool_calls; a takeover during the call
+      // fences the failure write → superseded instead, no stale FAILED terminal.
+      gateway.generateText.mockResolvedValue(textResult({ toolCalls: [toolCall(), toolCall()] }))
+      prisma.$queryRaw.mockResolvedValue([
+        { ownershipGeneration: 1, controlledBy: 'HUMAN', state: 'ACTIVE' },
+      ] as never)
+
+      await loop.run(claim(), plan({ toolAllowlist: ['current_time'] }))
+
+      expect(repository.finalizeSuperseded).toHaveBeenCalled()
+      expect(repository.finalizeFailed).not.toHaveBeenCalled()
+    })
+
+    it('stops before dispatching a SAFE tool when takeover lands during the provider call', async () => {
+      // 1 SAFE call; the fenced recordProviderCall sees the takeover and stops the loop before dispatch.
+      gateway.generateText.mockResolvedValue(textResult({ toolCalls: [toolCall()] }))
+      prisma.$queryRaw.mockResolvedValue([
+        { ownershipGeneration: 1, controlledBy: 'HUMAN', state: 'ACTIVE' },
+      ] as never)
+
+      await loop.run(claim(), plan({ toolAllowlist: ['current_time'] }))
+
+      expect(dispatcher.dispatch).not.toHaveBeenCalled()
+      expect(repository.finalizeSuperseded).toHaveBeenCalled()
     })
   })
 })

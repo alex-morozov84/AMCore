@@ -12,6 +12,7 @@ import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
 import { AiRunLoopExecutor } from './ai-run-loop-executor.service'
+import { isBotOwnershipStale } from './ai-run-ownership-fence'
 import type { RunPlan } from './ai-run-plan'
 
 import { EnvService } from '@/env/env.service'
@@ -131,6 +132,9 @@ export class AiRunExecutorService {
       select: {
         ownerUserId: true,
         organizationId: true,
+        ownershipGeneration: true,
+        controlledBy: true,
+        state: true,
         assistant: { select: { toolAllowlist: true } },
       },
     })
@@ -143,6 +147,13 @@ export class AiRunExecutorService {
     })
     if (conversation === null || input === null) {
       await this.repository.finalizeFailed(this.prisma, claim, AiRunErrorCode.INPUT_MISSING)
+      return null
+    }
+
+    // Ownership fence (ADR-049, Arc F): if a human took control since this run was queued, abandon it
+    // terminally BEFORE any provider I/O — no spend, no stale bot turn written into a human conversation.
+    if (isBotOwnershipStale(conversation, claim.ownershipGeneration)) {
+      await this.repository.finalizeSuperseded(this.prisma, claim)
       return null
     }
 

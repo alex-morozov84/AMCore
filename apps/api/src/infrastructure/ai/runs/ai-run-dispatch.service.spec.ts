@@ -20,6 +20,7 @@ function claim(id: string): ClaimedRun {
     attemptNumber: 1,
     maxAttempts: 3,
     deadlineAt: null,
+    ownershipGeneration: 0,
     leaseToken: 'lease',
   }
 }

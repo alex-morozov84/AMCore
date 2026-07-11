@@ -38,6 +38,10 @@ model AiRun {
   id                      String      @id @default(cuid())
   conversationId          String
   status                  AiRunStatus @default(QUEUED)
+  // Snapshot of the owning conversation's `ownershipGeneration` at run creation (ADR-049 fence,
+  // activated Arc F). The worker refuses to write into the conversation once its generation moves
+  // past this snapshot (a human took over) — a stale bot run can never write a human-owned turn.
+  ownershipGeneration     Int         @default(0)
   modelSnapshot           Json
   budgetSnapshot          Json?
   idempotencyKey          String? // idempotent run creation (Arc C)

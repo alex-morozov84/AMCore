@@ -15,6 +15,12 @@ import {
   writeRunSteps,
   writeUsageLedger,
 } from './ai-run-loop-persistence'
+import {
+  ConversationSupersededError,
+  isBotOwnershipStale,
+  lockAndAssertBotOwnership,
+  readBotOwnership,
+} from './ai-run-ownership-fence'
 import type { RunPlan } from './ai-run-plan'
 import { sanitizeGuardrailCategories } from './guardrail-step-detail'
 
@@ -59,6 +65,12 @@ export class AiRunLoopFinalizer {
       })
       this.metrics.observeAiToolLoopSteps('completed', providerCalls)
     } catch (error) {
+      // A human took over during the final write (ADR-049 fence, Arc F): the assistant turn rolled
+      // back — abandon the run superseded rather than authoring into a human-owned conversation.
+      if (error instanceof ConversationSupersededError) {
+        await this.repository.finalizeSuperseded(this.prisma, claim)
+        return
+      }
       this.handleFinalizeError(error, claim)
     }
   }
@@ -72,35 +84,30 @@ export class AiRunLoopFinalizer {
     reason: string,
     providerCalls: number
   ): Promise<void> {
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await writeRunSteps(tx, claim.id, [providerCallStep(result, durationMs)])
-        await writeUsageLedger(tx, claim, plan.attribution, plan.modelSlug, result)
-        if (
-          !(await this.repository.finalizeFailed(
-            tx,
-            claim,
-            AiRunErrorCode.TOOL_LOOP_FAILED,
-            reason
-          ))
-        ) {
-          throw new RunLeaseLostError()
-        }
-      })
-      this.metrics.observeAiToolLoopSteps('failed', providerCalls)
-    } catch (error) {
-      this.handleFinalizeError(error, claim)
-    }
+    const committed = await this.fencedWrite(claim, async (tx) => {
+      await writeRunSteps(tx, claim.id, [providerCallStep(result, durationMs)])
+      await writeUsageLedger(tx, claim, plan.attribution, plan.modelSlug, result)
+      if (
+        !(await this.repository.finalizeFailed(tx, claim, AiRunErrorCode.TOOL_LOOP_FAILED, reason))
+      ) {
+        throw new RunLeaseLostError()
+      }
+    })
+    if (committed) this.metrics.observeAiToolLoopSteps('failed', providerCalls)
   }
 
-  /** Intermediate provider call that led to a SAFE tool dispatch: its own step + ledger tx (no CAS). */
+  /**
+   * Intermediate provider call that led to a SAFE tool dispatch: its own step + ledger tx (no CAS),
+   * fenced. Returns `false` when a human took over (the run is already terminalized superseded) so the
+   * loop stops before dispatching the tool.
+   */
   async recordProviderCall(
     claim: ClaimedRun,
     plan: RunPlan,
     result: AiTextResult,
     durationMs: number
-  ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+  ): Promise<boolean> {
+    return this.fencedWrite(claim, async (tx) => {
       await writeRunSteps(tx, claim.id, [providerCallStep(result, durationMs)])
       await writeUsageLedger(tx, claim, plan.attribution, plan.modelSlug, result)
     })
@@ -108,24 +115,31 @@ export class AiRunLoopFinalizer {
 
   /** Step bound hit before a call this iteration → terminal FAILED (no provider call to ledger). */
   async exhausted(claim: ClaimedRun, providerCalls: number): Promise<void> {
-    await this.repository.finalizeFailed(
-      this.prisma,
-      claim,
-      AiRunErrorCode.TOOL_LOOP_FAILED,
-      AiRunTerminalReason.TOOL_LOOP_EXHAUSTED
-    )
-    this.metrics.observeAiToolLoopSteps('exhausted', providerCalls)
+    const committed = await this.fencedWrite(claim, async (tx) => {
+      if (
+        !(await this.repository.finalizeFailed(
+          tx,
+          claim,
+          AiRunErrorCode.TOOL_LOOP_FAILED,
+          AiRunTerminalReason.TOOL_LOOP_EXHAUSTED
+        ))
+      ) {
+        throw new RunLeaseLostError()
+      }
+    })
+    if (committed) this.metrics.observeAiToolLoopSteps('exhausted', providerCalls)
   }
 
   /** The SAFE tool failed host-side (its invocation is already durable): terminal FAILED CAS. */
   async dispatchFailed(claim: ClaimedRun, reason: string, providerCalls: number): Promise<void> {
-    await this.repository.finalizeFailed(
-      this.prisma,
-      claim,
-      AiRunErrorCode.TOOL_LOOP_FAILED,
-      reason
-    )
-    this.metrics.observeAiToolLoopSteps('failed', providerCalls)
+    const committed = await this.fencedWrite(claim, async (tx) => {
+      if (
+        !(await this.repository.finalizeFailed(tx, claim, AiRunErrorCode.TOOL_LOOP_FAILED, reason))
+      ) {
+        throw new RunLeaseLostError()
+      }
+    })
+    if (committed) this.metrics.observeAiToolLoopSteps('failed', providerCalls)
   }
 
   /** Output guard blocked the model text (Arc D): discard it, canned refusal, terminal FAILED. */
@@ -144,6 +158,17 @@ export class AiRunLoopFinalizer {
 
   /** Map a gateway failure to a retry (retryable) or terminal FAILED (permanent), mirroring Arc C. */
   async gatewayError(claim: ClaimedRun, error: unknown): Promise<void> {
+    // Fence (ADR-049, Arc F): a takeover during the failing provider call → abandon superseded rather
+    // than schedule a retry or write a stale FAILED terminal on a taken-over conversation.
+    if (
+      isBotOwnershipStale(
+        await readBotOwnership(this.prisma, claim.conversationId),
+        claim.ownershipGeneration
+      )
+    ) {
+      await this.repository.finalizeSuperseded(this.prisma, claim)
+      return
+    }
     if (error instanceof AiGatewayException) {
       if (error.retryable) await this.repository.finalizeRetry(this.prisma, claim, error.code)
       else await this.repository.finalizeFailed(this.prisma, claim, error.code)
@@ -171,6 +196,33 @@ export class AiRunLoopFinalizer {
   }
 
   // (providerCallStep moved to ai-run-loop-persistence so AiRunApprovalParker shares it — Arc E.5.)
+
+  /**
+   * Run a fenced durable-write transaction (ADR-049 fence, Arc F): lock the conversation + assert the
+   * run still owns it (bot control, matching generation) BEFORE writing steps/ledger/terminal CAS, then
+   * `write(tx)`. A human takeover rolls the write back and terminalizes the run superseded; a lost lease
+   * / other fault is left for recovery. Returns whether the write committed — terminal callers ignore it
+   * (the loop returns after them), the intermediate `recordProviderCall` caller stops the loop on false.
+   */
+  private async fencedWrite(
+    claim: ClaimedRun,
+    write: (tx: Prisma.TransactionClient) => Promise<void>
+  ): Promise<boolean> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await lockAndAssertBotOwnership(tx, claim.conversationId, claim.ownershipGeneration)
+        await write(tx)
+      })
+      return true
+    } catch (error) {
+      if (error instanceof ConversationSupersededError) {
+        await this.repository.finalizeSuperseded(this.prisma, claim)
+        return false
+      }
+      this.handleFinalizeError(error, claim)
+      return false
+    }
+  }
 
   /** A lost lease is not a failure (recovery owns the run); any other finalize fault stays retryable. */
   private handleFinalizeError(error: unknown, claim: ClaimedRun): void {

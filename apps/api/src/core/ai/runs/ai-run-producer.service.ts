@@ -1,10 +1,21 @@
 import { Injectable } from '@nestjs/common'
-import { AiAuthorType, AiMessageRole, AiRunStatus, Prisma } from '@prisma/client'
+import {
+  AiAuthorType,
+  AiConversationControl,
+  AiConversationState,
+  AiMessageRole,
+  AiRunStatus,
+  Prisma,
+} from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiRunResponse, CreateAiRunInput } from '@amcore/shared'
 
-import { NotFoundException, ServiceUnavailableException } from '../../../common/exceptions'
+import {
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '../../../common/exceptions'
 import { AI_RUN_DEFAULT_MAX_ATTEMPTS, AI_RUN_WAKE_JOB_OPTIONS } from '../ai-run.constants'
 
 import { toAiRunResponse } from './ai-run.mapper'
@@ -57,7 +68,7 @@ export class AiRunProducerService {
     input: CreateAiRunInput,
     modelSnapshot: Prisma.InputJsonValue
   ): Promise<{ run: Prisma.AiRunGetPayload<object>; created: boolean }> {
-    await this.lockOwnedConversation(tx, input.conversationId, userId)
+    const ownershipGeneration = await this.lockOwnedConversation(tx, input.conversationId, userId)
 
     if (input.idempotencyKey) {
       const existing = await tx.aiRun.findFirst({
@@ -68,11 +79,14 @@ export class AiRunProducerService {
 
     // Create the run first so the USER turn can carry its `runId`: this binds the input turn to
     // exactly one run, so when several runs are queued on one conversation before execution the
-    // C.4 worker reads a single run's own input rather than guessing by sequence.
+    // C.4 worker reads a single run's own input rather than guessing by sequence. The conversation's
+    // current `ownershipGeneration` is frozen onto the run (ADR-049 fence, Arc F) so a later human
+    // takeover supersedes this run instead of letting it write a stale turn.
     const run = await tx.aiRun.create({
       data: {
         conversationId: input.conversationId,
         status: AiRunStatus.QUEUED,
+        ownershipGeneration,
         modelSnapshot,
         idempotencyKey: input.idempotencyKey ?? null,
         maxAttempts: AI_RUN_DEFAULT_MAX_ATTEMPTS,
@@ -102,15 +116,33 @@ export class AiRunProducerService {
     tx: Prisma.TransactionClient,
     conversationId: string,
     userId: string
-  ): Promise<void> {
-    const rows = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
-      SELECT id FROM "ai"."ai_conversations"
+  ): Promise<number> {
+    const rows = await tx.$queryRaw<
+      { ownershipGeneration: number; controlledBy: string; state: string }[]
+    >(Prisma.sql`
+      SELECT "ownershipGeneration",
+             "controlledBy"::text AS "controlledBy",
+             state::text AS state
+      FROM "ai"."ai_conversations"
       WHERE id = ${conversationId} AND "ownerUserId" = ${userId}
       FOR UPDATE
     `)
-    if (rows.length === 0) {
+    const row = rows[0]
+    if (row === undefined) {
       throw new NotFoundException('Conversation', conversationId)
     }
+    // A new bot run cannot be queued while a human holds the conversation or it is closed (ADR-049
+    // fence, Arc F, invariant #6): the bot must not act under human control. 409 — the owner (or
+    // operator) releases control first. The worker fence is the backstop; this is the front-door gate.
+    if (
+      row.controlledBy !== AiConversationControl.BOT ||
+      row.state !== AiConversationState.ACTIVE
+    ) {
+      throw new ConflictException(
+        'This conversation is under human control or closed; a new AI run cannot be started.'
+      )
+    }
+    return row.ownershipGeneration
   }
 
   private async nextSequence(

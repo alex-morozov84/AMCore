@@ -30,6 +30,7 @@ function claim(over: Partial<ClaimedRun> = {}): ClaimedRun {
     attemptNumber: 1,
     maxAttempts: 3,
     deadlineAt: null,
+    ownershipGeneration: 0,
     leaseToken: 'lease-abc',
     ...over,
   }
@@ -71,6 +72,10 @@ describe('AiRunApprovalParker', () => {
     jest.clearAllMocks()
     prisma = mockDeep<PrismaService>()
     prisma.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 0 } } as never)
+    // The park fences the conversation first (ADR-049, Arc F); default to fresh, bot-owned, active.
+    prisma.$queryRaw.mockResolvedValue([
+      { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE' },
+    ] as never)
     prisma.$transaction.mockImplementation(((cb: (tx: PrismaService) => Promise<unknown>) =>
       cb(prisma)) as never)
     prisma.aiApproval.create.mockResolvedValue({ id: 'appr-1' } as never)
@@ -162,6 +167,23 @@ describe('AiRunApprovalParker', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'ai.run.park_lease_lost' }),
       expect.any(String)
+    )
+  })
+
+  it('abandons the run superseded (no approval) when a human took over before the park', async () => {
+    // The fence read returns a moved generation → lockAndAssertBotOwnership throws inside the tx.
+    prisma.$queryRaw.mockResolvedValue([
+      { ownershipGeneration: 1, controlledBy: 'HUMAN', state: 'PAUSED_FOR_HUMAN' },
+    ] as never)
+
+    const ok = await parker.park(claim(), plan, result, 5, dangerTool, {})
+
+    expect(ok).toBe(false)
+    expect(prisma.aiApproval.create).not.toHaveBeenCalled()
+    expect(prisma.aiToolInvocation.create).not.toHaveBeenCalled()
+    expect(repository.finalizeSuperseded).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({ id: 'run-1' })
     )
   })
 })
