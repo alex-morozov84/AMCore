@@ -64,7 +64,14 @@ export const AiRunTerminalReason = {
   TOOL_NOT_ALLOWED: 'tool_not_allowed',
   TOOL_ARGS_INVALID: 'tool_args_invalid',
   TOOL_EXECUTION_FAILED: 'tool_execution_failed',
+  /**
+   * A tool call needing human approval was requested (Arc E). Until Arc E.5 wired the durable park this
+   * was a terminal placeholder; from E.5 the loop parks the run in `WAITING_APPROVAL` instead, and this
+   * value is emitted only if the approval TTL elapses before a decision (`APPROVAL_EXPIRED`).
+   */
   TOOL_APPROVAL_REQUIRED: 'tool_approval_required',
+  /** The approval TTL elapsed before the owner decided (Arc E.5); the run fails non-retryably. */
+  APPROVAL_EXPIRED: 'approval_expired',
 } as const
 
 /**

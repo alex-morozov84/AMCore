@@ -25,6 +25,24 @@ export function toolIdempotencyKey(invocationId: string): string {
 }
 
 /**
+ * Deterministic, provider-agnostic `toolCallId` that pairs the reconstructed assistant tool-call turn
+ * with its tool-result turn for an approval-gated invocation (Arc E.5). The original provider call id
+ * is not persisted; this synthetic id is derived from the durable `invocationId` so an uninterrupted
+ * resume and a crash-resumed one build byte-identical transcripts. Used pairwise on both turns.
+ */
+export function approvedToolCallId(invocationId: string): string {
+  return `ai-tool-inv:${invocationId}`
+}
+
+/**
+ * Fixed, content-free tool-result fed back to the model when the owner REJECTED an approval-gated tool
+ * call (Arc E.5). It carries no arguments or reason text — the model simply learns the call was denied
+ * and answers without it. Re-entered as UNTRUSTED data under the Arc D boundary like any tool result.
+ */
+export const AI_TOOL_REJECTION_NOTICE =
+  'This tool call was rejected by the user and was not executed. Continue and answer without it.'
+
+/**
  * Bounded, machine-readable per-invocation error codes (`AiToolInvocation.errorCode`) — never a tool
  * payload, args, result, or free text. The loop maps these to a run terminal reason (Arc E.4).
  */

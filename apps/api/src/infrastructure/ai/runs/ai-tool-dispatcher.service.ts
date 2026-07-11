@@ -15,11 +15,13 @@ import type { AiToolCall } from '../gateway/ai-gateway.types'
 import {
   AiToolErrorCode,
   type AiToolErrorCodeValue,
+  approvedToolCallId,
   toolIdempotencyKey,
 } from '../tools/ai-tool.constants'
 import type { AiTool, AiToolContext } from '../tools/ai-tool.types'
 
 import type { ClaimedRun } from './ai-run-dispatch.types'
+import type { PendingApprovalInvocation } from './ai-run-loop-reconstruct'
 
 import { AuditLogService } from '@/core/audit'
 import { EnvService } from '@/env/env.service'
@@ -105,12 +107,98 @@ export class AiToolDispatcher {
       select: { id: true },
     })
 
+    return this.runToCompletion(invocation.id, tool, parsed.data, toolCall.toolCallId, ctx)
+  }
+
+  /**
+   * Execute an **already-approved** invocation on resume (Arc E.5, worker-only). Safety gates, in order:
+   * (1) the resolved tool must match the invocation's `toolId` **and** its approved `riskClass` — a
+   * pending approval can outlive a tool/risk change across deploys, and an approval only ever authorizes
+   * the exact risk the owner saw; (2) the persisted `argsSnapshot` is **re-validated against the current
+   * schema** (it may have tightened since park) and the freshly-parsed data is what executes/echoes,
+   * never a stale snapshot; (3) the `{APPROVED,EXECUTING}→EXECUTING` CAS is the SOLE gate that lets a
+   * non-SAFE tool run — accepting `EXECUTING` too so a worker crash *after* the gate but before the
+   * SUCCEEDED commit re-applies the SAME invocation idempotently on reclaim (at-least-once; non-SAFE
+   * tools carry `ctx.idempotencyKey`). A CAS miss (raced/terminal) means NOT executed. The pairing
+   * `toolCallId` is synthesized from the invocation id so resume transcripts stay deterministic.
+   */
+  async executeApproved(
+    invocation: PendingApprovalInvocation,
+    tool: AiTool,
+    ctx: ToolDispatchContext
+  ): Promise<ToolDispatchResult> {
+    if (tool.toolId !== invocation.toolId || tool.riskClass !== invocation.riskClass) {
+      return { status: 'failed', errorCode: AiToolErrorCode.TOOL_NOT_ALLOWED }
+    }
+    const parsed = tool.parameters.safeParse(invocation.argsSnapshot)
+    if (!parsed.success) return { status: 'failed', errorCode: AiToolErrorCode.TOOL_ARGS_INVALID }
+    const cas = await this.prisma.aiToolInvocation.updateMany({
+      where: {
+        id: invocation.id,
+        status: { in: [AiToolInvocationStatus.APPROVED, AiToolInvocationStatus.EXECUTING] },
+      },
+      data: { status: AiToolInvocationStatus.EXECUTING, startedAt: new Date() },
+    })
+    if (cas.count !== 1) return { status: 'failed', errorCode: AiToolErrorCode.TOOL_NOT_ALLOWED }
+    return this.runToCompletion(
+      invocation.id,
+      tool,
+      parsed.data,
+      approvedToolCallId(invocation.id),
+      ctx
+    )
+  }
+
+  /**
+   * Apply an owner REJECTION on resume (Arc E.5, worker-only): write the ordering `TOOL_INVOCATION`
+   * step so reconstruction replays the fixed rejection notice (the invocation is already `REJECTED`).
+   * No tool runs. The approval-decision audit was written by the web decision (E.5b).
+   */
+  async applyRejected(
+    invocation: PendingApprovalInvocation,
+    ctx: ToolDispatchContext
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const stepNumber = await nextStepNumber(tx, ctx.claim.id)
+      await tx.aiRunStep.create({
+        data: {
+          runId: ctx.claim.id,
+          stepNumber,
+          type: AiRunStepType.TOOL_INVOCATION,
+          detail: {
+            invocationId: invocation.id,
+            toolCallId: approvedToolCallId(invocation.id),
+          } satisfies Prisma.InputJsonValue,
+          finishedAt: new Date(),
+        },
+      })
+    })
+    this.metrics.incAiToolInvocation(
+      invocation.toolId,
+      invocation.riskClass.toLowerCase() as AiMetricsToolRiskClass,
+      'rejected'
+    )
+  }
+
+  /**
+   * Shared tail for a tool that is in `EXECUTING`: run it outside any tx under the timeout, then in tx2
+   * finalize `SUCCEEDED` + the ordering `TOOL_INVOCATION` step (bounded `{ invocationId, toolCallId }`),
+   * or `FAILED`. Content-free metric + best-effort audit. Used by both `dispatch` (SAFE) and
+   * `executeApproved` (approved non-SAFE).
+   */
+  private async runToCompletion(
+    invocationId: string,
+    tool: AiTool,
+    args: unknown,
+    toolCallId: string,
+    ctx: ToolDispatchContext
+  ): Promise<ToolDispatchResult> {
     const startedAt = performance.now()
     let output: string
     try {
-      output = await this.execute(tool, parsed.data, invocation.id, ctx)
+      output = await this.execute(tool, args, invocationId, ctx)
     } catch (error) {
-      await this.finalizeFailed(invocation.id, tool, ctx, startedAt, error)
+      await this.finalizeFailed(invocationId, tool, ctx, startedAt, error)
       return { status: 'failed', errorCode: AiToolErrorCode.TOOL_EXECUTION_FAILED }
     }
 
@@ -118,7 +206,7 @@ export class AiToolDispatcher {
     const durationMs = Math.round(performance.now() - startedAt)
     await this.prisma.$transaction(async (tx) => {
       await tx.aiToolInvocation.update({
-        where: { id: invocation.id },
+        where: { id: invocationId },
         data: {
           status: AiToolInvocationStatus.SUCCEEDED,
           resultSummary: { output: boundedOutput } satisfies Prisma.InputJsonValue,
@@ -132,10 +220,7 @@ export class AiToolDispatcher {
           runId: ctx.claim.id,
           stepNumber,
           type: AiRunStepType.TOOL_INVOCATION,
-          detail: {
-            invocationId: invocation.id,
-            toolCallId: toolCall.toolCallId,
-          } satisfies Prisma.InputJsonValue,
+          detail: { invocationId, toolCallId } satisfies Prisma.InputJsonValue,
           durationMs,
           finishedAt: new Date(),
         },
@@ -143,14 +228,8 @@ export class AiToolDispatcher {
     })
 
     this.metrics.incAiToolInvocation(tool.toolId, riskLabel(tool), 'succeeded')
-    await this.recordAudit(tool, ctx, invocation.id, 'ai.tool.invoked', { outcome: 'succeeded' })
-    return {
-      status: 'succeeded',
-      invocationId: invocation.id,
-      toolCallId: toolCall.toolCallId,
-      input: parsed.data,
-      output: boundedOutput,
-    }
+    await this.recordAudit(tool, ctx, invocationId, 'ai.tool.invoked', { outcome: 'succeeded' })
+    return { status: 'succeeded', invocationId, toolCallId, input: args, output: boundedOutput }
   }
 
   /** Run the tool outside any transaction, bounded by `AI_TOOL_EXECUTION_TIMEOUT_MS` (raced). */

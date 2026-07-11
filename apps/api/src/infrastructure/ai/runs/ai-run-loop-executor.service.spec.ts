@@ -1,4 +1,4 @@
-import { AiToolRiskClass } from '@prisma/client'
+import { AiToolInvocationStatus, AiToolRiskClass } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { z } from 'zod'
 
@@ -6,10 +6,12 @@ import { AiGatewayException } from '../gateway/ai-gateway.error'
 import type { AiTextResult, AiToolCall } from '../gateway/ai-gateway.types'
 import type { ModelGateway } from '../gateway/model-gateway.service'
 import { scanOutput } from '../guardrails/output-guard'
+import { AI_TOOL_REJECTION_NOTICE, approvedToolCallId } from '../tools/ai-tool.constants'
 import type { AiTool } from '../tools/ai-tool.types'
 import type { AiToolRegistry } from '../tools/ai-tool-registry.service'
 
 import type { AiRunRepository } from './ai-run.repository'
+import type { AiRunApprovalParker } from './ai-run-approval-parker.service'
 import type { ClaimedRun } from './ai-run-dispatch.types'
 import { AiRunLoopExecutor } from './ai-run-loop-executor.service'
 import { AiRunLoopFinalizer } from './ai-run-loop-finalizer.service'
@@ -106,7 +108,8 @@ describe('AiRunLoopExecutor', () => {
   let gateway: { generateText: jest.Mock }
   let repository: DeepMockProxy<AiRunRepository>
   let registry: { describeAllowed: jest.Mock; get: jest.Mock; requiresApproval: jest.Mock }
-  let dispatcher: { dispatch: jest.Mock }
+  let dispatcher: { dispatch: jest.Mock; executeApproved: jest.Mock; applyRejected: jest.Mock }
+  let parker: { park: jest.Mock }
   let env: { get: jest.Mock }
   let metrics: { incAiGuardrailCheck: jest.Mock; observeAiToolLoopSteps: jest.Mock }
   let loop: AiRunLoopExecutor
@@ -121,6 +124,7 @@ describe('AiRunLoopExecutor', () => {
     prisma = mockDeep<PrismaService>()
     prisma.aiRunStep.findMany.mockResolvedValue([] as never)
     prisma.aiToolInvocation.findMany.mockResolvedValue([] as never)
+    prisma.aiToolInvocation.findFirst.mockResolvedValue(null as never) // no pending approval by default
     prisma.aiRunStep.count.mockResolvedValue(0 as never)
     prisma.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 0 } } as never)
     prisma.aiMessage.aggregate.mockResolvedValue({ _max: { sequence: 0 } } as never)
@@ -152,7 +156,8 @@ describe('AiRunLoopExecutor', () => {
       get: jest.fn((id: string) => KNOWN_TOOLS[id]),
       requiresApproval: jest.fn((t: AiTool) => t.riskClass !== AiToolRiskClass.SAFE),
     }
-    dispatcher = { dispatch: jest.fn() }
+    dispatcher = { dispatch: jest.fn(), executeApproved: jest.fn(), applyRejected: jest.fn() }
+    parker = { park: jest.fn().mockResolvedValue(true) }
     env = { get: jest.fn(() => maxSteps) }
     metrics = { incAiGuardrailCheck: jest.fn(), observeAiToolLoopSteps: jest.fn() }
 
@@ -169,6 +174,7 @@ describe('AiRunLoopExecutor', () => {
       registry as unknown as AiToolRegistry,
       dispatcher as unknown as AiToolDispatcher,
       finalizer,
+      parker as unknown as AiRunApprovalParker,
       env as unknown as EnvService,
       metrics as unknown as MetricsService,
       logger as never
@@ -304,18 +310,6 @@ describe('AiRunLoopExecutor', () => {
       )
     })
 
-    it('fails tool_approval_required for a non-SAFE tool (E.5 will park instead)', async () => {
-      gateway.generateText.mockResolvedValue(textResult({ toolCalls: [toolCall('danger')] }))
-      await loop.run(claim(), plan({ toolAllowlist: ['danger'] }))
-      expect(dispatcher.dispatch).not.toHaveBeenCalled()
-      expect(repository.finalizeFailed).toHaveBeenCalledWith(
-        prisma,
-        expect.anything(),
-        'tool_loop_failed',
-        'tool_approval_required'
-      )
-    })
-
     it('fails the run when the SAFE tool fails host-side (mapping the dispatcher error code)', async () => {
       gateway.generateText.mockResolvedValue(textResult({ toolCalls: [toolCall()] }))
       dispatcher.dispatch.mockResolvedValue({
@@ -330,6 +324,131 @@ describe('AiRunLoopExecutor', () => {
         'tool_execution_failed'
       )
       expect(metrics.observeAiToolLoopSteps).toHaveBeenCalledWith('failed', 1)
+    })
+  })
+
+  describe('approval park + resume (Arc E.5)', () => {
+    it('PARKS an allowed non-SAFE call behind a durable approval (never executes it inline)', async () => {
+      gateway.generateText.mockResolvedValue(textResult({ toolCalls: [toolCall('danger')] }))
+      await loop.run(claim(), plan({ toolAllowlist: ['danger'] }))
+      // The tool is NOT dispatched, the run is NOT terminally failed — it parks.
+      expect(dispatcher.dispatch).not.toHaveBeenCalled()
+      expect(repository.finalizeFailed).not.toHaveBeenCalled()
+      expect(parker.park).toHaveBeenCalledTimes(1)
+      const [, , , , tool, args] = parker.park.mock.calls[0]!
+      expect(tool.toolId).toBe('danger')
+      expect(args).toEqual({}) // validated args handed to the parker (not the raw call)
+    })
+
+    it('fails tool_args_invalid (not park) when a non-SAFE call has invalid arguments', async () => {
+      const danger = { ...KNOWN_TOOLS.danger!, parameters: z.object({ n: z.number() }).strict() }
+      registry.get.mockImplementation((id: string) => (id === 'danger' ? danger : KNOWN_TOOLS[id]))
+      gateway.generateText.mockResolvedValue(textResult({ toolCalls: [toolCall('danger')] }))
+      await loop.run(claim(), plan({ toolAllowlist: ['danger'] }))
+      expect(parker.park).not.toHaveBeenCalled()
+      expect(repository.finalizeFailed).toHaveBeenCalledWith(
+        prisma,
+        expect.anything(),
+        'tool_loop_failed',
+        'tool_args_invalid'
+      )
+    })
+
+    it('resume-APPROVE: executes the approved invocation, then loops to final text', async () => {
+      prisma.aiToolInvocation.findFirst.mockResolvedValue({
+        id: 'inv-appr',
+        toolId: 'danger',
+        riskClass: AiToolRiskClass.SENSITIVE,
+        status: AiToolInvocationStatus.APPROVED,
+        argsSnapshot: {},
+      } as never)
+      dispatcher.executeApproved.mockResolvedValue({
+        status: 'succeeded',
+        invocationId: 'inv-appr',
+        toolCallId: approvedToolCallId('inv-appr'),
+        input: {},
+        output: 'done deal',
+      })
+      gateway.generateText.mockResolvedValue(textResult({ text: 'all set' }))
+
+      await loop.run(claim(), plan({ toolAllowlist: ['danger'] }))
+
+      expect(dispatcher.executeApproved).toHaveBeenCalledTimes(1)
+      // The executed approved round is fed back into the first (and only) provider step's transcript.
+      const messages = gateway.generateText.mock.calls[0]![0].messages
+      expect(messages).toHaveLength(3)
+      expect(messages[1].toolCalls[0].toolCallId).toBe(approvedToolCallId('inv-appr'))
+      expect(messages[2].toolResults[0].toolCallId).toBe(approvedToolCallId('inv-appr'))
+      expect(repository.finalizeCompleted).toHaveBeenCalledTimes(1)
+    })
+
+    it('resume: re-applies a stranded EXECUTING invocation (crash-recovery), never re-parking', async () => {
+      prisma.aiToolInvocation.findFirst.mockResolvedValue({
+        id: 'inv-appr',
+        toolId: 'danger',
+        riskClass: AiToolRiskClass.SENSITIVE,
+        status: AiToolInvocationStatus.EXECUTING,
+        argsSnapshot: {},
+      } as never)
+      dispatcher.executeApproved.mockResolvedValue({
+        status: 'succeeded',
+        invocationId: 'inv-appr',
+        toolCallId: approvedToolCallId('inv-appr'),
+        input: {},
+        output: 'recovered',
+      })
+      gateway.generateText.mockResolvedValue(textResult({ text: 'done' }))
+
+      await loop.run(claim(), plan({ toolAllowlist: ['danger'] }))
+
+      expect(dispatcher.executeApproved).toHaveBeenCalledTimes(1)
+      expect(parker.park).not.toHaveBeenCalled()
+      expect(repository.finalizeCompleted).toHaveBeenCalledTimes(1)
+    })
+
+    it('resume-APPROVE: an approved-tool host failure drives the run terminal (no provider call)', async () => {
+      prisma.aiToolInvocation.findFirst.mockResolvedValue({
+        id: 'inv-appr',
+        toolId: 'danger',
+        riskClass: AiToolRiskClass.SENSITIVE,
+        status: AiToolInvocationStatus.APPROVED,
+        argsSnapshot: {},
+      } as never)
+      dispatcher.executeApproved.mockResolvedValue({
+        status: 'failed',
+        errorCode: 'tool_execution_failed',
+      })
+      await loop.run(claim(), plan({ toolAllowlist: ['danger'] }))
+      expect(gateway.generateText).not.toHaveBeenCalled()
+      expect(repository.finalizeFailed).toHaveBeenCalledWith(
+        prisma,
+        expect.anything(),
+        'tool_loop_failed',
+        'tool_execution_failed'
+      )
+    })
+
+    it('resume-REJECT: replays the fixed rejection notice and loops to final text (no execution)', async () => {
+      prisma.aiToolInvocation.findFirst.mockResolvedValue({
+        id: 'inv-rej',
+        toolId: 'danger',
+        riskClass: AiToolRiskClass.SENSITIVE,
+        status: AiToolInvocationStatus.REJECTED,
+        argsSnapshot: {},
+      } as never)
+      prisma.aiRunStep.findFirst.mockResolvedValue(null as never) // not applied yet → pending reject
+      gateway.generateText.mockResolvedValue(textResult({ text: 'ok without the tool' }))
+
+      await loop.run(claim(), plan({ toolAllowlist: ['danger'] }))
+
+      expect(dispatcher.executeApproved).not.toHaveBeenCalled()
+      expect(dispatcher.applyRejected).toHaveBeenCalledTimes(1)
+      const messages = gateway.generateText.mock.calls[0]![0].messages
+      expect(messages).toHaveLength(3)
+      expect(messages[1].toolCalls[0].toolCallId).toBe(approvedToolCallId('inv-rej'))
+      // The tool-result turn carries the fixed, content-free rejection notice.
+      expect(messages[2].toolResults[0].output).toContain(AI_TOOL_REJECTION_NOTICE)
+      expect(repository.finalizeCompleted).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -415,27 +534,55 @@ describe('AiRunLoopExecutor', () => {
   })
 
   describe('crash-safe resume reconstruction', () => {
-    it('replays only already-SUCCEEDED tool invocations, skipping incomplete ones (invariant 7)', async () => {
-      // Two TOOL_INVOCATION steps persisted, but only inv1 is SUCCEEDED — inv2 must not be replayed.
+    it('replays only APPLIED (SUCCEEDED/REJECTED) invocations, skipping incomplete ones (invariant 7)', async () => {
+      // Two TOOL_INVOCATION steps persisted, but only inv1 is applied — inv2 must not be replayed.
       prisma.aiRunStep.findMany.mockResolvedValue([
         { detail: { invocationId: 'inv1', toolCallId: 'call1' } },
         { detail: { invocationId: 'inv2', toolCallId: 'call2' } },
       ] as never)
       prisma.aiToolInvocation.findMany.mockResolvedValue([
-        { id: 'inv1', toolId: 'current_time', argsSnapshot: {}, resultSummary: { output: 'now' } },
+        {
+          id: 'inv1',
+          toolId: 'current_time',
+          status: AiToolInvocationStatus.SUCCEEDED,
+          argsSnapshot: {},
+          resultSummary: { output: 'now' },
+        },
       ] as never)
       prisma.aiRunStep.count.mockResolvedValue(1 as never)
 
       await loop.run(claim(), plan({ toolAllowlist: ['current_time'] }))
 
-      // Only SUCCEEDED invocations query is status-scoped, and exactly ONE round is replayed:
+      // The reconstruction join is scoped to applied statuses only, and exactly ONE round is replayed:
       expect(prisma.aiToolInvocation.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ status: 'SUCCEEDED' }),
+          where: expect.objectContaining({ status: { in: ['SUCCEEDED', 'REJECTED'] } }),
         })
       )
       const messages = gateway.generateText.mock.calls[0]![0].messages
       expect(messages).toHaveLength(3) // 1 user + (1 assistant tool-call + 1 tool result) for inv1 only
+    })
+
+    it('replays a REJECTED invocation as the fixed rejection notice (Arc E.5)', async () => {
+      prisma.aiRunStep.findMany.mockResolvedValue([
+        { detail: { invocationId: 'inv-rej', toolCallId: approvedToolCallId('inv-rej') } },
+      ] as never)
+      prisma.aiToolInvocation.findMany.mockResolvedValue([
+        {
+          id: 'inv-rej',
+          toolId: 'danger',
+          status: AiToolInvocationStatus.REJECTED,
+          argsSnapshot: {},
+          resultSummary: null,
+        },
+      ] as never)
+      prisma.aiRunStep.count.mockResolvedValue(1 as never)
+
+      await loop.run(claim(), plan({ toolAllowlist: [] }))
+
+      const messages = gateway.generateText.mock.calls[0]![0].messages
+      expect(messages).toHaveLength(3)
+      expect(messages[2].toolResults[0].output).toContain(AI_TOOL_REJECTION_NOTICE)
     })
 
     it('keeps the tool-result boundary + marker for prior rounds even when the allowlist is now empty (finding A2-2)', async () => {

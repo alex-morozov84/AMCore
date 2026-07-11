@@ -1,4 +1,4 @@
-import { AiAuthorType, AiMessageRole, type AiRunStepType, Prisma } from '@prisma/client'
+import { AiAuthorType, AiMessageRole, AiRunStepType, Prisma } from '@prisma/client'
 
 import type { AiTextResult } from '../gateway/ai-gateway.types'
 
@@ -18,6 +18,15 @@ export interface RunStepSpec {
   detail?: Prisma.InputJsonValue
   durationMs?: number
   errorCode?: string
+}
+
+/** The bounded, content-free `PROVIDER_CALL` step detail for one provider call (loop + park share it). */
+export function providerCallStep(result: AiTextResult, durationMs: number): RunStepSpec {
+  return {
+    type: AiRunStepType.PROVIDER_CALL,
+    detail: { finishReason: result.finishReason, providerType: result.providerType },
+    durationMs,
+  }
 }
 
 /** Append a batch of steps with contiguous `stepNumber`s allocated from the current max. */

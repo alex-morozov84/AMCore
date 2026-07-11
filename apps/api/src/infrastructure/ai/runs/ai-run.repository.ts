@@ -119,6 +119,20 @@ export class AiRunRepository {
     return count === 1
   }
 
+  /**
+   * Park a claimed run for human approval (Arc E.5): CAS `RUNNING` → `WAITING_APPROVAL`, **releasing the
+   * lease** (token/expiry null) so the run is unleased and non-due — the reaper (RUNNING-only) and the
+   * claim query (QUEUED-only) both ignore it until a decision re-queues it or the expiry sweep resolves
+   * it. Not terminal (no `finishedAt`). Returns false when the lease was already lost (roll back).
+   */
+  parkForApproval(tx: Prisma.TransactionClient, claim: ClaimedRun): Promise<boolean> {
+    return this.cas(tx, claim, {
+      status: AiRunStatus.WAITING_APPROVAL,
+      leaseToken: null,
+      leaseExpiresAt: null,
+    })
+  }
+
   /** Run completed: CAS `RUNNING` → terminal `COMPLETED`. */
   finalizeCompleted(tx: Prisma.TransactionClient, claim: ClaimedRun): Promise<boolean> {
     return this.cas(tx, claim, {

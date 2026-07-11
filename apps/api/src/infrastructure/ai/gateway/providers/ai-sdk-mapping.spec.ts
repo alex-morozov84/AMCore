@@ -181,6 +181,40 @@ describe('toModelMessages (provider-agnostic turn mapping, Arc E)', () => {
       },
     ])
   })
+
+  it('accepts the Arc E.5 synthetic approval toolCallId, paired across the assistant + tool turns', () => {
+    // The approval-gated resume path pairs turns with `ai-tool-inv:<invocationId>` (no original
+    // provider id is persisted). The provider mapping must carry it through verbatim on both turns.
+    const synthetic = 'ai-tool-inv:inv-abc'
+    expect(
+      toModelMessages([
+        {
+          role: 'assistant',
+          toolCalls: [{ toolCallId: synthetic, toolName: 'danger', input: {} }],
+        },
+        {
+          role: 'tool',
+          toolResults: [{ toolCallId: synthetic, toolName: 'danger', output: 'ok' }],
+        },
+      ])
+    ).toEqual([
+      {
+        role: 'assistant',
+        content: [{ type: 'tool-call', toolCallId: synthetic, toolName: 'danger', input: {} }],
+      },
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: synthetic,
+            toolName: 'danger',
+            output: { type: 'text', value: 'ok' },
+          },
+        ],
+      },
+    ])
+  })
 })
 
 describe('toSdkTools (Arc E)', () => {

@@ -196,4 +196,136 @@ describe('AiToolDispatcher', () => {
 
     expect(result).toEqual({ status: 'failed', errorCode: 'tool_execution_failed' })
   })
+
+  describe('executeApproved (Arc E.5 resume — the sole non-SAFE execution gate)', () => {
+    const approved = {
+      id: 'inv-appr',
+      toolId: 'danger',
+      riskClass: AiToolRiskClass.SENSITIVE,
+      status: AiToolInvocationStatus.APPROVED,
+      argsSnapshot: {},
+    }
+    const dangerTool = () =>
+      makeTool({
+        toolId: 'danger',
+        riskClass: AiToolRiskClass.SENSITIVE,
+        idempotency: 'idempotent',
+      })
+
+    it('runs the tool ONLY after winning the {APPROVED,EXECUTING}→EXECUTING CAS, synthetic toolCallId', async () => {
+      prisma.aiToolInvocation.updateMany.mockResolvedValue({ count: 1 } as never)
+      const tool = dangerTool()
+
+      const result = await dispatcher.executeApproved(approved, tool, ctx)
+
+      expect(prisma.aiToolInvocation.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: 'inv-appr',
+            status: { in: [AiToolInvocationStatus.APPROVED, AiToolInvocationStatus.EXECUTING] },
+          },
+          data: expect.objectContaining({ status: AiToolInvocationStatus.EXECUTING }),
+        })
+      )
+      expect(tool.execute).toHaveBeenCalledTimes(1)
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'succeeded',
+          invocationId: 'inv-appr',
+          toolCallId: 'ai-tool-inv:inv-appr',
+          input: {},
+          output: 'now',
+        })
+      )
+      expect(prisma.aiRunStep.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'TOOL_INVOCATION',
+            detail: { invocationId: 'inv-appr', toolCallId: 'ai-tool-inv:inv-appr' },
+          }),
+        })
+      )
+    })
+
+    it('re-applies a stranded EXECUTING invocation idempotently on reclaim (crash-recovery, A2-R2 #1)', async () => {
+      // The CAS accepts EXECUTING too, so a worker crash after the gate but before SUCCEEDED re-runs it.
+      prisma.aiToolInvocation.updateMany.mockResolvedValue({ count: 1 } as never)
+      const tool = dangerTool()
+
+      const result = await dispatcher.executeApproved(
+        { ...approved, status: AiToolInvocationStatus.EXECUTING },
+        tool,
+        ctx
+      )
+
+      expect(result).toEqual(expect.objectContaining({ status: 'succeeded' }))
+      expect(tool.execute).toHaveBeenCalledTimes(1)
+    })
+
+    it('does NOT execute the tool when the execution CAS matches no row (lost race / terminal)', async () => {
+      prisma.aiToolInvocation.updateMany.mockResolvedValue({ count: 0 } as never)
+      const tool = dangerTool()
+
+      const result = await dispatcher.executeApproved(approved, tool, ctx)
+
+      expect(result).toEqual({ status: 'failed', errorCode: 'tool_not_allowed' })
+      expect(tool.execute).not.toHaveBeenCalled()
+    })
+
+    it('refuses (no CAS, no execution) when the resolved tool is not the invocation tool', async () => {
+      const tool = makeTool({ toolId: 'other', riskClass: AiToolRiskClass.SENSITIVE })
+
+      const result = await dispatcher.executeApproved(approved, tool, ctx)
+
+      expect(result).toEqual({ status: 'failed', errorCode: 'tool_not_allowed' })
+      expect(prisma.aiToolInvocation.updateMany).not.toHaveBeenCalled()
+      expect(tool.execute).not.toHaveBeenCalled()
+    })
+
+    it('refuses when the current tool risk no longer matches the approved risk (A2-R2 #2)', async () => {
+      // The owner approved a SENSITIVE call; the tool is now DESTRUCTIVE — never execute the escalation.
+      const tool = dangerTool()
+      ;(tool as { riskClass: AiToolRiskClass }).riskClass = AiToolRiskClass.DESTRUCTIVE
+
+      const result = await dispatcher.executeApproved(approved, tool, ctx)
+
+      expect(result).toEqual({ status: 'failed', errorCode: 'tool_not_allowed' })
+      expect(prisma.aiToolInvocation.updateMany).not.toHaveBeenCalled()
+      expect(tool.execute).not.toHaveBeenCalled()
+    })
+
+    it('refuses when the persisted args no longer satisfy the current schema (A2-R2 #2)', async () => {
+      // The tool schema tightened after the approval was granted → the stale args are now invalid.
+      const tool = dangerTool()
+      ;(tool as { parameters: unknown }).parameters = z.object({ n: z.number() }).strict()
+
+      const result = await dispatcher.executeApproved(approved, tool, ctx)
+
+      expect(result).toEqual({ status: 'failed', errorCode: 'tool_args_invalid' })
+      expect(prisma.aiToolInvocation.updateMany).not.toHaveBeenCalled()
+      expect(tool.execute).not.toHaveBeenCalled()
+    })
+  })
+
+  it('applyRejected writes the ordering TOOL_INVOCATION step + a rejected metric, runs no tool', async () => {
+    const rejected = {
+      id: 'inv-rej',
+      toolId: 'danger',
+      riskClass: AiToolRiskClass.SENSITIVE,
+      status: AiToolInvocationStatus.REJECTED,
+      argsSnapshot: {},
+    }
+
+    await dispatcher.applyRejected(rejected, ctx)
+
+    expect(prisma.aiRunStep.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'TOOL_INVOCATION',
+          detail: { invocationId: 'inv-rej', toolCallId: 'ai-tool-inv:inv-rej' },
+        }),
+      })
+    )
+    expect(metrics.incAiToolInvocation).toHaveBeenCalledWith('danger', 'sensitive', 'rejected')
+  })
 })

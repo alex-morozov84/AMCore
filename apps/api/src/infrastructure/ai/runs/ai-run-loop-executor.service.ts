@@ -1,6 +1,7 @@
 import { performance } from 'node:perf_hooks'
 
 import { Injectable } from '@nestjs/common'
+import { AiToolInvocationStatus } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiGatewayTool, AiTextResult, AiToolCall } from '../gateway/ai-gateway.types'
@@ -11,16 +12,23 @@ import {
   generateBoundaryNonce,
   toolResultBoundaryPolicy,
 } from '../guardrails/trust-boundary.builder'
+import { AI_TOOL_REJECTION_NOTICE, approvedToolCallId } from '../tools/ai-tool.constants'
 import type { AiTool, AiToolDescriptor } from '../tools/ai-tool.types'
 import { AiToolRegistry } from '../tools/ai-tool-registry.service'
 
 import { AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
+import { AiRunApprovalParker } from './ai-run-approval-parker.service'
 import type { ClaimedRun } from './ai-run-dispatch.types'
 import { AiRunLoopFinalizer } from './ai-run-loop-finalizer.service'
-import { countProviderCalls, reconstructRounds } from './ai-run-loop-reconstruct'
+import {
+  countProviderCalls,
+  findPendingApproval,
+  type PendingApprovalInvocation,
+  reconstructRounds,
+} from './ai-run-loop-reconstruct'
 import type { RunPlan } from './ai-run-plan'
-import { reconstructLoopMessages } from './ai-run-transcript'
+import { type CompletedToolRound, reconstructLoopMessages } from './ai-run-transcript'
 import { AiToolDispatcher, type ToolDispatchContext } from './ai-tool-dispatcher.service'
 
 import { EnvService } from '@/env/env.service'
@@ -32,16 +40,18 @@ type StepDecision =
   | { kind: 'final' }
   | { kind: 'fail'; reason: string }
   | { kind: 'execute'; tool: AiTool; call: AiToolCall }
+  | { kind: 'approval'; tool: AiTool; call: AiToolCall }
 
 /**
- * Bounded, durable, host-controlled SAFE tool loop (Track C — ADR-054, Arc E.4b, worker role only).
- * It reconstructs the run's transcript from Postgres, then per step offers the bound assistant's
- * allowlisted tools, calls the provider **once**, runs the Arc D output guard over every active marker,
- * and either finalizes the final text (`COMPLETED`) or executes at most **one SAFE** tool call
- * host-side (via `AiToolDispatcher`) and loops. Every durable write is delegated to `AiRunLoopFinalizer`
- * (per-call ledger + step trail + terminal CAS); the lease is renewed each step (invariant 9) and the
- * whole loop is bounded by `AI_TOOL_LOOP_MAX_STEPS` + the run deadline. A tool call needing approval
- * terminally fails with `tool_approval_required` until Arc E.5 wires the durable park.
+ * Bounded, durable, host-controlled tool loop (Track C — ADR-054, Arc E.4b/E.5, worker role only). It
+ * reconstructs the run's transcript from Postgres (applying any landed approval decision first), then
+ * per step offers the bound assistant's allowlisted tools, calls the provider **once**, runs the Arc D
+ * output guard over every active marker, and either finalizes the final text (`COMPLETED`), executes
+ * at most **one SAFE** tool call host-side (via `AiToolDispatcher`) and loops, or **parks** an allowed
+ * **non-SAFE** call behind a durable human approval (`AiRunApprovalParker`, Arc E.5). Every durable
+ * write is delegated (finalizer / parker): per-call ledger + step trail + terminal-or-park CAS; the
+ * lease is renewed each step (invariant 9) and the loop is bounded by `AI_TOOL_LOOP_MAX_STEPS` + the
+ * run deadline.
  */
 @Injectable()
 export class AiRunLoopExecutor {
@@ -52,6 +62,7 @@ export class AiRunLoopExecutor {
     private readonly registry: AiToolRegistry,
     private readonly dispatcher: AiToolDispatcher,
     private readonly finalizer: AiRunLoopFinalizer,
+    private readonly parker: AiRunApprovalParker,
     private readonly env: EnvService,
     private readonly metrics: MetricsService,
     private readonly logger: PinoLogger
@@ -71,6 +82,8 @@ export class AiRunLoopExecutor {
     // SUCCEEDED tool rounds must still carry the tool-result boundary marker + policy (finding A2-2).
     const rounds = await reconstructRounds(this.prisma, claim.id)
     let providerCalls = await countProviderCalls(this.prisma, claim.id)
+    // Apply a landed approval decision (execute the approved tool / feed a rejection) before the loop.
+    if (await this.applyPendingDecision(claim, plan, rounds, ctx, providerCalls)) return
     const setup = this.buildStep(plan, rounds.length > 0)
     const maxSteps = this.env.get('AI_TOOL_LOOP_MAX_STEPS')
 
@@ -119,6 +132,24 @@ export class AiRunLoopExecutor {
           decision.reason,
           providerCalls
         )
+        return
+      }
+      if (decision.kind === 'approval') {
+        // An allowed non-SAFE call: validate its args, then PARK behind a durable approval (the parker
+        // records this provider call + ledger in its own tx). The tool is NOT executed until approved.
+        const parsed = decision.tool.parameters.safeParse(decision.call.input)
+        if (!parsed.success) {
+          await this.finalizer.afterProviderFailure(
+            claim,
+            plan,
+            result,
+            durationMs,
+            AiRunTerminalReason.TOOL_ARGS_INVALID,
+            providerCalls
+          )
+          return
+        }
+        await this.parker.park(claim, plan, result, durationMs, decision.tool, parsed.data)
         return
       }
 
@@ -191,11 +222,67 @@ export class AiRunLoopExecutor {
     if (tool === undefined || !allowlist.includes(tool.toolId)) {
       return { kind: 'fail', reason: AiRunTerminalReason.TOOL_NOT_ALLOWED }
     }
-    // Approval-gated tools cannot execute in E.4b; E.5 replaces this with the durable WAITING_APPROVAL park.
-    if (this.registry.requiresApproval(tool)) {
-      return { kind: 'fail', reason: AiRunTerminalReason.TOOL_APPROVAL_REQUIRED }
-    }
+    // A non-SAFE (SENSITIVE/DESTRUCTIVE) call parks behind a durable human approval (Arc E.5) — never
+    // executed inline. A SAFE call runs host-side immediately.
+    if (this.registry.requiresApproval(tool)) return { kind: 'approval', tool, call }
     return { kind: 'execute', tool, call }
+  }
+
+  /**
+   * On resume, apply a landed approval decision before the normal loop (Arc E.5): execute the APPROVED
+   * tool (its `APPROVED→EXECUTING` CAS is the sole non-SAFE execution gate) or feed the fixed rejection
+   * notice, appending the round to `rounds`. Returns `true` when it drove the run terminal (approved
+   * tool failed / unregistered) — the caller then stops. `false` = nothing pending, or applied cleanly.
+   */
+  private async applyPendingDecision(
+    claim: ClaimedRun,
+    plan: RunPlan,
+    rounds: CompletedToolRound[],
+    ctx: ToolDispatchContext,
+    providerCalls: number
+  ): Promise<boolean> {
+    const pending = await findPendingApproval(this.prisma, claim.id)
+    if (pending === null) return false
+
+    // REJECTED: no execution — persist the ordering step + replay the fixed rejection notice.
+    if (pending.status === AiToolInvocationStatus.REJECTED) {
+      await this.dispatcher.applyRejected(pending, ctx)
+      rounds.push(rejectionRound(pending))
+      return false
+    }
+
+    // APPROVED (or a stranded EXECUTING from a crash before the SUCCEEDED commit) → execute the tool.
+    const tool = this.registry.get(pending.toolId)
+    if (tool === undefined) {
+      await this.finalizer.dispatchFailed(
+        claim,
+        AiRunTerminalReason.TOOL_NOT_ALLOWED,
+        providerCalls
+      )
+      return true
+    }
+    const res = await this.dispatcher.executeApproved(pending, tool, ctx)
+    if (res.status === 'failed') {
+      await this.finalizer.dispatchFailed(claim, res.errorCode, providerCalls)
+      return true
+    }
+    rounds.push({
+      toolCallId: res.toolCallId,
+      toolId: tool.toolId,
+      input: res.input,
+      output: res.output,
+    })
+    return false
+  }
+}
+
+/** The tool-result round fed back to the model for an owner-REJECTED approval-gated call (Arc E.5). */
+function rejectionRound(pending: PendingApprovalInvocation): CompletedToolRound {
+  return {
+    toolCallId: approvedToolCallId(pending.id),
+    toolId: pending.toolId,
+    input: pending.argsSnapshot,
+    output: AI_TOOL_REJECTION_NOTICE,
   }
 }
 

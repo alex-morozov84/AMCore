@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 
 import { AiGatewayModule } from './ai-gateway.module'
 import { AiRunRepository } from './runs/ai-run.repository'
+import { AiRunApprovalParker } from './runs/ai-run-approval-parker.service'
 import { AiRunDispatchProcessor } from './runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from './runs/ai-run-dispatch.service'
 import { AiRunExecutorService } from './runs/ai-run-executor.service'
@@ -37,6 +38,7 @@ import { PrismaModule } from '@/prisma'
     AiRunExecutorService,
     AiRunLoopExecutor,
     AiRunLoopFinalizer,
+    AiRunApprovalParker,
     AiToolDispatcher,
     AiRunDispatchService,
     AiRunDispatchProcessor,

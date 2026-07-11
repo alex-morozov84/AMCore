@@ -9,6 +9,7 @@ import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
 import {
+  providerCallStep,
   type RunStepSpec,
   writeAssistantTurn,
   writeRunSteps,
@@ -169,6 +170,8 @@ export class AiRunLoopFinalizer {
     return steps
   }
 
+  // (providerCallStep moved to ai-run-loop-persistence so AiRunApprovalParker shares it — Arc E.5.)
+
   /** A lost lease is not a failure (recovery owns the run); any other finalize fault stays retryable. */
   private handleFinalizeError(error: unknown, claim: ClaimedRun): void {
     if (error instanceof RunLeaseLostError) {
@@ -186,14 +189,5 @@ export class AiRunLoopFinalizer {
       },
       'AI run loop finalization failed after a successful provider call; left non-terminal for recovery'
     )
-  }
-}
-
-/** The bounded, content-free `PROVIDER_CALL` step detail for one provider call. */
-function providerCallStep(result: AiTextResult, durationMs: number): RunStepSpec {
-  return {
-    type: AiRunStepType.PROVIDER_CALL,
-    detail: { finishReason: result.finishReason, providerType: result.providerType },
-    durationMs,
   }
 }
