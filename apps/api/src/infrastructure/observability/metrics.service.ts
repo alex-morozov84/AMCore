@@ -88,7 +88,7 @@ export type AiMetricsAssistantAdminAction =
   | 'updated'
   | 'enabled'
   | 'disabled'
-export type AiMetricsControlAction = 'taken_over' | 'released'
+export type AiMetricsControlAction = 'taken_over' | 'released' | 'operator_message'
 export type AiMetricsControlActorRole = 'owner' | 'operator'
 
 /**

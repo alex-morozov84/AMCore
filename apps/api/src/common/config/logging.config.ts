@@ -155,6 +155,14 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
           'req.body.oauthAccount.keyHash',
           'req.body.oauthAccount.salt',
 
+          // AI human-takeover / operator-review (Track C — ADR-054, Arc F.3): the operator reason /
+          // ticket ref (takeover/release/operator-message body + the transcript-read header) and the
+          // operator message `content` are user/transcript text — never emit them to access/error logs.
+          // (Audit records them separately, content-free / bounded.)
+          'req.body.reason',
+          'req.body.content',
+          'req.headers["x-amcore-operator-reason"]',
+
           // Headers
           'req.headers.authorization',
           'req.headers.cookie',

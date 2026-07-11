@@ -1,13 +1,34 @@
-import { Body, Controller, HttpCode, HttpStatus, Param, Post } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common'
+import { ApiBearerAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
-import { type AiConversationResponse, AuthType, type RequestPrincipal } from '@amcore/shared'
+import {
+  AI_OPERATOR_REASON_HEADER,
+  type AiConversationResponse,
+  type AiMessageResponse,
+  type AiTranscriptResponse,
+  AuthType,
+  type RequestPrincipal,
+} from '@amcore/shared'
 
 import { Auth } from '../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator'
 import {
   AiConversationResponseDto,
+  AiMessageResponseDto,
+  AiTranscriptQueryDto,
+  AiTranscriptResponseDto,
+  PostOperatorMessageDto,
   ReleaseConversationDto,
   TakeoverConversationDto,
 } from '../dto/ai.dto'
@@ -50,5 +71,34 @@ export class AiConversationControlController {
     @Body() dto: ReleaseConversationDto
   ): Promise<AiConversationResponse> {
     return this.operator.release(principal, id, dto.reason ?? undefined)
+  }
+
+  @Get(':id/messages')
+  @ApiOperation({ summary: 'Read a conversation transcript (owner or SUPER_ADMIN operator)' })
+  @ApiHeader({
+    name: AI_OPERATOR_REASON_HEADER,
+    required: false,
+    description: 'Reason / ticket ref — required for a cross-user SUPER_ADMIN operator review.',
+  })
+  @ZodResponse({ type: AiTranscriptResponseDto, status: 200, description: 'Transcript page' })
+  getTranscript(
+    @CurrentUser() principal: RequestPrincipal,
+    @Param('id') id: string,
+    @Query() query: AiTranscriptQueryDto,
+    // The reason is a header (not a query param) so it never lands in access-log URLs; redacted in logs.
+    @Headers(AI_OPERATOR_REASON_HEADER) reason?: string
+  ): Promise<AiTranscriptResponse> {
+    return this.operator.getTranscript(principal, id, query, reason)
+  }
+
+  @Post(':id/messages')
+  @ApiOperation({ summary: 'Post a human turn while holding control' })
+  @ZodResponse({ type: AiMessageResponseDto, status: 201, description: 'Posted message' })
+  postMessage(
+    @CurrentUser() principal: RequestPrincipal,
+    @Param('id') id: string,
+    @Body() dto: PostOperatorMessageDto
+  ): Promise<AiMessageResponse> {
+    return this.operator.postMessage(principal, id, dto)
   }
 }

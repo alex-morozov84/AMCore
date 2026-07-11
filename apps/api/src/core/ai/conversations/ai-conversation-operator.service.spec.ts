@@ -3,7 +3,11 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { BadRequestException, NotFoundException } from '../../../common/exceptions'
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '../../../common/exceptions'
 
 import type { AiConversationControlService } from './ai-conversation-control.service'
 import { AiConversationOperatorService } from './ai-conversation-operator.service'
@@ -40,6 +44,8 @@ function freshSession(userId: string): Record<string, unknown> {
 describe('AiConversationOperatorService', () => {
   let prisma: DeepMockProxy<PrismaService>
   let control: { takeControl: jest.Mock; releaseControl: jest.Mock }
+  let audit: { record: jest.Mock }
+  let metrics: { incAiConversationControl: jest.Mock }
   let service: AiConversationOperatorService
 
   const takenOver = { id: 'conv-1', controlledBy: 'human' }
@@ -47,16 +53,23 @@ describe('AiConversationOperatorService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>()
+    ;(prisma.$transaction as unknown as jest.Mock).mockImplementation(
+      (cb: (tx: unknown) => unknown) => cb(prisma)
+    )
     control = {
       takeControl: jest.fn().mockResolvedValue(takenOver),
       releaseControl: jest.fn().mockResolvedValue(released),
     }
+    audit = { record: jest.fn().mockResolvedValue(undefined) }
+    metrics = { incAiConversationControl: jest.fn() }
     const env = { get: jest.fn(() => STEP_UP_WINDOW) } as unknown as EnvService
-    const logger = { setContext: jest.fn() } as unknown as PinoLogger
+    const logger = { setContext: jest.fn(), info: jest.fn() } as unknown as PinoLogger
     service = new AiConversationOperatorService(
       prisma,
       env,
       control as unknown as AiConversationControlService,
+      audit as unknown as import('../../audit').AuditLogService,
+      metrics as unknown as import('@/infrastructure/observability').MetricsService,
       logger
     )
   })
@@ -179,6 +192,144 @@ describe('AiConversationOperatorService', () => {
         errorCode: 'STEP_UP_REQUIRED',
       })
       expect(control.releaseControl).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getTranscript', () => {
+    const msg = (sequence: number): Record<string, unknown> => ({
+      id: `msg-${sequence}`,
+      conversationId: 'conv-1',
+      runId: null,
+      sequence,
+      role: 'USER',
+      authorType: 'USER',
+      content: [{ type: 'text', text: 'hi' }],
+      createdAt: new Date('2026-07-11T00:00:00.000Z'),
+    })
+
+    it('owner reads without an access audit; paginates by sequence with a nextCursor', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
+      // limit 2 → fetch 3, hasMore true, nextCursor = last returned sequence.
+      prisma.aiMessage.findMany.mockResolvedValue([msg(0), msg(1), msg(2)] as never)
+
+      const result = await service.getTranscript(ownerPrincipal, 'conv-1', { limit: 2 })
+
+      expect(result.data).toHaveLength(2)
+      expect(result.hasMore).toBe(true)
+      expect(result.nextCursor).toBe('1')
+      expect(audit.record).not.toHaveBeenCalled() // owner read is not audited
+    })
+
+    it('cross-user operator read is step-up + reason gated and AUDITED (content-free)', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
+      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
+      prisma.aiMessage.findMany.mockResolvedValue([msg(0)] as never)
+
+      await service.getTranscript(operatorPrincipal, 'conv-1', { limit: 20 }, 'SUP-9')
+
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'ai.conversation.transcript_accessed',
+          targetType: 'AI_CONVERSATION',
+          metadata: expect.objectContaining({ actorRole: 'operator', reasonRef: 'SUP-9' }),
+        })
+      )
+      // The audit metadata never carries message content.
+      const meta = audit.record.mock.calls[0]![0].metadata as Record<string, unknown>
+      expect(JSON.stringify(meta)).not.toContain('hi')
+    })
+
+    it('403 for a cross-user read with a stale session (no transcript served)', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
+      prisma.session.findUnique.mockResolvedValue(null as never)
+
+      await expect(
+        service.getTranscript(operatorPrincipal, 'conv-1', { limit: 20 }, 'SUP-9')
+      ).rejects.toMatchObject({ errorCode: 'STEP_UP_REQUIRED' })
+      expect(prisma.aiMessage.findMany).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('postMessage', () => {
+    const created = {
+      id: 'msg-3',
+      conversationId: 'conv-1',
+      runId: null,
+      sequence: 3,
+      role: 'ASSISTANT',
+      authorType: 'OPERATOR',
+      content: [{ type: 'text', text: 'reply' }],
+      createdAt: new Date('2026-07-11T00:00:00.000Z'),
+    }
+    const input = { content: [{ type: 'text' as const, text: 'reply' }], reason: 'SUP-1' }
+
+    beforeEach(() => {
+      prisma.aiMessage.aggregate.mockResolvedValue({ _max: { sequence: 2 } } as never)
+      prisma.aiMessage.create.mockResolvedValue(created as never)
+    })
+
+    it('lets the holding owner post a USER-authored ASSISTANT turn + in-tx audit', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
+      prisma.$queryRaw.mockResolvedValue([
+        { ownerUserId: 'owner-1', controlledBy: 'HUMAN', humanControlUserId: 'owner-1' },
+      ] as never)
+
+      await service.postMessage(ownerPrincipal, 'conv-1', { content: input.content })
+
+      expect(prisma.aiMessage.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            role: 'ASSISTANT',
+            authorType: 'USER',
+            authorUserId: 'owner-1',
+          }),
+        })
+      )
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'ai.conversation.operator_message' }),
+        { tx: prisma }
+      )
+      expect(metrics.incAiConversationControl).toHaveBeenCalledWith('operator_message', 'owner')
+    })
+
+    it('lets the holding operator post an OPERATOR-authored turn', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
+      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
+      prisma.$queryRaw.mockResolvedValue([
+        { ownerUserId: 'owner-1', controlledBy: 'HUMAN', humanControlUserId: 'admin-9' },
+      ] as never)
+
+      await service.postMessage(operatorPrincipal, 'conv-1', input)
+
+      expect(prisma.aiMessage.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ authorType: 'OPERATOR', authorUserId: 'admin-9' }),
+        })
+      )
+      expect(metrics.incAiConversationControl).toHaveBeenCalledWith('operator_message', 'operator')
+    })
+
+    it('409s when the actor does not currently hold control (must take over first)', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
+      prisma.$queryRaw.mockResolvedValue([
+        { ownerUserId: 'owner-1', controlledBy: 'BOT', humanControlUserId: null },
+      ] as never)
+
+      await expect(
+        service.postMessage(ownerPrincipal, 'conv-1', { content: input.content })
+      ).rejects.toThrow(ConflictException)
+      expect(prisma.aiMessage.create).not.toHaveBeenCalled()
+    })
+
+    it('409s when a different human holds control', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
+      prisma.$queryRaw.mockResolvedValue([
+        { ownerUserId: 'owner-1', controlledBy: 'HUMAN', humanControlUserId: 'someone-else' },
+      ] as never)
+
+      await expect(
+        service.postMessage(ownerPrincipal, 'conv-1', { content: input.content })
+      ).rejects.toThrow(ConflictException)
     })
   })
 })

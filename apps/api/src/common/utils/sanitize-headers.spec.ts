@@ -26,6 +26,7 @@ describe('sanitizeHeaders', () => {
       'x-auth-token': 'leaked',
       'stripe-signature': 't=1,v1=abc',
       'x-telegram-bot-api-secret-token': 'tg-secret',
+      'x-amcore-operator-reason': 'ticket-SUP-42',
     })
     expect(result).toEqual({
       authorization: '[REDACTED]',
@@ -36,6 +37,7 @@ describe('sanitizeHeaders', () => {
       'x-auth-token': '[REDACTED]',
       'stripe-signature': '[REDACTED]',
       'x-telegram-bot-api-secret-token': '[REDACTED]',
+      'x-amcore-operator-reason': '[REDACTED]',
     })
   })
 

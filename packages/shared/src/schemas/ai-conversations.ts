@@ -1,5 +1,10 @@
 import { z } from 'zod'
 
+import { PAGINATION } from '../constants'
+
+import { aiMessageContentSchema, aiMessageResponseSchema } from './ai-runs'
+import { cursorResponseSchema } from './pagination'
+
 /**
  * AI capability layer — human takeover / operator-review contracts (Track C — ADR-054, Arc F.3).
  *
@@ -41,3 +46,33 @@ export type TakeoverConversationInput = z.infer<typeof takeoverConversationSchem
 /** Release control back to the bot (`reason` optional here; required at runtime for cross-user). */
 export const releaseConversationSchema = z.object({ reason: aiControlReasonSchema.optional() })
 export type ReleaseConversationInput = z.infer<typeof releaseConversationSchema>
+
+/**
+ * Post a human turn while holding control (Arc F.3b). `content` is the same multimodal content-part
+ * contract as any transcript turn; the server renders it as a `role=ASSISTANT` turn authored by the
+ * human (`authorType=OPERATOR` for a cross-user operator, `USER` for the owner). `reason` is required
+ * at runtime for a cross-user operator only.
+ */
+export const postOperatorMessageSchema = z.object({
+  content: aiMessageContentSchema,
+  reason: aiControlReasonSchema.optional(),
+})
+export type PostOperatorMessageInput = z.infer<typeof postOperatorMessageSchema>
+
+/** The header a cross-user operator supplies their reason/ticket ref in on the transcript-read GET. */
+export const AI_OPERATOR_REASON_HEADER = 'x-amcore-operator-reason'
+
+/**
+ * Transcript read query (Arc F.3b). Keyset-paginated by monotonic `sequence` (ascending — oldest
+ * first), the conversation's natural order. `cursor` is the last `sequence` already seen. The
+ * cross-user operator reason is **not** a query param (that would leak into access-log URLs) — it is
+ * supplied in the `x-amcore-operator-reason` header (redacted in logs), validated by the same grammar.
+ */
+export const aiTranscriptQuerySchema = z.object({
+  cursor: z.coerce.number().int().nonnegative().optional(),
+  limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).default(PAGINATION.DEFAULT_LIMIT),
+})
+export type AiTranscriptQuery = z.infer<typeof aiTranscriptQuerySchema>
+
+export const aiTranscriptResponseSchema = cursorResponseSchema(aiMessageResponseSchema)
+export type AiTranscriptResponse = z.infer<typeof aiTranscriptResponseSchema>

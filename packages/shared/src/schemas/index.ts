@@ -253,12 +253,19 @@ export {
 export {
   // Human takeover / operator review (Arc F.3)
   AI_CONTROL_REASON_MAX_LENGTH,
+  AI_OPERATOR_REASON_HEADER,
   aiControlReasonSchema,
   takeoverConversationSchema,
   releaseConversationSchema,
+  postOperatorMessageSchema,
+  aiTranscriptQuerySchema,
+  aiTranscriptResponseSchema,
   type AiControlReason,
   type TakeoverConversationInput,
   type ReleaseConversationInput,
+  type PostOperatorMessageInput,
+  type AiTranscriptQuery,
+  type AiTranscriptResponse,
 } from './ai-conversations'
 
 export {
