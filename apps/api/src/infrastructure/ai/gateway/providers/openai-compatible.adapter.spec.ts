@@ -169,6 +169,53 @@ describe('OpenAICompatibleAdapter', () => {
     expect(responseFormat.type).toBe('json_schema')
   })
 
+  it('round-trips a tool call provider-agnostically and sends the tool schema (Arc E)', async () => {
+    const toolCompletion = {
+      id: 'chatcmpl-3',
+      object: 'chat.completion',
+      created: 0,
+      model: 'm',
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call_1',
+                type: 'function',
+                function: { name: 'current_time', arguments: '{}' },
+              },
+            ],
+          },
+          finish_reason: 'tool_calls',
+        },
+      ],
+      usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
+    }
+    const fetchImpl = fakeFetch(toolCompletion)
+    const adapter = new OpenAICompatibleAdapter(fetchImpl)
+
+    const result = await adapter.generateText({
+      ...call(AiProviderType.OPENAI, 'gpt-4o'),
+      tools: [
+        {
+          name: 'current_time',
+          description: 'Returns the time.',
+          parameters: z.object({}).strict(),
+        },
+      ],
+    })
+
+    expect(result.finishReason).toBe('tool_calls')
+    expect(result.toolCalls).toEqual([
+      { toolCallId: 'call_1', toolName: 'current_time', input: {} },
+    ])
+    const sentTools = fetchImpl.calls[0]!.body.tools as Array<{ function: { name: string } }>
+    expect(sentTools.map((sent) => sent.function.name)).toEqual(['current_time'])
+  })
+
   it('rejects a generic compatible model with no base URL as model_not_configured', async () => {
     const adapter = new OpenAICompatibleAdapter(fakeFetch(completion('x')))
     await expect(

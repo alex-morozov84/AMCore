@@ -1,10 +1,11 @@
 import { AiProviderType } from '@prisma/client'
 import { APICallError, NoObjectGeneratedError } from 'ai'
+import { z } from 'zod'
 
 import { AiGatewayException } from '../ai-gateway.error'
-import type { AiAdapterCall } from '../ai-gateway.types'
+import type { AiAdapterCall, AiGatewayTool } from '../ai-gateway.types'
 
-import { mapProviderError, mapTextResult } from './ai-sdk-mapping'
+import { mapProviderError, mapTextResult, toModelMessages, toSdkTools } from './ai-sdk-mapping'
 
 function call(type: AiProviderType = AiProviderType.OPENAI): AiAdapterCall {
   return {
@@ -57,7 +58,25 @@ describe('mapTextResult', () => {
 
   it('maps length and collapses unknown reasons to other', () => {
     expect(mapTextResult(result('length') as never, call()).finishReason).toBe('length')
-    expect(mapTextResult(result('tool-calls') as never, call()).finishReason).toBe('other')
+    expect(mapTextResult(result('some-future-reason') as never, call()).finishReason).toBe('other')
+  })
+
+  it('maps the tool-calls finish reason and surfaces the calls (Arc E)', () => {
+    const mapped = mapTextResult(
+      {
+        ...result('tool-calls'),
+        toolCalls: [{ toolCallId: 'c1', toolName: 'current_time', input: { x: 1 } }],
+      } as never,
+      call()
+    )
+    expect(mapped.finishReason).toBe('tool_calls')
+    expect(mapped.toolCalls).toEqual([
+      { toolCallId: 'c1', toolName: 'current_time', input: { x: 1 } },
+    ])
+  })
+
+  it('defaults toolCalls to an empty array on a plain text answer', () => {
+    expect(mapTextResult(result('stop') as never, call()).toolCalls).toEqual([])
   })
 
   it('throws content_filtered on a provider safety refusal', () => {
@@ -108,5 +127,105 @@ describe('mapProviderError', () => {
       finishReason: 'stop',
     })
     expect(mapProviderError(error, AiProviderType.OPENAI).code).toBe('output_validation_failed')
+  })
+})
+
+describe('toModelMessages (provider-agnostic turn mapping, Arc E)', () => {
+  it('maps user and assistant text turns unchanged', () => {
+    expect(
+      toModelMessages([
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'hello' },
+      ])
+    ).toEqual([
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'hello' },
+    ])
+  })
+
+  it('maps an assistant tool-call turn to tool-call content parts', () => {
+    expect(
+      toModelMessages([
+        {
+          role: 'assistant',
+          toolCalls: [{ toolCallId: 'c1', toolName: 'current_time', input: {} }],
+        },
+      ])
+    ).toEqual([
+      {
+        role: 'assistant',
+        content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'current_time', input: {} }],
+      },
+    ])
+  })
+
+  it('maps a tool-result turn to a tool message with a text output part', () => {
+    expect(
+      toModelMessages([
+        {
+          role: 'tool',
+          toolResults: [{ toolCallId: 'c1', toolName: 'current_time', output: 'now' }],
+        },
+      ])
+    ).toEqual([
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'c1',
+            toolName: 'current_time',
+            output: { type: 'text', value: 'now' },
+          },
+        ],
+      },
+    ])
+  })
+
+  it('accepts the Arc E.5 synthetic approval toolCallId, paired across the assistant + tool turns', () => {
+    // The approval-gated resume path pairs turns with `ai-tool-inv:<invocationId>` (no original
+    // provider id is persisted). The provider mapping must carry it through verbatim on both turns.
+    const synthetic = 'ai-tool-inv:inv-abc'
+    expect(
+      toModelMessages([
+        {
+          role: 'assistant',
+          toolCalls: [{ toolCallId: synthetic, toolName: 'danger', input: {} }],
+        },
+        {
+          role: 'tool',
+          toolResults: [{ toolCallId: synthetic, toolName: 'danger', output: 'ok' }],
+        },
+      ])
+    ).toEqual([
+      {
+        role: 'assistant',
+        content: [{ type: 'tool-call', toolCallId: synthetic, toolName: 'danger', input: {} }],
+      },
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: synthetic,
+            toolName: 'danger',
+            output: { type: 'text', value: 'ok' },
+          },
+        ],
+      },
+    ])
+  })
+})
+
+describe('toSdkTools (Arc E)', () => {
+  const tools: AiGatewayTool[] = [
+    { name: 'current_time', description: 'Returns the time.', parameters: z.object({}).strict() },
+  ]
+
+  it('registers each tool by name with a description and no execute (no auto-execution)', () => {
+    const set = toSdkTools(tools)
+    expect(Object.keys(set)).toEqual(['current_time'])
+    expect(set.current_time!.description).toBe('Returns the time.')
+    expect(set.current_time!.execute).toBeUndefined()
   })
 })

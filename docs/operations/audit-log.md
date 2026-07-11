@@ -18,6 +18,12 @@ Current action taxonomy:
 - `api_key.revoked`
 - `auth.step_up_failed`
 - `auth.step_up_succeeded`
+- `ai.approval.approved`
+- `ai.approval.expired`
+- `ai.approval.rejected`
+- `ai.approval.requested`
+- `ai.tool.execution_failed`
+- `ai.tool.invoked`
 - `org.invite_accepted`
 - `org.invite_created`
 - `org.invite_revoked`
@@ -44,6 +50,7 @@ Important data-model choices:
 - This is intentional so the audit trail survives hard-delete flows covered by
   ADR-030.
 - `metadata` is allowlist-driven per action, not arbitrary caller JSON.
+- AI tool/approval targets use `AI_TOOL_INVOCATION` and `AI_APPROVAL`.
 
 ## Sensitive Data Rules
 
@@ -53,9 +60,15 @@ Audit rows must not contain:
 - passwords
 - reset or invite tokens
 - API key secrets, hashes, or salts
+- prompt text, provider bodies, tool arguments, tool results, or approval reason
+  text
 - other credential material
 
 Recipient identifiers use `emailHash` when email identity is needed.
+
+AI tool/approval metadata is content-free and limited to bounded identifiers or
+codes such as `toolId`, `riskClass`, `invocationId`, `approvalId`, `runId`,
+`decision`, `reasonCode`, and `outcome`.
 
 ## Write Modes
 
@@ -69,9 +82,11 @@ AMCore uses two write modes:
 Current examples:
 
 - In-transaction: admin system-role change, invite create/accept, API key
-  create/revoke.
+  create/revoke, AI approval lifecycle events (`ai.approval.requested`,
+  `ai.approval.approved`, `ai.approval.rejected`, `ai.approval.expired`).
 - Best-effort: admin cleanup, admin session revocation, step-up
-  success/failure, invite revoke.
+  success/failure, invite revoke, AI tool execution events (`ai.tool.invoked`,
+  `ai.tool.execution_failed`).
 
 ## Append-Only Enforcement
 

@@ -29,9 +29,13 @@ const DISCLOSURE_PATTERNS = [
   /\b(revealing|disclosing|sharing|exposing) my (hidden|secret|internal|system)? ?(instructions?|system prompt|system message)\b/i,
 ]
 
-/** Optional context for the output guard: the run's boundary marker (checked, never stored). */
+/**
+ * Optional context for the output guard: the run's ACTIVE boundary markers (checked, never stored).
+ * A tool loop has more than one — the user-input marker and the tool-result marker (Arc E) — and the
+ * guard must detect leakage of every one, not only the first.
+ */
 export interface OutputGuardContext {
-  marker?: string
+  markers?: string[]
 }
 
 /** Scan complete model output and return a content-free verdict (Arc D output guard). */
@@ -39,8 +43,10 @@ export function scanOutput(output: string, context: OutputGuardContext = {}): Gu
   const tally = new CategoryTally()
   const lower = output.toLowerCase()
 
-  if (context.marker !== undefined && lower.includes(context.marker.toLowerCase())) {
-    tally.add(GUARDRAIL_OUTPUT_CATEGORY.BOUNDARY_MARKER_LEAK)
+  for (const marker of context.markers ?? []) {
+    if (lower.includes(marker.toLowerCase())) {
+      tally.add(GUARDRAIL_OUTPUT_CATEGORY.BOUNDARY_MARKER_LEAK)
+    }
   }
   if (lower.includes(GUARDRAIL_BOUNDARY_TAG_PREFIX)) {
     tally.add(GUARDRAIL_OUTPUT_CATEGORY.BOUNDARY_MARKER_LEAK)

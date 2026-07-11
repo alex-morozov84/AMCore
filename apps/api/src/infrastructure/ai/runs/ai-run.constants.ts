@@ -53,6 +53,25 @@ export const AiRunTerminalReason = {
   GUARDRAIL_INPUT_BLOCKED: 'guardrail_input_blocked',
   GUARDRAIL_OUTPUT_BLOCKED: 'guardrail_output_blocked',
   GUARDRAIL_INPUT_TOO_LARGE: 'guardrail_input_too_large',
+  /**
+   * Arc E bounded tool loop terminal reasons (non-retryable). The loop hit its step bound, the model
+   * broke the one-call-per-step contract, requested a tool it may not use, produced invalid tool
+   * arguments, a tool failed host-side, or requested an approval-gated tool before Arc E.5 wires the
+   * durable park (the E.4 placeholder — E.5 parks to WAITING_APPROVAL instead of failing).
+   */
+  TOOL_LOOP_EXHAUSTED: 'tool_loop_exhausted',
+  TOO_MANY_TOOL_CALLS: 'too_many_tool_calls',
+  TOOL_NOT_ALLOWED: 'tool_not_allowed',
+  TOOL_ARGS_INVALID: 'tool_args_invalid',
+  TOOL_EXECUTION_FAILED: 'tool_execution_failed',
+  /**
+   * A tool call needing human approval was requested (Arc E). Until Arc E.5 wired the durable park this
+   * was a terminal placeholder; from E.5 the loop parks the run in `WAITING_APPROVAL` instead, and this
+   * value is emitted only if the approval TTL elapses before a decision (`APPROVAL_EXPIRED`).
+   */
+  TOOL_APPROVAL_REQUIRED: 'tool_approval_required',
+  /** The approval TTL elapsed before the owner decided (Arc E.5); the run fails non-retryably. */
+  APPROVAL_EXPIRED: 'approval_expired',
 } as const
 
 /**
@@ -73,6 +92,12 @@ export const AiRunErrorCode = {
   UNKNOWN_ERROR: 'unknown_error',
   /** A guardrail blocked the run (input/output/oversize); the specific reason is terminalReasonCode. */
   GUARDRAIL_BLOCKED: 'guardrail_blocked',
+  /**
+   * The bounded tool loop terminally failed (Arc E). Umbrella `errorCode`; the specific cause is the
+   * `terminalReasonCode` (`tool_loop_exhausted`/`too_many_tool_calls`/`tool_not_allowed`/
+   * `tool_args_invalid`/`tool_execution_failed`/`tool_approval_required`), mirroring `GUARDRAIL_BLOCKED`.
+   */
+  TOOL_LOOP_FAILED: 'tool_loop_failed',
 } as const
 
 /**

@@ -105,6 +105,34 @@ export class AiRunRepository {
     }))
   }
 
+  /**
+   * Extend the lease on a still-owned `RUNNING` run (Arc E bounded loop, whose steps can outlast the
+   * initial lease). CAS on `(id, status=RUNNING, leaseToken)` so a worker that already lost the lease
+   * cannot renew it; returns false when the lease was reclaimed (the loop must then stop).
+   */
+  async renewLease(claim: ClaimedRun): Promise<boolean> {
+    const leaseExpiresAt = new Date(Date.now() + AI_RUN_LEASE_TTL_MS)
+    const { count } = await this.prisma.aiRun.updateMany({
+      where: { id: claim.id, status: AiRunStatus.RUNNING, leaseToken: claim.leaseToken },
+      data: { leaseExpiresAt },
+    })
+    return count === 1
+  }
+
+  /**
+   * Park a claimed run for human approval (Arc E.5): CAS `RUNNING` → `WAITING_APPROVAL`, **releasing the
+   * lease** (token/expiry null) so the run is unleased and non-due — the reaper (RUNNING-only) and the
+   * claim query (QUEUED-only) both ignore it until a decision re-queues it or the expiry sweep resolves
+   * it. Not terminal (no `finishedAt`). Returns false when the lease was already lost (roll back).
+   */
+  parkForApproval(tx: Prisma.TransactionClient, claim: ClaimedRun): Promise<boolean> {
+    return this.cas(tx, claim, {
+      status: AiRunStatus.WAITING_APPROVAL,
+      leaseToken: null,
+      leaseExpiresAt: null,
+    })
+  }
+
   /** Run completed: CAS `RUNNING` → terminal `COMPLETED`. */
   finalizeCompleted(tx: Prisma.TransactionClient, claim: ClaimedRun): Promise<boolean> {
     return this.cas(tx, claim, {

@@ -6,9 +6,24 @@ interface MetadataSpec {
   [key: string]: MetadataRule
 }
 
-type MetadataRule = MetadataSpec | PrimitiveArrayRule | true
+type MetadataRule = MetadataSpec | PrimitiveArrayRule | MetadataValueRule | true
 type Primitive = boolean | number | string | null
 type PrimitiveArrayRule = 'number[]' | 'string[]'
+/** A custom bounded-value rule: returns the accepted primitive, or `undefined` to drop the field. */
+type MetadataValueRule = (value: unknown) => Primitive | undefined
+
+/** Accept a string only when it is within `maxLength` and matches `pattern`; else drop the field. */
+function boundedString(maxLength: number, pattern: RegExp): MetadataValueRule {
+  return (value) =>
+    typeof value === 'string' && value.length <= maxLength && pattern.test(value)
+      ? value
+      : undefined
+}
+
+/** A bounded lowercase snake code — toolId, riskClass, outcome, decision, reasonCode (Arc E). */
+const aiCode = boundedString(64, /^[a-z][a-z0-9_]*$/)
+/** A bounded cuid-shaped id — runId, invocationId, approvalId (Arc E). */
+const aiId = boundedString(64, /^[a-z0-9]+$/)
 
 const cleanupCounts: MetadataSpec = {
   expiredApiKeys: true,
@@ -22,10 +37,30 @@ const cleanupCounts: MetadataSpec = {
 
 const commonSpec: MetadataSpec = { emailHash: true, pinoEvent: true }
 
+/**
+ * AI tool-loop + approval audit metadata (Track C — ADR-054, Arc E). Every allowed key is a bounded,
+ * content-free identifier or code — never tool args, tool result, prompt, provider body, or user
+ * text. `toolId`/`riskClass`/`invocationId`/`runId` describe *what* acted; `approvalId`/`decision`/
+ * `reasonCode`/`outcome` describe the gate/result.
+ */
+const aiToolContext: MetadataSpec = {
+  toolId: aiCode,
+  riskClass: aiCode,
+  invocationId: aiId,
+  runId: aiId,
+}
+const aiApprovalContext: MetadataSpec = { ...aiToolContext, approvalId: aiId }
+
 const specs: Record<AuditAction, MetadataSpec> = {
   'admin.cleanup.executed': { counts: cleanupCounts },
   'admin.user.sessions_revoked': { count: true, reason: true },
   'admin.user.system_role_changed': { afterSystemRole: true, beforeSystemRole: true },
+  'ai.approval.approved': { ...aiApprovalContext, decision: aiCode },
+  'ai.approval.expired': { ...aiApprovalContext, reasonCode: aiCode },
+  'ai.approval.rejected': { ...aiApprovalContext, decision: aiCode, reasonCode: aiCode },
+  'ai.approval.requested': { ...aiApprovalContext },
+  'ai.tool.execution_failed': { ...aiToolContext, reasonCode: aiCode },
+  'ai.tool.invoked': { ...aiToolContext, outcome: aiCode },
   'api_key.created': { expiresAt: true, name: true, scopes: 'string[]' },
   'api_key.revoked': { reason: true },
   'auth.step_up_failed': { reason: true },
@@ -57,6 +92,7 @@ function sanitizeObject(input: unknown, spec: MetadataSpec): Prisma.JsonObject {
 
 function sanitizeValue(value: unknown, rule: MetadataRule): Prisma.JsonValue | undefined {
   if (rule === true) return sanitizePrimitive(value)
+  if (typeof rule === 'function') return rule(value)
   if (typeof rule === 'string') return sanitizePrimitiveArray(value, rule)
   return sanitizeNested(value, rule)
 }

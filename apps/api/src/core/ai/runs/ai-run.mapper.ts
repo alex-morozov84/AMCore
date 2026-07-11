@@ -16,13 +16,18 @@ import type {
  * minimal Arc A `aiRunResponseSchema` shape, extended additively by later arcs.
  */
 
-export function toAiRunResponse(run: AiRun): AiRunResponse {
+export function toAiRunResponse(
+  run: AiRun,
+  pendingApprovalId: string | null = null
+): AiRunResponse {
   return {
     id: run.id,
     conversationId: run.conversationId,
     status: run.status.toLowerCase() as AiRunStatusValue,
     errorCode: run.errorCode,
     terminalReasonCode: run.terminalReasonCode,
+    // Only the single-run fetch resolves the parked run's pending approval; list/create leave it null.
+    pendingApprovalId,
     createdAt: run.createdAt.toISOString(),
     startedAt: run.startedAt?.toISOString() ?? null,
     finishedAt: run.finishedAt?.toISOString() ?? null,

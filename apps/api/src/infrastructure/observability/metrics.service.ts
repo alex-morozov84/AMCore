@@ -71,6 +71,26 @@ export type AiMetricsOperation = 'text' | 'object'
 export type AiMetricsTokenDirection = 'input' | 'output'
 export type AiMetricsGuardrailStage = 'input' | 'output'
 export type AiMetricsGuardrailVerdict = 'allow' | 'flag' | 'block'
+
+/** Tool risk class (lowercase wire form) — a bounded label for tool-invocation metrics (Arc E). */
+export type AiMetricsToolRiskClass = 'safe' | 'sensitive' | 'destructive'
+/** Terminal outcome of one tool invocation (Arc E). */
+export type AiMetricsToolOutcome = 'succeeded' | 'failed' | 'rejected' | 'skipped'
+/** Approval kind (lowercase projection of `AiApprovalKind`) (Arc E). */
+export type AiMetricsApprovalKind = 'tool_invocation' | 'handoff' | 'sensitive_action'
+/** Approval lifecycle state (lowercase projection of `AiApprovalState`) (Arc E). */
+export type AiMetricsApprovalState = 'pending' | 'approved' | 'rejected' | 'expired'
+/** Terminal outcome of a bounded agent loop, for the loop-steps histogram (Arc E). */
+export type AiMetricsToolLoopOutcome = 'completed' | 'exhausted' | 'failed'
+
+/**
+ * Defensive bound on the `tool_id` metric label — mirrors the code-owned tool-id grammar (Arc E).
+ * Callers pass registered ids, but an out-of-grammar/overlong value is coerced to `unknown` so a
+ * malformed id can never explode the label cardinality.
+ */
+const AI_TOOL_ID_LABEL_PATTERN = /^[a-z][a-z0-9_]*$/
+const AI_TOOL_ID_LABEL_MAX_LENGTH = 48
+const AI_TOOL_ID_LABEL_FALLBACK = 'unknown'
 export type CacheMetricsResult = 'hit' | 'negative_hit' | 'miss' | 'db_fallback' | 'corrupt'
 export type StorageMetricsDriver = 's3' | 'local' | 'memory'
 export type StorageMetricsOperation =
@@ -137,6 +157,9 @@ export class MetricsService implements OnModuleDestroy {
   private readonly aiRunRealtimePublishTotal: Counter<'outcome' | 'role'>
   private readonly aiRunRealtimeConnections: Gauge<'role'>
   private readonly aiRunRealtimeEventsTotal: Counter<'event' | 'role'>
+  private readonly aiToolInvocationsTotal: Counter<'tool_id' | 'risk_class' | 'outcome' | 'role'>
+  private readonly aiApprovalsTotal: Counter<'kind' | 'state' | 'role'>
+  private readonly aiToolLoopSteps: Histogram<'outcome' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -278,6 +301,19 @@ export class MetricsService implements OnModuleDestroy {
       help: 'Total AI run-status realtime stream/subscriber events by bounded event and process role.',
       labelNames: ['event', 'role'],
     })
+    this.aiToolInvocationsTotal = this.getOrCreateCounter(METRIC_NAMES.aiToolInvocationsTotal, {
+      help: 'Total AI tool invocations by code-owned tool id, risk class, and outcome (+ process role). tool_id is bounded to the code-owned registry; no args, result, or prompt is ever a label.',
+      labelNames: ['tool_id', 'risk_class', 'outcome', 'role'],
+    })
+    this.aiApprovalsTotal = this.getOrCreateCounter(METRIC_NAMES.aiApprovalsTotal, {
+      help: 'Total AI human-in-the-loop approvals by kind and state (+ process role). No approval/run/user id or reason text is ever a label.',
+      labelNames: ['kind', 'state', 'role'],
+    })
+    this.aiToolLoopSteps = this.getOrCreateHistogram(METRIC_NAMES.aiToolLoopSteps, {
+      help: 'Distribution of bounded agent-loop steps per finished AI run by terminal outcome (+ process role).',
+      labelNames: ['outcome', 'role'],
+      buckets: [1, 2, 3, 4, 6, 8, 12, 16],
+    })
   }
 
   get enabled(): boolean {
@@ -403,6 +439,42 @@ export class MetricsService implements OnModuleDestroy {
   incAiGuardrailCheck(stage: AiMetricsGuardrailStage, verdict: AiMetricsGuardrailVerdict): void {
     if (!this.enabled) return
     this.aiGuardrailChecksTotal.inc({ stage, verdict, role: this.role })
+  }
+
+  /**
+   * Count one AI tool invocation (Arc E). Labels are the bounded, code-owned `tool_id`, its
+   * `risk_class`, and the terminal `outcome` (+ process role) — never tool args, result, prompt, or
+   * any run/user id. `tool_id` is bounded because the registry is code-owned and size-capped.
+   */
+  incAiToolInvocation(
+    toolId: string,
+    riskClass: AiMetricsToolRiskClass,
+    outcome: AiMetricsToolOutcome
+  ): void {
+    if (!this.enabled) return
+    const tool_id =
+      toolId.length <= AI_TOOL_ID_LABEL_MAX_LENGTH && AI_TOOL_ID_LABEL_PATTERN.test(toolId)
+        ? toolId
+        : AI_TOOL_ID_LABEL_FALLBACK
+    this.aiToolInvocationsTotal.inc({ tool_id, risk_class: riskClass, outcome, role: this.role })
+  }
+
+  /**
+   * Count one AI human-in-the-loop approval transition (Arc E). Only the low-cardinality `kind`/
+   * `state` (+ process role) are labels — never an approval/run/user id or reason text.
+   */
+  incAiApproval(kind: AiMetricsApprovalKind, state: AiMetricsApprovalState): void {
+    if (!this.enabled) return
+    this.aiApprovalsTotal.inc({ kind, state, role: this.role })
+  }
+
+  /**
+   * Record the number of bounded agent-loop steps a finished AI run took (Arc E), labelled only by
+   * terminal `outcome` (+ process role). A negative count is ignored defensively.
+   */
+  observeAiToolLoopSteps(outcome: AiMetricsToolLoopOutcome, steps: number): void {
+    if (!this.enabled || steps < 0) return
+    this.aiToolLoopSteps.observe({ outcome, role: this.role }, steps)
   }
 
   observeStorageOperation(

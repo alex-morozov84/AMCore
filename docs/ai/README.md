@@ -11,11 +11,13 @@ consumers.
 > **Status — foundational (Track C, arc-phased).** Arc A shipped the persistence
 > schema and shared contracts; Arc B added the runtime `ModelGateway` and catalog
 > registry; Arc C wired the durable run worker and the run HTTP surface (bearer
-> conversation/run create/fetch/list/cancel plus a status-only SSE stream); **Arc D adds
-> the prompt-injection guardrail baseline** — a structural trust boundary, input/output
-> guards, safe refusals, and an adversarial corpus gate. The tool loop, human takeover,
-> and multimodal routing land in later arcs (E–G), each additive over what is documented
-> here. Sections marked _(later arc)_ describe the intended shape those arcs build toward.
+> conversation/run create/fetch/list/cancel plus a status-only SSE stream); Arc D added
+> the prompt-injection guardrail baseline — a structural trust boundary, input/output
+> guards, safe refusals, and an adversarial corpus gate; **Arc E adds the bounded self-hosted
+> tool loop + human-in-the-loop approvals** (code-owned tool registry, worker-only host-side
+> execution, durable `waiting_approval` park/resume, no product tools). Human takeover and
+> multimodal routing land in later arcs (F–G), each additive over what is documented here.
+> Sections marked _(later arc)_ describe the intended shape those arcs build toward.
 
 ## Design Principles
 
@@ -252,6 +254,105 @@ injection via tools/files (addressed by Arcs E/G, which reuse this boundary).
 | `AI_GUARDRAIL_INPUT_MODE`      | input-guard mode: `off` \| `flag` (default) \| `block`                           |
 | `AI_GUARDRAIL_MAX_INPUT_CHARS` | max characters of untrusted user text before a run is refused (default `100000`) |
 
+## Tool Loop + Human-in-the-Loop Approvals (shipped — Arc E)
+
+Arc E turns the Arc C single-shot executor into a **bounded, durable, worker-executed agent loop** over
+**code-owned tools**, and gates SENSITIVE/DESTRUCTIVE tool calls behind a **durable human approval**. No
+product tools ship — this is the reusable engine plus one SAFE reference tool (`current_time`).
+
+**The SDK never executes tools.** The gateway only returns the model's requested tool call; a tool runs
+**only** host-side in the worker, after its `AiToolInvocation` is persisted. The web role can neither
+resolve the tool registry/loop/dispatcher nor run an approved tool (enforced by DI + a process-role gate).
+
+### Code-owned tool registry (worker-only)
+
+- An `AiTool` is `{ toolId, displayName, description, Zod parameters, riskClass, idempotency, execute }`.
+  The model may only invoke a **registered** tool that is **also** on the conversation assistant's
+  `toolAllowlist` — it cannot invent one. The **default allowlist is empty**: a fresh starter is never
+  autonomously tool-capable; tools are opt-in via an assistant binding (Arc F) or a fork's registration.
+- `riskClass` (`SAFE` | `SENSITIVE` | `DESTRUCTIVE`) drives the **code-owned** approval policy (never
+  model/catalog-supplied): only `SAFE` runs without a human approval. A tool must declare a retry-safe
+  `idempotency` (`read_only` | `idempotent`); a non-retry-safe (`unsafe`) tool is refused registration.
+
+### Bounded loop (worker) — at most one tool call per provider step
+
+```
+per step: reconstruct transcript → generateText (tools offered) → output guard →
+  0 calls                  → finalize COMPLETED (assistant text)
+  1 SAFE call              → execute host-side → append tool result → next step
+  1 non-SAFE call          → PARK for approval (below)
+  > 1 call                 → FAILED  too_many_tool_calls
+  unknown / not-allowlisted → FAILED tool_not_allowed
+  step bound reached       → FAILED  tool_loop_exhausted
+```
+
+The step bound is the **provider-call** count (`AI_TOOL_LOOP_MAX_STEPS`, default 8); the whole loop is
+also capped by the run's deadline, and the lease is renewed each step. Each provider call commits its own
+`PROVIDER_CALL` step + a run-attributed `AiUsageLedger` row. A tool result **re-enters the model as
+untrusted data** through the **same** Arc D salted boundary (indirect-injection containment); the output
+guard runs **every step** over the user marker **and** the tool-result marker — mitigated, never
+eliminated. Crash-safe resume reconstructs from Postgres and never re-runs an already-applied invocation.
+
+### Human-in-the-loop approvals
+
+A non-SAFE call **parks** the run: one transaction records the provider call + `AiApproval(PENDING)` +
+`AiToolInvocation(AWAITING_APPROVAL)` and CASes the run `RUNNING → WAITING_APPROVAL`, **releasing the
+lease** (the run is unleased and non-due, so the reaper and the claim query ignore it). The **owner**
+decides; on approve/reject the run re-queues (`WAITING_APPROVAL → QUEUED`, **without** consuming a retry
+attempt), and the resumed worker executes the approved tool (its `APPROVED → EXECUTING` CAS is the sole
+gate that lets a non-SAFE tool run) or feeds a fixed, content-free rejection notice.
+
+```
+RUNNING ─(non-SAFE call)─▶ WAITING_APPROVAL ─approve─▶ QUEUED → resume: execute approved tool → COMPLETED
+                                            ─reject──▶ QUEUED → resume: feed rejection, answer without it
+                                            ─approval TTL elapsed (cron)──▶ FAILED  approval_expired
+                                            ─run deadline passed (cron)───▶ EXPIRED deadline_exceeded
+                                            ─cancel-while-waiting─────────▶ CANCELLED (approval voided)
+```
+
+- **Approval states:** `PENDING → APPROVED | REJECTED | EXPIRED`. v1 approver = the conversation **owner
+  only** (operator approval → Arc F). A repeat of the same decision is idempotent; a conflicting one is
+  `409`; a **stale** approval (TTL/deadline already elapsed) is inline-expired to `409` — never re-queued.
+- **Expiry** is a worker-only `@Cron` sweep (`FOR UPDATE SKIP LOCKED`, DB-owned, not Redis-locked) that
+  shares the decision path's expiry state machine: the run's own deadline → `EXPIRED` (`deadline_exceeded`),
+  the approval TTL only → `FAILED` (`approval_expired`).
+
+### HTTP surface (bearer, owner-scoped)
+
+| Method + path                     | Purpose                                                                |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `GET /ai/approvals`               | List owned approvals (`?status=pending\|approved\|rejected\|expired`). |
+| `POST /ai/approvals/:id/decision` | Approve or reject an owned pending approval (`{ decision, reason? }`). |
+
+`GET /ai/runs/:id` gains a `pendingApprovalId` hint on a `waiting_approval` run. Missing/not-owned →
+`404`; a stale/raced/conflicting decision → `409` (an already-recorded **same** decision → idempotent `200`).
+
+### Audit + metrics (content-free)
+
+The approval lifecycle is written **in the same transaction** as its state change (security evidence, not
+telemetry): `ai.approval.requested` (park), `ai.approval.approved` / `ai.approval.rejected` (decision),
+`ai.approval.expired` (expiry or cancel-void); tool execution is `ai.tool.invoked` /
+`ai.tool.execution_failed` (best-effort). Targets: `AI_TOOL_INVOCATION`, `AI_APPROVAL`. Metadata is
+allowlisted — `toolId, riskClass, invocationId, approvalId, runId, decision, reasonCode, outcome` —
+**never** args, results, prompts, or reason text. Metrics: `amcore_ai_tool_invocations_total{tool_id,
+risk_class,outcome}` (`tool_id` bounded to the code-owned registry), `amcore_ai_approvals_total{kind,state}`,
+and the `amcore_ai_tool_loop_steps` histogram — bounded labels only.
+
+### Process-role split (ADR-041)
+
+- **Worker-only:** the tool registry (`AI_TOOLS` + `AiToolRegistry`), the loop executor + host-side tool
+  dispatcher, the approval parker, and the approval-expiry `@Cron`.
+- **Web:** the approval HTTP surface (`AiApprovalsController` + `AiApprovalService`) and cancel-while-
+  waiting — Postgres read/write + a best-effort wake, no provider or tool I/O.
+
+### Configuration (Arc E)
+
+| Env var                        | Purpose                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `AI_TOOL_LOOP_MAX_STEPS`       | max provider steps per run before `tool_loop_exhausted` (default `8`, bounded)                                                        |
+| `AI_TOOL_EXECUTION_TIMEOUT_MS` | per-tool host-side execution bound in ms (default `15000`)                                                                            |
+| `AI_APPROVAL_TTL_MS`           | how long a run may sit parked in `waiting_approval` before its approval expires (default 24h; the run's own deadline wins if tighter) |
+
 ## Seeded Catalog
 
 `pnpm --filter api db:seed` (idempotent) seeds the intended configuration shape so
@@ -266,11 +367,10 @@ a fresh fork sees it without live keys:
 
 ## Coming in Later Arcs
 
-| Arc | Adds _(later arc)_                                                                                                             |
-| --- | ------------------------------------------------------------------------------------------------------------------------------ |
-| E   | Self-hosted tool loop with per-tool Zod schemas, allowlists, risk classes, and human-in-the-loop approvals (no product tools). |
-| F   | Assistant registry admin contract + human takeover / operator review (transcript, take/release control).                       |
-| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing.                                  |
+| Arc | Adds _(later arc)_                                                                                       |
+| --- | -------------------------------------------------------------------------------------------------------- |
+| F   | Assistant registry admin contract + human takeover / operator review (transcript, take/release control). |
+| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing.            |
 
 ## See Also
 

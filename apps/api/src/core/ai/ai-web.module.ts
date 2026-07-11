@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common'
 
+import { AiApprovalService } from './approvals/ai-approval.service'
+import { AiApprovalsController } from './approvals/ai-approvals.controller'
 import { AiConversationService } from './conversations/ai-conversation.service'
 import { AiConversationsController } from './conversations/ai-conversations.controller'
 import { AiRunRealtimeHub } from './realtime/ai-run-realtime.hub'
@@ -9,6 +11,7 @@ import { AiRunService } from './runs/ai-run.service'
 import { AiRunProducerService } from './runs/ai-run-producer.service'
 import { AiRunsController } from './runs/ai-runs.controller'
 
+import { AuditModule } from '@/core/audit'
 import { AiCatalogModule } from '@/infrastructure/ai/ai-catalog.module'
 import { QueueModule } from '@/infrastructure/queue'
 import { PrismaModule } from '@/prisma'
@@ -28,12 +31,18 @@ import { PrismaModule } from '@/prisma'
  * worker-side (`AiRealtimeModule` in `AiWorkerModule`); no provider-call capability is added here.
  */
 @Module({
-  imports: [PrismaModule, AiCatalogModule, QueueModule],
-  controllers: [AiConversationsController, AiRunsController, AiRunStreamController],
+  imports: [PrismaModule, AiCatalogModule, QueueModule, AuditModule],
+  controllers: [
+    AiConversationsController,
+    AiRunsController,
+    AiRunStreamController,
+    AiApprovalsController,
+  ],
   providers: [
     AiConversationService,
     AiRunProducerService,
     AiRunService,
+    AiApprovalService,
     AiRunRealtimeHub,
     AiRunRealtimeSubscriber,
   ],

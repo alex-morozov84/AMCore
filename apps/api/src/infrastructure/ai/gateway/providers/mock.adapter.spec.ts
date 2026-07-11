@@ -1,7 +1,9 @@
 import { AiProviderType } from '@prisma/client'
+import { z } from 'zod'
 
+import { wrapUntrusted } from '../../guardrails/trust-boundary.builder'
 import { AiGatewayException } from '../ai-gateway.error'
-import type { AiAdapterCall } from '../ai-gateway.types'
+import type { AiAdapterCall, AiGatewayTool } from '../ai-gateway.types'
 
 import { MockAiAdapter } from './mock.adapter'
 
@@ -84,5 +86,104 @@ describe('MockAiAdapter', () => {
       call({ messages: [{ role: 'user', content: '__mock_leak__' }] })
     )
     expect(result.text).toContain('amcore:user-data-')
+  })
+
+  describe('tool script (Arc E)', () => {
+    const tools: AiGatewayTool[] = [
+      { name: 'current_time', description: 'time', parameters: z.object({}).strict() },
+      { name: 'lookup', description: 'lookup', parameters: z.object({}).strict() },
+    ]
+
+    it('requests one tool call for the __mock_tool__ sentinel when the tool is offered', async () => {
+      const result = await adapter.generateText(
+        call({ messages: [{ role: 'user', content: '__mock_tool__:current_time' }], tools })
+      )
+      expect(result.finishReason).toBe('tool_calls')
+      expect(result.toolCalls).toEqual([
+        { toolCallId: 'mock-call-1', toolName: 'current_time', input: {} },
+      ])
+      expect(result.text).toBe('')
+    })
+
+    it('does not request a tool when none are offered (falls back to text)', async () => {
+      const result = await adapter.generateText(
+        call({ messages: [{ role: 'user', content: '__mock_tool__:current_time' }] })
+      )
+      expect(result.finishReason).toBe('stop')
+      expect(result.toolCalls).toEqual([])
+    })
+
+    it('ignores a sentinel naming a tool that is not offered (never invents one)', async () => {
+      const result = await adapter.generateText(
+        call({ messages: [{ role: 'user', content: '__mock_tool__:ghost' }], tools })
+      )
+      expect(result.toolCalls).toEqual([])
+      expect(result.finishReason).toBe('stop')
+    })
+
+    it('requests several calls for the __mock_tools__ sentinel', async () => {
+      const result = await adapter.generateText(
+        call({ messages: [{ role: 'user', content: '__mock_tools__:current_time,lookup' }], tools })
+      )
+      expect(result.toolCalls.map((toolCall) => toolCall.toolName)).toEqual([
+        'current_time',
+        'lookup',
+      ])
+      expect(result.finishReason).toBe('tool_calls')
+    })
+
+    it('produces a final answer citing outputs once a tool result is in the transcript', async () => {
+      const result = await adapter.generateText(
+        call({
+          messages: [
+            { role: 'user', content: '__mock_tool__:current_time' },
+            {
+              role: 'assistant',
+              toolCalls: [{ toolCallId: 'mock-call-1', toolName: 'current_time', input: {} }],
+            },
+            {
+              role: 'tool',
+              toolResults: [
+                { toolCallId: 'mock-call-1', toolName: 'current_time', output: '2026-07-10' },
+              ],
+            },
+          ],
+          tools,
+        })
+      )
+      expect(result.finishReason).toBe('stop')
+      expect(result.toolCalls).toEqual([])
+      expect(result.text).toContain('tool result: 2026-07-10')
+    })
+
+    it('reads the INNER content of a wrapped (untrusted) tool result, never echoing the marker', async () => {
+      const marker = 'amcore:user-data-tool-abc123'
+      const result = await adapter.generateText(
+        call({
+          messages: [
+            { role: 'user', content: '__mock_tool__:current_time' },
+            {
+              role: 'assistant',
+              toolCalls: [{ toolCallId: 'mock-call-1', toolName: 'current_time', input: {} }],
+            },
+            {
+              role: 'tool',
+              toolResults: [
+                {
+                  toolCallId: 'mock-call-1',
+                  toolName: 'current_time',
+                  output: wrapUntrusted(marker, 'demo-tool-output'),
+                },
+              ],
+            },
+          ],
+          tools,
+        })
+      )
+      // The mock answers with the inner content, so its output carries no boundary marker (which
+      // would otherwise trip the Arc D output guard when the loop resumes an approved tool).
+      expect(result.text).toContain('demo-tool-output')
+      expect(result.text).not.toContain(marker)
+    })
   })
 })

@@ -291,6 +291,23 @@ const envSchema = z.preprocess(
       // Max characters of untrusted user text before a run is refused (guardrail_input_too_large).
       // Always enforced (independent of the input mode). Bounded so a typo can't disable the cap.
       AI_GUARDRAIL_MAX_INPUT_CHARS: z.coerce.number().int().min(1).max(1_000_000).default(100000),
+      // Arc E bounded agent loop: max provider steps per run before tool_loop_exhausted. Bounded so
+      // a runaway loop can never burn unlimited provider calls; total wall-clock is also capped by
+      // the run deadline.
+      AI_TOOL_LOOP_MAX_STEPS: z.coerce.number().int().min(1).max(50).default(8),
+      // Arc E per-tool host-side execution bound (ms). Capped so a stuck tool cannot hold a loop
+      // step open indefinitely.
+      AI_TOOL_EXECUTION_TIMEOUT_MS: z.coerce.number().int().min(1).max(120000).default(15000),
+      // Arc E human-in-the-loop approval TTL (ms): how long a run may sit parked in WAITING_APPROVAL
+      // before the approval expires. Default 24h; bounded [1min, 30d] so a typo can neither expire a
+      // pending approval instantly nor park a run indefinitely. A run's own deadline still wins if it
+      // is tighter (the park stores min(now+TTL, deadlineAt)).
+      AI_APPROVAL_TTL_MS: z.coerce
+        .number()
+        .int()
+        .min(60_000)
+        .max(2_592_000_000)
+        .default(86_400_000),
     })
     .transform((env) => {
       // Locked invariant (Decision C): dev -> local, test -> memory,

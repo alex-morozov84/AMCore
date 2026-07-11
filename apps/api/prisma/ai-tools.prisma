@@ -97,6 +97,8 @@ model AiApproval {
   @@index([conversationId])
   @@index([runId])
   @@index([state])
+  // The approval-expiry sweep (Arc E.5) claims PENDING approvals whose TTL has elapsed.
+  @@index([state, expiresAt])
   @@map("ai_approvals")
   @@schema("ai")
 }

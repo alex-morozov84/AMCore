@@ -40,6 +40,11 @@ let TelegramBotApiClient: Token
 let ModelGateway: Token
 let AiProviderAdaptersToken: Token
 let AiRunExecutorService: Token
+let AiRunLoopExecutor: Token
+let AiRunApprovalParker: Token
+let AiApprovalExpiryService: Token
+let AiToolRegistry: Token
+let AiToolDispatcher: Token
 let AiRunDispatchProcessor: Token
 let AiRunRecoveryService: Token
 let AiRunRealtimePublisher: Token
@@ -48,6 +53,8 @@ let AiRunRealtimeHub: Token
 let AiRunStreamController: Token
 let AiRunsController: Token
 let AiConversationsController: Token
+let AiApprovalsController: Token
+let AiApprovalService: Token
 
 const noopPinoLogger = {
   setContext: () => undefined,
@@ -118,6 +125,12 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const modelGateway = await import('../src/infrastructure/ai/gateway/model-gateway.service')
     const aiGatewayTypes = await import('../src/infrastructure/ai/gateway/ai-gateway.types')
     const aiExecutor = await import('../src/infrastructure/ai/runs/ai-run-executor.service')
+    const aiLoop = await import('../src/infrastructure/ai/runs/ai-run-loop-executor.service')
+    const aiParker = await import('../src/infrastructure/ai/runs/ai-run-approval-parker.service')
+    const aiExpiry = await import('../src/infrastructure/ai/runs/ai-approval-expiry.service')
+    const aiToolRegistry = await import('../src/infrastructure/ai/tools/ai-tool-registry.service')
+    const aiToolDispatcher =
+      await import('../src/infrastructure/ai/runs/ai-tool-dispatcher.service')
     const aiProcessor = await import('../src/infrastructure/ai/runs/ai-run-dispatch.processor')
     const aiRecovery = await import('../src/infrastructure/ai/runs/ai-run-recovery.service')
     const aiPublisher = await import('../src/core/ai/realtime/ai-run-realtime.publisher')
@@ -127,6 +140,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const aiRunsController = await import('../src/core/ai/runs/ai-runs.controller')
     const aiConversationsController =
       await import('../src/core/ai/conversations/ai-conversations.controller')
+    const aiApprovalsController = await import('../src/core/ai/approvals/ai-approvals.controller')
+    const aiApprovalService = await import('../src/core/ai/approvals/ai-approval.service')
 
     AppModule = appModule.AppModule
     WebModule = webModule.WebModule
@@ -150,6 +165,11 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     ModelGateway = modelGateway.ModelGateway
     AiProviderAdaptersToken = aiGatewayTypes.AI_PROVIDER_ADAPTERS
     AiRunExecutorService = aiExecutor.AiRunExecutorService
+    AiRunLoopExecutor = aiLoop.AiRunLoopExecutor
+    AiRunApprovalParker = aiParker.AiRunApprovalParker
+    AiApprovalExpiryService = aiExpiry.AiApprovalExpiryService
+    AiToolRegistry = aiToolRegistry.AiToolRegistry
+    AiToolDispatcher = aiToolDispatcher.AiToolDispatcher
     AiRunDispatchProcessor = aiProcessor.AiRunDispatchProcessor
     AiRunRecoveryService = aiRecovery.AiRunRecoveryService
     AiRunRealtimePublisher = aiPublisher.AiRunRealtimePublisher
@@ -158,6 +178,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     AiRunStreamController = aiStreamController.AiRunStreamController
     AiRunsController = aiRunsController.AiRunsController
     AiConversationsController = aiConversationsController.AiConversationsController
+    AiApprovalsController = aiApprovalsController.AiApprovalsController
+    AiApprovalService = aiApprovalService.AiApprovalService
   })
 
   describe('web', () => {
@@ -206,6 +228,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       // Business HTTP + the SSE receive side are web-only.
       present(m, AiRunsController)
       present(m, AiConversationsController)
+      present(m, AiApprovalsController)
+      present(m, AiApprovalService)
       present(m, AiRunStreamController)
       present(m, AiRunRealtimeHub)
       present(m, AiRunRealtimeSubscriber)
@@ -216,6 +240,13 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, AiRunExecutorService)
       absent(m, AiRunDispatchProcessor)
       absent(m, AiRunRecoveryService)
+      // The Arc E bounded tool loop + code-owned tool registry/dispatcher are worker-only — the model
+      // can never reach a tool (or the loop that runs it) from the web DI graph.
+      absent(m, AiRunLoopExecutor)
+      absent(m, AiRunApprovalParker)
+      absent(m, AiApprovalExpiryService)
+      absent(m, AiToolRegistry)
+      absent(m, AiToolDispatcher)
       // The publisher is worker-only (only the worker emits run-status hints in Arc C).
       absent(m, AiRunRealtimePublisher)
     })
@@ -268,12 +299,19 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, ModelGateway)
       present(m, AiProviderAdaptersToken)
       present(m, AiRunExecutorService)
+      present(m, AiRunLoopExecutor)
+      present(m, AiRunApprovalParker)
+      present(m, AiApprovalExpiryService)
+      present(m, AiToolRegistry)
+      present(m, AiToolDispatcher)
       present(m, AiRunDispatchProcessor)
       present(m, AiRunRecoveryService)
       // It publishes run-status hints, but hosts no AI HTTP surface and no SSE receive side.
       present(m, AiRunRealtimePublisher)
       absent(m, AiRunsController)
       absent(m, AiConversationsController)
+      absent(m, AiApprovalsController)
+      absent(m, AiApprovalService)
       absent(m, AiRunStreamController)
       absent(m, AiRunRealtimeHub)
       absent(m, AiRunRealtimeSubscriber)
@@ -322,6 +360,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     it('composes both AI sides — HTTP + provider I/O + worker AND the SSE stream/hub/subscriber (Track C)', () => {
       present(m, AiRunsController)
       present(m, AiConversationsController)
+      present(m, AiApprovalsController)
+      present(m, AiApprovalService)
       present(m, ModelGateway)
       present(m, AiProviderAdaptersToken)
       present(m, AiRunExecutorService)

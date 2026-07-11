@@ -9,7 +9,13 @@ import type {
   AiTextResult,
 } from '../ai-gateway.types'
 
-import { mapProviderError, mapTextResult, mapUsage } from './ai-sdk-mapping'
+import {
+  mapProviderError,
+  mapTextResult,
+  mapUsage,
+  toModelMessages,
+  toSdkTools,
+} from './ai-sdk-mapping'
 
 /** The fetch shape both the global and the AI SDK's injectable `fetch` option satisfy. */
 export type AdapterFetch = typeof globalThis.fetch
@@ -30,11 +36,17 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
   protected abstract resolveLanguageModel(call: AiAdapterCall): LanguageModel
 
   async generateText(call: AiAdapterCall): Promise<AiTextResult> {
+    const hasTools = call.tools !== undefined && call.tools.length > 0
     try {
       const result = await generateText({
         model: this.resolveLanguageModel(call),
         system: call.system,
-        messages: call.messages,
+        messages: toModelMessages(call.messages),
+        // Tools are offered without an `execute`, and no `stopWhen` is set, so the SDK does exactly
+        // ONE step and returns the model's tool calls UNEXECUTED (Arc E invariant 1) — AMCore owns
+        // the loop and host-side execution. `toolChoice: 'auto'` lets the model answer or call a tool.
+        tools: hasTools ? toSdkTools(call.tools!) : undefined,
+        toolChoice: hasTools ? 'auto' : undefined,
         maxOutputTokens: call.maxOutputTokens,
         abortSignal: AbortSignal.timeout(call.timeoutMs),
         // The SDK must not retry: retry is Postgres-owned at the durable-run layer (Arc C,
@@ -53,7 +65,7 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
         model: this.resolveLanguageModel(call),
         schema,
         system: call.system,
-        messages: call.messages,
+        messages: toModelMessages(call.messages),
         maxOutputTokens: call.maxOutputTokens,
         abortSignal: AbortSignal.timeout(call.timeoutMs),
         maxRetries: 0,
