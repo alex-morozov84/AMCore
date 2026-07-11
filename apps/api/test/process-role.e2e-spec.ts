@@ -52,6 +52,8 @@ let AiRunRealtimeHub: Token
 let AiRunStreamController: Token
 let AiRunsController: Token
 let AiConversationsController: Token
+let AiApprovalsController: Token
+let AiApprovalService: Token
 
 const noopPinoLogger = {
   setContext: () => undefined,
@@ -136,6 +138,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const aiRunsController = await import('../src/core/ai/runs/ai-runs.controller')
     const aiConversationsController =
       await import('../src/core/ai/conversations/ai-conversations.controller')
+    const aiApprovalsController = await import('../src/core/ai/approvals/ai-approvals.controller')
+    const aiApprovalService = await import('../src/core/ai/approvals/ai-approval.service')
 
     AppModule = appModule.AppModule
     WebModule = webModule.WebModule
@@ -171,6 +175,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     AiRunStreamController = aiStreamController.AiRunStreamController
     AiRunsController = aiRunsController.AiRunsController
     AiConversationsController = aiConversationsController.AiConversationsController
+    AiApprovalsController = aiApprovalsController.AiApprovalsController
+    AiApprovalService = aiApprovalService.AiApprovalService
   })
 
   describe('web', () => {
@@ -219,6 +225,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       // Business HTTP + the SSE receive side are web-only.
       present(m, AiRunsController)
       present(m, AiConversationsController)
+      present(m, AiApprovalsController)
+      present(m, AiApprovalService)
       present(m, AiRunStreamController)
       present(m, AiRunRealtimeHub)
       present(m, AiRunRealtimeSubscriber)
@@ -297,6 +305,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, AiRunRealtimePublisher)
       absent(m, AiRunsController)
       absent(m, AiConversationsController)
+      absent(m, AiApprovalsController)
+      absent(m, AiApprovalService)
       absent(m, AiRunStreamController)
       absent(m, AiRunRealtimeHub)
       absent(m, AiRunRealtimeSubscriber)
@@ -345,6 +355,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     it('composes both AI sides — HTTP + provider I/O + worker AND the SSE stream/hub/subscriber (Track C)', () => {
       present(m, AiRunsController)
       present(m, AiConversationsController)
+      present(m, AiApprovalsController)
+      present(m, AiApprovalService)
       present(m, ModelGateway)
       present(m, AiProviderAdaptersToken)
       present(m, AiRunExecutorService)

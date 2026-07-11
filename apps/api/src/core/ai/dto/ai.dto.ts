@@ -1,6 +1,9 @@
 import { createZodDto } from 'nestjs-zod'
 
 import {
+  aiApprovalListQuerySchema,
+  aiApprovalListResponseSchema,
+  aiApprovalResponseSchema,
   aiConversationResponseSchema,
   aiRunCancelResponseSchema,
   aiRunListQuerySchema,
@@ -8,6 +11,7 @@ import {
   aiRunResponseSchema,
   createAiConversationSchema,
   createAiRunSchema,
+  decideAiApprovalSchema,
 } from '@amcore/shared'
 
 /**
@@ -22,3 +26,8 @@ export class AiRunResponseDto extends createZodDto(aiRunResponseSchema) {}
 export class AiRunListQueryDto extends createZodDto(aiRunListQuerySchema) {}
 export class AiRunPageDto extends createZodDto(aiRunPageSchema) {}
 export class AiRunCancelResponseDto extends createZodDto(aiRunCancelResponseSchema) {}
+// Human-in-the-loop approvals (Track C — ADR-054, Arc E.5).
+export class AiApprovalListQueryDto extends createZodDto(aiApprovalListQuerySchema) {}
+export class AiApprovalListResponseDto extends createZodDto(aiApprovalListResponseSchema) {}
+export class AiApprovalResponseDto extends createZodDto(aiApprovalResponseSchema) {}
+export class DecideAiApprovalDto extends createZodDto(decideAiApprovalSchema) {}

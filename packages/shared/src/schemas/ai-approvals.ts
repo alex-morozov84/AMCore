@@ -31,6 +31,12 @@ export const aiApprovalResponseSchema = z.object({
 })
 export type AiApprovalResponse = z.infer<typeof aiApprovalResponseSchema>
 
+/** The owner's approvals (bounded, newest first) — approvals are few, so this is not paginated. */
+export const aiApprovalListResponseSchema = z.object({
+  data: z.array(aiApprovalResponseSchema),
+})
+export type AiApprovalListResponse = z.infer<typeof aiApprovalListResponseSchema>
+
 /** List owned approvals, optionally filtered by state (e.g. `?status=pending`). */
 export const aiApprovalListQuerySchema = z.object({
   status: aiApprovalStateSchema.optional(),

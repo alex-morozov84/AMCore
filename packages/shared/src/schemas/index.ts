@@ -286,9 +286,11 @@ export {
   // Human-in-the-loop approvals (read projection + decision input)
   AI_APPROVAL_REASON_MAX_LENGTH,
   aiApprovalResponseSchema,
+  aiApprovalListResponseSchema,
   aiApprovalListQuerySchema,
   decideAiApprovalSchema,
   type AiApprovalResponse,
+  type AiApprovalListResponse,
   type AiApprovalListQuery,
   type DecideAiApprovalInput,
 } from './ai-approvals'

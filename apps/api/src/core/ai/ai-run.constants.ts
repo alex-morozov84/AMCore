@@ -12,6 +12,20 @@ export const AI_RUN_DEFAULT_MAX_ATTEMPTS = 3
 export const AI_RUN_CANCELLED_BY_USER = 'cancelled_by_user'
 
 /**
+ * Terminal reason/error codes an owner decision may set when it inline-expires a stale approval
+ * (Track C — ADR-054, Arc E.5). They **mirror** the worker `AiRunTerminalReason`/`AiRunErrorCode`
+ * values so the wire stays consistent across roles: a run whose deadline passed goes `EXPIRED`
+ * (`deadline_exceeded`); one whose approval TTL elapsed first goes `FAILED` (`approval_expired`, under
+ * the `tool_loop_failed` umbrella error code).
+ */
+export const AI_RUN_DEADLINE_EXCEEDED = 'deadline_exceeded'
+export const AI_RUN_APPROVAL_EXPIRED = 'approval_expired'
+export const AI_RUN_TOOL_LOOP_FAILED = 'tool_loop_failed'
+
+/** Defensive cap on the owner approval list (approvals are few; unpaginated read). */
+export const AI_APPROVAL_LIST_LIMIT = 100
+
+/**
  * Wake-job options for the `AI_RUNS` queue (ADR-052 pattern). A single attempt: the wake is only a
  * hint to drain due runs — Postgres `FOR UPDATE SKIP LOCKED` is the real dedupe and the recovery
  * cron (Arc C.4) re-drains, so a lost/duplicate wake strands nothing. No `jobId` dedupe needed.
