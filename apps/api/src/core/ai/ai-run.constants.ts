@@ -22,8 +22,14 @@ export const AI_RUN_DEADLINE_EXCEEDED = 'deadline_exceeded'
 export const AI_RUN_APPROVAL_EXPIRED = 'approval_expired'
 export const AI_RUN_TOOL_LOOP_FAILED = 'tool_loop_failed'
 
+/** Content-free `ai.approval.expired` reason for an approval voided because its run was cancelled. */
+export const AI_APPROVAL_RUN_CANCELLED = 'run_cancelled'
+
 /** Defensive cap on the owner approval list (approvals are few; unpaginated read). */
 export const AI_APPROVAL_LIST_LIMIT = 100
+
+/** Max stale approvals the worker expiry sweep terminalizes per cron tick (each in its own tx). */
+export const AI_APPROVAL_EXPIRY_BATCH_LIMIT = 50
 
 /**
  * Wake-job options for the `AI_RUNS` queue (ADR-052 pattern). A single attempt: the wake is only a

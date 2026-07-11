@@ -94,6 +94,11 @@ export const aiRunResponseSchema = z.object({
   status: aiRunStatusSchema,
   errorCode: z.string().nullable(),
   terminalReasonCode: z.string().nullable(),
+  /**
+   * The pending approval gating a `waiting_approval` run (Arc E.5), so a client knows which approval to
+   * decide. Populated on the single-run fetch; `null` elsewhere and whenever the run is not parked.
+   */
+  pendingApprovalId: z.string().nullable(),
   createdAt: z.iso.datetime(),
   startedAt: z.iso.datetime().nullable(),
   finishedAt: z.iso.datetime().nullable(),

@@ -17,29 +17,17 @@ import type {
 } from '@amcore/shared'
 
 import { ConflictException, NotFoundException } from '../../../common/exceptions'
-import {
-  AI_APPROVAL_LIST_LIMIT,
-  AI_RUN_APPROVAL_EXPIRED,
-  AI_RUN_DEADLINE_EXCEEDED,
-  AI_RUN_TOOL_LOOP_FAILED,
-  AI_RUN_WAKE_JOB_OPTIONS,
-} from '../ai-run.constants'
+import { AI_APPROVAL_LIST_LIMIT, AI_RUN_WAKE_JOB_OPTIONS } from '../ai-run.constants'
 import type { AiRunWakeJob } from '../runs/ai-run-producer.service'
 
 import { toAiApprovalResponse } from './ai-approval.mapper'
+import { ApprovalRaceError, expireApproval } from './ai-approval-expiry'
 
 import { AuditLogService } from '@/core/audit'
 import { MetricsService } from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '@/infrastructure/queue/queue.service'
 import { PrismaService } from '@/prisma'
-
-/**
- * Thrown inside the decision transaction when any CAS in `applyDecision`/`inlineExpire` matches ≠1 row
- * (the multi-CAS invariant: all-or-nothing). It forces the `$transaction` to roll back — no partial
- * approval/run/invocation mutation, no audit — and is mapped to a 409 in `decide`.
- */
-class ApprovalRaceError extends Error {}
 
 /** Row of the `FOR UPDATE OF a, r` lock join (enum columns cast to text for JS comparison). */
 interface ApprovalLockRow {
@@ -164,7 +152,12 @@ export class AiApprovalService {
     // NEVER re-queued. Deadline wins the reason over the approval TTL (both bounded content-free codes).
     const deadlinePassed = row.deadlineAt !== null && row.deadlineAt <= now
     if (deadlinePassed || (row.expiresAt !== null && row.expiresAt <= now)) {
-      await this.inlineExpire(tx, row, deadlinePassed, now)
+      await expireApproval(tx, this.audit, {
+        approvalId: row.id,
+        runId: row.runId,
+        deadlinePassed,
+        now,
+      })
       return { kind: 'expired' }
     }
     if (row.runStatus !== AiRunStatus.WAITING_APPROVAL) {
@@ -223,60 +216,6 @@ export class AiApprovalService {
         targetType: AuditTargetType.AI_APPROVAL,
         targetId: row.id,
         metadata: { approvalId: row.id, runId: row.runId, decision },
-      },
-      { tx }
-    )
-  }
-
-  /** Terminalize a stale approval's run (EXPIRED vs FAILED) + void the gate, with in-tx audit. */
-  private async inlineExpire(
-    tx: Prisma.TransactionClient,
-    row: ApprovalLockRow,
-    deadlinePassed: boolean,
-    now: Date
-  ): Promise<void> {
-    const approval = await tx.aiApproval.updateMany({
-      where: { id: row.id, state: AiApprovalState.PENDING },
-      data: { state: AiApprovalState.EXPIRED },
-    })
-    const runData = deadlinePassed
-      ? {
-          status: AiRunStatus.EXPIRED,
-          finishedAt: now,
-          terminalReasonCode: AI_RUN_DEADLINE_EXCEEDED,
-        }
-      : {
-          status: AiRunStatus.FAILED,
-          finishedAt: now,
-          errorCode: AI_RUN_TOOL_LOOP_FAILED,
-          terminalReasonCode: AI_RUN_APPROVAL_EXPIRED,
-        }
-    const run = await tx.aiRun.updateMany({
-      where: { id: row.runId, status: AiRunStatus.WAITING_APPROVAL },
-      data: runData,
-    })
-    const invocation = await tx.aiToolInvocation.updateMany({
-      where: { approvalId: row.id, status: AiToolInvocationStatus.AWAITING_APPROVAL },
-      data: {
-        status: deadlinePassed ? AiToolInvocationStatus.SKIPPED : AiToolInvocationStatus.REJECTED,
-      },
-    })
-    // Same all-or-nothing count discipline (A2-R2 #2): a run/invocation that raced out of the parked
-    // state must not leave a half-expired gate + a committed expiry audit — roll back to a 409 instead.
-    if (approval.count !== 1 || run.count !== 1 || invocation.count !== 1) {
-      throw new ApprovalRaceError()
-    }
-    await this.audit.record(
-      {
-        action: 'ai.approval.expired',
-        actorType: AuditActorType.SYSTEM,
-        targetType: AuditTargetType.AI_APPROVAL,
-        targetId: row.id,
-        metadata: {
-          approvalId: row.id,
-          runId: row.runId,
-          reasonCode: deadlinePassed ? AI_RUN_DEADLINE_EXCEEDED : AI_RUN_APPROVAL_EXPIRED,
-        },
       },
       { tx }
     )

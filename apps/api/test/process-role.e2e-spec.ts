@@ -42,6 +42,7 @@ let AiProviderAdaptersToken: Token
 let AiRunExecutorService: Token
 let AiRunLoopExecutor: Token
 let AiRunApprovalParker: Token
+let AiApprovalExpiryService: Token
 let AiToolRegistry: Token
 let AiToolDispatcher: Token
 let AiRunDispatchProcessor: Token
@@ -126,6 +127,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const aiExecutor = await import('../src/infrastructure/ai/runs/ai-run-executor.service')
     const aiLoop = await import('../src/infrastructure/ai/runs/ai-run-loop-executor.service')
     const aiParker = await import('../src/infrastructure/ai/runs/ai-run-approval-parker.service')
+    const aiExpiry = await import('../src/infrastructure/ai/runs/ai-approval-expiry.service')
     const aiToolRegistry = await import('../src/infrastructure/ai/tools/ai-tool-registry.service')
     const aiToolDispatcher =
       await import('../src/infrastructure/ai/runs/ai-tool-dispatcher.service')
@@ -165,6 +167,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     AiRunExecutorService = aiExecutor.AiRunExecutorService
     AiRunLoopExecutor = aiLoop.AiRunLoopExecutor
     AiRunApprovalParker = aiParker.AiRunApprovalParker
+    AiApprovalExpiryService = aiExpiry.AiApprovalExpiryService
     AiToolRegistry = aiToolRegistry.AiToolRegistry
     AiToolDispatcher = aiToolDispatcher.AiToolDispatcher
     AiRunDispatchProcessor = aiProcessor.AiRunDispatchProcessor
@@ -241,6 +244,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       // can never reach a tool (or the loop that runs it) from the web DI graph.
       absent(m, AiRunLoopExecutor)
       absent(m, AiRunApprovalParker)
+      absent(m, AiApprovalExpiryService)
       absent(m, AiToolRegistry)
       absent(m, AiToolDispatcher)
       // The publisher is worker-only (only the worker emits run-status hints in Arc C).
@@ -297,6 +301,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, AiRunExecutorService)
       present(m, AiRunLoopExecutor)
       present(m, AiRunApprovalParker)
+      present(m, AiApprovalExpiryService)
       present(m, AiToolRegistry)
       present(m, AiToolDispatcher)
       present(m, AiRunDispatchProcessor)

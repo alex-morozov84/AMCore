@@ -56,7 +56,7 @@ const specs: Record<AuditAction, MetadataSpec> = {
   'admin.user.sessions_revoked': { count: true, reason: true },
   'admin.user.system_role_changed': { afterSystemRole: true, beforeSystemRole: true },
   'ai.approval.approved': { ...aiApprovalContext, decision: aiCode },
-  'ai.approval.expired': { ...aiApprovalContext },
+  'ai.approval.expired': { ...aiApprovalContext, reasonCode: aiCode },
   'ai.approval.rejected': { ...aiApprovalContext, decision: aiCode, reasonCode: aiCode },
   'ai.approval.requested': { ...aiApprovalContext },
   'ai.tool.execution_failed': { ...aiToolContext, reasonCode: aiCode },
