@@ -237,9 +237,17 @@ export {
   AI_SYSTEM_PROMPT_MAX_LENGTH,
   aiAssistantResponseSchema,
   createAiAssistantSchema,
+  publishAiAssistantVersionSchema,
+  updateAiAssistantSchema,
+  aiAssistantListQuerySchema,
+  aiAssistantListResponseSchema,
   type AiModelSelection,
   type AiAssistantResponse,
   type CreateAiAssistantInput,
+  type PublishAiAssistantVersionInput,
+  type UpdateAiAssistantInput,
+  type AiAssistantListQuery,
+  type AiAssistantListResponse,
 } from './ai-assistants'
 
 export {

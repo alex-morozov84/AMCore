@@ -82,6 +82,12 @@ export type AiMetricsApprovalKind = 'tool_invocation' | 'handoff' | 'sensitive_a
 export type AiMetricsApprovalState = 'pending' | 'approved' | 'rejected' | 'expired'
 /** Terminal outcome of a bounded agent loop, for the loop-steps histogram (Arc E). */
 export type AiMetricsToolLoopOutcome = 'completed' | 'exhausted' | 'failed'
+export type AiMetricsAssistantAdminAction =
+  | 'created'
+  | 'version_published'
+  | 'updated'
+  | 'enabled'
+  | 'disabled'
 
 /**
  * Defensive bound on the `tool_id` metric label — mirrors the code-owned tool-id grammar (Arc E).
@@ -160,6 +166,7 @@ export class MetricsService implements OnModuleDestroy {
   private readonly aiToolInvocationsTotal: Counter<'tool_id' | 'risk_class' | 'outcome' | 'role'>
   private readonly aiApprovalsTotal: Counter<'kind' | 'state' | 'role'>
   private readonly aiToolLoopSteps: Histogram<'outcome' | 'role'>
+  private readonly aiAssistantAdminTotal: Counter<'action' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -314,6 +321,10 @@ export class MetricsService implements OnModuleDestroy {
       labelNames: ['outcome', 'role'],
       buckets: [1, 2, 3, 4, 6, 8, 12, 16],
     })
+    this.aiAssistantAdminTotal = this.getOrCreateCounter(METRIC_NAMES.aiAssistantAdminTotal, {
+      help: 'Total AI assistant-registry admin mutations by bounded action (+ process role). No slug, prompt, or config value is ever a label.',
+      labelNames: ['action', 'role'],
+    })
   }
 
   get enabled(): boolean {
@@ -466,6 +477,15 @@ export class MetricsService implements OnModuleDestroy {
   incAiApproval(kind: AiMetricsApprovalKind, state: AiMetricsApprovalState): void {
     if (!this.enabled) return
     this.aiApprovalsTotal.inc({ kind, state, role: this.role })
+  }
+
+  /**
+   * Count one AI assistant-registry admin mutation (Arc F.1), labelled only by the bounded `action`
+   * (+ process role). Never a slug, prompt, model, or config value.
+   */
+  incAiAssistantAdmin(action: AiMetricsAssistantAdminAction): void {
+    if (!this.enabled) return
+    this.aiAssistantAdminTotal.inc({ action, role: this.role })
   }
 
   /**

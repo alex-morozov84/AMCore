@@ -24,6 +24,8 @@ function boundedString(maxLength: number, pattern: RegExp): MetadataValueRule {
 const aiCode = boundedString(64, /^[a-z][a-z0-9_]*$/)
 /** A bounded cuid-shaped id — runId, invocationId, approvalId (Arc E). */
 const aiId = boundedString(64, /^[a-z0-9]+$/)
+/** A bounded assistant slug — lowercase alnum + hyphen (Arc F). */
+const aiSlug = boundedString(64, /^[a-z0-9][a-z0-9-]*$/)
 
 const cleanupCounts: MetadataSpec = {
   expiredApiKeys: true,
@@ -51,6 +53,13 @@ const aiToolContext: MetadataSpec = {
 }
 const aiApprovalContext: MetadataSpec = { ...aiToolContext, approvalId: aiId }
 
+/**
+ * AI assistant-admin audit metadata (Track C — ADR-054, Arc F.1). Bounded and content-free — the
+ * assistant `systemPrompt`/model/tool config is NEVER audited; only which version of which slug
+ * changed and its enabled state.
+ */
+const aiAssistantContext: MetadataSpec = { slug: aiSlug, version: true, enabled: true }
+
 const specs: Record<AuditAction, MetadataSpec> = {
   'admin.cleanup.executed': { counts: cleanupCounts },
   'admin.user.sessions_revoked': { count: true, reason: true },
@@ -59,6 +68,11 @@ const specs: Record<AuditAction, MetadataSpec> = {
   'ai.approval.expired': { ...aiApprovalContext, reasonCode: aiCode },
   'ai.approval.rejected': { ...aiApprovalContext, decision: aiCode, reasonCode: aiCode },
   'ai.approval.requested': { ...aiApprovalContext },
+  'ai.assistant.created': { ...aiAssistantContext },
+  'ai.assistant.disabled': { ...aiAssistantContext },
+  'ai.assistant.enabled': { ...aiAssistantContext },
+  'ai.assistant.updated': { ...aiAssistantContext },
+  'ai.assistant.version_published': { ...aiAssistantContext },
   'ai.tool.execution_failed': { ...aiToolContext, reasonCode: aiCode },
   'ai.tool.invoked': { ...aiToolContext, outcome: aiCode },
   'api_key.created': { expiresAt: true, name: true, scopes: 'string[]' },
