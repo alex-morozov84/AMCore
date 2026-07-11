@@ -74,6 +74,7 @@ describe('AiToolDispatcher', () => {
       status: 'succeeded',
       invocationId: 'inv1',
       toolCallId: 'call1',
+      input: {},
       output: 'now',
     })
     expect(prisma.aiToolInvocation.create).toHaveBeenCalledWith(
@@ -104,6 +105,25 @@ describe('AiToolDispatcher', () => {
     expect(metrics.incAiToolInvocation).toHaveBeenCalledWith('current_time', 'safe', 'succeeded')
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'ai.tool.invoked' })
+    )
+  })
+
+  it('returns the VALIDATED args (defaults/transform applied), not the raw model input', async () => {
+    // Crash-resume determinism (finding A2-1): the persisted argsSnapshot and the fed-back tool-call
+    // input must both be the parsed value, so an uninterrupted transcript == a resumed one.
+    prisma.aiToolInvocation.create.mockResolvedValue({ id: 'inv1' } as never)
+    const parameters = z.object({ limit: z.number().default(10), keep: z.string() }).strict()
+    const call = { toolCallId: 'call1', toolName: 'current_time', input: { keep: 'x' } }
+
+    const result = await dispatcher.dispatch(makeTool({ parameters }), call, ctx)
+
+    expect(result).toEqual(
+      expect.objectContaining({ status: 'succeeded', input: { limit: 10, keep: 'x' } })
+    )
+    expect(prisma.aiToolInvocation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ argsSnapshot: { limit: 10, keep: 'x' } }),
+      })
     )
   })
 

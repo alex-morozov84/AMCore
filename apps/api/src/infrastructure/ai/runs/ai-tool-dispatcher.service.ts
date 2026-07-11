@@ -42,7 +42,16 @@ export interface ToolDispatchContext {
 
 /** Outcome of one dispatched tool call: the SUCCEEDED output to feed back, or a bounded failure. */
 export type ToolDispatchResult =
-  | { status: 'succeeded'; invocationId: string; toolCallId: string; output: string }
+  | {
+      status: 'succeeded'
+      invocationId: string
+      toolCallId: string
+      /** The VALIDATED args (`parsed.data`, == the persisted `argsSnapshot`) — the loop echoes these
+       * back as the assistant tool-call turn so an uninterrupted transcript is byte-identical to a
+       * crash-resumed one reconstructed from `argsSnapshot` (schemas with defaults/transforms/strip). */
+      input: unknown
+      output: string
+    }
   | { status: 'failed'; errorCode: AiToolErrorCodeValue }
 
 /**
@@ -139,6 +148,7 @@ export class AiToolDispatcher {
       status: 'succeeded',
       invocationId: invocation.id,
       toolCallId: toolCall.toolCallId,
+      input: parsed.data,
       output: boundedOutput,
     }
   }

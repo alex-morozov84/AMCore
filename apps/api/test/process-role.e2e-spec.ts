@@ -40,6 +40,9 @@ let TelegramBotApiClient: Token
 let ModelGateway: Token
 let AiProviderAdaptersToken: Token
 let AiRunExecutorService: Token
+let AiRunLoopExecutor: Token
+let AiToolRegistry: Token
+let AiToolDispatcher: Token
 let AiRunDispatchProcessor: Token
 let AiRunRecoveryService: Token
 let AiRunRealtimePublisher: Token
@@ -118,6 +121,10 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const modelGateway = await import('../src/infrastructure/ai/gateway/model-gateway.service')
     const aiGatewayTypes = await import('../src/infrastructure/ai/gateway/ai-gateway.types')
     const aiExecutor = await import('../src/infrastructure/ai/runs/ai-run-executor.service')
+    const aiLoop = await import('../src/infrastructure/ai/runs/ai-run-loop-executor.service')
+    const aiToolRegistry = await import('../src/infrastructure/ai/tools/ai-tool-registry.service')
+    const aiToolDispatcher =
+      await import('../src/infrastructure/ai/runs/ai-tool-dispatcher.service')
     const aiProcessor = await import('../src/infrastructure/ai/runs/ai-run-dispatch.processor')
     const aiRecovery = await import('../src/infrastructure/ai/runs/ai-run-recovery.service')
     const aiPublisher = await import('../src/core/ai/realtime/ai-run-realtime.publisher')
@@ -150,6 +157,9 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     ModelGateway = modelGateway.ModelGateway
     AiProviderAdaptersToken = aiGatewayTypes.AI_PROVIDER_ADAPTERS
     AiRunExecutorService = aiExecutor.AiRunExecutorService
+    AiRunLoopExecutor = aiLoop.AiRunLoopExecutor
+    AiToolRegistry = aiToolRegistry.AiToolRegistry
+    AiToolDispatcher = aiToolDispatcher.AiToolDispatcher
     AiRunDispatchProcessor = aiProcessor.AiRunDispatchProcessor
     AiRunRecoveryService = aiRecovery.AiRunRecoveryService
     AiRunRealtimePublisher = aiPublisher.AiRunRealtimePublisher
@@ -216,6 +226,11 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, AiRunExecutorService)
       absent(m, AiRunDispatchProcessor)
       absent(m, AiRunRecoveryService)
+      // The Arc E bounded tool loop + code-owned tool registry/dispatcher are worker-only — the model
+      // can never reach a tool (or the loop that runs it) from the web DI graph.
+      absent(m, AiRunLoopExecutor)
+      absent(m, AiToolRegistry)
+      absent(m, AiToolDispatcher)
       // The publisher is worker-only (only the worker emits run-status hints in Arc C).
       absent(m, AiRunRealtimePublisher)
     })
@@ -268,6 +283,9 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, ModelGateway)
       present(m, AiProviderAdaptersToken)
       present(m, AiRunExecutorService)
+      present(m, AiRunLoopExecutor)
+      present(m, AiToolRegistry)
+      present(m, AiToolDispatcher)
       present(m, AiRunDispatchProcessor)
       present(m, AiRunRecoveryService)
       // It publishes run-status hints, but hosts no AI HTTP surface and no SSE receive side.

@@ -85,6 +85,12 @@ export const AiRunErrorCode = {
   UNKNOWN_ERROR: 'unknown_error',
   /** A guardrail blocked the run (input/output/oversize); the specific reason is terminalReasonCode. */
   GUARDRAIL_BLOCKED: 'guardrail_blocked',
+  /**
+   * The bounded tool loop terminally failed (Arc E). Umbrella `errorCode`; the specific cause is the
+   * `terminalReasonCode` (`tool_loop_exhausted`/`too_many_tool_calls`/`tool_not_allowed`/
+   * `tool_args_invalid`/`tool_execution_failed`/`tool_approval_required`), mirroring `GUARDRAIL_BLOCKED`.
+   */
+  TOOL_LOOP_FAILED: 'tool_loop_failed',
 } as const
 
 /**
