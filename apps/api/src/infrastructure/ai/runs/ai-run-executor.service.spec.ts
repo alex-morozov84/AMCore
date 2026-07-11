@@ -123,11 +123,31 @@ describe('AiRunExecutorService', () => {
         ownershipGeneration: 0,
         controlledBy: 'BOT',
         state: 'ACTIVE',
-        assistant: { toolAllowlist: ['current_time'] },
+        assistant: { toolAllowlist: ['current_time'], systemPrompt: null, enabled: true },
       } as never)
       await executor.execute(claim())
       expect(lastPlan().toolAllowlist).toEqual(['current_time'])
       expect(lastPlan().attribution).toEqual({ userId: 'u1', organizationId: 'org-9' })
+    })
+
+    it('uses the bound assistant systemPrompt as the trusted instruction, keeping the Arc D boundary', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({
+        ownerUserId: 'u1',
+        organizationId: null,
+        ownershipGeneration: 0,
+        controlledBy: 'BOT',
+        state: 'ACTIVE',
+        assistant: { toolAllowlist: [], systemPrompt: 'You are a pirate.', enabled: true },
+      } as never)
+
+      await executor.execute(claim())
+
+      // The assistant prompt is the trusted instruction...
+      expect(lastPlan().system).toContain('You are a pirate.')
+      // ...and the code-owned structural-boundary policy is STILL appended (Arc D preserved).
+      expect(lastPlan().system).toContain('UNTRUSTED')
+      // Default persona is replaced by the assistant's, not concatenated.
+      expect(lastPlan().system).not.toContain('AMCore assistant')
     })
 
     it('feeds the run OWN input turn (by runId) as the wrapped user message', async () => {
@@ -259,6 +279,25 @@ describe('AiRunExecutorService', () => {
         prisma,
         expect.anything(),
         'no_input_text'
+      )
+    })
+
+    it('fails a run whose bound assistant was disabled after it was queued (Arc F.4 kill-switch)', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({
+        ownerUserId: 'u1',
+        organizationId: null,
+        ownershipGeneration: 0,
+        controlledBy: 'BOT',
+        state: 'ACTIVE',
+        assistant: { toolAllowlist: [], systemPrompt: null, enabled: false },
+      } as never)
+      await executor.execute(claim())
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(repository.finalizeFailed).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({ id: 'run-1' }),
+        'assistant_disabled',
+        'assistant_disabled'
       )
     })
 

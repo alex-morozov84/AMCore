@@ -9,18 +9,23 @@ import {
 } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { AiRunResponse, CreateAiRunInput } from '@amcore/shared'
+import { aiModelSelectionSchema, type AiRunResponse, type CreateAiRunInput } from '@amcore/shared'
 
 import {
   ConflictException,
   NotFoundException,
   ServiceUnavailableException,
 } from '../../../common/exceptions'
-import { AI_RUN_DEFAULT_MAX_ATTEMPTS, AI_RUN_WAKE_JOB_OPTIONS } from '../ai-run.constants'
+import {
+  AI_MODEL_NOT_CONFIGURED,
+  AI_RUN_DEFAULT_MAX_ATTEMPTS,
+  AI_RUN_WAKE_JOB_OPTIONS,
+} from '../ai-run.constants'
 
 import { toAiRunResponse } from './ai-run.mapper'
 
 import { AiModelRegistry } from '@/infrastructure/ai/registry/ai-model-registry.service'
+import type { ResolvedAiModel } from '@/infrastructure/ai/registry/ai-registry.types'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '@/infrastructure/queue/queue.service'
 import { PrismaService } from '@/prisma'
@@ -50,11 +55,7 @@ export class AiRunProducerService {
   }
 
   async create(userId: string, input: CreateAiRunInput): Promise<AiRunResponse> {
-    const modelSnapshot = await this.resolveModelSnapshot()
-
-    const { run, created } = await this.prisma.$transaction((tx) =>
-      this.runInTx(tx, userId, input, modelSnapshot)
-    )
+    const { run, created } = await this.prisma.$transaction((tx) => this.runInTx(tx, userId, input))
 
     // Best-effort, post-commit: a Redis/queue outage must not fail a committed run — the worker
     // recovery cron (Arc C.4) claims the QUEUED run regardless. Never wake on an idempotent replay.
@@ -65,10 +66,13 @@ export class AiRunProducerService {
   private async runInTx(
     tx: Prisma.TransactionClient,
     userId: string,
-    input: CreateAiRunInput,
-    modelSnapshot: Prisma.InputJsonValue
+    input: CreateAiRunInput
   ): Promise<{ run: Prisma.AiRunGetPayload<object>; created: boolean }> {
-    const ownershipGeneration = await this.lockOwnedConversation(tx, input.conversationId, userId)
+    const { ownershipGeneration, assistantId } = await this.lockOwnedConversation(
+      tx,
+      input.conversationId,
+      userId
+    )
 
     if (input.idempotencyKey) {
       const existing = await tx.aiRun.findFirst({
@@ -76,6 +80,10 @@ export class AiRunProducerService {
       })
       if (existing) return { run: existing, created: false }
     }
+
+    // Resolve the model AFTER the idempotency check (never on a replay). A bound assistant supplies the
+    // model (credential-gated) + must be enabled (Arc F.4); otherwise the credential-gated default.
+    const modelSnapshot = await this.resolveModelSnapshot(assistantId)
 
     // Create the run first so the USER turn can carry its `runId`: this binds the input turn to
     // exactly one run, so when several runs are queued on one conversation before execution the
@@ -116,13 +124,19 @@ export class AiRunProducerService {
     tx: Prisma.TransactionClient,
     conversationId: string,
     userId: string
-  ): Promise<number> {
+  ): Promise<{ ownershipGeneration: number; assistantId: string | null }> {
     const rows = await tx.$queryRaw<
-      { ownershipGeneration: number; controlledBy: string; state: string }[]
+      {
+        ownershipGeneration: number
+        controlledBy: string
+        state: string
+        assistantId: string | null
+      }[]
     >(Prisma.sql`
       SELECT "ownershipGeneration",
              "controlledBy"::text AS "controlledBy",
-             state::text AS state
+             state::text AS state,
+             "assistantId"
       FROM "ai"."ai_conversations"
       WHERE id = ${conversationId} AND "ownerUserId" = ${userId}
       FOR UPDATE
@@ -142,7 +156,7 @@ export class AiRunProducerService {
         'This conversation is under human control or closed; a new AI run cannot be started.'
       )
     }
-    return row.ownershipGeneration
+    return { ownershipGeneration: row.ownershipGeneration, assistantId: row.assistantId ?? null }
   }
 
   private async nextSequence(
@@ -157,13 +171,18 @@ export class AiRunProducerService {
   }
 
   /**
-   * Freeze a **secret-free** snapshot of the resolved default model (no credential slot, base URL,
-   * or provider config). C.1 has no per-run model override, so the gated default is used; the
-   * worker re-resolves the credential at execution time (Arc C.4).
+   * Freeze a **secret-free** snapshot of the resolved model (no credential slot, base URL, or provider
+   * config). A bound assistant supplies the model via its `modelSelection` (Arc F.4, credential-gated);
+   * otherwise the credential-gated default. The worker re-resolves the credential at execution time.
    */
-  private async resolveModelSnapshot(): Promise<Prisma.InputJsonValue> {
-    const model = await this.registry.resolveDefaultModel()
-    if (!model) throw new ServiceUnavailableException('No AI model is configured.')
+  private async resolveModelSnapshot(assistantId: string | null): Promise<Prisma.InputJsonValue> {
+    const model =
+      assistantId !== null
+        ? await this.resolveAssistantModel(assistantId)
+        : await this.registry.resolveDefaultModel()
+    if (!model) {
+      throw new ServiceUnavailableException('No AI model is configured.', AI_MODEL_NOT_CONFIGURED)
+    }
     return {
       modelSlug: model.slug,
       providerType: model.provider.type,
@@ -172,6 +191,37 @@ export class AiRunProducerService {
       contextLimit: model.contextLimit,
       maxOutputTokens: model.maxOutputTokens,
     }
+  }
+
+  /**
+   * Resolve a bound assistant's model (Arc F.4). The assistant must be **enabled** (kill-switch — a
+   * disabled assistant cannot drive a run → `409`). Its `modelSelection` (primary + ordered fallbacks)
+   * is resolved **credential-gated**: the first candidate that exists, is enabled, and has a usable
+   * credential wins. A pinned model with no credential does **not** silently fall back to `mock` — the
+   * run is refused (`503`), so an operator's explicit model choice is never quietly downgraded in prod.
+   */
+  private async resolveAssistantModel(assistantId: string): Promise<ResolvedAiModel> {
+    const assistant = await this.prisma.aiAssistant.findUnique({
+      where: { id: assistantId },
+      select: { enabled: true, modelSelection: true },
+    })
+    if (!assistant) throw new NotFoundException('Ai assistant', assistantId)
+    if (!assistant.enabled) {
+      throw new ConflictException(
+        'The conversation assistant is disabled; a run cannot be started.'
+      )
+    }
+    const selection = aiModelSelectionSchema.safeParse(assistant.modelSelection)
+    if (selection.success) {
+      for (const slug of [selection.data.modelSlug, ...selection.data.fallback]) {
+        const model = await this.registry.resolveModel(slug)
+        if (model && this.registry.hasCredential(model)) return model
+      }
+    }
+    throw new ServiceUnavailableException(
+      'The assistant model is not configured.',
+      AI_MODEL_NOT_CONFIGURED
+    )
   }
 
   /** Swallow queue/Redis errors — the recovery cron drains the QUEUED run regardless. */

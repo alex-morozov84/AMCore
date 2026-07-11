@@ -175,12 +175,89 @@ describe('AiRunProducerService', () => {
     expect(logger.warn).toHaveBeenCalled()
   })
 
-  it('fails closed when no AI model is configured', async () => {
+  it('fails closed with errorCode model_not_configured when no AI model is configured', async () => {
     registry.resolveDefaultModel.mockResolvedValue(null)
 
-    await expect(service.create('user-1', INPUT)).rejects.toBeInstanceOf(
-      ServiceUnavailableException
-    )
-    expect(prisma.$transaction).not.toHaveBeenCalled()
+    await expect(service.create('user-1', INPUT)).rejects.toMatchObject({
+      constructor: ServiceUnavailableException,
+      errorCode: 'model_not_configured',
+    })
+    expect(prisma.aiRun.create).not.toHaveBeenCalled()
+  })
+
+  describe('bound assistant model (Arc F.4)', () => {
+    beforeEach(() => {
+      // The conversation is bound to an assistant; the lock query returns its id.
+      prisma.$queryRaw.mockResolvedValue([
+        { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE', assistantId: 'asst-1' },
+      ] as never)
+    })
+
+    it('resolves the bound assistant model (credential-gated), not the default', async () => {
+      prisma.aiAssistant.findUnique.mockResolvedValue({
+        enabled: true,
+        modelSelection: { modelSlug: 'claude-default', fallback: [] },
+      } as never)
+      registry.resolveModel.mockResolvedValue(DEFAULT_MODEL)
+      registry.hasCredential.mockReturnValue(true)
+
+      await service.create('user-1', INPUT)
+
+      expect(registry.resolveModel).toHaveBeenCalledWith('claude-default')
+      expect(registry.resolveDefaultModel).not.toHaveBeenCalled()
+      const snapshot = prisma.aiRun.create.mock.calls[0]?.[0]?.data.modelSnapshot as Record<
+        string,
+        unknown
+      >
+      expect(snapshot).toMatchObject({ modelSlug: 'claude-default' })
+    })
+
+    it('falls through the modelSelection chain to the first credentialed model', async () => {
+      prisma.aiAssistant.findUnique.mockResolvedValue({
+        enabled: true,
+        modelSelection: { modelSlug: 'gpt-x', fallback: ['claude-default'] },
+      } as never)
+      registry.resolveModel.mockImplementation((slug: string) =>
+        Promise.resolve(slug === 'claude-default' ? DEFAULT_MODEL : { ...DEFAULT_MODEL, slug })
+      )
+      // The primary has no credential; the fallback does.
+      registry.hasCredential.mockImplementation(
+        (m: { slug: string }) => m.slug === 'claude-default'
+      )
+
+      await service.create('user-1', INPUT)
+
+      const snapshot = prisma.aiRun.create.mock.calls[0]?.[0]?.data.modelSnapshot as Record<
+        string,
+        unknown
+      >
+      expect(snapshot).toMatchObject({ modelSlug: 'claude-default' })
+    })
+
+    it('rejects a run when the bound assistant is disabled (409)', async () => {
+      prisma.aiAssistant.findUnique.mockResolvedValue({
+        enabled: false,
+        modelSelection: { modelSlug: 'claude-default', fallback: [] },
+      } as never)
+
+      await expect(service.create('user-1', INPUT)).rejects.toBeInstanceOf(ConflictException)
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+    })
+
+    it('rejects a run when the pinned assistant model has no credential (503, no silent mock)', async () => {
+      prisma.aiAssistant.findUnique.mockResolvedValue({
+        enabled: true,
+        modelSelection: { modelSlug: 'gpt-x', fallback: [] },
+      } as never)
+      registry.resolveModel.mockResolvedValue({ ...DEFAULT_MODEL, slug: 'gpt-x' })
+      registry.hasCredential.mockReturnValue(false)
+
+      await expect(service.create('user-1', INPUT)).rejects.toMatchObject({
+        constructor: ServiceUnavailableException,
+        errorCode: 'model_not_configured',
+      })
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+      expect(registry.resolveDefaultModel).not.toHaveBeenCalled() // never silently falls back
+    })
   })
 })

@@ -78,6 +78,12 @@ export const AiRunTerminalReason = {
    * without writing a stale bot turn. Distinct from a user-requested cancel.
    */
   SUPERSEDED_BY_HUMAN: 'superseded_by_human',
+  /**
+   * The conversation's bound assistant was disabled after this run was queued (Arc F.4 kill-switch):
+   * terminal, non-retryable `FAILED` before any provider I/O. The producer gates new runs; this catches
+   * a disable that races an already-queued run.
+   */
+  ASSISTANT_DISABLED: 'assistant_disabled',
 } as const
 
 /**
@@ -104,6 +110,8 @@ export const AiRunErrorCode = {
    * `tool_args_invalid`/`tool_execution_failed`/`tool_approval_required`), mirroring `GUARDRAIL_BLOCKED`.
    */
   TOOL_LOOP_FAILED: 'tool_loop_failed',
+  /** The conversation's bound assistant was disabled before execution (Arc F.4 kill-switch). */
+  ASSISTANT_DISABLED: 'assistant_disabled',
 } as const
 
 /**

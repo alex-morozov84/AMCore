@@ -43,8 +43,8 @@ describe('AiConversationService', () => {
     expect(prisma.aiAssistant.findUnique).not.toHaveBeenCalled()
   })
 
-  it('binds a known assistant after an existence check', async () => {
-    prisma.aiAssistant.findUnique.mockResolvedValue({ id: 'asst-1' } as never)
+  it('binds a known ENABLED assistant', async () => {
+    prisma.aiAssistant.findUnique.mockResolvedValue({ enabled: true } as never)
     prisma.aiConversation.create.mockResolvedValue(
       fakeConversation({ assistantId: 'asst-1' }) as never
     )
@@ -59,6 +59,15 @@ describe('AiConversationService', () => {
 
     await expect(
       service.create('user-1', { assistantId: 'ghost', title: null })
+    ).rejects.toBeInstanceOf(BadRequestException)
+    expect(prisma.aiConversation.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects binding a DISABLED assistant (400, Arc F.4 kill-switch)', async () => {
+    prisma.aiAssistant.findUnique.mockResolvedValue({ enabled: false } as never)
+
+    await expect(
+      service.create('user-1', { assistantId: 'asst-off', title: null })
     ).rejects.toBeInstanceOf(BadRequestException)
     expect(prisma.aiConversation.create).not.toHaveBeenCalled()
   })
