@@ -57,6 +57,12 @@ model AiConversation {
   state               AiConversationState   @default(ACTIVE)
   controlledBy        AiConversationControl @default(BOT)
   ownershipGeneration Int                   @default(0)
+  // Current human holder while `controlledBy = HUMAN` (Arc F takeover). `humanControlUserId` is an
+  // attribution snapshot (no FK, like `AiMessage.authorUserId`) so it survives operator deletion;
+  // both are null under BOT control. They disambiguate holder-vs-holder authorization (owner vs a
+  // cross-user SUPER_ADMIN operator) — the generation fence handles bot staleness, this handles humans.
+  humanControlUserId     String?
+  humanControlAcquiredAt DateTime?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   closedAt            DateTime?

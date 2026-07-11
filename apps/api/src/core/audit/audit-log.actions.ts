@@ -11,6 +11,8 @@ export const AUDIT_ACTIONS = [
   'ai.assistant.enabled',
   'ai.assistant.updated',
   'ai.assistant.version_published',
+  'ai.conversation.released',
+  'ai.conversation.taken_over',
   'ai.tool.execution_failed',
   'ai.tool.invoked',
   'api_key.created',

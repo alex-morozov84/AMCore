@@ -25,6 +25,13 @@ export const AI_RUN_TOOL_LOOP_FAILED = 'tool_loop_failed'
 /** Content-free `ai.approval.expired` reason for an approval voided because its run was cancelled. */
 export const AI_APPROVAL_RUN_CANCELLED = 'run_cancelled'
 
+/**
+ * Terminal reason for a bot run abandoned because a human took control of the conversation (Arc F
+ * takeover). **Mirrors** the worker `AiRunTerminalReason.SUPERSEDED_BY_HUMAN` so the wire stays
+ * consistent whether the run was superseded by the take-time sweep (here) or the worker fence.
+ */
+export const AI_RUN_SUPERSEDED_BY_HUMAN = 'superseded_by_human'
+
 /** Defensive cap on the owner approval list (approvals are few; unpaginated read). */
 export const AI_APPROVAL_LIST_LIMIT = 100
 

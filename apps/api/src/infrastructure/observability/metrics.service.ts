@@ -88,6 +88,8 @@ export type AiMetricsAssistantAdminAction =
   | 'updated'
   | 'enabled'
   | 'disabled'
+export type AiMetricsControlAction = 'taken_over' | 'released'
+export type AiMetricsControlActorRole = 'owner' | 'operator'
 
 /**
  * Defensive bound on the `tool_id` metric label — mirrors the code-owned tool-id grammar (Arc E).
@@ -167,6 +169,7 @@ export class MetricsService implements OnModuleDestroy {
   private readonly aiApprovalsTotal: Counter<'kind' | 'state' | 'role'>
   private readonly aiToolLoopSteps: Histogram<'outcome' | 'role'>
   private readonly aiAssistantAdminTotal: Counter<'action' | 'role'>
+  private readonly aiConversationControlTotal: Counter<'action' | 'actor_role' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -325,6 +328,13 @@ export class MetricsService implements OnModuleDestroy {
       help: 'Total AI assistant-registry admin mutations by bounded action (+ process role). No slug, prompt, or config value is ever a label.',
       labelNames: ['action', 'role'],
     })
+    this.aiConversationControlTotal = this.getOrCreateCounter(
+      METRIC_NAMES.aiConversationControlTotal,
+      {
+        help: 'Total AI conversation human takeover/release transitions by bounded action and actor role (+ process role). No conversation/user id or reason text is ever a label.',
+        labelNames: ['action', 'actor_role', 'role'],
+      }
+    )
   }
 
   get enabled(): boolean {
@@ -486,6 +496,18 @@ export class MetricsService implements OnModuleDestroy {
   incAiAssistantAdmin(action: AiMetricsAssistantAdminAction): void {
     if (!this.enabled) return
     this.aiAssistantAdminTotal.inc({ action, role: this.role })
+  }
+
+  /**
+   * Count one AI conversation human takeover/release transition (Arc F), labelled only by the bounded
+   * `action` + `actor_role` (+ process role). Never a conversation/user id or reason text.
+   */
+  incAiConversationControl(
+    action: AiMetricsControlAction,
+    actorRole: AiMetricsControlActorRole
+  ): void {
+    if (!this.enabled) return
+    this.aiConversationControlTotal.inc({ action, actor_role: actorRole, role: this.role })
   }
 
   /**
