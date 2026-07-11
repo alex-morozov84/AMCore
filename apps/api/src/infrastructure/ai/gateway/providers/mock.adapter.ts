@@ -58,9 +58,11 @@ export class MockAiAdapter implements AiProviderAdapter {
 
   async generateText(call: AiAdapterCall): Promise<AiTextResult> {
     const last = call.messages[call.messages.length - 1]
-    // A tool result just came back → the loop is resuming; answer with the tool outputs.
+    // A tool result just came back → the loop is resuming; answer with the tool outputs. Read the
+    // INNER content of each result (a real model reads the data, it does NOT echo the Arc D untrusted
+    // boundary wrapper) — so the mock answer never carries the marker and never trips the output guard.
     if (last?.role === 'tool') {
-      const joined = last.toolResults.map((result) => result.output).join(' | ')
+      const joined = last.toolResults.map((result) => readUserContent(result.output)).join(' | ')
       return this.textResult(call, `[mock:${call.model.providerModelName}] tool result: ${joined}`)
     }
 

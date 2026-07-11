@@ -3,7 +3,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { INestApplication } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import type { NestExpressApplication } from '@nestjs/platform-express'
-import type { TestingModule } from '@nestjs/testing'
+import type { TestingModule, TestingModuleBuilder } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { ThrottlerStorage } from '@nestjs/throttler'
 import type { Role } from '@prisma/client'
@@ -72,7 +72,14 @@ export async function setupE2ETestInfrastructure(): Promise<
  * - Initializes NestJS app
  * - Runs migrations
  */
-export async function setupE2ETest(): Promise<E2ETestContext> {
+/**
+ * @param configure optional hook to apply extra `.overrideProvider(...)` etc. to the testing-module
+ * builder BEFORE compile — used to inject a **test-only** provider (e.g. a SENSITIVE demo tool via the
+ * `AI_TOOLS` token) that must never exist in production DI. Production code paths are untouched.
+ */
+export async function setupE2ETest(
+  configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder
+): Promise<E2ETestContext> {
   const { postgresContainer, redisContainer } = await setupE2ETestInfrastructure()
 
   // Set environment variables
@@ -106,12 +113,12 @@ export async function setupE2ETest(): Promise<E2ETestContext> {
   // Create testing module with real AppModule (no mocks!). Only PinoLogger is
   // overridden — see noopPinoLogger above and ai/TESTING.md for why this is
   // required once the DI graph grows.
-  const moduleFixture: TestingModule = await Test.createTestingModule({
-    imports: [AppModule],
-  })
+  const baseBuilder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(PinoLogger)
     .useValue(noopPinoLogger)
-    .compile()
+  const moduleFixture: TestingModule = await (
+    configure ? configure(baseBuilder) : baseBuilder
+  ).compile()
 
   // Create app instance. `rawBody: true` matches production (main.ts) so the
   // e2e bootstrap shares one parser contract with prod, not a divergent one.
