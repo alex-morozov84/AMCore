@@ -116,6 +116,17 @@ const EXPECTED: Record<string, Expected> = {
   // ai approvals (Arc E — human-in-the-loop decision surface)
   'get /ai/approvals': { status: '200', kind: 'json' },
   'post /ai/approvals/{id}/decision': { status: '200', kind: 'json' },
+  // ai assistant admin (Arc F.1 — SUPER_ADMIN registry surface)
+  'get /admin/ai/assistants': { status: '200', kind: 'json' },
+  'get /admin/ai/assistants/{id}': { status: '200', kind: 'json' },
+  'post /admin/ai/assistants': { status: '201', kind: 'json' },
+  'post /admin/ai/assistants/{slug}/versions': { status: '201', kind: 'json' },
+  'patch /admin/ai/assistants/{id}': { status: '200', kind: 'json' },
+  // ai human takeover / operator review (Arc F.3)
+  'post /ai/conversations/{id}/takeover': { status: '200', kind: 'json' },
+  'post /ai/conversations/{id}/release': { status: '200', kind: 'json' },
+  'get /ai/conversations/{id}/messages': { status: '200', kind: 'json' },
+  'post /ai/conversations/{id}/messages': { status: '201', kind: 'json' },
   // ai realtime (Arc C — status-only SSE stream, text/event-stream not JSON)
   'get /ai/runs/{id}/stream': { status: '200', kind: 'stream' },
   // metrics — Prometheus exposition (text, not JSON)
