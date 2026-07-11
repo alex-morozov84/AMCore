@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI capability layer — self-hosted tool loop + human-in-the-loop approvals (Track C, Arc E). Turns the
+  Arc C single-shot executor into a **bounded, durable, worker-executed agent loop** over **code-owned
+  tools**, gating SENSITIVE/DESTRUCTIVE calls behind a **durable human approval**. No product tools ship
+  — only the reusable engine + one SAFE reference tool (`current_time`); the default assistant tool
+  allowlist is empty, so a fresh starter is never autonomously tool-capable. **The SDK never executes
+  tools** — the gateway only returns the model's requested call; a tool runs **only** host-side in the
+  worker after its `AiToolInvocation` is persisted. **Process roles (ADR-041):** the tool registry, the
+  loop executor + host-side dispatcher, the approval parker, and the approval-expiry `@Cron` are
+  **worker-only**; the approval HTTP surface + cancel-while-waiting are **web-only** — neither leaks into
+  the other DI graph (process-role e2e gate). The loop offers only tools that are BOTH registered AND on
+  the conversation assistant's `toolAllowlist`, allows **at most one tool call per provider step** (0 →
+  `COMPLETED`; 1 SAFE → execute host-side + continue; 1 non-SAFE → park; `>1` → `too_many_tool_calls`;
+  unknown/not-allowlisted → `tool_not_allowed`), is bounded by `AI_TOOL_LOOP_MAX_STEPS` provider steps
+  (`tool_loop_exhausted`) + the run deadline + a per-step lease renewal, and ledgers **one
+  `AiUsageLedger` row per provider call**. Each tool result **re-enters the model as untrusted data**
+  through the same Arc D salted boundary and the output guard runs every step over the user **and**
+  tool-result markers (indirect injection mitigated, never eliminated); crash-safe resume reconstructs
+  from Postgres and never re-runs an applied invocation. A non-SAFE call **parks** the run
+  (`RUNNING → WAITING_APPROVAL`, lease released) with `AiApproval(PENDING)` +
+  `AiToolInvocation(AWAITING_APPROVAL)`; the **owner** approves/rejects, the run re-queues without
+  consuming a retry attempt, and the resumed worker executes the approved tool (its `APPROVED →
+EXECUTING` CAS is the sole gate for a non-SAFE tool) or feeds a fixed rejection notice. A worker-only `@Cron` sweep expires overdue approvals
+  (`FOR UPDATE SKIP LOCKED`, DB-owned): the run's own deadline → `EXPIRED` (`deadline_exceeded`), the
+  approval TTL only → `FAILED` (`approval_expired`); cancel-while-waiting terminalizes the run
+  `CANCELLED` and voids the gate. Endpoints (bearer, owner-scoped, 404 on not-owned): `GET /ai/approvals`
+  (`?status=`), `POST /ai/approvals/:id/decision` (`{ decision, reason? }`; idempotent same-decision
+  `200`, conflicting/stale `409`); `GET /ai/runs/:id` gains a `pendingApprovalId` hint. Content-free
+  audit: the **approval lifecycle** (`ai.approval.requested`/`approved`/`rejected`/`expired`) is written
+  **in the same transaction** as its state-change CAS (security evidence — a committed decision/park/
+  expiry can never lack its row); **tool-execution** audit (`ai.tool.invoked`/`execution_failed`) is
+  best-effort. Targets `AI_TOOL_INVOCATION`/`AI_APPROVAL`; allowlisted metadata only — never
+  args/results/prompts/reason text. Plus bounded metrics
+  (`amcore_ai_tool_invocations_total{tool_id,risk_class,outcome}`, `amcore_ai_approvals_total{kind,state}`,
+  `amcore_ai_tool_loop_steps`). New env: `AI_TOOL_LOOP_MAX_STEPS`, `AI_TOOL_EXECUTION_TIMEOUT_MS`,
+  `AI_APPROVAL_TTL_MS`. See [`docs/ai/README.md`](docs/ai/README.md).
 - AI capability layer — prompt-injection guardrail baseline (Track C, Arc D). Defense-in-depth
   containment per OWASP LLM01, applied by the worker around every run: a **structural trust boundary**
   (a code-owned trusted `system` instruction + the untrusted user turn JSON-encoded in a salted

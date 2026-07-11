@@ -113,6 +113,9 @@ const EXPECTED: Record<string, Expected> = {
   'get /ai/runs': { status: '200', kind: 'json' },
   'get /ai/runs/{id}': { status: '200', kind: 'json' },
   'post /ai/runs/{id}/cancel': { status: '200', kind: 'json' },
+  // ai approvals (Arc E — human-in-the-loop decision surface)
+  'get /ai/approvals': { status: '200', kind: 'json' },
+  'post /ai/approvals/{id}/decision': { status: '200', kind: 'json' },
   // ai realtime (Arc C — status-only SSE stream, text/event-stream not JSON)
   'get /ai/runs/{id}/stream': { status: '200', kind: 'stream' },
   // metrics — Prometheus exposition (text, not JSON)
