@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import {
+  AiArtifactKind,
   AiAuthorType,
   AiConversationControl,
   AiConversationState,
@@ -12,6 +13,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { aiModelSelectionSchema, type AiRunResponse, type CreateAiRunInput } from '@amcore/shared'
 
 import {
+  BadRequestException,
   ConflictException,
   NotFoundException,
   ServiceUnavailableException,
@@ -21,14 +23,44 @@ import {
   AI_RUN_DEFAULT_MAX_ATTEMPTS,
   AI_RUN_WAKE_JOB_OPTIONS,
 } from '../ai-run.constants'
+import {
+  AI_ARTIFACT_MAX_TOTAL_RAW_BYTES_PER_MESSAGE,
+  AI_ARTIFACT_REBIND_BLOCKED_STATUSES,
+  capabilityForArtifactKind,
+  modalityForArtifactKind,
+} from '../artifacts/ai-artifact.constants'
 
 import { toAiRunResponse } from './ai-run.mapper'
 
+import { EnvService } from '@/env/env.service'
 import { AiModelRegistry } from '@/infrastructure/ai/registry/ai-model-registry.service'
 import type { ResolvedAiModel } from '@/infrastructure/ai/registry/ai-registry.types'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '@/infrastructure/queue/queue.service'
 import { PrismaService } from '@/prisma'
+
+/** A resolved model plus the bound assistant's modality restriction, if any (Arc G). */
+interface ResolvedRunModel {
+  model: ResolvedAiModel
+  /** `null` when the conversation has no bound assistant — no assistant-level restriction applies. */
+  allowedModalities: string[] | null
+}
+
+/** One locked `AiArtifact` row's binding-relevant fields (Arc G). */
+interface ArtifactBindingRow {
+  kind: string
+  sizeBytes: number
+  boundRunStatus: string | null
+}
+
+/** Pull every `artifact_ref` part's id out of a run's input parts, in order, no dedup needed. */
+function extractArtifactIds(parts: CreateAiRunInput['inputParts']): string[] {
+  return parts
+    .filter((part): part is Extract<typeof part, { type: 'artifact_ref' }> => {
+      return part.type === 'artifact_ref'
+    })
+    .map((part) => part.artifactId)
+}
 
 /** Best-effort wake payload (ADR-052 pattern). Validated by the worker processor in Arc C.4. */
 export interface AiRunWakeJob {
@@ -49,6 +81,7 @@ export class AiRunProducerService {
     private readonly prisma: PrismaService,
     private readonly registry: AiModelRegistry,
     private readonly queue: QueueService,
+    private readonly env: EnvService,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(AiRunProducerService.name)
@@ -83,7 +116,16 @@ export class AiRunProducerService {
 
     // Resolve the model AFTER the idempotency check (never on a replay). A bound assistant supplies the
     // model (credential-gated) + must be enabled (Arc F.4); otherwise the credential-gated default.
-    const modelSnapshot = await this.resolveModelSnapshot(assistantId)
+    const resolved = await this.resolveModel(assistantId)
+    const modelSnapshot = this.toModelSnapshot(resolved.model)
+
+    // Validate every artifact_ref BEFORE creating anything (Arc G): existence/scope, the rebind
+    // matrix, model-capability gate, and assistant-modality gate all fail fast with no run/message/
+    // binding created. A text-only run (the overwhelmingly common case) skips this entirely.
+    const artifactIds = extractArtifactIds(input.inputParts)
+    if (artifactIds.length > 0) {
+      await this.assertArtifactsBindable(tx, input.conversationId, artifactIds, resolved)
+    }
 
     // Create the run first so the USER turn can carry its `runId`: this binds the input turn to
     // exactly one run, so when several runs are queued on one conversation before execution the
@@ -101,7 +143,7 @@ export class AiRunProducerService {
       },
     })
     const sequence = await this.nextSequence(tx, input.conversationId)
-    await tx.aiMessage.create({
+    const message = await tx.aiMessage.create({
       data: {
         conversationId: input.conversationId,
         runId: run.id,
@@ -112,7 +154,98 @@ export class AiRunProducerService {
         content: input.inputParts as unknown as Prisma.InputJsonValue,
       },
     })
+
+    // Bind last, in the same transaction: the earlier FOR UPDATE locks (held for the whole tx) make
+    // this the only writer that can land on each artifact for this attempt.
+    if (artifactIds.length > 0) {
+      await tx.aiArtifact.updateMany({
+        where: { id: { in: artifactIds }, conversationId: input.conversationId },
+        data: { runId: run.id, messageId: message.id },
+      })
+    }
+
     return { run, created: true }
+  }
+
+  /**
+   * Enforce the FINAL PLAN §7 binding rules for every referenced artifact, one locked row at a
+   * time (the count is bounded by `AI_ARTIFACT_MAX_PARTS_PER_MESSAGE`, so a sequential per-id lock
+   * is simpler and more testable than a single array-parameterized query, at a negligible
+   * round-trip cost). A violation throws before any run/message/binding is created.
+   */
+  private async assertArtifactsBindable(
+    tx: Prisma.TransactionClient,
+    conversationId: string,
+    artifactIds: string[],
+    resolved: ResolvedRunModel
+  ): Promise<void> {
+    const maxParts = this.env.get('AI_ARTIFACT_MAX_PARTS_PER_MESSAGE')
+    if (artifactIds.length > maxParts) {
+      throw new BadRequestException(
+        `Too many artifact references in one message (max ${maxParts}).`
+      )
+    }
+
+    let totalBytes = 0
+    for (const artifactId of artifactIds) {
+      const row = await this.lockArtifactForBinding(tx, conversationId, artifactId)
+      if (row === null) {
+        throw new BadRequestException(`Unknown artifact reference: ${artifactId}`)
+      }
+      if (
+        row.boundRunStatus !== null &&
+        AI_ARTIFACT_REBIND_BLOCKED_STATUSES.has(row.boundRunStatus as AiRunStatus)
+      ) {
+        throw new ConflictException(`Artifact ${artifactId} is already bound to another run.`)
+      }
+
+      const kind = row.kind as AiArtifactKind
+      const capability = capabilityForArtifactKind(kind)
+      if (capability === null || resolved.model.capabilities[capability] !== true) {
+        throw new BadRequestException(
+          `The resolved model does not support artifact kind "${kind.toLowerCase()}".`
+        )
+      }
+      const modality = modalityForArtifactKind(kind)
+      if (
+        resolved.allowedModalities !== null &&
+        (modality === null || !resolved.allowedModalities.includes(modality))
+      ) {
+        throw new BadRequestException(
+          `The conversation's assistant does not allow artifact kind "${kind.toLowerCase()}".`
+        )
+      }
+      totalBytes += row.sizeBytes
+    }
+
+    if (totalBytes > AI_ARTIFACT_MAX_TOTAL_RAW_BYTES_PER_MESSAGE) {
+      throw new BadRequestException(
+        'Referenced artifacts exceed the total per-message size budget.'
+      )
+    }
+  }
+
+  /**
+   * Lock one `AiArtifact` row (`FOR UPDATE OF a`) scoped to the given conversation, with its
+   * currently-bound run's status (if any) via a `LEFT JOIN` — existence, conversation-scope, and
+   * rebind eligibility all resolve from this single locked read. A foreign or nonexistent artifact
+   * id returns `null` (no existence leak — the two cases are indistinguishable from this query).
+   */
+  private async lockArtifactForBinding(
+    tx: Prisma.TransactionClient,
+    conversationId: string,
+    artifactId: string
+  ): Promise<ArtifactBindingRow | null> {
+    const rows = await tx.$queryRaw<ArtifactBindingRow[]>(Prisma.sql`
+      SELECT a."kind"::text AS "kind",
+             a."sizeBytes" AS "sizeBytes",
+             r.status::text AS "boundRunStatus"
+      FROM "ai"."ai_artifacts" a
+      LEFT JOIN "ai"."ai_runs" r ON a."runId" = r.id
+      WHERE a.id = ${artifactId} AND a."conversationId" = ${conversationId}
+      FOR UPDATE OF a
+    `)
+    return rows[0] ?? null
   }
 
   /**
@@ -171,18 +304,21 @@ export class AiRunProducerService {
   }
 
   /**
-   * Freeze a **secret-free** snapshot of the resolved model (no credential slot, base URL, or provider
-   * config). A bound assistant supplies the model via its `modelSelection` (Arc F.4, credential-gated);
-   * otherwise the credential-gated default. The worker re-resolves the credential at execution time.
+   * Resolve the model (+ the bound assistant's modality restriction, if any). A bound assistant
+   * supplies the model via its `modelSelection` (Arc F.4, credential-gated); otherwise the
+   * credential-gated default, with no assistant-level modality restriction (§2 invariant 4).
    */
-  private async resolveModelSnapshot(assistantId: string | null): Promise<Prisma.InputJsonValue> {
-    const model =
-      assistantId !== null
-        ? await this.resolveAssistantModel(assistantId)
-        : await this.registry.resolveDefaultModel()
+  private async resolveModel(assistantId: string | null): Promise<ResolvedRunModel> {
+    if (assistantId !== null) return this.resolveAssistantModel(assistantId)
+    const model = await this.registry.resolveDefaultModel()
     if (!model) {
       throw new ServiceUnavailableException('No AI model is configured.', AI_MODEL_NOT_CONFIGURED)
     }
+    return { model, allowedModalities: null }
+  }
+
+  /** Freeze a **secret-free** snapshot of the resolved model (no credential slot, base URL, or config). */
+  private toModelSnapshot(model: ResolvedAiModel): Prisma.InputJsonValue {
     return {
       modelSlug: model.slug,
       providerType: model.provider.type,
@@ -200,10 +336,10 @@ export class AiRunProducerService {
    * credential wins. A pinned model with no credential does **not** silently fall back to `mock` — the
    * run is refused (`503`), so an operator's explicit model choice is never quietly downgraded in prod.
    */
-  private async resolveAssistantModel(assistantId: string): Promise<ResolvedAiModel> {
+  private async resolveAssistantModel(assistantId: string): Promise<ResolvedRunModel> {
     const assistant = await this.prisma.aiAssistant.findUnique({
       where: { id: assistantId },
-      select: { enabled: true, modelSelection: true },
+      select: { enabled: true, modelSelection: true, allowedModalities: true },
     })
     if (!assistant) throw new NotFoundException('Ai assistant', assistantId)
     if (!assistant.enabled) {
@@ -215,7 +351,9 @@ export class AiRunProducerService {
     if (selection.success) {
       for (const slug of [selection.data.modelSlug, ...selection.data.fallback]) {
         const model = await this.registry.resolveModel(slug)
-        if (model && this.registry.hasCredential(model)) return model
+        if (model && this.registry.hasCredential(model)) {
+          return { model, allowedModalities: assistant.allowedModalities }
+        }
       }
     }
     throw new ServiceUnavailableException(

@@ -324,6 +324,10 @@ const envSchema = z.preprocess(
         .min(1)
         .max(33_554_432)
         .default(10_485_760),
+      // Max artifact_ref parts one run's inputParts may carry. Tighter than the generic
+      // AI_MESSAGE_MAX_PARTS (64, sized for text-only turns) — a handful of multi-MB binary parts is
+      // already a meaningful payload. Bounded so a typo can't allow an unbounded per-request fan-out.
+      AI_ARTIFACT_MAX_PARTS_PER_MESSAGE: z.coerce.number().int().min(1).max(20).default(4),
     })
     .transform((env) => {
       // Locked invariant (Decision C): dev -> local, test -> memory,
