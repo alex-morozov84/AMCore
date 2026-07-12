@@ -12,6 +12,13 @@ export const AI_RUN_DEFAULT_MAX_ATTEMPTS = 3
 export const AI_RUN_CANCELLED_BY_USER = 'cancelled_by_user'
 
 /**
+ * Bounded 503 `errorCode` when run creation cannot resolve a usable model (Arc F.4): no configured
+ * default, or a bound assistant whose `modelSelection` has no enabled + credentialed candidate. A
+ * machine-readable code the client can branch on, distinct from the generic `SERVICE_UNAVAILABLE`.
+ */
+export const AI_MODEL_NOT_CONFIGURED = 'model_not_configured'
+
+/**
  * Terminal reason/error codes an owner decision may set when it inline-expires a stale approval
  * (Track C — ADR-054, Arc E.5). They **mirror** the worker `AiRunTerminalReason`/`AiRunErrorCode`
  * values so the wire stays consistent across roles: a run whose deadline passed goes `EXPIRED`
@@ -24,6 +31,13 @@ export const AI_RUN_TOOL_LOOP_FAILED = 'tool_loop_failed'
 
 /** Content-free `ai.approval.expired` reason for an approval voided because its run was cancelled. */
 export const AI_APPROVAL_RUN_CANCELLED = 'run_cancelled'
+
+/**
+ * Terminal reason for a bot run abandoned because a human took control of the conversation (Arc F
+ * takeover). **Mirrors** the worker `AiRunTerminalReason.SUPERSEDED_BY_HUMAN` so the wire stays
+ * consistent whether the run was superseded by the take-time sweep (here) or the worker fence.
+ */
+export const AI_RUN_SUPERSEDED_BY_HUMAN = 'superseded_by_human'
 
 /** Defensive cap on the owner approval list (approvals are few; unpaginated read). */
 export const AI_APPROVAL_LIST_LIMIT = 100

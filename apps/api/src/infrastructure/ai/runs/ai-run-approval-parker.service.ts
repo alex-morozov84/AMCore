@@ -15,6 +15,7 @@ import type { AiTool } from '../tools/ai-tool.types'
 import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun } from './ai-run-dispatch.types'
 import { providerCallStep, writeRunSteps, writeUsageLedger } from './ai-run-loop-persistence'
+import { ConversationSupersededError, lockAndAssertBotOwnership } from './ai-run-ownership-fence'
 import type { RunPlan } from './ai-run-plan'
 
 import { AuditLogService } from '@/core/audit'
@@ -63,6 +64,9 @@ export class AiRunApprovalParker {
     const expiresAt = this.approvalExpiry(claim)
     try {
       await this.prisma.$transaction(async (tx) => {
+        // Ownership fence (ADR-049, Arc F): never park an approval on a conversation a human has taken
+        // over — this throws and rolls the park back, and the run is abandoned superseded (catch below).
+        await lockAndAssertBotOwnership(tx, claim.conversationId, claim.ownershipGeneration)
         await writeRunSteps(tx, claim.id, [providerCallStep(result, durationMs)])
         await writeUsageLedger(tx, claim, plan.attribution, plan.modelSlug, result)
         const approval = await tx.aiApproval.create({
@@ -97,6 +101,12 @@ export class AiRunApprovalParker {
           { event: 'ai.run.park_lease_lost', runId: claim.id },
           'AI run lease lost while parking for approval; park rolled back'
         )
+        return false
+      }
+      // A human took over before the park committed (ADR-049 fence, Arc F): abandon the run superseded
+      // instead of parking a pending approval on a human-owned conversation.
+      if (error instanceof ConversationSupersededError) {
+        await this.repository.finalizeSuperseded(this.prisma, claim)
         return false
       }
       // Provider call happened but the park failed durably — leave RUNNING for recovery (retry re-parks).

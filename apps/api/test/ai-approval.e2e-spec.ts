@@ -86,7 +86,8 @@ describe('AI approval lifecycle (e2e)', () => {
         slug: `demo-${Date.now()}-${seq}`,
         version: 1,
         displayName: 'Demo assistant',
-        enabled: false,
+        // Enabled so the Arc F.4 runtime gate lets it drive a run (the producer + executor now require it).
+        enabled: true,
         modelSelection: { modelSlug: 'mock-default' },
         allowedModalities: ['text'],
         toolAllowlist: ['demo_sensitive'],

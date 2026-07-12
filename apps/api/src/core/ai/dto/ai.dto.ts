@@ -5,13 +5,19 @@ import {
   aiApprovalListResponseSchema,
   aiApprovalResponseSchema,
   aiConversationResponseSchema,
+  aiMessageResponseSchema,
   aiRunCancelResponseSchema,
   aiRunListQuerySchema,
   aiRunPageSchema,
   aiRunResponseSchema,
+  aiTranscriptQuerySchema,
+  aiTranscriptResponseSchema,
   createAiConversationSchema,
   createAiRunSchema,
   decideAiApprovalSchema,
+  postOperatorMessageSchema,
+  releaseConversationSchema,
+  takeoverConversationSchema,
 } from '@amcore/shared'
 
 /**
@@ -21,6 +27,13 @@ import {
  */
 export class CreateAiConversationDto extends createZodDto(createAiConversationSchema) {}
 export class AiConversationResponseDto extends createZodDto(aiConversationResponseSchema) {}
+// Human takeover / operator review (Track C — ADR-054, Arc F.3).
+export class TakeoverConversationDto extends createZodDto(takeoverConversationSchema) {}
+export class ReleaseConversationDto extends createZodDto(releaseConversationSchema) {}
+export class PostOperatorMessageDto extends createZodDto(postOperatorMessageSchema) {}
+export class AiTranscriptQueryDto extends createZodDto(aiTranscriptQuerySchema) {}
+export class AiTranscriptResponseDto extends createZodDto(aiTranscriptResponseSchema) {}
+export class AiMessageResponseDto extends createZodDto(aiMessageResponseSchema) {}
 export class CreateAiRunDto extends createZodDto(createAiRunSchema) {}
 export class AiRunResponseDto extends createZodDto(aiRunResponseSchema) {}
 export class AiRunListQueryDto extends createZodDto(aiRunListQuerySchema) {}

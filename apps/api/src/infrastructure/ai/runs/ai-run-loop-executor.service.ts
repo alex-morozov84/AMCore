@@ -27,6 +27,7 @@ import {
   type PendingApprovalInvocation,
   reconstructRounds,
 } from './ai-run-loop-reconstruct'
+import { isBotOwnershipStale, readBotOwnership } from './ai-run-ownership-fence'
 import type { RunPlan } from './ai-run-plan'
 import { type CompletedToolRound, reconstructLoopMessages } from './ai-run-transcript'
 import { AiToolDispatcher, type ToolDispatchContext } from './ai-tool-dispatcher.service'
@@ -89,6 +90,18 @@ export class AiRunLoopExecutor {
 
     for (;;) {
       if (!(await this.repository.renewLease(claim))) return // lease reclaimed elsewhere — stop safely
+      // Ownership fence (ADR-049, Arc F): if a human took over mid-loop, stop before the next provider
+      // call or tool dispatch — no wasted spend on a taken-over conversation (the durable write is
+      // fenced under lock too, so this cheap read is an early exit, not the correctness guarantee).
+      if (
+        isBotOwnershipStale(
+          await readBotOwnership(this.prisma, claim.conversationId),
+          claim.ownershipGeneration
+        )
+      ) {
+        await this.repository.finalizeSuperseded(this.prisma, claim)
+        return
+      }
       if (claim.deadlineAt !== null && claim.deadlineAt <= new Date()) {
         await this.repository.finalizeExpired(this.prisma, claim)
         return
@@ -153,8 +166,13 @@ export class AiRunLoopExecutor {
         return
       }
 
-      await this.finalizer.recordProviderCall(claim, plan, result, durationMs)
+      // Record the provider call (fenced); stop if a human took over (the run is already superseded).
+      if (!(await this.finalizer.recordProviderCall(claim, plan, result, durationMs))) return
       const dispatched = await this.dispatcher.dispatch(decision.tool, decision.call, ctx)
+      if (dispatched.status === 'superseded') {
+        await this.repository.finalizeSuperseded(this.prisma, claim)
+        return
+      }
       if (dispatched.status === 'failed') {
         await this.finalizer.dispatchFailed(claim, dispatched.errorCode, providerCalls)
         return
@@ -244,9 +262,12 @@ export class AiRunLoopExecutor {
     const pending = await findPendingApproval(this.prisma, claim.id)
     if (pending === null) return false
 
-    // REJECTED: no execution — persist the ordering step + replay the fixed rejection notice.
+    // REJECTED: no execution — persist the ordering step (fenced) + replay the fixed rejection notice.
     if (pending.status === AiToolInvocationStatus.REJECTED) {
-      await this.dispatcher.applyRejected(pending, ctx)
+      if ((await this.dispatcher.applyRejected(pending, ctx)) === 'superseded') {
+        await this.repository.finalizeSuperseded(this.prisma, claim)
+        return true
+      }
       rounds.push(rejectionRound(pending))
       return false
     }
@@ -262,6 +283,10 @@ export class AiRunLoopExecutor {
       return true
     }
     const res = await this.dispatcher.executeApproved(pending, tool, ctx)
+    if (res.status === 'superseded') {
+      await this.repository.finalizeSuperseded(this.prisma, claim)
+      return true
+    }
     if (res.status === 'failed') {
       await this.finalizer.dispatchFailed(claim, res.errorCode, providerCalls)
       return true

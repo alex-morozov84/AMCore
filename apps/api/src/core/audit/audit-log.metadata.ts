@@ -24,6 +24,19 @@ function boundedString(maxLength: number, pattern: RegExp): MetadataValueRule {
 const aiCode = boundedString(64, /^[a-z][a-z0-9_]*$/)
 /** A bounded cuid-shaped id — runId, invocationId, approvalId (Arc E). */
 const aiId = boundedString(64, /^[a-z0-9]+$/)
+/** A bounded assistant slug — lowercase alnum + hyphen (Arc F). */
+const aiSlug = boundedString(64, /^[a-z0-9][a-z0-9-]*$/)
+/**
+ * An operator-supplied takeover reason / ticket ref (Arc F, D1 constraint). NOT transcript content — a
+ * bounded justification the owner requires for privileged-access accountability. Accepted only when it
+ * is a non-empty string ≤ 200 chars with no control characters (any language); otherwise dropped.
+ */
+const aiReasonRef: MetadataValueRule = (value) => {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 200) return undefined
+  // No control characters (any language is otherwise allowed - this is a bounded ref, not content).
+  for (let i = 0; i < value.length; i += 1) if (value.charCodeAt(i) < 0x20) return undefined
+  return value
+}
 
 const cleanupCounts: MetadataSpec = {
   expiredApiKeys: true,
@@ -51,6 +64,29 @@ const aiToolContext: MetadataSpec = {
 }
 const aiApprovalContext: MetadataSpec = { ...aiToolContext, approvalId: aiId }
 
+/**
+ * AI assistant-admin audit metadata (Track C — ADR-054, Arc F.1). Bounded and content-free — the
+ * assistant `systemPrompt`/model/tool config is NEVER audited; only which version of which slug
+ * changed and its enabled state.
+ */
+const aiAssistantContext: MetadataSpec = { slug: aiSlug, version: true, enabled: true }
+
+/**
+ * AI conversation takeover/release audit metadata (Track C — ADR-054, Arc F). Content-free: the
+ * generation transition, the resulting control, the actor's role, how many bot runs were superseded,
+ * and the operator's bounded reason/ticket ref (never transcript/prompt content).
+ */
+const aiConversationControlContext: MetadataSpec = {
+  conversationId: aiId,
+  fromGeneration: true,
+  toGeneration: true,
+  control: aiCode,
+  actorRole: aiCode,
+  supersededRuns: true,
+  voidedApprovals: true,
+  reasonRef: aiReasonRef,
+}
+
 const specs: Record<AuditAction, MetadataSpec> = {
   'admin.cleanup.executed': { counts: cleanupCounts },
   'admin.user.sessions_revoked': { count: true, reason: true },
@@ -59,6 +95,26 @@ const specs: Record<AuditAction, MetadataSpec> = {
   'ai.approval.expired': { ...aiApprovalContext, reasonCode: aiCode },
   'ai.approval.rejected': { ...aiApprovalContext, decision: aiCode, reasonCode: aiCode },
   'ai.approval.requested': { ...aiApprovalContext },
+  'ai.assistant.created': { ...aiAssistantContext },
+  'ai.assistant.disabled': { ...aiAssistantContext },
+  'ai.assistant.enabled': { ...aiAssistantContext },
+  'ai.assistant.updated': { ...aiAssistantContext },
+  'ai.assistant.version_published': { ...aiAssistantContext },
+  'ai.conversation.operator_message': {
+    conversationId: aiId,
+    messageId: aiId,
+    authorType: aiCode,
+    actorRole: aiCode,
+    reasonRef: aiReasonRef,
+  },
+  'ai.conversation.released': { ...aiConversationControlContext },
+  'ai.conversation.taken_over': { ...aiConversationControlContext },
+  'ai.conversation.transcript_accessed': {
+    conversationId: aiId,
+    actorRole: aiCode,
+    messageCount: true,
+    reasonRef: aiReasonRef,
+  },
   'ai.tool.execution_failed': { ...aiToolContext, reasonCode: aiCode },
   'ai.tool.invoked': { ...aiToolContext, outcome: aiCode },
   'api_key.created': { expiresAt: true, name: true, scopes: 'string[]' },

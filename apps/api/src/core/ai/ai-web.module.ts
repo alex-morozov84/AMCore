@@ -1,8 +1,13 @@
 import { Module } from '@nestjs/common'
 
+import { AiAssistantAdminController } from './admin/ai-assistant-admin.controller'
+import { AiAssistantAdminService } from './admin/ai-assistant-admin.service'
 import { AiApprovalService } from './approvals/ai-approval.service'
 import { AiApprovalsController } from './approvals/ai-approvals.controller'
 import { AiConversationService } from './conversations/ai-conversation.service'
+import { AiConversationControlController } from './conversations/ai-conversation-control.controller'
+import { AiConversationControlService } from './conversations/ai-conversation-control.service'
+import { AiConversationOperatorService } from './conversations/ai-conversation-operator.service'
 import { AiConversationsController } from './conversations/ai-conversations.controller'
 import { AiRunRealtimeHub } from './realtime/ai-run-realtime.hub'
 import { AiRunRealtimeSubscriber } from './realtime/ai-run-realtime.subscriber'
@@ -34,15 +39,20 @@ import { PrismaModule } from '@/prisma'
   imports: [PrismaModule, AiCatalogModule, QueueModule, AuditModule],
   controllers: [
     AiConversationsController,
+    AiConversationControlController,
     AiRunsController,
     AiRunStreamController,
     AiApprovalsController,
+    AiAssistantAdminController,
   ],
   providers: [
     AiConversationService,
+    AiConversationControlService,
+    AiConversationOperatorService,
     AiRunProducerService,
     AiRunService,
     AiApprovalService,
+    AiAssistantAdminService,
     AiRunRealtimeHub,
     AiRunRealtimeSubscriber,
   ],

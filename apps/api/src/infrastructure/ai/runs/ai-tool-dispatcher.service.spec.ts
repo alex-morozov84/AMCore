@@ -20,6 +20,7 @@ const claim: ClaimedRun = {
   attemptNumber: 1,
   maxAttempts: 3,
   deadlineAt: null,
+  ownershipGeneration: 0,
   leaseToken: 'lease1',
 }
 const ctx: ToolDispatchContext = { claim, ownerUserId: 'u1', organizationId: null }
@@ -50,6 +51,16 @@ describe('AiToolDispatcher', () => {
       (cb: (tx: unknown) => unknown) => cb(prisma)
     )
     prisma.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 2 } } as never)
+    // Ownership fence reads (ADR-049, Arc F): default to fresh, bot-owned, active — the pre-execution
+    // check (findUnique) and the in-tx result-commit fence ($queryRaw FOR UPDATE) both pass.
+    prisma.aiConversation.findUnique.mockResolvedValue({
+      ownershipGeneration: 0,
+      controlledBy: 'BOT',
+      state: 'ACTIVE',
+    } as never)
+    prisma.$queryRaw.mockResolvedValue([
+      { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE' },
+    ] as never)
     metrics = { incAiToolInvocation: jest.fn() }
     audit = { record: jest.fn().mockResolvedValue(undefined) }
     const env = { get: jest.fn(() => timeoutMs) } as unknown as EnvService
@@ -327,5 +338,60 @@ describe('AiToolDispatcher', () => {
       })
     )
     expect(metrics.incAiToolInvocation).toHaveBeenCalledWith('danger', 'sensitive', 'rejected')
+  })
+
+  describe('ownership fence (ADR-049, Arc F)', () => {
+    it('does not start the tool (no invocation, no execute) when a human already took over', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({
+        ownershipGeneration: 1,
+        controlledBy: 'HUMAN',
+        state: 'PAUSED_FOR_HUMAN',
+      } as never)
+      const tool = makeTool()
+
+      const result = await dispatcher.dispatch(tool, toolCall, ctx)
+
+      expect(result).toEqual({ status: 'superseded' })
+      expect(tool.execute).not.toHaveBeenCalled()
+      expect(prisma.aiToolInvocation.create).not.toHaveBeenCalled()
+    })
+
+    it('does not commit SUCCEEDED / the TOOL_INVOCATION step when takeover lands during execution', async () => {
+      prisma.aiToolInvocation.create.mockResolvedValue({ id: 'inv1' } as never)
+      // Pre-check passes (fresh), but the in-tx result-commit fence sees the generation moved.
+      prisma.$queryRaw.mockResolvedValue([
+        { ownershipGeneration: 1, controlledBy: 'HUMAN', state: 'ACTIVE' },
+      ] as never)
+
+      const result = await dispatcher.dispatch(makeTool(), toolCall, ctx)
+
+      expect(result).toEqual({ status: 'superseded' })
+      // The tool ran (at-least-once side effect), but no SUCCEEDED status or step was written.
+      expect(prisma.aiRunStep.create).not.toHaveBeenCalled()
+      expect(metrics.incAiToolInvocation).not.toHaveBeenCalledWith(
+        'current_time',
+        'safe',
+        'succeeded'
+      )
+    })
+
+    it('applyRejected does not write the ordering step when a human took over', async () => {
+      const rejected = {
+        id: 'inv-rej',
+        toolId: 'danger',
+        riskClass: AiToolRiskClass.SENSITIVE,
+        argsSnapshot: {},
+        status: AiToolInvocationStatus.REJECTED,
+      }
+      prisma.$queryRaw.mockResolvedValue([
+        { ownershipGeneration: 1, controlledBy: 'HUMAN', state: 'PAUSED_FOR_HUMAN' },
+      ] as never)
+
+      const result = await dispatcher.applyRejected(rejected, ctx)
+
+      expect(result).toBe('superseded')
+      expect(prisma.aiRunStep.create).not.toHaveBeenCalled()
+      expect(metrics.incAiToolInvocation).not.toHaveBeenCalled()
+    })
   })
 })

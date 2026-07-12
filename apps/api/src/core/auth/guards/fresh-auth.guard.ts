@@ -1,11 +1,11 @@
-import { type CanActivate, type ExecutionContext, HttpStatus, Injectable } from '@nestjs/common'
+import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
-import { AuthErrorCode, type RequestPrincipal } from '@amcore/shared'
+import { type RequestPrincipal } from '@amcore/shared'
 
-import { AppException } from '../../../common/exceptions'
 import { EnvService } from '../../../env/env.service'
 import { PrismaService } from '../../../prisma'
+import { assertSessionFresh } from '../session-freshness'
 
 /**
  * Metadata key set by `@RequireFreshAuth`. Value semantics:
@@ -51,39 +51,8 @@ export class FreshAuthGuard implements CanActivate {
     if (maxAge === undefined) return true
 
     const request = context.switchToHttp().getRequest<{ user?: RequestPrincipal }>()
-    const principal = request.user
-    const sid = principal?.sid
-    if (!sid || !principal) {
-      throw this.stepUpRequired()
-    }
-
-    const session = await this.prisma.session.findUnique({
-      where: { id: sid },
-      select: { lastAuthAt: true, revokedAt: true, expiresAt: true, userId: true },
-    })
-
-    const now = Date.now()
     const windowSec = maxAge ?? this.env.get('STEP_UP_MAX_AGE_SECONDS')
-
-    if (
-      !session ||
-      session.revokedAt !== null ||
-      session.expiresAt.getTime() <= now ||
-      session.userId !== principal.sub ||
-      session.lastAuthAt === null ||
-      now - session.lastAuthAt.getTime() > windowSec * 1000
-    ) {
-      throw this.stepUpRequired()
-    }
-
+    await assertSessionFresh(this.prisma, windowSec, request.user)
     return true
-  }
-
-  private stepUpRequired(): AppException {
-    return new AppException(
-      'Step-up authentication required',
-      HttpStatus.FORBIDDEN,
-      AuthErrorCode.STEP_UP_REQUIRED
-    )
   }
 }

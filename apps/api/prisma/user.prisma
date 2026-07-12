@@ -49,6 +49,8 @@ enum AuditTargetType {
   AI_RUN
   AI_TOOL_INVOCATION
   AI_APPROVAL
+  AI_ASSISTANT
+  AI_CONVERSATION
 
   @@schema("core")
 }

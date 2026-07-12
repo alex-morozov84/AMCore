@@ -1,15 +1,19 @@
 import { z } from 'zod'
 
+import { PAGINATION } from '../constants'
+
 import { aiIdentifierSchema, aiModalitySchema, aiSlugSchema } from './ai-common'
 import { aiDisplayNameSchema } from './ai-catalog'
+import { paginatedResponseSchema } from './pagination'
 
 /**
- * AI capability layer — assistant config contracts (Track C — ADR-054, Arc A).
+ * AI capability layer — assistant config contracts (Track C — ADR-054, Arc A + Arc F admin).
  *
  * Named, versioned assistant configs (the prompt-version store, basic form) — the
  * engine-side admin contract; UI deferred (D6). `systemPrompt` is trusted instruction text,
  * kept structurally distinct from untrusted user/tool content at the gateway trust boundary
- * (Arc D). Exercised from Arc F. Language-agnostic, no human-readable messages.
+ * (Arc D). The admin surface (create / publish-version / update / list) lands in Arc F.1.
+ * Language-agnostic, no human-readable messages.
  */
 
 /** Logical model selection: a primary model slug plus an ordered fallback chain. */
@@ -48,3 +52,43 @@ export const createAiAssistantSchema = z.object({
   budgetClass: aiIdentifierSchema.nullish(),
 })
 export type CreateAiAssistantInput = z.infer<typeof createAiAssistantSchema>
+
+/**
+ * Publish a new immutable version of an existing assistant `slug` (Arc F.1). The behavioral config
+ * of `createAiAssistantSchema` minus `slug` (the slug comes from the path); the server assigns the
+ * next `version`. A version row is never mutated in place — any behavioral change publishes a new one.
+ */
+export const publishAiAssistantVersionSchema = createAiAssistantSchema.omit({ slug: true })
+export type PublishAiAssistantVersionInput = z.infer<typeof publishAiAssistantVersionSchema>
+
+/**
+ * In-place assistant update (Arc F.1). Deliberately limited to the two **operational** fields —
+ * `enabled` (the kill-switch) and `displayName`. Behavioral fields (systemPrompt / modelSelection /
+ * toolAllowlist / modalities) are immutable per version and change only via a new version, so a bound
+ * conversation's behavior can never be retro-changed under it. At least one field must be present.
+ */
+export const updateAiAssistantSchema = z
+  .object({
+    displayName: aiDisplayNameSchema.optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((v) => v.displayName !== undefined || v.enabled !== undefined, {
+    error: 'At least one of displayName or enabled must be provided',
+  })
+export type UpdateAiAssistantInput = z.infer<typeof updateAiAssistantSchema>
+
+/**
+ * Admin assistant list query (Arc F.1). `version` defaults to `latest` (one row per slug, highest
+ * version); `all` returns every version. `slug` narrows to a single assistant's versions. Page-based
+ * (ADR-036 standard envelope), mirroring the other admin lists.
+ */
+export const aiAssistantListQuerySchema = z.object({
+  slug: aiSlugSchema.optional(),
+  version: z.enum(['latest', 'all']).default('latest'),
+  page: z.coerce.number().int().min(1).default(PAGINATION.DEFAULT_PAGE),
+  limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).default(PAGINATION.DEFAULT_LIMIT),
+})
+export type AiAssistantListQuery = z.infer<typeof aiAssistantListQuerySchema>
+
+export const aiAssistantListResponseSchema = paginatedResponseSchema(aiAssistantResponseSchema)
+export type AiAssistantListResponse = z.infer<typeof aiAssistantListResponseSchema>

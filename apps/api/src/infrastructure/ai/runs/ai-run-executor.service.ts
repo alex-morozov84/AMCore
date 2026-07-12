@@ -12,6 +12,7 @@ import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
 import { AiRunLoopExecutor } from './ai-run-loop-executor.service'
+import { isBotOwnershipStale } from './ai-run-ownership-fence'
 import type { RunPlan } from './ai-run-plan'
 
 import { EnvService } from '@/env/env.service'
@@ -131,7 +132,10 @@ export class AiRunExecutorService {
       select: {
         ownerUserId: true,
         organizationId: true,
-        assistant: { select: { toolAllowlist: true } },
+        ownershipGeneration: true,
+        controlledBy: true,
+        state: true,
+        assistant: { select: { toolAllowlist: true, systemPrompt: true, enabled: true } },
       },
     })
     // The run's OWN input turn is bound by `runId` (not the max-sequence message) so several runs
@@ -146,6 +150,25 @@ export class AiRunExecutorService {
       return null
     }
 
+    // Ownership fence (ADR-049, Arc F): if a human took control since this run was queued, abandon it
+    // terminally BEFORE any provider I/O — no spend, no stale bot turn written into a human conversation.
+    if (isBotOwnershipStale(conversation, claim.ownershipGeneration)) {
+      await this.repository.finalizeSuperseded(this.prisma, claim)
+      return null
+    }
+
+    // Enabled kill-switch (Arc F.4): a bound assistant disabled after this run was queued must not drive
+    // it. Terminal `FAILED` before any provider I/O (the producer gates new runs; this catches the race).
+    if (conversation.assistant && !conversation.assistant.enabled) {
+      await this.repository.finalizeFailed(
+        this.prisma,
+        claim,
+        AiRunErrorCode.ASSISTANT_DISABLED,
+        AiRunTerminalReason.ASSISTANT_DISABLED
+      )
+      return null
+    }
+
     const inputText = extractText(input.content)
     if (inputText.length === 0) {
       await this.repository.finalizeFailed(this.prisma, claim, AiRunErrorCode.NO_INPUT_TEXT)
@@ -156,9 +179,15 @@ export class AiRunExecutorService {
     if (inputFlagCategories === null) return null // oversize / block already refused
 
     // Arc D structural trust boundary: untrusted user text JSON-encoded in a salted container; the
-    // code-owned trusted instruction goes in `system`. The loop augments `system` when tools apply.
+    // trusted instruction goes in `system`. Arc F.4: the bound assistant's `systemPrompt` becomes that
+    // trusted instruction (falling back to the code-owned default) — the code-owned structural-boundary
+    // policy is ALWAYS appended by the builder, so a per-assistant prompt never weakens the boundary.
     const maxInputChars = this.env.get('AI_GUARDRAIL_MAX_INPUT_CHARS')
-    const boundary = buildTrustBoundaryRequest({ untrustedUserText: inputText, maxInputChars })
+    const boundary = buildTrustBoundaryRequest({
+      untrustedUserText: inputText,
+      maxInputChars,
+      systemInstruction: conversation.assistant?.systemPrompt ?? undefined,
+    })
     return {
       modelSlug,
       system: boundary.system,

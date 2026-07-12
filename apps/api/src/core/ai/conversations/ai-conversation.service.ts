@@ -20,7 +20,7 @@ export class AiConversationService {
 
   async create(userId: string, input: CreateAiConversationInput): Promise<AiConversationResponse> {
     const assistantId = input.assistantId ?? null
-    if (assistantId !== null) await this.assertAssistantExists(assistantId)
+    if (assistantId !== null) await this.assertAssistantBindable(assistantId)
 
     const conversation = await this.prisma.aiConversation.create({
       data: { ownerUserId: userId, assistantId, title: input.title ?? null },
@@ -36,12 +36,17 @@ export class AiConversationService {
     return toAiConversationResponse(conversation)
   }
 
-  /** Bind-time existence check only — assistant config is not interpreted until Arc F. */
-  private async assertAssistantExists(assistantId: string): Promise<void> {
+  /**
+   * Bind-time gate (Arc F.4): the assistant must exist **and be enabled**. A disabled assistant is a
+   * kill-switch — it cannot be bound to a new conversation (nor drive a run; the producer + executor
+   * gate that too). Its behavioral config (systemPrompt / modelSelection) is interpreted at run time.
+   */
+  private async assertAssistantBindable(assistantId: string): Promise<void> {
     const assistant = await this.prisma.aiAssistant.findUnique({
       where: { id: assistantId },
-      select: { id: true },
+      select: { enabled: true },
     })
     if (!assistant) throw new BadRequestException(`Unknown assistant "${assistantId}"`)
+    if (!assistant.enabled) throw new BadRequestException(`Assistant "${assistantId}" is disabled`)
   }
 }

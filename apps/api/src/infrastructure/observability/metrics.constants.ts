@@ -32,4 +32,6 @@ export const METRIC_NAMES = {
   aiToolInvocationsTotal: 'amcore_ai_tool_invocations_total',
   aiApprovalsTotal: 'amcore_ai_approvals_total',
   aiToolLoopSteps: 'amcore_ai_tool_loop_steps',
+  aiAssistantAdminTotal: 'amcore_ai_assistant_admin_total',
+  aiConversationControlTotal: 'amcore_ai_conversation_control_total',
 } as const

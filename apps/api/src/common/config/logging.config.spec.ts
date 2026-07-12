@@ -77,6 +77,55 @@ describe('createLoggingConfig', () => {
     expect(output).toContain('[REDACTED]')
   })
 
+  it('redacts AI operator reason (body + header) and message content in log output (Arc F.3)', () => {
+    const config = createLoggingConfig(clsServiceMock, 4096)
+    const stream = new PassThrough()
+    let output = ''
+    stream.on('data', (chunk) => {
+      output += chunk.toString()
+    })
+
+    const nestjsPinoPath = require.resolve('nestjs-pino')
+    const pinoPath = require.resolve('pino', { paths: [nestjsPinoPath] })
+    const pino = require(pinoPath) as (
+      options: object,
+      destination: NodeJS.WritableStream
+    ) => { info: (obj: object, msg: string) => void }
+
+    const pinoHttp = config.pinoHttp as { redact?: object }
+    const logger = pino({ redact: pinoHttp.redact }, stream)
+
+    logger.info(
+      {
+        req: {
+          body: {
+            reason: 'ticket-reason-sentinel',
+            content: [{ type: 'text', text: 'operator-message-sentinel' }],
+          },
+          headers: { 'x-amcore-operator-reason': 'header-reason-sentinel' },
+        },
+      },
+      'request'
+    )
+
+    expect(output).not.toContain('ticket-reason-sentinel')
+    expect(output).not.toContain('operator-message-sentinel')
+    expect(output).not.toContain('header-reason-sentinel')
+    expect(output).toContain('[REDACTED]')
+  })
+
+  it('lists the AI operator reason/content redaction paths', () => {
+    const config = createLoggingConfig(clsServiceMock, 4096)
+    const pinoHttp = config.pinoHttp as { redact?: { paths?: string[] } }
+    expect(pinoHttp.redact?.paths).toEqual(
+      expect.arrayContaining([
+        'req.body.reason',
+        'req.body.content',
+        'req.headers["x-amcore-operator-reason"]',
+      ])
+    )
+  })
+
   it('excludes startup health checks from auto logging', () => {
     const config = createLoggingConfig(clsServiceMock, 4096)
 

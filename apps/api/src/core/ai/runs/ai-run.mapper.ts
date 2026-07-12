@@ -1,9 +1,11 @@
-import type { AiConversation, AiRun } from '@prisma/client'
+import type { AiConversation, AiMessage, AiRun } from '@prisma/client'
 
 import type {
   AiConversationControlValue,
   AiConversationResponse,
   AiConversationStateValue,
+  AiMessageContent,
+  AiMessageResponse,
   AiRunResponse,
   AiRunStatusValue,
 } from '@amcore/shared'
@@ -31,6 +33,24 @@ export function toAiRunResponse(
     createdAt: run.createdAt.toISOString(),
     startedAt: run.startedAt?.toISOString() ?? null,
     finishedAt: run.finishedAt?.toISOString() ?? null,
+  }
+}
+
+/**
+ * DB → wire projection for a transcript message (Track C — ADR-054, Arc F.3b). `content` is stored as
+ * the validated structured-parts JSON and re-validated by `@ZodResponse` on the way out. The wire
+ * `role`/`authorType` are the lowercase projection of the Prisma SCREAMING_CASE tokens.
+ */
+export function toAiMessageResponse(message: AiMessage): AiMessageResponse {
+  return {
+    id: message.id,
+    conversationId: message.conversationId,
+    runId: message.runId,
+    sequence: message.sequence,
+    role: message.role.toLowerCase() as AiMessageResponse['role'],
+    authorType: message.authorType.toLowerCase() as AiMessageResponse['authorType'],
+    content: message.content as unknown as AiMessageContent,
+    createdAt: message.createdAt.toISOString(),
   }
 }
 

@@ -19,6 +19,7 @@ function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
     attemptNumber: 1,
     maxAttempts: 3,
     deadlineAt: null,
+    ownershipGeneration: 0,
     leaseToken: 'lease-abc',
     ...overrides,
   }
@@ -45,12 +46,18 @@ describe('AiRunRepository', () => {
           attemptCount: 1,
           maxAttempts: 3,
           deadlineAt: null,
+          ownershipGeneration: 4,
         },
       ] as never)
 
       const [run] = await repo.claimDueBatch()
 
-      expect(run).toMatchObject({ id: 'run-1', attemptNumber: 1, maxAttempts: 3 })
+      expect(run).toMatchObject({
+        id: 'run-1',
+        attemptNumber: 1,
+        maxAttempts: 3,
+        ownershipGeneration: 4,
+      })
       expect(run?.leaseToken).toEqual(expect.any(String))
     })
   })
@@ -90,6 +97,21 @@ describe('AiRunRepository', () => {
         })
       )
     })
+
+    it('finalizeSuperseded CASes RUNNING → CANCELLED / superseded_by_human (ADR-049 fence, Arc F)', async () => {
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
+      await expect(repo.finalizeSuperseded(prisma, claim())).resolves.toBe(true)
+      expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'run-1', status: 'RUNNING', leaseToken: 'lease-abc' },
+          data: expect.objectContaining({
+            status: 'CANCELLED',
+            terminalReasonCode: 'superseded_by_human',
+            leaseToken: null,
+          }),
+        })
+      )
+    })
   })
 
   describe('finalizeRefusal (Arc D guardrail block)', () => {
@@ -103,7 +125,10 @@ describe('AiRunRepository', () => {
     }
 
     beforeEach(() => {
-      prisma.$queryRaw.mockResolvedValue([{ id: 'conv-1' }] as never)
+      // The refusal write fences + locks the conversation first; default to fresh, bot-owned, active.
+      prisma.$queryRaw.mockResolvedValue([
+        { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE' },
+      ] as never)
       prisma.aiMessage.aggregate.mockResolvedValue({ _max: { sequence: 0 } } as never)
       prisma.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 0 } } as never)
       prisma.aiMessage.create.mockResolvedValue({} as never)
@@ -212,6 +237,25 @@ describe('AiRunRepository', () => {
     it('CAS loss → returns false (message + steps + terminal update roll back together)', async () => {
       prisma.aiRun.updateMany.mockResolvedValue({ count: 0 } as never)
       await expect(repo.finalizeRefusal(claim(), refusal())).resolves.toBe(false)
+    })
+
+    it('a human takeover during a refusal write abandons the run superseded, no transcript turn', async () => {
+      // The fence read shows the generation moved → the refusal write rolls back and the run is
+      // instead CANCELLED / superseded_by_human, with NO assistant refusal message written.
+      prisma.$queryRaw.mockResolvedValue([
+        { ownershipGeneration: 1, controlledBy: 'HUMAN', state: 'PAUSED_FOR_HUMAN' },
+      ] as never)
+
+      await expect(repo.finalizeRefusal(claim(), refusal())).resolves.toBe(true)
+      expect(prisma.aiMessage.create).not.toHaveBeenCalled()
+      expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'CANCELLED',
+            terminalReasonCode: 'superseded_by_human',
+          }),
+        })
+      )
     })
 
     it('records the output-block reason + OUTPUT_VALIDATION check step', async () => {

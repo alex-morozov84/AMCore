@@ -17,6 +17,10 @@ const SENSITIVE_HEADERS = new Set([
   'webhook-signature',
   'x-hub-signature-256',
   'x-telegram-bot-api-secret-token',
+  // AI operator-review reason / ticket ref (Track C — ADR-054, Arc F.3). AllExceptionsFilter logs
+  // sanitizeHeaders(request.headers) on 500s — a separate path from Pino's req.headers redact — so the
+  // header must be redacted here too, or a cross-user operator's reason would leak on an error.
+  'x-amcore-operator-reason',
 ])
 
 const REDACTED = '[REDACTED]'

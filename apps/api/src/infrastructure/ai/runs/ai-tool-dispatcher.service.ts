@@ -22,6 +22,12 @@ import type { AiTool, AiToolContext } from '../tools/ai-tool.types'
 
 import type { ClaimedRun } from './ai-run-dispatch.types'
 import type { PendingApprovalInvocation } from './ai-run-loop-reconstruct'
+import {
+  ConversationSupersededError,
+  isBotOwnershipStale,
+  lockAndAssertBotOwnership,
+  readBotOwnership,
+} from './ai-run-ownership-fence'
 
 import { AuditLogService } from '@/core/audit'
 import { EnvService } from '@/env/env.service'
@@ -55,6 +61,9 @@ export type ToolDispatchResult =
       output: string
     }
   | { status: 'failed'; errorCode: AiToolErrorCodeValue }
+  /** A human took over the conversation (ADR-049 fence, Arc F): the tool is not started, or its result
+   * is not committed. The loop terminalizes the run superseded; no durable tool step is written. */
+  | { status: 'superseded' }
 
 /**
  * Executes a single SAFE tool call host-side (Track C — ADR-054, Arc E, worker role only). It never
@@ -81,6 +90,11 @@ export class AiToolDispatcher {
     toolCall: AiToolCall,
     ctx: ToolDispatchContext
   ): Promise<ToolDispatchResult> {
+    // Ownership fence (ADR-049, Arc F): never START a tool on a conversation a human has taken over —
+    // don't even persist the EXECUTING invocation. A takeover DURING execution is caught by the fenced
+    // result commit (`runToCompletion`).
+    if (await this.superseded(ctx)) return { status: 'superseded' }
+
     // Defensive last gate before host-side execution: the resolved tool MUST match the model-
     // requested name AND be SAFE. This never fires on correct wiring, but it stops an upstream bug
     // (E.4b) from executing a mismatched tool or an approval-gated one before Arc E.5's park exists.
@@ -127,6 +141,8 @@ export class AiToolDispatcher {
     tool: AiTool,
     ctx: ToolDispatchContext
   ): Promise<ToolDispatchResult> {
+    // Ownership fence (ADR-049, Arc F): a human takeover before the approved tool resumes → don't run it.
+    if (await this.superseded(ctx)) return { status: 'superseded' }
     if (tool.toolId !== invocation.toolId || tool.riskClass !== invocation.riskClass) {
       return { status: 'failed', errorCode: AiToolErrorCode.TOOL_NOT_ALLOWED }
     }
@@ -152,32 +168,41 @@ export class AiToolDispatcher {
   /**
    * Apply an owner REJECTION on resume (Arc E.5, worker-only): write the ordering `TOOL_INVOCATION`
    * step so reconstruction replays the fixed rejection notice (the invocation is already `REJECTED`).
-   * No tool runs. The approval-decision audit was written by the web decision (E.5b).
+   * No tool runs. The approval-decision audit was written by the web decision (E.5b). Fenced (ADR-049,
+   * Arc F): this is a step write, so a human takeover rolls it back and returns `superseded` — the loop
+   * then finalizes the run superseded (same contract as `dispatch`/`executeApproved`).
    */
   async applyRejected(
     invocation: PendingApprovalInvocation,
     ctx: ToolDispatchContext
-  ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const stepNumber = await nextStepNumber(tx, ctx.claim.id)
-      await tx.aiRunStep.create({
-        data: {
-          runId: ctx.claim.id,
-          stepNumber,
-          type: AiRunStepType.TOOL_INVOCATION,
-          detail: {
-            invocationId: invocation.id,
-            toolCallId: approvedToolCallId(invocation.id),
-          } satisfies Prisma.InputJsonValue,
-          finishedAt: new Date(),
-        },
+  ): Promise<'applied' | 'superseded'> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await lockAndAssertBotOwnership(tx, ctx.claim.conversationId, ctx.claim.ownershipGeneration)
+        const stepNumber = await nextStepNumber(tx, ctx.claim.id)
+        await tx.aiRunStep.create({
+          data: {
+            runId: ctx.claim.id,
+            stepNumber,
+            type: AiRunStepType.TOOL_INVOCATION,
+            detail: {
+              invocationId: invocation.id,
+              toolCallId: approvedToolCallId(invocation.id),
+            } satisfies Prisma.InputJsonValue,
+            finishedAt: new Date(),
+          },
+        })
       })
-    })
+    } catch (error) {
+      if (error instanceof ConversationSupersededError) return 'superseded'
+      throw error
+    }
     this.metrics.incAiToolInvocation(
       invocation.toolId,
       invocation.riskClass.toLowerCase() as AiMetricsToolRiskClass,
       'rejected'
     )
+    return 'applied'
   }
 
   /**
@@ -204,32 +229,49 @@ export class AiToolDispatcher {
 
     const boundedOutput = output.slice(0, AI_TOOL_OUTPUT_MAX_CHARS)
     const durationMs = Math.round(performance.now() - startedAt)
-    await this.prisma.$transaction(async (tx) => {
-      await tx.aiToolInvocation.update({
-        where: { id: invocationId },
-        data: {
-          status: AiToolInvocationStatus.SUCCEEDED,
-          resultSummary: { output: boundedOutput } satisfies Prisma.InputJsonValue,
-          finishedAt: new Date(),
-          durationMs,
-        },
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Fence the result commit (ADR-049, Arc F): if a human took over WHILE the tool ran, roll back —
+        // the SUCCEEDED status + TOOL_INVOCATION step are not written into a human-owned conversation.
+        // The tool's external side effect already happened (at-least-once; it cannot be un-executed).
+        await lockAndAssertBotOwnership(tx, ctx.claim.conversationId, ctx.claim.ownershipGeneration)
+        await tx.aiToolInvocation.update({
+          where: { id: invocationId },
+          data: {
+            status: AiToolInvocationStatus.SUCCEEDED,
+            resultSummary: { output: boundedOutput } satisfies Prisma.InputJsonValue,
+            finishedAt: new Date(),
+            durationMs,
+          },
+        })
+        const stepNumber = await nextStepNumber(tx, ctx.claim.id)
+        await tx.aiRunStep.create({
+          data: {
+            runId: ctx.claim.id,
+            stepNumber,
+            type: AiRunStepType.TOOL_INVOCATION,
+            detail: { invocationId, toolCallId } satisfies Prisma.InputJsonValue,
+            durationMs,
+            finishedAt: new Date(),
+          },
+        })
       })
-      const stepNumber = await nextStepNumber(tx, ctx.claim.id)
-      await tx.aiRunStep.create({
-        data: {
-          runId: ctx.claim.id,
-          stepNumber,
-          type: AiRunStepType.TOOL_INVOCATION,
-          detail: { invocationId, toolCallId } satisfies Prisma.InputJsonValue,
-          durationMs,
-          finishedAt: new Date(),
-        },
-      })
-    })
+    } catch (error) {
+      if (error instanceof ConversationSupersededError) return { status: 'superseded' }
+      throw error
+    }
 
     this.metrics.incAiToolInvocation(tool.toolId, riskLabel(tool), 'succeeded')
     await this.recordAudit(tool, ctx, invocationId, 'ai.tool.invoked', { outcome: 'succeeded' })
     return { status: 'succeeded', invocationId, toolCallId, input: args, output: boundedOutput }
+  }
+
+  /** Non-locking ownership pre-check: true when a human has taken the conversation over (ADR-049, Arc F). */
+  private async superseded(ctx: ToolDispatchContext): Promise<boolean> {
+    return isBotOwnershipStale(
+      await readBotOwnership(this.prisma, ctx.claim.conversationId),
+      ctx.claim.ownershipGeneration
+    )
   }
 
   /** Run the tool outside any transaction, bounded by `AI_TOOL_EXECUTION_TIMEOUT_MS` (raced). */

@@ -30,6 +30,7 @@ function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
     attemptNumber: 1,
     maxAttempts: 3,
     deadlineAt: null,
+    ownershipGeneration: 0,
     leaseToken: 'lease-abc',
     ...overrides,
   }
@@ -89,6 +90,9 @@ describe('AiRunExecutorService', () => {
     prisma.aiConversation.findUnique.mockResolvedValue({
       ownerUserId: 'u1',
       organizationId: null,
+      ownershipGeneration: 0,
+      controlledBy: 'BOT',
+      state: 'ACTIVE',
       assistant: null,
     } as never)
     prisma.aiMessage.findFirst.mockResolvedValue({
@@ -116,11 +120,34 @@ describe('AiRunExecutorService', () => {
       prisma.aiConversation.findUnique.mockResolvedValue({
         ownerUserId: 'u1',
         organizationId: 'org-9',
-        assistant: { toolAllowlist: ['current_time'] },
+        ownershipGeneration: 0,
+        controlledBy: 'BOT',
+        state: 'ACTIVE',
+        assistant: { toolAllowlist: ['current_time'], systemPrompt: null, enabled: true },
       } as never)
       await executor.execute(claim())
       expect(lastPlan().toolAllowlist).toEqual(['current_time'])
       expect(lastPlan().attribution).toEqual({ userId: 'u1', organizationId: 'org-9' })
+    })
+
+    it('uses the bound assistant systemPrompt as the trusted instruction, keeping the Arc D boundary', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({
+        ownerUserId: 'u1',
+        organizationId: null,
+        ownershipGeneration: 0,
+        controlledBy: 'BOT',
+        state: 'ACTIVE',
+        assistant: { toolAllowlist: [], systemPrompt: 'You are a pirate.', enabled: true },
+      } as never)
+
+      await executor.execute(claim())
+
+      // The assistant prompt is the trusted instruction...
+      expect(lastPlan().system).toContain('You are a pirate.')
+      // ...and the code-owned structural-boundary policy is STILL appended (Arc D preserved).
+      expect(lastPlan().system).toContain('UNTRUSTED')
+      // Default persona is replaced by the assistant's, not concatenated.
+      expect(lastPlan().system).not.toContain('AMCore assistant')
     })
 
     it('feeds the run OWN input turn (by runId) as the wrapped user message', async () => {
@@ -253,6 +280,45 @@ describe('AiRunExecutorService', () => {
         expect.anything(),
         'no_input_text'
       )
+    })
+
+    it('fails a run whose bound assistant was disabled after it was queued (Arc F.4 kill-switch)', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({
+        ownerUserId: 'u1',
+        organizationId: null,
+        ownershipGeneration: 0,
+        controlledBy: 'BOT',
+        state: 'ACTIVE',
+        assistant: { toolAllowlist: [], systemPrompt: null, enabled: false },
+      } as never)
+      await executor.execute(claim())
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(repository.finalizeFailed).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({ id: 'run-1' }),
+        'assistant_disabled',
+        'assistant_disabled'
+      )
+    })
+
+    it('supersedes (no loop, no spend) when a human took over since the run was queued', async () => {
+      // The conversation generation moved past the run's snapshot (0) — the ADR-049 fence fires.
+      prisma.aiConversation.findUnique.mockResolvedValue({
+        ownerUserId: 'u1',
+        organizationId: null,
+        ownershipGeneration: 1,
+        controlledBy: 'HUMAN',
+        state: 'PAUSED_FOR_HUMAN',
+        assistant: null,
+      } as never)
+      await executor.execute(claim())
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(repository.finalizeSuperseded).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({ id: 'run-1' })
+      )
+      // No provider I/O and no input-guard work happened on a taken-over conversation.
+      expect(metrics.incAiGuardrailCheck).not.toHaveBeenCalled()
     })
   })
 

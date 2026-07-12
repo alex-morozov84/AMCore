@@ -19,6 +19,7 @@ import type {
   RunReapResult,
   RunRetryOutcome,
 } from './ai-run-dispatch.types'
+import { ConversationSupersededError, lockAndAssertBotOwnership } from './ai-run-ownership-fence'
 import { sanitizeGuardrailCategories } from './guardrail-step-detail'
 
 import { PrismaService } from '@/prisma'
@@ -34,6 +35,7 @@ interface ClaimedRow {
   attemptCount: number
   maxAttempts: number
   deadlineAt: Date | null
+  ownershipGeneration: number
 }
 
 /** Shape returned by the raw reaper/expiry `SELECT ... FOR UPDATE SKIP LOCKED`. */
@@ -91,7 +93,7 @@ export class AiRunRepository {
       ) AS sub
       WHERE r.id = sub.id
       RETURNING r.id, r."conversationId", r."modelSnapshot", r."attemptCount",
-                r."maxAttempts", r."deadlineAt"
+                r."maxAttempts", r."deadlineAt", r."ownershipGeneration"
     `)
 
     return rows.map((row) => ({
@@ -101,6 +103,7 @@ export class AiRunRepository {
       attemptNumber: row.attemptCount,
       maxAttempts: row.maxAttempts,
       deadlineAt: row.deadlineAt,
+      ownershipGeneration: row.ownershipGeneration,
       leaseToken,
     }))
   }
@@ -206,7 +209,9 @@ export class AiRunRepository {
   async finalizeRefusal(claim: ClaimedRun, refusal: GuardrailRefusalInput): Promise<boolean> {
     try {
       await this.prisma.$transaction(async (tx) => {
-        await this.lockConversation(tx, claim.conversationId)
+        // Fence + lock in one step (ADR-049, Arc F): if a human took over, this throws and the whole
+        // refusal write rolls back — the run is then abandoned superseded instead (catch below).
+        await lockAndAssertBotOwnership(tx, claim.conversationId, claim.ownershipGeneration)
         const sequence = await this.nextSequence(tx, claim.conversationId)
         await tx.aiMessage.create({
           data: {
@@ -237,8 +242,29 @@ export class AiRunRepository {
       return true
     } catch (error) {
       if (error instanceof RunLeaseLostError) return false
+      // A human took over before the refusal landed — abandon the run terminally, no transcript write.
+      if (error instanceof ConversationSupersededError) {
+        await this.finalizeSuperseded(this.prisma, claim)
+        return true
+      }
       throw error
     }
+  }
+
+  /**
+   * A human took control of the conversation (ADR-049 fence, Arc F): CAS `RUNNING` → terminal
+   * `CANCELLED` with `superseded_by_human`, writing **no** transcript turn. The stale bot run is
+   * abandoned so it can never author a message into a human-owned conversation.
+   */
+  finalizeSuperseded(tx: Prisma.TransactionClient, claim: ClaimedRun): Promise<boolean> {
+    return this.cas(tx, claim, {
+      status: AiRunStatus.CANCELLED,
+      finishedAt: new Date(),
+      errorCode: null,
+      terminalReasonCode: AiRunTerminalReason.SUPERSEDED_BY_HUMAN,
+      leaseToken: null,
+      leaseExpiresAt: null,
+    })
   }
 
   /**
@@ -412,16 +438,6 @@ export class AiRunRepository {
         },
       ],
     })
-  }
-
-  /** Row-lock the conversation so the refusal turn serializes against concurrent appends. */
-  private async lockConversation(
-    tx: Prisma.TransactionClient,
-    conversationId: string
-  ): Promise<void> {
-    await tx.$queryRaw(Prisma.sql`
-      SELECT id FROM "ai"."ai_conversations" WHERE id = ${conversationId} FOR UPDATE
-    `)
   }
 
   private async nextSequence(

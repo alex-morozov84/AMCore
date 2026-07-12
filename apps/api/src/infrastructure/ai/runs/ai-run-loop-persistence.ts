@@ -3,6 +3,7 @@ import { AiAuthorType, AiMessageRole, AiRunStepType, Prisma } from '@prisma/clie
 import type { AiTextResult } from '../gateway/ai-gateway.types'
 
 import type { ClaimedRun } from './ai-run-dispatch.types'
+import { lockAndAssertBotOwnership } from './ai-run-ownership-fence'
 import type { RunAttribution } from './ai-run-plan'
 
 /**
@@ -80,13 +81,18 @@ export async function writeUsageLedger(
   })
 }
 
-/** Persist the final assistant text turn, serialized against concurrent appends via a row lock. */
+/**
+ * Persist the final assistant text turn. The lock is the ownership fence (ADR-049, Arc F): it locks the
+ * conversation `FOR UPDATE` (serializing concurrent appends) AND throws `ConversationSupersededError`
+ * if a human took over since this run was queued — the whole success transaction then rolls back and
+ * the finalizer abandons the run superseded, so no stale bot turn lands in a human-owned conversation.
+ */
 export async function writeAssistantTurn(
   tx: Prisma.TransactionClient,
   claim: ClaimedRun,
   text: string
 ): Promise<void> {
-  await lockConversation(tx, claim.conversationId)
+  await lockAndAssertBotOwnership(tx, claim.conversationId, claim.ownershipGeneration)
   const sequence = await nextSequence(tx, claim.conversationId)
   await tx.aiMessage.create({
     data: {
@@ -98,16 +104,6 @@ export async function writeAssistantTurn(
       content: [{ type: 'text', text }] as unknown as Prisma.InputJsonValue,
     },
   })
-}
-
-/** Row-lock the conversation so concurrent transcript appends serialize (mirrors the producer). */
-async function lockConversation(
-  tx: Prisma.TransactionClient,
-  conversationId: string
-): Promise<void> {
-  await tx.$queryRaw(Prisma.sql`
-    SELECT id FROM "ai"."ai_conversations" WHERE id = ${conversationId} FOR UPDATE
-  `)
 }
 
 async function nextSequence(tx: Prisma.TransactionClient, conversationId: string): Promise<number> {

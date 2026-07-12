@@ -55,6 +55,12 @@ let AiRunsController: Token
 let AiConversationsController: Token
 let AiApprovalsController: Token
 let AiApprovalService: Token
+// AI human takeover / operator review (Track C — ADR-054, Arc F)
+let AiConversationControlController: Token
+let AiConversationControlService: Token
+let AiConversationOperatorService: Token
+let AiAssistantAdminController: Token
+let AiAssistantAdminService: Token
 
 const noopPinoLogger = {
   setContext: () => undefined,
@@ -142,6 +148,15 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       await import('../src/core/ai/conversations/ai-conversations.controller')
     const aiApprovalsController = await import('../src/core/ai/approvals/ai-approvals.controller')
     const aiApprovalService = await import('../src/core/ai/approvals/ai-approval.service')
+    const aiControlController =
+      await import('../src/core/ai/conversations/ai-conversation-control.controller')
+    const aiControlService =
+      await import('../src/core/ai/conversations/ai-conversation-control.service')
+    const aiOperatorService =
+      await import('../src/core/ai/conversations/ai-conversation-operator.service')
+    const aiAssistantAdminController =
+      await import('../src/core/ai/admin/ai-assistant-admin.controller')
+    const aiAssistantAdminService = await import('../src/core/ai/admin/ai-assistant-admin.service')
 
     AppModule = appModule.AppModule
     WebModule = webModule.WebModule
@@ -180,6 +195,11 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     AiConversationsController = aiConversationsController.AiConversationsController
     AiApprovalsController = aiApprovalsController.AiApprovalsController
     AiApprovalService = aiApprovalService.AiApprovalService
+    AiConversationControlController = aiControlController.AiConversationControlController
+    AiConversationControlService = aiControlService.AiConversationControlService
+    AiConversationOperatorService = aiOperatorService.AiConversationOperatorService
+    AiAssistantAdminController = aiAssistantAdminController.AiAssistantAdminController
+    AiAssistantAdminService = aiAssistantAdminService.AiAssistantAdminService
   })
 
   describe('web', () => {
@@ -230,6 +250,12 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, AiConversationsController)
       present(m, AiApprovalsController)
       present(m, AiApprovalService)
+      // Arc F: human takeover / operator review + assistant admin are web-only.
+      present(m, AiConversationControlController)
+      present(m, AiConversationControlService)
+      present(m, AiConversationOperatorService)
+      present(m, AiAssistantAdminController)
+      present(m, AiAssistantAdminService)
       present(m, AiRunStreamController)
       present(m, AiRunRealtimeHub)
       present(m, AiRunRealtimeSubscriber)
@@ -312,6 +338,12 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, AiConversationsController)
       absent(m, AiApprovalsController)
       absent(m, AiApprovalService)
+      // Arc F takeover/operator + assistant admin never enter the worker DI graph.
+      absent(m, AiConversationControlController)
+      absent(m, AiConversationControlService)
+      absent(m, AiConversationOperatorService)
+      absent(m, AiAssistantAdminController)
+      absent(m, AiAssistantAdminService)
       absent(m, AiRunStreamController)
       absent(m, AiRunRealtimeHub)
       absent(m, AiRunRealtimeSubscriber)
@@ -362,6 +394,9 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, AiConversationsController)
       present(m, AiApprovalsController)
       present(m, AiApprovalService)
+      present(m, AiConversationControlController)
+      present(m, AiConversationOperatorService)
+      present(m, AiAssistantAdminController)
       present(m, ModelGateway)
       present(m, AiProviderAdaptersToken)
       present(m, AiRunExecutorService)

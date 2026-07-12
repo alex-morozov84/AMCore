@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI capability layer — assistant registry admin + runtime application + human takeover / operator review
+  (Track C, Arc F). **Assistant registry admin** (`admin/ai/assistants`, SUPER_ADMIN, bearer-only):
+  create / publish an **immutable** version / in-place `enabled`+`displayName` patch (mutations are
+  step-up + audited), plus role-gated list (latest-per-slug) / get. **Runtime application** of the bound
+  assistant: the `enabled` kill-switch gates binding (`400`), run creation (producer `409`), and execution
+  (terminal `assistant_disabled`); the
+  `systemPrompt` becomes the trusted `system` instruction (the code-owned structural boundary policy is
+  always appended — the Arc D boundary is never weakened); `modelSelection` freezes the run model
+  credential-gated across `[modelSlug, ...fallback]`, and a pinned uncredentialed model fails run creation
+  `503 model_not_configured` (never a silent `mock` downgrade); `toolAllowlist` is unchanged from Arc E.
+  **Ownership fence activated (ADR-049):** each run freezes the conversation's `ownershipGeneration`; a
+  human takeover increments it, and the worker refuses to write once it moves — at preflight, a loop-top
+  early exit, and an authoritative in-tx fence on every durable write — terminalizing
+  `cancelled`/`superseded_by_human` with no stale transcript/step/terminal row. **Takeover / release /
+  transcript / operator-message** (bearer; owner or cross-user SUPER_ADMIN operator; API keys `401`;
+  not-visible `404`): take control also supersedes unleased bot runs + voids their pending approvals under
+  the shared approval-driven lock (a later decision is a `409` non-effect); an operator turn requires
+  currently holding control (`409` else) and is a `role=ASSISTANT` message authored `OPERATOR`
+  (cross-user) / `USER` (owner). The **owner may always reclaim/release their own conversation**; a
+  different SUPER_ADMIN on a held conversation gets `409`. A **cross-user operator** needs step-up
+  freshness (`403 STEP_UP_REQUIRED`) **and** a bounded reason/ticket ref on every action incl. the
+  transcript read (via the `x-amcore-operator-reason` header, not a query param). **Privacy posture
+  (accepted):** a SUPER_ADMIN can read a user's private AI transcript cross-user — gated by step-up + a
+  mandatory reason and **audited** (`ai.conversation.transcript_accessed`, fail-closed before serving);
+  owner reads are not audited. **Content-free everywhere:** message/prompt/reason text never enters
+  audit/logs/metrics — audits (`ai.conversation.taken_over`/`released`/`operator_message`/
+  `transcript_accessed`, `ai.assistant.*`, per-approval `ai.approval.expired`) carry only bounded
+  ids/codes; the operator reason (body + header) and message `content` are redacted in the Pino serializer
+  **and** the source-side `sanitizeHeaders()`; metrics
+  (`amcore_ai_conversation_control_total{action,actor_role,role}`, `amcore_ai_assistant_admin_total{action,role}`)
+  carry only bounded labels. New audit targets `AI_ASSISTANT`/`AI_CONVERSATION`; no new env var (cross-user
+  step-up reuses `STEP_UP_MAX_AGE_SECONDS`). No product bot ships; process-role split keeps the whole
+  surface web-only (worker owns only the fence).
 - AI capability layer — self-hosted tool loop + human-in-the-loop approvals (Track C, Arc E). Turns the
   Arc C single-shot executor into a **bounded, durable, worker-executed agent loop** over **code-owned
   tools**, gating SENSITIVE/DESTRUCTIVE calls behind a **durable human approval**. No product tools ship
@@ -127,7 +160,7 @@ EXECUTING` CAS is the sole gate for a non-SAFE tool) or feeds a fixed rejection 
   multimodal content-part contract. `db:seed` seeds the intended shape (enabled `mock` +
   Claude default + disabled OpenAI/OpenRouter/Yandex/OpenAI-compatible examples) so a fork
   sees it without live keys. The runtime gateway, durable run worker, guardrails, tool loop,
-  human takeover, and multimodal routing land in later arcs. See
+  and human takeover have since shipped in Arcs B–F; multimodal routing remains a later arc. See
   [`docs/ai/README.md`](docs/ai/README.md). Also fixes the Prisma 7 seed-client construction
   (driver adapter) so `db:seed` runs.
 
