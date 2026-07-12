@@ -13,10 +13,12 @@ consumers.
 > registry; Arc C wired the durable run worker and the run HTTP surface (bearer
 > conversation/run create/fetch/list/cancel plus a status-only SSE stream); Arc D added
 > the prompt-injection guardrail baseline — a structural trust boundary, input/output
-> guards, safe refusals, and an adversarial corpus gate; **Arc E adds the bounded self-hosted
-> tool loop + human-in-the-loop approvals** (code-owned tool registry, worker-only host-side
-> execution, durable `waiting_approval` park/resume, no product tools). Human takeover and
-> multimodal routing land in later arcs (F–G), each additive over what is documented here.
+> guards, safe refusals, and an adversarial corpus gate; Arc E added the bounded self-hosted
+> tool loop + human-in-the-loop approvals (code-owned tool registry, worker-only host-side
+> execution, durable `waiting_approval` park/resume, no product tools); **Arc F adds the
+> assistant registry admin surface, runtime application of the bound assistant, and human
+> takeover / operator review** (take/release control, transcript read, operator turns, the
+> activated ownership fence). Multimodal routing lands in Arc G, additive over what is here.
 > Sections marked _(later arc)_ describe the intended shape those arcs build toward.
 
 ## Design Principles
@@ -27,7 +29,7 @@ consumers.
 | **AMCore owns the control plane**                     | Postgres is authoritative for the catalog, conversations, runs, tool invocations, approvals, artifacts, and the usage ledger. Redis is admission/cache/realtime infrastructure; BullMQ is a wake path with worker-only Postgres-driven recovery (the durable-job pattern reused from the notification subsystem). |
 | **Model output is untrusted**                         | Output is never executed, sent externally, or treated as authority without schema validation, a tool allowlist, approval policy, and audit. Prompt text, user files, provider responses, API keys, and tool results are never written to logs/metrics/audit metadata unless explicitly redacted and allowlisted.  |
 | **Prompt-injection containment, not a silver bullet** | The design follows OWASP LLM01 defense-in-depth: a structural trust boundary between trusted instructions and untrusted user/tool/file content, output validation, least-privilege tools, and human-in-the-loop approval. It is mitigated and contained, **never claimed eliminated**.                            |
-| **Admin-manageable catalog**                          | Providers, models, policies, and assistant configs are DB-backed, admin-editable state. The engine-side admin contracts ship now; the admin UI is deferred to the frontend phase.                                                                                                                                 |
+| **Admin-manageable catalog**                          | Providers, models, policies, and assistant configs are DB-backed control-plane state. Arc F ships the assistant-registry admin surface; provider/model/policy catalog admin is deliberately deferred. The admin UI is deferred to the frontend phase.                                                             |
 
 ## Persistence (shipped — Arc A)
 
@@ -69,8 +71,8 @@ source of truth for both API and (future) web:
 - **Wire enums** — the lowercase projection of every lifecycle enum (run status,
   conversation state/control, message role, author type, tool risk/status,
   approval, artifact kind/trust); the API never leaks `SCREAMING_CASE` DB tokens.
-- **Catalog** — provider/model/policy/assistant read projections + admin
-  create/update inputs (the engine-side of the admin catalog).
+- **Catalog** — provider/model/policy/assistant read projections and bounded admin input shapes. Arc F
+  exposes the assistant-registry admin endpoints; provider/model/policy admin remains deferred.
 - **Runs** — the **multimodal content-part contract** (`text` | `artifact_ref`,
   additive), conversation/message/run/artifact read projections, the minimal
   run-creation request, and the usage summary.
@@ -311,7 +313,8 @@ RUNNING ─(non-SAFE call)─▶ WAITING_APPROVAL ─approve─▶ QUEUED → re
 ```
 
 - **Approval states:** `PENDING → APPROVED | REJECTED | EXPIRED`. v1 approver = the conversation **owner
-  only** (operator approval → Arc F). A repeat of the same decision is idempotent; a conflicting one is
+  only**. Arc F operator review can take over a conversation and void waiting approvals, but it does not
+  grant cross-user approval decisions. A repeat of the same decision is idempotent; a conflicting one is
   `409`; a **stale** approval (TTL/deadline already elapsed) is inline-expired to `409` — never re-queued.
 - **Expiry** is a worker-only `@Cron` sweep (`FOR UPDATE SKIP LOCKED`, DB-owned, not Redis-locked) that
   shares the decision path's expiry state machine: the run's own deadline → `EXPIRED` (`deadline_exceeded`),
@@ -353,6 +356,147 @@ and the `amcore_ai_tool_loop_steps` histogram — bounded labels only.
 | `AI_TOOL_EXECUTION_TIMEOUT_MS` | per-tool host-side execution bound in ms (default `15000`)                                                                            |
 | `AI_APPROVAL_TTL_MS`           | how long a run may sit parked in `waiting_approval` before its approval expires (default 24h; the run's own deadline wins if tighter) |
 
+## Assistant Registry + Human Takeover / Operator Review (shipped — Arc F)
+
+Arc F makes the `AiAssistant` catalog real runtime config and adds the human takeover / operator-review
+surface. Every state-changing mutation and every cross-user transcript read is content-free-audited and
+bearer-only; no product bot ships.
+
+### Assistant registry admin (web, SUPER_ADMIN)
+
+A DB-backed, versioned assistant config store under `admin/ai/assistants` — SUPER_ADMIN only, bearer-only,
+step-up (`@RequireFreshAuth`) on every mutation, rate-limited, and audited (`ai.assistant.*`).
+
+| Method + path                              | Purpose                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------- |
+| `GET /admin/ai/assistants`                 | List (paged; latest-per-slug by default, `?slug=`, `?version=all`). |
+| `GET /admin/ai/assistants/:id`             | Fetch one version.                                                  |
+| `POST /admin/ai/assistants`                | Create a new slug (version 1).                                      |
+| `POST /admin/ai/assistants/:slug/versions` | Publish a new **immutable** version.                                |
+| `PATCH /admin/ai/assistants/:id`           | In-place update of `enabled` / `displayName` **only**.              |
+
+- **Versions are immutable.** A behavioral change (`systemPrompt` / `modelSelection` / `toolAllowlist` /
+  modalities) publishes a new `(slug, version)` row; an in-place `PATCH` touches only the operational
+  kill-switch `enabled` and `displayName`. A conversation binds a resolved version, so a later bump can
+  never retro-change an in-flight conversation.
+- **Content-free.** The `systemPrompt` is trusted admin text; it is never written to audit/logs/metrics.
+
+### Runtime assistant application
+
+When a conversation is bound to an assistant, the run engine applies its config:
+
+- **`enabled` kill-switch** — a disabled assistant cannot be bound to a new conversation (`400`), cannot
+  drive a new run (producer `409`), and a disable that races an already-queued run fails it terminally at
+  execution (`assistant_disabled`).
+- **`systemPrompt`** becomes the trusted `system`-channel instruction (replacing the code-owned default
+  persona). The **structural boundary policy is always appended** — a per-assistant prompt never weakens
+  the Arc D trust boundary; untrusted user/tool text stays in the salted container.
+- **`modelSelection`** resolves the run's frozen model snapshot, **credential-gated** across
+  `[modelSlug, ...fallback]`: the first enabled + credentialed candidate wins. A pinned uncredentialed
+  model **fails run creation** (`503 model_not_configured`) — it never silently downgrades to `mock`
+  (mock fallback applies only to the unpinned/default path).
+- **`toolAllowlist`** is unchanged from Arc E (intersected with the code-owned registry).
+
+### Conversation ownership fence (ADR-049, activated)
+
+`AiConversation` carries `controlledBy: BOT|HUMAN`, `state: ACTIVE|PAUSED_FOR_HUMAN|CLOSED`, a monotonic
+`ownershipGeneration`, and the current `humanControlUserId` holder. Each run freezes the generation it was
+created under; a human takeover increments it. The worker refuses to write into a conversation once the
+generation moves — at preflight (before any provider I/O), a cheap loop-top early-exit, and an
+**authoritative in-tx fence** on every durable write (assistant turn, refusal, approval park, tool-result
+commit). A fenced run terminalizes `cancelled` / `superseded_by_human` with **no stale transcript, step,
+or terminal-progress row**. (A tool already dispatched is at-least-once by nature — its external effect
+cannot be un-executed — but no durable result/step is committed.)
+
+### Takeover / release / transcript / operator-message (web, bearer)
+
+Access is the conversation **owner** OR a cross-user **SUPER_ADMIN operator**; a missing or not-visible
+conversation is a `404` (no existence leak). API keys are rejected (`@Auth(Bearer)` → `401`).
+
+| Method + path                         | Purpose                                                           |
+| ------------------------------------- | ----------------------------------------------------------------- |
+| `POST /ai/conversations/:id/takeover` | Seize human control → `HUMAN`/`PAUSED_FOR_HUMAN`, generation++.   |
+| `POST /ai/conversations/:id/release`  | Hand control back → `BOT`/`ACTIVE`, holder cleared, generation++. |
+| `GET /ai/conversations/:id/messages`  | Keyset transcript (by `sequence`, oldest first).                  |
+| `POST /ai/conversations/:id/messages` | Post a human turn while holding control.                          |
+
+- **Take control** also supersedes the conversation's unleased (`QUEUED` / `WAITING_APPROVAL`) bot runs in
+  the same transaction and voids their `PENDING` approvals (→ `EXPIRED`) + `AWAITING_APPROVAL` invocations
+  (→ `SKIPPED`), under the same approval-driven lock the decide/cancel/expiry paths use (deadlock-safe). A
+  later approval decision on a voided gate is a `409` non-effect. Leased `RUNNING` runs are left to the
+  worker fence.
+- **Operator message** requires the actor to **currently hold control** (`409` otherwise). The turn is a
+  `role=ASSISTANT` message authored by the human — `authorType=OPERATOR` for a cross-user operator,
+  `USER` for the owner (the human occupies the assistant seat during takeover; `authorType` preserves who
+  wrote it). It cannot bypass the ownership/fence semantics: it writes under the conversation lock only
+  while a human holds control, so no bot run can race it.
+- **Holder rules.** The **owner may always take / reclaim / release their own conversation** (even from a
+  SUPER_ADMIN holder — a user is never locked out of their own data). A **different** SUPER_ADMIN taking a
+  conversation another human already holds gets `409` (no operator↔operator re-takeover until an
+  assignment model exists); the same holder re-taking is an idempotent no-op.
+
+### Cross-user operator: step-up, bounded reason, and the privacy posture
+
+A **cross-user SUPER_ADMIN operator** (acting on a conversation they do not own) additionally requires,
+for **every** action — takeover, release, operator message, **and transcript read**:
+
+- **step-up freshness** (ADR-037): a stale session is `403 STEP_UP_REQUIRED` **before** any mutation;
+- a **bounded `reason` / ticket ref** — required, validated against a control-char-free grammar aligned
+  with the audit sanitizer (a reason that validates always survives into the audit). On the transcript
+  read it is supplied via the **`x-amcore-operator-reason` header** (never a query param — that would leak
+  into access-log URLs); on the write actions it is the request body `reason`.
+
+**Privacy posture (accepted, deliberate).** A SUPER_ADMIN operator **can read a user's private AI
+transcript** cross-user. This is privileged support access, gated by step-up + a mandatory reason, and
+**every cross-user transcript read is itself audited** (`ai.conversation.transcript_accessed`) — the
+transcript is not served until that audit is written (fail-closed accountability). An owner reading their
+own transcript is not audited. Operator self-service against another user's data is intentionally
+constrained: there is no operator role, queue, or org-shared inbox in this arc.
+
+### Content-free audit / log / metrics guarantees
+
+The transcript/operator content is stored (that is the conversation) and returned to the authorized
+reader (that is the review), but **never** appears in audit metadata, logs, or metrics:
+
+- **Audit** (security evidence): `ai.conversation.taken_over` / `released` / `operator_message` and
+  `ai.assistant.*` carry only bounded ids/codes (generation transition, control, actor role, counts,
+  `authorType`, `messageId`, and the bounded `reasonRef`) — never message/prompt text, tool args/results,
+  or free-form reason. The **state-changing** events are written **in-tx** with the change they record;
+  the transcript-read event `ai.conversation.transcript_accessed` is a **read event**, so it is written
+  **fail-closed — awaited before the transcript is served**, not in a transaction with a mutation. Approval
+  voids are audited per-approval (`ai.approval.expired`, `reasonCode=superseded_by_human`) plus the
+  aggregate takeover event.
+- **Logs**: the operator `reason` (body + the `x-amcore-operator-reason` header) and the operator-message
+  `content` are redacted in the Pino serializer **and** the source-side `sanitizeHeaders()` (the 500-path
+  exception filter), so they never reach access/error logs.
+- **Metrics**: `amcore_ai_conversation_control_total{action,actor_role,role}` and
+  `amcore_ai_assistant_admin_total{action,role}` carry only bounded operational labels (`role` is the
+  emitting process role) — no conversation/user id, slug, model, or reason.
+
+### API examples
+
+```bash
+# Admin: create + publish an assistant version, then enable it (SUPER_ADMIN, step-up required on writes)
+curl -X POST /admin/ai/assistants -H 'Authorization: Bearer <admin-jwt>' -H 'Content-Type: application/json' \
+  -d '{"slug":"support","displayName":"Support","systemPrompt":"You are ...","modelSelection":{"modelSlug":"claude-default","fallback":[]}}'
+curl -X PATCH /admin/ai/assistants/<id> -H 'Authorization: Bearer <admin-jwt>' -H 'Content-Type: application/json' \
+  -d '{"enabled":true}'
+
+# Owner: take control of their own conversation, post a human turn, release (no reason/step-up needed)
+curl -X POST /ai/conversations/<id>/takeover -H 'Authorization: Bearer <owner-jwt>' -H 'Content-Type: application/json' \
+  -d '{}'
+curl -X POST /ai/conversations/<id>/messages -H 'Authorization: Bearer <owner-jwt>' -H 'Content-Type: application/json' \
+  -d '{"content":[{"type":"text","text":"Let me help with that."}]}'
+curl -X POST /ai/conversations/<id>/release -H 'Authorization: Bearer <owner-jwt>' -H 'Content-Type: application/json' \
+  -d '{}'
+
+# Cross-user operator: step-up + a bounded reason are REQUIRED; the transcript reason is a header
+curl -X POST /ai/conversations/<id>/takeover -H 'Authorization: Bearer <fresh-admin-jwt>' -H 'Content-Type: application/json' \
+  -d '{"reason":"SUPPORT-1234"}'
+curl -G /ai/conversations/<id>/messages -H 'Authorization: Bearer <fresh-admin-jwt>' \
+  -H 'x-amcore-operator-reason: SUPPORT-1234'
+```
+
 ## Seeded Catalog
 
 `pnpm --filter api db:seed` (idempotent) seeds the intended configuration shape so
@@ -367,10 +511,13 @@ a fresh fork sees it without live keys:
 
 ## Coming in Later Arcs
 
-| Arc | Adds _(later arc)_                                                                                       |
-| --- | -------------------------------------------------------------------------------------------------------- |
-| F   | Assistant registry admin contract + human takeover / operator review (transcript, take/release control). |
-| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing.            |
+| Arc | Adds _(later arc)_                                                                            |
+| --- | --------------------------------------------------------------------------------------------- |
+| G   | Multimodal foundation: storage-backed file/image/PDF artifacts with capability-gated routing. |
+
+Deferred, additive when triggered (each its own plan): a provider/model/policy catalog admin surface, an
+operator role / assignment / org-shared support inbox, bot-initiated handoff (`WAITING_HUMAN` /
+`AiApprovalKind.HANDOFF`), a web-side realtime control console, and per-assistant guardrail policy.
 
 ## See Also
 
