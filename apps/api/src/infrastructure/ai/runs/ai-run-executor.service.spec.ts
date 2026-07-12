@@ -10,6 +10,7 @@ import type { RunPlan } from './ai-run-plan'
 
 import type { EnvService } from '@/env/env.service'
 import type { MetricsService } from '@/infrastructure/observability'
+import { StorageObjectNotFoundError } from '@/infrastructure/storage'
 import type { PrismaService } from '@/prisma'
 
 /**
@@ -41,8 +42,9 @@ describe('AiRunExecutorService', () => {
   let repository: DeepMockProxy<AiRunRepository>
   let loop: { run: jest.Mock }
   let publisher: { publish: jest.Mock }
+  let storage: { download: jest.Mock }
   let env: { get: jest.Mock }
-  let metrics: { incAiGuardrailCheck: jest.Mock }
+  let metrics: { incAiGuardrailCheck: jest.Mock; incAiArtifactResolution: jest.Mock }
   let executor: AiRunExecutorService
 
   const logger = { setContext: jest.fn(), warn: jest.fn(), error: jest.fn() }
@@ -65,13 +67,15 @@ describe('AiRunExecutorService', () => {
     repository = mockDeep<AiRunRepository>()
     loop = { run: jest.fn().mockResolvedValue(undefined) }
     publisher = { publish: jest.fn().mockResolvedValue(undefined) }
+    storage = { download: jest.fn() }
     env = { get: jest.fn() }
-    metrics = { incAiGuardrailCheck: jest.fn() }
+    metrics = { incAiGuardrailCheck: jest.fn(), incAiArtifactResolution: jest.fn() }
     executor = new AiRunExecutorService(
       prisma,
       repository,
       loop as unknown as AiRunLoopExecutor,
       publisher as unknown as AiRunRealtimePublisher,
+      storage as never,
       env as unknown as EnvService,
       metrics as unknown as MetricsService,
       logger as never
@@ -155,6 +159,151 @@ describe('AiRunExecutorService', () => {
       expect(prisma.aiMessage.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { runId: 'run-1', role: 'USER' } })
       )
+    })
+  })
+
+  describe('artifact resolution (Arc G)', () => {
+    const MULTIMODAL_SNAPSHOT = {
+      modelSlug: 'claude-default',
+      capabilities: { vision: true, pdf: true },
+    }
+
+    function artifactRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+      return {
+        id: 'art-1',
+        kind: 'IMAGE',
+        contentType: 'image/png',
+        storageKey: 'ai-artifacts/conv-1/art-1/original',
+        ...overrides,
+      }
+    }
+
+    it('resolves an artifact-only turn (no text) into a multimodal user message', async () => {
+      prisma.aiMessage.findFirst.mockResolvedValue({
+        content: [{ type: 'artifact_ref', artifactId: 'art-1' }],
+      } as never)
+      prisma.aiArtifact.findMany.mockResolvedValue([artifactRow()] as never)
+      const bytes = Buffer.from('fake-png-bytes')
+      storage.download.mockResolvedValue(bytes)
+
+      await executor.execute(claim({ modelSnapshot: MULTIMODAL_SNAPSHOT }))
+
+      expect(loop.run).toHaveBeenCalledTimes(1)
+      const content = (lastPlan().userMessages[0] as { content: unknown }).content as Array<
+        Record<string, unknown>
+      >
+      expect(content[0]).toMatchObject({ type: 'text' })
+      expect((content[0] as { text: string }).text).toContain('amcore:user-data-')
+      expect(content[1]).toEqual({ type: 'image', data: bytes, mediaType: 'image/png' })
+      expect(prisma.aiArtifact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: { in: ['art-1'] }, runId: 'run-1' } })
+      )
+      expect(storage.download).toHaveBeenCalledWith('ai-artifacts/conv-1/art-1/original')
+      expect(metrics.incAiArtifactResolution).toHaveBeenCalledWith('success')
+    })
+
+    it('appends a PDF artifact alongside text as sibling parts, never inside the wrapped text', async () => {
+      prisma.aiMessage.findFirst.mockResolvedValue({
+        content: [
+          { type: 'text', text: 'summarize this' },
+          { type: 'artifact_ref', artifactId: 'art-2' },
+        ],
+      } as never)
+      prisma.aiArtifact.findMany.mockResolvedValue([
+        artifactRow({ id: 'art-2', kind: 'PDF', contentType: 'application/pdf' }),
+      ] as never)
+      const bytes = Buffer.from('fake-pdf-bytes')
+      storage.download.mockResolvedValue(bytes)
+
+      await executor.execute(claim({ modelSnapshot: MULTIMODAL_SNAPSHOT }))
+
+      const content = (lastPlan().userMessages[0] as { content: unknown }).content as Array<
+        Record<string, unknown>
+      >
+      expect((content[0] as { text: string }).text).toContain(
+        JSON.stringify({ text: 'summarize this' })
+      )
+      expect(content[1]).toEqual({ type: 'file', data: bytes, mediaType: 'application/pdf' })
+      // The artifact bytes never leak into the trusted system channel.
+      expect(lastPlan().system).not.toContain('fake-pdf-bytes')
+    })
+
+    it('fails artifact_unavailable (not_found) when the referenced row is missing', async () => {
+      prisma.aiMessage.findFirst.mockResolvedValue({
+        content: [{ type: 'artifact_ref', artifactId: 'ghost' }],
+      } as never)
+      prisma.aiArtifact.findMany.mockResolvedValue([] as never)
+
+      await executor.execute(claim({ modelSnapshot: MULTIMODAL_SNAPSHOT }))
+
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(storage.download).not.toHaveBeenCalled()
+      expect(metrics.incAiArtifactResolution).toHaveBeenCalledWith('not_found')
+      expect(repository.finalizeFailed).toHaveBeenCalledWith(
+        prisma,
+        expect.anything(),
+        'artifact_unavailable'
+      )
+    })
+
+    it('fails artifact_unavailable (capability_unsupported) when the frozen snapshot lacks the capability (worker backstop)', async () => {
+      prisma.aiMessage.findFirst.mockResolvedValue({
+        content: [{ type: 'artifact_ref', artifactId: 'art-1' }],
+      } as never)
+      prisma.aiArtifact.findMany.mockResolvedValue([artifactRow()] as never)
+
+      // No `vision`/`pdf` in the snapshot — this should never happen in practice (the producer
+      // already gated it), but the worker must still fail closed, not call the provider.
+      await executor.execute(claim({ modelSnapshot: { modelSlug: 'claude-default' } }))
+
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(storage.download).not.toHaveBeenCalled()
+      expect(metrics.incAiArtifactResolution).toHaveBeenCalledWith('capability_unsupported')
+      expect(repository.finalizeFailed).toHaveBeenCalledWith(
+        prisma,
+        expect.anything(),
+        'artifact_unavailable'
+      )
+    })
+
+    it('fails TERMINALLY (artifact_unavailable) when the object is genuinely missing (StorageObjectNotFoundError)', async () => {
+      prisma.aiMessage.findFirst.mockResolvedValue({
+        content: [{ type: 'artifact_ref', artifactId: 'art-1' }],
+      } as never)
+      prisma.aiArtifact.findMany.mockResolvedValue([artifactRow()] as never)
+      storage.download.mockRejectedValue(
+        new StorageObjectNotFoundError('ai-artifacts/conv-1/art-1/original')
+      )
+
+      await executor.execute(claim({ modelSnapshot: MULTIMODAL_SNAPSHOT }))
+
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(metrics.incAiArtifactResolution).toHaveBeenCalledWith('storage_error')
+      expect(repository.finalizeFailed).toHaveBeenCalledWith(
+        prisma,
+        expect.anything(),
+        'artifact_unavailable'
+      )
+      expect(repository.finalizeRetry).not.toHaveBeenCalled()
+    })
+
+    it('schedules a RETRY (not a terminal failure) on a generic/transient storage error', async () => {
+      prisma.aiMessage.findFirst.mockResolvedValue({
+        content: [{ type: 'artifact_ref', artifactId: 'art-1' }],
+      } as never)
+      prisma.aiArtifact.findMany.mockResolvedValue([artifactRow()] as never)
+      storage.download.mockRejectedValue(new Error('ECONNRESET'))
+
+      await executor.execute(claim({ modelSnapshot: MULTIMODAL_SNAPSHOT }))
+
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(metrics.incAiArtifactResolution).toHaveBeenCalledWith('storage_error')
+      expect(repository.finalizeRetry).toHaveBeenCalledWith(
+        prisma,
+        expect.anything(),
+        'artifact_unavailable'
+      )
+      expect(repository.finalizeFailed).not.toHaveBeenCalled()
     })
   })
 
@@ -269,17 +418,11 @@ describe('AiRunExecutorService', () => {
       )
     })
 
-    it('permanently fails when the input turn has no text part', async () => {
-      prisma.aiMessage.findFirst.mockResolvedValue({
-        content: [{ type: 'artifact_ref', artifactId: 'a1' }],
-      } as never)
+    it('permanently fails when the input turn has neither text nor an artifact_ref part', async () => {
+      prisma.aiMessage.findFirst.mockResolvedValue({ content: [] } as never)
       await executor.execute(claim())
       expect(loop.run).not.toHaveBeenCalled()
-      expect(repository.finalizeFailed).toHaveBeenCalledWith(
-        prisma,
-        expect.anything(),
-        'no_input_text'
-      )
+      expect(repository.finalizeFailed).toHaveBeenCalledWith(prisma, expect.anything(), 'no_input')
     })
 
     it('fails a run whose bound assistant was disabled after it was queued (Arc F.4 kill-switch)', async () => {

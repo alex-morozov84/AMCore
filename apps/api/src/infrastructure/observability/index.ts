@@ -3,6 +3,7 @@ export type {
   AiMetricsApprovalKind,
   AiMetricsApprovalState,
   AiMetricsArtifactKind,
+  AiMetricsArtifactResolutionResult,
   AiMetricsArtifactUploadResult,
   AiMetricsAssistantAdminAction,
   AiMetricsControlAction,

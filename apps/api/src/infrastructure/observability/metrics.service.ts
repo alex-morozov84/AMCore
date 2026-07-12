@@ -93,6 +93,12 @@ export type AiMetricsControlActorRole = 'owner' | 'operator'
 /** The only two `AiArtifactKind`s Arc G builds (Track C — ADR-054). */
 export type AiMetricsArtifactKind = 'image' | 'pdf'
 export type AiMetricsArtifactUploadResult = 'success' | 'rejected'
+/** Worker-side artifact byte-resolution outcome (Arc G), a distinct I/O surface from upload. */
+export type AiMetricsArtifactResolutionResult =
+  | 'success'
+  | 'not_found'
+  | 'capability_unsupported'
+  | 'storage_error'
 
 /**
  * Defensive bound on the `tool_id` metric label — mirrors the code-owned tool-id grammar (Arc E).
@@ -174,6 +180,7 @@ export class MetricsService implements OnModuleDestroy {
   private readonly aiAssistantAdminTotal: Counter<'action' | 'role'>
   private readonly aiConversationControlTotal: Counter<'action' | 'actor_role' | 'role'>
   private readonly aiArtifactUploadsTotal: Counter<'kind' | 'result' | 'role'>
+  private readonly aiArtifactResolutionTotal: Counter<'result' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -343,6 +350,13 @@ export class MetricsService implements OnModuleDestroy {
       help: 'Total AI artifact upload attempts by bounded kind and result (+ process role). No conversation/artifact/user id, filename, or content type is ever a label.',
       labelNames: ['kind', 'result', 'role'],
     })
+    this.aiArtifactResolutionTotal = this.getOrCreateCounter(
+      METRIC_NAMES.aiArtifactResolutionTotal,
+      {
+        help: 'Total AI artifact byte-resolution attempts by bounded result (+ process role). No conversation/artifact/user id, storage key, or content type is ever a label.',
+        labelNames: ['result', 'role'],
+      }
+    )
   }
 
   get enabled(): boolean {
@@ -526,6 +540,16 @@ export class MetricsService implements OnModuleDestroy {
   incAiArtifactUpload(kind: AiMetricsArtifactKind, result: AiMetricsArtifactUploadResult): void {
     if (!this.enabled) return
     this.aiArtifactUploadsTotal.inc({ kind, result, role: this.role })
+  }
+
+  /**
+   * Count one worker-side AI artifact byte-resolution attempt (Arc G), labelled only by the
+   * bounded `result` (+ process role). Never a conversation/artifact/user id, storage key, or
+   * content type.
+   */
+  incAiArtifactResolution(result: AiMetricsArtifactResolutionResult): void {
+    if (!this.enabled) return
+    this.aiArtifactResolutionTotal.inc({ result, role: this.role })
   }
 
   /**
