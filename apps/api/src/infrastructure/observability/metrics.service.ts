@@ -90,6 +90,9 @@ export type AiMetricsAssistantAdminAction =
   | 'disabled'
 export type AiMetricsControlAction = 'taken_over' | 'released' | 'operator_message'
 export type AiMetricsControlActorRole = 'owner' | 'operator'
+/** The only two `AiArtifactKind`s Arc G builds (Track C — ADR-054). */
+export type AiMetricsArtifactKind = 'image' | 'pdf'
+export type AiMetricsArtifactUploadResult = 'success' | 'rejected'
 
 /**
  * Defensive bound on the `tool_id` metric label — mirrors the code-owned tool-id grammar (Arc E).
@@ -170,6 +173,7 @@ export class MetricsService implements OnModuleDestroy {
   private readonly aiToolLoopSteps: Histogram<'outcome' | 'role'>
   private readonly aiAssistantAdminTotal: Counter<'action' | 'role'>
   private readonly aiConversationControlTotal: Counter<'action' | 'actor_role' | 'role'>
+  private readonly aiArtifactUploadsTotal: Counter<'kind' | 'result' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -335,6 +339,10 @@ export class MetricsService implements OnModuleDestroy {
         labelNames: ['action', 'actor_role', 'role'],
       }
     )
+    this.aiArtifactUploadsTotal = this.getOrCreateCounter(METRIC_NAMES.aiArtifactUploadsTotal, {
+      help: 'Total AI artifact upload attempts by bounded kind and result (+ process role). No conversation/artifact/user id, filename, or content type is ever a label.',
+      labelNames: ['kind', 'result', 'role'],
+    })
   }
 
   get enabled(): boolean {
@@ -508,6 +516,16 @@ export class MetricsService implements OnModuleDestroy {
   ): void {
     if (!this.enabled) return
     this.aiConversationControlTotal.inc({ action, actor_role: actorRole, role: this.role })
+  }
+
+  /**
+   * Count one AI artifact upload attempt (Arc G), labelled only by the bounded `kind` (`image`|
+   * `pdf`) + `result` (+ process role). Never a conversation/artifact/user id, filename, or
+   * content type — those are unbounded/sensitive and would explode cardinality or leak content.
+   */
+  incAiArtifactUpload(kind: AiMetricsArtifactKind, result: AiMetricsArtifactUploadResult): void {
+    if (!this.enabled) return
+    this.aiArtifactUploadsTotal.inc({ kind, result, role: this.role })
   }
 
   /**

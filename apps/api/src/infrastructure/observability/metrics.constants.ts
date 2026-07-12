@@ -34,4 +34,5 @@ export const METRIC_NAMES = {
   aiToolLoopSteps: 'amcore_ai_tool_loop_steps',
   aiAssistantAdminTotal: 'amcore_ai_assistant_admin_total',
   aiConversationControlTotal: 'amcore_ai_conversation_control_total',
+  aiArtifactUploadsTotal: 'amcore_ai_artifact_uploads_total',
 } as const

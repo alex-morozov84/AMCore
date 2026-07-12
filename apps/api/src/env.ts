@@ -308,6 +308,22 @@ const envSchema = z.preprocess(
         .min(60_000)
         .max(2_592_000_000)
         .default(86_400_000),
+      // Arc G artifact upload size ceilings (raw bytes, before base64 encoding). Defaults match the
+      // existing IMAGE_VALIDATION/DOCUMENT_VALIDATION presets; bounded so a typo can neither starve
+      // real uploads nor exceed verified provider per-request payload limits (Anthropic: 10 MB
+      // base64/image, ~32 MB total request).
+      AI_ARTIFACT_MAX_IMAGE_BYTES: z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(20_971_520)
+        .default(5_242_880),
+      AI_ARTIFACT_MAX_DOCUMENT_BYTES: z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(33_554_432)
+        .default(10_485_760),
     })
     .transform((env) => {
       // Locked invariant (Decision C): dev -> local, test -> memory,

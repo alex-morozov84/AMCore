@@ -1,6 +1,7 @@
-import type { AiConversation, AiMessage, AiRun } from '@prisma/client'
+import type { AiArtifact, AiConversation, AiMessage, AiRun } from '@prisma/client'
 
 import type {
+  AiArtifactResponse,
   AiConversationControlValue,
   AiConversationResponse,
   AiConversationStateValue,
@@ -51,6 +52,21 @@ export function toAiMessageResponse(message: AiMessage): AiMessageResponse {
     authorType: message.authorType.toLowerCase() as AiMessageResponse['authorType'],
     content: message.content as unknown as AiMessageContent,
     createdAt: message.createdAt.toISOString(),
+  }
+}
+
+/**
+ * DB → wire projection for a multimodal artifact (Track C — ADR-054, Arc G). `storageKey`/`hash`
+ * never leave the server — the response is the Arc A `aiArtifactResponseSchema` shape, unchanged.
+ */
+export function toAiArtifactResponse(artifact: AiArtifact): AiArtifactResponse {
+  return {
+    id: artifact.id,
+    kind: artifact.kind.toLowerCase() as AiArtifactResponse['kind'],
+    contentType: artifact.contentType,
+    sizeBytes: artifact.sizeBytes,
+    trustLevel: artifact.trustLevel.toLowerCase() as AiArtifactResponse['trustLevel'],
+    createdAt: artifact.createdAt.toISOString(),
   }
 }
 

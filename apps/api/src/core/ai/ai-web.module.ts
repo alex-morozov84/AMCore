@@ -4,6 +4,8 @@ import { AiAssistantAdminController } from './admin/ai-assistant-admin.controlle
 import { AiAssistantAdminService } from './admin/ai-assistant-admin.service'
 import { AiApprovalService } from './approvals/ai-approval.service'
 import { AiApprovalsController } from './approvals/ai-approvals.controller'
+import { AiArtifactUploadService } from './artifacts/ai-artifact-upload.service'
+import { AiArtifactsController } from './artifacts/ai-artifacts.controller'
 import { AiConversationService } from './conversations/ai-conversation.service'
 import { AiConversationControlController } from './conversations/ai-conversation-control.controller'
 import { AiConversationControlService } from './conversations/ai-conversation-control.service'
@@ -44,6 +46,7 @@ import { PrismaModule } from '@/prisma'
     AiRunStreamController,
     AiApprovalsController,
     AiAssistantAdminController,
+    AiArtifactsController,
   ],
   providers: [
     AiConversationService,
@@ -55,6 +58,7 @@ import { PrismaModule } from '@/prisma'
     AiAssistantAdminService,
     AiRunRealtimeHub,
     AiRunRealtimeSubscriber,
+    AiArtifactUploadService,
   ],
 })
 export class AiWebModule {}
