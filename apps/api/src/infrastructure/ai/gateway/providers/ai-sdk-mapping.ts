@@ -1,9 +1,12 @@
 import type { AiProviderType } from '@prisma/client'
 import {
   APICallError,
+  type FilePart,
+  type ImagePart,
   type LanguageModelUsage,
   type ModelMessage,
   NoObjectGeneratedError,
+  type TextPart,
   tool,
   type ToolSet,
   TypeValidationError,
@@ -18,6 +21,7 @@ import type {
   AiTextResult,
   AiToolCall,
   AiUsage,
+  AiUserContentPart,
 } from '../ai-gateway.types'
 
 /**
@@ -86,13 +90,23 @@ export function mapTextResult(
 
 /**
  * Convert AMCore's provider-agnostic turns into SDK `ModelMessage`s. A user/assistant text turn maps
- * to a plain message; an assistant tool-call turn maps to `tool-call` content parts; a tool-result
- * turn maps to a `tool` message with `tool-result` parts whose text output is sent as
- * `{ type: 'text' }`. This is the only place tool turns take SDK shape — kept neutral across providers.
+ * to a plain message; a multimodal user turn (Arc G) maps its parts 1:1 to the SDK's neutral
+ * `TextPart | ImagePart | FilePart` array; an assistant tool-call turn maps to `tool-call` content
+ * parts; a tool-result turn maps to a `tool` message with `tool-result` parts whose text output is
+ * sent as `{ type: 'text' }`. This is the only place tool/multimodal turns take SDK shape — kept
+ * neutral across providers.
  */
 export function toModelMessages(messages: AiGenerateMessage[]): ModelMessage[] {
   return messages.map((message): ModelMessage => {
-    if (message.role === 'user') return { role: 'user', content: message.content }
+    if (message.role === 'user') {
+      return {
+        role: 'user',
+        content:
+          typeof message.content === 'string'
+            ? message.content
+            : message.content.map(toSdkUserPart),
+      }
+    }
     if (message.role === 'tool') {
       return {
         role: 'tool',
@@ -117,6 +131,17 @@ export function toModelMessages(messages: AiGenerateMessage[]): ModelMessage[] {
     }
     return { role: 'assistant', content: message.content }
   })
+}
+
+/**
+ * Map one Arc G multimodal content part to the SDK's neutral `TextPart | ImagePart | FilePart`.
+ * `image`/`file` data is always the worker-resolved `Buffer` (never a URL) — see
+ * `AiUserContentPart`.
+ */
+function toSdkUserPart(part: AiUserContentPart): TextPart | ImagePart | FilePart {
+  if (part.type === 'text') return { type: 'text', text: part.text }
+  if (part.type === 'image') return { type: 'image', image: part.data, mediaType: part.mediaType }
+  return { type: 'file', data: part.data, mediaType: part.mediaType, filename: part.filename }
 }
 
 /**

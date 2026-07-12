@@ -183,6 +183,61 @@ describe('ModelGateway.generateText', () => {
       /Duplicate AI provider adapter/
     )
   })
+
+  it('rejects a multimodal user turn when the model lacks vision (central capability gate)', async () => {
+    const gateway = makeGateway({
+      resolveDefaultModel: jest.fn(async () => model({ capabilities: { text: true } })),
+      hasCredential: () => true,
+    })
+    await expect(
+      gateway.generateText({
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'image', data: Buffer.from('x'), mediaType: 'image/png' }],
+          },
+        ],
+      })
+    ).rejects.toMatchObject({ code: 'capability_unsupported' })
+  })
+
+  it('rejects a multimodal user turn when the model lacks pdf (central capability gate)', async () => {
+    const gateway = makeGateway({
+      resolveDefaultModel: jest.fn(async () => model({ capabilities: { text: true } })),
+      hasCredential: () => true,
+    })
+    await expect(
+      gateway.generateText({
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'file', data: Buffer.from('x'), mediaType: 'application/pdf' }],
+          },
+        ],
+      })
+    ).rejects.toMatchObject({ code: 'capability_unsupported' })
+  })
+
+  it('dispatches a multimodal user turn when the model declares the required capability', async () => {
+    const gateway = makeGateway({
+      resolveDefaultModel: jest.fn(async () =>
+        model({ capabilities: { text: true, vision: true } })
+      ),
+      hasCredential: () => true,
+    })
+    const result = await gateway.generateText({
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'hi' },
+            { type: 'image', data: Buffer.from('x'), mediaType: 'image/png' },
+          ],
+        },
+      ],
+    })
+    expect(result.text).toContain('hi')
+  })
 })
 
 describe('ModelGateway.generateObject', () => {
