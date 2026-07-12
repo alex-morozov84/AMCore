@@ -53,13 +53,18 @@ interface ArtifactBindingRow {
   boundRunStatus: string | null
 }
 
-/** Pull every `artifact_ref` part's id out of a run's input parts, in order, no dedup needed. */
+/**
+ * Pull every `artifact_ref` part's id out of a run's input parts, in first-seen order,
+ * deduplicated (Arc G) — a duplicate reference to the same artifact is validated/counted/bound
+ * once, so the byte budget is not double-counted and the worker resolves it once.
+ */
 function extractArtifactIds(parts: CreateAiRunInput['inputParts']): string[] {
-  return parts
+  const ids = parts
     .filter((part): part is Extract<typeof part, { type: 'artifact_ref' }> => {
       return part.type === 'artifact_ref'
     })
     .map((part) => part.artifactId)
+  return [...new Set(ids)]
 }
 
 /** Best-effort wake payload (ADR-052 pattern). Validated by the worker processor in Arc C.4. */

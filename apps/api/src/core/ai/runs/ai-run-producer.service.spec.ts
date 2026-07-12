@@ -306,6 +306,29 @@ describe('AiRunProducerService', () => {
       })
     })
 
+    it('deduplicates a repeated artifact_ref: locks/counts/binds it once', async () => {
+      const dupInput: CreateAiRunInput = {
+        conversationId: 'conv-1',
+        inputParts: [
+          { type: 'artifact_ref', artifactId: 'art-1' },
+          { type: 'artifact_ref', artifactId: 'art-1' },
+        ],
+        idempotencyKey: null,
+      }
+      prisma.$queryRaw
+        .mockResolvedValueOnce(CONVERSATION_ROW as never)
+        .mockResolvedValueOnce(artifactRow() as never)
+
+      await service.create('user-1', dupInput)
+
+      // Conversation lock + exactly ONE artifact lock (not two) — the duplicate collapsed.
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+      expect(prisma.aiArtifact.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['art-1'] }, conversationId: 'conv-1' },
+        data: { runId: 'run-1', messageId: 'msg-1' },
+      })
+    })
+
     it('allows rebinding an artifact whose bound run is FAILED', async () => {
       prisma.$queryRaw
         .mockResolvedValueOnce(CONVERSATION_ROW as never)

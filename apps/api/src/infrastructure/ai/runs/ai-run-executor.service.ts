@@ -8,7 +8,10 @@ import { capabilityForArtifactKind } from '../../../core/ai/artifacts/ai-artifac
 import { AiRunRealtimePublisher } from '../../../core/ai/realtime/ai-run-realtime.publisher'
 import type { AiGenerateMessage, AiUserContentPart } from '../gateway/ai-gateway.types'
 import { scanInput } from '../guardrails/input-guard'
-import { buildTrustBoundaryRequest } from '../guardrails/trust-boundary.builder'
+import {
+  buildTrustBoundaryRequest,
+  multimodalUntrustedPolicy,
+} from '../guardrails/trust-boundary.builder'
 
 import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
@@ -208,22 +211,27 @@ export class AiRunExecutorService {
     })
     // Artifact parts ride as sibling entries in the SAME untrusted user turn as the wrapped text —
     // never `system`. `wrapUntrusted` only ever wraps the text payload; binary parts are appended
-    // alongside it, not embedded inside the escaped text blob.
-    const userMessages: AiGenerateMessage[] =
-      artifactParts.length > 0
-        ? [
-            {
-              role: 'user' as const,
-              content: [
-                { type: 'text' as const, text: boundary.messages[0]!.content },
-                ...artifactParts,
-              ],
-            },
-          ]
-        : boundary.messages
+    // alongside it, not embedded inside the escaped text blob. When artifacts are present the system
+    // instruction also gains the multimodal untrusted-data policy (defense in depth) — binary parts
+    // cannot be marker-wrapped, so this tells the model that image/PDF content is data, not commands.
+    const hasArtifacts = artifactParts.length > 0
+    const system = hasArtifacts
+      ? `${boundary.system}\n\n${multimodalUntrustedPolicy()}`
+      : boundary.system
+    const userMessages: AiGenerateMessage[] = hasArtifacts
+      ? [
+          {
+            role: 'user' as const,
+            content: [
+              { type: 'text' as const, text: boundary.messages[0]!.content },
+              ...artifactParts,
+            ],
+          },
+        ]
+      : boundary.messages
     return {
       modelSlug,
-      system: boundary.system,
+      system,
       userMessages,
       marker: boundary.marker,
       toolAllowlist: conversation.assistant?.toolAllowlist ?? [],
@@ -373,10 +381,14 @@ function extractText(content: Prisma.JsonValue): string {
   return texts.join('\n')
 }
 
-/** Pull every `artifact_ref` part's id out of a structured message content, in order (Arc G). */
+/**
+ * Pull every `artifact_ref` part's id out of a structured message content, in first-seen order,
+ * deduplicated (Arc G) — a duplicate reference to the same artifact resolves once (one storage
+ * fetch, one provider part), never twice.
+ */
 function extractArtifactIds(content: Prisma.JsonValue): string[] {
   if (!Array.isArray(content)) return []
-  const ids: string[] = []
+  const ids = new Set<string>()
   for (const part of content) {
     if (
       part !== null &&
@@ -385,10 +397,10 @@ function extractArtifactIds(content: Prisma.JsonValue): string[] {
       (part as Record<string, unknown>).type === 'artifact_ref' &&
       typeof (part as Record<string, unknown>).artifactId === 'string'
     ) {
-      ids.push((part as Record<string, unknown>).artifactId as string)
+      ids.add((part as Record<string, unknown>).artifactId as string)
     }
   }
-  return ids
+  return [...ids]
 }
 
 /**

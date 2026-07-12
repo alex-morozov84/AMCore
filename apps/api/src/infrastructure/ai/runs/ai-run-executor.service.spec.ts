@@ -200,6 +200,37 @@ describe('AiRunExecutorService', () => {
       )
       expect(storage.download).toHaveBeenCalledWith('ai-artifacts/conv-1/art-1/original')
       expect(metrics.incAiArtifactResolution).toHaveBeenCalledWith('success')
+      // Defense in depth: the system instruction gains the multimodal untrusted-data policy.
+      expect(lastPlan().system).toContain('UNTRUSTED')
+      expect(lastPlan().system.toLowerCase()).toContain('image')
+    })
+
+    it('does NOT add the multimodal policy to a text-only run (no artifacts present)', async () => {
+      // Default beforeEach input is text-only; the system instruction must not mention image/file.
+      await executor.execute(claim())
+      expect(lastPlan().system.toLowerCase()).not.toContain('image and file')
+    })
+
+    it('deduplicates a repeated artifact_ref: one storage fetch, one provider part', async () => {
+      prisma.aiMessage.findFirst.mockResolvedValue({
+        content: [
+          { type: 'artifact_ref', artifactId: 'art-1' },
+          { type: 'artifact_ref', artifactId: 'art-1' },
+        ],
+      } as never)
+      prisma.aiArtifact.findMany.mockResolvedValue([artifactRow()] as never)
+      storage.download.mockResolvedValue(Buffer.from('png'))
+
+      await executor.execute(claim({ modelSnapshot: MULTIMODAL_SNAPSHOT }))
+
+      expect(prisma.aiArtifact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: { in: ['art-1'] }, runId: 'run-1' } })
+      )
+      expect(storage.download).toHaveBeenCalledTimes(1)
+      const content = (lastPlan().userMessages[0] as { content: unknown }).content as unknown[]
+      // One text wrapper + exactly one image part (not two).
+      expect(content).toHaveLength(2)
+      expect(metrics.incAiArtifactResolution).toHaveBeenCalledTimes(1)
     })
 
     it('appends a PDF artifact alongside text as sibling parts, never inside the wrapped text', async () => {
