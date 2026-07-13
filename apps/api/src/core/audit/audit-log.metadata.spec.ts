@@ -85,4 +85,29 @@ describe('sanitizeAuditMetadata — AI tool-loop + approval actions', () => {
 
     expect(result).toEqual({ approvalId: 'appr1abc' })
   })
+
+  it('keeps only bounded content-free fields for ai.conversation.artifact_accessed (Arc G)', () => {
+    const result = sanitizeAuditMetadata('ai.conversation.artifact_accessed', {
+      conversationId: 'conv1abc',
+      artifactId: 'art1abc',
+      kind: 'image',
+      actorRole: 'operator',
+      reasonRef: 'SUPPORT-1234',
+      // Everything below must be dropped — never a storage key, hash, or content type.
+      storageKey: 'ai-artifacts/conv1abc/art1abc/original',
+      hash: 'deadbeef',
+      contentType: 'image/png',
+    })
+
+    expect(result).toEqual({
+      conversationId: 'conv1abc',
+      artifactId: 'art1abc',
+      kind: 'image',
+      actorRole: 'operator',
+      reasonRef: 'SUPPORT-1234',
+    })
+    expect(result).not.toHaveProperty('storageKey')
+    expect(result).not.toHaveProperty('hash')
+    expect(result).not.toHaveProperty('contentType')
+  })
 })

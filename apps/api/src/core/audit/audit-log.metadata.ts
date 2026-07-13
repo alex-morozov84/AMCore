@@ -100,6 +100,13 @@ const specs: Record<AuditAction, MetadataSpec> = {
   'ai.assistant.enabled': { ...aiAssistantContext },
   'ai.assistant.updated': { ...aiAssistantContext },
   'ai.assistant.version_published': { ...aiAssistantContext },
+  'ai.conversation.artifact_accessed': {
+    conversationId: aiId,
+    artifactId: aiId,
+    kind: aiCode,
+    actorRole: aiCode,
+    reasonRef: aiReasonRef,
+  },
   'ai.conversation.operator_message': {
     conversationId: aiId,
     messageId: aiId,

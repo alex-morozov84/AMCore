@@ -10,39 +10,23 @@ import {
 import { PinoLogger } from 'nestjs-pino'
 
 import {
-  aiControlReasonSchema,
   type AiConversationResponse,
   type AiMessageResponse,
   type AiTranscriptQuery,
   type AiTranscriptResponse,
   type PostOperatorMessageInput,
   type RequestPrincipal,
-  SystemRole,
 } from '@amcore/shared'
 
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '../../../common/exceptions'
-import { assertSessionFresh } from '../../auth/session-freshness'
+import { ConflictException, NotFoundException } from '../../../common/exceptions'
 import { toAiMessageResponse } from '../runs/ai-run.mapper'
 
-import { AiConversationControlService, type ControlActor } from './ai-conversation-control.service'
+import { AiConversationAccessAuthorizer } from './ai-conversation-access.authorizer'
+import { AiConversationControlService } from './ai-conversation-control.service'
 
 import { AuditLogService } from '@/core/audit'
-import { EnvService } from '@/env/env.service'
 import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
-
-/** The authorization verdict for one operator action on a conversation. */
-interface AuthorizedActor {
-  actor: ControlActor
-  /** True when a SUPER_ADMIN is acting on a conversation they do NOT own (privileged support access). */
-  isCrossUser: boolean
-  /** The validated (trimmed, control-char-free) reason to record, or `undefined` for an owner who omitted it. */
-  reason: string | undefined
-}
 
 /** The conversation's holder columns, read under `FOR UPDATE` for the operator-message write. */
 interface HolderRow {
@@ -64,7 +48,7 @@ interface HolderRow {
 export class AiConversationOperatorService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly env: EnvService,
+    private readonly authorizer: AiConversationAccessAuthorizer,
     private readonly control: AiConversationControlService,
     private readonly audit: AuditLogService,
     private readonly metrics: MetricsService,
@@ -79,7 +63,7 @@ export class AiConversationOperatorService {
     conversationId: string,
     reason?: string
   ): Promise<AiConversationResponse> {
-    const authorized = await this.authorize(principal, conversationId, reason)
+    const authorized = await this.authorizer.authorize(principal, conversationId, reason)
     return this.control.takeControl(authorized.actor, conversationId, authorized.reason)
   }
 
@@ -89,7 +73,7 @@ export class AiConversationOperatorService {
     conversationId: string,
     reason?: string
   ): Promise<AiConversationResponse> {
-    const authorized = await this.authorize(principal, conversationId, reason)
+    const authorized = await this.authorizer.authorize(principal, conversationId, reason)
     return this.control.releaseControl(authorized.actor, conversationId, authorized.reason)
   }
 
@@ -105,7 +89,7 @@ export class AiConversationOperatorService {
     query: AiTranscriptQuery,
     reason?: string
   ): Promise<AiTranscriptResponse> {
-    const authorized = await this.authorize(principal, conversationId, reason)
+    const authorized = await this.authorizer.authorize(principal, conversationId, reason)
 
     const rows = await this.prisma.aiMessage.findMany({
       where: {
@@ -120,20 +104,27 @@ export class AiConversationOperatorService {
     const nextCursor = hasMore ? String(page[page.length - 1]!.sequence) : null
 
     if (authorized.isCrossUser) {
-      // Fail-closed accountability: the privileged read is audited BEFORE the transcript is returned.
-      await this.audit.record({
-        action: 'ai.conversation.transcript_accessed',
-        actorType: AuditActorType.USER,
-        actorId: authorized.actor.userId,
-        targetType: AuditTargetType.AI_CONVERSATION,
-        targetId: conversationId,
-        metadata: {
-          conversationId,
-          actorRole: 'operator',
-          messageCount: page.length,
-          reasonRef: authorized.reason,
+      // Fail-CLOSED accountability (ADR-045): recorded with `failOpen: false` and awaited BEFORE the
+      // transcript is returned — if the audit write fails, this throws and the transcript is NOT
+      // served. (Plain best-effort `record()` would swallow the failure and leak the transcript —
+      // the bug this replaces: the read path has no transaction, so only `failOpen: false` is
+      // actually fail-closed here.)
+      await this.audit.record(
+        {
+          action: 'ai.conversation.transcript_accessed',
+          actorType: AuditActorType.USER,
+          actorId: authorized.actor.userId,
+          targetType: AuditTargetType.AI_CONVERSATION,
+          targetId: conversationId,
+          metadata: {
+            conversationId,
+            actorRole: 'operator',
+            messageCount: page.length,
+            reasonRef: authorized.reason,
+          },
         },
-      })
+        { failOpen: false }
+      )
     }
 
     return { data: page.map(toAiMessageResponse), nextCursor, hasMore }
@@ -152,7 +143,7 @@ export class AiConversationOperatorService {
     conversationId: string,
     input: PostOperatorMessageInput
   ): Promise<AiMessageResponse> {
-    const authorized = await this.authorize(principal, conversationId, input.reason)
+    const authorized = await this.authorizer.authorize(principal, conversationId, input.reason)
 
     const { message, authorType } = await this.prisma.$transaction(async (tx) => {
       const holder = await this.lockHolder(tx, conversationId)
@@ -212,50 +203,6 @@ export class AiConversationOperatorService {
       'AI conversation operator message posted'
     )
     return toAiMessageResponse(message)
-  }
-
-  /**
-   * Resolve + authorize the actor. Reads only the immutable `ownerUserId` (unlocked): a missing
-   * conversation, or an actor who is neither the owner nor a SUPER_ADMIN, is a `404` (no existence
-   * leak). Any supplied reason is validated against the audit-aligned grammar (`400` if invalid). For a
-   * **cross-user** operator, step-up freshness (403 before any mutation) and a valid reason (`400`) are
-   * mandatory; an owner acting on their own conversation skips both.
-   */
-  private async authorize(
-    principal: RequestPrincipal,
-    conversationId: string,
-    reason: string | undefined
-  ): Promise<AuthorizedActor> {
-    const conversation = await this.prisma.aiConversation.findUnique({
-      where: { id: conversationId },
-      select: { ownerUserId: true },
-    })
-    const isSuperAdmin = principal.systemRole === SystemRole.SuperAdmin
-    if (!conversation || (conversation.ownerUserId !== principal.sub && !isSuperAdmin)) {
-      throw new NotFoundException('Conversation', conversationId)
-    }
-
-    // Validate any supplied reason against the SAME bounded, control-char-free grammar the audit
-    // sanitizer accepts — a reason that passes here survives into the audit (no silent loss).
-    let validatedReason: string | undefined
-    if (reason !== undefined) {
-      const parsed = aiControlReasonSchema.safeParse(reason)
-      if (!parsed.success)
-        throw new BadRequestException('The reason (ticket reference) is invalid.')
-      validatedReason = parsed.data
-    }
-
-    const isCrossUser = isSuperAdmin && conversation.ownerUserId !== principal.sub
-    if (isCrossUser) {
-      await assertSessionFresh(this.prisma, this.env.get('STEP_UP_MAX_AGE_SECONDS'), principal)
-      if (validatedReason === undefined) {
-        throw new BadRequestException(
-          'A reason (ticket reference) is required for a cross-user operator action.'
-        )
-      }
-    }
-
-    return { actor: { userId: principal.sub, isSuperAdmin }, isCrossUser, reason: validatedReason }
   }
 
   /** Lock the conversation `FOR UPDATE` and read the holder columns for the operator-message assertion. */

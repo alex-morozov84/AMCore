@@ -11,6 +11,7 @@ export const AUDIT_ACTIONS = [
   'ai.assistant.enabled',
   'ai.assistant.updated',
   'ai.assistant.version_published',
+  'ai.conversation.artifact_accessed',
   'ai.conversation.operator_message',
   'ai.conversation.released',
   'ai.conversation.taken_over',
