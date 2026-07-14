@@ -48,13 +48,29 @@ export const releaseConversationSchema = z.object({ reason: aiControlReasonSchem
 export type ReleaseConversationInput = z.infer<typeof releaseConversationSchema>
 
 /**
- * Post a human turn while holding control (Arc F.3b). `content` is the same multimodal content-part
- * contract as any transcript turn; the server renders it as a `role=ASSISTANT` turn authored by the
- * human (`authorType=OPERATOR` for a cross-user operator, `USER` for the owner). `reason` is required
- * at runtime for a cross-user operator only.
+ * Operator/owner human-turn content (Arc G): the same content-part array as any transcript turn, but
+ * **text only** — an `artifact_ref` part is rejected at the contract boundary. Arc G ships
+ * user-uploaded artifacts on the **run-input** path only; the human turn posted via
+ * `POST /ai/conversations/:id/messages` does not support artifacts this arc. Silently accepting and
+ * storing an unvalidated `artifact_ref` here would be the same anti-pattern the run path fixes, so it
+ * is refused. (Not a live injection vector today — runs never replay conversation history, so a
+ * planted ref can never reach a provider; this is a data-hygiene / API-consistency guarantee. If a
+ * future arc replays conversation history into a run, this decision must be revisited.)
+ */
+export const aiTextOnlyMessageContentSchema = aiMessageContentSchema.refine(
+  (parts) => parts.every((part) => part.type === 'text'),
+  { error: 'Only text parts are supported here; artifact references are not allowed.' }
+)
+export type AiTextOnlyMessageContent = z.infer<typeof aiTextOnlyMessageContentSchema>
+
+/**
+ * Post a human turn while holding control (Arc F.3b; Arc G tightens `content` to text-only). The
+ * server renders it as a `role=ASSISTANT` turn authored by the human (`authorType=OPERATOR` for a
+ * cross-user operator, `USER` for the owner). `reason` is required at runtime for a cross-user
+ * operator only.
  */
 export const postOperatorMessageSchema = z.object({
-  content: aiMessageContentSchema,
+  content: aiTextOnlyMessageContentSchema,
   reason: aiControlReasonSchema.optional(),
 })
 export type PostOperatorMessageInput = z.infer<typeof postOperatorMessageSchema>
