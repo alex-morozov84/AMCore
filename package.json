@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Modular personal productivity platform",
+  "description": "Production-oriented NestJS application starter",
   "author": "Alexander Morozov <mail@alex-morozov.com>",
   "license": "MIT",
   "repository": {
