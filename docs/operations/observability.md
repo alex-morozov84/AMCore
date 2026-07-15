@@ -170,27 +170,38 @@ client-event metric (e.g. `notif-subscriber`).
 AI metrics (Track C) are bounded and carry no prompt/response content, model
 slug, credential, or free-form approval reason as a label:
 
-- `amcore_ai_generations_total{provider,operation,result}` — `provider` is the
+- `amcore_ai_generations_total{provider,operation,result,role}` — `provider` is the
   lowercase provider _type_ (`anthropic|openai|…|mock`), `operation=text|object`,
   `result=success|error`;
-- `amcore_ai_tokens_total{provider,direction}` — `direction=input|output`;
+- `amcore_ai_tokens_total{provider,direction,role}` — `direction=input|output`;
 - `amcore_ai_guardrail_checks_total{stage,verdict,role}` — Arc D guardrail checks:
   `stage=input|output`, `verdict=allow|flag|block`. Only these bounded labels — no
   prompt/output content, boundary marker, or category value is ever a label.
-- `amcore_ai_tool_invocations_total{tool_id,risk_class,outcome}` — Arc E
+- `amcore_ai_tool_invocations_total{tool_id,risk_class,outcome,role}` — Arc E
   host-side tool invocation outcomes. `tool_id` is bounded to the code-owned
   registry, `risk_class=safe|sensitive|destructive`, and
   `outcome=succeeded|failed|rejected` (`rejected` = a resume that fed a
   user-rejected tool call back to the model, never executed);
-- `amcore_ai_approvals_total{kind,state}` — Arc E approval lifecycle
+- `amcore_ai_approvals_total{kind,state,role}` — Arc E approval lifecycle
   transitions. `kind=tool_invocation` in v1;
   `state=pending|approved|rejected|expired`;
-- `amcore_ai_tool_loop_steps` — histogram of provider-call steps used by the
-  bounded Arc E tool loop.
+- `amcore_ai_tool_loop_steps{outcome,role}` — histogram of provider-call steps used by the
+  bounded Arc E tool loop; `outcome=completed|exhausted|failed`.
+- `amcore_ai_artifact_uploads_total{kind,result,role}` — Arc G owner upload
+  outcomes. `kind=image|pdf`, `result=success|rejected`, and `role` is the
+  emitting process role.
+- `amcore_ai_artifact_resolution_total{result,role}` — Arc G worker-side artifact
+  byte resolution before the provider request. `result=success|not_found|
+capability_unsupported|storage_error`, plus the emitting process `role`.
 
 AI tool and approval metrics never label by approval ID, invocation ID, run ID,
 user ID, tool args/result, prompt text, provider body, model slug, or free-form
 approval reason.
+
+AI artifact metrics additionally never label by conversation ID, artifact ID,
+storage key, hash, filename, content type, or bytes. Unsupported/undetectable
+upload types do not invent an unbounded `kind` label; the generic HTTP RED metric
+already counts the rejected request by normalized route/status.
 
 The AI run **status-only** SSE stream (Arc C) mirrors the notification realtime
 metrics, still carrying no user/IP/run/event IDs:

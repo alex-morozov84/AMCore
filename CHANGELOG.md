@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI capability layer — multimodal foundation (Track C, Arc G). Storage-backed **image (JPEG/PNG/WebP)
+  and PDF** artifacts with capability-gated routing. **Upload** (`POST /ai/conversations/:id/artifacts`,
+  bearer, owner-only, throttled): magic-byte validated (never the client `Content-Type`; no GIF/SVG),
+  stored **private** (never a public/signed URL), recorded as an `UNTRUSTED` `AiArtifact`. **Run input**
+  references artifacts by id (`artifact_ref` content parts); at run creation the producer validates each —
+  conversation scope (no-leak `400`), the frozen model's capability (`vision`/`pdf`), the bound assistant's
+  `allowedModalities`, a per-message count + raw-byte budget, and a **rebind matrix** (an artifact may be
+  reused only after its bound run is `FAILED`/`CANCELLED`/`EXPIRED`; `409` on
+  `QUEUED`/`RUNNING`/`WAITING_APPROVAL`/`WAITING_HUMAN`/`COMPLETED`) — all in the run-creation transaction.
+  The **worker** fetches bytes server-side and inlines them into a multimodal provider request as sibling
+  parts inside the **same Arc D untrusted user-turn container** (never `system`); the system instruction
+  gains a multimodal untrusted-data policy (defense in depth). **Download**
+  (`GET /ai/conversations/:id/artifacts/:artifactId`, app-mediated, attachment + `nosniff`, no Range) is
+  owner-or-cross-user-operator, matching the Arc F transcript posture (step-up + bounded reason for a
+  cross-user operator), with a content-free **fail-closed** `ai.conversation.artifact_accessed` audit
+  before bytes are served. A new strict audit path (`record({ failOpen: false })`) also **retroactively
+  hardens the Arc F transcript read**, which previously used the fail-open path. Operator/owner human
+  turns are restricted to text (`artifact_ref` rejected). New env: `AI_ARTIFACT_MAX_IMAGE_BYTES`,
+  `AI_ARTIFACT_MAX_DOCUMENT_BYTES`, `AI_ARTIFACT_MAX_PARTS_PER_MESSAGE`. Guardrails scan text only — text
+  rendered inside an image/PDF is **not** scanned (a documented OWASP LLM01 residual; contained by channel
+  separation, never claimed eliminated). No new migration (the Arc A `AiArtifact` schema was laid whole).
 - AI capability layer — assistant registry admin + runtime application + human takeover / operator review
   (Track C, Arc F). **Assistant registry admin** (`admin/ai/assistants`, SUPER_ADMIN, bearer-only):
   create / publish an **immutable** version / in-place `enabled`+`displayName` patch (mutations are
