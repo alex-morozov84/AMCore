@@ -4,6 +4,7 @@ import {
   aiApprovalListQuerySchema,
   aiApprovalListResponseSchema,
   aiApprovalResponseSchema,
+  aiArtifactResponseSchema,
   aiConversationResponseSchema,
   aiMessageResponseSchema,
   aiRunCancelResponseSchema,
@@ -27,6 +28,8 @@ import {
  */
 export class CreateAiConversationDto extends createZodDto(createAiConversationSchema) {}
 export class AiConversationResponseDto extends createZodDto(aiConversationResponseSchema) {}
+// Multimodal artifact upload (Track C — ADR-054, Arc G).
+export class AiArtifactResponseDto extends createZodDto(aiArtifactResponseSchema) {}
 // Human takeover / operator review (Track C — ADR-054, Arc F.3).
 export class TakeoverConversationDto extends createZodDto(takeoverConversationSchema) {}
 export class ReleaseConversationDto extends createZodDto(releaseConversationSchema) {}

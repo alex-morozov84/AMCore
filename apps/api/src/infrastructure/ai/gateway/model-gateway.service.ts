@@ -17,6 +17,7 @@ import {
   type AiUsage,
 } from './ai-gateway.types'
 import { AiCredentialResolver } from './credential-resolver'
+import { findUnsupportedMultimodalCapability } from './multimodal-capability'
 
 import { EnvService } from '@/env/env.service'
 import {
@@ -125,6 +126,12 @@ export class ModelGateway {
     const adapter = this.adapters.get(model.provider.type)
     if (!this.registry.hasCredential(model) || adapter === undefined) {
       throw AiGatewayException.modelNotConfigured(model.slug)
+    }
+    // Central multimodal capability gate (Arc G): the correctness boundary for any caller,
+    // mirroring the generateObject structured_output gate below.
+    const unsupported = findUnsupportedMultimodalCapability(model, request.messages)
+    if (unsupported !== null) {
+      throw AiGatewayException.capabilityUnsupported(model.slug, unsupported)
     }
     const call: AiAdapterCall = {
       model,

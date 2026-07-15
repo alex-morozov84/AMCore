@@ -61,6 +61,10 @@ let AiConversationControlService: Token
 let AiConversationOperatorService: Token
 let AiAssistantAdminController: Token
 let AiAssistantAdminService: Token
+// AI multimodal artifacts (Track C — ADR-054, Arc G)
+let AiArtifactsController: Token
+let AiArtifactUploadService: Token
+let AiArtifactDownloadService: Token
 
 const noopPinoLogger = {
   setContext: () => undefined,
@@ -157,6 +161,11 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const aiAssistantAdminController =
       await import('../src/core/ai/admin/ai-assistant-admin.controller')
     const aiAssistantAdminService = await import('../src/core/ai/admin/ai-assistant-admin.service')
+    const aiArtifactsController = await import('../src/core/ai/artifacts/ai-artifacts.controller')
+    const aiArtifactUploadService =
+      await import('../src/core/ai/artifacts/ai-artifact-upload.service')
+    const aiArtifactDownloadService =
+      await import('../src/core/ai/artifacts/ai-artifact-download.service')
 
     AppModule = appModule.AppModule
     WebModule = webModule.WebModule
@@ -199,6 +208,9 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     AiConversationControlService = aiControlService.AiConversationControlService
     AiConversationOperatorService = aiOperatorService.AiConversationOperatorService
     AiAssistantAdminController = aiAssistantAdminController.AiAssistantAdminController
+    AiArtifactsController = aiArtifactsController.AiArtifactsController
+    AiArtifactUploadService = aiArtifactUploadService.AiArtifactUploadService
+    AiArtifactDownloadService = aiArtifactDownloadService.AiArtifactDownloadService
     AiAssistantAdminService = aiAssistantAdminService.AiAssistantAdminService
   })
 
@@ -256,6 +268,10 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, AiConversationOperatorService)
       present(m, AiAssistantAdminController)
       present(m, AiAssistantAdminService)
+      // Arc G: artifact upload/download are web-only (Postgres + storage I/O, no provider call).
+      present(m, AiArtifactsController)
+      present(m, AiArtifactUploadService)
+      present(m, AiArtifactDownloadService)
       present(m, AiRunStreamController)
       present(m, AiRunRealtimeHub)
       present(m, AiRunRealtimeSubscriber)
@@ -344,6 +360,9 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, AiConversationOperatorService)
       absent(m, AiAssistantAdminController)
       absent(m, AiAssistantAdminService)
+      absent(m, AiArtifactsController)
+      absent(m, AiArtifactUploadService)
+      absent(m, AiArtifactDownloadService)
       absent(m, AiRunStreamController)
       absent(m, AiRunRealtimeHub)
       absent(m, AiRunRealtimeSubscriber)
@@ -397,6 +416,9 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, AiConversationControlController)
       present(m, AiConversationOperatorService)
       present(m, AiAssistantAdminController)
+      present(m, AiArtifactsController)
+      present(m, AiArtifactUploadService)
+      present(m, AiArtifactDownloadService)
       present(m, ModelGateway)
       present(m, AiProviderAdaptersToken)
       present(m, AiRunExecutorService)

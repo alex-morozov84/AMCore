@@ -88,6 +88,23 @@ describe('MockAiAdapter', () => {
     expect(result.text).toContain('amcore:user-data-')
   })
 
+  it('reads the text part of a multimodal turn and ignores non-text parts (Arc G)', async () => {
+    const result = await adapter.generateText(
+      call({
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'hello' },
+              { type: 'image', data: Buffer.from('x'), mediaType: 'image/png' },
+            ],
+          },
+        ],
+      })
+    )
+    expect(result.text).toBe('[mock:mock] hello')
+  })
+
   describe('tool script (Arc E)', () => {
     const tools: AiGatewayTool[] = [
       { name: 'current_time', description: 'time', parameters: z.object({}).strict() },

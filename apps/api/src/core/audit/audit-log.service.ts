@@ -24,6 +24,13 @@ export class AuditLogService {
       await opts.tx.auditLog.create({ data })
       return
     }
+    if (opts.failOpen === false) {
+      // Strict, non-transactional: the caller needs this row durable BEFORE it proceeds
+      // (privileged-read accountability — the transcript/artifact is not served until the access is
+      // recorded). A failure propagates so the caller fails closed; it is never swallowed.
+      await this.prisma.auditLog.create({ data })
+      return
+    }
     await this.recordBestEffort(data)
   }
 

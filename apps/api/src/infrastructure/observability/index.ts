@@ -2,6 +2,9 @@ export { METRIC_NAMES } from './metrics.constants'
 export type {
   AiMetricsApprovalKind,
   AiMetricsApprovalState,
+  AiMetricsArtifactKind,
+  AiMetricsArtifactResolutionResult,
+  AiMetricsArtifactUploadResult,
   AiMetricsAssistantAdminAction,
   AiMetricsControlAction,
   AiMetricsControlActorRole,

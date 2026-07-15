@@ -77,4 +77,30 @@ describe('AuditLogService', () => {
     expect(mockCtx.prisma.auditLog.create).not.toHaveBeenCalled()
     expect(tx.auditLog.create).toHaveBeenCalledTimes(1)
   })
+
+  it('default non-tx record() is fail-open: a write failure is swallowed (best-effort)', async () => {
+    const mockCtx = createMockContext()
+    mockCtx.prisma.auditLog.create.mockRejectedValue(new Error('db down'))
+    const service = new AuditLogService(mockContextToPrisma(mockCtx), cls, logger as never)
+
+    await expect(
+      service.record({ action: 'auth.step_up_succeeded', actorType: AuditActorType.SYSTEM })
+    ).resolves.toBeUndefined()
+    expect(logger.warn).toHaveBeenCalledTimes(1) // logged, not thrown
+  })
+
+  it('strict non-tx record({ failOpen: false }) PROPAGATES a write failure (fail-closed)', async () => {
+    const mockCtx = createMockContext()
+    mockCtx.prisma.auditLog.create.mockRejectedValue(new Error('db down'))
+    const service = new AuditLogService(mockContextToPrisma(mockCtx), cls, logger as never)
+
+    await expect(
+      service.record(
+        { action: 'ai.conversation.artifact_accessed', actorType: AuditActorType.USER },
+        { failOpen: false }
+      )
+    ).rejects.toThrow('db down')
+    // Strict never swallows: no best-effort warn on the strict path.
+    expect(logger.warn).not.toHaveBeenCalled()
+  })
 })

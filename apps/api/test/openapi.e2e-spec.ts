@@ -21,7 +21,7 @@ import { setupE2ETest, teardownE2ETest } from './helpers'
  * Terminus health probes (`/health*`) document 200/503 via `@ApiResponse`
  * without a body schema by design and are the one justified exclusion.
  */
-type BodyKind = 'json' | 'none' | 'redirect' | 'text' | 'stream'
+type BodyKind = 'json' | 'none' | 'redirect' | 'text' | 'stream' | 'binary'
 interface Expected {
   status: string
   kind: BodyKind
@@ -127,6 +127,9 @@ const EXPECTED: Record<string, Expected> = {
   'post /ai/conversations/{id}/release': { status: '200', kind: 'json' },
   'get /ai/conversations/{id}/messages': { status: '200', kind: 'json' },
   'post /ai/conversations/{id}/messages': { status: '201', kind: 'json' },
+  // ai artifacts (Arc G — upload is typed JSON; download is a binary attachment stream)
+  'post /ai/conversations/{id}/artifacts': { status: '201', kind: 'json' },
+  'get /ai/conversations/{id}/artifacts/{artifactId}': { status: '200', kind: 'binary' },
   // ai realtime (Arc C — status-only SSE stream, text/event-stream not JSON)
   'get /ai/runs/{id}/stream': { status: '200', kind: 'stream' },
   // metrics — Prometheus exposition (text, not JSON)
@@ -170,6 +173,10 @@ describe('OpenAPI success surface (e2e)', () => {
   const eventStreamSchema = (response: Record<string, unknown> | undefined): object | undefined =>
     (response?.content as Record<string, { schema?: object }> | undefined)?.['text/event-stream']
       ?.schema
+  const octetSchema = (response: Record<string, unknown> | undefined): object | undefined =>
+    (response?.content as Record<string, { schema?: object }> | undefined)?.[
+      'application/octet-stream'
+    ]?.schema
   const nonEmpty = (schema: object | undefined): boolean =>
     !!schema && Object.keys(schema).length > 0
 
@@ -235,6 +242,11 @@ describe('OpenAPI success surface (e2e)', () => {
         case 'stream':
           if (!nonEmpty(eventStreamSchema(response))) {
             violations.push(`${key}: ${code} has no text/event-stream body schema`)
+          }
+          break
+        case 'binary':
+          if (!nonEmpty(octetSchema(response))) {
+            violations.push(`${key}: ${code} has no application/octet-stream body schema`)
           }
           break
         case 'none':

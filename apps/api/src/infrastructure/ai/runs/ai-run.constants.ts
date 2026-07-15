@@ -98,8 +98,18 @@ export const AiRunErrorCode = {
   MODEL_SNAPSHOT_INVALID: 'model_snapshot_invalid',
   /** The run's own input turn (`AiMessage.runId = run.id`) was absent. */
   INPUT_MISSING: 'input_missing',
-  /** The input turn carried no text part (Arc C is text-only). */
-  NO_INPUT_TEXT: 'no_input_text',
+  /**
+   * The input turn carried neither a text part nor an `artifact_ref` part (Arc G: an artifact-only
+   * turn, e.g. an image with no caption, is now valid — this only fires when both are absent).
+   */
+  NO_INPUT: 'no_input',
+  /**
+   * A referenced artifact could not be used: its row was missing, the frozen model snapshot lacks
+   * the required capability (worker backstop — the producer already gated this; should never
+   * actually fire), or the storage fetch failed (deleted/corrupted object). Terminal,
+   * non-retryable — analogous to `INPUT_MISSING`/`NO_INPUT`.
+   */
+  ARTIFACT_UNAVAILABLE: 'artifact_unavailable',
   /** An unexpected non-gateway error around the provider call; retried defensively. */
   UNKNOWN_ERROR: 'unknown_error',
   /** A guardrail blocked the run (input/output/oversize); the specific reason is terminalReasonCode. */

@@ -363,7 +363,7 @@ is imported (worker/all). Assert the gating in `test/process-role.e2e-spec.ts`.
 - [`docs/auth/`](../../docs/auth/README.md) — Complete auth & RBAC guide for developers
 - [`docs/authorization.md`](../../docs/authorization.md) — Authorization concepts
 - [`docs/notifications/`](../../docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email & Telegram delivery, realtime SSE stream)
-- [`docs/ai/`](../../docs/ai/README.md) — AI capability layer (provider-agnostic catalog, worker-only `ModelGateway`, durable runs + run API + status-only SSE, usage ledger)
+- [`docs/ai/`](../../docs/ai/README.md) — AI capability layer (assistants/agents, provider/model catalog, durable runs, tools/approvals, takeover/operator review, multimodal artifacts, security)
 
 ## Contributing
 

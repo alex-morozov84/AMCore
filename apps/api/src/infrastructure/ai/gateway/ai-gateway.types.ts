@@ -30,13 +30,26 @@ export interface AiToolResultPart {
 }
 
 /**
- * One conversation turn handed to the gateway. A discriminated union so the tool path (Arc E) is
- * additive over the Arc B text path: a plain text `user`/`assistant` turn, an `assistant` tool-call
- * turn, or a `tool` result turn. The provider-agnostic mapper converts these to the SDK's message
- * parts — no provider-specific block ever crosses this boundary.
+ * One part of a multimodal user turn's content (Track C — ADR-054, Arc G). Mirrors the Vercel AI
+ * SDK's own `TextPart | ImagePart | FilePart` shape so `toModelMessages` is a straight pass-through
+ * mapping, not a re-derivation. Image/file bytes are always resolved server-side by the worker from
+ * private storage and inlined here as a `Buffer` — never a URL, so a provider never fetches AMCore
+ * storage directly (see `ai-run-executor.service.ts` artifact resolution).
+ */
+export type AiUserContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: Buffer; mediaType: string }
+  | { type: 'file'; data: Buffer; mediaType: string; filename?: string }
+
+/**
+ * One conversation turn handed to the gateway. A discriminated union so the tool path (Arc E) and
+ * the multimodal path (Arc G) are both additive over the Arc B text path: a plain text
+ * `user`/`assistant` turn, a multimodal `user` turn, an `assistant` tool-call turn, or a `tool`
+ * result turn. The provider-agnostic mapper converts these to the SDK's message parts — no
+ * provider-specific block ever crosses this boundary.
  */
 export type AiGenerateMessage =
-  | { role: 'user'; content: string }
+  | { role: 'user'; content: string | AiUserContentPart[] }
   | { role: 'assistant'; content: string }
   | { role: 'assistant'; toolCalls: AiToolCall[] }
   | { role: 'tool'; toolResults: AiToolResultPart[] }

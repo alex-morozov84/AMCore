@@ -1,12 +1,17 @@
 import { Injectable } from '@nestjs/common'
-import { AiMessageRole, AiRunStepType, Prisma } from '@prisma/client'
+import { AiArtifactKind, AiMessageRole, AiRunStepType, Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiRunSseReason, AiRunStatusValue } from '@amcore/shared'
 
+import { capabilityForArtifactKind } from '../../../core/ai/artifacts/ai-artifact.constants'
 import { AiRunRealtimePublisher } from '../../../core/ai/realtime/ai-run-realtime.publisher'
+import type { AiGenerateMessage, AiUserContentPart } from '../gateway/ai-gateway.types'
 import { scanInput } from '../guardrails/input-guard'
-import { buildTrustBoundaryRequest } from '../guardrails/trust-boundary.builder'
+import {
+  buildTrustBoundaryRequest,
+  multimodalUntrustedPolicy,
+} from '../guardrails/trust-boundary.builder'
 
 import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
@@ -17,6 +22,7 @@ import type { RunPlan } from './ai-run-plan'
 
 import { EnvService } from '@/env/env.service'
 import { MetricsService } from '@/infrastructure/observability'
+import { StorageObjectNotFoundError, StorageService } from '@/infrastructure/storage'
 import { PrismaService } from '@/prisma'
 
 /** The single bounded realtime reason (Track C — ADR-054, Arc C.5); no content ever rides it. */
@@ -38,6 +44,7 @@ export class AiRunExecutorService {
     private readonly repository: AiRunRepository,
     private readonly loop: AiRunLoopExecutor,
     private readonly publisher: AiRunRealtimePublisher,
+    private readonly storage: StorageService,
     private readonly env: EnvService,
     private readonly metrics: MetricsService,
     private readonly logger: PinoLogger
@@ -169,14 +176,28 @@ export class AiRunExecutorService {
       return null
     }
 
+    // Arc G: a turn is valid with either non-empty text OR at least one artifact_ref — an
+    // image-only turn with no caption is no longer a failure (the bug this arc fixes).
     const inputText = extractText(input.content)
-    if (inputText.length === 0) {
-      await this.repository.finalizeFailed(this.prisma, claim, AiRunErrorCode.NO_INPUT_TEXT)
+    const artifactIds = extractArtifactIds(input.content)
+    if (inputText.length === 0 && artifactIds.length === 0) {
+      await this.repository.finalizeFailed(this.prisma, claim, AiRunErrorCode.NO_INPUT)
       return null
     }
 
     const inputFlagCategories = await this.runInputGuards(claim, inputText)
     if (inputFlagCategories === null) return null // oversize / block already refused
+
+    // Resolve every referenced artifact (Arc G): the producer already gated existence/capability/
+    // modality/rebind at run-creation time — this is the worker-side backstop (re-checks capability
+    // against the frozen snapshot, "should never actually fire") plus the actual byte fetch, which
+    // only the worker can do (never the web role). A resolution failure is terminal.
+    let artifactParts: AiUserContentPart[] = []
+    if (artifactIds.length > 0) {
+      const resolved = await this.resolveArtifacts(claim, artifactIds)
+      if (resolved === null) return null // already finalized artifact_unavailable
+      artifactParts = resolved
+    }
 
     // Arc D structural trust boundary: untrusted user text JSON-encoded in a salted container; the
     // trusted instruction goes in `system`. Arc F.4: the bound assistant's `systemPrompt` becomes that
@@ -188,10 +209,30 @@ export class AiRunExecutorService {
       maxInputChars,
       systemInstruction: conversation.assistant?.systemPrompt ?? undefined,
     })
+    // Artifact parts ride as sibling entries in the SAME untrusted user turn as the wrapped text —
+    // never `system`. `wrapUntrusted` only ever wraps the text payload; binary parts are appended
+    // alongside it, not embedded inside the escaped text blob. When artifacts are present the system
+    // instruction also gains the multimodal untrusted-data policy (defense in depth) — binary parts
+    // cannot be marker-wrapped, so this tells the model that image/PDF content is data, not commands.
+    const hasArtifacts = artifactParts.length > 0
+    const system = hasArtifacts
+      ? `${boundary.system}\n\n${multimodalUntrustedPolicy()}`
+      : boundary.system
+    const userMessages: AiGenerateMessage[] = hasArtifacts
+      ? [
+          {
+            role: 'user' as const,
+            content: [
+              { type: 'text' as const, text: boundary.messages[0]!.content },
+              ...artifactParts,
+            ],
+          },
+        ]
+      : boundary.messages
     return {
       modelSlug,
-      system: boundary.system,
-      userMessages: boundary.messages,
+      system,
+      userMessages,
       marker: boundary.marker,
       toolAllowlist: conversation.assistant?.toolAllowlist ?? [],
       inputFlagCategories,
@@ -200,6 +241,85 @@ export class AiRunExecutorService {
         organizationId: conversation.organizationId,
       },
     }
+  }
+
+  /**
+   * Resolve every referenced artifact to a multimodal SDK part, or finalize the run terminally and
+   * return `null`. Bytes are always fetched server-side via `StorageService.download` and inlined —
+   * never a signed/public URL handed to a provider (FINAL PLAN invariant 1). Scoped to
+   * `runId: claim.id` as a defense-in-depth check: the producer (Arc G G.3) already bound exactly
+   * these ids to this run in the same transaction that persisted the input turn, so a mismatch here
+   * would mean data corruption, not a normal race.
+   */
+  private async resolveArtifacts(
+    claim: ClaimedRun,
+    artifactIds: string[]
+  ): Promise<AiUserContentPart[] | null> {
+    const capabilities = modelCapabilitiesFromSnapshot(claim.modelSnapshot)
+    const rows = await this.prisma.aiArtifact.findMany({
+      where: { id: { in: artifactIds }, runId: claim.id },
+      select: { id: true, kind: true, contentType: true, storageKey: true },
+    })
+    const byId = new Map(rows.map((row) => [row.id, row]))
+
+    const parts: AiUserContentPart[] = []
+    for (const artifactId of artifactIds) {
+      const row = byId.get(artifactId)
+      if (row === undefined) {
+        this.metrics.incAiArtifactResolution('not_found')
+        await this.repository.finalizeFailed(
+          this.prisma,
+          claim,
+          AiRunErrorCode.ARTIFACT_UNAVAILABLE
+        )
+        return null
+      }
+      const capability = capabilityForArtifactKind(row.kind)
+      if (capability === null || capabilities[capability] !== true) {
+        this.metrics.incAiArtifactResolution('capability_unsupported')
+        await this.repository.finalizeFailed(
+          this.prisma,
+          claim,
+          AiRunErrorCode.ARTIFACT_UNAVAILABLE
+        )
+        return null
+      }
+      let data: Buffer
+      try {
+        data = await this.storage.download(row.storageKey)
+      } catch (error) {
+        this.metrics.incAiArtifactResolution('storage_error')
+        // A genuinely missing/deleted object is permanent — no retry can fix it. Any other storage
+        // fault (network blip, provider hiccup, transient credential/timeout error) is retried
+        // through the existing PG-owned retry schedule instead of permanently failing the run,
+        // mirroring how `AiRunLoopFinalizer.gatewayError` treats an unexpected non-gateway error.
+        if (error instanceof StorageObjectNotFoundError) {
+          await this.repository.finalizeFailed(
+            this.prisma,
+            claim,
+            AiRunErrorCode.ARTIFACT_UNAVAILABLE
+          )
+        } else {
+          this.logger.error(
+            { event: 'ai.run.artifact_storage_retry', runId: claim.id },
+            'Transient artifact storage fetch failure; scheduling retry'
+          )
+          await this.repository.finalizeRetry(
+            this.prisma,
+            claim,
+            AiRunErrorCode.ARTIFACT_UNAVAILABLE
+          )
+        }
+        return null
+      }
+      parts.push(
+        row.kind === AiArtifactKind.IMAGE
+          ? { type: 'image', data, mediaType: row.contentType }
+          : { type: 'file', data, mediaType: row.contentType }
+      )
+      this.metrics.incAiArtifactResolution('success')
+    }
+    return parts
   }
 
   /**
@@ -243,7 +363,7 @@ function modelSlugFromSnapshot(snapshot: Prisma.JsonValue): string | null {
   return typeof slug === 'string' && slug.length > 0 ? slug : null
 }
 
-/** Concatenate the text parts of a structured message content (Arc C is text-only). */
+/** Concatenate the text parts of a structured message content. */
 function extractText(content: Prisma.JsonValue): string {
   if (!Array.isArray(content)) return ''
   const texts: string[] = []
@@ -259,4 +379,44 @@ function extractText(content: Prisma.JsonValue): string {
     }
   }
   return texts.join('\n')
+}
+
+/**
+ * Pull every `artifact_ref` part's id out of a structured message content, in first-seen order,
+ * deduplicated (Arc G) — a duplicate reference to the same artifact resolves once (one storage
+ * fetch, one provider part), never twice.
+ */
+function extractArtifactIds(content: Prisma.JsonValue): string[] {
+  if (!Array.isArray(content)) return []
+  const ids = new Set<string>()
+  for (const part of content) {
+    if (
+      part !== null &&
+      typeof part === 'object' &&
+      !Array.isArray(part) &&
+      (part as Record<string, unknown>).type === 'artifact_ref' &&
+      typeof (part as Record<string, unknown>).artifactId === 'string'
+    ) {
+      ids.add((part as Record<string, unknown>).artifactId as string)
+    }
+  }
+  return [...ids]
+}
+
+/**
+ * Defensively parse `capabilities` out of the run's frozen model snapshot (Arc G worker capability
+ * backstop) — never trust the JSON blob's shape; an unexpected value is dropped rather than
+ * coerced, so a malformed snapshot fails every capability check closed, not open.
+ */
+function modelCapabilitiesFromSnapshot(snapshot: Prisma.JsonValue): Record<string, boolean> {
+  if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)) return {}
+  const capabilities = (snapshot as Record<string, unknown>).capabilities
+  if (capabilities === null || typeof capabilities !== 'object' || Array.isArray(capabilities)) {
+    return {}
+  }
+  const result: Record<string, boolean> = {}
+  for (const [key, value] of Object.entries(capabilities as Record<string, unknown>)) {
+    if (typeof value === 'boolean') result[key] = value
+  }
+  return result
 }

@@ -6,6 +6,7 @@ import {
 import {
   buildTrustBoundaryRequest,
   generateBoundaryNonce,
+  multimodalUntrustedPolicy,
   type TrustBoundaryResult,
 } from './trust-boundary.builder'
 
@@ -97,6 +98,20 @@ describe('buildTrustBoundaryRequest (Arc D trust boundary)', () => {
       expect(a.marker).not.toBe(b.marker)
       expect(a.marker.startsWith(GUARDRAIL_BOUNDARY_TAG_PREFIX)).toBe(true)
       expect(generateBoundaryNonce()).toMatch(/^[A-Za-z0-9_-]+$/)
+    })
+  })
+
+  describe('multimodalUntrustedPolicy (Arc G)', () => {
+    it('declares non-text (image/file) parts UNTRUSTED without wrapping bytes or claiming detection', () => {
+      const policy = multimodalUntrustedPolicy()
+
+      expect(policy).toContain('UNTRUSTED')
+      expect(policy.toLowerCase()).toContain('image')
+      expect(policy.toLowerCase()).toContain('file')
+      // It instructs "data, never instructions" — the same posture as the text/tool boundary.
+      expect(policy).toMatch(/never as instructions/i)
+      // Content-free: it references marker/role rules, not any specific artifact/prompt content.
+      expect(policy).not.toContain('amcore:user-data-')
     })
   })
 

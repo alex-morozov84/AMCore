@@ -16,12 +16,13 @@ Deployment targets and CD environments remain adopter-specific.
 
 ### Application Modules
 
-| Module            | Status         | Description                                                                                  |
-| ----------------- | -------------- | -------------------------------------------------------------------------------------------- |
-| **Notifications** | 🚧 In progress | In-app feed + preferences + durable email & Telegram dispatch + realtime SSE fan-out shipped |
-| **Fitness**       | 📋 Planned     | Workout tracking, exercise library, progress charts                                          |
-| **Finance**       | 📋 Planned     | Wallet management, transaction tracking                                                      |
-| **Subscriptions** | 📋 Planned     | Subscription monitoring, reminders                                                           |
+| Module            | Status          | Description                                                                                  |
+| ----------------- | --------------- | -------------------------------------------------------------------------------------------- |
+| **Notifications** | 🚧 In progress  | In-app feed + preferences + durable email & Telegram dispatch + realtime SSE fan-out shipped |
+| **AI Capability** | ✅ Foundational | Provider-agnostic AI backend: assistants, runs, tools/approvals, takeover, multimodal inputs |
+| **Fitness**       | 📋 Planned      | Workout tracking, exercise library, progress charts                                          |
+| **Finance**       | 📋 Planned      | Wallet management, transaction tracking                                                      |
+| **Subscriptions** | 📋 Planned      | Subscription monitoring, reminders                                                           |
 
 ## Tech Stack
 
@@ -49,6 +50,7 @@ amcore/
 │   └── typescript-config/
 ├── docs/
 │   ├── auth/           # Authentication & authorization documentation
+│   ├── ai/             # AI capability layer (assistants, runs, tools, artifacts, providers, security)
 │   ├── notifications/  # Notifications subsystem (in-app feed, durable email & Telegram dispatch, realtime SSE, preferences)
 │   ├── media/          # Image derivative/media processing documentation
 │   └── storage/        # File storage documentation
@@ -123,7 +125,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 - **Health Checks** — `/health`, `/health/startup`, `/health/ready`, `/health/live` (Kubernetes-ready)
 - **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys, invites) and notification retention at 03:00 UTC, both with multi-instance locking; plus a notification-dispatch recovery poller that runs on every worker replica (coordinated by Postgres `SKIP LOCKED`, not a lock)
 - **Notifications** — durable per-user subsystem: in-app feed + preferences, worker-driven email **and Telegram** channels with Postgres-owned retry/leases/attempt history (Telegram adds a `/start` deep-link + secret-header webhook + durable `update_id` dedupe), and a bearer-authenticated realtime SSE stream (`GET /notifications/stream`) fanned out cross-replica via Redis Pub/Sub with no sticky sessions (see [`docs/notifications/`](docs/notifications/README.md))
-- **AI Capability Layer** _(foundational)_ — a provider-agnostic AI control plane on its own `ai` Postgres schema: a DB-backed admin-manageable catalog (Anthropic/Claude default + OpenAI/OpenRouter/Yandex/OpenAI-compatible/mock) and a worker-only `ModelGateway` over the Vercel AI SDK for credential-gated text + capability-gated structured output, with a usage/cost ledger and content-free metrics. Durable **AI runs** execute on a worker (BullMQ wake + Postgres claim/lease/recovery, at-least-once provider effect / exactly-once durable outcome) behind a bearer HTTP surface — conversation/run create/fetch/list/cancel (`/ai/conversations`, `/ai/runs`) plus a **status-only** SSE stream (`GET /ai/runs/:id/stream`, refetch-on-hint, not token streaming). **Prompt-injection guardrails** wrap every run (OWASP LLM01 defense-in-depth): a structural trust boundary (untrusted user and tool-result text JSON-encoded in salted containers, never the instruction channel), deterministic low-false-positive input/output guards, and safe terminal refusals — mitigated and contained, never eliminated. A bounded, worker-executed **self-hosted tool loop** runs code-owned tools only after allowlist checks and persisted `AiToolInvocation` records; SENSITIVE/DESTRUCTIVE calls park in durable human-in-the-loop approvals (`GET /ai/approvals`, `POST /ai/approvals/:id/decision`). Human takeover and multimodal routing remain later arcs (see [`docs/ai/`](docs/ai/README.md))
+- **AI Capability Layer** _(foundational)_ — a provider-agnostic AI backend on its own `ai` Postgres schema: seeded provider/model catalog (Anthropic/Claude default + OpenAI/OpenRouter/Yandex/OpenAI-compatible/mock), worker-only `ModelGateway`, durable conversation/run API (`/ai/conversations`, `/ai/runs`), status-only SSE (`GET /ai/runs/:id/stream`), usage ledger, and content-free metrics. Versioned **assistants/agents** are managed through `admin/ai/assistants`; a bounded worker-executed **tool loop** runs code-owned tools and parks SENSITIVE/DESTRUCTIVE calls for owner approval (`/ai/approvals`). Human takeover/operator review (`/ai/conversations/:id/takeover`, transcript read, operator messages) is shipped with stale bot-write fencing and fail-closed privileged-read audit. Multimodal **artifacts** support private JPEG/PNG/WebP/PDF upload + `artifact_ref` run input with capability-gated routing. Prompt-injection controls use OWASP LLM01 defense-in-depth: structural trusted/untrusted separation, deterministic text guards, and safe refusals — mitigated and contained, never claimed eliminated (see [`docs/ai/`](docs/ai/README.md)).
 
 ### Tests
 
@@ -137,7 +139,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
 - [`docs/auth/csrf.md`](docs/auth/csrf.md) — Narrow CSRF posture for cookie-backed browser surfaces
 - [`docs/notifications/`](docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email & Telegram delivery, realtime SSE stream)
-- [`docs/ai/`](docs/ai/README.md) — AI capability layer guide (provider-agnostic catalog, `ModelGateway`, durable runs + run API + status-only SSE, prompt-injection guardrails, usage ledger, persistence + contracts; tools/takeover/multimodal arcs in progress)
+- [`docs/ai/`](docs/ai/README.md) — AI capability layer guide (assistants/agents, providers/models, durable runs, status-only SSE, tools/approvals, takeover/operator review, multimodal artifacts, security)
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
 - [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
 - [`docs/authorization.md`](docs/authorization.md) — Authorization guide

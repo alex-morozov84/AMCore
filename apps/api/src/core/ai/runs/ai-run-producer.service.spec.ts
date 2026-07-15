@@ -4,6 +4,7 @@ import type { PinoLogger } from 'nestjs-pino'
 import type { CreateAiRunInput } from '@amcore/shared'
 
 import {
+  BadRequestException,
   ConflictException,
   NotFoundException,
   ServiceUnavailableException,
@@ -11,6 +12,7 @@ import {
 
 import { AiRunProducerService } from './ai-run-producer.service'
 
+import type { EnvService } from '@/env/env.service'
 import type { AiModelRegistry } from '@/infrastructure/ai/registry/ai-model-registry.service'
 import type { ResolvedAiModel } from '@/infrastructure/ai/registry/ai-registry.types'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
@@ -58,6 +60,7 @@ describe('AiRunProducerService', () => {
   let prisma: DeepMockProxy<PrismaService>
   let registry: DeepMockProxy<AiModelRegistry>
   let queue: DeepMockProxy<QueueService>
+  let env: EnvService
   let logger: DeepMockProxy<PinoLogger>
   let service: AiRunProducerService
 
@@ -65,8 +68,11 @@ describe('AiRunProducerService', () => {
     prisma = mockDeep<PrismaService>()
     registry = mockDeep<AiModelRegistry>()
     queue = mockDeep<QueueService>()
+    env = {
+      get: jest.fn((key: string) => (key === 'AI_ARTIFACT_MAX_PARTS_PER_MESSAGE' ? 4 : 33_554_432)),
+    } as unknown as EnvService
     logger = mockDeep<PinoLogger>()
-    service = new AiRunProducerService(prisma, registry, queue, logger)
+    service = new AiRunProducerService(prisma, registry, queue, env, logger)
 
     registry.resolveDefaultModel.mockResolvedValue(DEFAULT_MODEL)
     prisma.$transaction.mockImplementation(((cb: (tx: PrismaService) => Promise<unknown>) =>
@@ -258,6 +264,225 @@ describe('AiRunProducerService', () => {
       })
       expect(prisma.aiRun.create).not.toHaveBeenCalled()
       expect(registry.resolveDefaultModel).not.toHaveBeenCalled() // never silently falls back
+    })
+  })
+
+  describe('artifact_ref binding (Arc G)', () => {
+    const MULTIMODAL_MODEL: ResolvedAiModel = {
+      ...DEFAULT_MODEL,
+      capabilities: { structured_output: true, vision: true, pdf: true },
+    }
+    const CONVERSATION_ROW = [
+      { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE', assistantId: null },
+    ]
+    const INPUT_WITH_ARTIFACT: CreateAiRunInput = {
+      conversationId: 'conv-1',
+      inputParts: [
+        { type: 'text', text: 'describe this' },
+        { type: 'artifact_ref', artifactId: 'art-1' },
+      ],
+      idempotencyKey: null,
+    }
+
+    function artifactRow(overrides: Record<string, unknown> = {}): Record<string, unknown>[] {
+      return [{ kind: 'IMAGE', sizeBytes: 1000, boundRunStatus: null, ...overrides }]
+    }
+
+    beforeEach(() => {
+      registry.resolveDefaultModel.mockResolvedValue(MULTIMODAL_MODEL)
+      prisma.aiMessage.create.mockResolvedValue({ id: 'msg-1' } as never)
+    })
+
+    it('binds a fresh (never-bound) artifact to the new run and message', async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce(CONVERSATION_ROW as never)
+        .mockResolvedValueOnce(artifactRow() as never)
+
+      await service.create('user-1', INPUT_WITH_ARTIFACT)
+
+      expect(prisma.aiArtifact.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['art-1'] }, conversationId: 'conv-1' },
+        data: { runId: 'run-1', messageId: 'msg-1' },
+      })
+    })
+
+    it('deduplicates a repeated artifact_ref: locks/counts/binds it once', async () => {
+      const dupInput: CreateAiRunInput = {
+        conversationId: 'conv-1',
+        inputParts: [
+          { type: 'artifact_ref', artifactId: 'art-1' },
+          { type: 'artifact_ref', artifactId: 'art-1' },
+        ],
+        idempotencyKey: null,
+      }
+      prisma.$queryRaw
+        .mockResolvedValueOnce(CONVERSATION_ROW as never)
+        .mockResolvedValueOnce(artifactRow() as never)
+
+      await service.create('user-1', dupInput)
+
+      // Conversation lock + exactly ONE artifact lock (not two) — the duplicate collapsed.
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+      expect(prisma.aiArtifact.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['art-1'] }, conversationId: 'conv-1' },
+        data: { runId: 'run-1', messageId: 'msg-1' },
+      })
+    })
+
+    it('allows rebinding an artifact whose bound run is FAILED', async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce(CONVERSATION_ROW as never)
+        .mockResolvedValueOnce(artifactRow({ boundRunStatus: 'FAILED' }) as never)
+
+      await expect(service.create('user-1', INPUT_WITH_ARTIFACT)).resolves.toMatchObject({
+        id: 'run-1',
+      })
+    })
+
+    it('allows rebinding an artifact whose bound run is CANCELLED or EXPIRED', async () => {
+      for (const status of ['CANCELLED', 'EXPIRED']) {
+        prisma.$queryRaw
+          .mockResolvedValueOnce(CONVERSATION_ROW as never)
+          .mockResolvedValueOnce(artifactRow({ boundRunStatus: status }) as never)
+        await expect(service.create('user-1', INPUT_WITH_ARTIFACT)).resolves.toMatchObject({
+          id: 'run-1',
+        })
+      }
+    })
+
+    it.each(['QUEUED', 'RUNNING', 'WAITING_APPROVAL', 'WAITING_HUMAN', 'COMPLETED'])(
+      'rejects rebinding an artifact whose bound run is %s (409, no run created)',
+      async (status) => {
+        prisma.$queryRaw
+          .mockResolvedValueOnce(CONVERSATION_ROW as never)
+          .mockResolvedValueOnce(artifactRow({ boundRunStatus: status }) as never)
+
+        await expect(service.create('user-1', INPUT_WITH_ARTIFACT)).rejects.toBeInstanceOf(
+          ConflictException
+        )
+        expect(prisma.aiRun.create).not.toHaveBeenCalled()
+      }
+    )
+
+    it('rejects an unknown/foreign artifact reference (400, no run created)', async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce(CONVERSATION_ROW as never)
+        .mockResolvedValueOnce([] as never)
+
+      await expect(service.create('user-1', INPUT_WITH_ARTIFACT)).rejects.toBeInstanceOf(
+        BadRequestException
+      )
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+    })
+
+    it('rejects when the resolved model lacks the required capability (400)', async () => {
+      registry.resolveDefaultModel.mockResolvedValue(DEFAULT_MODEL) // no vision/pdf
+      prisma.$queryRaw
+        .mockResolvedValueOnce(CONVERSATION_ROW as never)
+        .mockResolvedValueOnce(artifactRow() as never)
+
+      await expect(service.create('user-1', INPUT_WITH_ARTIFACT)).rejects.toBeInstanceOf(
+        BadRequestException
+      )
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+    })
+
+    it("rejects when the bound assistant's allowedModalities excludes the artifact kind (400)", async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ ...CONVERSATION_ROW[0], assistantId: 'asst-1' }] as never)
+        .mockResolvedValueOnce(artifactRow() as never)
+      prisma.aiAssistant.findUnique.mockResolvedValue({
+        enabled: true,
+        modelSelection: { modelSlug: 'claude-default', fallback: [] },
+        allowedModalities: ['text'],
+      } as never)
+      registry.resolveModel.mockResolvedValue(MULTIMODAL_MODEL)
+      registry.hasCredential.mockReturnValue(true)
+
+      await expect(service.create('user-1', INPUT_WITH_ARTIFACT)).rejects.toBeInstanceOf(
+        BadRequestException
+      )
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+    })
+
+    it("allows the artifact kind when the bound assistant's allowedModalities includes it", async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ ...CONVERSATION_ROW[0], assistantId: 'asst-1' }] as never)
+        .mockResolvedValueOnce(artifactRow() as never)
+      prisma.aiAssistant.findUnique.mockResolvedValue({
+        enabled: true,
+        modelSelection: { modelSlug: 'claude-default', fallback: [] },
+        allowedModalities: ['text', 'image'],
+      } as never)
+      registry.resolveModel.mockResolvedValue(MULTIMODAL_MODEL)
+      registry.hasCredential.mockReturnValue(true)
+
+      await expect(service.create('user-1', INPUT_WITH_ARTIFACT)).resolves.toMatchObject({
+        id: 'run-1',
+      })
+    })
+
+    it('rejects too many artifact references before any artifact lock query (400)', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce(CONVERSATION_ROW as never)
+      const tooMany: CreateAiRunInput = {
+        conversationId: 'conv-1',
+        inputParts: [
+          { type: 'artifact_ref', artifactId: 'a1' },
+          { type: 'artifact_ref', artifactId: 'a2' },
+          { type: 'artifact_ref', artifactId: 'a3' },
+          { type: 'artifact_ref', artifactId: 'a4' },
+          { type: 'artifact_ref', artifactId: 'a5' },
+        ],
+        idempotencyKey: null,
+      }
+
+      await expect(service.create('user-1', tooMany)).rejects.toBeInstanceOf(BadRequestException)
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1) // only the conversation lock
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+    })
+
+    it('rejects when referenced artifacts exceed the total per-message byte budget (400)', async () => {
+      const twoArtifacts: CreateAiRunInput = {
+        conversationId: 'conv-1',
+        inputParts: [
+          { type: 'artifact_ref', artifactId: 'a1' },
+          { type: 'artifact_ref', artifactId: 'a2' },
+        ],
+        idempotencyKey: null,
+      }
+      prisma.$queryRaw
+        .mockResolvedValueOnce(CONVERSATION_ROW as never)
+        .mockResolvedValueOnce(artifactRow({ sizeBytes: 20_000_000 }) as never)
+        .mockResolvedValueOnce(artifactRow({ sizeBytes: 20_000_000 }) as never)
+
+      await expect(service.create('user-1', twoArtifacts)).rejects.toBeInstanceOf(
+        BadRequestException
+      )
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+    })
+
+    it('rejects a single artifact above the aggregate raw-byte cap even though it is within the per-document upload max (base64-overhead regression)', async () => {
+      // 26 MB raw is well under the per-document upload ceiling an operator could configure
+      // (env-bounded up to 33_554_432) but above AI_ARTIFACT_MAX_TOTAL_RAW_BYTES_PER_MESSAGE
+      // (25_165_824 = 32 MiB * 3/4, the reverse of base64's 4/3 expansion) — this is the exact
+      // scenario a raw-byte cap set to the encoded 32 MiB ceiling directly would have missed.
+      prisma.$queryRaw
+        .mockResolvedValueOnce(CONVERSATION_ROW as never)
+        .mockResolvedValueOnce(artifactRow({ kind: 'PDF', sizeBytes: 26_000_000 }) as never)
+
+      await expect(service.create('user-1', INPUT_WITH_ARTIFACT)).rejects.toBeInstanceOf(
+        BadRequestException
+      )
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+    })
+
+    it('does not touch aiArtifact.updateMany for a text-only run (no behavior change)', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce(CONVERSATION_ROW as never)
+
+      await service.create('user-1', INPUT)
+
+      expect(prisma.aiArtifact.updateMany).not.toHaveBeenCalled()
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1) // only the conversation lock
     })
   })
 })

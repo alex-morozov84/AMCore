@@ -10,6 +10,7 @@ import type {
   AiTextResult,
   AiToolCall,
   AiUsage,
+  AiUserContentPart,
 } from '../ai-gateway.types'
 
 /** Rough deterministic token estimate (~4 chars/token) for the key-less mock. */
@@ -21,7 +22,21 @@ function estimateTokens(text: string): number {
 function messageText(message: AiGenerateMessage): string {
   if (message.role === 'tool') return message.toolResults.map((result) => result.output).join(' ')
   if ('toolCalls' in message) return message.toolCalls.map((call) => call.toolName).join(' ')
-  return message.content
+  return contentText(message.content)
+}
+
+/**
+ * Flatten a user turn's content to plain text (Arc G). The mock never declares `vision`/`pdf`, so
+ * the gateway's central capability gate keeps a multimodal turn from reaching it in practice —
+ * this only makes the mock defensively correct (image/file parts are invisible to a text-only
+ * provider, exactly as a real text-only model would behave if it ignored non-text parts).
+ */
+function contentText(content: string | AiUserContentPart[]): string {
+  if (typeof content === 'string') return content
+  return content
+    .filter((part): part is Extract<AiUserContentPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join(' ')
 }
 
 /**
@@ -66,8 +81,8 @@ export class MockAiAdapter implements AiProviderAdapter {
       return this.textResult(call, `[mock:${call.model.providerModelName}] tool result: ${joined}`)
     }
 
-    const rawLastUser =
-      [...call.messages].reverse().find((message) => message.role === 'user')?.content ?? ''
+    const lastUserMessage = [...call.messages].reverse().find((message) => message.role === 'user')
+    const rawLastUser = lastUserMessage ? contentText(lastUserMessage.content) : ''
     const userContent = readUserContent(rawLastUser)
 
     if (userContent.includes('__mock_error__')) throw new Error('mock adapter forced failure')

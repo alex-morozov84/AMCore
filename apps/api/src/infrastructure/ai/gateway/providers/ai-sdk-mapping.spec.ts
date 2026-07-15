@@ -182,6 +182,38 @@ describe('toModelMessages (provider-agnostic turn mapping, Arc E)', () => {
     ])
   })
 
+  it('maps a multimodal user turn to SDK text/image/file parts (Arc G)', () => {
+    const image = Buffer.from('img')
+    const pdf = Buffer.from('pdf')
+    expect(
+      toModelMessages([
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'describe this' },
+            { type: 'image', data: image, mediaType: 'image/png' },
+            { type: 'file', data: pdf, mediaType: 'application/pdf', filename: 'a.pdf' },
+          ],
+        },
+      ])
+    ).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'describe this' },
+          { type: 'image', image, mediaType: 'image/png' },
+          { type: 'file', data: pdf, mediaType: 'application/pdf', filename: 'a.pdf' },
+        ],
+      },
+    ])
+  })
+
+  it('leaves a plain string user turn unchanged (no multimodal parts present)', () => {
+    expect(toModelMessages([{ role: 'user', content: 'hi' }])).toEqual([
+      { role: 'user', content: 'hi' },
+    ])
+  })
+
   it('accepts the Arc E.5 synthetic approval toolCallId, paired across the assistant + tool turns', () => {
     // The approval-gated resume path pairs turns with `ai-tool-inv:<invocationId>` (no original
     // provider id is persisted). The provider mapping must carry it through verbatim on both turns.

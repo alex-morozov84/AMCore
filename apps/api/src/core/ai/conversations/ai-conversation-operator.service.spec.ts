@@ -9,6 +9,7 @@ import {
   NotFoundException,
 } from '../../../common/exceptions'
 
+import { AiConversationAccessAuthorizer } from './ai-conversation-access.authorizer'
 import type { AiConversationControlService } from './ai-conversation-control.service'
 import { AiConversationOperatorService } from './ai-conversation-operator.service'
 
@@ -64,9 +65,12 @@ describe('AiConversationOperatorService', () => {
     metrics = { incAiConversationControl: jest.fn() }
     const env = { get: jest.fn(() => STEP_UP_WINDOW) } as unknown as EnvService
     const logger = { setContext: jest.fn(), info: jest.fn() } as unknown as PinoLogger
+    // The real authorizer over the SAME mocked prisma/env: the extraction (Arc G) is
+    // behavior-preserving, so every access/step-up/reason expectation below stays green unchanged.
+    const authorizer = new AiConversationAccessAuthorizer(prisma, env)
     service = new AiConversationOperatorService(
       prisma,
-      env,
+      authorizer,
       control as unknown as AiConversationControlService,
       audit as unknown as import('../../audit').AuditLogService,
       metrics as unknown as import('@/infrastructure/observability').MetricsService,
@@ -232,11 +236,27 @@ describe('AiConversationOperatorService', () => {
           action: 'ai.conversation.transcript_accessed',
           targetType: 'AI_CONVERSATION',
           metadata: expect.objectContaining({ actorRole: 'operator', reasonRef: 'SUP-9' }),
-        })
+        }),
+        // Strict, fail-closed: the read is not served until the access is durably recorded.
+        { failOpen: false }
       )
       // The audit metadata never carries message content.
       const meta = audit.record.mock.calls[0]![0].metadata as Record<string, unknown>
       expect(JSON.stringify(meta)).not.toContain('hi')
+    })
+
+    it('does not return the transcript when the fail-closed access audit rejects (cross-user)', async () => {
+      prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
+      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
+      prisma.aiMessage.findMany.mockResolvedValue([msg(0)] as never)
+      audit.record.mockRejectedValue(new Error('audit sink down'))
+
+      // getTranscript awaits the strict audit before returning — a rejection propagates, so the
+      // caller never receives the transcript. (Paired with the AuditLogService spec proving the
+      // strict `failOpen:false` path actually throws on a real DB-write failure.)
+      await expect(
+        service.getTranscript(operatorPrincipal, 'conv-1', { limit: 20 }, 'SUP-9')
+      ).rejects.toThrow('audit sink down')
     })
 
     it('403 for a cross-user read with a stale session (no transcript served)', async () => {

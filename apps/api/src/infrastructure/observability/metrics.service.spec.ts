@@ -185,6 +185,40 @@ describe('MetricsService', () => {
     expect(line).not.toMatch(/category=|reason=|marker=/)
   })
 
+  it('records AI artifact uploads with only bounded kind/result/role labels', async () => {
+    const service = makeService()
+
+    service.incAiArtifactUpload('image', 'success')
+    service.incAiArtifactUpload('pdf', 'rejected')
+
+    const output = await service.metrics()
+    expect(output).toContain(
+      `${METRIC_NAMES.aiArtifactUploadsTotal}{kind="image",result="success",role="web"`
+    )
+    const line = output
+      .split('\n')
+      .find((l) => l.startsWith(`${METRIC_NAMES.aiArtifactUploadsTotal}{kind="pdf"`))
+    expect(line).toContain('result="rejected"')
+    expect(line).not.toMatch(/conversationId=|artifactId=|filename=|contentType=/)
+  })
+
+  it('records AI artifact byte resolution with only a bounded result/role label', async () => {
+    const service = makeService()
+
+    service.incAiArtifactResolution('success')
+    service.incAiArtifactResolution('storage_error')
+
+    const output = await service.metrics()
+    expect(output).toContain(
+      `${METRIC_NAMES.aiArtifactResolutionTotal}{result="success",role="web"`
+    )
+    const line = output
+      .split('\n')
+      .find((l) => l.startsWith(`${METRIC_NAMES.aiArtifactResolutionTotal}{result="storage_error"`))
+    expect(line).toBeDefined()
+    expect(line).not.toMatch(/conversationId=|artifactId=|storageKey=|contentType=/)
+  })
+
   it('records AI tool-invocation, approval, and loop-step metrics with only bounded labels', async () => {
     const service = makeService()
 
