@@ -10,7 +10,14 @@ import {
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { ApiBearerAuth, ApiHeader, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
 import type { Response } from 'express'
 import { ZodResponse } from 'nestjs-zod'
@@ -75,6 +82,10 @@ export class AiArtifactsController {
     description: 'Reason / ticket ref — required for a cross-user SUPER_ADMIN operator download.',
   })
   @ApiOperation({ summary: 'Download an artifact (owner or SUPER_ADMIN operator)' })
+  @ApiOkResponse({
+    description: 'The artifact bytes, served as an attachment (never a URL).',
+    schema: { type: 'string', format: 'binary' },
+  })
   downloadArtifact(
     @CurrentUser() principal: RequestPrincipal,
     @Param('id') conversationId: string,
