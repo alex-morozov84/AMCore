@@ -178,7 +178,8 @@ describe('AI multimodal artifact lifecycle (e2e)', () => {
    * genuinely-broken run still fails the caller's specific status assertion.
    */
   async function driveToTerminal(runId: string): Promise<void> {
-    for (let i = 0; i < 5; i += 1) {
+    const MAX_DRAINS = 5
+    for (let i = 0; i < MAX_DRAINS; i += 1) {
       await dispatch.drainDueBatches()
       const run = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })
       if (TERMINAL.includes(run.status)) return
@@ -186,6 +187,13 @@ describe('AI multimodal artifact lifecycle (e2e)', () => {
         await prisma.aiRun.update({ where: { id: runId }, data: { nextAttemptAt: new Date(0) } })
       }
     }
+    // Never reached in a healthy run: fail with a precise diagnostic instead of leaving the caller's
+    // status assertion to report an opaque non-terminal status (e.g. QUEUED) after the drains.
+    const run = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })
+    throw new Error(
+      `Run ${runId} did not reach a terminal status within ${MAX_DRAINS} drains ` +
+        `(status=${run.status}, errorCode=${run.errorCode ?? 'null'}, attemptCount=${run.attemptCount})`
+    )
   }
 
   describe('upload + run + worker resolution (headline)', () => {
