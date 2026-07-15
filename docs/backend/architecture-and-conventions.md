@@ -14,10 +14,11 @@ For the high-level module tree, tech stack, and runtime layers, read
 
 AMCore is a **modular monolith**. The rules that keep it modular:
 
-- **A schema per bounded product area.** `core` is the shared system foundation —
-  auth, organizations, api-keys, and admin cooperate closely and may read each
-  other's tables. Each distinct _product_ area gets its own schema (`fitness`,
-  `finance`, `subscriptions`). Every Prisma model is tagged `@@schema("<area>")`.
+- **A schema per bounded area.** `core` is the shared system foundation — auth,
+  organizations, api-keys, and admin cooperate closely and may read each other's
+  tables. Each distinct product or reusable capability gets its own schema
+  (for example, `notifications`, `ai`, or a downstream app's domain schema).
+  Every Prisma model is tagged `@@schema("<area>")`.
 - **Product areas don't reach into another area's tables.** Cross-area access goes
   through an exported NestJS **service**, never a direct Prisma read of another
   area's tables. (Within the shared `core` foundation, modules may read each other.)

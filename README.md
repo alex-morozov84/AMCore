@@ -1,7 +1,6 @@
 # AMCore
 
-> Modular personal productivity platform — fitness, finance, subscriptions.
-> Built on a production-oriented NestJS API starter.
+> Production-oriented NestJS application starter for secure, modular products.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](LICENSE)
 [![CI](https://github.com/alex-morozov84/AMCore/actions/workflows/ci.yml/badge.svg)](https://github.com/alex-morozov84/AMCore/actions/workflows/ci.yml)
@@ -9,20 +8,33 @@
 
 ## Overview
 
-AMCore is a modular web application for personal productivity. The backend is
-designed as an exemplary open-source NestJS starter with strong application and
-security foundations, broad tests, and a completed production-readiness baseline.
+AMCore is a production-oriented application starter for building secure, modular
+SaaS products, internal tools, and AI-enabled systems. The current reusable
+surface is backend-first: a NestJS API foundation with strong application and
+security primitives, broad tests, and a completed production-readiness baseline.
 Deployment targets and CD environments remain adopter-specific.
 
-### Application Modules
+The repository also contains a Next.js frontend workspace. It is intentionally
+kept as a starter shell while the backend surface is completed, then will be
+brought up to the same quality bar instead of being removed.
 
-| Module            | Status          | Description                                                                                  |
-| ----------------- | --------------- | -------------------------------------------------------------------------------------------- |
-| **Notifications** | 🚧 In progress  | In-app feed + preferences + durable email & Telegram dispatch + realtime SSE fan-out shipped |
-| **AI Capability** | ✅ Foundational | Provider-agnostic AI backend: assistants, runs, tools/approvals, takeover, multimodal inputs |
-| **Fitness**       | 📋 Planned      | Workout tracking, exercise library, progress charts                                          |
-| **Finance**       | 📋 Planned      | Wallet management, transaction tracking                                                      |
-| **Subscriptions** | 📋 Planned      | Subscription monitoring, reminders                                                           |
+### Backend Starter Capabilities
+
+| Capability        | Status          | Description                                                                                 |
+| ----------------- | --------------- | ------------------------------------------------------------------------------------------- |
+| **Auth & RBAC**   | ✅ Shipped      | Email auth, OAuth/OIDC, sessions, organizations, CASL permissions, admin flows              |
+| **API Keys**      | ✅ Shipped      | Long-lived scoped server-to-server tokens with hashed secrets and org permission checks     |
+| **Storage**       | ✅ Shipped      | S3-compatible, local, and memory drivers with private-by-default uploads and download seams |
+| **Media**         | ✅ Foundational | Safe image derivatives via `sharp`/libvips; avatar upload/delete is the shipped consumer    |
+| **Notifications** | ✅ Shipped      | In-app feed, preferences, durable email + Telegram dispatch, realtime SSE fan-out           |
+| **AI Capability** | ✅ Foundational | Provider-agnostic assistants, runs, tools/approvals, takeover, multimodal inputs            |
+| **Operations**    | ✅ Shipped      | Health, observability, audit log, idempotency, webhooks, CI/security automation             |
+
+### Product Modules
+
+Product-specific modules are intentionally left to downstream applications.
+Forks can add their own bounded areas on top of the starter's reusable
+capabilities without inheriting an unrelated sample domain.
 
 ## Tech Stack
 

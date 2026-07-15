@@ -96,13 +96,12 @@ apps/api/src/
 
 PostgreSQL uses schema separation for module isolation:
 
-| Schema          | Tables                                                                                                                                                                                     |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `core`          | users, sessions, oauth_accounts, user_settings, password_reset_tokens, email_verification_tokens, api_keys, organizations, org_members, roles, member_roles, permissions, role_permissions |
-| `notifications` | notifications, notification_deliveries, notification_delivery_attempts, notification_preferences, telegram_connections, telegram_link_tokens, telegram_update_receipts                     |
-| `fitness`       | exercises, workouts, measurements (coming)                                                                                                                                                 |
-| `finance`       | wallets, transactions (planned)                                                                                                                                                            |
-| `subscriptions` | services, subscriptions (planned)                                                                                                                                                          |
+| Schema           | Tables                                                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `core`           | users, sessions, oauth_accounts, user_settings, password_reset_tokens, email_verification_tokens, api_keys, organizations, org_members, roles, member_roles, permissions, role_permissions |
+| `notifications`  | notifications, notification_deliveries, notification_delivery_attempts, notification_preferences, telegram_connections, telegram_link_tokens, telegram_update_receipts                     |
+| `ai`             | providers, models, assistants, conversations, messages, runs, steps, tool invocations, approvals, artifacts, usage ledger                                                                  |
+| `<product-area>` | downstream application tables; add a schema per bounded domain                                                                                                                             |
 
 Modules communicate through explicit service/module contracts and shared API
 schemas. PostgreSQL schemas separate ownership, but do not permit direct
