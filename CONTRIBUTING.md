@@ -80,9 +80,13 @@ chore: unify github repository url
 1. Run `pnpm lint` and `pnpm typecheck` — must pass.
 2. Run `pnpm test` — all tests must pass.
 3. Run `pnpm format:check` — or `pnpm format` to fix.
-4. Add notable user-facing changes to `CHANGELOG.md` under `[Unreleased]`. Skip
+4. Check docs impact. Update affected `README.md`, `AGENTS.md`, and `docs/`
+   pages when behavior, API contracts, extension points, security invariants,
+   operations, commands, or contributor workflow changed. If no docs update is
+   needed, say so in the PR.
+5. Add notable user-facing changes to `CHANGELOG.md` under `[Unreleased]`. Skip
    internal refactors, tests, and typo-only documentation changes.
-5. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
+6. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
 
 CI runs the same checks on push; fixing any failures before opening a PR saves time.
 

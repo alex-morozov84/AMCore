@@ -81,12 +81,15 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   lines, no mention of the tool).
 - Keep changes small and focused: **files < 150 lines, functions < 30 lines**;
   one responsibility per file.
-- **Updating docs is part of "done", not optional.** When a change affects
-  user/contributor-facing behavior or a contract, update the relevant `docs/`,
-  `README.md`, `CONTRIBUTING.md`, and `AGENTS.md` in the same PR. Record significant
-  or architectural choices in an ADR. Add notable user-facing changes under
-  `CHANGELOG.md` → `[Unreleased]`; ordinary PRs do not create or change release tags.
-  See `CONTRIBUTING.md` → _Changelog & releases_ for the release procedure.
+- **Docs impact check is required.** Before editing, identify which public docs
+  the task can affect. When behavior, API contracts, extension points, security
+  invariants, operations, commands, or contributor workflow change, update the
+  relevant `docs/`, `README.md`, `CONTRIBUTING.md`, and `AGENTS.md` in the same
+  PR. If no docs change is needed, state why in the final response. Record
+  significant or architectural choices in an ADR. Add notable user-facing
+  changes under `CHANGELOG.md` → `[Unreleased]`; ordinary PRs do not create or
+  change release tags. See `CONTRIBUTING.md` → _Changelog & releases_ for the
+  release procedure.
 - First-time setup of `strict` repo protections (they do not travel with a
   fork): `bash scripts/setup-repo-security.sh` — see
   `docs/operations/ci-security.md` → _Strict security setup after forking_. The
