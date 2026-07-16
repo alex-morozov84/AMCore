@@ -4,6 +4,25 @@ AMCore exposes Prometheus metrics from the API process. Logs remain structured
 Pino JSON with `correlationId`; metrics are the low-cardinality time-series
 surface for latency, error rate, and runtime health trends.
 
+## Structured Logs
+
+Application logs are structured Pino JSON in production and include a
+`correlationId` on every log record. The value is read from `X-Request-ID` /
+`X-Correlation-ID` when present, otherwise AMCore generates one for the request.
+
+HTTP request logs include bounded request metadata such as method, route, status,
+user id when authenticated, user agent, and an anonymized client IP. IPv4
+addresses have the host portion zeroed; IPv6 addresses keep only the network
+prefix. Health routes are excluded from request logs to reduce noise.
+
+Sensitive data is redacted before logs leave the process. This includes
+passwords, password hashes, refresh/access/OAuth tokens, API keys, cookies,
+authorization headers, token-bearing action URLs, AI operator reasons, provider
+bodies, and other known secret-bearing fields. New code must not log raw request
+bodies, rendered email bodies, object keys, prompt/provider payloads, or
+free-form user content unless a feature-specific public doc explicitly allows
+that field.
+
 ## Metrics Endpoint
 
 Real bootstrap sets the global prefix, so the scrape path is:
