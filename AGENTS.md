@@ -119,6 +119,8 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - `CONTRIBUTING.md` — contributor process (commands, commit format, PR checklist).
 - `docs/backend/architecture-and-conventions.md` — how to add a backend module
   (boundaries, shared contracts, process roles, required tests).
+- `docs/email/` — email extension contract: `NotificationsService` vs
+  `EmailService`, React Email templates, queueing, and secret-link rules.
 - `docs/auth/`, `docs/storage/`, `docs/media/` — feature guides.
 - `docs/operations/` — deployment, observability, webhooks, idempotency,
   audit-log, **ci-security** (CI gates + repo-security setup).

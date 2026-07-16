@@ -4,18 +4,18 @@
 
 ## Tech Stack
 
-| Component         | Technology                                     | Purpose                            |
-| ----------------- | ---------------------------------------------- | ---------------------------------- |
-| **Framework**     | NestJS 11                                      | Modular monolith                   |
-| **Database**      | PostgreSQL 16                                  | Primary data store (multi-schema)  |
-| **ORM**           | Prisma 7                                       | Type-safe database access          |
-| **Cache / Queue** | Redis + BullMQ                                 | Sessions, caching, background jobs |
-| **Validation**    | Zod + nestjs-zod                               | Request validation + auto Swagger  |
-| **Auth**          | JWT + Refresh Tokens, OAuth 2.0/OIDC, API Keys | Multi-method authentication        |
-| **Email**         | Resend + React Email + FormatJS                | Transactional emails               |
-| **Storage**       | S3-compatible + local + memory drivers         | File uploads, avatars, signed URLs |
-| **Logging**       | Pino (nestjs-pino)                             | Structured JSON logging            |
-| **API Docs**      | Swagger (OpenAPI)                              | Auto-generated at `/docs`          |
+| Component         | Technology                                     | Purpose                                                |
+| ----------------- | ---------------------------------------------- | ------------------------------------------------------ |
+| **Framework**     | NestJS 11                                      | Modular monolith                                       |
+| **Database**      | PostgreSQL 16                                  | Primary data store (multi-schema)                      |
+| **ORM**           | Prisma 7                                       | Type-safe database access                              |
+| **Cache / Queue** | Redis + BullMQ                                 | Sessions, caching, background jobs                     |
+| **Validation**    | Zod + nestjs-zod                               | Request validation + auto Swagger                      |
+| **Auth**          | JWT + Refresh Tokens, OAuth 2.0/OIDC, API Keys | Multi-method authentication                            |
+| **Email**         | Resend + React Email + FormatJS                | Transactional emails and notification-channel delivery |
+| **Storage**       | S3-compatible + local + memory drivers         | File uploads, avatars, signed URLs                     |
+| **Logging**       | Pino (nestjs-pino)                             | Structured JSON logging                                |
+| **API Docs**      | Swagger (OpenAPI)                              | Auto-generated at `/docs`                              |
 
 ## Module Structure
 
@@ -78,7 +78,7 @@ apps/api/src/
 │
 ├── infrastructure/
 │   ├── ai/                     # Track C: worker-only ModelGateway + SDK adapters + durable run engine
-│   ├── email/                  # Resend + React Email (direct secret sends + queued notifications)
+│   ├── email/                  # Resend + React Email (direct secret sends + queued non-secret email + notification adapter)
 │   ├── queue/                  # BullMQ setup + Bull Board
 │   ├── storage/                # S3/local/memory storage providers + validation
 │   └── schedule/               # Nightly cleanup cron
@@ -361,6 +361,7 @@ is imported (worker/all). Assert the gating in `test/process-role.e2e-spec.ts`.
 - [`docs/operations/observability.md`](../../docs/operations/observability.md) — Metrics and tracing guide
 - [`docs/auth/`](../../docs/auth/README.md) — Complete auth & RBAC guide for developers
 - [`docs/authorization.md`](../../docs/authorization.md) — Authorization concepts
+- [`docs/email/`](../../docs/email/README.md) — Email extension contract (templates, queueing, secret-bearing sends)
 - [`docs/notifications/`](../../docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email & Telegram delivery, realtime SSE stream)
 - [`docs/ai/`](../../docs/ai/README.md) — AI capability layer (assistants/agents, provider/model catalog, durable runs, tools/approvals, takeover/operator review, multimodal artifacts, security)
 

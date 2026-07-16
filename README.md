@@ -63,6 +63,7 @@ amcore/
 ├── docs/
 │   ├── auth/           # Authentication & authorization documentation
 │   ├── ai/             # AI capability layer (assistants, runs, tools, artifacts, providers, security)
+│   ├── email/          # Email extension contract (templates, queueing, secret-bearing sends)
 │   ├── notifications/  # Notifications subsystem (in-app feed, durable email & Telegram dispatch, realtime SSE, preferences)
 │   ├── media/          # Image derivative/media processing documentation
 │   └── storage/        # File storage documentation
@@ -150,6 +151,7 @@ requires adopter-owned infrastructure, secrets, environments, and capacity choic
 - [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md) — How to add a backend module (boundaries, contracts, process roles, tests)
 - [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
 - [`docs/auth/csrf.md`](docs/auth/csrf.md) — Narrow CSRF posture for cookie-backed browser surfaces
+- [`docs/email/`](docs/email/README.md) — Email extension contract (when to use `NotificationsService` vs `EmailService`, how to add templates, queueing and secret-link rules)
 - [`docs/notifications/`](docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email & Telegram delivery, realtime SSE stream)
 - [`docs/ai/`](docs/ai/README.md) — AI capability layer guide (assistants/agents, providers/models, durable runs, status-only SSE, tools/approvals, takeover/operator review, multimodal artifacts, security)
 - [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)

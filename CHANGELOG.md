@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the email extension contract for downstream product emails, including
+  `NotificationsService` vs `EmailService` selection, template wiring, queueing
+  rules, required tests, and secret-bearing email invariants.
 - Documented repository workflow modes (`strict`, `flexible`, `custom`) so
   downstream products can choose their GitHub enforcement model instead of
   inheriting AMCore upstream's strict protected-`main` workflow by default.
@@ -294,6 +297,8 @@ connection` reports status; `DELETE …/connection` unlinks (cancelling pending
 
 ### Changed
 
+- Hardened the mock email provider to log metadata only, avoiding rendered HTML
+  or plaintext previews that could contain secret token URLs.
 - The `account.password_changed` security alert now also delivers to Telegram for a
   linked user (Arc D), as an **optional, non-mandatory** default channel — generic
   plain-text, disableable in preferences, and a no-op (`SKIPPED`) for an unlinked user.
