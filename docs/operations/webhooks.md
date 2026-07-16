@@ -46,7 +46,7 @@ provider is currently wired to the standard `webhook-id` /
 
 ### `telegram`
 
-A different verifier **family** (Arc D): Telegram provides **no body signature and no
+A different verifier **family**: Telegram provides **no body signature and no
 timestamp**. `setWebhook(secret_token=…)` makes Telegram attach a static shared secret in
 the `X-Telegram-Bot-Api-Secret-Token` header on every POST; the verifier compares it to
 `WEBHOOK_TELEGRAM_SECRET` in constant time. A missing / array / non-string header is a

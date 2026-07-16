@@ -51,8 +51,8 @@ then publish an assistant version whose `toolAllowlist` includes `"echo"`.
   downstream.
 - Tools must enforce their own domain authorization using `ctx.ownerUserId` /
   `ctx.organizationId`.
-- Tool output is plain text in this arc and re-enters the model as untrusted data.
-  Do not put secrets or large payloads in it.
+- Tool output is plain text and re-enters the model as untrusted data. Do not put
+  secrets or large payloads in it.
 
 ## Approval Flow
 
@@ -79,7 +79,7 @@ tool is not executed.
 | `POST /ai/approvals/:id/decision` | Approve or reject an owned pending approval. |
 
 Only the conversation owner can decide approvals. Cross-user operators can take
-over/review a conversation, but do not receive approval authority in this arc.
+over/review a conversation, but do not receive approval authority.
 
 ## Configuration
 

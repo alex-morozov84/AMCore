@@ -109,7 +109,7 @@ Residual caveat:
 
 - a sufficiently privileged owner or superuser can still bypass append-only via
   DDL such as disabling or dropping the trigger.
-- External WORM storage is out of scope for Arc 6.
+- External WORM storage is out of scope for the current audit-log baseline.
 
 ## Retention And Export
 
@@ -124,7 +124,7 @@ Current policy:
 
 ## Read Access
 
-Arc 6 does not add an admin read endpoint yet.
+AMCore does not ship an admin read endpoint yet.
 
 When a read endpoint is added later, access to the audit log must itself be
 audited.

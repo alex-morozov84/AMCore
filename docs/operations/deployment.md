@@ -213,7 +213,7 @@ drain disjoint rows without double-sending. The throttler is Redis-backed
 
 Two long-lived SSE endpoints share the same rules and must not be buffered or timed
 out by an intermediary: `GET /notifications/stream` (ADR-053) and the AI run
-**status-only** stream `GET /ai/runs/:id/stream` (Track C — the same primitives,
+**status-only** stream `GET /ai/runs/:id/stream` (the same primitives,
 governed by the parallel `AI_REALTIME_*` knobs; e.g. `AI_REALTIME_HEARTBEAT_MS`,
 `AI_REALTIME_MAX_CONNECTIONS`, `AI_REALTIME_NAMESPACE`). The guidance below is written
 for the notification stream; apply it identically to the AI run stream.

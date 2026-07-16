@@ -146,9 +146,9 @@ use bearer sessions.
 
 ## Current Scope and Deferred Work
 
-Shipped: foundational Track C arcs A–G — persistence/contracts, gateway/catalog
-runtime, durable runs, guardrails, tools/approvals, assistant registry/human
-takeover, and multimodal image/PDF artifacts.
+Shipped: persistence/contracts, gateway/catalog runtime, durable runs,
+guardrails, tools/approvals, assistant registry/human takeover, and multimodal
+image/PDF artifacts.
 
 Deferred, additive follow-ons:
 

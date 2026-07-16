@@ -75,7 +75,7 @@ fails CI if a new handler ships without one (or with the wrong status).
 | `PUT`    | `/notifications/preferences`         | `204`. Upsert one `(category, channel)` override. `400` for unknown pair or a channel mandatory across the category. |
 | `PATCH`  | `/notifications/settings`            | `204`. Master toggle write (`{ notificationsEnabled: boolean }`).                                                    |
 | `GET`    | `/notifications/stream`              | `text/event-stream`. Realtime feed-change hints (SSE) — see [Realtime stream](#realtime-stream-sse) below.           |
-| `POST`   | `/notifications/telegram/link`       | `201 { url, expiresAt }`. Issues a one-time `t.me/<bot>?start=<token>` deep link (Arc D).                            |
+| `POST`   | `/notifications/telegram/link`       | `201 { url, expiresAt }`. Issues a one-time `t.me/<bot>?start=<token>` deep link.                                    |
 | `GET`    | `/notifications/telegram/connection` | `200 { connected, status, linkedAt }`. Current Telegram connection status (no chat/user id).                         |
 | `DELETE` | `/notifications/telegram/connection` | `204`. Unlink (hard-delete) and cancel the connection's due deliveries. Idempotent.                                  |
 
@@ -272,7 +272,7 @@ mailbox, proves control of it — OWASP/NIST), so the post-reset
 
 ### Telegram channel
 
-Telegram is the third external channel (Arc D), opt-in via config (see
+Telegram is the third external channel, opt-in via config (see
 [`docs/operations/webhooks.md`](../operations/webhooks.md) and `.env.example`). It is
 **additive** over the same resolver/dispatcher contracts — no state-machine change.
 
@@ -385,7 +385,7 @@ Proxy/buffering/HTTP-2 guidance is in
 
 ## What's Not in the Starter Yet
 
-These are intentional later-arc deliveries — additive over the
+These are intentional deferred deliveries — additive over the
 producer/feed/preferences/dispatch contract, not gaps in the current scope:
 
 - **Web Push** — deferred to the frontend phase; the backend channel and the

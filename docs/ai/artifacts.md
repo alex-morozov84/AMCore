@@ -1,6 +1,6 @@
 # AI Multimodal Artifacts
 
-Artifacts are private uploaded inputs for AI runs. Arc G supports images
+Artifacts are private uploaded inputs for AI runs. AMCore supports images
 (JPEG/PNG/WebP) and PDFs. Uploads are stored through AMCore storage and referenced
 from run input by id; bytes never ride inside JSON content parts.
 
@@ -50,7 +50,7 @@ Rules:
 - GIF, SVG, generic files, OCR, AV scanning, and content/DLP scanning are not shipped.
 - Validation uses magic bytes, never the client `Content-Type` alone.
 - Uploads are private. The artifact response never returns a public or signed URL.
-- Downloads are attachment + `nosniff`, no Range support in Arc G.
+- Downloads are attachment + `nosniff`; Range requests are not supported.
 - Cross-user SUPER_ADMIN downloads require fresh auth + bounded reason and are
   fail-closed audited before bytes are served.
 

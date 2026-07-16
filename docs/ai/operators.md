@@ -67,4 +67,4 @@ API keys are rejected. Missing/not-visible conversations return no-leak `404`.
 - Human turns are stored as `role=assistant` with `authorType=user` or
   `authorType=operator`, preserving who wrote the assistant-seat turn.
 - A different SUPER_ADMIN cannot take over a conversation already held by another
-  human in this arc (`409`).
+  human (`409`).

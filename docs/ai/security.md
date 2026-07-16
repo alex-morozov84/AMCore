@@ -39,10 +39,10 @@ Oversize text input is refused with a bounded terminal reason.
 ## Multimodal Residual Risk
 
 Guardrails scan text only. Text rendered inside an image or embedded in a PDF is
-not inspected in Arc G. Visual / embedded-text prompt injection is a documented
+not inspected. Visual / embedded-text prompt injection is a documented
 residual risk: contained by channel separation, never claimed eliminated.
 
-Arc G also does not ship malware scanning, OCR, DLP, moderation, or AV product
+AMCore does not ship malware scanning, OCR, DLP, moderation, or AV product
 integration.
 
 ## Audit

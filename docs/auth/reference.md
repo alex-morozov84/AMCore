@@ -194,7 +194,7 @@ Side effects: the token is consumed atomically (single-use, even under concurren
 requests); all sessions are revoked; the account email is marked **verified**
 (the reset proves control of the mailbox); and a security notification
 (`account.password_changed`) is emitted — mandatory in-app + email, plus generic
-Telegram for a linked/enabled destination (optional, non-mandatory; Arc D).
+Telegram for a linked/enabled destination (optional, non-mandatory).
 
 ---
 
