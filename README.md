@@ -70,100 +70,27 @@ amcore/
 └── .github/        # CI, Dependabot, issue/PR templates
 ```
 
-## API Starter — What's Built
+## What's Built
 
-The backend is a fully-featured NestJS starter. The application, security, and
-operations baseline below is implemented and tested. Production deployment still
-requires adopter-owned infrastructure, secrets, environments, and capacity choices.
+The backend starter includes the core application, security, and operations
+primitives needed for a product-grade API. Production deployment still requires
+adopter-owned infrastructure, secrets, environments, and capacity choices.
 
-### Foundation
+| Area                  | Start here                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------------- |
+| Backend architecture  | [`apps/api/README.md`](apps/api/README.md)                                                               |
+| Add a backend module  | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md)           |
+| Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                                      |
+| RBAC / authorization  | [`docs/authorization.md`](docs/authorization.md), [`docs/auth/rbac.md`](docs/auth/rbac.md)               |
+| Email                 | [`docs/email/`](docs/email/README.md)                                                                    |
+| Notifications         | [`docs/notifications/`](docs/notifications/README.md)                                                    |
+| AI capability layer   | [`docs/ai/`](docs/ai/README.md)                                                                          |
+| Storage and media     | [`docs/storage/`](docs/storage/README.md), [`docs/media/`](docs/media/README.md)                         |
+| Production operations | [`docs/operations/deployment.md`](docs/operations/deployment.md), [`docs/operations/`](docs/operations/) |
+| API surface           | Swagger/OpenAPI at `/docs` in development                                                                |
 
-- Monorepo setup (pnpm + Turborepo), multi-schema PostgreSQL, Redis
-- Environment validation (Zod, fails fast on startup)
-- 3-layer exception filters (domain → Prisma → HTTP → catch-all)
-- Structured logging with Pino: correlation ID, GDPR IP anonymization, sensitive data redaction
-- Graceful shutdown (SIGTERM/SIGINT, log flush)
-- Global rate limiting (10 req/s + 100 req/min via `@nestjs/throttler`), Redis-backed so limits are shared across API replicas; degrades to local in-memory limits if Redis is unavailable (ADR-039)
-- Helmet, CORS, cookie parser
-- Swagger/OpenAPI at `/docs` (dev only)
-- CI: lint, typecheck, test, build, boot-smoke, security scans, Dependabot
-
-### Authentication
-
-- Registration + login (Argon2id hashing)
-- JWT access tokens (15 min) + opaque refresh tokens (7 days, SHA-256 hashed in DB)
-- Refresh token rotation — old token destroyed on every use
-- `httpOnly` + `secure` + `sameSite=strict` cookie for refresh token
-- Session management: list, revoke one, revoke all, revoke others
-- Password reset flow: single-use token, 15 min expiry, invalidates all sessions
-- Email verification flow: single-use token, 48 h expiry
-- Account enumeration prevention on forgot-password and resend-verification
-- Login brute-force protection: per-IP (100/24 h) + per-email+IP (5/1 h → 15-min block)
-- Redis-based rate limiting for sensitive operations (3/hour per email)
-
-### OAuth 2.0 / OIDC
-
-- **Google** — OIDC via discovery, PKCE (S256)
-- **GitHub** — OAuth 2.0, verified primary email via `/user/emails`
-- **Apple** — Sign In with Apple, dynamic JWT client secret (P8 key)
-- **Telegram** — OIDC, link-only (no email), phone from ID token
-- Account linking: authenticated users can connect additional providers
-- State + PKCE for OAuth, with server-side state and browser binding for login CSRF protection
-- Provider factory pattern — providers disabled automatically if env vars missing
-
-### RBAC (Role-Based Access Control)
-
-- System roles: `USER` / `SUPER_ADMIN`
-- Organization-scoped permissions via CASL + DB-backed roles
-- `PermissionsCacheService` — Redis cache with `aclVersion` invalidation
-- `AbilityFactory` — builds CASL abilities with condition interpolation (`${user.id}`)
-- Decorators: `@Auth()`, `@CheckPolicies()`, `@SystemRoles()`, `@CurrentUser()`
-- Organizations module: create, invite members, assign roles, switch context
-- Admin module: user/org management, promote to SUPER_ADMIN
-
-### API Keys
-
-- Long-lived scoped tokens for server-to-server access
-- Dual-token format: `amcore_live_{shortToken}_{longToken}` (shortToken plain for O(1) lookup, longToken SHA-256 hashed)
-- Scopes: `action:subject` format, intersected with user's org permissions
-- Lazy `lastUsedAt` update via Redis gate (no hot row contention)
-- Nightly cleanup of expired keys
-
-### Infrastructure
-
-- **Email** — Resend (prod) / Mock (dev), React Email templates, FormatJS i18n (RU/EN), direct send for secret links, BullMQ for the queued welcome email; the notifications subsystem delivers its own email channel durably (see below)
-- **Queue** — BullMQ, multiple queues, Bull Board at `/admin/queues` (SUPER_ADMIN only)
-- **Cache** — Cache-aside with distributed locking (stampede protection), tag-based invalidation
-- **Storage** — S3-compatible provider abstraction, local filesystem dev driver, in-memory test driver, magic-byte upload validation, signed/public URLs, opt-in health check, avatar upload/delete example
-- **Health Checks** — `/health`, `/health/startup`, `/health/ready`, `/health/live` (Kubernetes-ready)
-- **Scheduled Jobs** — Nightly cleanup at 02:00 UTC (expired sessions, tokens, API keys, invites) and notification retention at 03:00 UTC, both with multi-instance locking; plus a notification-dispatch recovery poller that runs on every worker replica (coordinated by Postgres `SKIP LOCKED`, not a lock)
-- **Notifications** — durable per-user subsystem: in-app feed + preferences, worker-driven email **and Telegram** channels with Postgres-owned retry/leases/attempt history (Telegram adds a `/start` deep-link + secret-header webhook + durable `update_id` dedupe), and a bearer-authenticated realtime SSE stream (`GET /notifications/stream`) fanned out cross-replica via Redis Pub/Sub with no sticky sessions (see [`docs/notifications/`](docs/notifications/README.md))
-- **AI Capability Layer** _(foundational)_ — a provider-agnostic AI backend on its own `ai` Postgres schema: seeded provider/model catalog (Anthropic/Claude default + OpenAI/OpenRouter/Yandex/OpenAI-compatible/mock), worker-only `ModelGateway`, durable conversation/run API (`/ai/conversations`, `/ai/runs`), status-only SSE (`GET /ai/runs/:id/stream`), usage ledger, and content-free metrics. Versioned **assistants/agents** are managed through `admin/ai/assistants`; a bounded worker-executed **tool loop** runs code-owned tools and parks SENSITIVE/DESTRUCTIVE calls for owner approval (`/ai/approvals`). Human takeover/operator review (`/ai/conversations/:id/takeover`, transcript read, operator messages) is shipped with stale bot-write fencing and fail-closed privileged-read audit. Multimodal **artifacts** support private JPEG/PNG/WebP/PDF upload + `artifact_ref` run input with capability-gated routing. Prompt-injection controls use OWASP LLM01 defense-in-depth: structural trusted/untrusted separation, deterministic text guards, and safe refusals — mitigated and contained, never claimed eliminated (see [`docs/ai/`](docs/ai/README.md)).
-
-### Tests
-
-- Backend unit tests: Jest
-- E2E suites: Jest + Testcontainers
-- Email templates: Vitest integration tests (real rendering, RU/EN, plaintext)
-
-### Documentation
-
-- [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md) — How to add a backend module (boundaries, contracts, process roles, tests)
-- [`docs/auth/`](docs/auth/README.md) — Complete auth guide (concepts, flows, OAuth, RBAC, API reference)
-- [`docs/auth/csrf.md`](docs/auth/csrf.md) — Narrow CSRF posture for cookie-backed browser surfaces
-- [`docs/email/`](docs/email/README.md) — Email extension contract (when to use `NotificationsService` vs `EmailService`, how to add templates, queueing and secret-link rules)
-- [`docs/notifications/`](docs/notifications/README.md) — Notifications guide (in-app feed, preferences, definitions, producer contract, durable email & Telegram delivery, realtime SSE stream)
-- [`docs/ai/`](docs/ai/README.md) — AI capability layer guide (assistants/agents, providers/models, durable runs, status-only SSE, tools/approvals, takeover/operator review, multimodal artifacts, security)
-- [`docs/storage/`](docs/storage/README.md) — Storage guide (providers, configuration, uploads, API reference)
-- [`docs/media/`](docs/media/README.md) — Media processing guide (image derivatives, configuration, security)
-- [`docs/authorization.md`](docs/authorization.md) — Authorization guide
-- [`docs/operations/deployment.md`](docs/operations/deployment.md) — Deployment & migration runbook
-- [`docs/operations/webhooks.md`](docs/operations/webhooks.md) — Signed inbound webhook guide
-- [`docs/operations/idempotency.md`](docs/operations/idempotency.md) — HTTP idempotency contract and operations guide
-- [`docs/operations/audit-log.md`](docs/operations/audit-log.md) — Persistent audit log semantics and append-only model
-- [`docs/operations/observability.md`](docs/operations/observability.md) — Metrics and tracing guide
-- [`docs/operations/ci-security.md`](docs/operations/ci-security.md) — CI security automation and manual repo prerequisites
-- [`apps/api/README.md`](apps/api/README.md) — Backend architecture
+Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
+and Vitest for React Email template rendering.
 
 ## Quick Start
 
