@@ -197,11 +197,14 @@ pnpm dev
 
 > **Building a product from this starter?** First update
 > [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) from `upstream-starter` to
-> `downstream-product` and record the product identity, roadmap location, and upstream-sync
-> policy. Repository files _declare_ the technical policy; GitHub-side enforcement is separate
-> external state. Apply the supported settings with one command (`gh` + `jq` + repo admin):
-> `bash scripts/setup-repo-security.sh`. Deployment environments and secrets are configured
-> separately. See
+> `downstream-product` and record the product identity, roadmap location, upstream-sync
+> policy, and workflow mode: `strict`, `flexible`, or `custom`. Repository files
+> _declare_ the technical policy; GitHub-side enforcement is separate external state.
+> For `strict` mode, apply the supported settings with one command (`gh` + `jq` +
+> repo admin): `bash scripts/setup-repo-security.sh`. `flexible` and `custom`
+> forks may choose different repository protections, but should document their
+> rules in `PROJECT_CONTEXT.md` or their contributor guide. Deployment environments
+> and secrets are configured separately. See
 > [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
