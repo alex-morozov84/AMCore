@@ -54,18 +54,24 @@ chore: unify github repository url
 
 ## Branching & merging
 
-- `main` is the **single protected trunk** (PR-only; a direct push is rejected).
-  Branch off `main` (`<type>/<name>`) and open a PR into `main`. This is **GitHub
-  Flow** — there is no long-lived `develop` branch.
-- Required CI checks must pass before merge. **Merge with Squash** (linear history;
-  one commit per PR). The **PR title becomes the squash commit message**, so it is
-  linted as a Conventional Commit by CI.
-- **Releases are tags.** Cut an annotated `vX.Y.Z` tag / GitHub Release from `main`;
-  staging and production are promoted through deploy **environments**, not branches.
-  To patch an older version, branch `release/x.y` from that tag when a backport is
-  actually needed — no permanent `develop` required.
-- First-time repo-protection setup (these settings do not travel with a fork):
-  `bash scripts/setup-repo-security.sh` — needs `gh` + `jq` and repo admin; see
+- Follow the workflow mode declared in `PROJECT_CONTEXT.md`.
+- **`strict` mode (AMCore upstream default):** `main` is the single protected
+  trunk (PR-only; a direct push is rejected). Branch off `main` (`<type>/<name>`)
+  and open a PR into `main`. This is **GitHub Flow** — there is no long-lived
+  `develop` branch.
+- **`strict` mode merges:** required CI checks must pass before merge. **Merge
+  with Squash** (linear history; one commit per PR). The **PR title becomes the
+  squash commit message**, so it is linted as a Conventional Commit by CI.
+- **`strict` mode releases:** cut an annotated `vX.Y.Z` tag / GitHub Release from
+  `main`; staging and production are promoted through deploy **environments**,
+  not branches. To patch an older version, branch `release/x.y` from that tag
+  when a backport is actually needed — no permanent `develop` required.
+- **Downstream products:** choose `strict`, `flexible`, or `custom` in
+  `PROJECT_CONTEXT.md`. `flexible` / `custom` forks may relax branch protection
+  or merge rules, but their own contributor docs become authoritative.
+- First-time `strict` repo-protection setup (these settings do not travel with a
+  fork): `bash scripts/setup-repo-security.sh` — needs `gh` + `jq` and repo
+  admin; see
   [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt). The security
   scripts require a Unix-like shell (macOS/Linux/WSL).
 

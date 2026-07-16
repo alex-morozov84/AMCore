@@ -66,8 +66,9 @@ Three categories:
    `commitlint.config.js`, `.husky/*`, docs. Present in any clone/fork.
 2. **External GitHub state** — applied rulesets / branch protection, merge methods, secret
    scanning, required checks, environments, secrets. **Not** inherited; it lives on github.com.
-3. **Activation** — running `setup-repo-security.sh` reconciles the _supported_ settings from
-   the JSON; environments / secrets / deploy credentials are configured separately.
+3. **Activation** — running `setup-repo-security.sh` reconciles AMCore's supported
+   `strict` settings from the JSON; environments / secrets / deploy credentials
+   are configured separately.
 
 | Capability                                                 | Fork receives        | Active / enforced automatically                                                        |
 | ---------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------- |
@@ -79,19 +80,38 @@ Three categories:
 | Environments, secrets, variables, deployment credentials   | No                   | Configure separately; the setup script does not create them                            |
 
 > Repository files **declare** the intended policy. GitHub-hosted enforcement is **external
-> repository state**. Run `setup-repo-security.sh` to reconcile the supported settings; configure
-> deployment environments and secrets separately. **Do not infer live enforcement from tracked
-> files** — verify the actual state via the GitHub UI / API.
+> repository state**. For `strict` mode, run `setup-repo-security.sh` to reconcile
+> the supported settings; configure deployment environments and secrets separately.
+> **Do not infer live enforcement from tracked files** — verify the actual state
+> via the GitHub UI / API.
 
 A plain `git clone` of _this_ repo works against the same remote's settings; a **fork** (or a new
 repository) has its **own** external state, which is independently configured and is not
 guaranteed to match upstream (platform/org defaults and fork-network rules may differ).
 
-## Security setup after forking
+## Workflow modes for forks
+
+Downstream products should declare one workflow mode in `PROJECT_CONTEXT.md`:
+
+- `strict` — mirrors AMCore upstream: protected `main`, PR-only changes,
+  squash-only merges, required status checks, immutable release tags, secret
+  scanning, push protection, and Dependabot alerts. Use
+  `scripts/setup-repo-security.sh` to apply the supported GitHub repository
+  settings.
+- `flexible` — keeps the same CI/security files but lets the product relax
+  branch protection, merge method, or review rules. Document the chosen rules
+  and understand that GitHub will not enforce guarantees you did not enable.
+- `custom` — the product owns a different workflow. Link the authoritative
+  workflow and repository-protection documentation from `PROJECT_CONTEXT.md`.
+
+AMCore upstream uses `strict`. Agents and contributors must follow the mode
+declared by the checkout instead of assuming every fork uses protected `main`.
+
+## Strict security setup after forking
 
 Some protections — branch rulesets, secret scanning, push protection — are
-**repository settings** and do NOT travel with a clone/fork. Enable them with one
-command:
+**repository settings** and do NOT travel with a clone/fork. For a fork that chose
+`strict`, enable them with one command:
 
 1. Install the GitHub CLI — `brew install gh` (or see https://cli.github.com).
 2. Sign in with repository **admin** access — `gh auth login`
@@ -102,8 +122,9 @@ This enables native **secret scanning** + **push protection**, the **dependency
 graph** + Dependabot alerts, and imports the **rulesets** for `main` (PR-only,
 **Squash-only** merges, required status checks, block force-push, restrict
 deletions) and for **release tags** (`refs/tags/v*` — block tag update and
-deletion, so published versions are immutable). It is **idempotent** — safe to
-re-run (it also removes the retired `Protect develop` ruleset if present).
+deletion, so published versions are immutable). It is the supported `strict`
+setup. It is **idempotent** — safe to re-run (it also removes the retired
+`Protect develop` ruleset if present).
 
 Notes:
 

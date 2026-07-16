@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Documented repository workflow modes (`strict`, `flexible`, `custom`) so
+  downstream products can choose their GitHub enforcement model instead of
+  inheriting AMCore upstream's strict protected-`main` workflow by default.
 - AI capability layer — multimodal foundation (Track C, Arc G). Storage-backed **image (JPEG/PNG/WebP)
   and PDF** artifacts with capability-gated routing. **Upload** (`POST /ai/conversations/:id/artifacts`,
   bearer, owner-only, throttled): magic-byte validated (never the client `Content-Type`; no GIF/SVG),

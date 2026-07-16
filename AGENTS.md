@@ -7,7 +7,8 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
 ## Operating context (read first)
 
 1. Read `PROJECT_CONTEXT.md`. It declares whether this checkout is the AMCore
-   upstream starter or a downstream product. Do not guess from git remotes or names.
+   upstream starter or a downstream product, and which workflow mode applies
+   (`strict`, `flexible`, or `custom`). Do not guess from git remotes or names.
    If the file is missing or still says `upstream-starter` in a product fork, stop
    and ask the owner to initialize it.
 2. Detect the working-context overlay:
@@ -56,15 +57,22 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 
 ## How to contribute (workflow)
 
-- **`main` is the single protected trunk — PR-only. A direct push is rejected.**
-  Branch off `main` (`<type>/<name>`); open a PR into `main`. This is **GitHub Flow** —
-  there is no long-lived `develop` branch.
-- **Required CI status checks must pass before merge. Merge with Squash only** — one PR
-  becomes one linear commit on `main`, and the **PR title becomes the commit message**
-  (so it is CI-validated as a Conventional Commit).
-- **Releases are tags, not a branch merge.** Cut an annotated `vX.Y.Z` tag / GitHub
-  Release from `main`; staging and production are driven by deploy **environments**, not
-  branches. To maintain an older line, branch `release/x.y` from its tag on demand.
+- Follow the workflow mode declared in `PROJECT_CONTEXT.md`.
+- **`strict` mode (AMCore upstream default):** `main` is the single protected
+  trunk — PR-only. A direct push is rejected. Branch off `main`
+  (`<type>/<name>`); open a PR into `main`. This is **GitHub Flow** — there is
+  no long-lived `develop` branch.
+- **`strict` mode merges:** required CI status checks must pass before merge.
+  Merge with Squash only — one PR becomes one linear commit on `main`, and the
+  **PR title becomes the commit message** (so it is CI-validated as a
+  Conventional Commit).
+- **`strict` mode releases:** releases are tags, not a branch merge. Cut an
+  annotated `vX.Y.Z` tag / GitHub Release from `main`; staging and production
+  are driven by deploy **environments**, not branches. To maintain an older
+  line, branch `release/x.y` from its tag on demand.
+- **`flexible` / `custom` downstream modes:** follow the downstream product's
+  declared rules. Do not force AMCore's protected-`main`, PR-only workflow onto
+  a fork that explicitly chose a different mode.
 - **Conventional Commits.** Form: `type(scope): subject`, subject lowercase. **Scope is
   optional** — add it when the change maps to one clear area, omit it for cross-cutting
   changes (`docs:`, `chore:`, release commits). If present, use an allowed value:
@@ -79,10 +87,10 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   or architectural choices in an ADR. Add notable user-facing changes under
   `CHANGELOG.md` → `[Unreleased]`; ordinary PRs do not create or change release tags.
   See `CONTRIBUTING.md` → _Changelog & releases_ for the release procedure.
-- First-time setup of the repo protections (they do not travel with a fork):
-  `bash scripts/setup-repo-security.sh` — see
-  `docs/operations/ci-security.md` → _Security setup after forking_. The security
-  scripts need a Unix-like shell (macOS/Linux/WSL).
+- First-time setup of `strict` repo protections (they do not travel with a
+  fork): `bash scripts/setup-repo-security.sh` — see
+  `docs/operations/ci-security.md` → _Strict security setup after forking_. The
+  security scripts need a Unix-like shell (macOS/Linux/WSL).
 
 ## Code conventions
 
