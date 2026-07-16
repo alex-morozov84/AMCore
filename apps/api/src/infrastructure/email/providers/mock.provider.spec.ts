@@ -64,5 +64,24 @@ describe('MockEmailProvider', () => {
 
       expect(result.success).toBe(true)
     })
+
+    it('should not log rendered body previews', async () => {
+      await provider.send({
+        to: 'test@example.com',
+        subject: 'Secret',
+        html: '<a href="https://app.example/reset?token=secret-token">Reset</a>',
+        text: 'https://app.example/reset?token=secret-token',
+      })
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'test@example.com',
+          hasHtml: true,
+          hasText: true,
+        }),
+        'Email sent (MOCK)'
+      )
+      expect(mockLogger.debug).not.toHaveBeenCalled()
+    })
   })
 })
