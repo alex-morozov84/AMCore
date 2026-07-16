@@ -8,17 +8,17 @@ This guide covers everything — from "how do I log a user in" to "how do I rest
 
 ## What's included
 
-| Topic                           | What it covers                                                   |
-| ------------------------------- | ---------------------------------------------------------------- |
-| [Concepts](./concepts.md)       | How tokens, sessions, and the security model work                |
-| [CSRF Posture](./csrf.md)       | Which cookie surfaces exist and how CSRF is handled              |
-| [Email Auth](./email-auth.md)   | Register, login, password reset, email verification              |
-| [OAuth](./oauth.md)             | Social login (Google, GitHub, Apple, Telegram) + account linking |
-| [Sessions](./sessions.md)       | Managing active sessions, token rotation, multi-device           |
-| [RBAC](./rbac.md)               | Roles, organizations, and permission checks                      |
-| [Invites](./invites.md)         | Inviting people to an organization by email                      |
-| [API Keys](./api-keys.md)       | Machine-to-machine access with scoped keys                       |
-| [API Reference](./reference.md) | All endpoints, parameters, and error codes                       |
+| Topic                            | What it covers                                                    |
+| -------------------------------- | ----------------------------------------------------------------- |
+| [Concepts](./concepts.md)        | How tokens, sessions, and the security model work                 |
+| [CSRF Posture](./csrf.md)        | Which cookie surfaces exist and how CSRF is handled               |
+| [Email Auth](./email-auth.md)    | Register, login, password reset, email verification               |
+| [OAuth](./oauth.md)              | Social login (Google, GitHub, Apple, Telegram) + account linking  |
+| [Sessions](./sessions.md)        | Managing active sessions, token rotation, multi-device            |
+| [RBAC](./rbac.md)                | System roles, organizations, permissions, CASL — the auth-z guide |
+| [Invites](./invites.md)          | Inviting people to an organization by email                       |
+| [API Keys](./api-keys.md)        | Machine-to-machine access with scoped keys                        |
+| [Auth contracts](./reference.md) | Credential model, error codes, environment variables              |
 
 ---
 
@@ -103,4 +103,4 @@ either. Credential and session management routes (`/api-keys/**`,
 | `JWT_REFRESH_DAYS` | Refresh token lifetime (default: `7`)  |
 | `FRONTEND_URL`     | Where OAuth redirects land             |
 
-See [API Reference](./reference.md#environment-variables) for the full list.
+See [Auth contracts](./reference.md#environment-variables) for the full list.

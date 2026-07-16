@@ -121,7 +121,7 @@ See [`docs/operations/observability.md`](../../docs/operations/observability.md)
 
 - Backend module recipe — [`docs/backend/architecture-and-conventions.md`](../../docs/backend/architecture-and-conventions.md)
 - Auth, sessions, OAuth, RBAC, API keys — [`docs/auth/`](../../docs/auth/README.md)
-- Authorization concepts — [`docs/authorization.md`](../../docs/authorization.md)
+- Authorization concepts — [`docs/auth/rbac.md`](../../docs/auth/rbac.md)
 - Email extension contract — [`docs/email/`](../../docs/email/README.md)
 - Notifications — [`docs/notifications/`](../../docs/notifications/README.md)
 - AI capability layer — [`docs/ai/`](../../docs/ai/README.md)

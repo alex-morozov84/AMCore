@@ -81,7 +81,7 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | Backend architecture  | [`apps/api/README.md`](apps/api/README.md)                                                               |
 | Add a backend module  | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md)           |
 | Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                                      |
-| RBAC / authorization  | [`docs/authorization.md`](docs/authorization.md), [`docs/auth/rbac.md`](docs/auth/rbac.md)               |
+| RBAC / authorization  | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                 |
 | Email                 | [`docs/email/`](docs/email/README.md)                                                                    |
 | Notifications         | [`docs/notifications/`](docs/notifications/README.md)                                                    |
 | AI capability layer   | [`docs/ai/`](docs/ai/README.md)                                                                          |
