@@ -46,16 +46,9 @@ curl /ai/conversations/<conversation-id>/messages \
 Cross-user transcript and artifact reads are fail-closed audited before content
 is served. Owner reads/downloads are not audited as privileged access.
 
-## API
-
-| Method + path                         | Purpose                                                     |
-| ------------------------------------- | ----------------------------------------------------------- |
-| `POST /ai/conversations/:id/takeover` | Seize human control.                                        |
-| `POST /ai/conversations/:id/release`  | Release control back to bot.                                |
-| `GET /ai/conversations/:id/messages`  | Keyset transcript read.                                     |
-| `POST /ai/conversations/:id/messages` | Post a text-only human/operator turn while holding control. |
-
-API keys are rejected. Missing/not-visible conversations return no-leak `404`.
+The takeover / release / transcript / operator-message endpoint shapes are in the
+OpenAPI document at `/docs`. All are bearer-only (**API keys are rejected**), and
+missing or not-visible conversations return no-leak `404`.
 
 ## Semantics
 

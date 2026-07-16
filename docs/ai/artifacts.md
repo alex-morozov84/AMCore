@@ -39,12 +39,9 @@ text-only; artifacts are a run-input surface.
 
 ## Upload and Download Rules
 
-| Method + path                                     | Purpose                                 |
-| ------------------------------------------------- | --------------------------------------- |
-| `POST /ai/conversations/:id/artifacts`            | Owner-only, throttled multipart upload. |
-| `GET /ai/conversations/:id/artifacts/:artifactId` | Authorized app-mediated download.       |
-
-Rules:
+Upload is an owner-only throttled multipart `POST` to a conversation; download is
+an authorized app-mediated `GET` (shapes in the OpenAPI document at `/docs`). The
+rules that matter:
 
 - Accepted formats: JPEG, PNG, WebP, PDF.
 - GIF, SVG, generic files, OCR, AV scanning, and content/DLP scanning are not shipped.

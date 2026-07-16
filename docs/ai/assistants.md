@@ -83,14 +83,7 @@ Only `enabled` and `displayName` are patchable in place.
   text-only assistants and add `"image"` / `"pdf"` only when the selected model
   supports those capabilities.
 
-## API
-
-| Method + path                              | Purpose                                       |
-| ------------------------------------------ | --------------------------------------------- | ----------------------- |
-| `GET /admin/ai/assistants`                 | List assistant versions (`version=latest      | all`, optional `slug`). |
-| `GET /admin/ai/assistants/:id`             | Fetch one assistant version.                  |
-| `POST /admin/ai/assistants`                | Create assistant slug/version 1.              |
-| `POST /admin/ai/assistants/:slug/versions` | Publish a new immutable assistant version.    |
-| `PATCH /admin/ai/assistants/:id`           | Toggle `enabled` and/or rename `displayName`. |
-
-All assistant admin writes require SUPER_ADMIN, bearer auth, and fresh auth.
+The `/admin/ai/assistants` endpoint shapes are in the OpenAPI document at `/docs`.
+All assistant admin reads require SUPER_ADMIN; all writes additionally require
+**fresh auth** and reject API keys. Only `enabled` and `displayName` are patchable
+in place — every other config change is a new immutable version.
