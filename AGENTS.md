@@ -117,6 +117,7 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 
 ## Where the docs are
 
+- `docs/README.md` — the documentation map: route to any guide by intent.
 - `README.md` — overview + Quick Start.
 - `PROJECT_CONTEXT.md` — checkout identity: upstream starter or downstream product.
 - `CONTRIBUTING.md` — contributor process (commands, commit format, PR checklist).
@@ -126,7 +127,8 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `EmailService`, React Email templates, queueing, and secret-link rules.
 - `docs/auth/`, `docs/storage/`, `docs/media/` — feature guides.
 - `docs/operations/` — deployment, observability, webhooks, idempotency,
-  audit-log, **ci-security** (CI gates + repo-security setup).
+  audit-log, **ci-security** (CI gates + repo-security setup); see
+  [`docs/operations/README.md`](docs/operations/README.md) for the index.
 
 ## Testing
 

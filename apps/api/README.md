@@ -119,6 +119,7 @@ See [`docs/operations/observability.md`](../../docs/operations/observability.md)
 
 ## Documentation Map
 
+- All docs by intent — [`docs/README.md`](../../docs/README.md)
 - Backend module recipe — [`docs/backend/architecture-and-conventions.md`](../../docs/backend/architecture-and-conventions.md)
 - Auth, sessions, OAuth, RBAC, API keys — [`docs/auth/`](../../docs/auth/README.md)
 - Authorization concepts — [`docs/auth/rbac.md`](../../docs/auth/rbac.md)
@@ -127,5 +128,5 @@ See [`docs/operations/observability.md`](../../docs/operations/observability.md)
 - AI capability layer — [`docs/ai/`](../../docs/ai/README.md)
 - Storage and media — [`docs/storage/`](../../docs/storage/README.md), [`docs/media/`](../../docs/media/README.md)
 - Deployment and migrations — [`docs/operations/deployment.md`](../../docs/operations/deployment.md)
-- Audit, observability, idempotency, webhooks, CI security — [`docs/operations/`](../../docs/operations/)
+- Audit, observability, idempotency, webhooks, CI security — [`docs/operations/`](../../docs/operations/README.md)
 - Contributor commands and PR flow — [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
