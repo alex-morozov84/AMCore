@@ -1,13 +1,13 @@
 # Deployment & Migrations
 
 How to take AMCore from clone → migrated schema → running app, locally and in
-production. The canonical decision is recorded internally as ADR-040.
+production.
 
 ## Branch, release & environments model
 
 AMCore uses **GitHub Flow**: a single protected trunk `main`, short-lived PR
 branches, **Squash** merges, and **releases as annotated `vX.Y.Z` tags / GitHub
-Releases**. There is no long-lived `develop` branch (see ADR-048).
+Releases**. There is no long-lived `develop` branch.
 
 Environments are driven by the **deploy pipeline, not by branches** — a branch per
 environment is an anti-pattern:
@@ -152,7 +152,7 @@ rotation:** set a new `WEBHOOK_TELEGRAM_SECRET`, redeploy, then re-run this comm
 ## Production environment requirements
 
 The dev-friendly compose defaults are local-only. With `NODE_ENV=production` the
-API fails fast (ADR-029 / env validation) unless:
+API fails fast (env validation) unless:
 
 - `DATABASE_URL` includes `sslmode=require` or `sslmode=verify-full`;
 - `STORAGE_DRIVER=s3` with `STORAGE_BUCKET` / `STORAGE_ACCESS_KEY_ID` /
@@ -182,7 +182,7 @@ first, migrate, then remove the old path in a later release.
 `pnpm --filter api db:seed` is dev/demo only. There is no implicit production
 seed; production rollout runs `migrate deploy` and nothing else.
 
-## Process roles: web / worker (ADR-041)
+## Process roles: web / worker
 
 The same image runs as different roles via `PROCESS_ROLE`:
 
@@ -206,13 +206,13 @@ next night). The **notification-dispatch recovery** cron is the exception: it ru
 on **every** worker replica and is _not_ lock-guarded — that is intentional
 (`SingletonCronRunner` is fail-closed on a Redis hiccup, exactly when recovery is
 needed), and Postgres `FOR UPDATE SKIP LOCKED` is the coordinator, so replicas
-drain disjoint rows without double-sending. The throttler is Redis-backed
-(ADR-039) and BullMQ workers consume one shared queue. Add worker replicas freely.
+drain disjoint rows without double-sending. The throttler is Redis-backed and
+BullMQ workers consume one shared queue. Add worker replicas freely.
 
 ## Realtime SSE behind a proxy
 
 Two long-lived SSE endpoints share the same rules and must not be buffered or timed
-out by an intermediary: `GET /notifications/stream` (ADR-053) and the AI run
+out by an intermediary: `GET /notifications/stream` and the AI run
 **status-only** stream `GET /ai/runs/:id/stream` (the same primitives,
 governed by the parallel `AI_REALTIME_*` knobs; e.g. `AI_REALTIME_HEARTBEAT_MS`,
 `AI_REALTIME_MAX_CONNECTIONS`, `AI_REALTIME_NAMESPACE`). The guidance below is written

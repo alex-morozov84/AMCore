@@ -48,7 +48,7 @@ CodeQL is report-only, but new alerts on a PR still need triage — **don't blan
    _false positive_ and a one-line justification. Example: `js/insufficient-password-hash`
    on a SHA-256 of a **high-entropy random token** is correct — slow KDFs only defend
    low-entropy _passwords_; a 256-bit random value has no brute-force surface.
-3. **Always record the "why"** next to the code AND in the relevant ADR / feature doc, so
+3. **Always record the "why"** next to the code AND in the relevant feature doc, so
    the dismissal is reviewable and survives a re-scan.
 
 Inline `// codeql[…]` / `// lgtm` comments are **not** honored by GitHub code scanning
@@ -171,13 +171,10 @@ The hook is **graceful-if-absent**:
   warning and skips that check;
 - CI remains the hard gate via `workflow-lint.yml`.
 
-To opt into the full local loop, install the same tools used in CI:
-
-- `actionlint` `v1.7.12`
-- `zizmor` `v1.25.2`
-
-Install them from their upstream GitHub releases and place the binaries on your
-`PATH`.
+To opt into the full local loop, install `actionlint` and `zizmor` from their
+upstream GitHub releases and place the binaries on your `PATH`. Match the versions
+pinned in `.github/workflows/workflow-lint.yml` — that workflow is the source of
+truth, so no version is duplicated here.
 
 ### CLI Tool Versions
 

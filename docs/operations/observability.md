@@ -1,51 +1,39 @@
 # Observability
 
-AMCore exposes Prometheus metrics from the API process. Logs remain structured
-Pino JSON with `correlationId`; metrics are the low-cardinality time-series
-surface for latency, error rate, and runtime health trends.
+AMCore exposes Prometheus metrics from the API process. Logs are structured Pino
+JSON with a `correlationId`; metrics are the low-cardinality time-series surface
+for latency, error rate, and runtime health.
 
 ## Structured Logs
 
-Application logs are structured Pino JSON in production and include a
-`correlationId` on every log record. The value is read from `X-Request-ID` /
-`X-Correlation-ID` when present, otherwise AMCore generates one for the request.
+Application logs are structured Pino JSON in production and carry a
+`correlationId` on every record. The value is read from `X-Request-ID` /
+`X-Correlation-ID` when present, otherwise AMCore generates one per request.
 
-HTTP request logs include bounded request metadata such as method, route, status,
-user id when authenticated, user agent, and an anonymized client IP. IPv4
-addresses have the host portion zeroed; IPv6 addresses keep only the network
-prefix. Health routes are excluded from request logs to reduce noise.
+HTTP request logs include bounded request metadata — method, route, status, user
+id when authenticated, user agent, and an **anonymized client IP** (IPv4 host
+octet zeroed; IPv6 reduced to its network prefix). Health routes are excluded
+from request logs to reduce noise.
 
-Sensitive data is redacted before logs leave the process. This includes
-passwords, password hashes, refresh/access/OAuth tokens, API keys, cookies,
-authorization headers, token-bearing action URLs, AI operator reasons, provider
-bodies, and other known secret-bearing fields. New code must not log raw request
-bodies, rendered email bodies, object keys, prompt/provider payloads, or
-free-form user content unless a feature-specific public doc explicitly allows
-that field.
+Sensitive data is redacted before logs leave the process: passwords, password
+hashes, refresh/access/OAuth tokens, API keys, cookies, authorization headers,
+token-bearing action URLs, AI operator reasons, provider bodies, and other known
+secret-bearing fields. **New code must not log** raw request bodies, rendered
+email bodies, object keys, prompt/provider payloads, or free-form user content
+unless a feature-specific public doc explicitly allows that field.
 
 ## Metrics Endpoint
 
-Real bootstrap sets the global prefix, so the scrape path is:
-
-```text
-GET /api/v1/metrics
-```
-
-The e2e test app does not set the global prefix, so tests scrape `/metrics`.
-
-`METRICS_ENABLED=true` by default. When disabled, the route returns `404`.
+The scrape path is `GET /api/v1/metrics` (the e2e test app has no global prefix,
+so tests scrape `/metrics`). `METRICS_ENABLED=true` by default; when disabled the
+route returns `404`.
 
 ## Production Exposure
 
 Do not expose `/api/v1/metrics` to the public internet without protection.
-
-Recommended production patterns:
-
-- scrape it from a private pod/service network;
-- block it at public ingress; or
-- set `METRICS_AUTH_TOKEN` and configure Prometheus to send a bearer token.
-
-Example Prometheus scrape config:
+Recommended patterns: scrape it from a private pod/service network, block it at
+public ingress, or set `METRICS_AUTH_TOKEN` and have Prometheus send a bearer
+token.
 
 ```yaml
 scrape_configs:
@@ -58,208 +46,140 @@ scrape_configs:
       credentials: '${METRICS_AUTH_TOKEN}'
 ```
 
-## Current Metrics
+## Metric Families
 
-AMCore currently exports:
+Every metric is `amcore_`-prefixed (plus default `prom-client` `process_*` /
+`nodejs_*`) and carries only bounded labels. `role` is the emitting process role
+(`web|worker|all`). This is the family reference; the [label rules](#label-rules)
+are the hard contract every label must satisfy.
 
-- default `prom-client` Node.js/process metrics (`process_*`, `nodejs_*`);
-- `amcore_http_requests_total{method,route,status_code,role}`;
-- `amcore_http_request_duration_seconds{method,route,status_code,role}`;
-- `amcore_http_requests_in_flight{method,route,role}`;
-- `amcore_metrics_collector_errors_total{collector}`;
-- `amcore_db_pool_connections{state,role}`, where
-  `state=total|idle|waiting`;
-- `amcore_db_slow_queries_total{role}`;
-- `amcore_redis_client_events_total{client,event,role}`;
-- `amcore_queue_jobs{queue,state,role}`;
-- `amcore_queue_events_total{queue,event,role}`;
-- `amcore_cache_operations_total{cache,result,role}`;
-- `amcore_storage_operations_total{driver,operation,result,role}`;
-- `amcore_storage_operation_duration_seconds{driver,operation,result,role}`;
-- `amcore_media_operations_total{preset,operation,result,role}`;
-- `amcore_media_operation_duration_seconds{preset,operation,result,role}`;
-- `amcore_email_operations_total{template,operation,mode,result,retryable,role}`;
-- `amcore_email_operation_duration_seconds{template,operation,mode,result,role}`;
-- `amcore_email_dead_letters_total{template,unrecoverable,role}`.
+**HTTP & runtime**
 
-HTTP metrics are captured with middleware and `res.on('finish')`, so guard
-rejections and unmatched routes are counted. `/api/v1/metrics` is excluded from
-its own HTTP metrics and from request logs. Health routes are excluded from logs
-but included in HTTP metrics.
+- `http_requests_total{method,route,status_code,role}`,
+  `http_request_duration_seconds{…}`, `http_requests_in_flight{method,route,role}`
+  — captured on `res.on('finish')`, so guard rejections and unmatched routes are
+  counted. `/api/v1/metrics` is excluded from its own HTTP metrics.
+- `metrics_collector_errors_total{collector}`.
+- `db_pool_connections{state,role}` (`state=total|idle|waiting`),
+  `db_slow_queries_total{role}` — collected from the process-local pool; no query
+  text or model names.
+- `redis_client_events_total{client,event,role}` —
+  `client=shared|queue_producer|queue_worker|throttler` (SSE Pub/Sub subscribers
+  appear distinctly, e.g. `notif-subscriber`, `ai-run-subscriber`);
+  `event=error|reconnecting|degraded`.
 
-DB pool values are collected at scrape time from the process-local PostgreSQL
-pool. Slow-query metrics intentionally do not include query text or model names.
+**Queues** (exported by `worker`/`all` only — absent on `web`)
 
-Redis labels are bounded:
+- `queue_jobs{queue,state,role}` —
+  `state=waiting|active|delayed|completed|failed|paused|prioritized|waiting_children`.
+- `queue_events_total{queue,event,role}` —
+  `event=job_added|redis_error|redis_reconnecting|worker_error|dead_letter`. Job
+  IDs and job names are never labels.
 
-- `client=shared|queue_producer|queue_worker|throttler`;
-- `event=error|reconnecting|degraded`.
+**Cache**
 
-The shared node-redis and BullMQ clients report only verified events. The
-throttler reports every Redis fallback as `client=throttler,event=degraded`; its
-log remains debounced independently.
+- `cache_operations_total{cache,result,role}` — `cache=user|permissions`,
+  `result=hit|negative_hit|miss|db_fallback|corrupt`.
 
-Queue depth uses these bounded states:
+**Storage & media**
 
-```text
-waiting active delayed completed failed paused prioritized waiting_children
-```
+- `storage_operations_total{driver,operation,result,role}` and
+  `storage_operation_duration_seconds{driver,operation,result,role}` —
+  `driver=s3|local|memory`, `result=success|error`, bounded `operation` set
+  (`upload`, `download`, `download_stream`, `get_metadata`, `delete`,
+  `delete_many`, `exists`, `list`, `copy`, `move`, `signed_download_url`,
+  `signed_upload_url`). Object keys, buckets, endpoints, and URLs are never labels.
+- `media_operations_total{preset,operation,result,role}` and
+  `media_operation_duration_seconds{preset,operation,result,role}` —
+  `preset=avatar`, `operation=process|delete_derivatives`.
 
-It is exported only from worker-capable module graphs:
+**Email**
 
-- `PROCESS_ROLE=worker`: exported;
-- `PROCESS_ROLE=all`: exported;
-- `PROCESS_ROLE=web`: absent.
+- `email_operations_total{template,operation,mode,result,retryable,role}` and
+  `email_operation_duration_seconds{template,operation,mode,result,role}` —
+  `operation=dispatch|render|send|process`, `mode=queued|direct|worker`,
+  `result=success|error|discarded`,
+  `template=welcome|password-reset|email-verification|org-invite|notification|unknown`.
+- `email_dead_letters_total{template,unrecoverable,role}`. Recipients, provider
+  IDs, job IDs, payloads, and error messages are never labels.
 
-Queue depth is shared Redis state, not a per-process value. Never sum it across
-replicas. Use non-additive aggregation:
+**Realtime SSE** (notification + AI run status streams; no user/IP/event IDs)
 
-```promql
-max by(queue, state) (amcore_queue_jobs)
-```
+- `notification_realtime_connections{role}` and `ai_run_realtime_connections{role}` —
+  open-stream gauges.
+- `notification_realtime_publish_total{outcome,role}` and
+  `ai_run_realtime_publish_total{outcome,role}` —
+  `outcome=published|failed|dropped`.
+- `notification_realtime_events_total{event,role}` and
+  `ai_run_realtime_events_total{event,role}` —
+  `event=received|routed|no_local_target|invalid_envelope|rejected_global|rejected_user|slow_close|startup_failure`
+  (`rejected_global`=503 admission, `rejected_user`=429, `slow_close`=slow
+  consumer disconnected on buffer overflow).
 
-Queue events are bounded to `job_added`, `redis_error`,
-`redis_reconnecting`, `worker_error`, and `dead_letter`. Job IDs and arbitrary
-job names are never metric labels.
+**AI** (no prompt/response content, model slug, credential, or reason as a label)
 
-Cache metrics use `cache=user|permissions` and
-`result=hit|negative_hit|miss|db_fallback|corrupt`. Only the explicit user
-negative-cache envelope emits `negative_hit`; a cached permissions `[]` is a
-normal `hit`. A corrupt entry emits both `corrupt` and `miss` because it is
-deleted and handled as a miss. `db_fallback` counts actual DB loads after cache
-miss or lock contention.
+- `ai_generations_total{provider,operation,result,role}` (`provider` is the
+  lowercase provider _type_, `operation=text|object`, `result=success|error`),
+  `ai_tokens_total{provider,direction,role}` (`direction=input|output`).
+- `ai_guardrail_checks_total{stage,verdict,role}` (`stage=input|output`,
+  `verdict=allow|flag|block`).
+- `ai_tool_invocations_total{tool_id,risk_class,outcome,role}` (`tool_id` bounded
+  to the code-owned registry, `risk_class=safe|sensitive|destructive`,
+  `outcome=succeeded|failed|rejected|skipped`), `ai_tool_loop_steps{outcome,role}`
+  (`outcome=completed|exhausted|failed`).
+- `ai_approvals_total{kind,state,role}`
+  (`kind=tool_invocation|handoff|sensitive_action`,
+  `state=pending|approved|rejected|expired`).
+- `ai_assistant_admin_total{action,role}`
+  (`action=created|version_published|updated|enabled|disabled`).
+- `ai_conversation_control_total{action,actor_role,role}`
+  (`action=taken_over|released|operator_message`, `actor_role=owner|operator`).
+- `ai_artifact_uploads_total{kind,result,role}` (`kind=image|pdf`,
+  `result=success|rejected`),
+  `ai_artifact_resolution_total{result,role}`
+  (`result=success|not_found|capability_unsupported|storage_error`).
 
-Cache counters are recorded per Redis read, not per request: under cache-stampede
-lock contention a single lookup may re-read the cache several times, so these
-counters can exceed one increment per request. Compute hit ratios from the
-counters themselves (for example `hit / (hit + miss)`) rather than against request
-counts.
+OpenTelemetry tracing is optional and not exported by default.
 
-Storage metrics are emitted by the `StorageService` facade, so all drivers have
-the same surface:
+## Operator Interpretation
 
-- `driver=s3|local|memory`;
-- `result=success|error`;
-- bounded operations: `upload`, `download`, `download_stream`, `get_metadata`,
-  `delete`, `delete_many`, `exists`, `list`, `copy`, `move`,
-  `signed_download_url`, and `signed_upload_url`.
+- **Queue depth is shared Redis state, not per-process.** Never sum
+  `amcore_queue_jobs` across replicas; aggregate non-additively:
 
-The synchronous `getPublicUrl()` constructor is intentionally excluded because
-it performs no I/O. Object keys, buckets, endpoints, and URLs are never labels.
+  ```promql
+  max by(queue, state) (amcore_queue_jobs)
+  ```
 
-Media metrics currently use `preset=avatar`,
-`operation=process|delete_derivatives`, and `result=success|error`. They measure
-the complete media operation, while the nested storage calls remain visible in
-the storage metrics. Source/derivative keys, owner IDs, dimensions, and error
-messages are not labels.
-
-Email metrics keep phase and delivery semantics separate:
-
-- `operation=dispatch|render|send|process`;
-- `mode=queued|direct|worker`;
-- `result=success|error|discarded`;
-- `retryable=true|false|unknown`;
-- `template=welcome|password-reset|email-verification|org-invite|notification|unknown`.
-
-`dispatch/queued` measures enqueueing, `render` and `send` measure their own
-phases, and `process/worker` measures the complete BullMQ attempt. Secret-bearing
-legacy queue jobs and unknown job types are `discarded`, not silently counted as
-success. Terminal failures also increment
-`amcore_email_dead_letters_total{template,unrecoverable}`. Recipient addresses,
-provider IDs, job IDs, payloads, and error messages are never labels.
-
-Realtime notification (SSE) metrics are bounded and carry no user/IP/event IDs:
-
-- `amcore_notification_realtime_connections{role}` — gauge of currently-open SSE
-  streams on the process;
-- `amcore_notification_realtime_publish_total{outcome,role}` —
-  `outcome=published|failed|dropped` (`dropped` = the in-flight publish cap was hit);
-- `amcore_notification_realtime_events_total{event,role}` —
-  `event=received|routed|no_local_target|invalid_envelope|rejected_global|rejected_user|slow_close|startup_failure`.
-
-`rejected_global` (503) and `rejected_user` (429) split the admission rejections;
-`slow_close` counts slow consumers disconnected on write-buffer overflow;
-`startup_failure` counts a stream that failed to start after admission (flushing the
-headers or writing the ready frame threw); it is torn down quietly rather than
-rethrown, because once admitted the response may already be an SSE commitment and an
-exception filter must not try to write a JSON error onto a sent/ended response.
-The dedicated Pub/Sub subscriber connection is classified distinctly in the Redis
-client-event metric (e.g. `notif-subscriber`).
-
-AI metrics are bounded and carry no prompt/response content, model
-slug, credential, or free-form approval reason as a label:
-
-- `amcore_ai_generations_total{provider,operation,result,role}` — `provider` is the
-  lowercase provider _type_ (`anthropic|openai|…|mock`), `operation=text|object`,
-  `result=success|error`;
-- `amcore_ai_tokens_total{provider,direction,role}` — `direction=input|output`;
-- `amcore_ai_guardrail_checks_total{stage,verdict,role}` — guardrail checks:
-  `stage=input|output`, `verdict=allow|flag|block`. Only these bounded labels — no
-  prompt/output content, boundary marker, or category value is ever a label.
-- `amcore_ai_tool_invocations_total{tool_id,risk_class,outcome,role}` —
-  host-side tool invocation outcomes. `tool_id` is bounded to the code-owned
-  registry, `risk_class=safe|sensitive|destructive`, and
-  `outcome=succeeded|failed|rejected` (`rejected` = a resume that fed a
-  user-rejected tool call back to the model, never executed);
-- `amcore_ai_approvals_total{kind,state,role}` — approval lifecycle
-  transitions. `kind=tool_invocation` in v1;
-  `state=pending|approved|rejected|expired`;
-- `amcore_ai_tool_loop_steps{outcome,role}` — histogram of provider-call steps used by the
-  bounded tool loop; `outcome=completed|exhausted|failed`.
-- `amcore_ai_artifact_uploads_total{kind,result,role}` — owner upload
-  outcomes. `kind=image|pdf`, `result=success|rejected`, and `role` is the
-  emitting process role.
-- `amcore_ai_artifact_resolution_total{result,role}` — worker-side artifact
-  byte resolution before the provider request. `result=success|not_found|
-capability_unsupported|storage_error`, plus the emitting process `role`.
-
-AI tool and approval metrics never label by approval ID, invocation ID, run ID,
-user ID, tool args/result, prompt text, provider body, model slug, or free-form
-approval reason.
-
-AI artifact metrics additionally never label by conversation ID, artifact ID,
-storage key, hash, filename, content type, or bytes. Unsupported/undetectable
-upload types do not invent an unbounded `kind` label; the generic HTTP RED metric
-already counts the rejected request by normalized route/status.
-
-The AI run **status-only** SSE stream mirrors the notification realtime
-metrics, still carrying no user/IP/run/event IDs:
-
-- `amcore_ai_run_realtime_connections{role}` — gauge of currently-open AI run SSE
-  streams on the process;
-- `amcore_ai_run_realtime_publish_total{outcome,role}` —
-  `outcome=published|failed|dropped`;
-- `amcore_ai_run_realtime_events_total{event,role}` — same bounded `event` set as the
-  notification stream. The dedicated Pub/Sub subscriber is classified as
-  `ai-run-subscriber` in the Redis client-event metric.
-
-OpenTelemetry tracing remains optional and is not exported by default.
+- **Cache counters are per Redis read, not per request** — under cache-stampede
+  lock contention one lookup may re-read the cache several times. Compute hit
+  ratios from the counters (`hit / (hit + miss)`), never against request counts.
+  `negative_hit` comes only from the explicit user negative-cache envelope (a
+  cached permissions `[]` is a normal `hit`); a corrupt entry emits both `corrupt`
+  and `miss` because it is deleted and re-handled as a miss.
+- **Email `discarded` is not success** — secret-bearing legacy queue jobs and
+  unknown job types are counted `discarded`; terminal failures also increment
+  `email_dead_letters_total`.
+- **Health routes** are excluded from request logs but **counted** in HTTP metrics.
 
 ## Label Rules
 
 Labels must stay bounded and non-sensitive.
 
-Allowed examples:
+**Allowed:** process role (`web|worker|all`); normalized HTTP route templates
+(`/organizations/:id`); status code; bounded queue/cache/storage/email/media
+operation names.
 
-- process role: `web`, `worker`, `all`;
-- normalized HTTP route templates such as `/organizations/:id`;
-- status code;
-- bounded queue/cache/storage/email/media operation names.
+**Forbidden:** raw URLs, query strings, or route regex internals; user,
+organization, session, invite, API-key, or job IDs; email addresses, phone
+numbers, IP addresses, user agents; object keys, buckets, signed URLs, Redis
+keys; tokens, token/API-key hashes, password fields; prompt text or provider
+payloads.
 
-Forbidden examples:
+If a safe route template cannot be derived, AMCore uses a bounded fallback such as
+`unknown` instead of the raw path.
 
-- raw URLs, query strings, or route regex internals;
-- user, organization, session, invite, API key, or job IDs;
-- email addresses, phone numbers, IP addresses, user agents;
-- object keys, buckets, signed URLs, Redis keys;
-- tokens, token hashes, API key hashes, password fields;
-- prompt text or provider payloads for future AI features.
+## Web and Worker Roles
 
-If a safe route template cannot be derived, AMCore uses a bounded fallback such
-as `unknown` instead of the raw path.
-
-## Web And Worker Roles
-
-`PROCESS_ROLE=web`, `worker`, and `all` all expose metrics. The worker process
-has no business API routes and no Bull Board, but it does expose health and
-metrics so Kubernetes can probe it and Prometheus can scrape it.
+`PROCESS_ROLE=web`, `worker`, and `all` all expose metrics. The worker has no
+business API routes and no Bull Board, but does expose health and metrics so
+Kubernetes can probe it and Prometheus can scrape it.
