@@ -48,10 +48,12 @@ Each links to the "how to add X" section in its guide — the instructions live
 there, not here.
 
 - Add a backend module → [Backend architecture & conventions](backend/architecture-and-conventions.md)
-- Add an OAuth provider → [Auth · OAuth](auth/oauth.md)
+- Add an OAuth provider → [Auth · OAuth](auth/oauth.md#adding-a-new-provider)
 - Add a notification definition → [Notifications · Add a notification definition](notifications/README.md#add-a-notification-definition)
 - Add an AI tool + approval policy → [AI · Add a Tool](ai/tools-and-approvals.md#add-a-tool)
 - Add an AI provider / model → [AI · Add or Change a Model](ai/providers.md#add-or-change-a-model)
 - Add an assistant version → [AI · Publish a New Version](ai/assistants.md#publish-a-new-version)
 - Add an artifact-backed run input → [AI · Upload and Use an Artifact](ai/artifacts.md#upload-and-use-an-artifact)
 - Add an email template → [Email · Add a Template](email/templates.md#add-a-template)
+- Add an audited action → [Operations · Add an audited action](operations/audit-log.md#add-an-audited-action)
+- Add a metric → [Operations · Add a metric](operations/observability.md#add-a-metric)
