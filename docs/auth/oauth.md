@@ -282,6 +282,92 @@ Telegram is link-only because it doesn't provide an email address — only a pho
 
 ---
 
+## Adding a new provider
+
+Adding a provider (Microsoft, Discord, GitLab, …) is a self-contained extension:
+implement one interface, register it behind config, and declare its env vars. The
+shared machinery — one-time `state`, PKCE, the browser-binding cookie, the login
+ticket, and account linking — is owned by `OAuthService` and applies to every
+provider automatically. **A provider never touches those controls;** it only
+builds URLs, exchanges the code, and normalizes the profile.
+
+**1. Implement `OAuthProvider`** in
+[`core/auth/oauth/providers/<name>.provider.ts`](../../apps/api/src/core/auth/oauth/providers/).
+The interface
+([`oauth-provider.interface.ts`](../../apps/api/src/core/auth/oauth/providers/oauth-provider.interface.ts))
+is three methods; [`github.provider.ts`](../../apps/api/src/core/auth/oauth/providers/github.provider.ts)
+is the smallest reference:
+
+```ts
+export class DiscordProvider implements OAuthProvider {
+  readonly name = 'discord'
+  constructor(private readonly config: OAuthProviderConfig) {}
+
+  getAuthorizationURL(state: string, codeVerifier: string): Promise<URL> {
+    const url = new URL('https://discord.com/oauth2/authorize')
+    url.searchParams.set('client_id', this.config.clientId)
+    url.searchParams.set('redirect_uri', this.config.redirectUri)
+    url.searchParams.set('response_type', 'code')
+    url.searchParams.set('scope', 'identify email')
+    url.searchParams.set('state', state) // state is generated for you — just echo it
+    // If the provider supports PKCE, derive the challenge from codeVerifier:
+    //   url.searchParams.set('code_challenge', sha256Base64Url(codeVerifier))
+    //   url.searchParams.set('code_challenge_method', 'S256')
+    return Promise.resolve(url)
+  }
+
+  async exchangeCode(code: string, codeVerifier: string): Promise<OAuthTokens> {
+    // POST to the token endpoint; throw AppException(..., OAUTH_PROVIDER_ERROR) on failure.
+    // Pass codeVerifier only if the provider does PKCE (GitHub ignores it).
+    return { accessToken: '...' }
+  }
+
+  async getUserProfile(tokens: OAuthTokens): Promise<OAuthUserProfile> {
+    // Fetch the provider's userinfo and normalize to the shared profile shape.
+    return {
+      providerId: '...', // the provider's stable internal user id — never the email
+      provider: 'discord',
+      email: '...', // or null if the provider returns none (see login vs link-only)
+      emailVerified: true,
+      displayName: '...',
+      avatarUrl: null,
+    }
+  }
+}
+```
+
+`OAuthTokens` and `OAuthUserProfile` are the shared contracts in
+[`packages/shared`](../../packages/shared/src) — every provider normalizes to the
+same profile shape ([What user data is collected](#what-user-data-is-collected)),
+so nothing downstream is provider-specific.
+
+**2. Register it behind config** in
+[`oauth-provider.factory.ts`](../../apps/api/src/core/auth/oauth/providers/oauth-provider.factory.ts).
+Add a `tryRegister…()` that reads the env vars and **registers only when they are
+all present**, then call it from `registerProviders()`. This is what makes the
+provider config-driven: an unconfigured provider is simply absent from
+`GET /auth/oauth/providers`, and requesting it returns
+`400 OAUTH_PROVIDER_NOT_CONFIGURED` from the factory (the `:provider` route
+param is validated there — no separate allowlist to update). If the provider
+uses `response_mode=form_post`, also add it to `isFormPostProvider()` in
+[`oauth-binding-cookie.ts`](../../apps/api/src/core/auth/oauth/oauth-binding-cookie.ts)
+so the POST callback and `SameSite=None` browser-binding cookie are selected.
+
+**3. Declare the env vars** in
+[`apps/api/src/env.ts`](../../apps/api/src/env.ts): add the keys as
+`optionalEnvString()` / `optionalEnvUrl()`, and add a `requireAllIfAny('Discord
+OAuth', [...])` group so a partially-configured provider fails fast at startup
+rather than at the first login. Mirror them in
+[`.env.example`](../../.env.example).
+
+**Login vs link-only.** A provider that cannot return an email (as with Telegram)
+**cannot back standalone login** — the callback resolves `OAUTH_EMAIL_REQUIRED`
+when no email and no existing linked account are found. Such providers are
+link-only. Everything else — one-time `state`, the browser-binding cookie that
+prevents login-CSRF, PKCE where supported, and the single-use login ticket — is
+enforced centrally and needs no per-provider code. Add a provider spec alongside
+the implementation (the existing `*.provider.spec.ts` files are the pattern).
+
 ## What user data is collected
 
 All providers are normalized to the same profile shape before the user record is created or updated:

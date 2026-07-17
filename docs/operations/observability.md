@@ -178,6 +178,49 @@ payloads.
 If a safe route template cannot be derived, AMCore uses a bounded fallback such as
 `unknown` instead of the raw path.
 
+## Add a metric
+
+Metrics are centralized in
+[`MetricsService`](../../apps/api/src/infrastructure/observability/metrics.service.ts)
+so labels, naming, and the `enabled` gate stay uniform. `ObservabilityModule`
+exports the service; inject it wherever you emit. Two shapes:
+
+**Instrument-owned counter / histogram / gauge** — the common case. Register the
+name, declare the instrument, and expose a typed, guarded emit method:
+
+1. Add the name to `METRIC_NAMES` in
+   [`metrics.constants.ts`](../../apps/api/src/infrastructure/observability/metrics.constants.ts)
+   with the `amcore_` prefix (`amcore_refunds_total`).
+2. Declare the field and create it in the constructor via the
+   `getOrCreateCounter` / `getOrCreateHistogram` / `getOrCreateGauge` helpers,
+   with a `help` string and `labelNames`.
+3. Add an emit method that **guards on `enabled`** and injects the process role:
+
+   ```ts
+   incRefund(outcome: RefundOutcome, result: RefundResult): void {
+     if (!this.enabled) return
+     this.refundsTotal.inc({ outcome, result, role: this.role })
+   }
+   ```
+
+**Externally-collected gauge** (sampled from a pool, queue, or other live source
+at scrape time) — use the public `registerGauge({ name, help, labelNames,
+collect })`, whose `collect` callback runs on each scrape. Registration is
+**first-wins** (reusing a name keeps the original callback). The DB-pool and
+queue-depth collectors are the reference pattern.
+
+**Label discipline is the contract, not a style preference.** Every label must
+satisfy the [Label Rules](#label-rules): bounded and non-sensitive. Give each
+label a **closed string-union type** (as the existing `…Outcome` / `…Result`
+types do) so its cardinality can't drift, and coerce any value derived from
+caller input to a bounded fallback (`unknown`) rather than passing it through —
+the `tool_id` label is the worked example. Never label a metric with an id, URL,
+object key, token, email, prompt, or any free-form value.
+
+After adding one, extend the [Metric Families](#metric-families) list above so the
+family reference stays complete, and cover the emit path in the metrics unit
+specs.
+
 ## Web and Worker Roles
 
 `PROCESS_ROLE=web`, `worker`, and `all` all expose metrics. The worker has no
