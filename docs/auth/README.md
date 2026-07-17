@@ -96,11 +96,11 @@ either. Credential and session management routes (`/api-keys/**`,
 
 ## Environments
 
-| Variable           | Description                            |
-| ------------------ | -------------------------------------- |
-| `JWT_SECRET`       | Signs access tokens — keep this secret |
-| `JWT_EXPIRATION`   | Access token lifetime (default: `15m`) |
-| `JWT_REFRESH_DAYS` | Refresh token lifetime (default: `7`)  |
-| `FRONTEND_URL`     | Where OAuth redirects land             |
+| Variable                | Description                            |
+| ----------------------- | -------------------------------------- |
+| `JWT_SECRET`            | Signs access tokens — keep this secret |
+| `JWT_ACCESS_EXPIRATION` | Access token lifetime (default: `15m`) |
+| `JWT_REFRESH_DAYS`      | Refresh token lifetime (default: `7`)  |
+| `FRONTEND_URL`          | Where OAuth redirects land             |
 
 See [Auth contracts](./reference.md#environment-variables) for the full list.
