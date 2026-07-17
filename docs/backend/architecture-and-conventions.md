@@ -125,8 +125,7 @@ with `@Auth(...)` — a guardrail test fails otherwise. Bearer (an interactive u
 session) is the default credential; allow API keys only on handlers that should
 accept them, and never for credential management or other high-risk operations. For
 role/permission checks and adding your own CASL subjects, follow
-[`docs/authorization.md`](../authorization.md) and [`docs/auth/rbac.md`](../auth/rbac.md)
-— don't reinvent it.
+[`docs/auth/rbac.md`](../auth/rbac.md) — don't reinvent it.
 
 ### 5. Register in the correct process role
 
@@ -191,8 +190,7 @@ Commands are in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#api-specific-test-comm
 
 ## See also
 
-- Auth, RBAC, OAuth, API keys, sessions — [`docs/auth/`](../auth/README.md),
-  [`docs/authorization.md`](../authorization.md)
+- Auth, RBAC, OAuth, API keys, sessions — [`docs/auth/`](../auth/README.md)
 - Notifications — in-app feed, preferences, definition registry, transaction-aware producer, durable worker-driven email & Telegram channels, realtime SSE fan-out — [`docs/notifications/`](../notifications/README.md)
 - AI capability layer — assistants/agents, provider/model catalog, durable runs, tools/approvals, human takeover, multimodal artifacts, security posture — [`docs/ai/`](../ai/README.md)
 - Storage, uploads, signed URLs — [`docs/storage/`](../storage/README.md)

@@ -47,8 +47,8 @@ Each row stores:
 Important data-model choices:
 
 - `actorId`, `targetId`, and `organizationId` have no foreign keys.
-- This is intentional so the audit trail survives hard-delete flows covered by
-  ADR-030.
+- This is intentional so the audit trail survives hard-delete flows (a deleted
+  user or org must not cascade away its audit history).
 - `metadata` is allowlist-driven per action, not arbitrary caller JSON.
 - AI tool/approval targets use `AI_TOOL_INVOCATION` and `AI_APPROVAL`.
 
@@ -109,7 +109,7 @@ Residual caveat:
 
 - a sufficiently privileged owner or superuser can still bypass append-only via
   DDL such as disabling or dropping the trigger.
-- External WORM storage is out of scope for Arc 6.
+- External WORM storage is out of scope for the current audit-log baseline.
 
 ## Retention And Export
 
@@ -124,7 +124,7 @@ Current policy:
 
 ## Read Access
 
-Arc 6 does not add an admin read endpoint yet.
+AMCore does not ship an admin read endpoint yet.
 
 When a read endpoint is added later, access to the audit log must itself be
 audited.

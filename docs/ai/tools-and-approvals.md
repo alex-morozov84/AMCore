@@ -51,8 +51,8 @@ then publish an assistant version whose `toolAllowlist` includes `"echo"`.
   downstream.
 - Tools must enforce their own domain authorization using `ctx.ownerUserId` /
   `ctx.organizationId`.
-- Tool output is plain text in this arc and re-enters the model as untrusted data.
-  Do not put secrets or large payloads in it.
+- Tool output is plain text and re-enters the model as untrusted data. Do not put
+  secrets or large payloads in it.
 
 ## Approval Flow
 
@@ -71,15 +71,13 @@ curl -X POST /ai/approvals/<approval-id>/decision \
 Rejecting an approval resumes the run with a fixed “tool rejected” notice; the
 tool is not executed.
 
-## API
+An approval that is not decided within `AI_APPROVAL_TTL_MS` expires and the run
+terminates.
 
-| Method + path                     | Purpose                                      |
-| --------------------------------- | -------------------------------------------- | -------- | -------- | ---------- |
-| `GET /ai/approvals`               | List owned approvals (`?status=pending       | approved | rejected | expired`). |
-| `POST /ai/approvals/:id/decision` | Approve or reject an owned pending approval. |
-
-Only the conversation owner can decide approvals. Cross-user operators can take
-over/review a conversation, but do not receive approval authority in this arc.
+The `/ai/approvals` endpoint shapes (list, filterable by status; decision) are in
+the OpenAPI document at `/docs`. **Only the conversation owner can decide
+approvals** — cross-user operators can take over or review a conversation but
+never receive approval authority.
 
 ## Configuration
 

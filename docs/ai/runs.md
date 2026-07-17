@@ -75,19 +75,10 @@ Key behavior:
 This is not token streaming. Treat the event as “refetch `GET /ai/runs/:id`”.
 Postgres remains the source of truth.
 
-## HTTP API
-
-| Method + path               | Purpose                                                          |
-| --------------------------- | ---------------------------------------------------------------- |
-| `POST /ai/conversations`    | Create a conversation.                                           |
-| `GET /ai/conversations/:id` | Fetch an owned conversation.                                     |
-| `POST /ai/runs`             | Queue a run on a conversation.                                   |
-| `GET /ai/runs/:id`          | Fetch an owned run's status.                                     |
-| `GET /ai/runs`              | Keyset-paginated owned runs (`?conversationId=&cursor=&limit=`). |
-| `POST /ai/runs/:id/cancel`  | Cooperatively cancel an owned run.                               |
-| `GET /ai/runs/:id/stream`   | Status-only SSE stream of run-status hints.                      |
-
-Missing/not-owned resources return no-leak `404`.
+Conversation and run endpoint shapes (`/ai/conversations`, `/ai/runs`, the
+keyset-paginated list, cancel, and the SSE stream) are in the OpenAPI document at
+`/docs`. All are bearer-authenticated and owner-scoped; missing or not-owned
+resources return no-leak `404`.
 
 ## Configuration
 

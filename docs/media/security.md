@@ -68,7 +68,7 @@ and memory limits. That is a deployment pattern, not required for the baseline.
 
 ## Deferred Scope
 
-The following are intentionally **not** implemented in this arc:
+The following are intentionally **not** implemented in the current media scope:
 
 - **Queue/async processing** — added only when a real async consumer exists (the
   avatar flow is synchronous and bounded).
