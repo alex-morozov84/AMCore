@@ -145,7 +145,7 @@ not the top-level field). See [API Keys](./api-keys.md) for the scope grammar.
 
 | Variable                          | Default              | Description                                     |
 | --------------------------------- | -------------------- | ----------------------------------------------- |
-| `JWT_EXPIRATION`                  | `15m`                | Access-token lifetime                           |
+| `JWT_ACCESS_EXPIRATION`           | `15m`                | Access-token lifetime                           |
 | `JWT_REFRESH_DAYS`                | `7`                  | Refresh-token lifetime (days)                   |
 | `PASSWORD_RESET_EXPIRY_MINUTES`   | `15`                 | Reset-link lifetime                             |
 | `EMAIL_VERIFICATION_EXPIRY_HOURS` | `48`                 | Verification-link lifetime                      |
