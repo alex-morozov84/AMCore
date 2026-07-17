@@ -36,6 +36,23 @@ webhooks, idempotency, schedule, observability). Put a new product module under
 `core/` (or its own top-level area); put a reusable technical capability under
 `infrastructure/`.
 
+### Do I need CQRS?
+
+**No — not as a default.** AMCore does **not** use a global command/query bus
+(`@nestjs/cqrs`), and adopting one is not required to build a module "the right
+way". The default shape is `Controller → Service → Prisma`. You already get the
+healthy part of the split for free: keep methods side-effect-honest (a method
+changes state _or_ returns data) and decompose a module into focused,
+single-responsibility services rather than one god-service.
+
+_Local_ command/query separation — distinct read vs. write services, or a
+purpose-built read model — is fine **where read/write complexity actually
+justifies it** (e.g. reporting, audit-log search, a support inbox). That is a
+per-context judgement, not a mandate, and it needs no framework. Reach for a full
+CQRS bus only in a bounded context with a large, measured read/write asymmetry
+that must scale independently, or an event-sourcing requirement — decide that for
+that context alone, never globally.
+
 ## Decide the state model first
 
 Before writing code, classify where each piece of your module's state lives — this
