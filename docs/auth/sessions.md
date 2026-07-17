@@ -75,8 +75,8 @@ A new `refresh_token` cookie is set with the rotated token.
 
 **Endpoint:** `GET /api/v1/auth/sessions`
 
-Paginated list (ADR-036). Accepts the canonical pagination query
-parameters: `?page=N&limit=M` with `1 ≤ page` and
+Paginated list. Accepts the canonical pagination query parameters:
+`?page=N&limit=M` with `1 ≤ page` and
 `1 ≤ limit ≤ 100`; both default to `page=1, limit=20` if omitted.
 Sessions are ordered newest first (`createdAt DESC, id ASC`) so page
 boundaries are deterministic.
@@ -164,11 +164,11 @@ admin API) revokes **all** of the target user's sessions, so they must
 re-authenticate. This pairs with the system-role freshness check
 ([rbac.md](./rbac.md)): a demotion loses privileged access on the next request,
 and a promotion cannot silently elevate an existing refresh session — it requires
-a fresh login. See ADR-037.
+a fresh login.
 
 ---
 
-## Step-up re-authentication (OB-06b)
+## Step-up re-authentication
 
 Each session tracks when it was last authenticated (`lastAuthAt`). Destructive
 admin operations — `PATCH /admin/users/:id` and `POST /admin/cleanup` — require
@@ -184,7 +184,7 @@ access token does not count as re-authentication.
 OAuth-only accounts (no password) cannot use password step-up and receive
 `403 STEP_UP_METHOD_UNAVAILABLE`. Sessions created before this feature shipped
 have a `NULL` `lastAuthAt` and must re-login (or step up) before performing a
-guarded operation. See ADR-037.
+guarded operation.
 
 ---
 

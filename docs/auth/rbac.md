@@ -62,7 +62,7 @@ The `systemRole` claim in the JWT is **necessary but not sufficient** on
 `@SystemRoles` routes. On every privileged request the guard re-reads the
 caller's **current** `systemRole` from the database and requires that **both**
 the token claim **and** the live DB role satisfy the requirement
-(`claim ∩ current DB role`). Consequences (ADR-037):
+(`claim ∩ current DB role`). Consequences:
 
 - **Demotion takes effect on the next request.** A demoted `SUPER_ADMIN`'s
   existing token — still cryptographically valid for up to its 15-minute
@@ -100,7 +100,7 @@ WHERE email = 'admin@yourdomain.com';
 mounted on the `worker` role, requires a `SUPER_ADMIN` session cookie, and
 defaults to read-only (`BULL_BOARD_READ_ONLY=true`).** Set it writable only when
 operators need to retry/promote/clean jobs. Because it is cookie-backed, it is
-in scope for the CSRF policy — see [CSRF Posture](./csrf.md) and ADR-047.
+in scope for the CSRF policy — see [CSRF Posture](./csrf.md).
 
 ---
 
@@ -162,8 +162,8 @@ Permission {
   `manage` + `all` = superuser within the org.
 
 `action` and `subject` are **closed enums** (`Action` and `Subject` in
-`packages/shared/src/enums/permissions.ts`). Per OB-01, `assignPermissionSchema`
-validates both, so an off-enum value returns `400 Bad Request`. Domain subjects
+`packages/shared/src/enums/permissions.ts`). `assignPermissionSchema` validates
+both, so an off-enum value returns `400 Bad Request`. Domain subjects
 (`Contact`, `Deal`, …) are **not** built in — a fork adds them (see
 [Adding your own subjects](#adding-your-own-subjects)).
 
@@ -231,7 +231,7 @@ Out of the box, permissions cover `User`, `Organization`, `Role`, and
 
 **1. Extend the `Subject` enum** in `packages/shared/src/enums/permissions.ts`
 and rebuild `@amcore/shared` (skipping the rebuild leaves the API rejecting the
-new subject with `400`, per OB-01):
+new subject with `400`):
 
 ```typescript
 export enum Subject {
@@ -322,12 +322,12 @@ invalidation fails.
 All management routes require an org-context JWT (call `/switch` first) and the
 `ADMIN` role. See `/docs` for exact shapes; the semantics that matter:
 
-- **Roles list** is paginated (ADR-036), ordered `isSystem DESC, name ASC` so
-  system roles head the list.
+- **Roles list** is paginated and ordered `isSystem DESC, name ASC` so system
+  roles head the list.
 - **Roles and permissions are created separately** — the API does not accept
   inline permissions on role creation. Each permission is validated, audited,
-  and linked on its own; the join row and the `aclVersion` bump are transactional
-  (ADR-035).
+  and linked on its own; the join row and the `aclVersion` bump are
+  transactional.
 - **Built-in roles** (`ADMIN`, `MEMBER`, `VIEWER`) and **built-in permissions**
   are seeded on first run (`pnpm --filter api db:seed`) and cannot be modified or
   deleted via the API.

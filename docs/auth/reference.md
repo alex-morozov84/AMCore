@@ -49,11 +49,11 @@ alone:
   marked **verified** (the reset proves mailbox control), and an
   `account.password_changed` security notification is emitted.
 - **Step-up (`POST /auth/step-up`)** re-verifies the current password to refresh
-  the session's recent-auth window (OB-06b), required before step-up-guarded
-  admin operations once `STEP_UP_MAX_AGE_SECONDS` (default 10 min) has elapsed.
-  It refreshes the existing session server-side — it does **not** create a
-  session or rotate the refresh token, and a silent `POST /auth/refresh` does
-  **not** refresh the window.
+  the session's recent-auth window, required before step-up-guarded admin
+  operations once `STEP_UP_MAX_AGE_SECONDS` (default 10 min) has elapsed. It
+  refreshes the existing session server-side — it does **not** create a session
+  or rotate the refresh token, and a silent `POST /auth/refresh` does **not**
+  refresh the window.
 
 ---
 
@@ -62,7 +62,14 @@ alone:
 All errors share a stable envelope:
 
 ```json
-{ "statusCode": 401, "message": "Invalid credentials", "errorCode": "INVALID_CREDENTIALS" }
+{
+  "statusCode": 401,
+  "message": "Invalid credentials",
+  "errorCode": "INVALID_CREDENTIALS",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "path": "/api/v1/auth/login",
+  "correlationId": "req_..."
+}
 ```
 
 Some carry `metadata` (e.g. `retryAfterSeconds` on a `429`). Validation failures

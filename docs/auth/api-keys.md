@@ -122,23 +122,29 @@ Routes are JWT-only by default. A small, explicit allowlist of routes accepts AP
 
 The allowlist:
 
-| Route group                     | API key accepted? | Why                                                                                                                                                                                                                                              |
-| ------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /auth/me`                  | ✅                | Identity self-check for integrations. Stable opt-in.                                                                                                                                                                                             |
-| `POST /organizations`           | ❌                | Creates a new org and makes the caller ADMIN. A scoped key bound to org A could otherwise spin up org C — cross-org expansion via integration credential. Org creation is interactive (OA-03).                                                   |
-| `GET /organizations`            | ❌                | Returns every org the owner belongs to — leaks org-membership topology beyond the key's bound org. Use the key's `organizationId` instead (OA-03).                                                                                               |
-| `GET /organizations/:id`        | ✅                | API key allowed **only when bound to that exact org** (`principal.organizationId === :id`) — read of another org returns 403. JWT principals keep the existing membership-based read so users can browse orgs before calling `/switch` (OA-03).  |
-| `/organizations/:id/switch`     | ❌                | Mints a new JWT — would let a scoped key trade itself for a full-permission token.                                                                                                                                                               |
-| `/organizations/:id/members/**` | ✅                | Member management with `manage:Organization` scope per ADR-033. Per-handler `@CheckPolicies` is the actual authorization gate. Role assignment validates role ownership — a member of org A cannot be assigned a custom role from org B (OA-05). |
-| `/organizations/:id/roles/**`   | ✅                | Org-role management with `manage:Organization` scope per ADR-033. `GET /organizations/:id/roles` requires `principal.organizationId === :id` so an admin switched into one org cannot enumerate another org's role/permission catalogue (OA-06). |
-| `/api-keys/**`                  | ❌                | Credential management — you can't create/list/revoke keys with a key.                                                                                                                                                                            |
-| `/auth/sessions/**`             | ❌                | Browser session management — out of scope for integrations.                                                                                                                                                                                      |
-| `/admin/**`                     | ❌                | Platform-admin operations — SUPER_ADMIN-owned keys would otherwise bypass scopes (the system-role guard ignores them).                                                                                                                           |
-| Everything else with auth       | ❌                | JWT-only by default — bearer-only is the safe baseline.                                                                                                                                                                                          |
+| Route group                     | API key accepted? | Why                                                                                                                                                                                                                                     |
+| ------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/me`                  | ✅                | Identity self-check for integrations. Stable opt-in.                                                                                                                                                                                    |
+| `POST /organizations`           | ❌                | Creates a new org and makes the caller ADMIN. A scoped key bound to org A could otherwise spin up org C — cross-org expansion via integration credential. Org creation is interactive.                                                  |
+| `GET /organizations`            | ❌                | Returns every org the owner belongs to — leaks org-membership topology beyond the key's bound org. Use the key's `organizationId` instead.                                                                                              |
+| `GET /organizations/:id`        | ✅                | API key allowed **only when bound to that exact org** (`principal.organizationId === :id`) — read of another org returns 403. JWT principals keep the existing membership-based read so users can browse orgs before calling `/switch`. |
+| `/organizations/:id/switch`     | ❌                | Mints a new JWT — would let a scoped key trade itself for a full-permission token.                                                                                                                                                      |
+| `/organizations/:id/members/**` | ✅                | Member management with `manage:Organization` scope. Per-handler `@CheckPolicies` is the actual authorization gate. Role assignment validates role ownership — a member of org A cannot be assigned a custom role from org B.            |
+| `/organizations/:id/roles/**`   | ✅                | Org-role management with `manage:Organization` scope. `GET /organizations/:id/roles` requires `principal.organizationId === :id` so an admin switched into one org cannot enumerate another org's role/permission catalogue.            |
+| `/api-keys/**`                  | ❌                | Credential management — you can't create/list/revoke keys with a key.                                                                                                                                                                   |
+| `/auth/sessions/**`             | ❌                | Browser session management — out of scope for integrations.                                                                                                                                                                             |
+| `/admin/**`                     | ❌                | Platform-admin operations — SUPER_ADMIN-owned keys would otherwise bypass scopes (the system-role guard ignores them).                                                                                                                  |
+| Everything else with auth       | ❌                | JWT-only by default — bearer-only is the safe baseline.                                                                                                                                                                                 |
 
-> The allowlist is stable post-Stage 4. Per-handler `@CheckPolicies` decorators remain the actual authorization gate within each accepted route; service-level `assertOrgContext` binds URL `:orgId` parameters to the principal's bound org so cross-tenant catalogue reads cannot slip through function-level policies (OA-03 / OA-06).
+> Per-handler `@CheckPolicies` decorators remain the actual authorization gate
+> within each accepted route; service-level `assertOrgContext` binds URL
+> `:orgId` parameters to the principal's bound org so cross-tenant catalogue
+> reads cannot slip through function-level policies.
 
-Adding API-key acceptance to a new route requires an amendment to ADR-034 (the bearer-only auth default, recorded internally) plus a matching entry in `apps/api/src/core/auth/decorators/auth-decorator-coverage.spec.ts`; the metadata test fails until both agree.
+Adding API-key acceptance to a new route requires updating the internally
+recorded bearer-only auth decision plus a matching entry in
+`apps/api/src/core/auth/decorators/auth-decorator-coverage.spec.ts`; the metadata
+test fails until both agree.
 
 ---
 
@@ -160,9 +166,9 @@ Use one key per (owner, organization) pair. To grant cross-org access, issue mul
 
 **Endpoint:** `GET /api/v1/api-keys` — **JWT only**.
 
-Paginated list (ADR-036). Accepts `?page=N&limit=M` with `1 ≤ page`
-and `1 ≤ limit ≤ 100`; defaults `page=1, limit=20`. Keys are ordered
-newest first (`createdAt DESC, id ASC`). No secret fields are exposed.
+Paginated list. Accepts `?page=N&limit=M` with `1 ≤ page` and
+`1 ≤ limit ≤ 100`; defaults `page=1, limit=20`. Keys are ordered newest first
+(`createdAt DESC, id ASC`). No secret fields are exposed.
 
 ```bash
 curl 'https://api.example.com/api/v1/api-keys?page=1&limit=20' \
