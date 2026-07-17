@@ -1,4 +1,4 @@
-import sharp from 'sharp'
+import sharp, { type Metadata, type Sharp } from 'sharp'
 
 import { DECODABLE_SOURCE_FORMATS, OUTPUT_CONTENT_TYPE } from '../media.constants'
 import {
@@ -78,7 +78,7 @@ export class SharpImageProcessor implements ImageProcessor {
     }
   }
 
-  private async readMetadata(input: Buffer): Promise<sharp.Metadata> {
+  private async readMetadata(input: Buffer): Promise<Metadata> {
     try {
       return await sharp(input, { limitInputPixels: this.config.limitInputPixels }).metadata()
     } catch {
@@ -107,7 +107,7 @@ export class SharpImageProcessor implements ImageProcessor {
   }
 
   /** Apply the output encoder. Metadata is dropped by default (no keepMetadata). */
-  private encode(pipeline: sharp.Sharp, spec: ImageDerivativeSpec): sharp.Sharp {
+  private encode(pipeline: Sharp, spec: ImageDerivativeSpec): Sharp {
     switch (spec.format) {
       case 'jpeg':
         // JPEG has no alpha channel: flatten transparency onto white first.

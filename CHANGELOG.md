@@ -316,6 +316,13 @@ connection` reports status; `DELETE …/connection` unlinks (cancelling pending
   the runtime image): `.swcrc` now excludes `*.spec.ts`, `*-spec.ts`, `__tests__`,
   and `__mocks__` (SWC ignores the `tsconfig.build.json` excludes). Removed the
   redundant `@types/uuid` (uuid v13 ships its own types).
+- Bumped `zod` (4.3 → 4.4) and `sharp` (0.34 → 0.35). No runtime behavior change
+  in AMCore: the env-schema `z.preprocess` helpers now annotate the stable
+  `z.ZodType` base (zod 4.4 renamed the internal `ZodPipe` wrapper to
+  `ZodPreprocess`, PR #5929), and the `sharp` image processor imports the
+  `Metadata`/`Sharp` types by name (sharp 0.35 dropped the default-import
+  namespace). **Note for forks:** sharp 0.35 requires Node.js ≥ 20.9.0 (AMCore
+  already targets Node 22).
 
 ### Fixed
 
