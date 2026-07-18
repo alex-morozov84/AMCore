@@ -187,8 +187,13 @@ CI is the actual gate, not either hook:
   `prettier --write` step formats every matched file repo-wide, including
   inside `apps/*` and `packages/*`. Its ESLint step is workspace-aware by
   design: `apps/api/**`, `apps/web/**`, and `packages/shared/**` each get
-  linted with `eslint -c <that workspace's eslint.config.mjs>`, matching what
-  `pnpm lint` (via Turbo) runs for that workspace in CI. A catch-all
+  linted via `pnpm --filter <workspace> exec eslint`, which runs with that
+  workspace's directory as cwd — the same mechanism `pnpm lint` (via Turbo)
+  uses for that workspace in CI, so it resolves the same nested
+  `eslint.config.mjs` and behaves identically (an explicit `eslint -c
+<path>` from the repo root also works, but leaves cwd at the repo root,
+  which confuses cwd-relative plugin checks like Next.js's pages-directory
+  detection into printing a spurious warning). A catch-all
   `*.{ts,tsx,js,jsx}` pattern still exists in `lint-staged` for genuinely
   root-level files (currently only `eslint.config.js` and
   `commitlint.config.js`) — it does nothing for files already covered by a
@@ -198,7 +203,7 @@ CI is the actual gate, not either hook:
 
 **Do not add a new lintable workspace under `apps/*` or `packages/*` without
 also adding a matching `lint-staged` pattern** in the root `package.json`
-pointing at that workspace's own `eslint.config.mjs`, or its staged files
+using `pnpm --filter <workspace> exec eslint`, or its staged files
 will silently skip ESLint locally (formatting still runs) while still being
 correctly caught by CI's `pnpm lint`. This is exactly the gap found and fixed
 2026-07-18: `packages/shared` had no `eslint.config.mjs`/`lint` script at all

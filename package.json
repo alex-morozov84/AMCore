@@ -41,18 +41,18 @@
   },
   "lint-staged": {
     "apps/api/**/*.{ts,tsx,js,jsx}": [
-      "eslint -c apps/api/eslint.config.mjs --fix --no-warn-ignored",
-      "eslint -c apps/api/eslint.config.mjs --max-warnings=0 --no-warn-ignored",
+      "pnpm --filter api exec eslint --fix --no-warn-ignored",
+      "pnpm --filter api exec eslint --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
     "apps/web/**/*.{ts,tsx,js,jsx}": [
-      "eslint -c apps/web/eslint.config.mjs --fix --no-warn-ignored",
-      "eslint -c apps/web/eslint.config.mjs --max-warnings=0 --no-warn-ignored",
+      "pnpm --filter web exec eslint --fix --no-warn-ignored",
+      "pnpm --filter web exec eslint --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
     "packages/shared/**/*.{ts,tsx,js,jsx}": [
-      "eslint -c packages/shared/eslint.config.mjs --fix --no-warn-ignored",
-      "eslint -c packages/shared/eslint.config.mjs --max-warnings=0 --no-warn-ignored",
+      "pnpm --filter shared exec eslint --fix --no-warn-ignored",
+      "pnpm --filter shared exec eslint --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
     "*.{ts,tsx,js,jsx}": [
