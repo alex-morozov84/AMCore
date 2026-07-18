@@ -125,9 +125,7 @@ await this.notifications.notify({
 
 // Atomic with a business mutation: rolls back if the outer transaction does.
 await this.prisma.$transaction(async (tx) => {
-  await tx.thing.update({
-    /* ... */
-  })
+  await tx.thing.update({/* ... */})
   await this.notifications.notifyTx(tx, {
     recipientUserId: user.id,
     type: 'your_area.your_event',

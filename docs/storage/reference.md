@@ -20,15 +20,15 @@ await storage.upload({
 
 Input:
 
-| Field                | Type                     | Notes                                        |
-| -------------------- | ------------------------ | -------------------------------------------- | --------------------- |
-| `key`                | `string`                 | Object key; normalized and traversal-guarded |
-| `body`               | `Buffer                  | Readable`                                    | Bytes to store        |
-| `contentType`        | `string?`                | Metadata only; validate bytes before calling |
-| `contentDisposition` | `string?`                | Metadata / response behavior                 |
-| `cacheControl`       | `string?`                | Provider cache metadata                      |
-| `metadata`           | `Record<string,string>?` | Provider metadata                            |
-| `visibility`         | `'private'               | 'public-read'?`                              | Defaults to `private` |
+| Field                | Type                          | Notes                                        |
+| -------------------- | ----------------------------- | -------------------------------------------- |
+| `key`                | `string`                      | Object key; normalized and traversal-guarded |
+| `body`               | `Buffer \| Readable`          | Bytes to store                               |
+| `contentType`        | `string?`                     | Metadata only; validate bytes before calling |
+| `contentDisposition` | `string?`                     | Metadata / response behavior                 |
+| `cacheControl`       | `string?`                     | Provider cache metadata                      |
+| `metadata`           | `Record<string,string>?`      | Provider metadata                            |
+| `visibility`         | `'private' \| 'public-read'?` | Defaults to `private`                        |
 
 Result:
 
