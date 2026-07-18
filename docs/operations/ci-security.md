@@ -157,6 +157,24 @@ bash ./scripts/verify-action-pins.sh
 This catches the annotated-tag trap (`refs/tags/vX` object vs
 `refs/tags/vX^{}` commit) that ordinary SHA-format checks do not.
 
+### Docker Base Image Pins
+
+`apps/api/Dockerfile` pins its `node:22-slim` `FROM` lines to a full digest
+(`node:22-slim@sha256:...`), the same principle as Action Pins above applied to
+container images: a mutable tag can change under you without review. Re-resolve
+the digest before bumping it:
+
+```bash
+docker buildx imagetools inspect node:22-slim
+```
+
+and update both `FROM` lines together (`base` and `runner` stages currently
+share one digest). The `docker-image-smoke` CI job scans the built image with
+Trivy, which flags known vulnerabilities in the currently pinned image — it
+does **not** detect that `node:22-slim` has moved to a newer digest upstream.
+Re-resolving the digest is a manual maintainer step (or wire up separate Docker
+base-image update automation, e.g. Dependabot's `docker` ecosystem or Renovate).
+
 ### Optional Local Workflow-Lint Tooling
 
 The repository also ships a convenience `.husky/pre-push` hook that runs:

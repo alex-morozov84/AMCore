@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Pinned the `apps/api` production/runner Docker base image (`node:22-slim`) to
+  a specific digest instead of a mutable tag, and removed the base image's
+  bundled `npm`/`npx` from the runner (unused at runtime; source of an
+  unpatched base-image CVE).
+- Patched a transitive dev-only `js-yaml@3.14.2` DoS (CVE-2026-53550 /
+  GHSA-h67p-54hq-rp68) pulled in via Jest's coverage tooling, now pinned to the
+  patched `3.15.0`.
+
 ### Changed
 
 - Modernized Prisma packaging for the API: Prisma Client now uses the Prisma 7
@@ -374,9 +384,10 @@ connection` reports status; `DELETE …/connection` unlinks (cancelling pending
   (`@nestjs/platform-express`), `form-data` 4.0.6 (`axios`), `hono` 4.12.25,
   `vite` 7.3.5, and the dev/build-only `undici` 7.28.0 (`testcontainers`),
   `piscina` 4.9.3 (`@swc/cli` / `@nestjs/cli`), `@babel/core` 7.29.6. `js-yaml`
-  is pinned to 4.2.0 on the 4.x line only (GHSA-h67p-54hq-rp68); the dev-only 3.x
-  consumer (`@istanbuljs/load-nyc-config`, coverage tooling) predates the 4.x API
-  and parses only trusted project config.
+  was pinned to 4.2.0 on the 4.x line only (GHSA-h67p-54hq-rp68) at the time, since
+  no fix existed yet for the dev-only 3.x consumer (`@istanbuljs/load-nyc-config`,
+  coverage tooling). The later CVE-2026-53550 follow-up (see `[Unreleased] >
+Security` above) now also pins 3.x to the backported `3.15.0` fix.
 - Bumped the `protobufjs` override to 7.6.3 and `tmp` to 0.2.7, closing three
   transitive advisories (two high, one medium). `protobufjs` stays on the 7.x
   line its parents require (`@nestjs/terminus` > `@grpc/grpc-js`, and the dev-only

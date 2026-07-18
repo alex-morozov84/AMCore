@@ -163,6 +163,21 @@ jobs:
             test -x ./node_modules/.bin/prisma
           '
 
+      - name: Verify npm/npx are absent from the runner image
+        run: |
+          docker run --rm "$AMCORE_API_IMAGE" sh -lc '
+            node --version
+            if command -v npm >/dev/null 2>&1; then
+              echo "npm unexpectedly present in runner image"
+              exit 1
+            fi
+            if command -v npx >/dev/null 2>&1; then
+              echo "npx unexpectedly present in runner image"
+              exit 1
+            fi
+            echo "npm/npx absent, node OK"
+          '
+
       - name: Scan the built runner image with Trivy
         run: |
           trivy image \

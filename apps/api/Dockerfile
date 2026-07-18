@@ -7,7 +7,7 @@
 # with the repo's `engines` / `packageManager`. A CI-gated smoke test
 # (.github/workflows/ci.yml) verifies a real sharp WebP encode plus module
 # resolution inside the final runner image.
-FROM node:22-slim AS base
+FROM node:22-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS base
 
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
@@ -99,7 +99,7 @@ CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 # Shipping Corepack's bundled pnpm would also
 # drag its vulnerable bundled `undici` into the image (CVE-2026-12151) and bloat
 # the attack surface for no runtime benefit.
-FROM node:22-slim AS runner
+FROM node:22-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS runner
 
 WORKDIR /app
 
@@ -117,6 +117,11 @@ RUN groupadd --system --gid 1001 nodejs && \
 # The deployed bundle is fully self-contained for app runtime: dist/ and a flat
 # node_modules. Migration files/CLI live in the separate `migrator` target.
 COPY --from=build --chown=nestjs:nodejs /prod/api ./
+
+# The base image bundles its own npm/npx, unused here (only `node dist/main.js`
+# runs at runtime) and a known source of base-image CVEs (e.g. its bundled
+# sigstore, CVE-2026-48815). Remove it rather than carry the CVE for nothing.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 USER nestjs
 
