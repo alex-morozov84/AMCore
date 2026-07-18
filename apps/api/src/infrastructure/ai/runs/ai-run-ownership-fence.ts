@@ -1,5 +1,4 @@
-import { AiConversationControl, AiConversationState, Prisma } from '@prisma/client'
-
+import { AiConversationControl, AiConversationState, Prisma } from '@/generated/prisma/client'
 import { PrismaService } from '@/prisma'
 
 /**

@@ -1,4 +1,3 @@
-import type { EmailVerificationToken, PasswordResetToken } from '@prisma/client'
 import type { PinoLogger } from 'nestjs-pino'
 
 import { AppException } from '../../common/exceptions'
@@ -6,6 +5,8 @@ import type { EnvService } from '../../env/env.service'
 
 import { createMockContext, type MockContext, mockContextToPrisma } from './test-context'
 import { TokenManagerService } from './token-manager.service'
+
+import type { EmailVerificationToken, PasswordResetToken } from '@/generated/prisma/client'
 
 describe('TokenManagerService', () => {
   let service: TokenManagerService

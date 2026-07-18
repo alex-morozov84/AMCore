@@ -1,4 +1,3 @@
-import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import { SystemRole } from '@amcore/shared'
@@ -6,6 +5,8 @@ import { SystemRole } from '@amcore/shared'
 import type { PrismaService } from '../../prisma'
 
 import { PrivilegedRoleService } from './privileged-role.service'
+
+import type { PrismaClient } from '@/generated/prisma/client'
 
 describe('PrivilegedRoleService', () => {
   let service: PrivilegedRoleService

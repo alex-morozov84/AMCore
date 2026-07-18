@@ -1,4 +1,3 @@
-import { AiRunStepType } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import {
@@ -9,6 +8,7 @@ import {
 import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun, GuardrailRefusalInput } from './ai-run-dispatch.types'
 
+import { AiRunStepType } from '@/generated/prisma/client'
 import type { PrismaService } from '@/prisma'
 
 function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {

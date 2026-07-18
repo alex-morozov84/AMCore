@@ -1,5 +1,4 @@
 import type { INestApplication } from '@nestjs/common'
-import { NotificationAttemptOutcome, NotificationDeliveryStatus } from '@prisma/client'
 import request from 'supertest'
 
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
@@ -13,6 +12,8 @@ import { NotificationsService } from '../src/core/notifications/notifications.se
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
+
+import { NotificationAttemptOutcome, NotificationDeliveryStatus } from '@/generated/prisma/client'
 
 interface RegisteredUser {
   userId: string

@@ -1,10 +1,11 @@
-import { AuditActorType, AuditCategory, AuditTargetType } from '@prisma/client'
 import type { ClsService } from 'nestjs-cls'
 import type { PinoLogger } from 'nestjs-pino'
 
 import { createMockContext, mockContextToPrisma } from '../auth/test-context'
 
 import { AuditLogService } from './audit-log.service'
+
+import { AuditActorType, AuditCategory, AuditTargetType } from '@/generated/prisma/client'
 
 describe('AuditLogService', () => {
   const cls = {

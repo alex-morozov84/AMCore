@@ -1,4 +1,4 @@
-import type { AiRunStepType, Prisma } from '@prisma/client'
+import type { AiRunStepType, Prisma } from '@/generated/prisma/client'
 
 /**
  * A run atomically claimed for one execution attempt: leased (`RUNNING`), its `attemptCount` already

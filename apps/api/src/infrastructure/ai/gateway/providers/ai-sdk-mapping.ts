@@ -1,4 +1,3 @@
-import type { AiProviderType } from '@prisma/client'
 import {
   APICallError,
   type FilePart,
@@ -23,6 +22,8 @@ import type {
   AiUsage,
   AiUserContentPart,
 } from '../ai-gateway.types'
+
+import type { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Mapping helpers between the Vercel AI SDK and AMCore's own gateway contracts (Track C —

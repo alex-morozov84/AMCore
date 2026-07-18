@@ -1,6 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
-import { AiArtifactKind, AiRunStatus } from '@prisma/client'
 import request from 'supertest'
 
 import { seedAiCatalog } from '../prisma/seed-ai-catalog'
@@ -17,6 +16,8 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+
+import { AiArtifactKind, AiRunStatus } from '@/generated/prisma/client'
 
 /**
  * Arc G merge gate (Track C — ADR-054) — end-to-end proof of the multimodal artifact lifecycle over

@@ -1,8 +1,8 @@
-import { AiToolRiskClass } from '@prisma/client'
-
 import type { AiToolContext } from '../ai-tool.types'
 
 import { currentTimeTool } from './current-time.tool'
+
+import { AiToolRiskClass } from '@/generated/prisma/client'
 
 function ctx(): AiToolContext {
   return {

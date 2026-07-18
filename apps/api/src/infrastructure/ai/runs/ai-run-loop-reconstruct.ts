@@ -1,14 +1,13 @@
+import { AI_TOOL_REJECTION_NOTICE } from '../tools/ai-tool.constants'
+
+import type { CompletedToolRound } from './ai-run-transcript'
+
 import {
   AiRunStepType,
   AiToolInvocationStatus,
   type AiToolRiskClass,
   type Prisma,
-} from '@prisma/client'
-
-import { AI_TOOL_REJECTION_NOTICE } from '../tools/ai-tool.constants'
-
-import type { CompletedToolRound } from './ai-run-transcript'
-
+} from '@/generated/prisma/client'
 import type { PrismaService } from '@/prisma'
 
 /**

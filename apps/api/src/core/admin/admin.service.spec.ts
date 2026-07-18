@@ -1,5 +1,3 @@
-import type { Organization, User } from '@prisma/client'
-import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 
@@ -11,6 +9,9 @@ import type { PrismaService } from '../../prisma'
 import type { AuditLogService } from '../audit'
 
 import { AdminService } from './admin.service'
+
+import type { Organization, User } from '@/generated/prisma/client'
+import type { PrismaClient } from '@/generated/prisma/client'
 
 describe('AdminService', () => {
   let service: AdminService

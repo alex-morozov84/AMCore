@@ -1,12 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import {
-  AiAuthorType,
-  AiConversationControl,
-  AiMessageRole,
-  AuditActorType,
-  AuditTargetType,
-  Prisma,
-} from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import {
@@ -25,6 +17,14 @@ import { AiConversationAccessAuthorizer } from './ai-conversation-access.authori
 import { AiConversationControlService } from './ai-conversation-control.service'
 
 import { AuditLogService } from '@/core/audit'
+import {
+  AiAuthorType,
+  AiConversationControl,
+  AiMessageRole,
+  AuditActorType,
+  AuditTargetType,
+  Prisma,
+} from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 

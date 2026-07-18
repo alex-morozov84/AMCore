@@ -1,5 +1,3 @@
-import type { Organization, OrgMember, Role } from '@prisma/client'
-import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import type { RequestPrincipal } from '@amcore/shared'
@@ -16,6 +14,9 @@ import type { AppAbility } from '../auth/casl/ability.factory'
 import type { OrgAclVersionService } from '../auth/org-acl-version.service'
 
 import { OrganizationsService } from './organizations.service'
+
+import type { Organization, OrgMember, Role } from '@/generated/prisma/client'
+import type { PrismaClient } from '@/generated/prisma/client'
 
 // findOne reads `ability.can(Read, Organization)` only for api_key
 // principals (OA-03). JWT cases pass `allowAbility()`; api_key cases

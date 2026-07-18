@@ -6,7 +6,6 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { TestingModule, TestingModuleBuilder } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { ThrottlerStorage } from '@nestjs/throttler'
-import type { Role } from '@prisma/client'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import type { Cache } from 'cache-manager'
@@ -21,6 +20,8 @@ import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dis
 import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
 import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
+
+import type { Role } from '@/generated/prisma/client'
 
 /**
  * No-op PinoLogger stub for e2e. Per ai/TESTING.md "Known NestJS E2E Runtime

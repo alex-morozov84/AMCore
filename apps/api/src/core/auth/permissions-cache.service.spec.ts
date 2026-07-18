@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import type { Permission } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
 import { PermissionsCacheService } from './permissions-cache.service'
 
+import type { Permission } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 

@@ -1,7 +1,6 @@
 import { performance } from 'node:perf_hooks'
 
 import { Injectable } from '@nestjs/common'
-import { AiToolInvocationStatus } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiGatewayTool, AiTextResult, AiToolCall } from '../gateway/ai-gateway.types'
@@ -33,6 +32,7 @@ import { type CompletedToolRound, reconstructLoopMessages } from './ai-run-trans
 import { AiToolDispatcher, type ToolDispatchContext } from './ai-tool-dispatcher.service'
 
 import { EnvService } from '@/env/env.service'
+import { AiToolInvocationStatus } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 

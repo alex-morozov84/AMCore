@@ -121,10 +121,11 @@ pnpm --filter api db:migrate          # prisma migrate dev (LOCAL development on
 pnpm dev
 ```
 
-> Production uses `prisma migrate deploy` as a one-shot step before rollout — never
-> `db:migrate` (which is `migrate dev`). To run the Docker stack against a
-> managed/VPS DB or real S3, set `COMPOSE_PROFILES=` empty plus
-> `COMPOSE_DATABASE_URL` / `COMPOSE_REDIS_URL` (and the S3 vars) in `.env`. See
+> Production uses `prisma migrate deploy` from the CLI-capable migrator image as
+> a one-shot step before rolling out the slim app image — never `db:migrate`
+> (which is `migrate dev`). To run the Docker stack against a managed/VPS DB or
+> real S3, set `COMPOSE_PROFILES=` empty plus `COMPOSE_DATABASE_URL` /
+> `COMPOSE_REDIS_URL` (and the S3 vars) in `.env`. See
 > [`docs/operations/deployment.md`](docs/operations/deployment.md).
 
 > **Building a product from this starter?** First update

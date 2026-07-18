@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { AiRunStepType, Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AiGatewayException } from '../gateway/ai-gateway.error'
@@ -24,6 +23,7 @@ import {
 import type { RunPlan } from './ai-run-plan'
 import { sanitizeGuardrailCategories } from './guardrail-step-detail'
 
+import { AiRunStepType, Prisma } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 

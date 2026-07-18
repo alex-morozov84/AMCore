@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { NotificationDeliveryStatus, type Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
 
@@ -24,6 +23,7 @@ import { NotificationPreferenceRepository } from './notification-preference.repo
 import { NotificationPreferenceResolver } from './notification-preference.resolver'
 import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
+import { NotificationDeliveryStatus, type Prisma } from '@/generated/prisma/client'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '@/infrastructure/queue/queue.service'
 

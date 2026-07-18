@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AI_APPROVAL_EXPIRY_BATCH_LIMIT } from '@/core/ai/ai-run.constants'
 import { ApprovalRaceError, expireApproval } from '@/core/ai/approvals/ai-approval-expiry'
 import { AuditLogService } from '@/core/audit'
+import { Prisma } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 

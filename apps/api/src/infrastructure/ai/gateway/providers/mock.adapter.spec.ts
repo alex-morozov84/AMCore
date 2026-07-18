@@ -1,4 +1,3 @@
-import { AiProviderType } from '@prisma/client'
 import { z } from 'zod'
 
 import { wrapUntrusted } from '../../guardrails/trust-boundary.builder'
@@ -6,6 +5,8 @@ import { AiGatewayException } from '../ai-gateway.error'
 import type { AiAdapterCall, AiGatewayTool } from '../ai-gateway.types'
 
 import { MockAiAdapter } from './mock.adapter'
+
+import { AiProviderType } from '@/generated/prisma/client'
 
 function call(over: Partial<AiAdapterCall> = {}): AiAdapterCall {
   return {

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { AuditActorType, AuditTargetType } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { PrismaService } from '../../../../prisma'
@@ -10,6 +9,7 @@ import { parseStartCommand, parseUpdateId } from './telegram-update.schema'
 
 import { AuditLogService } from '@/core/audit/audit-log.service'
 import { EnvService } from '@/env/env.service'
+import { AuditActorType, AuditTargetType } from '@/generated/prisma/client'
 
 /**
  * Inbound Telegram webhook handler (web role, Arc D / D.6). Orchestrates the **single transaction**

@@ -2,7 +2,6 @@ jest.mock('./providers/oauth-provider.factory', () => ({ OAuthProviderFactory: j
 jest.mock('./oauth-client.service', () => ({ OAuthClientService: jest.fn() }))
 
 import { HttpStatus } from '@nestjs/common'
-import type { OAuthProvider, User } from '@prisma/client'
 import type { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode } from '@amcore/shared'
@@ -13,6 +12,8 @@ import { EmailIdentityService } from '../email-identity.service'
 import { OAuthService } from './oauth.service'
 import { hashOAuthStateNonce } from './oauth-nonce'
 import type { OAuthStateData } from './oauth-state.service'
+
+import type { OAuthProvider, User } from '@/generated/prisma/client'
 
 // Browser-binding nonce the controller would set as the `oauth_state` cookie; the
 // mocked state record stores its hash, so a callback carrying TEST_NONCE is bound.

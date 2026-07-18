@@ -1,9 +1,10 @@
-import { AiProviderType } from '@prisma/client'
 import { z } from 'zod'
 
 import type { AiAdapterCall } from '../ai-gateway.types'
 
 import { AnthropicAdapter } from './anthropic.adapter'
+
+import { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Anthropic adapter against a fake provider via an injected `fetch` (Track C — ADR-054, Arc B):

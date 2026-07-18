@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import type { Prisma } from '@prisma/client'
 
 import type { RequestPrincipal } from '@amcore/shared'
 
@@ -13,6 +12,8 @@ import { PrismaService } from '../../prisma'
 
 import { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
+
+import type { Prisma } from '@/generated/prisma/client'
 
 type PrismaTx = Prisma.TransactionClient
 

@@ -1,8 +1,7 @@
-import { AiProviderType } from '@prisma/client'
-
 import { AiCredentialResolver } from './credential-resolver'
 
 import type { EnvService } from '@/env/env.service'
+import { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Unit tests for the code-owned credential allowlist (Track C — ADR-054, Arc B). The

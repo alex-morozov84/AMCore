@@ -1,12 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
-import {
-  AiApprovalState,
-  AiMessageRole,
-  AiRunStatus,
-  AiRunStepType,
-  AiToolInvocationStatus,
-} from '@prisma/client'
 
 import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { ConflictException } from '../src/common/exceptions'
@@ -22,6 +15,14 @@ import type { PrismaService } from '../src/prisma'
 
 import { demoSensitiveTool } from './fixtures/demo-sensitive.tool'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
+
+import {
+  AiApprovalState,
+  AiMessageRole,
+  AiRunStatus,
+  AiRunStepType,
+  AiToolInvocationStatus,
+} from '@/generated/prisma/client'
 
 /**
  * Arc E.5b-3 — first end-to-end proof of the human-in-the-loop approval lifecycle over real Postgres +

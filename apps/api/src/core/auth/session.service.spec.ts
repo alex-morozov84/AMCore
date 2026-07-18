@@ -1,4 +1,3 @@
-import { type Session, SystemRole, type User } from '@prisma/client'
 import type { PinoLogger } from 'nestjs-pino'
 
 import { NotFoundException } from '../../common/exceptions'
@@ -6,6 +5,8 @@ import { NotFoundException } from '../../common/exceptions'
 import { SessionService } from './session.service'
 import { createMockContext, type MockContext, mockContextToPrisma } from './test-context'
 import { TokenService } from './token.service'
+
+import { type Session, SystemRole, type User } from '@/generated/prisma/client'
 
 describe('SessionService', () => {
   let sessionService: SessionService

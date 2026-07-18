@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import type { Prisma } from '@/generated/prisma/client'
 
 /**
  * A delivery atomically claimed for one processing attempt: leased (`PROCESSING`),

@@ -1,11 +1,11 @@
-import { TelegramConnectionStatus } from '@prisma/client'
-
 import { NotificationChannel } from '../../notification.constants'
 import type { NotificationDefinition } from '../../notification-definition.types'
 import type { TargetRecipient, TargetRecipientTelegram } from '../channel-target-resolver.types'
 
 import { TelegramTerminalReason } from './telegram.constants'
 import { TelegramTargetResolver } from './telegram-target.resolver'
+
+import { TelegramConnectionStatus } from '@/generated/prisma/client'
 
 const resolver = new TelegramTargetResolver()
 

@@ -1,5 +1,4 @@
 import { HttpStatus, Injectable } from '@nestjs/common'
-import type { OAuthProvider, User } from '@prisma/client'
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -16,6 +15,8 @@ import { UserCacheService } from '../user-cache.service'
 import { generateOAuthStateNonce, hashOAuthStateNonce } from './oauth-nonce'
 import { OAuthStateService } from './oauth-state.service'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory'
+
+import type { OAuthProvider, User } from '@/generated/prisma/client'
 
 interface LoginCallbackResult {
   mode: 'login'

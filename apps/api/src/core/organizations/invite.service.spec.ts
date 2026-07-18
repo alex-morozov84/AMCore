@@ -1,5 +1,3 @@
-import type { OrgInvite, OrgMember, PrismaClient, Role, User } from '@prisma/client'
-import { Prisma } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -19,6 +17,9 @@ import type { InviteAcceptLimiterService } from './invite-accept-limiter.service
 import type { InviteRateLimiterService } from './invite-rate-limiter.service'
 import type { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
+
+import type { OrgInvite, OrgMember, PrismaClient, Role, User } from '@/generated/prisma/client'
+import { Prisma } from '@/generated/prisma/client'
 
 // InviteService imports EmailService, which transitively pulls the ESM-only
 // React Email / FormatJS chain. Mock the leaves so this unit suite loads

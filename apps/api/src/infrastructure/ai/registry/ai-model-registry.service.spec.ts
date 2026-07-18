@@ -1,4 +1,3 @@
-import { AiProviderType } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import { AiCredentialResolver } from '../gateway/credential-resolver'
@@ -6,6 +5,7 @@ import { AiCredentialResolver } from '../gateway/credential-resolver'
 import { AiModelRegistry } from './ai-model-registry.service'
 
 import type { EnvService } from '@/env/env.service'
+import { AiProviderType } from '@/generated/prisma/client'
 import type { MetricsService } from '@/infrastructure/observability'
 import type { AppRedisClient } from '@/infrastructure/redis'
 import type { PrismaService } from '@/prisma'

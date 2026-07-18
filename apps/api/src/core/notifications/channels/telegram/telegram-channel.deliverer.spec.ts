@@ -1,4 +1,3 @@
-import type { Notification } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { z } from 'zod'
 
@@ -18,6 +17,7 @@ import { TelegramChannelDeliverer } from './telegram-channel.deliverer'
 import { telegramGenericMessages } from './telegram-messages'
 
 import type { EnvService } from '@/env/env.service'
+import type { Notification } from '@/generated/prisma/client'
 
 const base = {
   category: NotificationCategory.PRODUCT,

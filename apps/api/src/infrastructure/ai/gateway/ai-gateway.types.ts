@@ -1,7 +1,8 @@
-import type { AiProviderType } from '@prisma/client'
 import type { ZodType } from 'zod'
 
 import type { ResolvedAiModel } from '../registry/ai-registry.types'
+
+import type { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Gateway request/result contracts (Track C — ADR-054, Arc B). The cross-provider common

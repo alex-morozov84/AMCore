@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
-import type { User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
+import type { User } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 

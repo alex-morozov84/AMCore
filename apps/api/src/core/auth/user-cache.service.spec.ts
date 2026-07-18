@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { SystemRole, type User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
 import { UserCacheService } from './user-cache.service'
 
+import { SystemRole, type User } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 

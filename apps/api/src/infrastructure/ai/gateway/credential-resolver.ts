@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common'
-import { AiProviderType } from '@prisma/client'
 
 import type { Env } from '../../../env'
 
 import { EnvService } from '@/env/env.service'
+import { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Code-owned credential allowlist (Track C — ADR-054, Arc B).

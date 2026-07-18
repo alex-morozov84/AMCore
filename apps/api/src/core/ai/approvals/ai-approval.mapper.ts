@@ -1,6 +1,6 @@
-import type { AiApproval, AiToolInvocation } from '@prisma/client'
-
 import type { AiApprovalResponse } from '@amcore/shared'
+
+import type { AiApproval, AiToolInvocation } from '@/generated/prisma/client'
 
 /** An approval with the one tool invocation it gates (v1 is one-per-approval) — id + risk only. */
 export type AiApprovalWithTool = AiApproval & {

@@ -1,4 +1,4 @@
-import { AiArtifactKind, AiRunStatus } from '@prisma/client'
+import { AiArtifactKind, AiRunStatus } from '@/generated/prisma/client'
 
 /**
  * AI artifact upload constants (Track C — ADR-054, Arc G). Only `IMAGE` (JPEG/PNG/WebP) and `PDF`

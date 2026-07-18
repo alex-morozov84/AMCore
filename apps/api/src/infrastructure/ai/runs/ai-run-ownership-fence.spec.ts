@@ -1,5 +1,3 @@
-import type { Prisma } from '@prisma/client'
-
 import {
   ConversationSupersededError,
   isBotOwnershipStale,
@@ -8,6 +6,7 @@ import {
   readBotOwnership,
 } from './ai-run-ownership-fence'
 
+import type { Prisma } from '@/generated/prisma/client'
 import type { PrismaService } from '@/prisma'
 
 const fresh: OwnershipFenceRow = { ownershipGeneration: 3, controlledBy: 'BOT', state: 'ACTIVE' }

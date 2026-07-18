@@ -1,5 +1,4 @@
 import { Injectable, type StreamableFile } from '@nestjs/common'
-import { AuditActorType, AuditTargetType } from '@prisma/client'
 import type { Response } from 'express'
 
 import type { RequestPrincipal } from '@amcore/shared'
@@ -8,6 +7,7 @@ import { NotFoundException } from '../../../common/exceptions'
 import { AiConversationAccessAuthorizer } from '../conversations/ai-conversation-access.authorizer'
 
 import { AuditLogService } from '@/core/audit'
+import { AuditActorType, AuditTargetType } from '@/generated/prisma/client'
 import { StorageDownloadService } from '@/infrastructure/storage'
 import { PrismaService } from '@/prisma'
 

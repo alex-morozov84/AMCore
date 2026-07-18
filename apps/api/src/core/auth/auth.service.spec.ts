@@ -1,4 +1,3 @@
-import { SystemRole, type User } from '@prisma/client'
 import * as argon2 from 'argon2'
 import type { PinoLogger } from 'nestjs-pino'
 
@@ -16,6 +15,8 @@ import { createMockContext, type MockContext, mockContextToPrisma } from './test
 import { TokenService } from './token.service'
 import { TokenManagerService } from './token-manager.service'
 import { UserCacheService } from './user-cache.service'
+
+import { SystemRole, type User } from '@/generated/prisma/client'
 
 // Mock email module to prevent TSX/ESM import issues (jest.mock is hoisted automatically)
 jest.mock('../../infrastructure/email', () => ({ EmailService: jest.fn() }))

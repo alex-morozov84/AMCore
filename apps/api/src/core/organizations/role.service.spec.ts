@@ -1,5 +1,3 @@
-import type { Permission, Role } from '@prisma/client'
-import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import type { RequestPrincipal } from '@amcore/shared'
@@ -11,6 +9,9 @@ import type { PrismaService } from '../../prisma'
 import type { AssignPermissionDto, CreateRoleDto, UpdateRoleDto } from './dto'
 import type { OrganizationsService } from './organizations.service'
 import { RoleService } from './role.service'
+
+import type { Permission, Role } from '@/generated/prisma/client'
+import type { PrismaClient } from '@/generated/prisma/client'
 
 describe('RoleService', () => {
   let service: RoleService

@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { Prisma, type PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '../src/generated/prisma/client'
 
 import { AI_CATALOG_SEED } from './seed-ai-catalog.data'
 

@@ -14,7 +14,7 @@ UTC time, has no side effect, and is not on any assistant allowlist by default.
 
 ```ts
 // apps/api/src/infrastructure/ai/tools/reference/echo.tool.ts
-import { AiToolRiskClass } from '@prisma/client'
+import { AiToolRiskClass } from '@/generated/prisma/client'
 import { z } from 'zod'
 
 import type { AiTool } from '../ai-tool.types'

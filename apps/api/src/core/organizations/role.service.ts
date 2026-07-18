@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import type { Permission, Prisma, Role } from '@prisma/client'
 
 import type {
   OrgRoleResponse,
@@ -13,6 +12,8 @@ import { PrismaService } from '../../prisma'
 
 import type { AssignPermissionDto, CreateRoleDto, UpdateRoleDto } from './dto'
 import { OrganizationsService } from './organizations.service'
+
+import type { Permission, Prisma, Role } from '@/generated/prisma/client'
 
 export type RoleWithPermissions = Role & { permissions: { permission: Permission }[] }
 

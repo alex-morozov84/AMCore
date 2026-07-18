@@ -108,11 +108,11 @@ COMPOSE_PROFILES=          docker compose config --quiet     # remote
 
 ## Production rollout (without compose)
 
-Run the **same production image** as a one-shot migration before rolling out the
-app. Kubernetes — a Job, ideally a Helm `pre-upgrade` hook:
+Run the **CLI-capable migrator image** as a one-shot migration before rolling out
+the slim app image. Kubernetes — a Job, ideally a Helm `pre-upgrade` hook:
 
 ```yaml
-# Job (same image as the Deployment), runs once before the app rollout
+# Job (migrator image built from the same source state), runs once before rollout
 command: ['./node_modules/.bin/prisma', 'migrate', 'deploy']
 env:
   - name: DATABASE_URL # direct URL; only DATABASE_URL is needed here
@@ -127,7 +127,7 @@ Manual one-off (any Docker host):
 
 ```bash
 docker run --rm -e DATABASE_URL="postgresql://…?sslmode=require" \
-  <amcore-api-image> ./node_modules/.bin/prisma migrate deploy
+  <amcore-api-migrator-image>
 ```
 
 ## Telegram webhook registration (one-shot, optional)

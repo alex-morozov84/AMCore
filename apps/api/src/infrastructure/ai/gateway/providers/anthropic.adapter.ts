@@ -1,11 +1,12 @@
 import { createAnthropic } from '@ai-sdk/anthropic'
-import { AiProviderType } from '@prisma/client'
 import type { LanguageModel } from 'ai'
 
 import { AiGatewayException } from '../ai-gateway.error'
 import type { AiAdapterCall } from '../ai-gateway.types'
 
 import { AbstractAiSdkAdapter } from './ai-sdk.adapter.base'
+
+import { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Anthropic / Claude adapter (Track C — ADR-054, Arc B) — the default provider family. The SDK

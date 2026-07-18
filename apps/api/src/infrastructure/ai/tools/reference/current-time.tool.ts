@@ -1,7 +1,8 @@
-import { AiToolRiskClass } from '@prisma/client'
 import { z } from 'zod'
 
 import type { AiTool } from '../ai-tool.types'
+
+import { AiToolRiskClass } from '@/generated/prisma/client'
 
 /**
  * SAFE reference tool (Track C — ADR-054, Arc E) — the documented pattern for a code-owned tool.

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { AiProviderType } from '@prisma/client'
 
 import { AiGatewayException } from '../ai-gateway.error'
 import type {
@@ -12,6 +11,8 @@ import type {
   AiUsage,
   AiUserContentPart,
 } from '../ai-gateway.types'
+
+import { AiProviderType } from '@/generated/prisma/client'
 
 /** Rough deterministic token estimate (~4 chars/token) for the key-less mock. */
 function estimateTokens(text: string): number {

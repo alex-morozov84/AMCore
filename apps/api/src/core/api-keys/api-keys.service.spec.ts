@@ -1,4 +1,3 @@
-import { SystemRole } from '@prisma/client'
 import type { Cache } from 'cache-manager'
 import type { PinoLogger } from 'nestjs-pino'
 
@@ -7,6 +6,8 @@ import type { AuditLogService } from '../audit'
 import { createMockContext, type MockContext, mockContextToPrisma } from '../auth/test-context'
 
 import { ApiKeysService } from './api-keys.service'
+
+import { SystemRole } from '@/generated/prisma/client'
 
 describe('ApiKeysService', () => {
   let service: ApiKeysService

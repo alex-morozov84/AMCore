@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
 import { Injectable } from '@nestjs/common'
-import { AiAuthorType, AiMessageRole, AiRunStatus, AiRunStepType, Prisma } from '@prisma/client'
 
 import {
   AI_RUN_CLAIM_BATCH_LIMIT,
@@ -22,6 +21,13 @@ import type {
 import { ConversationSupersededError, lockAndAssertBotOwnership } from './ai-run-ownership-fence'
 import { sanitizeGuardrailCategories } from './guardrail-step-detail'
 
+import {
+  AiAuthorType,
+  AiMessageRole,
+  AiRunStatus,
+  AiRunStepType,
+  Prisma,
+} from '@/generated/prisma/client'
 import { PrismaService } from '@/prisma'
 
 /** Thrown inside `finalizeRefusal`'s transaction when the CAS matches no row → roll everything back. */

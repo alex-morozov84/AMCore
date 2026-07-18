@@ -1,8 +1,9 @@
 /* eslint-disable no-console */
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient, type Role } from '@prisma/client'
 import { config } from 'dotenv'
 import { Pool } from 'pg'
+
+import { PrismaClient, type Role } from '../src/generated/prisma/client'
 
 import { seedAiCatalog } from './seed-ai-catalog'
 

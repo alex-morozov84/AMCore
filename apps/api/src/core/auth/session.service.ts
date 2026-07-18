@@ -1,5 +1,4 @@
 import { HttpStatus, Injectable } from '@nestjs/common'
-import type { Session, User } from '@prisma/client'
 import { randomBytes } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -9,6 +8,8 @@ import { AppException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 
 import { TokenService } from './token.service'
+
+import type { Session, User } from '@/generated/prisma/client'
 
 interface CreateSessionParams {
   userId: string

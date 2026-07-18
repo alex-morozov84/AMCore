@@ -1,7 +1,8 @@
-import { AiProviderType } from '@prisma/client'
 import { z } from 'zod'
 
 import { aiCapabilityMapSchema, aiConfigObjectSchema } from '@amcore/shared'
+
+import { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Resolved catalog shapes (Track C — ADR-054, Arc B) — the DB-derived, secret-free projections

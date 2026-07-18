@@ -1,9 +1,10 @@
-import type { PrismaClient, Role } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import { ForbiddenException } from '../../common/exceptions'
 
 import { RoleAssignabilityService } from './role-assignability.service'
+
+import type { PrismaClient, Role } from '@/generated/prisma/client'
 
 describe('RoleAssignabilityService', () => {
   let service: RoleAssignabilityService

@@ -1,4 +1,3 @@
-import { AiProviderType } from '@prisma/client'
 import { z } from 'zod'
 
 import type { AiModelRegistry } from '../registry/ai-model-registry.service'
@@ -10,6 +9,7 @@ import { ModelGateway } from './model-gateway.service'
 import { MockAiAdapter } from './providers/mock.adapter'
 
 import type { EnvService } from '@/env/env.service'
+import { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Unit tests for the ModelGateway seam (Track C — ADR-054, Arc B): model resolution, the central

@@ -1,12 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import {
-  AiApprovalState,
-  AiRunStatus,
-  AiToolInvocationStatus,
-  AuditActorType,
-  AuditTargetType,
-  Prisma,
-} from '@prisma/client'
 
 import type {
   AiRunCancelResponse,
@@ -23,6 +15,14 @@ import { toAiRunResponse } from './ai-run.mapper'
 import { decodeAiRunCursor, encodeAiRunCursor } from './ai-run-cursor'
 
 import { AuditLogService } from '@/core/audit'
+import {
+  AiApprovalState,
+  AiRunStatus,
+  AiToolInvocationStatus,
+  AuditActorType,
+  AuditTargetType,
+  Prisma,
+} from '@/generated/prisma/client'
 import { PrismaService } from '@/prisma'
 
 /** Rolls the cancel-while-waiting transaction back when the parked gate raced out from under it. */

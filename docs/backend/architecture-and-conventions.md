@@ -75,6 +75,13 @@ and datasource live in `schema.prisma`). Tag every model with `@@schema("<area>"
 **If you introduce a new schema, add it to `datasource db { schemas = [...] }` in
 `schema.prisma` first** — otherwise the migration won't create it.
 
+AMCore uses Prisma 7's source-generated client (`provider = "prisma-client"`,
+`output = "../src/generated/prisma"`). Runtime API code imports Prisma enums,
+types, and `PrismaClient` from `@/generated/prisma/client`, not from the
+deprecated `@prisma/client` generated package surface. The generated directory is
+created by `pnpm --filter api db:generate` / API `postinstall` before
+typecheck/build/test.
+
 Let Prisma diff the schema against your local dev DB; **don't hand-craft migration
 history, and never run `migrate dev` against production:**
 

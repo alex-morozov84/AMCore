@@ -1,14 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
-import {
-  AiApprovalState,
-  AiConversationControl,
-  AiConversationState,
-  AiMessageRole,
-  AiRunStatus,
-  AiRunStepType,
-  AiToolInvocationStatus,
-} from '@prisma/client'
 import request from 'supertest'
 
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
@@ -35,6 +26,16 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+
+import {
+  AiApprovalState,
+  AiConversationControl,
+  AiConversationState,
+  AiMessageRole,
+  AiRunStatus,
+  AiRunStepType,
+  AiToolInvocationStatus,
+} from '@/generated/prisma/client'
 
 /**
  * Arc F.5 — end-to-end proof of human takeover / operator review over real Postgres + the durable

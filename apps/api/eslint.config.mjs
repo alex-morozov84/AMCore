@@ -13,6 +13,9 @@ const bannedExceptionImports = [
 export default [
   ...nestConfig,
   {
+    ignores: ['src/generated/prisma/**'],
+  },
+  {
     files: ['src/**/*.ts'],
     rules: {
       'no-restricted-imports': [

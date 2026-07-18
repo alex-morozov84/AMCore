@@ -1,6 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { HttpStatus, Inject, Injectable } from '@nestjs/common'
-import { AuditActorType, AuditTargetType } from '@prisma/client'
 import * as argon2 from 'argon2'
 import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
@@ -28,6 +27,8 @@ import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 import { TokenManagerService } from './token-manager.service'
 import { UserCacheService } from './user-cache.service'
+
+import { AuditActorType, AuditTargetType } from '@/generated/prisma/client'
 
 interface AuthResult {
   user: UserResponse
