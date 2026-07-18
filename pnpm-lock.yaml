@@ -275,11 +275,11 @@ importers:
         specifier: ^1.15.43
         version: 1.15.43
       '@testcontainers/postgresql':
-        specifier: ^11.14.0
-        version: 11.14.0
+        specifier: ^12.0.4
+        version: 12.0.4
       '@testcontainers/redis':
-        specifier: ^11.14.0
-        version: 11.14.0
+        specifier: ^12.0.4
+        version: 12.0.4
       '@types/cookie-parser':
         specifier: ^1.4.10
         version: 1.4.10(@types/express@5.0.6)
@@ -302,8 +302,8 @@ importers:
         specifier: ^19.2.17
         version: 19.2.17
       '@types/supertest':
-        specifier: ^6.0.3
-        version: 6.0.3
+        specifier: ^7.2.1
+        version: 7.2.1
       '@vitest/ui':
         specifier: ^4.1.10
         version: 4.1.10(vitest@4.1.10)
@@ -329,8 +329,8 @@ importers:
         specifier: ^7.2.2
         version: 7.2.2
       testcontainers:
-        specifier: ^11.14.0
-        version: 11.14.0
+        specifier: ^12.0.4
+        version: 12.0.4
       ts-jest:
         specifier: ^29.4.11
         version: 29.4.11(@babel/core@7.29.6)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.6))(jest-util@30.4.1)(jest@30.4.2(@types/node@25.9.5))(typescript@5.9.3)
@@ -3422,11 +3422,11 @@ packages:
     peerDependencies:
       react: ^18 || ^19
 
-  '@testcontainers/postgresql@11.14.0':
-    resolution: {integrity: sha512-wYbJn8GRTj8qfqzfVubxioYWlHJU/ImIjuzPwyy9C5Qfo6g3GLduPZAj+BifvqTZjgT3gd4gFVLCPhBji7dc1w==}
+  '@testcontainers/postgresql@12.0.4':
+    resolution: {integrity: sha512-a/pLU6j5lpKKAlUTPwqweqMGhOSjgTSb6HBX69TOrXn32ifU37nnQDmNFTj8ddOAw+BQL9oTRkeOxVbZkqhgZA==}
 
-  '@testcontainers/redis@11.14.0':
-    resolution: {integrity: sha512-WX005slz2JMQPw2avbSjf5awVjpmFhOs5xCxeGSYLcV5ia4W1edv/P6MdOw4dZnvDQDuN5LfqNoV/ut3XGb2pA==}
+  '@testcontainers/redis@12.0.4':
+    resolution: {integrity: sha512-44Ov3Lcptb3KqljcCy6xIJ2VxNsN+3Kw/YpBiotZpOcI4iLgLNmcOgvCFPVo+vDoh4rCfgtNUEbIpL5Mu7oRuw==}
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -3660,8 +3660,8 @@ packages:
   '@types/superagent@8.1.11':
     resolution: {integrity: sha512-KA7srSW/HENDtOw9DOqaFLgWuMqN9WgjEw62lh9dpvRaZDkhdOkazASd7X7i2eMUYLHa1U37ZttnePsH5zTDHw==}
 
-  '@types/supertest@6.0.3':
-    resolution: {integrity: sha512-8WzXq62EXFhJ7QsH3Ocb/iKQ/Ty9ZVWnVzoTKc9tyyFRRF3a74Tk2+TLFgaFFw364Ere+npzHKEJ6ga2LzIL7w==}
+  '@types/supertest@7.2.1':
+    resolution: {integrity: sha512-4CbBvoYVLHL7+yhbYrZET0vsvuyXTC05aRe7dNQkwMzm56auceoy6Yu3K50uZmwfHna1os3CMSgM/3QVkUtPTw==}
 
   '@types/whatwg-mimetype@3.0.2':
     resolution: {integrity: sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA==}
@@ -5164,9 +5164,9 @@ packages:
     resolution: {integrity: sha512-XJgGhoR/CLpqshm4d3L7rzH6t8NgDFUIIpztYlLHIApeJjMZKYJMz2zxPsYxnejq5h3ELYSw/RBsi3t5h7gNTA==}
     engines: {node: '>= 8.0'}
 
-  dockerode@4.0.12:
-    resolution: {integrity: sha512-/bCZd6KlGcjZO8Buqmi/vXuqEGVEZ0PNjx/biBNqJD3MhK9DmdiAuKxqfNhflgDESDIiBz3qF+0e55+CpnrUcw==}
-    engines: {node: '>= 8.0'}
+  dockerode@5.0.1:
+    resolution: {integrity: sha512-avsq/xk4YPIrn0CgleX5bjT9Y8IT1p9PxrNQ++RBQ2WEyFfHCTDsT9kmyxz+H/axnjAwg8wJWEIuPGOUuNupiA==}
+    engines: {node: '>= 14.17'}
 
   doctrine@2.1.0:
     resolution: {integrity: sha512-35mSku4ZXK0vfCuHEDAwt55dg2jNajHZ1odvF+8SSr82EsZY4QmXfuWso8oEd8zRhVObSN18aM0CjSdoBX7zIw==}
@@ -5792,9 +5792,9 @@ packages:
   get-port-please@3.2.0:
     resolution: {integrity: sha512-I9QVvBw5U/hw3RmWpYKRumUeaDgxTPd401x364rLmWBJcOQ753eov1eTgzDqRG9bqFIfDc7gfzcQEWrUri3o1A==}
 
-  get-port@7.2.0:
-    resolution: {integrity: sha512-afP4W205ONCuMoPBqcR6PSXnzX35KTcJygfJfcp+QY+uwm3p20p1YczWXhlICIzGMCxYBQcySEcOgsJcrkyobg==}
-    engines: {node: '>=16'}
+  get-port@5.1.1:
+    resolution: {integrity: sha512-g/Q1aTSDOxFpchXC4i8ZWvxA1lnPqx/JHqcpIw0/LX9T8x/GBbi6YnlN5nhaKIFkT8oFsscUKgDJYxfwfS6QsQ==}
+    engines: {node: '>=8'}
 
   get-proto@1.0.1:
     resolution: {integrity: sha512-sTSfBjoXBp89JvIKIefqw7U2CCebsc74kiY6awiGogKtoSGbgjYE/G/+l9sF3MWFPNc9IcoOC4ODfKHfxFmp0g==}
@@ -8217,8 +8217,8 @@ packages:
     resolution: {integrity: sha512-cAGWPIyOHU6zlmg88jwm7VRyXnMN7iV68OGAbYDk/Mh/xC/pzVPlQtY6ngoIH/5/tciuhGfvESU8GrHrcxD56w==}
     engines: {node: '>=8'}
 
-  testcontainers@11.14.0:
-    resolution: {integrity: sha512-r9pniwv/iwzyHaI7gwAvAm4Y+IvjJg3vBWdjrUCaDMc2AXIr4jKbq7jJO18Mw2ybs73pZy1Aj7p/4RVBGMRWjg==}
+  testcontainers@12.0.4:
+    resolution: {integrity: sha512-QIR/8xF1+F/26cIM+9B4yyxNTbKJxAv3hygZyhPRgZ8Q2AhlPZjDdpXRuk16V37X4bgJRI3hXFhoEICMBA7Adg==}
 
   text-decoder@1.2.7:
     resolution: {integrity: sha512-vlLytXkeP4xvEq2otHeJfSQIRyWxo/oZGEbXrtEEF9Hnmrdly59sUbzZ/QgyWuLYHctCHxFF4tRQZNQ9k60ExQ==}
@@ -8553,10 +8553,6 @@ packages:
   utils-merge@1.0.1:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
-
-  uuid@11.1.1:
-    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
-    hasBin: true
 
   uuid@13.0.2:
     resolution: {integrity: sha512-vzi9uRZ926x4XV73S/4qQaTwPXM2JBj6/6lI/byHH1jOpCzb0zDbfytgA9LcN/hzb2l7WQSQnxITOVx5un/wGw==}
@@ -11602,18 +11598,18 @@ snapshots:
       '@tanstack/query-core': 5.99.2
       react: 19.2.4
 
-  '@testcontainers/postgresql@11.14.0':
+  '@testcontainers/postgresql@12.0.4':
     dependencies:
-      testcontainers: 11.14.0
+      testcontainers: 12.0.4
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
       - react-native-b4a
       - supports-color
 
-  '@testcontainers/redis@11.14.0':
+  '@testcontainers/redis@12.0.4':
     dependencies:
-      testcontainers: 11.14.0
+      testcontainers: 12.0.4
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -11898,7 +11894,7 @@ snapshots:
       '@types/node': 25.9.5
       form-data: 4.0.6
 
-  '@types/supertest@6.0.3':
+  '@types/supertest@7.2.1':
     dependencies:
       '@types/methods': 1.1.4
       '@types/superagent': 8.1.11
@@ -12401,7 +12397,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
-      vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@25.3.5)(@vitest/ui@4.1.10)(happy-dom@20.10.6)(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@7.3.5(@types/node@25.3.5)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.8.3))
+      vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@25.9.5)(@vitest/ui@4.1.10)(happy-dom@20.10.6)(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@7.3.5(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.8.3))
 
   '@vitest/utils@4.1.10':
     dependencies:
@@ -13524,7 +13520,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  dockerode@4.0.12:
+  dockerode@5.0.1:
     dependencies:
       '@balena/dockerignore': 1.0.2
       '@grpc/grpc-js': 1.14.4
@@ -13532,7 +13528,6 @@ snapshots:
       docker-modem: 5.0.7
       protobufjs: 7.6.3
       tar-fs: 2.1.5
-      uuid: 11.1.1
     transitivePeerDependencies:
       - supports-color
 
@@ -14411,7 +14406,7 @@ snapshots:
 
   get-port-please@3.2.0: {}
 
-  get-port@7.2.0: {}
+  get-port@5.1.1: {}
 
   get-proto@1.0.1:
     dependencies:
@@ -17157,7 +17152,7 @@ snapshots:
       glob: 7.2.3
       minimatch: 3.1.5
 
-  testcontainers@11.14.0:
+  testcontainers@12.0.4:
     dependencies:
       '@balena/dockerignore': 1.0.2
       '@types/dockerode': 4.0.1
@@ -17166,8 +17161,8 @@ snapshots:
       byline: 5.0.0
       debug: 4.4.3
       docker-compose: 1.4.2
-      dockerode: 4.0.12
-      get-port: 7.2.0
+      dockerode: 5.0.1
+      get-port: 5.1.1
       proper-lockfile: 4.1.2
       properties-reader: 3.0.1
       ssh-remote-port-forward: 1.0.4
@@ -17549,8 +17544,6 @@ snapshots:
   util-deprecate@1.0.2: {}
 
   utils-merge@1.0.1: {}
-
-  uuid@11.1.1: {}
 
   uuid@13.0.2: {}
 
