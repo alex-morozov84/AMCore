@@ -522,9 +522,43 @@ describe('AbilityFactory', () => {
 
       const ability = await factory.createForUser(principal)
 
-      // Permission has condition: { id: '${user.sub}' } → interpolated to { id: 'user-123' }
+      // Permission has condition: { id: '${user.sub}' } → interpolated to { id: 'user-123' }.
+      // Object-level checks (not just the class-level check below) prove the interpolated
+      // condition actually discriminates: it must match the user's own record and reject
+      // everyone else's, not just report "a rule exists for Read User".
       expect(ability.can(Action.Read, Subject.User)).toBe(true)
+      expect(ability.can(Action.Read, subject('User', { id: 'user-123' } as any))).toBe(true)
+      expect(ability.can(Action.Read, subject('User', { id: 'someone-else' } as any))).toBe(false)
       expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
+    })
+
+    it('treats empty-object conditions ({}) as unconditioned, same as null conditions', async () => {
+      permissionsCache.getPermissions.mockResolvedValueOnce([
+        {
+          id: 'perm-empty-conditions',
+          action: 'read',
+          subject: 'User',
+          conditions: {},
+          fields: [],
+          inverted: false,
+          organizationId: 'org-1',
+        },
+      ] as any)
+
+      const principal: RequestPrincipal = {
+        type: 'jwt',
+        sub: 'user-123',
+        systemRole: SystemRole.User,
+        organizationId: 'org-1',
+        aclVersion: 5,
+      }
+
+      const ability = await factory.createForUser(principal)
+
+      // An empty conditions object must not accidentally deny everything — it must behave
+      // exactly like no conditions at all (matches any User record).
+      expect(ability.can(Action.Read, subject('User', { id: 'user-123' } as any))).toBe(true)
+      expect(ability.can(Action.Read, subject('User', { id: 'someone-else' } as any))).toBe(true)
     })
 
     it('should handle inverted permissions (explicit deny)', async () => {
