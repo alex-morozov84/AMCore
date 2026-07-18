@@ -538,6 +538,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@amcore/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
       '@amcore/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config

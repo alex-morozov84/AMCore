@@ -21,12 +21,14 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@amcore/eslint-config": "workspace:*",
     "@amcore/typescript-config": "workspace:*",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
