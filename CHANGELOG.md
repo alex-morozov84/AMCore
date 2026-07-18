@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   source-generated `prisma-client` generator, the app runtime image is slimmed by
   excluding Prisma CLI/studio tooling, and production migrations run from a
   dedicated CLI-capable migrator image/target before app rollout.
+- Replaced the deprecated `@react-email/components` dependency with a small,
+  vendored set of the 10 email JSX primitives AMCore's templates actually use
+  (`apps/api/src/infrastructure/email/react-email/`), avoiding both the
+  deprecated package and the unified `react-email` package's ~65 MB of
+  CLI/dev-server/editor dependencies in the production image.
+  `@react-email/render` remains an external dependency.
 
 ### Added
 
