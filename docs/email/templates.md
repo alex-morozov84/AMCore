@@ -17,9 +17,8 @@ render switch. Keep them in sync.
    see `apps/api/src/infrastructure/email/react-email/NOTICE.md` for why
    these are vendored. If a template needs a primitive outside that set
    (`Row`/`Column`, `Img`, `Link`, `Markdown`, `Tailwind`, `Font`,
-   `CodeBlock`), that's a new decision, not a drop-in addition — see the
-   NOTICE and `ai/decisions/adr-059-vendor-react-email-primitives.md`
-   (private) before reaching for the `react-email` package.
+   `CodeBlock`), that's a new decision, not a drop-in addition — read the
+   NOTICE first before reaching for the `react-email` package.
 5. Add a localized subject helper beside the template.
 6. Wire `EmailService.renderTemplate()` to the component and subject helper.
 7. Add the payload type to `RenderableEmailData`.

@@ -15,9 +15,18 @@ manually only if AMCore's needs change. Rendering is still delegated to the
 upstream, actively-maintained `@react-email/render` package — nothing here
 reimplements rendering, only the JSX primitives.
 
-**Why vendored instead of depending on the package:** see
-`ai/decisions/adr-0XX-vendor-react-email-primitives.md` (private maintainer
-repo) and `docs/email/README.md`.
+**Why vendored instead of depending on the package:** `@react-email/components`
+— and every individual `@react-email/*` component package it wraps — is
+deprecated upstream. The suggested replacement, the unified `react-email`
+package, ships CLI/dev-server/editor tooling (`socket.io`, `esbuild`,
+`tailwindcss`, `prismjs`, `marked`, etc.) as unconditional `dependencies`.
+AMCore's `apps/api` deploys via `pnpm deploy --prod`, which materializes a
+flat `node_modules` for the production image rather than bundling — so those
+dependencies get installed regardless of whether the app imports them,
+measured at tens of megabytes added to the production image for tooling that
+never runs there. AMCore's actual usage is exactly the 10 primitives listed
+above, none of which need anything beyond React, so vendoring them removes
+both the deprecated-dependency risk and the image-size cost.
 
 ## Source
 
