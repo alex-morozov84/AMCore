@@ -97,14 +97,14 @@ importers:
         specifier: ^3.1089.0
         version: 3.1089.0
       '@bull-board/api':
-        specifier: ^6.21.3
-        version: 6.21.3(@bull-board/ui@6.21.3)
+        specifier: ^8.1.2
+        version: 8.1.2(@bull-board/ui@8.1.2)
       '@bull-board/express':
-        specifier: ^6.21.3
-        version: 6.21.3
+        specifier: ^8.1.2
+        version: 8.1.2
       '@bull-board/nestjs':
-        specifier: ^6.21.3
-        version: 6.21.3(@bull-board/api@6.21.3(@bull-board/ui@6.21.3))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        specifier: ^8.1.2
+        version: 8.1.2(@bull-board/api@8.1.2(@bull-board/ui@8.1.2))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@casl/ability':
         specifier: ^6.8.1
         version: 6.8.1
@@ -250,8 +250,8 @@ importers:
         specifier: ^0.35.3
         version: 0.35.3(@types/node@25.9.5)
       uuid:
-        specifier: ^13.0.2
-        version: 13.0.2
+        specifier: ^14.0.1
+        version: 14.0.1
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -983,26 +983,26 @@ packages:
   '@borewit/text-codec@0.2.2':
     resolution: {integrity: sha512-DDaRehssg1aNrH4+2hnj1B7vnUGEjU6OIlyRdkMd0aUdIUvKXrJfXsy8LVtXAy7DRvYVluWbMspsRhz2lcW0mQ==}
 
-  '@bull-board/api@6.21.3':
-    resolution: {integrity: sha512-FoQO+0MgZsPrQX9WLZx0KpINamJY48FUU+OyMcZxx9mQWCwsdak45V/uBgQrTYB3GaF5oGA0SxPXEp4RHwj36A==}
+  '@bull-board/api@8.1.2':
+    resolution: {integrity: sha512-6NGYCIRhHJmmoCwAFA1z4lPpR/D/BdOjyERd2MMeG4Samu05FSjzKKdN55S3ga30EcXeENfYzmNn6IDmVz5OTg==}
     peerDependencies:
-      '@bull-board/ui': 6.21.3
+      '@bull-board/ui': 8.1.2
 
-  '@bull-board/express@6.21.3':
-    resolution: {integrity: sha512-9tE5osCSjjDYCJtTt/bOeXGbykPlhiIKtlGG3/YPCuvQ3qkYrjdBiXSzEUXGqqgX6Kf4HVri/UuY8gy99g/A7w==}
+  '@bull-board/express@8.1.2':
+    resolution: {integrity: sha512-IldpQLXlezJRzk1BVNJjH+Oi3NBRcBopq9bI2ndLs0R+ySK1ux+TtGDUW+eX2fl0wEHwSpuUgPBAJID695zohA==}
 
-  '@bull-board/nestjs@6.21.3':
-    resolution: {integrity: sha512-2IU5tK628/swEfoaIFnPqTdEUrRNbUO73YAigt4Q5eGnJguLJVc5O3sSa4FBWLoy44B6XM+b9cCWEx65kkosDA==}
+  '@bull-board/nestjs@8.1.2':
+    resolution: {integrity: sha512-7sgESSitxULFSxuWIYx6zUyCgQIVFtw+s5ezGFvdh3/s2dwP2NoOQ76xJn+16cXh0EAFM+rN1f05BAtc0aLlUQ==}
     peerDependencies:
-      '@bull-board/api': ^6.21.3
+      '@bull-board/api': ^8.1.2
       '@nestjs/bull-shared': ^10.0.0 || ^11.0.0
       '@nestjs/common': ^9.0.0 || ^10.0.0 || ^11.0.0
       '@nestjs/core': ^9.0.0 || ^10.0.0 || ^11.0.0
       reflect-metadata: ^0.1.13 || ^0.2.0
       rxjs: ^7.8.1
 
-  '@bull-board/ui@6.21.3':
-    resolution: {integrity: sha512-s/PLBJab8cnoQAGVqjQb0v4oGe0KgB4aQ5G5g93doxzXB/D+wkXNL9P9+zLWLldBJXE57jL4CR99ttDCIiyNHw==}
+  '@bull-board/ui@8.1.2':
+    resolution: {integrity: sha512-gC5u9XUSiRile4/VC+WHXtaPvfZV4Mrrz8MSvPe32Hjl2MXStfSuEOb+9Tw/WMpNSZ442tGpFZLz0RDh1Yo3jg==}
 
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
@@ -5227,8 +5227,8 @@ packages:
   effect@3.20.0:
     resolution: {integrity: sha512-qMLfDJscrNG8p/aw+IkT9W7fgj50Z4wG5bLBy0Txsxz8iUHjDIkOgO3SV0WZfnQbNG2VJYb0b+rDLMrhM4+Krw==}
 
-  ejs@5.0.2:
-    resolution: {integrity: sha512-IpbUaI/CAW86l3f+T8zN0iggSc0LmMZLcIW5eRVStLVNCoTXkE0YlncbbH50fp8Cl6zHIky0sW2uUbhBqGw0Jw==}
+  ejs@6.0.1:
+    resolution: {integrity: sha512-UaaM14yby8U3k02ihS1Bmj5Kz2d7CCQM1scxpgs4Mhkq8F1wR2gl3+Ts4h5Ne4Mnt7M9m4Dw7jsuMr3+xO4vZA==}
     engines: {node: '>=0.12.18'}
     hasBin: true
 
@@ -8554,8 +8554,8 @@ packages:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
 
-  uuid@13.0.2:
-    resolution: {integrity: sha512-vzi9uRZ926x4XV73S/4qQaTwPXM2JBj6/6lI/byHH1jOpCzb0zDbfytgA9LcN/hzb2l7WQSQnxITOVx5un/wGw==}
+  uuid@14.0.1:
+    resolution: {integrity: sha512-6ZxzVpzDXDa3bJWaHilVayA+BH/1zmxCJoVgvmqJnid/gPoKHxUrS/aC/T6LGQtNHT+XHG9fXPJB4d+IrU30Ew==}
     hasBin: true
 
   v8-to-istanbul@9.3.0:
@@ -9485,32 +9485,32 @@ snapshots:
 
   '@borewit/text-codec@0.2.2': {}
 
-  '@bull-board/api@6.21.3(@bull-board/ui@6.21.3)':
+  '@bull-board/api@8.1.2(@bull-board/ui@8.1.2)':
     dependencies:
-      '@bull-board/ui': 6.21.3
+      '@bull-board/ui': 8.1.2
       redis-info: 3.1.0
 
-  '@bull-board/express@6.21.3':
+  '@bull-board/express@8.1.2':
     dependencies:
-      '@bull-board/api': 6.21.3(@bull-board/ui@6.21.3)
-      '@bull-board/ui': 6.21.3
-      ejs: 5.0.2
+      '@bull-board/api': 8.1.2(@bull-board/ui@8.1.2)
+      '@bull-board/ui': 8.1.2
+      ejs: 6.0.1
       express: 5.2.1
     transitivePeerDependencies:
       - supports-color
 
-  '@bull-board/nestjs@6.21.3(@bull-board/api@6.21.3(@bull-board/ui@6.21.3))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@bull-board/nestjs@8.1.2(@bull-board/api@8.1.2(@bull-board/ui@8.1.2))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
-      '@bull-board/api': 6.21.3(@bull-board/ui@6.21.3)
+      '@bull-board/api': 8.1.2(@bull-board/ui@8.1.2)
       '@nestjs/bull-shared': 11.0.4(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)
       '@nestjs/common': 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
 
-  '@bull-board/ui@6.21.3':
+  '@bull-board/ui@8.1.2':
     dependencies:
-      '@bull-board/api': 6.21.3(@bull-board/ui@6.21.3)
+      '@bull-board/api': 8.1.2(@bull-board/ui@8.1.2)
 
   '@cacheable/utils@2.5.0':
     dependencies:
@@ -13590,7 +13590,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
 
-  ejs@5.0.2: {}
+  ejs@6.0.1: {}
 
   electron-to-chromium@1.5.393: {}
 
@@ -17545,7 +17545,7 @@ snapshots:
 
   utils-merge@1.0.1: {}
 
-  uuid@13.0.2: {}
+  uuid@14.0.1: {}
 
   v8-to-istanbul@9.3.0:
     dependencies:
