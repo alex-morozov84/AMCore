@@ -13,8 +13,7 @@ import { MetricsService } from '@/infrastructure/observability'
 
 /** Admission verdict before any SSE headers are flushed. */
 export type AdmissionResult =
-  | { ok: true; connection: NotificationStreamConnection }
-  | { ok: false; reason: 'global' | 'user' }
+  { ok: true; connection: NotificationStreamConnection } | { ok: false; reason: 'global' | 'user' }
 
 /**
  * Process-local registry of open SSE streams (ADR-053), web/all role only. Holds

@@ -13,8 +13,7 @@ import { MetricsService } from '@/infrastructure/observability'
 
 /** Admission verdict before any SSE headers are flushed. */
 export type AdmissionResult =
-  | { ok: true; connection: AiRunStreamConnection }
-  | { ok: false; reason: 'global' | 'user' }
+  { ok: true; connection: AiRunStreamConnection } | { ok: false; reason: 'global' | 'user' }
 
 /**
  * Process-local registry of open AI run-status SSE streams (Track C — ADR-054, Arc C.5; ADR-053
