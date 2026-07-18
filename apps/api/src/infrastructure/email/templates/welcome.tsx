@@ -1,17 +1,7 @@
 import { createIntl } from '@formatjs/intl'
-import {
-  Body,
-  Container,
-  Head,
-  Heading,
-  Hr,
-  Html,
-  Preview,
-  Section,
-  Text,
-} from '@react-email/components'
 
 import { emailMessages, type Locale } from '../messages'
+import { Body, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '../react-email'
 
 export interface WelcomeEmailProps {
   name: string

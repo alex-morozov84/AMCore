@@ -1,4 +1,6 @@
 import { createIntl } from '@formatjs/intl'
+
+import { emailMessages, type Locale } from '../messages'
 import {
   Body,
   Button,
@@ -10,9 +12,7 @@ import {
   Preview,
   Section,
   Text,
-} from '@react-email/components'
-
-import { emailMessages, type Locale } from '../messages'
+} from '../react-email'
 
 export interface PasswordResetEmailProps {
   name: string

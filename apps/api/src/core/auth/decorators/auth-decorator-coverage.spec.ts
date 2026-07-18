@@ -32,11 +32,16 @@
  */
 
 // Loading each controller transitively pulls everything that controller
-// depends on through Node's module graph. Two trees in this repo carry
-// ESM-only dependencies that ts-jest's default `transformIgnorePatterns`
+// depends on through Node's module graph. One tree in this repo carries
+// an ESM-only dependency that ts-jest's default `transformIgnorePatterns`
 // doesn't process:
-//   - EmailModule → React-Email templates → `@react-email/components`
 //   - OAuth chain → `oauth-client.service` → `jose`
+//
+// (EmailModule → React-Email templates used to hit the same problem via
+// `@react-email/components`; those primitives are now vendored first-party
+// source, see infrastructure/email/react-email/NOTICE.md, so this tree no
+// longer needs the workaround on that account — the mock below stays for
+// EmailModule regardless, to keep unit tests free of real send side effects.)
 //
 // The existing unit suite mocks them at the call site (e.g.
 // `auth.controller.spec.ts:11`, `oauth.service.spec.ts:1-2`). We do
