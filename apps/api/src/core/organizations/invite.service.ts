@@ -37,10 +37,7 @@ const INVITE_EXPIRY_MS = INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000
 const INVITE_TOKEN_BYTES = 32
 
 type CreateInviteBranch =
-  | 'noop_already_member'
-  | 'rotated_existing'
-  | 'pending_known_user'
-  | 'pending_new_email'
+  'noop_already_member' | 'rotated_existing' | 'pending_known_user' | 'pending_new_email'
 
 /**
  * Carried out of the `createInvite` transaction so the post-commit email

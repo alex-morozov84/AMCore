@@ -53,20 +53,11 @@ export type AiRunRealtimeStreamEvent =
   | 'slow_close'
   | 'startup_failure'
 export type QueueMetricsEvent =
-  | 'job_added'
-  | 'redis_error'
-  | 'redis_reconnecting'
-  | 'worker_error'
-  | 'dead_letter'
+  'job_added' | 'redis_error' | 'redis_reconnecting' | 'worker_error' | 'dead_letter'
 export type QueueMetricsQueue = 'default' | 'email' | 'notifications' | 'ai-runs'
 export type CacheMetricsCache = 'user' | 'permissions' | 'ai_catalog'
 export type AiMetricsProvider =
-  | 'anthropic'
-  | 'openai'
-  | 'openrouter'
-  | 'openai_compatible'
-  | 'yandex_ai_studio'
-  | 'mock'
+  'anthropic' | 'openai' | 'openrouter' | 'openai_compatible' | 'yandex_ai_studio' | 'mock'
 export type AiMetricsOperation = 'text' | 'object'
 export type AiMetricsTokenDirection = 'input' | 'output'
 export type AiMetricsGuardrailStage = 'input' | 'output'
@@ -83,11 +74,7 @@ export type AiMetricsApprovalState = 'pending' | 'approved' | 'rejected' | 'expi
 /** Terminal outcome of a bounded agent loop, for the loop-steps histogram (Arc E). */
 export type AiMetricsToolLoopOutcome = 'completed' | 'exhausted' | 'failed'
 export type AiMetricsAssistantAdminAction =
-  | 'created'
-  | 'version_published'
-  | 'updated'
-  | 'enabled'
-  | 'disabled'
+  'created' | 'version_published' | 'updated' | 'enabled' | 'disabled'
 export type AiMetricsControlAction = 'taken_over' | 'released' | 'operator_message'
 export type AiMetricsControlActorRole = 'owner' | 'operator'
 /** The only two `AiArtifactKind`s Arc G builds (Track C — ADR-054). */
@@ -95,10 +82,7 @@ export type AiMetricsArtifactKind = 'image' | 'pdf'
 export type AiMetricsArtifactUploadResult = 'success' | 'rejected'
 /** Worker-side artifact byte-resolution outcome (Arc G), a distinct I/O surface from upload. */
 export type AiMetricsArtifactResolutionResult =
-  | 'success'
-  | 'not_found'
-  | 'capability_unsupported'
-  | 'storage_error'
+  'success' | 'not_found' | 'capability_unsupported' | 'storage_error'
 
 /**
  * Defensive bound on the `tool_id` metric label — mirrors the code-owned tool-id grammar (Arc E).
@@ -126,12 +110,7 @@ export type StorageMetricsOperation =
 export type MediaMetricsPreset = 'avatar'
 export type MediaMetricsOperation = 'process' | 'delete_derivatives'
 export type EmailMetricsTemplate =
-  | 'welcome'
-  | 'password-reset'
-  | 'email-verification'
-  | 'org-invite'
-  | 'notification'
-  | 'unknown'
+  'welcome' | 'password-reset' | 'email-verification' | 'org-invite' | 'notification' | 'unknown'
 export type EmailMetricsOperation = 'dispatch' | 'render' | 'send' | 'process'
 export type EmailMetricsMode = 'queued' | 'direct' | 'worker'
 export type MetricsResult = 'success' | 'error'

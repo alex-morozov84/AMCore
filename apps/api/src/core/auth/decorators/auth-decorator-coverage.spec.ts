@@ -303,9 +303,7 @@ describe('Core controllers — @Auth coverage and ADR-034 allowlist (OA-11 guard
         // itself. That's the most accurate way to identify a Nest
         // controller without booting the module.
         const rawClassPath = Reflect.getMetadata(PATH_METADATA, exported) as
-          | string
-          | string[]
-          | undefined
+          string | string[] | undefined
         if (rawClassPath === undefined) continue
         const classPath = normalizePath(rawClassPath)
 
@@ -328,9 +326,7 @@ describe('Core controllers — @Auth coverage and ADR-034 allowlist (OA-11 guard
           // PATH_METADATA on a method is set by @Get/@Post/@Put/etc.
           // Helper methods without an HTTP verb decorator are skipped.
           const rawHandlerPath = Reflect.getMetadata(PATH_METADATA, handler) as
-            | string
-            | string[]
-            | undefined
+            string | string[] | undefined
           if (rawHandlerPath === undefined) continue
           const handlerPath = normalizePath(rawHandlerPath)
 
@@ -353,8 +349,7 @@ describe('Core controllers — @Auth coverage and ADR-034 allowlist (OA-11 guard
 
           if (resolvedAuthTypes.includes(AuthType.ApiKey)) {
             const httpVerb = Reflect.getMetadata(METHOD_METADATA, handler) as
-              | RequestMethod
-              | undefined
+              RequestMethod | undefined
             if (httpVerb === undefined) continue // no HTTP verb → not a routable handler
             const matched = matchesAllowlist(httpVerb, classPath, handlerPath)
             if (!matched) {
