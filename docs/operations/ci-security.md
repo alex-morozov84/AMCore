@@ -175,6 +175,43 @@ does **not** detect that `node:24-slim` has moved to a newer digest upstream.
 Re-resolving the digest is a manual maintainer step (or wire up separate Docker
 base-image update automation, e.g. Dependabot's `docker` ecosystem or Renovate).
 
+### Local Commit Hooks: Scope and Limits
+
+Two Husky hooks run on every local commit, and both are convenience layers —
+CI is the actual gate, not either hook:
+
+- **`.husky/commit-msg`** runs `commitlint` against the commit message. This
+  covers the whole repository; there's nothing workspace-scoped about a
+  commit message.
+- **`.husky/pre-commit`** runs `lint-staged` against staged files. Its
+  `prettier --write` step formats every matched file repo-wide, including
+  inside `apps/*` and `packages/*`. Its ESLint step is workspace-aware by
+  design: `apps/api/**`, `apps/web/**`, and `packages/shared/**` each get
+  linted with `eslint -c <that workspace's eslint.config.mjs>`, matching what
+  `pnpm lint` (via Turbo) runs for that workspace in CI. A catch-all
+  `*.{ts,tsx,js,jsx}` pattern still exists in `lint-staged` for genuinely
+  root-level files (currently only `eslint.config.js` and
+  `commitlint.config.js`) — it does nothing for files already covered by a
+  workspace-specific pattern above, since the root `eslint.config.js`
+  deliberately ignores `apps/**`/`packages/**` (that root config is for the
+  two root-level files only, not a fallback for the workspaces).
+
+**Do not add a new lintable workspace under `apps/*` or `packages/*` without
+also adding a matching `lint-staged` pattern** in the root `package.json`
+pointing at that workspace's own `eslint.config.mjs`, or its staged files
+will silently skip ESLint locally (formatting still runs) while still being
+correctly caught by CI's `pnpm lint`. This is exactly the gap found and fixed
+2026-07-18: `packages/shared` had no `eslint.config.mjs`/`lint` script at all
+(never linted anywhere, not even in CI) until that gap surfaced 19 real,
+long-accumulated lint violations on first run, and the pre-commit hook's
+`*.{ts,tsx,js,jsx}` pattern ran ESLint from the repo root — which silently
+skipped every file under `apps/**`/`packages/**` because the root config
+ignores those paths, and `--no-warn-ignored` suppressed even the "file was
+ignored" notice. `pnpm lint`/`pnpm --filter <workspace> lint` was and remains
+the authoritative local check; run it before relying on a clean commit if
+you're touching a workspace's ESLint config or adding a new lintable
+workspace.
+
 ### Optional Local Workflow-Lint Tooling
 
 The repository also ships a convenience `.husky/pre-push` hook that runs:

@@ -1,4 +1,4 @@
-import { SystemRole } from '../enums/roles'
+import type { SystemRole } from '../enums/roles'
 
 // Unified identity on request.user — populated by any auth strategy
 // Validated pattern: "IdentityBill" in @eropple/nestjs-auth, request.user in Passport

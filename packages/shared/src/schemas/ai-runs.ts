@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+import { PAGINATION } from '../constants'
+
+import { aiDecimalStringSchema, aiSlugSchema } from './ai-common'
 import {
   aiArtifactKindSchema,
   aiArtifactTrustLevelSchema,
@@ -9,10 +12,7 @@ import {
   aiMessageRoleSchema,
   aiRunStatusSchema,
 } from './ai-enums'
-import { aiDecimalStringSchema, aiSlugSchema } from './ai-common'
 import { type CursorResponse, cursorResponseSchema } from './pagination'
-
-import { PAGINATION } from '../constants'
 
 /**
  * AI capability layer — durable run/conversation read contracts (Track C — ADR-054, Arc A).

@@ -40,6 +40,21 @@
     "typescript": "^5.9.3"
   },
   "lint-staged": {
+    "apps/api/**/*.{ts,tsx,js,jsx}": [
+      "eslint -c apps/api/eslint.config.mjs --fix --no-warn-ignored",
+      "eslint -c apps/api/eslint.config.mjs --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "apps/web/**/*.{ts,tsx,js,jsx}": [
+      "eslint -c apps/web/eslint.config.mjs --fix --no-warn-ignored",
+      "eslint -c apps/web/eslint.config.mjs --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "packages/shared/**/*.{ts,tsx,js,jsx}": [
+      "eslint -c packages/shared/eslint.config.mjs --fix --no-warn-ignored",
+      "eslint -c packages/shared/eslint.config.mjs --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
     "*.{ts,tsx,js,jsx}": [
       "eslint --fix --no-warn-ignored",
       "eslint --max-warnings=0 --no-warn-ignored",

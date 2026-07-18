@@ -2,8 +2,8 @@ import { z } from 'zod'
 
 import { PAGINATION } from '../constants'
 
-import { aiIdentifierSchema, aiModalitySchema, aiSlugSchema } from './ai-common'
 import { aiDisplayNameSchema } from './ai-catalog'
+import { aiIdentifierSchema, aiModalitySchema, aiSlugSchema } from './ai-common'
 import { paginatedResponseSchema } from './pagination'
 
 /**

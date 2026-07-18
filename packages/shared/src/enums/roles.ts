@@ -15,4 +15,5 @@ export const SystemRole = {
   SuperAdmin: 'SUPER_ADMIN',
 } as const
 
+// eslint-disable-next-line @typescript-eslint/no-redeclare -- deliberate const-as-type pattern, see file header
 export type SystemRole = (typeof SystemRole)[keyof typeof SystemRole]
