@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- Pinned the `apps/api` production/runner Docker base image (`node:22-slim`) to
+- Pinned the `apps/api` production/runner Docker base image (`node:24-slim`) to
   a specific digest instead of a mutable tag, and removed the base image's
   bundled `npm`/`npx` from the runner (unused at runtime; source of an
   unpatched base-image CVE).
