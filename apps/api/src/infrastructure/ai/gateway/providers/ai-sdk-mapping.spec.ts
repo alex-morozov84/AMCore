@@ -1,4 +1,3 @@
-import { AiProviderType } from '@prisma/client'
 import { APICallError, NoObjectGeneratedError } from 'ai'
 import { z } from 'zod'
 
@@ -6,6 +5,8 @@ import { AiGatewayException } from '../ai-gateway.error'
 import type { AiAdapterCall, AiGatewayTool } from '../ai-gateway.types'
 
 import { mapProviderError, mapTextResult, toModelMessages, toSdkTools } from './ai-sdk-mapping'
+
+import { AiProviderType } from '@/generated/prisma/client'
 
 function call(type: AiProviderType = AiProviderType.OPENAI): AiAdapterCall {
   return {

@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 
 import { HttpStatus, Injectable } from '@nestjs/common'
-import { AiArtifactKind, AiConversationControl, AiConversationState } from '@prisma/client'
 
 import type { AiArtifactResponse } from '@amcore/shared'
 
@@ -16,6 +15,11 @@ import { toAiArtifactResponse } from '../runs/ai-run.mapper'
 import { AI_ARTIFACT_ALLOWED_MIME_TYPES, detectAiArtifactKind } from './ai-artifact.constants'
 
 import { EnvService } from '@/env/env.service'
+import {
+  AiArtifactKind,
+  AiConversationControl,
+  AiConversationState,
+} from '@/generated/prisma/client'
 import { type AiMetricsArtifactKind, MetricsService } from '@/infrastructure/observability'
 import { normalizeObjectKey, StorageService } from '@/infrastructure/storage'
 import { PrismaService } from '@/prisma'

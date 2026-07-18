@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common'
-import type { AiProviderType } from '@prisma/client'
 
 import { AppException } from '@/common/exceptions/domain'
+import type { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Bounded, machine-readable AI gateway error taxonomy (Track C — ADR-054, Arc B). Every failure

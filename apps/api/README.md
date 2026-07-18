@@ -36,8 +36,9 @@ pnpm --filter api build
 ```
 
 Local development migrations use `pnpm --filter api db:migrate` (`prisma
-migrate dev`). Production uses `db:migrate:prod` / `prisma migrate deploy` as a
-one-shot step before rollout. See
+migrate dev`). Production uses `db:migrate:prod` / `prisma migrate deploy` from
+the CLI-capable migrator image as a one-shot step before the slim app image
+rollout. See
 [`docs/operations/deployment.md`](../../docs/operations/deployment.md).
 
 ## Source Map
@@ -50,6 +51,7 @@ apps/api/src/
   worker.module.ts        # worker process composition
   app-imports.ts          # shared/web/worker import lists
   env.ts                  # Zod environment validation
+  generated/prisma/       # Prisma 7 source-generated client (build artifact)
   core/                   # domain modules and HTTP surfaces
   infrastructure/         # cross-cutting providers and adapters
   common/                 # filters, logging config, utilities

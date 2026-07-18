@@ -25,7 +25,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
-import type { User } from '@prisma/client'
 import type { Request, Response } from 'express'
 import { ZodResponse } from 'nestjs-zod'
 
@@ -69,6 +68,7 @@ import { negotiateLocale } from './locale-negotiation'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 
+import type { User } from '@/generated/prisma/client'
 import { AVATAR_VALIDATION, FileValidationPipe } from '@/infrastructure/storage'
 
 // Multer hard stop for the avatar upload. Set above AVATAR_VALIDATION.maxSize

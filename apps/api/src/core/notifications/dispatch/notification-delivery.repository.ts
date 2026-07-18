@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
 import { Injectable } from '@nestjs/common'
-import { NotificationAttemptOutcome, NotificationDeliveryStatus, Prisma } from '@prisma/client'
 
 import { PrismaService } from '../../../prisma'
 import {
@@ -14,6 +13,12 @@ import {
 
 import { applyRetryAfterFloor, computeNextAttemptAt } from './notification-backoff'
 import type { ClaimedDelivery, FinalizeResult, ReapResult } from './notification-dispatch.types'
+
+import {
+  NotificationAttemptOutcome,
+  NotificationDeliveryStatus,
+  Prisma,
+} from '@/generated/prisma/client'
 
 /** Shape returned by the raw claim `UPDATE ... RETURNING`. */
 interface ClaimedRow {

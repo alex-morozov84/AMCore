@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { NotificationDeliveryStatus, TelegramConnectionStatus } from '@prisma/client'
 
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
 
@@ -19,6 +18,7 @@ import { TelegramBotApiClient } from './telegram-bot-api.client'
 import { telegramGenericMessages } from './telegram-messages'
 
 import { EnvService } from '@/env/env.service'
+import { NotificationDeliveryStatus, TelegramConnectionStatus } from '@/generated/prisma/client'
 
 function toLocale(value: string): SupportedLocale {
   return (SUPPORTED_LOCALES as readonly string[]).includes(value)

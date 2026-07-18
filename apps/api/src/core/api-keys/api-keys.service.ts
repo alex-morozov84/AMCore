@@ -2,7 +2,6 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { Inject, Injectable } from '@nestjs/common'
-import { AuditActorType, AuditTargetType, type Prisma } from '@prisma/client'
 import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -12,6 +11,8 @@ import type { CreateApiKeyInput } from '@amcore/shared'
 import { ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 import { AuditLogService } from '../audit'
+
+import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
 
 export interface CreateApiKeyResult {
   id: string

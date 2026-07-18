@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto'
 
 import { HttpStatus, Injectable } from '@nestjs/common'
-import type { Organization, Prisma } from '@prisma/client'
 
 import {
   Action,
@@ -22,6 +21,8 @@ import type { AppAbility } from '../auth/casl/ability.factory'
 import { OrgAclVersionService } from '../auth/org-acl-version.service'
 
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
+
+import type { Organization, Prisma } from '@/generated/prisma/client'
 
 type PrismaTx = Prisma.TransactionClient
 

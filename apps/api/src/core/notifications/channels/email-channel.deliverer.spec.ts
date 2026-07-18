@@ -1,5 +1,6 @@
-import type { Notification } from '@prisma/client'
 import { z } from 'zod'
+
+import type { Notification } from '@/generated/prisma/client'
 
 // Importing EmailService pulls the email template chain (@react-email/render +
 // @formatjs/intl, ESM); mock them so the Jest (CommonJS) project can load this spec.

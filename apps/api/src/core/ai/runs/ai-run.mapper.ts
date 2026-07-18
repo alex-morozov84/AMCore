@@ -1,5 +1,3 @@
-import type { AiArtifact, AiConversation, AiMessage, AiRun } from '@prisma/client'
-
 import type {
   AiArtifactResponse,
   AiConversationControlValue,
@@ -10,6 +8,8 @@ import type {
   AiRunResponse,
   AiRunStatusValue,
 } from '@amcore/shared'
+
+import type { AiArtifact, AiConversation, AiMessage, AiRun } from '@/generated/prisma/client'
 
 /**
  * DB → wire projections for the AI run/conversation surface (Track C — ADR-054, Arc C). The wire

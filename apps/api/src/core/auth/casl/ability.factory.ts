@@ -1,7 +1,6 @@
 import { type PureAbility, type RawRuleOf } from '@casl/ability'
 import { createPrismaAbility, type PrismaQuery, type Subjects } from '@casl/prisma'
 import { Injectable } from '@nestjs/common'
-import type { Organization, Permission, Role, User } from '@prisma/client'
 
 import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
 
@@ -9,6 +8,8 @@ import { OrgAclVersionService } from '../org-acl-version.service'
 import { PermissionsCacheService } from '../permissions-cache.service'
 
 import { interpolateConditions } from './interpolate-conditions'
+
+import type { Organization, Permission, Role, User } from '@/generated/prisma/client'
 
 // Define Prisma subjects (add domain models as they're created: Contact, Deal, etc.)
 type AppSubjects =

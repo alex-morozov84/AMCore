@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { AiArtifactKind, AiMessageRole, AiRunStepType, Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiRunSseReason, AiRunStatusValue } from '@amcore/shared'
@@ -21,6 +20,7 @@ import { isBotOwnershipStale } from './ai-run-ownership-fence'
 import type { RunPlan } from './ai-run-plan'
 
 import { EnvService } from '@/env/env.service'
+import { AiArtifactKind, AiMessageRole, AiRunStepType, Prisma } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { StorageObjectNotFoundError, StorageService } from '@/infrastructure/storage'
 import { PrismaService } from '@/prisma'

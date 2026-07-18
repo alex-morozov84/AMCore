@@ -1,14 +1,6 @@
 import { performance } from 'node:perf_hooks'
 
 import { Injectable } from '@nestjs/common'
-import {
-  AiRunStepType,
-  AiToolInvocationStatus,
-  AiToolRiskClass,
-  AuditActorType,
-  AuditTargetType,
-  Prisma,
-} from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiToolCall } from '../gateway/ai-gateway.types'
@@ -31,6 +23,14 @@ import {
 
 import { AuditLogService } from '@/core/audit'
 import { EnvService } from '@/env/env.service'
+import {
+  AiRunStepType,
+  AiToolInvocationStatus,
+  AiToolRiskClass,
+  AuditActorType,
+  AuditTargetType,
+  Prisma,
+} from '@/generated/prisma/client'
 import { type AiMetricsToolRiskClass, MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 

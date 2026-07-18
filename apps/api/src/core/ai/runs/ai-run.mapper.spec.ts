@@ -1,6 +1,6 @@
-import type { AiRun } from '@prisma/client'
-
 import { toAiRunResponse } from './ai-run.mapper'
+
+import type { AiRun } from '@/generated/prisma/client'
 
 /** Build a minimal terminal `AiRun` row for projection tests (only the mapped fields matter). */
 function run(overrides: Partial<AiRun> = {}): AiRun {

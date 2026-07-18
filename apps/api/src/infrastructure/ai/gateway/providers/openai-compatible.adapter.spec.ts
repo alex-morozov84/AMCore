@@ -1,9 +1,10 @@
-import { AiProviderType } from '@prisma/client'
 import { z } from 'zod'
 
 import type { AiAdapterCall } from '../ai-gateway.types'
 
 import { OpenAICompatibleAdapter } from './openai-compatible.adapter'
+
+import { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * OpenAI-compatible adapter against a fake provider via an injected `fetch` (Track C — ADR-054,

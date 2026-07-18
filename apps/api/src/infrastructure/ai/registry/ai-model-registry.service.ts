@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { AiProviderType } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AiCredentialResolver } from '../gateway/credential-resolver'
@@ -12,6 +11,7 @@ import {
 } from './ai-registry.types'
 
 import { EnvService } from '@/env/env.service'
+import { AiProviderType } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { type AppRedisClient, REDIS_CLIENT } from '@/infrastructure/redis'
 import { PrismaService } from '@/prisma'

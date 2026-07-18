@@ -1,10 +1,11 @@
 import { ArgumentsHost, HttpStatus } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode, InfrastructureErrorCode, ResourceErrorCode } from '@amcore/shared'
 
 import { PrismaClientExceptionFilter } from './prisma-exception.filter'
+
+import { Prisma } from '@/generated/prisma/client'
 
 describe('PrismaClientExceptionFilter', () => {
   let filter: PrismaClientExceptionFilter

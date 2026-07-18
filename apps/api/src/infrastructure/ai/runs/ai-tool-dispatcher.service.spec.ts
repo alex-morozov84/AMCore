@@ -1,4 +1,3 @@
-import { AiToolInvocationStatus, AiToolRiskClass, type PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { z } from 'zod'
 
@@ -10,6 +9,11 @@ import { AiToolDispatcher, type ToolDispatchContext } from './ai-tool-dispatcher
 
 import type { AuditLogService } from '@/core/audit'
 import type { EnvService } from '@/env/env.service'
+import {
+  AiToolInvocationStatus,
+  AiToolRiskClass,
+  type PrismaClient,
+} from '@/generated/prisma/client'
 import type { MetricsService } from '@/infrastructure/observability'
 import type { PrismaService } from '@/prisma'
 

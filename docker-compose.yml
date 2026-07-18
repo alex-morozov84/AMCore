@@ -106,7 +106,8 @@ services:
       retries: 5
 
   # ---------------------------------------------------------------------------
-  # One-shot migration step (ADR-040): runs `migrate deploy` once, BEFORE api/web.
+  # One-shot migration step (ADR-040/058): runs `migrate deploy` once, BEFORE api/web.
+  # This uses the CLI-capable migrator target; the app runtime image is CLI-free.
   # Uses MIGRATION_DATABASE_URL (direct connection) when set, else DATABASE_URL.
   # `required:false` lets it wait for bundled Postgres when present and skip it
   # when using a remote DB. Rerun it on upgrades before recreating api/web.
@@ -115,7 +116,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    command: ['./node_modules/.bin/prisma', 'migrate', 'deploy']
+      target: migrator
     environment:
       DATABASE_URL: ${MIGRATION_DATABASE_URL:-${COMPOSE_DATABASE_URL:-postgresql://amcore:amcore@postgres:5432/amcore}}
     depends_on:

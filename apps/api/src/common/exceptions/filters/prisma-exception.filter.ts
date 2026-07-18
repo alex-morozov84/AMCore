@@ -1,5 +1,4 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
 import { Response } from 'express'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
@@ -7,6 +6,8 @@ import { PinoLogger } from 'nestjs-pino'
 import { AuthErrorCode, InfrastructureErrorCode, ResourceErrorCode } from '@amcore/shared'
 
 import type { ErrorResponse } from '../types'
+
+import { Prisma } from '@/generated/prisma/client'
 
 interface PrismaErrorMapping {
   status: HttpStatus

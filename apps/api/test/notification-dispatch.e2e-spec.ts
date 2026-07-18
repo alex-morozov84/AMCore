@@ -1,6 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
-import { NotificationAttemptOutcome, NotificationDeliveryStatus } from '@prisma/client'
 
 import { NotificationDeliveryRepository } from '../src/core/notifications/dispatch/notification-delivery.repository'
 import { NotificationDispatchService } from '../src/core/notifications/dispatch/notification-dispatch.service'
@@ -8,6 +7,8 @@ import { NotificationChannel } from '../src/core/notifications/notification.cons
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
+
+import { NotificationAttemptOutcome, NotificationDeliveryStatus } from '@/generated/prisma/client'
 
 /**
  * Arc B merge gate (ADR-052) — the durable-dispatcher proofs that the unit specs cannot

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import type { Notification } from '@prisma/client'
 
 import {
   DEFAULT_LOCALE,
@@ -14,6 +13,8 @@ import { PrismaService } from '../../prisma'
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
 import { decodeFeedCursor, encodeFeedCursor } from './notification-feed-cursor'
 import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
+
+import type { Notification } from '@/generated/prisma/client'
 
 export interface FeedQuery {
   cursor?: string

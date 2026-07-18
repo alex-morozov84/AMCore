@@ -1,13 +1,14 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { Injectable } from '@nestjs/common'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { Pool } from 'pg'
 
 import type { Env } from '../env'
 import { EnvService } from '../env/env.service'
 import { MetricsService } from '../infrastructure/observability'
+
+import { PrismaClient } from '@/generated/prisma/client'
 
 type SlowQueryEvent = {
   query: string

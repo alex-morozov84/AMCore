@@ -1,13 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import {
-  AiArtifactKind,
-  AiAuthorType,
-  AiConversationControl,
-  AiConversationState,
-  AiMessageRole,
-  AiRunStatus,
-  Prisma,
-} from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { aiModelSelectionSchema, type AiRunResponse, type CreateAiRunInput } from '@amcore/shared'
@@ -33,6 +24,15 @@ import {
 import { toAiRunResponse } from './ai-run.mapper'
 
 import { EnvService } from '@/env/env.service'
+import {
+  AiArtifactKind,
+  AiAuthorType,
+  AiConversationControl,
+  AiConversationState,
+  AiMessageRole,
+  AiRunStatus,
+  Prisma,
+} from '@/generated/prisma/client'
 import { AiModelRegistry } from '@/infrastructure/ai/registry/ai-model-registry.service'
 import type { ResolvedAiModel } from '@/infrastructure/ai/registry/ai-registry.types'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'

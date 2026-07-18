@@ -1,4 +1,3 @@
-import type { Prisma, PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 
@@ -6,6 +5,7 @@ import type { PrismaService } from '../../prisma'
 
 import { NotificationRetentionService } from './notification-retention.service'
 
+import type { Prisma, PrismaClient } from '@/generated/prisma/client'
 import type { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.runner'
 
 const sqlText = (sql: Prisma.Sql): string => sql.strings.join('')

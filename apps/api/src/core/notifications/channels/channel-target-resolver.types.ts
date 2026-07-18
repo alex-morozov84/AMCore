@@ -1,7 +1,7 @@
-import type { Prisma, TelegramConnectionStatus } from '@prisma/client'
-
 import type { NotificationChannel } from '../notification.constants'
 import type { NotificationDefinition } from '../notification-definition.types'
+
+import type { Prisma, TelegramConnectionStatus } from '@/generated/prisma/client'
 
 /** Telegram connection facts (Arc D), loaded only when a definition supports the channel. */
 export interface TargetRecipientTelegram {

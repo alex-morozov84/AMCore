@@ -1,12 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import {
-  AiApprovalKind,
-  AiApprovalState,
-  AiToolInvocationStatus,
-  AuditActorType,
-  AuditTargetType,
-  Prisma,
-} from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiTextResult } from '../gateway/ai-gateway.types'
@@ -20,6 +12,14 @@ import type { RunPlan } from './ai-run-plan'
 
 import { AuditLogService } from '@/core/audit'
 import { EnvService } from '@/env/env.service'
+import {
+  AiApprovalKind,
+  AiApprovalState,
+  AiToolInvocationStatus,
+  AuditActorType,
+  AuditTargetType,
+  Prisma,
+} from '@/generated/prisma/client'
 import { type AiMetricsToolRiskClass, MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 

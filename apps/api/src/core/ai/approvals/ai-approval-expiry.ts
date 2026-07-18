@@ -1,19 +1,18 @@
 import {
-  AiApprovalState,
-  AiRunStatus,
-  AiToolInvocationStatus,
-  AuditActorType,
-  AuditTargetType,
-  type Prisma,
-} from '@prisma/client'
-
-import {
   AI_RUN_APPROVAL_EXPIRED,
   AI_RUN_DEADLINE_EXCEEDED,
   AI_RUN_TOOL_LOOP_FAILED,
 } from '../ai-run.constants'
 
 import type { AuditLogService } from '@/core/audit'
+import {
+  AiApprovalState,
+  AiRunStatus,
+  AiToolInvocationStatus,
+  AuditActorType,
+  AuditTargetType,
+  type Prisma,
+} from '@/generated/prisma/client'
 
 /**
  * Thrown when any CAS in `expireApproval` matches ≠1 row (the parked-gate invariant raced away). It

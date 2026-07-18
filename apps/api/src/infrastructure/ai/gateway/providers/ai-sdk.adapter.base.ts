@@ -1,4 +1,3 @@
-import type { AiProviderType } from '@prisma/client'
 import { generateObject, generateText, type LanguageModel } from 'ai'
 import type { ZodType } from 'zod'
 
@@ -16,6 +15,8 @@ import {
   toModelMessages,
   toSdkTools,
 } from './ai-sdk-mapping'
+
+import type { AiProviderType } from '@/generated/prisma/client'
 
 /** The fetch shape both the global and the AI SDK's injectable `fetch` option satisfy. */
 export type AdapterFetch = typeof globalThis.fetch

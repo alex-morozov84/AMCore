@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import type { Prisma } from '@prisma/client'
 
 import { ForbiddenException } from '../../common/exceptions'
+
+import type { Prisma } from '@/generated/prisma/client'
 
 type PrismaTx = Prisma.TransactionClient
 

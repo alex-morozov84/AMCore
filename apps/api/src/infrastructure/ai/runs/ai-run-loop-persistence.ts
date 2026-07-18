@@ -1,10 +1,10 @@
-import { AiAuthorType, AiMessageRole, AiRunStepType, Prisma } from '@prisma/client'
-
 import type { AiTextResult } from '../gateway/ai-gateway.types'
 
 import type { ClaimedRun } from './ai-run-dispatch.types'
 import { lockAndAssertBotOwnership } from './ai-run-ownership-fence'
 import type { RunAttribution } from './ai-run-plan'
+
+import { AiAuthorType, AiMessageRole, AiRunStepType, Prisma } from '@/generated/prisma/client'
 
 /**
  * Free transactional-write helpers for the bounded tool loop (Track C — ADR-054, Arc E, worker role

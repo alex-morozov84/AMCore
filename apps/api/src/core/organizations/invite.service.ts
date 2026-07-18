@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 
 import { HttpStatus, Injectable } from '@nestjs/common'
-import { AuditActorType, AuditTargetType, Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { CreateInviteInput } from '@amcore/shared'
@@ -26,6 +25,8 @@ import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
 import { InviteRateLimiterService } from './invite-rate-limiter.service'
 import { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
+
+import { AuditActorType, AuditTargetType, Prisma } from '@/generated/prisma/client'
 
 type PrismaTx = Prisma.TransactionClient
 

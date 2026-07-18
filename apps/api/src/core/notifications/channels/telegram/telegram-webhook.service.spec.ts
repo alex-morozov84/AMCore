@@ -1,4 +1,3 @@
-import { Prisma } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 
@@ -9,6 +8,7 @@ import { TelegramWebhookService } from './telegram-webhook.service'
 
 import type { AuditLogService } from '@/core/audit/audit-log.service'
 import type { EnvService } from '@/env/env.service'
+import { Prisma } from '@/generated/prisma/client'
 
 const TOKEN = 'a'.repeat(43)
 

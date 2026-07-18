@@ -1,5 +1,6 @@
-import type { AiToolRiskClass } from '@prisma/client'
 import type { ZodType } from 'zod'
+
+import type { AiToolRiskClass } from '@/generated/prisma/client'
 
 /**
  * Self-hosted tool contract (Track C — ADR-054, Arc E, worker role only). A tool is code-owned: the

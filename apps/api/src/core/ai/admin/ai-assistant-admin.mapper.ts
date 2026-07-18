@@ -1,6 +1,6 @@
-import type { AiAssistant } from '@prisma/client'
-
 import type { AiAssistantResponse, AiModelSelection } from '@amcore/shared'
+
+import type { AiAssistant } from '@/generated/prisma/client'
 
 /**
  * DB → wire projection for the assistant-admin surface (Track C — ADR-054, Arc F.1). `modelSelection`

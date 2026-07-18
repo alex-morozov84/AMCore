@@ -1,4 +1,3 @@
-import { type AiAssistant, Prisma } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -13,6 +12,7 @@ import type { AuditLogService } from '../../audit'
 
 import { AiAssistantAdminService } from './ai-assistant-admin.service'
 
+import { type AiAssistant, Prisma } from '@/generated/prisma/client'
 import type { MetricsService } from '@/infrastructure/observability'
 import type { PrismaService } from '@/prisma'
 

@@ -1,6 +1,5 @@
 import type { ExecutionContext } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
-import { SystemRole as PrismaSystemRole, type User } from '@prisma/client'
 import type { Request, Response } from 'express'
 
 import {
@@ -12,6 +11,8 @@ import {
 } from '@amcore/shared'
 
 import { AppException, ConflictException, UnauthorizedException } from '../../common/exceptions'
+
+import { SystemRole as PrismaSystemRole, type User } from '@/generated/prisma/client'
 
 // Mock email module to prevent TSX/ESM import issues
 jest.mock('../../infrastructure/email', () => ({

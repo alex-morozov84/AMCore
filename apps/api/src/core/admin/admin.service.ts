@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { AuditActorType, AuditTargetType, type Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import {
@@ -17,6 +16,8 @@ import type { CleanupResult } from '../../infrastructure/schedule/cleanup.servic
 import { CleanupService } from '../../infrastructure/schedule/cleanup.service'
 import { PrismaService } from '../../prisma'
 import { AuditLogService } from '../audit'
+
+import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
 
 type PrismaTx = Prisma.TransactionClient
 

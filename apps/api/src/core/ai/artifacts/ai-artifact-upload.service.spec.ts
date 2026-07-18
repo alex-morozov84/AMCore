@@ -1,4 +1,3 @@
-import { AiArtifactKind, AiConversationControl, AiConversationState } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import { AppException, BadRequestException, ConflictException } from '../../../common/exceptions'
@@ -7,6 +6,11 @@ import { NotFoundException } from '../../../common/exceptions'
 import { AiArtifactUploadService } from './ai-artifact-upload.service'
 
 import type { EnvService } from '@/env/env.service'
+import {
+  AiArtifactKind,
+  AiConversationControl,
+  AiConversationState,
+} from '@/generated/prisma/client'
 import type { StorageService } from '@/infrastructure/storage'
 import type { PrismaService } from '@/prisma'
 

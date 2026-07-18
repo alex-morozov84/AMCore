@@ -1,9 +1,9 @@
-import { AiProviderType } from '@prisma/client'
-
 import type { ResolvedAiModel } from '../registry/ai-registry.types'
 
 import type { AiGenerateMessage } from './ai-gateway.types'
 import { findUnsupportedMultimodalCapability } from './multimodal-capability'
+
+import { AiProviderType } from '@/generated/prisma/client'
 
 /**
  * Unit tests for the Arc G central multimodal capability gate (Track C — ADR-054): pure detection

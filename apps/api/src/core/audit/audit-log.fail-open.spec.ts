@@ -1,10 +1,11 @@
-import { AuditActorType } from '@prisma/client'
 import type { ClsService } from 'nestjs-cls'
 import type { PinoLogger } from 'nestjs-pino'
 
 import { createMockContext, mockContextToPrisma } from '../auth/test-context'
 
 import { AuditLogService } from './audit-log.service'
+
+import { AuditActorType } from '@/generated/prisma/client'
 
 describe('AuditLogService fail-open path', () => {
   it('swallows non-transactional write failures and logs a warning', async () => {

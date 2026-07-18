@@ -5,7 +5,9 @@
 // Models are split into separate files by module
 
 generator client {
-  provider        = "prisma-client-js"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  moduleFormat    = "cjs"
   previewFeatures = ["partialIndexes"]
 }
 

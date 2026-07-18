@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Modernized Prisma packaging for the API: Prisma Client now uses the Prisma 7
+  source-generated `prisma-client` generator, the app runtime image is slimmed by
+  excluding Prisma CLI/studio tooling, and production migrations run from a
+  dedicated CLI-capable migrator image/target before app rollout.
+
 ### Added
 
 - Added the email extension contract for downstream product emails, including

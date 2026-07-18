@@ -1,14 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import {
-  AiApprovalState,
-  AiConversationControl,
-  AiConversationState,
-  AiRunStatus,
-  AiToolInvocationStatus,
-  AuditActorType,
-  AuditTargetType,
-  Prisma,
-} from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiConversationResponse } from '@amcore/shared'
@@ -19,6 +9,16 @@ import { ApprovalRaceError } from '../approvals/ai-approval-expiry'
 import { toAiConversationResponse } from '../runs/ai-run.mapper'
 
 import { AuditLogService } from '@/core/audit'
+import {
+  AiApprovalState,
+  AiConversationControl,
+  AiConversationState,
+  AiRunStatus,
+  AiToolInvocationStatus,
+  AuditActorType,
+  AuditTargetType,
+  Prisma,
+} from '@/generated/prisma/client'
 import {
   type AiMetricsControlAction,
   type AiMetricsControlActorRole,

@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto'
 
 import { HttpStatus } from '@nestjs/common'
-import { NotificationDeliveryStatus, Prisma } from '@prisma/client'
 
 import { NotificationChannel } from '../../notification.constants'
 
@@ -9,6 +8,7 @@ import { TelegramCancelReason } from './telegram.constants'
 import type { TelegramStartCommand } from './telegram-update.schema'
 
 import { AppException } from '@/common/exceptions'
+import { NotificationDeliveryStatus, Prisma } from '@/generated/prisma/client'
 
 /** A successful bind, signalled to the post-commit confirmation/audit step. */
 export interface BindResult {

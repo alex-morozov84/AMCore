@@ -1,7 +1,8 @@
-import { AiToolRiskClass } from '@prisma/client'
 import { z } from 'zod'
 
 import type { AiTool } from '../../src/infrastructure/ai/tools/ai-tool.types'
+
+import { AiToolRiskClass } from '@/generated/prisma/client'
 
 const parameters = z.object({}).strict()
 

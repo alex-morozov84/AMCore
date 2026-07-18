@@ -1,6 +1,11 @@
-import type { AuditActorType, AuditCategory, AuditTargetType, Prisma } from '@prisma/client'
-
 import type { AuditAction } from './audit-log.actions'
+
+import type {
+  AuditActorType,
+  AuditCategory,
+  AuditTargetType,
+  Prisma,
+} from '@/generated/prisma/client'
 
 export interface AuditLogEntry {
   action: AuditAction

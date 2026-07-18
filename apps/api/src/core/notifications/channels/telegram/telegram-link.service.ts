@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 
 import { Injectable } from '@nestjs/common'
-import { AuditActorType, AuditTargetType, NotificationDeliveryStatus, Prisma } from '@prisma/client'
 
 import type { TelegramConnectionResponse, TelegramLinkResponse } from '@amcore/shared'
 
@@ -12,6 +11,12 @@ import { TELEGRAM_LINK_TOKEN_TTL_MS, TelegramCancelReason } from './telegram.con
 
 import { AuditLogService } from '@/core/audit/audit-log.service'
 import { EnvService } from '@/env/env.service'
+import {
+  AuditActorType,
+  AuditTargetType,
+  NotificationDeliveryStatus,
+  Prisma,
+} from '@/generated/prisma/client'
 
 /** SHA-256 hex of a raw token — only the hash is ever stored (mirrors reset-token hygiene). */
 function hashToken(raw: string): string {

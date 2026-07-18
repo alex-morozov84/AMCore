@@ -1,10 +1,10 @@
-import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import { SystemRole } from '@amcore/shared'
 
 import { BullBoardAuthService } from './bull-board-auth.service'
 
+import type { PrismaClient } from '@/generated/prisma/client'
 import type { PrismaService } from '@/prisma'
 
 describe('BullBoardAuthService (read-only Bull Board verifier — EQS-01)', () => {

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { AuditActorType, AuditCategory, type Prisma } from '@prisma/client'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -7,6 +6,8 @@ import { PrismaService } from '../../prisma'
 
 import { sanitizeAuditMetadata } from './audit-log.metadata'
 import type { AuditLogEntry, AuditLogRecordOptions } from './audit-log.types'
+
+import { AuditActorType, AuditCategory, type Prisma } from '@/generated/prisma/client'
 
 @Injectable()
 export class AuditLogService {

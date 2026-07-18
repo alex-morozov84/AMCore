@@ -1,7 +1,8 @@
-import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import type { PrismaService } from '../../prisma'
+
+import type { PrismaClient } from '@/generated/prisma/client'
 
 export type MockContext = {
   prisma: DeepMockProxy<PrismaClient>

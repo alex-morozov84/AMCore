@@ -1,6 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
-import { AiMessageRole, AiRunStatus, Prisma } from '@prisma/client'
 
 import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
@@ -10,6 +9,8 @@ import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispa
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
+
+import { AiMessageRole, AiRunStatus, Prisma } from '@/generated/prisma/client'
 
 /**
  * Arc C merge gate (Track C — ADR-054, ADR-052 pattern). The durable AI-run worker proofs the unit

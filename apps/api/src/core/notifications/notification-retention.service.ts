@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { PrismaService } from '../../prisma'
 
+import { Prisma } from '@/generated/prisma/client'
 import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.runner'
 
 /**

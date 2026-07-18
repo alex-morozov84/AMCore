@@ -1,4 +1,3 @@
-import type { PrismaClient } from '@prisma/client'
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 
@@ -6,6 +5,8 @@ import type { PrismaService } from '../../prisma'
 
 import { CleanupService } from './cleanup.service'
 import type { SingletonCronRunner } from './singleton-cron.runner'
+
+import type { PrismaClient } from '@/generated/prisma/client'
 
 describe('CleanupService', () => {
   let service: CleanupService

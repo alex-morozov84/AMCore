@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { type AiAssistant, AuditActorType, AuditTargetType, Prisma } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import type {
@@ -17,6 +16,12 @@ import { AuditLogService } from '../../audit'
 
 import { toAiAssistantResponse } from './ai-assistant-admin.mapper'
 
+import {
+  type AiAssistant,
+  AuditActorType,
+  AuditTargetType,
+  Prisma,
+} from '@/generated/prisma/client'
 import { type AiMetricsAssistantAdminAction, MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 
