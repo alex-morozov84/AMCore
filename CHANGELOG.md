@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bumped the minimum/targeted Node.js runtime from 22 (Maintenance LTS) to 24
+  (Active LTS) across `engines`, `.nvmrc`, CI, and both `apps/api`/`apps/web`
+  Docker base images.
 - Modernized Prisma packaging for the API: Prisma Client now uses the Prisma 7
   source-generated `prisma-client` generator, the app runtime image is slimmed by
   excluding Prisma CLI/studio tooling, and production migrations run from a

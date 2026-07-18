@@ -3,11 +3,11 @@
 # ===========================================
 # Debian slim (glibc), not Alpine (musl): the API depends on `sharp`/libvips for
 # media processing. Slim ships sharp's prebuilt glibc binary with bundled libvips
-# out of the box and matches the glibc CI runners. node:22 + pnpm@11.1.2 align
+# out of the box and matches the glibc CI runners. node:24 + pnpm@11.1.2 align
 # with the repo's `engines` / `packageManager`. A CI-gated smoke test
 # (.github/workflows/ci.yml) verifies a real sharp WebP encode plus module
 # resolution inside the final runner image.
-FROM node:22-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS base
+FROM node:24-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS base
 
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
@@ -99,7 +99,7 @@ CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 # Shipping Corepack's bundled pnpm would also
 # drag its vulnerable bundled `undici` into the image (CVE-2026-12151) and bloat
 # the attack surface for no runtime benefit.
-FROM node:22-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS runner
+FROM node:24-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runner
 
 WORKDIR /app
 
