@@ -247,10 +247,19 @@ export enum Subject {
 
 **2. Guard the controller** with `@CheckPolicies` (see above).
 
-**3. Filter reads with `accessibleBy`** so scope conditions apply automatically:
+**3. Filter reads with `accessibleBy`** so scope conditions apply automatically. `@casl/prisma`
+v2's `accessibleBy` no longer throws on its own — an unsatisfiable condition can otherwise
+surface as a raw Prisma query error instead of failing closed cleanly, because Prisma doesn't
+reliably mock an empty `OR` ([prisma/prisma#17367](https://github.com/prisma/prisma/issues/17367)).
+Extend the Prisma Client with `createCaslExtension()` **before** the first `accessibleBy()`
+call — AMCore does not wire this extension in by default since nothing in the starter calls
+`accessibleBy()` yet:
 
 ```typescript
-import { accessibleBy } from '@casl/prisma'
+import { accessibleBy, createCaslExtension } from '@casl/prisma'
+
+// Once, wherever the Prisma Client is constructed:
+const prisma = new PrismaClient().$extends(createCaslExtension())
 
 @Get('/contacts')
 findAll(@CurrentAbility() ability: AppAbility) {

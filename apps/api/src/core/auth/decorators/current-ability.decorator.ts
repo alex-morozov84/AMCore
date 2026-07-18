@@ -16,7 +16,8 @@ import type { AppAbility } from '../casl/ability.factory'
  * }
  * ```
  *
- * Usage in services:
+ * Usage in services (requires extending the Prisma Client with
+ * `createCaslExtension()` from `@casl/prisma` first — see `docs/auth/rbac.md`):
  * ```typescript
  * async findAll(ability: AppAbility) {
  *   return this.prisma.contact.findMany({

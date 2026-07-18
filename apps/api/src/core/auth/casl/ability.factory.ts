@@ -1,4 +1,4 @@
-import { type PureAbility, type RawRuleOf } from '@casl/ability'
+import { type Ability, type RawRuleOf } from '@casl/ability'
 import { createPrismaAbility, type PrismaQuery, type Subjects } from '@casl/prisma'
 import { Injectable } from '@nestjs/common'
 
@@ -22,7 +22,7 @@ type AppSubjects =
     }>
 
 // AppAbility type for CASL + Prisma
-export type AppAbility = PureAbility<[string, AppSubjects], PrismaQuery>
+export type AppAbility = Ability<[string, AppSubjects], PrismaQuery>
 
 // Structural subset of Prisma's Permission the factory actually uses.
 // Keeping the surface narrow lets us synthesize owner permissions (e.g.

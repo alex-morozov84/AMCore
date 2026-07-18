@@ -19,6 +19,21 @@ import type { RequestPrincipal } from '@amcore/shared'
  * @param principal - RequestPrincipal (user identity)
  * @returns Conditions with interpolated values
  */
+/**
+ * Thrown when a `${...}` placeholder resolves to `undefined` — an unknown or
+ * misspelled path on the principal. A stored permission's condition must
+ * never silently widen into "no constraint" because a path couldn't be
+ * resolved; failing loudly here denies the request instead (surfaced by
+ * callers as a 500, not a permissive ability) rather than risking a
+ * mistyped condition quietly authorizing more than intended.
+ */
+export class UnresolvedConditionPlaceholderError extends Error {
+  constructor(path: string) {
+    super(`interpolateConditions: unresolved placeholder "\${${path}}"`)
+    this.name = 'UnresolvedConditionPlaceholderError'
+  }
+}
+
 export function interpolateConditions(
   conditions: Record<string, unknown>,
   principal: RequestPrincipal
@@ -28,6 +43,7 @@ export function interpolateConditions(
     JSON.stringify(conditions).replace(/"\$\{([^}]+)\}"/g, (_, path: string) => {
       // Simple dot-path resolver: "user.sub" → principal.sub
       const value = getNestedValue({ user: principal }, path)
+      if (value === undefined) throw new UnresolvedConditionPlaceholderError(path)
       return JSON.stringify(value)
     })
   )
