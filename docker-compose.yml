@@ -54,7 +54,7 @@ x-app-env: &app-env
   NOTIFICATIONS_REALTIME_PUBLISH_TIMEOUT_MS: ${NOTIFICATIONS_REALTIME_PUBLISH_TIMEOUT_MS:-1000}
   NOTIFICATIONS_REALTIME_MAX_INFLIGHT_PUBLISH: ${NOTIFICATIONS_REALTIME_MAX_INFLIGHT_PUBLISH:-1000}
 
-# Health-only Node fetch check (node:22-slim has no wget/curl). Readiness, so
+# Health-only Node fetch check (node:24-slim has no wget/curl). Readiness, so
 # web waits for DB/Redis to be usable; the worker uses it for liveness too.
 x-health-ready: &health-ready
   test:

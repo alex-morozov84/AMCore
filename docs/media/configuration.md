@@ -40,7 +40,7 @@ possible future re-derivation; only derivatives are `public-read`.
 ## Native Dependency
 
 Image processing uses `sharp` (libvips). The API Docker image is built on
-`node:22-slim` (glibc) so sharp's prebuilt binary loads cleanly, and a CI smoke
+`node:24-slim` (glibc) so sharp's prebuilt binary loads cleanly, and a CI smoke
 test encodes a WebP inside the built production image to verify native loading.
 Forks on Alpine must configure the musl sharp package and keep an equivalent
 production-image smoke check.

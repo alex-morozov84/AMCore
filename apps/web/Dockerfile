@@ -1,10 +1,10 @@
 # ===========================================
 # Base — pinned runtime + package manager
 # ===========================================
-# Node 22 + pnpm 11.1.2 to match the repo's engines/packageManager (the root
+# Node 24 + pnpm 11.1.2 to match the repo's engines/packageManager (the root
 # package.json's `packageManager` drives the corepack version regardless of what
 # is prepared here, so they must agree — a Node 20 base broke pnpm 11).
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
@@ -38,7 +38,7 @@ RUN pnpm --filter web build
 # ===========================================
 # Runner — minimal, self-contained, non-root
 # ===========================================
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
