@@ -106,11 +106,11 @@ importers:
         specifier: ^8.1.2
         version: 8.1.2(@bull-board/api@8.1.2(@bull-board/ui@8.1.2))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@casl/ability':
-        specifier: ^6.8.1
-        version: 6.8.1
+        specifier: ^7.0.1
+        version: 7.0.1
       '@casl/prisma':
-        specifier: ^1.6.2
-        version: 1.6.2(@casl/ability@6.8.1)(@prisma/client@7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(typescript@5.9.3))
+        specifier: ^2.0.2
+        version: 2.0.2(@casl/ability@7.0.1)(@prisma/client@7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(typescript@5.9.3))
       '@formatjs/intl':
         specifier: ^4.1.17
         version: 4.1.17
@@ -1007,14 +1007,14 @@ packages:
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
 
-  '@casl/ability@6.8.1':
-    resolution: {integrity: sha512-VX5DD1JbSP/DdewZnNwXXaCzve+0pLe14mcUj2l93CdOFAQUT/ylAptNqxf3Wc/jlsuSanAgXza4Z1Iq23dzpQ==}
+  '@casl/ability@7.0.1':
+    resolution: {integrity: sha512-krOW1zQGEie5lH6fpryrcsPvc5r2pe5Vn5xbthuzc5X9gwzHIyZgGGgw9dMoSLHXdjB4BIVxGG/HBkG+1NuyZQ==}
 
-  '@casl/prisma@1.6.2':
-    resolution: {integrity: sha512-w0Y8pB/Zp5bSl5E3Ffn0tLazZ2GQZkL64lf+YDevoaDB1+K6RUOFCGVkvE3bYYv+qLYTgO261k99GufIJ4iHeg==}
+  '@casl/prisma@2.0.2':
+    resolution: {integrity: sha512-IYp9rABl8s9fF+4NubSahYMXqwLbmVCz8Hd9Xa4MbS6xMkSRTTa+tq9oKQFd/SJ6VoLe2oY+7Wg0eF9CjOCnYA==}
     peerDependencies:
-      '@casl/ability': ^5.3.0 || ^6.0.0
-      '@prisma/client': ^2.14.0 || ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
+      '@casl/ability': ^7.0.0
+      '@prisma/client': ^4.16.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -3860,17 +3860,17 @@ packages:
     resolution: {integrity: sha512-/uejZt4dSere1bx12WLlPfv8GktzcaDtuJ7s42/HEZ5zGj9oxRaD4bj7qwSunXkf+pbAhFt2zjpHYUiT5lHf0Q==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@ucast/core@1.10.2':
-    resolution: {integrity: sha512-ons5CwXZ/51wrUPfoduC+cO7AS1/wRb0ybpQJ9RrssossDxVy4t49QxWoWgfBDvVKsz9VXzBk9z0wqTdZ+Cq8g==}
+  '@ucast/core@2.0.0':
+    resolution: {integrity: sha512-4XVx6LzPXZGvnZO5jp39cm/G4UvuwvEdtmg+9+4+zl6uFkCcB7UJacvtMYeBE56GJVT99Zqy6Pii7dGJq3Kz9Q==}
 
-  '@ucast/js@3.1.0':
-    resolution: {integrity: sha512-eJ7yQeYtMK85UZjxoxBEbTWx6UMxEXKbjVyp+NlzrT5oMKV5Gpo/9bjTl3r7msaXTVC8iD9NJacqJ8yp7joX+Q==}
+  '@ucast/js@4.0.1':
+    resolution: {integrity: sha512-9O5xPBvwEWQk2WvO69Eh2WJB8QljVZ2vRVdFvfnKjlZwWXcYxp1lqLBhwXBU1AtuSgCvKhJPkXdjKJggUmAmQQ==}
 
-  '@ucast/mongo2js@1.4.1':
-    resolution: {integrity: sha512-9aeg5cmqwRQnKCXHN6I17wk83Rcm487bHelaG8T4vfpWneAI469wSI3Srnbu+PuZ5znWRbnwtVq9RgPL+bN6CA==}
+  '@ucast/mongo2js@2.0.0':
+    resolution: {integrity: sha512-vNBZzRnsfLr/TSxEoxz6W6hHQ5tmWsfEeC0nCq5z8RezC1AqIRy3cfHm8AGvlGtcn+cTSFQcZremfqnz6wm+nQ==}
 
-  '@ucast/mongo@2.4.3':
-    resolution: {integrity: sha512-XcI8LclrHWP83H+7H2anGCEeDq0n+12FU2mXCTz6/Tva9/9ddK/iacvvhCyW6cijAAOILmt0tWplRyRhVyZLsA==}
+  '@ucast/mongo@3.0.0':
+    resolution: {integrity: sha512-kwuSH+kdB4GCR0LGhy/PEDm4PCflur89AlK82kNiYD0FvsA8A/p+0sx7m+/R8mMFAlmlkAd3VXp7sM/cLLYWYg==}
 
   '@ungap/structured-clone@1.3.3':
     resolution: {integrity: sha512-60YRaenCQcVjYEKOcG824+DRGGIQ3VKErcBoAEDJZz5bKIs2ZG+X/H9Nk+Q6EVkwJk5QNApxbrc5QtBSwtrXAg==}
@@ -9517,16 +9517,16 @@ snapshots:
       hashery: 1.5.1
       keyv: 5.6.0
 
-  '@casl/ability@6.8.1':
+  '@casl/ability@7.0.1':
     dependencies:
-      '@ucast/mongo2js': 1.4.1
+      '@ucast/mongo2js': 2.0.0
 
-  '@casl/prisma@1.6.2(@casl/ability@6.8.1)(@prisma/client@7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(typescript@5.9.3))':
+  '@casl/prisma@2.0.2(@casl/ability@7.0.1)(@prisma/client@7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(typescript@5.9.3))':
     dependencies:
-      '@casl/ability': 6.8.1
+      '@casl/ability': 7.0.1
       '@prisma/client': 7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(typescript@5.9.3)
-      '@ucast/core': 1.10.2
-      '@ucast/js': 3.1.0
+      '@ucast/core': 2.0.0
+      '@ucast/js': 4.0.1
 
   '@colors/colors@1.5.0':
     optional: true
@@ -12184,21 +12184,21 @@ snapshots:
       '@typescript-eslint/types': 8.59.0
       eslint-visitor-keys: 5.0.1
 
-  '@ucast/core@1.10.2': {}
+  '@ucast/core@2.0.0': {}
 
-  '@ucast/js@3.1.0':
+  '@ucast/js@4.0.1':
     dependencies:
-      '@ucast/core': 1.10.2
+      '@ucast/core': 2.0.0
 
-  '@ucast/mongo2js@1.4.1':
+  '@ucast/mongo2js@2.0.0':
     dependencies:
-      '@ucast/core': 1.10.2
-      '@ucast/js': 3.1.0
-      '@ucast/mongo': 2.4.3
+      '@ucast/core': 2.0.0
+      '@ucast/js': 4.0.1
+      '@ucast/mongo': 3.0.0
 
-  '@ucast/mongo@2.4.3':
+  '@ucast/mongo@3.0.0':
     dependencies:
-      '@ucast/core': 1.10.2
+      '@ucast/core': 2.0.0
 
   '@ungap/structured-clone@1.3.3': {}
 
