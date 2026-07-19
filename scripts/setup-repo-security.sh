@@ -101,6 +101,20 @@ JSON
 
 api --method PUT "repos/$owner/$repo/vulnerability-alerts" >/dev/null
 
+# Dependabot security updates: auto-open PRs that fix a vulnerable dependency.
+# Distinct from the alerts above AND from the version updates in dependabot.yml
+# (which ignores semver-majors) — this is the only channel that will auto-propose
+# a fix for a vulnerability whose patched release is a major bump. Requires the
+# alerts enabled above. Forks do NOT inherit this setting, so strict setup applies
+# it. Tolerated (not fatal): some plans/visibilities reject the call, and the rest
+# of the security setup must still complete. See
+# https://docs.github.com/en/rest/repos/repos#enable-dependabot-security-updates
+if api --method PUT "repos/$owner/$repo/automated-security-fixes" >/dev/null 2>&1; then
+  echo "setup-repo-security: enabled Dependabot security updates (automated-security-fixes)"
+else
+  echo "setup-repo-security: WARNING could not enable Dependabot security updates; enable manually in Settings -> Code security (Dependabot security updates)" >&2
+fi
+
 echo "setup-repo-security: ensured squash-only merges + delete-branch-on-merge, dependency graph, vulnerability alerts, secret scanning, and push protection"
 
 upsert_ruleset "$owner" "$repo" "$RULESET_DIR/main.json"

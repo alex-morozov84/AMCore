@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Patched a transitive dev-only `js-yaml@3.14.2` DoS (CVE-2026-53550 /
   GHSA-h67p-54hq-rp68) pulled in via Jest's coverage tooling, now pinned to the
   patched `3.15.0`.
+- `strict` repo setup (`scripts/setup-repo-security.sh`) now enables **Dependabot
+  security updates** (`automated-security-fixes`) in addition to alerts. Because
+  `dependabot.yml` ignores semver-majors, this is the only channel that
+  auto-opens a fix PR for a vulnerability whose patched release is a major bump.
+  Forks do not inherit repository settings, so this must be applied per repo.
 
 ### Changed
 
@@ -32,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deprecated package and the unified `react-email` package's ~65 MB of
   CLI/dev-server/editor dependencies in the production image.
   `@react-email/render` remains an external dependency.
+- Docker Compose health checks now probe the IPv4 loopback `127.0.0.1` instead of
+  `localhost`. On minimal/Alpine base images `localhost` can resolve to IPv6 `::1`
+  first while the app listens on IPv4, flapping the container to `unhealthy`; the
+  explicit IPv4 target keeps the readiness probe deterministic across the images a
+  fork may build on.
 
 ### Added
 

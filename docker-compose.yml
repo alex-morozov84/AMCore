@@ -56,12 +56,16 @@ x-app-env: &app-env
 
 # Health-only Node fetch check (node:24-slim has no wget/curl). Readiness, so
 # web waits for DB/Redis to be usable; the worker uses it for liveness too.
+# Use the IPv4 loopback 127.0.0.1, not `localhost`: on minimal/Alpine images
+# `localhost` can resolve to ::1 (IPv6) first while the app listens on IPv4, so
+# the probe would flap `unhealthy`. This upstream image is slim (IPv6 loopback
+# present), but a fork onto a minimal image must not inherit that fragility.
 x-health-ready: &health-ready
   test:
     - CMD
     - node
     - -e
-    - "fetch('http://localhost:5002/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+    - "fetch('http://127.0.0.1:5002/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
   interval: 30s
   timeout: 10s
   retries: 3
