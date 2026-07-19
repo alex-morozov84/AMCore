@@ -119,7 +119,10 @@ Some protections — branch rulesets, secret scanning, push protection — are
 3. Apply the settings — `bash ./scripts/setup-repo-security.sh` (also needs `jq`).
 
 This enables native **secret scanning** + **push protection**, the **dependency
-graph** + Dependabot alerts, and imports the **rulesets** for `main` (PR-only,
+graph** + Dependabot alerts + **Dependabot security updates** (auto-PRs that fix
+vulnerable dependencies — the only channel that patches a vuln whose fix is a
+semver-major, since `dependabot.yml` ignores majors), and imports the **rulesets**
+for `main` (PR-only,
 **Squash-only** merges, required status checks, block force-push, restrict
 deletions) and for **release tags** (`refs/tags/v*` — block tag update and
 deletion, so published versions are immutable). It is the supported `strict`
