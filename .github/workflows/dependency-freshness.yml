@@ -1,0 +1,62 @@
+name: Dependency freshness
+
+# Surfaces the update signals Dependabot does NOT raise (ignored semver-majors,
+# Docker base-image digest drift, curl-pinned CLI releases) into a single tracking
+# issue, edited in place each run. Complements dependabot.yml; does not open PRs.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate freshness report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/dependency-freshness.mjs > "$RUNNER_TEMP/report.md"
+
+      - name: Upsert tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT: ${{ runner.temp }}/report.md
+        run: |
+          set -euo pipefail
+          label='dependency-freshness'
+          title='Dependency freshness report'
+          gh label create "$label" --color BFD4F2 \
+            --description 'Automated dependency freshness report' 2>/dev/null || true
+          number="$(gh issue list --state open --label "$label" --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file "$REPORT"
+            echo "updated issue #$number"
+          else
+            gh issue create --title "$title" --label "$label" --body-file "$REPORT"
+          fi

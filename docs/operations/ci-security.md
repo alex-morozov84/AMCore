@@ -177,6 +177,8 @@ Trivy, which flags known vulnerabilities in the currently pinned image — it
 does **not** detect that `node:24-slim` has moved to a newer digest upstream.
 Re-resolving the digest is a manual maintainer step (or wire up separate Docker
 base-image update automation, e.g. Dependabot's `docker` ecosystem or Renovate).
+The weekly **Dependency freshness** workflow (see below) does raise a _signal_
+when the pinned digest has drifted from upstream — the bump itself stays manual.
 
 ### Local Commit Hooks: Scope and Limits
 
@@ -261,7 +263,18 @@ When bumping one of these tools:
 2. verify the checksum against the upstream release asset;
 3. re-run the relevant local validation before review.
 
-## Forker Expectations
+### Dependency freshness report
+
+Dependabot handles patch/minor npm + action bumps and (per repo, see
+[_Strict security setup_](#strict-security-setup-after-forking)) opens security
+PRs — but it does not surface **semver-major** npm updates (ignored in
+`dependabot.yml`), Docker base-image **digest drift**, or newer **curl-pinned CLI
+tool** releases. The `dependency-freshness.yml` workflow closes that visibility
+gap: on a weekly schedule (and on-demand via `workflow_dispatch`) it runs
+`scripts/dependency-freshness.mjs` and **upserts a single tracking issue** (label
+`dependency-freshness`, edited in place) listing all three. It opens no PRs and is
+a report only — triage each item and bump deliberately, following the rules above
+and the major-bump guidance in the maintainer backlog.
 
 Forkers can keep this stack lean:
 
