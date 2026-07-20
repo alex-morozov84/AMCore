@@ -106,6 +106,12 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   native i18n handles translation). Backend DTOs use `createZodDto()`.
 - **Shared types go in `packages/shared/src/types/`** whenever used by both api
   and web or representing an API contract — single source of truth, no duplication.
+- **Environment config: one Zod schema, split by domain** under
+  `apps/api/src/env/schema/*.env.ts` (read via `EnvService`, never `process.env`).
+  Adding a variable means declaring it in a section **and** documenting it in
+  `.env.example` — a CI guard (`env-example-coverage.spec.ts`) fails if the two
+  drift or if a copied `.env.example` would not boot. Follow
+  `docs/backend/architecture-and-conventions.md` → _Adding an environment variable_.
 - **Redis caching** for frequently-read entities (cache-aside + tag invalidation +
   distributed lock); pattern in `apps/api/src/core/auth/user-cache.service.ts`.
 - **Frontend (web):** Feature-Sliced Design; import from public APIs only
