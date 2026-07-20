@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a weekly **Dependency freshness** workflow
+  (`.github/workflows/dependency-freshness.yml` + `scripts/dependency-freshness.mjs`)
+  that upserts a single tracking issue listing the update signals Dependabot does
+  not raise: ignored semver-major npm updates, Docker base-image digest drift, and
+  newer curl-pinned CLI tool releases. Report-only — it opens no PRs.
 - Added the email extension contract for downstream product emails, including
   `NotificationsService` vs `EmailService` selection, template wiring, queueing
   rules, required tests, and secret-bearing email invariants.
