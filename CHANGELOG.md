@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Extended the backend extension docs: an "Adding an external service / infra
+  dependency" guide (config, client/service seams, health, lifecycle, process role,
+  tests) alongside the environment-variable guide, an `AGENTS.md` pointer to the env
+  workflow + coverage guard, and actionable failure messages on the coverage guard.
 - Added a CI guard (`apps/api/src/env/schema/env-example-coverage.spec.ts`) that
   fails if `.env.example` drifts from the env schema — every schema key must be
   documented (active or commented) and no example key may be unknown to the schema

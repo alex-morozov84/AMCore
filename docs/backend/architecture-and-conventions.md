@@ -195,6 +195,33 @@ per area), composed flat in `base.ts`, with cross-field logic in `refinements/`.
    directly (the only exceptions are the bootstrap-time flags read before
    `ConfigModule`, documented in code where they occur).
 
+## Adding an external service / infra dependency
+
+A backing service (a third-party API client, an object store, a message broker)
+is wired as a small NestJS provider/module — same boundaries as a feature module,
+plus these seams:
+
+1. **Config, not literals.** Endpoints, credentials, and toggles come from the env
+   schema (above), read via `EnvService`. Never hardcode a host or key. Gate an
+   optional integration behind an "enabled" check so the app still boots without it.
+2. **Own a client, expose a service.** Construct the SDK/client once in a provider
+   (its lifetime tied to the module), and expose a thin service with the operations
+   your modules need — don't leak the raw client. Storage is the reference: a driver
+   interface (`s3` / `local` / `memory`) selected by config, with a stable service
+   surface.
+3. **Health.** If the app's readiness depends on it, contribute a health indicator
+   (see the storage health probe) — behind an opt-in flag when the check has a cost.
+   Don't fail liveness on a non-critical dependency.
+4. **Lifecycle.** Release sockets/handles on shutdown via `OnModuleDestroy`
+   (Nest already runs shutdown hooks — see `main.ts`), so `SIGTERM` drains cleanly
+   and tests don't leak handles.
+5. **Process role.** Put the module in the right list (see step 5 of the module
+   recipe): a producer/shared client → `coreImports`; a consumer that only runs work
+   → a worker-only module.
+6. **Tests.** Unit-test the service against a faked client; prefer an in-process fake
+   or a `memory` driver for e2e over a network dependency. Reserve real-service e2e
+   for an env-gated, opt-in suite.
+
 ## Cross-cutting decision points
 
 Apply these only when your module needs them:

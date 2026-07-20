@@ -45,11 +45,19 @@ const documented = new Set(
 )
 
 describe('.env.example ↔ env schema coverage', () => {
+  const GUIDE = 'docs/backend/architecture-and-conventions.md#adding-an-environment-variable'
+
   it('documents every schema key (active or commented), except the synthetic denylist', () => {
     const missing = SCHEMA_KEYS.filter(
       (key) => !documented.has(key) && !SCHEMA_DENYLIST.has(key)
     ).sort()
-    expect(missing).toEqual([])
+    expect(
+      missing.length === 0
+        ? 'ok'
+        : `.env.example is missing ${missing.length} schema key(s): ${missing.join(', ')}. ` +
+            `Add each in its section — active \`KEY=\` for required keys, commented \`# KEY=\` ` +
+            `for optional/advanced ones. See ${GUIDE}.`
+    ).toBe('ok')
   })
 
   it('documents no key that is neither a schema key nor an allowed compose/webhook key', () => {
@@ -62,7 +70,13 @@ describe('.env.example ↔ env schema coverage', () => {
           !WEBHOOK_SECRET_PATTERN.test(key)
       )
       .sort()
-    expect(unknown).toEqual([])
+    expect(
+      unknown.length === 0
+        ? 'ok'
+        : `.env.example documents ${unknown.length} key(s) the schema does not accept: ` +
+            `${unknown.join(', ')}. Remove them, fix a typo, or (if compose-only) add to ` +
+            `COMPOSE_ONLY_ALLOW in this spec. See ${GUIDE}.`
+    ).toBe('ok')
   })
 
   // A fork runs `cp .env.example .env` and expects the app to boot. Its *active*
@@ -71,6 +85,17 @@ describe('.env.example ↔ env schema coverage', () => {
   // such optional groups must be shipped commented, not active-empty.
   it('is copyable: its active assignments pass validate() unchanged', () => {
     const parsed = parse(readFileSync(findEnvExample()))
-    expect(() => validate(parsed)).not.toThrow()
+    let error = ''
+    try {
+      validate(parsed)
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : String(caught)
+    }
+    expect(
+      error === ''
+        ? 'ok'
+        : `\`cp .env.example .env\` would not boot: ${error} — ship optional groups ` +
+            `(e.g. OAuth providers) commented, not active-with-empty-values. See ${GUIDE}.`
+    ).toBe('ok')
   })
 })
