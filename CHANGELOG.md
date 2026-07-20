@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a CI guard (`apps/api/src/env/schema/env-example-coverage.spec.ts`) that
+  fails if `.env.example` drifts from the env schema — every schema key must be
+  documented (active or commented) and no example key may be unknown to the schema
+  (compose-only and dynamic `WEBHOOK_*_SECRET` keys are allow-listed). Completed
+  `.env.example` into a full reference (GitHub/Apple OAuth, Telegram callback, RBAC
+  cache knob) and documented the flow in the backend "Adding an environment
+  variable" guide.
 - Added a weekly **Dependency freshness** workflow
   (`.github/workflows/dependency-freshness.yml` + `scripts/dependency-freshness.mjs`)
   that upserts a single tracking issue listing the update signals Dependabot does

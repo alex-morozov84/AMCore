@@ -166,6 +166,35 @@ the **right** list — a misplaced processor runs in the wrong process:
   worker only).
 - **Genuinely shared infrastructure / producers** → `coreImports`.
 
+## Adding an environment variable
+
+Env is validated once at boot by a Zod schema. It is split into domain sections
+under [`apps/api/src/env/schema/`](../../apps/api/src/env/schema) (one `*.env.ts`
+per area), composed flat in `base.ts`, with cross-field logic in `refinements/`.
+`apps/api/src/env.ts` is a re-export shim, so consumers keep importing from `@/env`.
+
+1. **Declare it** in the matching section (e.g. `storage.env.ts`) as a Zod field:
+   - a safe fallback → `.default(...)` (the app runs without the operator setting it);
+   - an optional feature credential → `optionalEnvString()` / `optionalEnvUrl()`;
+   - genuinely required (no safe default) → no `.default()`/`.optional()` — the app
+     refuses to boot without it.
+2. **Cross-field behavior**, if any, goes in `refinements/` — a value derived from
+   other fields in `derive-defaults.ts`; a "set one → set all" group or conditional
+   requirement in `provider-rules.ts` / `resource-rules.ts`. Keep each rule small and
+   single-domain.
+3. **Document it** in the root [`.env.example`](../../.env.example), in the matching
+   section: **active** (`KEY=value`) for required/common starter keys, **commented**
+   (`# KEY=default`) for optional/advanced knobs. This is enforced —
+   [`env-example-coverage.spec.ts`](../../apps/api/src/env/schema/env-example-coverage.spec.ts)
+   **fails CI** if a schema key is undocumented, or a documented key is not a schema
+   key (only compose-only vars like `COMPOSE_*`/`MIGRATION_DATABASE_URL` and dynamic
+   `WEBHOOK_*_SECRET` are allow-listed).
+4. **Pass it to containers** that need it at runtime via `x-app-env` in
+   [`docker-compose.yml`](../../docker-compose.yml).
+5. **Read it** type-safely through `EnvService.get('KEY')` — never `process.env`
+   directly (the only exceptions are the bootstrap-time flags read before
+   `ConfigModule`, documented in code where they occur).
+
 ## Cross-cutting decision points
 
 Apply these only when your module needs them:

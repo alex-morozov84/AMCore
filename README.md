@@ -78,19 +78,20 @@ The backend starter includes the core application, security, and operations
 primitives needed for a product-grade API. Production deployment still requires
 adopter-owned infrastructure, secrets, environments, and capacity choices.
 
-| Area                  | Start here                                                                                     |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| All docs by intent    | [`docs/README.md`](docs/README.md) — the documentation map                                     |
-| Backend architecture  | [`apps/api/README.md`](apps/api/README.md)                                                     |
-| Add a backend module  | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md) |
-| Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                            |
-| RBAC / authorization  | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                       |
-| Email                 | [`docs/email/`](docs/email/README.md)                                                          |
-| Notifications         | [`docs/notifications/`](docs/notifications/README.md)                                          |
-| AI capability layer   | [`docs/ai/`](docs/ai/README.md)                                                                |
-| Storage and media     | [`docs/storage/`](docs/storage/README.md), [`docs/media/`](docs/media/README.md)               |
-| Production operations | [`docs/operations/`](docs/operations/README.md) — deployment, observability, CI security       |
-| API surface           | Swagger/OpenAPI at `/docs` in development                                                      |
+| Area                  | Start here                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| All docs by intent    | [`docs/README.md`](docs/README.md) — the documentation map                                                                                                   |
+| Backend architecture  | [`apps/api/README.md`](apps/api/README.md)                                                                                                                   |
+| Add a backend module  | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md)                                                               |
+| Add an env variable   | [`docs/backend/architecture-and-conventions.md#adding-an-environment-variable`](docs/backend/architecture-and-conventions.md#adding-an-environment-variable) |
+| Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                                                                                          |
+| RBAC / authorization  | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                                                                     |
+| Email                 | [`docs/email/`](docs/email/README.md)                                                                                                                        |
+| Notifications         | [`docs/notifications/`](docs/notifications/README.md)                                                                                                        |
+| AI capability layer   | [`docs/ai/`](docs/ai/README.md)                                                                                                                              |
+| Storage and media     | [`docs/storage/`](docs/storage/README.md), [`docs/media/`](docs/media/README.md)                                                                             |
+| Production operations | [`docs/operations/`](docs/operations/README.md) — deployment, observability, CI security                                                                     |
+| API surface           | Swagger/OpenAPI at `/docs` in development                                                                                                                    |
 
 Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
 and Vitest for React Email template rendering.
