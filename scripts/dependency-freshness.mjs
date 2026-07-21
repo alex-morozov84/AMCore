@@ -33,10 +33,11 @@ function npmMajors() {
   // contains `{` (e.g. `{"node":">=24.0.0"}`), so anchor on the first line that
   // *starts* with `{` — the JSON object, pretty-printed or compact — then take
   // from its first `{` to the last `}`. The warning line starts with `.`/`[WARN]`.
-  const { out } = run('pnpm', ['-r', 'outdated', '--format', 'json'], 120000)
+  const { ok, out } = run('pnpm', ['-r', 'outdated', '--format', 'json'], 120000)
   const lines = out.split('\n')
   const startLine = lines.findIndex((line) => line.trim().startsWith('{'))
   const body = startLine === -1 ? '' : lines.slice(startLine).join('\n')
+  if (!ok && !body) return { error: 'could not run `pnpm outdated`' }
   let data
   try {
     data = body ? JSON.parse(body.slice(body.indexOf('{'), body.lastIndexOf('}') + 1)) : {}

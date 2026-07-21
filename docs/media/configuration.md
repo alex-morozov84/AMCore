@@ -2,7 +2,9 @@
 
 All media settings come from `MEDIA_*` environment variables (already present in
 [`.env.example`](../../.env.example)). They are validated at startup in
-`apps/api/src/env.ts`.
+[`media.env.ts`](../../apps/api/src/env/schema/media.env.ts), with cross-field
+caps enforced in
+[`resource-rules.ts`](../../apps/api/src/env/schema/refinements/resource-rules.ts).
 
 ## Environment Variables
 
