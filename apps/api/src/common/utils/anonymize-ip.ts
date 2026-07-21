@@ -30,7 +30,6 @@ export function anonymizeIp(ip: string | undefined): string | undefined {
 }
 
 interface RequestWithIp {
-  headers: Record<string, string | string[] | undefined>
   ip?: string
   socket?: {
     remoteAddress?: string
@@ -38,32 +37,18 @@ interface RequestWithIp {
 }
 
 /**
- * Extracts real client IP from request headers (handles proxies/load balancers)
+ * Resolves the client IP for audit/logging.
  *
- * Priority:
- * 1. X-Real-IP (Nginx)
- * 2. X-Forwarded-For (first IP in chain)
- * 3. req.ip
- * 4. req.socket.remoteAddress
+ * Uses Express's computed `req.ip`, which honors the `trust proxy` setting
+ * (TRUST_PROXY): with it off, `req.ip` is the socket peer; with it configured, the
+ * real client with untrusted `X-Forwarded-*` hops stripped. `X-Forwarded-For` /
+ * `X-Real-IP` are NEVER read directly — they are client-controlled and would let a
+ * caller spoof the recorded IP. Configure TRUST_PROXY to your proxy topology to get
+ * true client IPs behind a reverse proxy.
  *
  * @param req - Express Request object
  * @returns Client IP address
  */
 export function getClientIp(req: RequestWithIp): string | undefined {
-  // X-Real-IP from Nginx
-  const realIp = req.headers['x-real-ip']
-  if (realIp) return realIp as string
-
-  // X-Forwarded-For (take first IP from chain)
-  const forwardedFor = req.headers['x-forwarded-for']
-  if (forwardedFor) {
-    const ips = forwardedFor.toString().split(',')
-    const firstIp = ips[0]
-    if (firstIp) {
-      return firstIp.trim()
-    }
-  }
-
-  // Fallback to direct connection IP
-  return req.ip || req.socket?.remoteAddress
+  return req.ip ?? req.socket?.remoteAddress
 }

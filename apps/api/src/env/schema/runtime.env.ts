@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { resolveTrustProxy } from '../../common/utils/trust-proxy'
+
 // Core runtime/process wiring: environment, process role, HTTP surface.
 export const runtimeEnv = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -15,4 +17,19 @@ export const runtimeEnv = z.object({
     .string()
     .default('http://localhost:3002')
     .transform((s) => s.split(',').map((x) => x.trim())),
+  // Express `trust proxy` (proxy awareness). Default `false` — `req.ip` is the socket
+  // peer and `X-Forwarded-*` is not trusted. Set it to the real proxy topology behind
+  // a reverse proxy/LB so `req.ip` is the true client. Validated + mapped to Express's
+  // value by `resolveTrustProxy` (see common/utils/trust-proxy.ts).
+  TRUST_PROXY: z
+    .string()
+    .default('false')
+    .transform((value, ctx) => {
+      try {
+        return resolveTrustProxy(value)
+      } catch (error) {
+        ctx.addIssue({ code: 'custom', message: (error as Error).message })
+        return z.NEVER
+      }
+    }),
 })

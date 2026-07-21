@@ -228,7 +228,11 @@ off` on the stream location (and never gzip a `text/event-stream`).
   per origin (~6), which the per-tab streams would consume; HTTP/2 multiplexes them.
 - **Rate-limit at the ingress, not the app.** The app enforces only a per-user cap
   (429) and a global per-process cap (503); real client-IP / cluster-wide limiting
-  belongs at the trusted proxy (the app does not trust `X-Forwarded-For`).
+  belongs at the trusted proxy. By default the app does **not** trust
+  `X-Forwarded-*` (so `req.ip` is the socket peer and cannot be spoofed) — set
+  **`TRUST_PROXY`** to your proxy topology (`loopback`, a subnet/CIDR, or a hop
+  count) when running behind a trusted reverse proxy/LB so `req.ip`, rate limiting,
+  and audit/logging reflect the real client.
 - **No sticky sessions needed.** Any replica can serve any user — a hint published
   on one replica fans out via Redis Pub/Sub to all. **When several environments
   share one Redis, give each a distinct `NOTIFICATIONS_REALTIME_NAMESPACE`** so

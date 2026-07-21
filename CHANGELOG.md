@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Added an opt-in **`TRUST_PROXY`** setting and stopped trusting client-controlled
+  forwarded headers when resolving the client IP. `getClientIp` (used by audit and
+  request logs) now returns Express's `req.ip`, which honors `trust proxy` — default
+  `false` uses the socket peer (not spoofable); set `TRUST_PROXY` to your proxy
+  topology (`loopback`, a subnet/CIDR, or a hop count) behind a trusted reverse
+  proxy/LB. Previously `X-Real-IP`/`X-Forwarded-For` were trusted unconditionally,
+  letting a caller forge the logged/audited IP.
 - Pinned the `apps/api` production/runner Docker base image (`node:24-slim`) to
   a specific digest instead of a mutable tag, and removed the base image's
   bundled `npm`/`npx` from the runner (unused at runtime; source of an

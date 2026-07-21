@@ -44,6 +44,12 @@ async function bootstrap(): Promise<void> {
   const env = app.get(EnvService)
   const isProduction = env.get('NODE_ENV') === 'production'
 
+  // Proxy awareness: Express derives `req.ip`/`req.protocol` from `X-Forwarded-*`
+  // only for the hops TRUST_PROXY names. Default `false` trusts nothing (req.ip is
+  // the socket peer), so forwarded headers can't spoof the client IP; set it to the
+  // real proxy topology when running behind a reverse proxy/LB.
+  app.set('trust proxy', env.get('TRUST_PROXY'))
+
   // Use Pino logger
   const logger = app.get(Logger)
   app.useLogger(logger)
