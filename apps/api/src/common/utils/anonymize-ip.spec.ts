@@ -11,11 +11,15 @@ describe('anonymizeIp', () => {
     expect(anonymizeIp('2001:0db8:85a3:0000:0000:8a2e:0370:7334')).toBe('2001::')
     expect(anonymizeIp('2001:db8::1')).toBe('2001::')
     expect(anonymizeIp('fe80::1')).toBe('fe80::')
+    expect(anonymizeIp('::1')).toBe('0::')
+    expect(anonymizeIp('::ffff:192.168.1.100')).toBe('0::')
   })
 
   it('should return undefined for invalid IP', () => {
     expect(anonymizeIp('not-an-ip')).toBeUndefined()
     expect(anonymizeIp('192.168')).toBeUndefined()
+    expect(anonymizeIp('999.999.999.999')).toBeUndefined()
+    expect(anonymizeIp('::ffff:999.999.999.999')).toBeUndefined()
   })
 
   it('should return undefined for undefined input', () => {

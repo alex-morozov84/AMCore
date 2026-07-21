@@ -353,12 +353,13 @@ uses `response_mode=form_post`, also add it to `isFormPostProvider()` in
 [`oauth-binding-cookie.ts`](../../apps/api/src/core/auth/oauth/oauth-binding-cookie.ts)
 so the POST callback and `SameSite=None` browser-binding cookie are selected.
 
-**3. Declare the env vars** in
-[`apps/api/src/env.ts`](../../apps/api/src/env.ts): add the keys as
-`optionalEnvString()` / `optionalEnvUrl()`, and add a `requireAllIfAny('Discord
-OAuth', [...])` group so a partially-configured provider fails fast at startup
-rather than at the first login. Mirror them in
-[`.env.example`](../../.env.example).
+**3. Declare the env vars** in the env schema's OAuth section
+([`oauth.env.ts`](../../apps/api/src/env/schema/oauth.env.ts)): add the keys as
+`optionalEnvString()` / `optionalEnvUrl()`. Then add a `requireAllIfAny('Discord
+OAuth', [...])` group in
+[`provider-rules.ts`](../../apps/api/src/env/schema/refinements/provider-rules.ts)
+so a partially-configured provider fails fast at startup rather than at the first
+login. Mirror them in [`.env.example`](../../.env.example).
 
 **Login vs link-only.** A provider that cannot return an email (as with Telegram)
 **cannot back standalone login** — the callback resolves `OAUTH_EMAIL_REQUIRED`

@@ -1,3 +1,5 @@
+import { isIP } from 'node:net'
+
 /**
  * Anonymizes IP address for GDPR compliance
  *
@@ -10,21 +12,18 @@
 export function anonymizeIp(ip: string | undefined): string | undefined {
   if (!ip) return undefined
 
+  const version = isIP(ip)
+  if (version === 0) return undefined
+
   // IPv4
-  if (ip.includes('.')) {
+  if (version === 4) {
     const parts = ip.split('.')
-    if (parts.length === 4) {
-      return `${parts[0]}.${parts[1]}.0.0`
-    }
+    return `${parts[0]}.${parts[1]}.0.0`
   }
 
   // IPv6 - keep only first segment (16 bits)
-  if (ip.includes(':')) {
-    const firstSegment = ip.split(':')[0]
-    if (firstSegment) {
-      return `${firstSegment}::`
-    }
-  }
+  const firstHextet = ip.startsWith('::') ? '0' : ip.split(':')[0]
+  if (firstHextet) return `${firstHextet}::`
 
   return undefined
 }

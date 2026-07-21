@@ -9,18 +9,20 @@ does not express.
 
 ## Find the right guide
 
-| I want to…                                       | Go to                                                                                |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| Add a backend module the AMCore way              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md) |
-| Configure auth, OAuth, sessions                  | [`auth/`](auth/README.md)                                                            |
-| Set up RBAC / authorization                      | [`auth/rbac.md`](auth/rbac.md)                                                       |
-| Issue scoped API keys                            | [`auth/api-keys.md`](auth/api-keys.md)                                               |
-| Add or customize email                           | [`email/`](email/README.md)                                                          |
-| Add a notification                               | [`notifications/`](notifications/README.md)                                          |
-| Add an AI provider / tool / assistant / artifact | [`ai/`](ai/README.md)                                                                |
-| Add a storage- or media-backed feature           | [`storage/`](storage/README.md), [`media/`](media/README.md)                         |
-| Deploy, run, or operate the system               | [`operations/`](operations/README.md)                                                |
-| Understand the CI / repo-security workflow       | [`operations/ci-security.md`](operations/ci-security.md)                             |
+| I want to…                                       | Go to                                                                                                                             |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| Add a backend module the AMCore way              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                              |
+| Add an environment variable                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
+| Add an external service / infra dependency       | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
+| Configure auth, OAuth, sessions                  | [`auth/`](auth/README.md)                                                                                                         |
+| Set up RBAC / authorization                      | [`auth/rbac.md`](auth/rbac.md)                                                                                                    |
+| Issue scoped API keys                            | [`auth/api-keys.md`](auth/api-keys.md)                                                                                            |
+| Add or customize email                           | [`email/`](email/README.md)                                                                                                       |
+| Add a notification                               | [`notifications/`](notifications/README.md)                                                                                       |
+| Add an AI provider / tool / assistant / artifact | [`ai/`](ai/README.md)                                                                                                             |
+| Add a storage- or media-backed feature           | [`storage/`](storage/README.md), [`media/`](media/README.md)                                                                      |
+| Deploy, run, or operate the system               | [`operations/`](operations/README.md)                                                                                             |
+| Understand the CI / repo-security workflow       | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
 
 ## Documentation map
 
@@ -48,6 +50,8 @@ Each links to the "how to add X" section in its guide — the instructions live
 there, not here.
 
 - Add a backend module → [Backend architecture & conventions](backend/architecture-and-conventions.md)
+- Add an environment variable → [Backend architecture & conventions · Adding an environment variable](backend/architecture-and-conventions.md#adding-an-environment-variable)
+- Add an external service / infra dependency → [Backend architecture & conventions · Adding an external service / infra dependency](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency)
 - Add an OAuth provider → [Auth · OAuth](auth/oauth.md#adding-a-new-provider)
 - Add a notification definition → [Notifications · Add a notification definition](notifications/README.md#add-a-notification-definition)
 - Add an AI tool + approval policy → [AI · Add a Tool](ai/tools-and-approvals.md#add-a-tool)

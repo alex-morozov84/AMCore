@@ -70,14 +70,14 @@ Three categories:
    `strict` settings from the JSON; environments / secrets / deploy credentials
    are configured separately.
 
-| Capability                                                 | Fork receives        | Active / enforced automatically                                                        |
-| ---------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------- |
-| Workflows, ruleset JSON, setup script, commitlint config   | Files                | No guarantee                                                                           |
-| GitHub Actions checks                                      | Workflow definitions | Only when Actions / workflow runs are enabled (scheduled runs off by default on forks) |
-| Required checks, squash-only, protected `main` / `v*` tags | Declarative JSON     | No — apply the setup script                                                            |
-| Secret scanning, push protection, dependency alerts        | No                   | Apply the setup script; availability depends on GitHub plan / visibility               |
-| Husky commit hooks                                         | Hook files           | After `pnpm install`; local and bypassable                                             |
-| Environments, secrets, variables, deployment credentials   | No                   | Configure separately; the setup script does not create them                            |
+| Capability                                                  | Fork receives        | Active / enforced automatically                                                        |
+| ----------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| Workflows, ruleset JSON, setup script, commitlint config    | Files                | No guarantee                                                                           |
+| GitHub Actions checks                                       | Workflow definitions | Only when Actions / workflow runs are enabled (scheduled runs off by default on forks) |
+| Required checks, squash-only, protected `main` / `v*` tags  | Declarative JSON     | No — apply the setup script                                                            |
+| Secret scanning, push protection, Dependabot alerts/updates | No                   | Apply the setup script; availability depends on GitHub plan / visibility               |
+| Husky commit hooks                                          | Hook files           | After `pnpm install`; local and bypassable                                             |
+| Environments, secrets, variables, deployment credentials    | No                   | Configure separately; the setup script does not create them                            |
 
 > Repository files **declare** the intended policy. GitHub-hosted enforcement is **external
 > repository state**. For `strict` mode, run `setup-repo-security.sh` to reconcile
@@ -95,7 +95,7 @@ Downstream products should declare one workflow mode in `PROJECT_CONTEXT.md`:
 
 - `strict` — mirrors AMCore upstream: protected `main`, PR-only changes,
   squash-only merges, required status checks, immutable release tags, secret
-  scanning, push protection, and Dependabot alerts. Use
+  scanning, push protection, Dependabot alerts, and Dependabot security updates. Use
   `scripts/setup-repo-security.sh` to apply the supported GitHub repository
   settings.
 - `flexible` — keeps the same CI/security files but lets the product relax
@@ -273,8 +273,10 @@ tool** releases. The `dependency-freshness.yml` workflow closes that visibility
 gap: on a weekly schedule (and on-demand via `workflow_dispatch`) it runs
 `scripts/dependency-freshness.mjs` and **upserts a single tracking issue** (label
 `dependency-freshness`, edited in place) listing all three. It opens no PRs and is
-a report only — triage each item and bump deliberately, following the rules above
-and the major-bump guidance in the maintainer backlog.
+a report only — triage each item and bump deliberately. For semver-major updates,
+use a separate PR, read the upstream migration notes/changelog, record any
+intentional deferral in the product's own backlog or issue tracker, and run the
+full relevant CI before merging.
 
 Forkers can keep this stack lean:
 

@@ -12,8 +12,11 @@ Application logs are structured Pino JSON in production and carry a
 
 HTTP request logs include bounded request metadata — method, route, status, user
 id when authenticated, user agent, and an **anonymized client IP** (IPv4 host
-octet zeroed; IPv6 reduced to its network prefix). Health routes are excluded
-from request logs to reduce noise.
+octet zeroed; IPv6 reduced to its network prefix). The source IP is Express
+`req.ip`: by default this is the socket peer and ignores spoofable
+`X-Forwarded-*` headers; behind a trusted reverse proxy/load balancer, set
+`TRUST_PROXY` to the real topology so logs, audit records, and rate limiting use
+the real client IP. Health routes are excluded from request logs to reduce noise.
 
 Sensitive data is redacted before logs leave the process: passwords, password
 hashes, refresh/access/OAuth tokens, API keys, cookies, authorization headers,
