@@ -24,50 +24,27 @@ describe('anonymizeIp', () => {
 })
 
 describe('getClientIp', () => {
-  it('should extract IP from X-Real-IP header', () => {
-    const req = {
-      headers: { 'x-real-ip': '192.168.1.100' },
-    }
-    expect(getClientIp(req)).toBe('192.168.1.100')
+  it("uses Express's req.ip (trust-proxy-aware)", () => {
+    expect(getClientIp({ ip: '192.168.1.100' })).toBe('192.168.1.100')
   })
 
-  it('should extract first IP from X-Forwarded-For', () => {
-    const req = {
-      headers: { 'x-forwarded-for': '192.168.1.100, 10.0.0.1, 172.16.0.1' },
-    }
-    expect(getClientIp(req)).toBe('192.168.1.100')
+  it('falls back to req.socket.remoteAddress when req.ip is unset', () => {
+    expect(getClientIp({ socket: { remoteAddress: '192.168.1.100' } })).toBe('192.168.1.100')
   })
 
-  it('should prioritize X-Real-IP over X-Forwarded-For', () => {
-    const req = {
-      headers: {
-        'x-real-ip': '192.168.1.100',
-        'x-forwarded-for': '10.0.0.1',
-      },
-    }
-    expect(getClientIp(req)).toBe('192.168.1.100')
+  it('never trusts client-controlled forwarded headers (spoofing)', () => {
+    // With trust proxy off, Express leaves req.ip as the socket peer regardless of
+    // any X-Forwarded-For / X-Real-IP the caller sent — so a spoofed header cannot
+    // change the recorded IP.
+    const spoofed = {
+      headers: { 'x-forwarded-for': '1.2.3.4', 'x-real-ip': '5.6.7.8' },
+      ip: '10.0.0.9',
+      socket: { remoteAddress: '10.0.0.9' },
+    } as unknown as { ip?: string; socket?: { remoteAddress?: string } }
+    expect(getClientIp(spoofed)).toBe('10.0.0.9')
   })
 
-  it('should fallback to req.ip', () => {
-    const req = {
-      headers: {},
-      ip: '192.168.1.100',
-    }
-    expect(getClientIp(req)).toBe('192.168.1.100')
-  })
-
-  it('should fallback to req.socket.remoteAddress', () => {
-    const req = {
-      headers: {},
-      socket: { remoteAddress: '192.168.1.100' },
-    }
-    expect(getClientIp(req)).toBe('192.168.1.100')
-  })
-
-  it('should return undefined if no IP found', () => {
-    const req = {
-      headers: {},
-    }
-    expect(getClientIp(req)).toBeUndefined()
+  it('returns undefined if no IP is available', () => {
+    expect(getClientIp({})).toBeUndefined()
   })
 })

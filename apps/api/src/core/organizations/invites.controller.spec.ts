@@ -103,14 +103,16 @@ describe('AuthInvitesController (OB-02 Stage C)', () => {
     } as never
   }
 
-  it('extracts client IP via x-forwarded-for and forwards token + principal + ip to acceptInvite', async () => {
+  it('forwards the trust-proxy-aware client IP (req.ip), ignoring spoofable forwarded headers', async () => {
     const inviteService = mockInviteService()
     const expected: AcceptInviteResponse = { organizationId: 'org-1', roleId: 'role-1' }
     inviteService.acceptInvite.mockResolvedValue(expected)
 
     const controller = new AuthInvitesController(inviteService)
     const dto = { token: 'a'.repeat(43) } as AcceptInviteDto
-    const req = makeRequest({ 'x-forwarded-for': '203.0.113.10, 70.41.3.18' })
+    // A spoofed X-Forwarded-For must be ignored; req.ip (set by Express per
+    // `trust proxy`) is authoritative.
+    const req = makeRequest({ 'x-forwarded-for': '1.2.3.4' }, '203.0.113.10')
 
     const result = await controller.accept(dto, principal, req)
 
