@@ -209,6 +209,105 @@ needed), and Postgres `FOR UPDATE SKIP LOCKED` is the coordinator, so replicas
 drain disjoint rows without double-sending. The throttler is Redis-backed and
 BullMQ workers consume one shared queue. Add worker replicas freely.
 
+## TLS & reverse proxy
+
+AMCore's Node process speaks plain HTTP; TLS terminates at the **edge** — a
+reverse proxy, your cloud load balancer, or a Kubernetes Ingress — never inside
+the app. There is no in-app certificate management. `helmet()` already sends
+HSTS and the other secure-header defaults (`apps/api/src/main.ts`); once the
+edge speaks HTTPS, the app side needs no extra configuration for that part.
+
+The proxy is **bring-your-own** — nginx, Caddy, Traefik, an ALB/GCP HTTPS LB, or
+an Ingress controller all work. This guide documents **nginx** as the
+first-class example because it fronts the majority of compose/VPS deployments
+of this starter; a cloud LB/Ingress applies the same two rules below through
+its own listener/annotation configuration instead of an `nginx.conf`.
+
+### The two rules any edge proxy must follow
+
+1. **Terminate TLS, forward plain HTTP.** The proxy holds the certificate
+   (Let's Encrypt/ACME, a managed cert, or your CA); it speaks HTTPS to the
+   internet and HTTP to `api`/`web` on the private network.
+2. **Sanitize `X-Forwarded-*` at the edge, and configure `TRUST_PROXY` to match
+   whatever the edge actually does.** A caller can send its own
+   `X-Forwarded-For`/`X-Forwarded-Proto` — if nginx is your edge, **overwrite**
+   them (`proxy_set_header`, not `$proxy_add_x_forwarded_for`) so a spoofed
+   client header never reaches the app. Some managed load balancers instead
+   **append** to an existing `X-Forwarded-For` by documented default (e.g. AWS
+   ALB) rather than overwrite it — that is not a misconfiguration, but it means
+   safety comes from the app's side, not the header: pair either behavior with
+   the app's opt-in **`TRUST_PROXY`** setting (`.env.example`, default
+   `false`). The app never parses forwarded headers itself — `req.ip`/
+   `req.protocol` reflect them **only** once `TRUST_PROXY` is configured for
+   your exact proxy topology (e.g. `TRUST_PROXY=loopback` for an nginx on the
+   same host, or the exact trusted hop count/CIDR for a managed LB), which
+   makes Express trust only the last N untrusted hops rather than the whole
+   `X-Forwarded-For` chain. Leaving `TRUST_PROXY=false` behind a proxy that
+   already sanitizes headers is safe, but audit/request logs then record the
+   proxy's own IP, not the client's. Avoid broad `TRUST_PROXY=true` unless the
+   edge is guaranteed to sanitize (not append to) forwarded headers.
+
+### Reference nginx config
+
+```nginx
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name api.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+
+    # nginx defaults this to 1m, which would 413 real uploads before AMCore's
+    # own validation ever runs. 45m covers the largest current hard limit (the
+    # 40 MiB AI artifact upload cap, apps/api/src/core/ai/artifacts/
+    # ai-artifact.constants.ts) with headroom; raise it if you raise that
+    # constant or any other upload ceiling further.
+    client_max_body_size 45m;
+
+    location / {
+        proxy_pass http://api:5002;
+        proxy_http_version 1.1;
+
+        # Overwrite, don't append — replaces any client-supplied values.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Host $host;
+    }
+
+    # SSE endpoints (see "Realtime SSE behind a proxy" below) need buffering
+    # off and a read timeout above the heartbeat interval.
+    location ~ ^/(api/v1/notifications/stream|api/v1/ai/runs/.+/stream)$ {
+        proxy_pass http://api:5002;
+        proxy_http_version 1.1;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Host $host;
+        proxy_buffering off;
+        proxy_read_timeout 75s;
+    }
+}
+```
+
+Then set `TRUST_PROXY=loopback` (nginx on the same host) or the appropriate
+subnet/hop count, and see "Realtime SSE behind a proxy" below for the full
+streaming-specific rules (buffering, timeouts, connection caps).
+
+### Cloud load balancer / Ingress
+
+A managed LB or Kubernetes Ingress (ALB, GCP HTTPS LB, Ingress-nginx, …)
+terminates TLS the same way, but you configure header/timeout/body-size
+behavior through the platform, not an `nginx.conf`. Check your provider's
+documented `X-Forwarded-For` behavior rather than assuming it — **AWS ALB
+appends by default** rather than overwriting, which is fine as long as
+`TRUST_PROXY` is set to the exact trusted hop count/CIDR (so Express trusts
+only the LB's own hop, not the whole header chain) rather than the broad
+`true`. Also confirm idle/read timeouts exceed the SSE heartbeat and that the
+platform's request body-size limit is at or above your largest enabled
+upload ceiling.
+
 ## Realtime SSE behind a proxy
 
 Two long-lived SSE endpoints share the same rules and must not be buffered or timed
@@ -228,11 +327,9 @@ off` on the stream location (and never gzip a `text/event-stream`).
   per origin (~6), which the per-tab streams would consume; HTTP/2 multiplexes them.
 - **Rate-limit at the ingress, not the app.** The app enforces only a per-user cap
   (429) and a global per-process cap (503); real client-IP / cluster-wide limiting
-  belongs at the trusted proxy. By default the app does **not** trust
-  `X-Forwarded-*` (so `req.ip` is the socket peer and cannot be spoofed) — set
-  **`TRUST_PROXY`** to your proxy topology (`loopback`, a subnet/CIDR, or a hop
-  count) when running behind a trusted reverse proxy/LB so `req.ip`, rate limiting,
-  and audit/logging reflect the real client.
+  belongs at the trusted proxy. See "TLS & reverse proxy" above for the
+  **`TRUST_PROXY`** setting that makes `req.ip`, rate limiting, and audit/logging
+  reflect the real client behind your proxy.
 - **No sticky sessions needed.** Any replica can serve any user — a hint published
   on one replica fans out via Redis Pub/Sub to all. **When several environments
   share one Redis, give each a distinct `NOTIFICATIONS_REALTIME_NAMESPACE`** so
