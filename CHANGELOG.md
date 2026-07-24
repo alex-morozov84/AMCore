@@ -52,6 +52,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Documented **TLS & reverse proxy** setup in `docs/operations/deployment.md`:
+  the two rules any edge proxy (nginx, cloud LB, Kubernetes Ingress) must
+  follow — terminate TLS and forward plain HTTP, and sanitize `X-Forwarded-*`
+  (overwrite at nginx, or the exact trusted hop/CIDR via `TRUST_PROXY` for LBs
+  that append by default, e.g. AWS ALB) — paired with the existing opt-in
+  `TRUST_PROXY` setting, a reference nginx config (current `http2 on;` syntax,
+  `client_max_body_size` sized to the AI artifact upload ceiling, header
+  overwrite, SSE-tuned location block), and a cloud LB/Ingress note. The prior
+  `TRUST_PROXY` explanation under "Realtime SSE behind a proxy" now points
+  here instead of duplicating it.
 - Extended the backend extension docs: an "Adding an external service / infra
   dependency" guide (config, client/service seams, health, lifecycle, process role,
   tests) alongside the environment-variable guide, an `AGENTS.md` pointer to the env
