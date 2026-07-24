@@ -52,6 +52,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added an **optional bundled Caddy `edge` compose profile**
+  (`docker/caddy/Caddyfile`, `docker-compose.yml`) for automatic HTTPS with
+  minimal configuration. It **replaces** a reverse proxy — not an addition
+  alongside nginx/Traefik/a cloud LB — enabled via
+  `COMPOSE_PROFILES=...,edge` plus `CADDY_DOMAIN`/`CADDY_EMAIL`/`TRUST_PROXY=1`
+  (the shared `x-app-env` anchor now forwards `TRUST_PROXY` to `api`/`worker`,
+  default `false`). Fronts `api` by default (a commented block, with
+  `CADDY_WEB_DOMAIN` passed through to the `caddy` service, adds `apps/web`
+  on a second domain). Unlike the nginx example, Caddy needs no
+  `client_max_body_size` or SSE-buffering config, and sanitizes
+  `X-Forwarded-*` by default — hence the `TRUST_PROXY=1` recommendation
+  (Caddy is exactly one hop). Documented in `docs/operations/deployment.md`
+  under "TLS & reverse proxy" → "Optional bundled edge: Caddy", with the same
+  compose-only-path honesty caveat as the nginx guidance.
 - Documented **TLS & reverse proxy** setup in `docs/operations/deployment.md`:
   the two rules any edge proxy (nginx, cloud LB, Kubernetes Ingress) must
   follow — terminate TLS and forward plain HTTP, and sanitize `X-Forwarded-*`
