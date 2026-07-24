@@ -49,7 +49,9 @@ a backport is actually needed.
 
 One env-driven file serves both local and managed/cloud infrastructure. Bundled
 Postgres + Redis sit behind the `local-infra` profile; `api`/`web`/`migrate` are
-always present. The switch is `COMPOSE_PROFILES` in `.env`. The Docker stack reads
+always present. An optional automatic-HTTPS reverse proxy sits behind the
+`edge` profile — see "TLS & reverse proxy" → "Optional bundled edge: Caddy"
+below. The switch is `COMPOSE_PROFILES` in `.env`. The Docker stack reads
 its DB/Redis from `COMPOSE_DATABASE_URL` / `COMPOSE_REDIS_URL` (default: bundled
 services), kept separate from the host `DATABASE_URL` / `REDIS_URL` used by
 `pnpm dev`, so a host `.env` cannot misconfigure the containers.
@@ -307,6 +309,50 @@ only the LB's own hop, not the whole header chain) rather than the broad
 `true`. Also confirm idle/read timeouts exceed the SSE heartbeat and that the
 platform's request body-size limit is at or above your largest enabled
 upload ceiling.
+
+### Optional bundled edge: Caddy
+
+If you don't already run a reverse proxy, `docker-compose.yml` ships an
+**optional** [Caddy](https://caddyserver.com/) service behind the `edge`
+profile that gets you automatic HTTPS with almost no configuration. It is a
+**replacement** for a reverse proxy, not an addition — don't run it alongside
+nginx/Traefik/a cloud LB, and don't enable it if a platform LB/Ingress already
+terminates TLS in front of this stack.
+
+Enable it by adding `edge` to `COMPOSE_PROFILES` (e.g.
+`COMPOSE_PROFILES=local-infra,edge`) and setting these in `.env`:
+
+```bash
+CADDY_DOMAIN="api.example.com"   # must have an A/AAAA record pointed at this host
+CADDY_EMAIL="ops@example.com"    # ACME account contact (Let's Encrypt)
+TRUST_PROXY=1                    # Caddy is exactly one hop in front of the app
+```
+
+`docker/caddy/Caddyfile` fronts `api:5002` by default — matching the nginx
+example above, and consistent with `apps/web` being a deliberate starter
+shell rather than a required production surface. A commented block in that
+file shows how to also front `apps/web` on a second domain if you want to
+expose it too.
+
+A few things that differ from the nginx example on purpose:
+
+- **No `client_max_body_size`-equivalent needed.** Caddy's `reverse_proxy`
+  has no default request-body-size cap, unlike nginx's `1m` default.
+- **No SSE tuning needed.** Caddy detects `Content-Type: text/event-stream`
+  and streams the response immediately; there is no buffering flag to turn off.
+- **`X-Forwarded-*` is sanitized by default.** Unlike nginx, Caddy's
+  `reverse_proxy` ignores client-supplied `X-Forwarded-For`/`-Proto`/`-Host`
+  values out of the box and sets them itself from the real connection — no
+  extra directive required. Because Caddy is exactly one hop in front of
+  `api`, set **`TRUST_PROXY=1`** (not a preset or CIDR) so the app trusts
+  that one hop and no further.
+
+**Honesty caveat:** this profile serves the **compose deployment path**
+only. If you deploy to a managed platform or Kubernetes, TLS terminates at
+the platform's LB/Ingress instead (see "Cloud load balancer / Ingress"
+above) — don't add this Caddy service there. For local testing without a
+public domain, `docker/caddy/Caddyfile` has a comment showing the
+`localhost` + `tls internal` (Caddy's local CA) alternative to Let's Encrypt.
 
 ## Realtime SSE behind a proxy
 

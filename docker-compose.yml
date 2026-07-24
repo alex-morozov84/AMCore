@@ -11,6 +11,11 @@
 #   `required:false` makes the optional dependency skip. (The host DATABASE_URL /
 #   REDIS_URL are for `pnpm dev` and do not affect this stack.)
 #
+# Optional bundled edge (COMPOSE_PROFILES=...,edge): an automatic-HTTPS Caddy
+# reverse proxy in front of `api`. This REPLACES a reverse proxy — use only if
+# you don't already run nginx/Traefik/a cloud LB. See deployment.md → "TLS &
+# reverse proxy" → "Optional bundled edge: Caddy".
+#
 # Requires Docker Compose v2.20.2+ (depends_on `required:false`,
 # `service_completed_successfully`). Production hardening (sslmode, S3, real JWT
 # secret >= 32 chars) is documented in docs/operations/deployment.md.
@@ -24,6 +29,10 @@
 x-app-env: &app-env
   NODE_ENV: ${NODE_ENV:-development}
   API_PORT: 5002
+  # Express `trust proxy` (ADR / deployment.md → "TLS & reverse proxy").
+  # Default off (safe with no proxy in front). Set TRUST_PROXY=1 in .env when
+  # enabling the `edge` Caddy profile — Caddy is exactly one hop.
+  TRUST_PROXY: ${TRUST_PROXY:-false}
   # COMPOSE_* are decoupled from the host DATABASE_URL/REDIS_URL (which are for
   # `pnpm dev`), so a host `.env` can never poison the container config. Unset →
   # bundled services; set COMPOSE_DATABASE_URL/COMPOSE_REDIS_URL for managed DB/Redis.
@@ -183,6 +192,38 @@ services:
       api:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------------
+  # Optional bundled edge — OPTIONAL, only with COMPOSE_PROFILES=...,edge.
+  # Replaces a reverse proxy; requires CADDY_DOMAIN/CADDY_EMAIL (below) and a
+  # real domain pointed at this host. See deployment.md → "TLS & reverse
+  # proxy" → "Optional bundled edge: Caddy".
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    profiles: ['edge']
+    environment:
+      # NOT `:?required` — that's interpolated for every service at `compose
+      # config` time regardless of profile, which would break the default
+      # (non-`edge`) stack for everyone. An empty value here instead fails
+      # inside the `caddy` container at startup — only when `edge` is active.
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-}
+      CADDY_EMAIL: ${CADDY_EMAIL:-}
+      # Only used if you uncomment the apps/web block in the Caddyfile.
+      CADDY_WEB_DOMAIN: ${CADDY_WEB_DOMAIN:-}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
+  caddy_data:
+  caddy_config:
