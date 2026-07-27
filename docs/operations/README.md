@@ -10,6 +10,10 @@ specific concern comes up.
   setup (nginx example, the optional bundled Caddy `edge` profile, and
   `TRUST_PROXY`), the Redis queue profile, database pool sizing, and
   SSE-behind-a-proxy guidance.
+- **[Backup & restore](backup-restore.md)** — which backup strategy fits your
+  deployment (managed-provider PITR, self-hosted WAL archiving, or the
+  logical-dump fallback), and the planned optional compose `backup`/
+  `restore` profiles (not yet shipped).
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
   rules, structured logging and redaction, and operator interpretation of the
   key metrics.

@@ -52,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Documented **backup & restore** (`docs/operations/backup-restore.md`):
+  which strategy fits which deployment (managed-provider PITR as the
+  recommended default; self-hosted WAL archiving via pgBackRest/WAL-G for
+  real production; a logical-dump fallback for small/self-hosted
+  deployments, with an explicit **dump ≠ PITR** caveat), how the upcoming
+  compose `backup`/`restore` profiles will be used, and what's out of scope
+  (object storage, secret rotation, Redis). Cross-linked from `deployment.md`
+  → "Rollback" and the operations doc map.
 - Added an **optional bundled Caddy `edge` compose profile**
   (`docker/caddy/Caddyfile`, `docker-compose.yml`) for automatic HTTPS with
   minimal configuration. It **replaces** a reverse proxy — not an addition

@@ -174,8 +174,9 @@ This is a one-time adoption step, not part of normal deploys.
 
 ## Rollback
 
-Prisma has no automatic down-migration. Roll back by **restoring from backup** or
-by shipping a **forward-fix** migration. Destructive migrations (dropping/renaming
+Prisma has no automatic down-migration. Roll back by **restoring from
+backup** (see [Backup & Restore](backup-restore.md)) or by shipping a
+**forward-fix** migration. Destructive migrations (dropping/renaming
 columns) require app-compatibility planning — deploy a backward-compatible app
 first, migrate, then remove the old path in a later release.
 
