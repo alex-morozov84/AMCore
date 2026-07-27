@@ -6,8 +6,14 @@ specific concern comes up.
 
 - **[Deployment & migrations](deployment.md)** — clone → migrate → run, locally
   and in production. One-shot `prisma migrate deploy`, production env
-  requirements, the `web` / `worker` / `all` process roles, the Redis queue
-  profile, database pool sizing, and SSE-behind-a-proxy guidance.
+  requirements, the `web` / `worker` / `all` process roles, TLS/reverse-proxy
+  setup (nginx example, the optional bundled Caddy `edge` profile, and
+  `TRUST_PROXY`), the Redis queue profile, database pool sizing, and
+  SSE-behind-a-proxy guidance.
+- **[Backup & restore](backup-restore.md)** — which backup strategy fits your
+  deployment (managed-provider PITR, self-hosted WAL archiving, or the
+  logical-dump fallback), and the optional compose `backup`/`restore`
+  profiles this repo ships.
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
   rules, structured logging and redaction, and operator interpretation of the
   key metrics.

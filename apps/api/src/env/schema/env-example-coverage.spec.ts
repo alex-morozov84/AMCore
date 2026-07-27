@@ -36,6 +36,15 @@ const COMPOSE_ONLY_ALLOW = new Set([
   'COMPOSE_DATABASE_URL',
   'COMPOSE_REDIS_URL',
   'MIGRATION_DATABASE_URL',
+  // Optional bundled Caddy `edge` profile — consumed by the `caddy` compose
+  // service's own environment, not the app's env schema.
+  'CADDY_DOMAIN',
+  'CADDY_EMAIL',
+  'CADDY_WEB_DOMAIN',
+  // Optional bundled `backup`/`restore` profiles — consumed by the `backup`
+  // compose service's own environment, not the app's env schema.
+  'BACKUP_INTERVAL_SECONDS',
+  'BACKUP_RETENTION_DAYS',
 ])
 const WEBHOOK_SECRET_PATTERN = /^WEBHOOK_[A-Z0-9_]+_SECRET$/
 

@@ -52,6 +52,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added TLS/reverse-proxy setup and database backup/restore to
+  `docs/README.md`'s "Find the right guide" intent table and its Operations
+  documentation-map entry — the top-level docs map didn't mention either
+  guide even though `docs/operations/deployment.md` and
+  `docs/operations/backup-restore.md` already covered them.
+- Added **optional bundled `backup`/`restore` compose profiles**
+  (`docker/postgres/backup.sh`, `docker/postgres/restore.sh`,
+  `docker-compose.yml`) for the logical-dump fallback described in
+  `docs/operations/backup-restore.md`. `COMPOSE_PROFILES=...,backup` runs a
+  scheduled `pg_dump` (custom format, atomic rename on success) on
+  `postgres:16-alpine` — no third-party backup image — targeting
+  `COMPOSE_DATABASE_URL` if set, else the bundled `postgres` service;
+  `BACKUP_INTERVAL_SECONDS` (default daily) and `BACKUP_RETENTION_DAYS`
+  (default 7, pruned automatically) are configurable. Restore is a one-shot,
+  like `migrate` — it never runs on a normal `docker compose up`; it needs
+  its own `restore` profile _and_ an explicit `run`:
+  `docker compose --profile restore run --rm restore <dump-filename>`
+  (`pg_restore --clean --if-exists --no-owner`). This is a logical dump, not
+  point-in-time recovery — the doc's honesty caveat and the managed/self-hosted
+  PITR guidance are unchanged. `docs/operations/backup-restore.md` also now
+  explains the backup interval is a sleep-based countdown (not a wall-clock
+  cron schedule), where dumps are stored (the `postgres_backups` volume, and
+  how to redirect it for offsite storage), and that logs are Docker logs for
+  the backup service (stdout/stderr only, no separate log file). TLS/
+  reverse-proxy and backup/restore are now listed in the root `README.md`
+  capability table and `AGENTS.md`'s operations pointer, alongside the
+  existing `docs/operations/` guides.
+- Documented **backup & restore** (`docs/operations/backup-restore.md`):
+  which strategy fits which deployment (managed-provider PITR as the
+  recommended default; self-hosted WAL archiving via pgBackRest/WAL-G for
+  real production; a logical-dump fallback for small/self-hosted
+  deployments, with an explicit **dump ≠ PITR** caveat), how the compose
+  `backup`/`restore` profiles are used, and what's out of scope (object
+  storage, secret rotation, Redis). Cross-linked from `deployment.md` →
+  "Rollback" and the operations doc map.
+- Added an **optional bundled Caddy `edge` compose profile**
+  (`docker/caddy/Caddyfile`, `docker-compose.yml`) for automatic HTTPS with
+  minimal configuration. It **replaces** a reverse proxy — not an addition
+  alongside nginx/Traefik/a cloud LB — enabled via
+  `COMPOSE_PROFILES=...,edge` plus `CADDY_DOMAIN`/`CADDY_EMAIL`/`TRUST_PROXY=1`
+  (the shared `x-app-env` anchor now forwards `TRUST_PROXY` to `api`/`worker`,
+  default `false`). Fronts `api` by default (a commented block, with
+  `CADDY_WEB_DOMAIN` passed through to the `caddy` service, adds `apps/web`
+  on a second domain). Unlike the nginx example, Caddy needs no
+  `client_max_body_size` or SSE-buffering config, and sanitizes
+  `X-Forwarded-*` by default — hence the `TRUST_PROXY=1` recommendation
+  (Caddy is exactly one hop). Documented in `docs/operations/deployment.md`
+  under "TLS & reverse proxy" → "Optional bundled edge: Caddy", with the same
+  compose-only-path honesty caveat as the nginx guidance.
+- Documented **TLS & reverse proxy** setup in `docs/operations/deployment.md`:
+  the two rules any edge proxy (nginx, cloud LB, Kubernetes Ingress) must
+  follow — terminate TLS and forward plain HTTP, and sanitize `X-Forwarded-*`
+  (overwrite at nginx, or the exact trusted hop/CIDR via `TRUST_PROXY` for LBs
+  that append by default, e.g. AWS ALB) — paired with the existing opt-in
+  `TRUST_PROXY` setting, a reference nginx config (current `http2 on;` syntax,
+  `client_max_body_size` sized to the AI artifact upload ceiling, header
+  overwrite, SSE-tuned location block), and a cloud LB/Ingress note. The prior
+  `TRUST_PROXY` explanation under "Realtime SSE behind a proxy" now points
+  here instead of duplicating it.
 - Extended the backend extension docs: an "Adding an external service / infra
   dependency" guide (config, client/service seams, health, lifecycle, process role,
   tests) alongside the environment-variable guide, an `AGENTS.md` pointer to the env
