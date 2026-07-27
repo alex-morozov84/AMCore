@@ -46,24 +46,35 @@ function npmMajors() {
   }
   const rows = Object.entries(data)
     .filter(([, v]) => v?.current && v?.latest && major(v.latest) > major(v.current))
-    .map(([name, v]) => ({ name, current: v.current, latest: v.latest, type: v.dependencyType ?? '' }))
+    .map(([name, v]) => ({
+      name,
+      current: v.current,
+      latest: v.latest,
+      type: v.dependencyType ?? '',
+    }))
     .sort((a, b) => a.name.localeCompare(b.name))
   return { rows }
 }
 
-function dockerDrift() {
+const DOCKERFILES = ['apps/api/Dockerfile', 'apps/web/Dockerfile']
+
+function dockerDrift(path) {
   let dockerfile
   try {
-    dockerfile = readFileSync('apps/api/Dockerfile', 'utf8')
+    dockerfile = readFileSync(path, 'utf8')
   } catch {
-    return { error: '`apps/api/Dockerfile` not found' }
+    return { path, error: `\`${path}\` not found` }
   }
   const m = dockerfile.match(/FROM\s+(\S+?:\S+?)@sha256:([0-9a-f]{64})/)
-  if (!m) return { error: 'no digest-pinned base image found' }
+  if (!m) return { path, error: 'no digest-pinned base image found' }
   const [, ref, pinned] = m
-  const res = run('docker', ['buildx', 'imagetools', 'inspect', ref, '--format', '{{.Manifest.Digest}}'], 20000)
+  const res = run(
+    'docker',
+    ['buildx', 'imagetools', 'inspect', ref, '--format', '{{.Manifest.Digest}}'],
+    20000
+  )
   const current = res.ok ? res.out.replace(/^sha256:/, '') : null
-  return { ref, pinned, current }
+  return { path, ref, pinned, current }
 }
 
 // tool -> upstream repo + the `<VAR>: <version>` pin declared in a workflow file.
@@ -76,7 +87,11 @@ const TOOLS = [
 ]
 
 function pinnedVersion(varName) {
-  const res = run('bash', ['-c', `grep -rhoE '${varName}:[[:space:]]*[0-9][0-9.]*' .github/workflows | head -1`], 10000)
+  const res = run(
+    'bash',
+    ['-c', `grep -rhoE '${varName}:[[:space:]]*[0-9][0-9.]*' .github/workflows | head -1`],
+    10000
+  )
   const m = res.out.match(/([0-9][0-9.]*)/)
   return m ? m[1] : null
 }
@@ -117,17 +132,21 @@ function render({ npm, docker, cli }) {
   }
 
   out.push('## Docker base image digest', '')
-  if (docker.error) out.push(`> ⚠️ ${docker.error}`, '')
-  else if (!docker.current) out.push(`> ❔ Could not resolve the current digest for \`${docker.ref}\`.`, '')
-  else if (docker.current === docker.pinned) out.push(`✅ \`${docker.ref}\` pin matches the upstream digest.`, '')
-  else
-    out.push(
-      `⚠️ \`${docker.ref}\` moved upstream — re-resolve and bump both \`FROM\` lines.`,
-      '',
-      `- pinned:  \`sha256:${docker.pinned}\``,
-      `- current: \`sha256:${docker.current}\``,
-      '',
-    )
+  for (const d of docker) {
+    if (d.error) out.push(`> ⚠️ ${d.path}: ${d.error}`, '')
+    else if (!d.current)
+      out.push(`> ❔ Could not resolve the current digest for \`${d.ref}\` (${d.path}).`, '')
+    else if (d.current === d.pinned)
+      out.push(`✅ \`${d.path}\`: \`${d.ref}\` pin matches the upstream digest.`, '')
+    else
+      out.push(
+        `⚠️ \`${d.path}\`: \`${d.ref}\` moved upstream — re-resolve and bump both \`FROM\` lines.`,
+        '',
+        `- pinned:  \`sha256:${d.pinned}\``,
+        `- current: \`sha256:${d.current}\``,
+        ''
+      )
+  }
 
   out.push('', '## curl-pinned CLI tools', '', '| Tool | Pinned | Latest | |', '|---|---|---|---|')
   for (const c of cli) {
@@ -138,4 +157,4 @@ function render({ npm, docker, cli }) {
   return out.join('\n')
 }
 
-console.log(render({ npm: npmMajors(), docker: dockerDrift(), cli: cliDrift() }))
+console.log(render({ npm: npmMajors(), docker: DOCKERFILES.map(dockerDrift), cli: cliDrift() }))

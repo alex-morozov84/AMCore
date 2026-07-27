@@ -162,23 +162,25 @@ This catches the annotated-tag trap (`refs/tags/vX` object vs
 
 ### Docker Base Image Pins
 
-`apps/api/Dockerfile` pins its `node:24-slim` `FROM` lines to a full digest
-(`node:24-slim@sha256:...`), the same principle as Action Pins above applied to
-container images: a mutable tag can change under you without review. Re-resolve
-the digest before bumping it:
+Both `apps/api/Dockerfile` (`node:24-slim`) and `apps/web/Dockerfile`
+(`node:24-alpine`) pin their `FROM` lines to a full digest
+(`node:24-slim@sha256:...` / `node:24-alpine@sha256:...`), the same principle
+as Action Pins above applied to container images: a mutable tag can change
+under you without review. Re-resolve the digest before bumping it:
 
 ```bash
-docker buildx imagetools inspect node:24-slim
+docker buildx imagetools inspect node:24-slim    # or node:24-alpine for apps/web
 ```
 
-and update both `FROM` lines together (`base` and `runner` stages currently
-share one digest). The `docker-image-smoke` CI job scans the built image with
-Trivy, which flags known vulnerabilities in the currently pinned image — it
-does **not** detect that `node:24-slim` has moved to a newer digest upstream.
-Re-resolving the digest is a manual maintainer step (or wire up separate Docker
-base-image update automation, e.g. Dependabot's `docker` ecosystem or Renovate).
-The weekly **Dependency freshness** workflow (see below) does raise a _signal_
-when the pinned digest has drifted from upstream — the bump itself stays manual.
+and update both `FROM` lines in that Dockerfile together (`base` and `runner`
+stages share one digest per image). The `docker-image-smoke` CI job scans the
+built API image with Trivy, which flags known vulnerabilities in the currently
+pinned image — it does **not** detect that the base image has moved to a newer
+digest upstream. Re-resolving the digest is a manual maintainer step (or wire
+up separate Docker base-image update automation, e.g. Dependabot's `docker`
+ecosystem or Renovate). The weekly **Dependency freshness** workflow (see
+below) tracks both Dockerfiles and raises a _signal_ when either pinned digest
+has drifted from upstream — the bump itself stays manual.
 
 ### Local Commit Hooks: Scope and Limits
 
