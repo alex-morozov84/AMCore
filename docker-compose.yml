@@ -16,6 +16,11 @@
 # you don't already run nginx/Traefik/a cloud LB. See deployment.md → "TLS &
 # reverse proxy" → "Optional bundled edge: Caddy".
 #
+# Optional bundled backup/restore (COMPOSE_PROFILES=...,backup for scheduled
+# pg_dump snapshots; `--profile restore run --rm restore <file>` for the
+# one-shot restore). Logical-dump fallback only, NOT point-in-time recovery —
+# see docs/operations/backup-restore.md.
+#
 # Requires Docker Compose v2.20.2+ (depends_on `required:false`,
 # `service_completed_successfully`). Production hardening (sslmode, S3, real JWT
 # secret >= 32 chars) is documented in docs/operations/deployment.md.
@@ -222,8 +227,52 @@ services:
       api:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------------
+  # Optional bundled backup — OPTIONAL, only with COMPOSE_PROFILES=...,backup.
+  # Logical-dump fallback (NOT point-in-time recovery) — see
+  # docs/operations/backup-restore.md.
+  # ---------------------------------------------------------------------------
+  backup:
+    image: postgres:16-alpine
+    profiles: ['backup']
+    entrypoint: ['sh', '/scripts/backup.sh']
+    environment:
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://amcore:amcore@postgres:5432/amcore}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./docker/postgres/backup.sh:/scripts/backup.sh:ro
+      - postgres_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Optional bundled restore — one-shot, like `migrate`; never runs on a normal
+  # `docker compose up`. Requires its own profile AND an explicit `run` so it
+  # cannot fire by accident:
+  #   docker compose --profile restore run --rm restore <dump-filename>
+  # ---------------------------------------------------------------------------
+  restore:
+    image: postgres:16-alpine
+    profiles: ['restore']
+    entrypoint: ['sh', '/scripts/restore.sh']
+    environment:
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://amcore:amcore@postgres:5432/amcore}
+    volumes:
+      - ./docker/postgres/restore.sh:/scripts/restore.sh:ro
+      - postgres_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: 'no'
+
 volumes:
   postgres_data:
   redis_data:
   caddy_data:
   caddy_config:
+  postgres_backups:

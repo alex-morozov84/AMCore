@@ -52,14 +52,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added **optional bundled `backup`/`restore` compose profiles**
+  (`docker/postgres/backup.sh`, `docker/postgres/restore.sh`,
+  `docker-compose.yml`) for the logical-dump fallback described in
+  `docs/operations/backup-restore.md`. `COMPOSE_PROFILES=...,backup` runs a
+  scheduled `pg_dump` (custom format, atomic rename on success) on
+  `postgres:16-alpine` — no third-party backup image — targeting
+  `COMPOSE_DATABASE_URL` if set, else the bundled `postgres` service;
+  `BACKUP_INTERVAL_SECONDS` (default daily) and `BACKUP_RETENTION_DAYS`
+  (default 7, pruned automatically) are configurable. Restore is a one-shot,
+  like `migrate` — it never runs on a normal `docker compose up`; it needs
+  its own `restore` profile _and_ an explicit `run`:
+  `docker compose --profile restore run --rm restore <dump-filename>`
+  (`pg_restore --clean --if-exists --no-owner`). This is a logical dump, not
+  point-in-time recovery — the doc's honesty caveat and the managed/self-hosted
+  PITR guidance are unchanged. `docs/operations/backup-restore.md` also now
+  explains the backup interval is a sleep-based countdown (not a wall-clock
+  cron schedule), where dumps are stored (the `postgres_backups` volume, and
+  how to redirect it for offsite storage), and that logs are Docker logs for
+  the backup service (stdout/stderr only, no separate log file). TLS/
+  reverse-proxy and backup/restore are now listed in the root `README.md`
+  capability table and `AGENTS.md`'s operations pointer, alongside the
+  existing `docs/operations/` guides.
 - Documented **backup & restore** (`docs/operations/backup-restore.md`):
   which strategy fits which deployment (managed-provider PITR as the
   recommended default; self-hosted WAL archiving via pgBackRest/WAL-G for
   real production; a logical-dump fallback for small/self-hosted
-  deployments, with an explicit **dump ≠ PITR** caveat), how the upcoming
-  compose `backup`/`restore` profiles will be used, and what's out of scope
-  (object storage, secret rotation, Redis). Cross-linked from `deployment.md`
-  → "Rollback" and the operations doc map.
+  deployments, with an explicit **dump ≠ PITR** caveat), how the compose
+  `backup`/`restore` profiles are used, and what's out of scope (object
+  storage, secret rotation, Redis). Cross-linked from `deployment.md` →
+  "Rollback" and the operations doc map.
 - Added an **optional bundled Caddy `edge` compose profile**
   (`docker/caddy/Caddyfile`, `docker-compose.yml`) for automatic HTTPS with
   minimal configuration. It **replaces** a reverse proxy — not an addition
