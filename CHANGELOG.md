@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a specific digest instead of a mutable tag, and removed the base image's
   bundled `npm`/`npx` from the runner (unused at runtime; source of an
   unpatched base-image CVE).
+- Pinned the `apps/web` production/runner Docker base image (`node:24-alpine`)
+  to a specific digest instead of a mutable tag, matching `apps/api` (OSSF
+  Scorecard's `Pinned-Dependencies` check had flagged it as unpinned).
+  Extended `scripts/dependency-freshness.mjs`'s Docker digest-drift check to
+  cover both Dockerfiles — it previously only tracked `apps/api`.
 - Patched a transitive dev-only `js-yaml@3.14.2` DoS (CVE-2026-53550 /
   GHSA-h67p-54hq-rp68) pulled in via Jest's coverage tooling, now pinned to the
   patched `3.15.0`.
