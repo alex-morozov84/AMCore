@@ -136,9 +136,10 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - `docs/email/` — email extension contract: `NotificationsService` vs
   `EmailService`, React Email templates, queueing, and secret-link rules.
 - `docs/auth/`, `docs/storage/`, `docs/media/` — feature guides.
-- `docs/operations/` — deployment, observability, webhooks, idempotency,
-  audit-log, **ci-security** (CI gates + repo-security setup); see
-  [`docs/operations/README.md`](docs/operations/README.md) for the index.
+- `docs/operations/` — deployment, TLS/reverse-proxy (nginx or the optional
+  bundled Caddy profile), backup/restore, observability, webhooks,
+  idempotency, audit-log, **ci-security** (CI gates + repo-security setup);
+  see [`docs/operations/README.md`](docs/operations/README.md) for the index.
 
 ## Testing
 

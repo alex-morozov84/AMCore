@@ -20,15 +20,15 @@ brought up to the same quality bar instead of being removed.
 
 ### Backend Starter Capabilities
 
-| Capability        | Status          | Description                                                                                 |
-| ----------------- | --------------- | ------------------------------------------------------------------------------------------- |
-| **Auth & RBAC**   | ✅ Shipped      | Email auth, OAuth/OIDC, sessions, organizations, CASL permissions, admin flows              |
-| **API Keys**      | ✅ Shipped      | Long-lived scoped server-to-server tokens with hashed secrets and org permission checks     |
-| **Storage**       | ✅ Shipped      | S3-compatible, local, and memory drivers with private-by-default uploads and download seams |
-| **Media**         | ✅ Foundational | Safe image derivatives via `sharp`/libvips; avatar upload/delete is the shipped consumer    |
-| **Notifications** | ✅ Shipped      | In-app feed, preferences, durable email + Telegram dispatch, realtime SSE fan-out           |
-| **AI Capability** | ✅ Foundational | Provider-agnostic assistants, runs, tools/approvals, takeover, multimodal inputs            |
-| **Operations**    | ✅ Shipped      | Health, observability, audit log, idempotency, webhooks, CI/security automation             |
+| Capability        | Status          | Description                                                                                                                                                                |
+| ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Auth & RBAC**   | ✅ Shipped      | Email auth, OAuth/OIDC, sessions, organizations, CASL permissions, admin flows                                                                                             |
+| **API Keys**      | ✅ Shipped      | Long-lived scoped server-to-server tokens with hashed secrets and org permission checks                                                                                    |
+| **Storage**       | ✅ Shipped      | S3-compatible, local, and memory drivers with private-by-default uploads and download seams                                                                                |
+| **Media**         | ✅ Foundational | Safe image derivatives via `sharp`/libvips; avatar upload/delete is the shipped consumer                                                                                   |
+| **Notifications** | ✅ Shipped      | In-app feed, preferences, durable email + Telegram dispatch, realtime SSE fan-out                                                                                          |
+| **AI Capability** | ✅ Foundational | Provider-agnostic assistants, runs, tools/approvals, takeover, multimodal inputs                                                                                           |
+| **Operations**    | ✅ Shipped      | Health, observability, audit log, idempotency, webhooks, TLS/reverse-proxy (incl. an optional bundled Caddy edge profile), Postgres backup/restore, CI/security automation |
 
 ### Product Modules
 
@@ -78,20 +78,22 @@ The backend starter includes the core application, security, and operations
 primitives needed for a product-grade API. Production deployment still requires
 adopter-owned infrastructure, secrets, environments, and capacity choices.
 
-| Area                  | Start here                                                                                                                                                   |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| All docs by intent    | [`docs/README.md`](docs/README.md) — the documentation map                                                                                                   |
-| Backend architecture  | [`apps/api/README.md`](apps/api/README.md)                                                                                                                   |
-| Add a backend module  | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md)                                                               |
-| Add an env variable   | [`docs/backend/architecture-and-conventions.md#adding-an-environment-variable`](docs/backend/architecture-and-conventions.md#adding-an-environment-variable) |
-| Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                                                                                          |
-| RBAC / authorization  | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                                                                     |
-| Email                 | [`docs/email/`](docs/email/README.md)                                                                                                                        |
-| Notifications         | [`docs/notifications/`](docs/notifications/README.md)                                                                                                        |
-| AI capability layer   | [`docs/ai/`](docs/ai/README.md)                                                                                                                              |
-| Storage and media     | [`docs/storage/`](docs/storage/README.md), [`docs/media/`](docs/media/README.md)                                                                             |
-| Production operations | [`docs/operations/`](docs/operations/README.md) — deployment, observability, CI security                                                                     |
-| API surface           | Swagger/OpenAPI at `/docs` in development                                                                                                                    |
+| Area                  | Start here                                                                                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All docs by intent    | [`docs/README.md`](docs/README.md) — the documentation map                                                                                                                      |
+| Backend architecture  | [`apps/api/README.md`](apps/api/README.md)                                                                                                                                      |
+| Add a backend module  | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md)                                                                                  |
+| Add an env variable   | [`docs/backend/architecture-and-conventions.md#adding-an-environment-variable`](docs/backend/architecture-and-conventions.md#adding-an-environment-variable)                    |
+| Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                                                                                                             |
+| RBAC / authorization  | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                                                                                        |
+| Email                 | [`docs/email/`](docs/email/README.md)                                                                                                                                           |
+| Notifications         | [`docs/notifications/`](docs/notifications/README.md)                                                                                                                           |
+| AI capability layer   | [`docs/ai/`](docs/ai/README.md)                                                                                                                                                 |
+| Storage and media     | [`docs/storage/`](docs/storage/README.md), [`docs/media/`](docs/media/README.md)                                                                                                |
+| Production operations | [`docs/operations/`](docs/operations/README.md) — deployment, observability, CI security                                                                                        |
+| TLS / reverse proxy   | [`docs/operations/deployment.md`](docs/operations/deployment.md) — bring-your-own proxy (nginx example) or the optional bundled Caddy `edge` compose profile                    |
+| Backup & restore      | [`docs/operations/backup-restore.md`](docs/operations/backup-restore.md) — managed-provider PITR, self-hosted WAL archiving, or the bundled compose `backup`/`restore` profiles |
+| API surface           | Swagger/OpenAPI at `/docs` in development                                                                                                                                       |
 
 Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
 and Vitest for React Email template rendering.

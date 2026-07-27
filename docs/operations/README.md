@@ -12,8 +12,8 @@ specific concern comes up.
   SSE-behind-a-proxy guidance.
 - **[Backup & restore](backup-restore.md)** — which backup strategy fits your
   deployment (managed-provider PITR, self-hosted WAL archiving, or the
-  logical-dump fallback), and the planned optional compose `backup`/
-  `restore` profiles (not yet shipped).
+  logical-dump fallback), and the optional compose `backup`/`restore`
+  profiles this repo ships.
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
   rules, structured logging and redaction, and operator interpretation of the
   key metrics.
