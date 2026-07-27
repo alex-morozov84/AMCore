@@ -50,7 +50,8 @@ apps/api/src/
   web.module.ts           # web process composition
   worker.module.ts        # worker process composition
   app-imports.ts          # shared/web/worker import lists
-  env.ts                  # Zod environment validation
+  env.ts                  # compatibility re-export for @/env imports
+  env/                    # Zod env schema sections, EnvModule, EnvService
   generated/prisma/       # Prisma 7 source-generated client (build artifact)
   core/                   # domain modules and HTTP surfaces
   infrastructure/         # cross-cutting providers and adapters
@@ -129,6 +130,8 @@ See [`docs/operations/observability.md`](../../docs/operations/observability.md)
 - Notifications — [`docs/notifications/`](../../docs/notifications/README.md)
 - AI capability layer — [`docs/ai/`](../../docs/ai/README.md)
 - Storage and media — [`docs/storage/`](../../docs/storage/README.md), [`docs/media/`](../../docs/media/README.md)
-- Deployment and migrations — [`docs/operations/deployment.md`](../../docs/operations/deployment.md)
-- Audit, observability, idempotency, webhooks, CI security — [`docs/operations/`](../../docs/operations/README.md)
+- Deployment, migrations, process roles — [`docs/operations/deployment.md`](../../docs/operations/deployment.md)
+- TLS / reverse proxy / Caddy / `TRUST_PROXY` — [`docs/operations/deployment.md`](../../docs/operations/deployment.md#tls--reverse-proxy)
+- Postgres backup & restore — [`docs/operations/backup-restore.md`](../../docs/operations/backup-restore.md)
+- Audit, observability, idempotency, webhooks, CI/dependency security — [`docs/operations/`](../../docs/operations/README.md)
 - Contributor commands and PR flow — [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
