@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added TLS/reverse-proxy setup and database backup/restore to
+  `docs/README.md`'s "Find the right guide" intent table and its Operations
+  documentation-map entry — the top-level docs map didn't mention either
+  guide even though `docs/operations/deployment.md` and
+  `docs/operations/backup-restore.md` already covered them.
 - Added **optional bundled `backup`/`restore` compose profiles**
   (`docker/postgres/backup.sh`, `docker/postgres/restore.sh`,
   `docker-compose.yml`) for the logical-dump fallback described in

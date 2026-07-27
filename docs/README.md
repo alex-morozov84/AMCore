@@ -22,6 +22,8 @@ does not express.
 | Add an AI provider / tool / assistant / artifact | [`ai/`](ai/README.md)                                                                                                             |
 | Add a storage- or media-backed feature           | [`storage/`](storage/README.md), [`media/`](media/README.md)                                                                      |
 | Deploy, run, or operate the system               | [`operations/`](operations/README.md)                                                                                             |
+| Set up TLS / a reverse proxy                     | [`operations/deployment.md`](operations/deployment.md#tls--reverse-proxy)                                                         |
+| Back up or restore the database                  | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
 | Understand the CI / repo-security workflow       | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
 
 ## Documentation map
@@ -42,7 +44,9 @@ does not express.
 - **[Storage](storage/README.md)** & **[Media](media/README.md)** — the
   cloud-agnostic file layer and the image-derivative layer on top of it.
 - **[Operations](operations/README.md)** — deployment, migrations, process
-  roles, observability, CI/repo security, audit log, webhooks, and idempotency.
+  roles, TLS/reverse-proxy setup (nginx or the optional bundled Caddy
+  profile), Postgres backup/restore, observability, CI/repo security, audit
+  log, webhooks, and idempotency.
 
 ## Common extension tasks
 
