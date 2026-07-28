@@ -9,7 +9,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common'
-import { ApiNoContentResponse, ApiQuery } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
@@ -42,12 +48,15 @@ import { CreateApiKeyResponseDto } from './dto/create-api-key-response.dto'
  * list, or revoke API keys. See `ai/API_KEYS_REVIEW.md` AK-01 and
  * ADR-024 / ADR-034.
  */
+@ApiTags('api-keys')
+@ApiBearerAuth()
 @Auth(AuthType.Bearer)
 @Controller('api-keys')
 export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create an API key for the current user — returns the secret once' })
   @ZodResponse({ type: CreateApiKeyResponseDto, status: 201, description: 'API key created' })
   create(
     @CurrentUser() user: RequestPrincipal,
@@ -57,6 +66,7 @@ export class ApiKeysController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'List API keys owned by the current user' })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -82,6 +92,7 @@ export class ApiKeysController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Revoke an API key owned by the current user' })
   @ApiNoContentResponse({ description: 'API key revoked' })
   revoke(@CurrentUser() user: RequestPrincipal, @Param('id') id: string): Promise<void> {
     return this.apiKeysService.revoke(id, user.sub)
