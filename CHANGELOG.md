@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Documented `TELEGRAM_API_BASE_URL` as a supported relay override for
+  deployment regions where `api.telegram.org` is network-blocked, in
+  `docs/notifications/README.md`'s Telegram channel section and `.env.example`
+  (previously only usable by reading the client source — it was labeled as a
+  test-only knob).
+
 ## [0.2.0] - 2026-07-27
 
 ### Security

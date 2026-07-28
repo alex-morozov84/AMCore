@@ -48,8 +48,9 @@ type BotApiCall = { httpStatus: number; body: BotApiResponse } | 'transport_erro
 
 /**
  * Direct Telegram Bot API client (worker infra, Arc D / D.3). `fetch` + an abort timeout, a
- * **validated base-URL override** (`TELEGRAM_API_BASE_URL`, fake-server-testable), and the
- * `TELEGRAM_BOT_TOKEN`. The token sits in the request path, so the token-bearing URL **never**
+ * **validated base-URL override** (`TELEGRAM_API_BASE_URL` — points at a self-hosted relay
+ * where the public API is blocked, see docs/notifications/README.md; also fake-server-testable),
+ * and the `TELEGRAM_BOT_TOKEN`. The token sits in the request path, so the token-bearing URL **never**
  * appears in a thrown error or log — failures map to bounded codes only. No framework, no
  * `parse_mode`. Classification uses the **HTTP status** (Telegram sets it == `error_code`), so a
  * non-2xx body claiming `ok:true` is never counted as delivered.
