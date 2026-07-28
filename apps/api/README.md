@@ -46,6 +46,7 @@ rollout. See
 ```text
 apps/api/src/
   main.ts                 # bootstrap: HTTP, Swagger, shutdown
+  swagger.config.ts       # shared OpenAPI config for runtime docs + e2e guard
   app.module.ts           # all-in-one composition
   web.module.ts           # web process composition
   worker.module.ts        # worker process composition

@@ -88,9 +88,11 @@ The system supports three ways to authenticate a request:
 | **None**       | No header                               | Public endpoints          |
 
 JWT and API key share the same `Authorization: Bearer` header — the
-server tells them apart by the token format. Most data endpoints accept
-either. Credential and session management routes (`/api-keys/**`,
-`/auth/sessions/**`) require a JWT specifically — see [API Keys](./api-keys.md).
+server tells them apart by the token format. Authenticated routes are
+JWT-only by default; only the explicit API-key allowlist accepts
+`amcore_live_...` credentials. Credential and session management routes
+(`/api-keys/**`, `/auth/sessions/**`) require a JWT specifically — see
+[API Keys](./api-keys.md).
 
 ---
 
