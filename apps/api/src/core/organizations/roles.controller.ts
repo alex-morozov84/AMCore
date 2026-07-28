@@ -15,6 +15,7 @@ import {
   ApiNoContentResponse,
   ApiOperation,
   ApiQuery,
+  ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
@@ -57,6 +58,13 @@ import { RoleService } from './role.service'
  * each handler in this controller individually — adding a new handler
  * also requires an allowlist entry (via ADR amendment) for the
  * metadata test to pass. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
+ *
+ * `@ApiSecurity('apiKeyBearer')` (Swagger-visible counterpart of the
+ * allowlist) is applied per-handler rather than at class level, matching
+ * the convention in `organizations.controller.ts` — `@nestjs/swagger`
+ * concatenates class + method `security` arrays rather than allowing a
+ * method to opt out, so per-handler application is the only pattern that
+ * stays safe if a future handler here ever needs a bearer-only override.
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
@@ -67,6 +75,7 @@ export class RolesController {
 
   @Get()
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'List all roles in the organization — ADMIN only' })
   @ApiQuery({
     name: 'page',
@@ -94,6 +103,7 @@ export class RolesController {
 
   @Post()
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Create a custom role — ADMIN only' })
   @ZodResponse({ type: OrgRoleResponseDto, status: 201, description: 'Role created' })
   createRole(
@@ -106,6 +116,7 @@ export class RolesController {
 
   @Patch(':roleId')
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Update a custom role — ADMIN only' })
   @ZodResponse({ type: OrgRoleResponseDto, status: 200, description: 'Updated role' })
   updateRole(
@@ -120,6 +131,7 @@ export class RolesController {
   @Delete(':roleId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Delete a custom role — ADMIN only (system roles cannot be deleted)' })
   @ApiNoContentResponse({ description: 'Role deleted' })
   deleteRole(
@@ -132,6 +144,7 @@ export class RolesController {
 
   @Post(':roleId/permissions')
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Assign a CASL permission to a custom role — ADMIN only' })
   @ZodResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
   assignPermission(
@@ -146,6 +159,7 @@ export class RolesController {
   @Delete(':roleId/permissions/:permId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Remove a permission from a custom role — ADMIN only' })
   @ApiNoContentResponse({ description: 'Permission removed' })
   removePermission(

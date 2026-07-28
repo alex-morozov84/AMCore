@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Documented AMCore API keys as a second named OpenAPI bearer security scheme
+  (`apiKeyBearer`, `Authorization: Bearer amcore_live_<id>_<secret>`) in the
+  Swagger UI at `/docs`, applied to exactly the ADR-034 allowlisted routes.
+  Previously the API-key credential was accepted by the runtime but entirely
+  invisible in the published API surface. A new e2e guardrail
+  (`apps/api/test/openapi.e2e-spec.ts`) shares the same allowlist as
+  `auth-decorator-coverage.spec.ts` so the two can't drift.
 - Documented `TELEGRAM_API_BASE_URL` as a supported relay override for
   deployment regions where `api.telegram.org` is network-blocked, in
   `docs/notifications/README.md`'s Telegram channel section and `.env.example`

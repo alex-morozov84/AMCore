@@ -1,6 +1,9 @@
-import type { INestApplication } from '@nestjs/common'
-import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
+import { type INestApplication, RequestMethod } from '@nestjs/common'
+import { type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
 import { cleanupOpenApiDoc } from 'nestjs-zod'
+
+import { ADR_034_APIKEY_ALLOWLIST } from '../src/core/auth/decorators/adr-034-api-key-allowlist'
+import { buildSwaggerConfig } from '../src/swagger.config'
 
 import type { E2ETestContext } from './helpers'
 import { setupE2ETest, teardownE2ETest } from './helpers'
@@ -8,18 +11,26 @@ import { setupE2ETest, teardownE2ETest } from './helpers'
 /**
  * Arc C — OpenAPI success-surface completeness (ADR-050).
  *
- * Generates the OpenAPI document the same way `main.ts` does (DocumentBuilder
- * + `cleanupOpenApiDoc`) from the fully-booted AppModule, then asserts the
- * documented success response of every public operation **exactly** matches an
- * explicit expected inventory: the precise success status code and the body
- * kind (typed JSON schema / 204 no-content / 3xx redirect / text). The check
- * runs both ways — every documented operation must be in the inventory and
- * every inventory entry must be documented — so a new handler that ships
- * without a typed `@ZodResponse` (or with the wrong status) fails CI, and a
- * silent status flip (e.g. a `POST` defaulting back to 200) is caught.
+ * Generates the OpenAPI document the same way `main.ts` does (shared
+ * `buildSwaggerConfig()` + `cleanupOpenApiDoc`) from the fully-booted
+ * AppModule, then asserts the documented success response of every public
+ * operation **exactly** matches an explicit expected inventory: the precise
+ * success status code and the body kind (typed JSON schema / 204 no-content /
+ * 3xx redirect / text). The check runs both ways — every documented operation
+ * must be in the inventory and every inventory entry must be documented — so
+ * a new handler that ships without a typed `@ZodResponse` (or with the wrong
+ * status) fails CI, and a silent status flip (e.g. a `POST` defaulting back
+ * to 200) is caught.
  *
  * Terminus health probes (`/health*`) document 200/503 via `@ApiResponse`
  * without a body schema by design and are the one justified exclusion.
+ *
+ * A second guardrail below (`apiKeyBearer` security surface) shares
+ * `ADR_034_APIKEY_ALLOWLIST` with `auth-decorator-coverage.spec.ts` so both
+ * checks read from one list: every allowlisted route must document the
+ * `apiKeyBearer` OpenAPI security scheme, and no other route may (catching
+ * the class-vs-method security metadata leak risk described in
+ * `organizations.controller.ts`'s class doc-comment).
  */
 type BodyKind = 'json' | 'none' | 'redirect' | 'text' | 'stream' | 'binary'
 interface Expected {
@@ -148,12 +159,7 @@ describe('OpenAPI success surface (e2e)', () => {
     context = await setupE2ETest()
     app = context.app
 
-    const config = new DocumentBuilder()
-      .setTitle('AMCore API')
-      .addBearerAuth()
-      .addCookieAuth('refresh_token')
-      .build()
-    document = cleanupOpenApiDoc(SwaggerModule.createDocument(app, config))
+    document = cleanupOpenApiDoc(SwaggerModule.createDocument(app, buildSwaggerConfig()))
   }, 120000)
 
   afterAll(async () => {
@@ -255,6 +261,69 @@ describe('OpenAPI success surface (e2e)', () => {
         case 'redirect':
           // 3xx already asserted by the status match; redirects carry no body.
           break
+      }
+    }
+
+    expect(violations).toEqual([])
+  })
+
+  // Route signature (method + classPath + handlerPath, as declared on the
+  // controller) → OpenAPI path key (`:param` → `{param}`, leading slash).
+  const toOpenApiPathKey = (
+    method: RequestMethod,
+    classPath: string,
+    handlerPath: string
+  ): string => {
+    const joined = [classPath, handlerPath].filter(Boolean).join('/')
+    const path = `/${joined}`.replace(/:([A-Za-z0-9_]+)/g, '{$1}')
+    return `${RequestMethod[method]!.toLowerCase()} ${path}`
+  }
+
+  const securityOf = (key: string): ReadonlyArray<Record<string, string[]>> => {
+    const [method, ...pathParts] = key.split(' ')
+    const path = pathParts.join(' ')
+    const item = document.paths[path] as
+      Record<string, { security?: Array<Record<string, string[]>> }> | undefined
+    return item?.[method!]?.security ?? []
+  }
+
+  it('documents the apiKeyBearer security scheme on exactly the ADR-034 allowlisted operations', () => {
+    // Guards against a dangling security reference: every @ApiSecurity('apiKeyBearer')
+    // reference below is meaningless if the scheme itself isn't registered in
+    // components.securitySchemes (e.g. buildSwaggerConfig() regresses).
+    expect(document.components?.securitySchemes?.['apiKeyBearer']).toBeDefined()
+
+    const allowlistedKeys = new Set(
+      ADR_034_APIKEY_ALLOWLIST.map((entry) =>
+        toOpenApiPathKey(entry.method, entry.classPath, entry.handlerPath)
+      )
+    )
+    const violations: string[] = []
+
+    for (const key of allowlistedKeys) {
+      const security = securityOf(key)
+      const hasApiKeyBearer = security.some((req) => 'apiKeyBearer' in req)
+      if (!hasApiKeyBearer) {
+        violations.push(`${key}: in ADR_034_APIKEY_ALLOWLIST but missing apiKeyBearer security`)
+      }
+    }
+
+    // The inverse direction: no operation outside the allowlist may document
+    // apiKeyBearer — this is the guard against the class-vs-method security
+    // metadata leak described in organizations.controller.ts (a class-level
+    // @ApiSecurity would concatenate onto bearer-only handlers too).
+    for (const [path, item] of Object.entries(document.paths)) {
+      if (isExcluded(path)) continue
+      for (const method of HTTP_METHODS) {
+        const op = (
+          item as Record<string, { security?: Array<Record<string, string[]>> } | undefined>
+        )[method]
+        if (!op) continue
+        const key = `${method} ${path}`
+        const hasApiKeyBearer = (op.security ?? []).some((req) => 'apiKeyBearer' in req)
+        if (hasApiKeyBearer && !allowlistedKeys.has(key)) {
+          violations.push(`${key}: documents apiKeyBearer but is not in ADR_034_APIKEY_ALLOWLIST`)
+        }
       }
     }
 

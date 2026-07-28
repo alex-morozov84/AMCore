@@ -18,6 +18,11 @@ token format:
 Authorization: Bearer {accessToken | amcore_live_...}
 ```
 
+The Swagger UI at `/docs` documents this as two named bearer schemes —
+`bearer` (JWT) and `apiKeyBearer` (`amcore_live_<id>_<secret>`) — rather than
+a separate header, since both credential types ride the same
+`Authorization: Bearer` transport.
+
 | Symbol | Meaning              |
 | ------ | -------------------- |
 | 🔓     | Public — no auth     |
