@@ -101,7 +101,7 @@ and Vitest for React Email template rendering.
 ## Quick Start
 
 ```bash
-# Prerequisites: Node.js 24+, pnpm 11+, Docker (Compose v2.20.2+)
+# Prerequisites: Node.js 24.15+, pnpm 11+, Docker (Compose v2.20.2+)
 
 git clone https://github.com/alex-morozov84/AMCore.git
 cd AMCore
