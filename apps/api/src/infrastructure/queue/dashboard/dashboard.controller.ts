@@ -21,7 +21,7 @@ import { SystemRoles } from '@/core/auth/decorators/system-roles.decorator'
  *   rejects API-key / `x-api-key` machine credentials and requires a valid
  *   `refresh_token` cookie belonging to a `SUPER_ADMIN` user.
  */
-@ApiTags('Admin')
+@ApiTags('admin')
 @ApiBearerAuth()
 @Controller('admin/queues')
 @SystemRoles(SystemRole.SuperAdmin)
