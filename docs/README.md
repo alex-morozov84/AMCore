@@ -12,6 +12,7 @@ does not express.
 | I want to…                                       | Go to                                                                                                                             |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | Add a backend module the AMCore way              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                              |
+| Add a route/page on the frontend the AMCore way  | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                 |
 | Add an environment variable                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
 | Add an external service / infra dependency       | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
 | Configure auth, OAuth, sessions                  | [`auth/`](auth/README.md)                                                                                                         |
@@ -31,6 +32,9 @@ does not express.
 - **[Backend architecture & conventions](backend/architecture-and-conventions.md)** —
   how to add a backend module: Prisma, shared contracts, NestJS wiring, auth,
   process roles, and required tests.
+- **[Frontend architecture & conventions](frontend/architecture-and-conventions.md)** —
+  FSD layer boundaries, route thinness, Server/Client Component defaults,
+  state model, and how the frontend consumes the backend.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
   sessions, OAuth, [RBAC](auth/rbac.md), [API keys](auth/api-keys.md), invites,
   CSRF, and the [auth contracts reference](auth/reference.md).
@@ -54,6 +58,7 @@ Each links to the "how to add X" section in its guide — the instructions live
 there, not here.
 
 - Add a backend module → [Backend architecture & conventions](backend/architecture-and-conventions.md)
+- Add a route/page → [Frontend architecture & conventions · The recipe](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)
 - Add an environment variable → [Backend architecture & conventions · Adding an environment variable](backend/architecture-and-conventions.md#adding-an-environment-variable)
 - Add an external service / infra dependency → [Backend architecture & conventions · Adding an external service / infra dependency](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency)
 - Add an OAuth provider → [Auth · OAuth](auth/oauth.md#adding-a-new-provider)
