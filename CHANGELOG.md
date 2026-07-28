@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Documented the avatar upload (`POST /auth/me/avatar`) and AI artifact upload
+  (`POST /ai/conversations/{id}/artifacts`) endpoints as `multipart/form-data`
+  in Swagger, with a binary `file` field — the Swagger UI "Try it out" panel
+  previously had no way to attach a file for either endpoint.
 - Documented the API-key management endpoints (`POST/GET/DELETE /api-keys`) in
   Swagger with a proper `api-keys` tag and per-operation summaries — they were
   previously present in `/docs` with no grouping or descriptions at all.
