@@ -93,7 +93,7 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | Production operations | [`docs/operations/`](docs/operations/README.md) — deployment, observability, CI security                                                                                        |
 | TLS / reverse proxy   | [`docs/operations/deployment.md`](docs/operations/deployment.md) — bring-your-own proxy (nginx example) or the optional bundled Caddy `edge` compose profile                    |
 | Backup & restore      | [`docs/operations/backup-restore.md`](docs/operations/backup-restore.md) — managed-provider PITR, self-hosted WAL archiving, or the bundled compose `backup`/`restore` profiles |
-| API surface           | Swagger/OpenAPI at `/docs` in development                                                                                                                                       |
+| API surface           | Swagger/OpenAPI at `/docs` in development, including JWT/API-key bearer schemes, multipart uploads, and CI-guarded success-response inventory                                   |
 
 Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
 and Vitest for React Email template rendering.

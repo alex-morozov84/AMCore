@@ -94,6 +94,16 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   changes under `CHANGELOG.md` → `[Unreleased]`; ordinary PRs do not create or
   change release tags. See `CONTRIBUTING.md` → _Changelog & releases_ for the
   release procedure.
+- **OpenAPI is public documentation.** For any `apps/api` controller, auth,
+  request/response DTO, upload, or route-contract change, update Swagger
+  metadata in the same PR: `@ApiTags`, `@ApiOperation`, auth decorators
+  (`@ApiBearerAuth`, `@ApiSecurity('apiKeyBearer')` where ADR-034 allows API
+  keys), success/error responses, params/queries, and multipart
+  `@ApiConsumes`/`@ApiBody` as applicable. Keep
+  `apps/api/test/openapi.e2e-spec.ts` in sync: add new public handlers to the
+  success inventory and extend/adjust OpenAPI guardrails when changing security
+  schemes or upload request bodies. Do not treat Markdown docs as a substitute
+  for `/docs`.
 - First-time setup of `strict` repo protections (they do not travel with a
   fork): `bash scripts/setup-repo-security.sh` — see
   `docs/operations/ci-security.md` → _Strict security setup after forking_. The

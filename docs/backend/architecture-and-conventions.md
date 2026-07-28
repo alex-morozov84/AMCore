@@ -122,13 +122,16 @@ pnpm --filter @amcore/shared build
   to the shared contract (pattern: `api-keys.service.ts` → `findAllForUser` maps
   `keys.map((k) => ({ ... }))` into `ApiKeyListResponse`).
 
-- **Controller** — declare the accepted auth types and a **typed success response**
-  on every public handler:
+- **Controller** — declare the accepted auth types, matching Swagger auth metadata,
+  and a **typed success response** on every public handler:
 
   ```ts
+  @ApiTags('things')
+  @ApiBearerAuth()
   @Auth(AuthType.Bearer)
   @Controller('things')
   export class ThingsController {
+    @ApiOperation({ summary: 'Create a thing' })
     @Post()
     @ZodResponse({ type: ThingResponseDto, status: 201, description: 'Thing created' })
     create(@CurrentUser() user: RequestPrincipal, @Body() dto: CreateThingDto) {
@@ -150,6 +153,14 @@ session) is the default credential; allow API keys only on handlers that should
 accept them, and never for credential management or other high-risk operations. For
 role/permission checks and adding your own CASL subjects, follow
 [`docs/auth/rbac.md`](../auth/rbac.md) — don't reinvent it.
+
+If a handler accepts API keys, add it to the ADR-034 allowlist
+(`apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts`) and document
+the operation with `@ApiSecurity('apiKeyBearer')` at the **handler level**. Do
+not put `apiKeyBearer` on the controller class: `@nestjs/swagger` concatenates
+class and method security metadata, so class-level API-key metadata leaks onto
+bearer-only handler overrides. The OpenAPI e2e test checks this allowlist in
+both directions.
 
 ### 5. Register in the correct process role
 
@@ -262,6 +273,11 @@ Cover the critical paths and the project-specific gates:
   inventory in [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts).
   The check runs both ways: a handler that ships without a typed `@ZodResponse` (or
   with the wrong status) **fails CI**.
+- **OpenAPI security/multipart guardrails** — API-key-capable handlers must match
+  the shared ADR-034 allowlist and document `apiKeyBearer`; upload handlers that
+  use `FileInterceptor('file', ...)` must document `multipart/form-data` with a
+  binary `file` request body. Both are asserted in
+  [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts).
 - **Process-role gating** — if you added a processor or cron, assert it runs only in
   the right role, as in
   [`apps/api/test/process-role.e2e-spec.ts`](../../apps/api/test/process-role.e2e-spec.ts).

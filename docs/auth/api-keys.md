@@ -142,9 +142,11 @@ The allowlist:
 > reads cannot slip through function-level policies.
 
 Adding API-key acceptance to a new route requires updating the internally
-recorded bearer-only auth decision plus a matching entry in
-`apps/api/src/core/auth/decorators/auth-decorator-coverage.spec.ts`; the metadata
-test fails until both agree.
+recorded bearer-only auth decision plus a matching entry in the shared
+ADR-034 allowlist
+(`apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts`). The auth
+metadata test and the OpenAPI e2e guard both consume that list, so a new
+API-key route fails CI until runtime auth and Swagger security metadata agree.
 
 ---
 
