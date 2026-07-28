@@ -18,6 +18,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express'
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCookieAuth,
   ApiNoContentResponse,
   ApiOperation,
@@ -263,6 +265,14 @@ export class AuthController {
     })
   )
   @ApiOperation({ summary: 'Upload current user avatar' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+      required: ['file'],
+    },
+  })
   @ZodResponse({ type: AvatarResponseDto, status: 201, description: 'Avatar stored' })
   async uploadAvatar(
     @CurrentUser('sub') userId: string,

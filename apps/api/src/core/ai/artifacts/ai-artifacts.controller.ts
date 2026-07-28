@@ -12,6 +12,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express'
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
@@ -63,6 +65,14 @@ export class AiArtifactsController {
     FileInterceptor('file', { limits: { fileSize: AI_ARTIFACT_UPLOAD_HARD_LIMIT_BYTES } })
   )
   @ApiOperation({ summary: 'Upload an image/PDF artifact into an owned AI conversation' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+      required: ['file'],
+    },
+  })
   @ZodResponse({ type: AiArtifactResponseDto, status: 201, description: 'Artifact stored' })
   uploadArtifact(
     @CurrentUser('sub') userId: string,

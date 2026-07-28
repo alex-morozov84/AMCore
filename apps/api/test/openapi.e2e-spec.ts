@@ -329,4 +329,37 @@ describe('OpenAPI success surface (e2e)', () => {
 
     expect(violations).toEqual([])
   })
+
+  it('documents a multipart/form-data request body with a binary file field for both upload operations', () => {
+    const MULTIPART_UPLOADS = [
+      'post /auth/me/avatar',
+      'post /ai/conversations/{id}/artifacts',
+    ] as const
+
+    interface RequestBodyLike {
+      content?: Record<string, { schema?: { properties?: Record<string, { format?: string }> } }>
+    }
+
+    const violations: string[] = []
+
+    for (const key of MULTIPART_UPLOADS) {
+      const [method, ...pathParts] = key.split(' ')
+      const path = pathParts.join(' ')
+      const item = document.paths[path] as
+        Record<string, { requestBody?: RequestBodyLike } | undefined> | undefined
+      const op = item?.[method!]
+      const multipart = op?.requestBody?.content?.['multipart/form-data']
+      if (!multipart) {
+        violations.push(`${key}: no multipart/form-data request body documented`)
+        continue
+      }
+      if (multipart.schema?.properties?.['file']?.format !== 'binary') {
+        violations.push(
+          `${key}: multipart body's "file" property is not documented as format: binary`
+        )
+      }
+    }
+
+    expect(violations).toEqual([])
+  })
 })
