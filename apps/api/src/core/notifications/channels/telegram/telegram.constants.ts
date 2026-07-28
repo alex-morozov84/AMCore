@@ -44,7 +44,11 @@ export const TELEGRAM_REQUEST_TIMEOUT_MS = 8000
 /** Defensive ceiling on a Bot API response body (responses are normally < 4KB). */
 export const TELEGRAM_MAX_RESPONSE_BYTES = 64 * 1024
 
-/** Default public Bot API base URL (overridable for the fake-server e2e). */
+/**
+ * Default public Bot API base URL. Overridable via `TELEGRAM_API_BASE_URL` — to
+ * route through a self-hosted relay where the public API is blocked (see
+ * docs/notifications/README.md → "Telegram relay") or for the fake-server e2e.
+ */
 export const DEFAULT_TELEGRAM_API_BASE_URL = 'https://api.telegram.org'
 
 /** One-time deep-link token lifetime (mirrors the password-reset window). */

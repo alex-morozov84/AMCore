@@ -10,8 +10,9 @@ import { optionalEnvString, optionalEnvUrl, optionalTelegramUsername } from './h
 export const telegramEnv = z.object({
   TELEGRAM_BOT_TOKEN: optionalEnvString(),
   TELEGRAM_CALLBACK_URL: optionalEnvUrl(),
-  // Username builds the deep link; the API base URL is overridable for the
-  // fake-server e2e (default = the public Bot API).
+  // Username builds the deep link; the API base URL is overridable to route through
+  // a self-hosted relay where the public API is blocked (docs/notifications/README.md
+  // -> "Telegram relay"), or for the fake-server e2e (default = the public Bot API).
   TELEGRAM_BOT_USERNAME: optionalTelegramUsername(),
   TELEGRAM_API_BASE_URL: z.url().default(DEFAULT_TELEGRAM_API_BASE_URL),
   // Public URL of the `/webhooks/telegram` endpoint, used only by the `telegram:setup`

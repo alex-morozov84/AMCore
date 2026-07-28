@@ -208,6 +208,24 @@ error (`403` / chat-not-found) → terminal `FAILED` and the connection is fence
 `BLOCKED` (user must relink); a `429 retry_after` is honored as a retry floor. No
 chat/user id, provider text, or token ever appears in an attempt or log.
 
+**Telegram relay (blocked regions).** Telegram's Bot API (`api.telegram.org`) is
+blocked at the network level in some deployment regions, independent of the bot
+token or account. `TELEGRAM_API_BASE_URL` (see `.env.example`) overrides the Bot
+API origin the API server calls — set it to a relay you run instead of the
+default public API. Every request the client makes is built as
+`<TELEGRAM_API_BASE_URL>/bot<token>/<method>`
+([`telegram-bot-api.client.ts`](../../apps/api/src/core/notifications/channels/telegram/telegram-bot-api.client.ts)),
+and the `telegram:setup` CLI's `setWebhook` call honors the same override, so
+both outbound sends and webhook registration go through the relay consistently.
+The relay itself is just a reverse proxy that forwards `/bot*` requests
+unmodified to the real `https://api.telegram.org` (nginx/Caddy or similar) —
+AMCore doesn't ship one.
+
+**Only point this at infrastructure you control.** The bot token travels in the
+URL path of every request, so whoever terminates TLS on the relay gets full
+control of the bot (read/send messages, change the webhook). Never point it at
+a third-party or public Bot API mirror.
+
 ## Preferences & mandatory channels
 
 Resolving which channels deliver a notification is **top wins**:
