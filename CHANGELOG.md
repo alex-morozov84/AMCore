@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (previously only usable by reading the client source — it was labeled as a
   test-only knob).
 
+### Fixed
+
+- Unified the Bull Board dashboard's Swagger tag from `Admin` to `admin`,
+  matching the casing already used by every other admin-surface controller —
+  previously the Swagger UI sidebar showed two separate groups for what is
+  conceptually one area.
+
 ## [0.2.0] - 2026-07-27
 
 ### Security
