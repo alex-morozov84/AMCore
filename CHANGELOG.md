@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Documented the frontend architecture contract for `apps/web`: FSD layer
+  boundaries on top of Next.js App Router, route-thinness rules, Server/Client
+  Component defaults, the server-state-vs-client-state split, and how the
+  frontend consumes the backend — `docs/frontend/` (new).
 - Documented the avatar upload (`POST /auth/me/avatar`) and AI artifact upload
   (`POST /ai/conversations/{id}/artifacts`) endpoints as `multipart/form-data`
   in Swagger, with a binary `file` field — the Swagger UI "Try it out" panel

@@ -124,9 +124,15 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `docs/backend/architecture-and-conventions.md` → _Adding an environment variable_.
 - **Redis caching** for frequently-read entities (cache-aside + tag invalidation +
   distributed lock); pattern in `apps/api/src/core/auth/user-cache.service.ts`.
-- **Frontend (web):** Feature-Sliced Design; import from public APIs only
-  (`@/shared/ui`, not `@/shared/ui/button`). Colors via variables
-  (`bg-accent`, `text-foreground`) — never `bg-[#hex]`.
+- **Frontend (web):** Feature-Sliced Design on Next.js App Router — `app/` is
+  Next routing plumbing only (thin), page composition lives in `_pages/`
+  (current tree: `views/`, pending migration to the target layer name),
+  `widgets`/`features`/`entities`/`shared` keep canonical FSD meanings.
+  Import a slice through its public API only (`@/shared/ui`, not
+  `@/shared/ui/button`). Server Components by default; push `'use client'` to
+  the interactive leaf. TanStack Query for server state, Zustand for local
+  client state. Colors via variables (`bg-accent`, `text-foreground`) — never
+  `bg-[#hex]`. Full contract: `docs/frontend/architecture-and-conventions.md`.
 - **CI dependencies are pinned:** every workflow `uses:` pins a full commit SHA
   (resolve annotated tags via `git ls-remote <repo> <tag> '<tag>^{}'` and use the
   `^{}` commit); CLI tools pin version + sha256. `scripts/verify-action-pins.sh`

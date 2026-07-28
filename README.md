@@ -83,6 +83,7 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | All docs by intent    | [`docs/README.md`](docs/README.md) — the documentation map                                                                                                                      |
 | Backend architecture  | [`apps/api/README.md`](apps/api/README.md)                                                                                                                                      |
 | Add a backend module  | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md)                                                                                  |
+| Frontend architecture | [`docs/frontend/architecture-and-conventions.md`](docs/frontend/architecture-and-conventions.md)                                                                                |
 | Add an env variable   | [`docs/backend/architecture-and-conventions.md#adding-an-environment-variable`](docs/backend/architecture-and-conventions.md#adding-an-environment-variable)                    |
 | Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                                                                                                             |
 | RBAC / authorization  | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                                                                                        |
