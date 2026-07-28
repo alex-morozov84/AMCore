@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Documented the API-key management endpoints (`POST/GET/DELETE /api-keys`) in
+  Swagger with a proper `api-keys` tag and per-operation summaries — they were
+  previously present in `/docs` with no grouping or descriptions at all.
 - Documented AMCore API keys as a second named OpenAPI bearer security scheme
   (`apiKeyBearer`, `Authorization: Bearer amcore_live_<id>_<secret>`) in the
   Swagger UI at `/docs`, applied to exactly the ADR-034 allowlisted routes.
