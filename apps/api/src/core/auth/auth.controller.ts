@@ -22,6 +22,7 @@ import {
   ApiNoContentResponse,
   ApiOperation,
   ApiQuery,
+  ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
@@ -221,6 +222,7 @@ export class AuthController {
   @Get('me')
   @Auth(AuthType.Bearer, AuthType.ApiKey)
   @ApiBearerAuth()
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Get current user profile' })
   @ZodResponse({ type: ProfileResponseDto, status: 200, description: 'Current user profile' })
   async me(@CurrentUser() user: RequestPrincipal): Promise<ProfileResponse> {

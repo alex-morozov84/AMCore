@@ -15,6 +15,7 @@ import {
   ApiNoContentResponse,
   ApiOperation,
   ApiQuery,
+  ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
@@ -60,6 +61,14 @@ import { OrganizationsService } from './organizations.service'
  * handler added here inherits the class annotation but must also be
  * added to the allowlist (via ADR amendment) for the metadata test to
  * pass. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
+ *
+ * `@ApiSecurity('apiKeyBearer')` (the Swagger-visible counterpart of the
+ * ADR-034 allowlist) is applied per-handler, never at class level:
+ * `@nestjs/swagger` concatenates class- and method-level `security`
+ * arrays rather than letting a method override the class, so a
+ * class-level `@ApiSecurity` would incorrectly leak onto `create`,
+ * `findAll`, and `switchOrganization` below despite their handler-level
+ * `@Auth(AuthType.Bearer)` override.
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
@@ -141,6 +150,7 @@ export class OrganizationsController {
    * service so the rule sits next to the business logic.
    */
   @Get(':id')
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Get organization details (must be a member)' })
   @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Organization details' })
   findOne(
@@ -153,6 +163,7 @@ export class OrganizationsController {
 
   @Patch(':id')
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Update organization — ADMIN only, requires org context in JWT' })
   @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Updated organization' })
   update(
@@ -166,6 +177,7 @@ export class OrganizationsController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Delete organization — ADMIN only, requires org context in JWT' })
   @ApiNoContentResponse({ description: 'Organization deleted' })
   remove(@Param('id') id: string, @CurrentUser() principal: RequestPrincipal): Promise<void> {

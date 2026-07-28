@@ -1,5 +1,11 @@
 import { Body, Controller, Delete, HttpCode, HttpStatus, Param, Post } from '@nestjs/common'
-import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
@@ -35,6 +41,13 @@ import { MemberService } from './member.service'
  * each handler in this controller individually — adding a new handler
  * also requires an allowlist entry (via ADR amendment) for the
  * metadata test to pass. See OA-11.
+ *
+ * `@ApiSecurity('apiKeyBearer')` (Swagger-visible counterpart of the
+ * allowlist) is applied per-handler rather than at class level, matching
+ * the convention in `organizations.controller.ts` — `@nestjs/swagger`
+ * concatenates class + method `security` arrays rather than allowing a
+ * method to opt out, so per-handler application is the only pattern that
+ * stays safe if a future handler here ever needs a bearer-only override.
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
@@ -48,6 +61,7 @@ export class MembersController {
 
   @Post('invite')
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ZodResponse({
     type: InviteResponseDto,
     status: 202,
@@ -73,6 +87,7 @@ export class MembersController {
   @Delete(':userId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Remove a member from the organization — ADMIN only' })
   @ApiNoContentResponse({ description: 'Member removed' })
   removeMember(
@@ -86,6 +101,7 @@ export class MembersController {
   @Post(':userId/roles/:roleId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Assign a role to a member — ADMIN only' })
   @ApiNoContentResponse({ description: 'Role assigned' })
   assignRole(
@@ -100,6 +116,7 @@ export class MembersController {
   @Delete(':userId/roles/:roleId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Remove a role from a member — ADMIN only' })
   @ApiNoContentResponse({ description: 'Role removed' })
   removeRole(

@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core'
 import type { NestExpressApplication } from '@nestjs/platform-express'
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import { SwaggerModule } from '@nestjs/swagger'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import { Logger } from 'nestjs-pino'
@@ -10,6 +10,7 @@ import { AppModule } from './app.module'
 import { configureBodyParser } from './bootstrap/configure-body-parser'
 import { EnvService } from './env/env.service'
 import { ShutdownService } from './shutdown.service'
+import { buildSwaggerConfig } from './swagger.config'
 import { WebModule } from './web.module'
 import { WorkerModule } from './worker.module'
 
@@ -79,15 +80,7 @@ async function bootstrap(): Promise<void> {
 
   // Swagger - only in development, and never on the worker (health-only surface)
   if (!isProduction && !isWorker) {
-    const config = new DocumentBuilder()
-      .setTitle('AMCore API')
-      .setDescription('AMCore API documentation')
-      .setVersion('0.0.1')
-      .addBearerAuth()
-      .addCookieAuth('refresh_token')
-      .build()
-
-    const document = SwaggerModule.createDocument(app, config)
+    const document = SwaggerModule.createDocument(app, buildSwaggerConfig())
     SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document))
   }
 
