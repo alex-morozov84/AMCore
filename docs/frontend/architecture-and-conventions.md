@@ -158,11 +158,14 @@ architectural structure.
 
 ## See also
 
+- [Brand, theme, and design tokens](./brand-theme-and-tokens.md) — token
+  architecture, light/dark/system modes, the no-flash mechanism, and the
+  downstream rebrand checklist.
 - [Backend architecture & conventions](../backend/architecture-and-conventions.md) —
   the equivalent contract for `apps/api`.
 - `AGENTS.md` → Code conventions — the condensed cross-tool version of the
   rules on this page.
 - Later frontend/admin starter tracks add their own guide here as they land:
-  brand/theme tokens, i18n and error localization, FSD lint guardrails,
-  shared UI/shadcn baseline, API client/auth/query patterns, the testing
-  pyramid, and Storybook.
+  i18n and error localization, FSD lint guardrails, shared UI/shadcn
+  baseline, API client/auth/query patterns, the testing pyramid, and
+  Storybook.

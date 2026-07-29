@@ -17,7 +17,7 @@ export function LoginPage() {
         <LoginForm />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Нет аккаунта?{' '}
-          <Link href="/register" className="text-accent hover:underline">
+          <Link href="/register" className="text-primary hover:underline">
             {t('register')}
           </Link>
         </p>
