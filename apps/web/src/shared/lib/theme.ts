@@ -75,6 +75,34 @@ export function getSystemPrefersDark(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+// Characters that are unsafe to embed verbatim inside an inline <script>
+// tag, mapped to their \uXXXX escape. Built from charCodes (not literal
+// source characters) so nothing invisible/ambiguous ever sits in this file.
+const UNSAFE_INLINE_SCRIPT_CHARS: Record<string, string> = {
+  '<': '\\u003C',
+  '>': '\\u003E',
+  [String.fromCharCode(0x2028)]: '\\u2028',
+  [String.fromCharCode(0x2029)]: '\\u2029',
+}
+
+/**
+ * Escapes a JSON string for safe embedding inside an inline `<script>` tag.
+ * `JSON.stringify` alone does not escape `<`, `>`, or the JS line-separator
+ * characters — a value containing `</script>` would prematurely close the
+ * surrounding tag when parsed as HTML (CWE-79/94/116), and an unescaped
+ * U+2028/U+2029 is a syntax error in some JS engines. `THEME_STORAGE_KEY`
+ * and `DEFAULT_THEME_SETTING` are hardcoded constants today and can't
+ * contain either, but escaping here means that stays true even if a future
+ * change makes either value configurable.
+ */
+export function escapeForInlineScript(json: string): string {
+  let result = ''
+  for (const char of json) {
+    result += UNSAFE_INLINE_SCRIPT_CHARS[char] ?? char
+  }
+  return result
+}
+
 /**
  * Vanilla-JS source for the pre-hydration `<Script>` (see app/layout.tsx).
  * Runs before React, so it can't import this module — it's generated from
@@ -82,5 +110,7 @@ export function getSystemPrefersDark(): boolean {
  * from the TypeScript helpers above.
  */
 export function getThemeInitScript(): string {
-  return `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var s=localStorage.getItem(k);var setting=(s==='light'||s==='dark'||s==='system')?s:${JSON.stringify(DEFAULT_THEME_SETTING)};var dark=setting==='dark'||(setting==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.style.colorScheme=dark?'dark':'light'}catch(e){}})()`
+  const storageKey = escapeForInlineScript(JSON.stringify(THEME_STORAGE_KEY))
+  const defaultSetting = escapeForInlineScript(JSON.stringify(DEFAULT_THEME_SETTING))
+  return `(function(){try{var k=${storageKey};var s=localStorage.getItem(k);var setting=(s==='light'||s==='dark'||s==='system')?s:${defaultSetting};var dark=setting==='dark'||(setting==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.style.colorScheme=dark?'dark':'light'}catch(e){}})()`
 }

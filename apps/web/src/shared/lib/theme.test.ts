@@ -8,6 +8,7 @@ import { contrastRatio, WCAG_AA_NORMAL_TEXT } from './contrast'
 import {
   applyTheme,
   DEFAULT_THEME_SETTING,
+  escapeForInlineScript,
   getThemeInitScript,
   isThemeSetting,
   readStoredThemeSetting,
@@ -123,6 +124,40 @@ describe('storage failure resilience', () => {
     expect(callback).not.toHaveBeenCalled()
 
     unsubscribe()
+  })
+})
+
+describe('escapeForInlineScript', () => {
+  // CodeQL js/bad-code-sanitization (CWE-79/94/116): a raw `</script>`
+  // inside a JSON-stringified value embedded in an inline <script> tag
+  // would prematurely close the tag. Built from charCodes, not literal
+  // source characters, so this test file itself can't hide the same
+  // invisible-character mistake the fix was guarding against.
+  const lt = String.fromCharCode(0x3c) // '<'
+  const gt = String.fromCharCode(0x3e) // '>'
+  const lineSeparator = String.fromCharCode(0x2028)
+  const paragraphSeparator = String.fromCharCode(0x2029)
+
+  it('escapes a </script>-breakout attempt', () => {
+    const malicious = JSON.stringify(`${lt}/script${gt}alert(1)${lt}script${gt}`)
+
+    const escaped = escapeForInlineScript(malicious)
+
+    expect(escaped).not.toContain(lt)
+    expect(escaped).not.toContain(gt)
+    expect(escaped).toContain('\\u003C/script\\u003E')
+  })
+
+  it('escapes JS line-separator characters', () => {
+    const escaped = escapeForInlineScript(`${lineSeparator}${paragraphSeparator}`)
+
+    expect(escaped).toBe('\\u2028\\u2029')
+  })
+
+  it('leaves ordinary characters untouched', () => {
+    const json = JSON.stringify('amcore-theme')
+
+    expect(escapeForInlineScript(json)).toBe(json)
   })
 })
 
