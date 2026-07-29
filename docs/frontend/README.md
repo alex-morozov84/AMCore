@@ -10,11 +10,12 @@ guessing.
 | Topic                                                           | What it covers                                                                                                                 |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | [Architecture & conventions](./architecture-and-conventions.md) | FSD layer boundaries, route thinness, Server/Client Component defaults, state model, and how the frontend consumes the backend |
+| [Brand, theme, and design tokens](./brand-theme-and-tokens.md)  | Token architecture, light/dark/system modes, the no-flash mechanism, brand assets, and the downstream rebrand checklist        |
 
 More guides land here as later frontend/admin starter tracks complete
-(branding/theme, i18n, FSD lint guardrails, shared UI, API client patterns,
-testing, Storybook) — see `architecture-and-conventions.md`'s "See also"
-section for the current set.
+(i18n, FSD lint guardrails, shared UI, API client patterns, testing,
+Storybook) — see `architecture-and-conventions.md`'s "See also" section for
+the current set.
 
 ## Start here
 
@@ -22,3 +23,5 @@ section for the current set.
 - Backend endpoint shapes (paths, request/response bodies, status codes) →
   the Swagger/OpenAPI document at `/docs` in development, not this guide —
   see [Architecture & conventions § Relationship to backend/OpenAPI docs](./architecture-and-conventions.md#relationship-to-backendopenapi-docs)
+- Rebranding a downstream fork (logo, PWA icons, tokens, theme mode) →
+  [Brand, theme, and design tokens § Downstream rebrand checklist](./brand-theme-and-tokens.md#downstream-rebrand-checklist)

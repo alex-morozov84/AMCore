@@ -132,7 +132,10 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `@/shared/ui/button`). Server Components by default; push `'use client'` to
   the interactive leaf. TanStack Query for server state, Zustand for local
   client state. Colors via variables (`bg-accent`, `text-foreground`) — never
-  `bg-[#hex]`. Full contract: `docs/frontend/architecture-and-conventions.md`.
+  `bg-[#hex]`. Theme defaults to `system` (light/dark), owned by
+  `shared/lib/theme.ts` — no `next-themes` dependency. Full contract:
+  `docs/frontend/architecture-and-conventions.md`,
+  `docs/frontend/brand-theme-and-tokens.md`.
 - **CI dependencies are pinned:** every workflow `uses:` pins a full commit SHA
   (resolve annotated tags via `git ls-remote <repo> <tag> '<tag>^{}'` and use the
   `^{}` commit); CLI tools pin version + sha256. `scripts/verify-action-pins.sh`

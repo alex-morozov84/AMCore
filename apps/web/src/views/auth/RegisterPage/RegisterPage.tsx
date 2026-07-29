@@ -17,7 +17,7 @@ export function RegisterPage() {
         <RegisterForm />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Уже есть аккаунт?{' '}
-          <Link href="/login" className="text-accent hover:underline">
+          <Link href="/login" className="text-primary hover:underline">
             {t('login')}
           </Link>
         </p>

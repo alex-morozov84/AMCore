@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Implemented a working light/dark/system theme for `apps/web`, with a
+  neutral default token palette and no-flash pre-hydration script — the
+  previous theme toggle existed in the Zustand UI store but was never
+  wired to the DOM, so the app always rendered a hardcoded dark-violet
+  palette regardless of the stored preference. `system` is now the
+  default, resolved via a small AMCore-owned module
+  (`shared/lib/theme.ts` + `ThemeProvider`) rather than the `next-themes`
+  dependency. Added `docs/frontend/brand-theme-and-tokens.md`: token
+  architecture, the downstream rebrand checklist, and contrast
+  expectations (enforced by a new dependency-free WCAG AA test that reads
+  the actual `globals.css` values).
+- Generated real PWA manifest icons (`icon-192x192.png`,
+  `icon-512x512.png`, `icon-512x512-maskable.png`) from the existing AM
+  brand mark — `manifest.ts` previously referenced icon files that didn't
+  exist, so the install prompt/splash screen 404'd. The AM logo itself is
+  unchanged; only the manifest's leftover personal-product description
+  and hardcoded dark-violet colors were replaced with neutral
+  starter-appropriate values.
 - Documented the frontend architecture contract for `apps/web`: FSD layer
   boundaries on top of Next.js App Router, route-thinness rules, Server/Client
   Component defaults, the server-state-vs-client-state split, and how the

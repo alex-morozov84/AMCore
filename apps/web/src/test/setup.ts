@@ -21,3 +21,22 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(),
 }))
+
+// jsdom doesn't implement matchMedia — needed by shared/lib/theme.ts and
+// ThemeProvider (system-preference detection). Defaults to "no preference
+// matched"; override per-test with window.matchMedia mockImplementationOnce
+// where a test needs prefers-color-scheme: dark to be true.
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  configurable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+})
