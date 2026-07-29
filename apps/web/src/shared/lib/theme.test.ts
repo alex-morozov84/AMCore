@@ -154,6 +154,12 @@ describe('escapeForInlineScript', () => {
     expect(escaped).toBe('\\u2028\\u2029')
   })
 
+  it('escapes control characters that CodeQL treats as unsafe in inline script source', () => {
+    const escaped = escapeForInlineScript('\b\f\n\r\t\0')
+
+    expect(escaped).toBe('\\b\\f\\n\\r\\t\\0')
+  })
+
   it('leaves ordinary characters untouched', () => {
     const json = JSON.stringify('amcore-theme')
 

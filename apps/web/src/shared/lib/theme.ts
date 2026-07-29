@@ -75,12 +75,21 @@ export function getSystemPrefersDark(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+// CodeQL js/bad-code-sanitization recognizes this String#replace shape as a
+// sanitizer for JSON.stringify(...) values embedded in inline script source.
+const UNSAFE_INLINE_SCRIPT_PATTERN = /[<>\b\f\n\r\t\0\u2028\u2029]/g
+
 // Characters that are unsafe to embed verbatim inside an inline <script>
-// tag, mapped to their \uXXXX escape. Built from charCodes (not literal
-// source characters) so nothing invisible/ambiguous ever sits in this file.
+// tag, mapped to their JS escape.
 const UNSAFE_INLINE_SCRIPT_CHARS: Record<string, string> = {
   '<': '\\u003C',
   '>': '\\u003E',
+  [String.fromCharCode(0x00)]: '\\0',
+  [String.fromCharCode(0x08)]: '\\b',
+  [String.fromCharCode(0x09)]: '\\t',
+  [String.fromCharCode(0x0a)]: '\\n',
+  [String.fromCharCode(0x0c)]: '\\f',
+  [String.fromCharCode(0x0d)]: '\\r',
   [String.fromCharCode(0x2028)]: '\\u2028',
   [String.fromCharCode(0x2029)]: '\\u2029',
 }
@@ -96,11 +105,7 @@ const UNSAFE_INLINE_SCRIPT_CHARS: Record<string, string> = {
  * change makes either value configurable.
  */
 export function escapeForInlineScript(json: string): string {
-  let result = ''
-  for (const char of json) {
-    result += UNSAFE_INLINE_SCRIPT_CHARS[char] ?? char
-  }
-  return result
+  return json.replace(UNSAFE_INLINE_SCRIPT_PATTERN, (char) => UNSAFE_INLINE_SCRIPT_CHARS[char])
 }
 
 /**
