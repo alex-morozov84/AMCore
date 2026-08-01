@@ -1,4 +1,36 @@
 {
+  "errors": {
+    "EMAIL_ALREADY_EXISTS": "Аккаунт с таким email уже существует.",
+    "PHONE_ALREADY_EXISTS": "Аккаунт с таким номером телефона уже существует.",
+    "INVALID_CREDENTIALS": "Неверный email или пароль.",
+    "TOKEN_INVALID": "Ссылка недействительна или устарела.",
+    "RATE_LIMIT_EXCEEDED": "Слишком много попыток. Подождите немного и попробуйте снова.",
+    "AUTH_ORIGIN_REJECTED": "Запрос пришёл с неизвестного источника.",
+    "SESSION_NOT_FOUND": "Такой сессии больше не существует.",
+    "UNAUTHORIZED": "Войдите, чтобы продолжить.",
+    "OAUTH_STATE_INVALID": "Попытка входа устарела. Попробуйте снова.",
+    "OAUTH_PROVIDER_ERROR": "Провайдер входа вернул ошибку. Попробуйте снова.",
+    "OAUTH_EMAIL_REQUIRED": "Провайдер не передал email, а он нужен для входа.",
+    "OAUTH_PROVIDER_NOT_CONFIGURED": "Этот способ входа недоступен.",
+    "OAUTH_ACCOUNT_ALREADY_LINKED": "Этот аккаунт уже привязан к другому пользователю.",
+    "OAUTH_TICKET_INVALID": "Ссылка для входа устарела. Попробуйте снова.",
+    "STEP_UP_REQUIRED": "Подтвердите пароль, чтобы продолжить.",
+    "STEP_UP_METHOD_UNAVAILABLE": "Для этого аккаунта подтверждение паролем недоступно.",
+    "RESOURCE_ALREADY_EXISTS": "Такая запись уже существует.",
+    "API_KEY_ALREADY_EXISTS": "API-ключ с таким названием уже существует.",
+    "DATABASE_POOL_TIMEOUT": "Сервис занят. Попробуйте через мгновение.",
+    "API_KEY_SCOPE_INVALID_FORMAT": "Скоуп должен быть в формате action:Subject.",
+    "API_KEY_SCOPE_UNKNOWN_ACTION": "Неизвестное действие в скоупе.",
+    "API_KEY_SCOPE_UNKNOWN_SUBJECT": "Неизвестный объект в скоупе.",
+    "API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN": "manage:all запрещён — он даёт неограниченный доступ.",
+    "INVITE_INVALID_OR_EXPIRED": "Приглашение недействительно или устарело.",
+    "INVITE_ALREADY_MEMBER": "Вы уже состоите в этой организации.",
+    "INVITE_EMAIL_NOT_VERIFIED": "Подтвердите email, прежде чем принять приглашение.",
+    "NETWORK_ERROR": "Не удаётся связаться с сервером. Проверьте соединение и попробуйте снова.",
+    "TIMEOUT": "Запрос выполнялся слишком долго. Попробуйте снова.",
+    "UNKNOWN_ERROR": "Что-то пошло не так. Попробуйте снова.",
+    "correlationHint": "Идентификатор запроса: {id}"
+  },
   "common": {
     "loading": "Загрузка…",
     "error": "Что-то пошло не так",
@@ -25,9 +57,7 @@
     "loginSubtitle": "Войдите в свой аккаунт",
     "registerSubtitle": "Создайте новый аккаунт",
     "loggingIn": "Вход…",
-    "registering": "Регистрация…",
-    "loginError": "Не удалось войти",
-    "registerError": "Не удалось зарегистрироваться"
+    "registering": "Регистрация…"
   },
   "dashboard": {
     "welcome": "Добро пожаловать!",

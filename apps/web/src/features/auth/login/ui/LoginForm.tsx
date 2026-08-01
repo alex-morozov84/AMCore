@@ -5,10 +5,8 @@ import { useTranslations } from 'next-intl'
 import { type LoginInput, loginSchema } from '@amcore/shared'
 import { zodResolver } from '@hookform/resolvers/zod'
 
-import { getErrorMessage } from '@/shared/api'
 import {
-  Alert,
-  AlertDescription,
+  ApiErrorAlert,
   Button,
   Form,
   FormControl,
@@ -39,16 +37,10 @@ export function LoginForm() {
     mutate(data)
   }
 
-  const errorMessage = error ? getErrorMessage(error, t('loginError')) : null
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
-        {errorMessage && (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage}</AlertDescription>
-          </Alert>
-        )}
+        <ApiErrorAlert error={error} />
 
         <FormField
           control={form.control}
