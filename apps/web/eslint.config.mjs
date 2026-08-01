@@ -161,6 +161,39 @@ export default [
     },
   },
 
+  // No user-facing copy in code.
+  //
+  // Catches the concrete, mechanical half of the rule: a non-ASCII string
+  // literal in `src/` is almost always Russian copy that belongs in a message
+  // catalogue. It cannot catch hardcoded *English* copy — that still needs
+  // review — but it is what let a half-migrated tree keep shipping Russian
+  // beside correct `useTranslations()` calls.
+  //
+  // Tests and catalogues are exempt: fixtures legitimately contain non-ASCII
+  // input, and the catalogues are where the copy is supposed to live.
+  {
+    name: 'project/no-hardcoded-copy',
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}', 'src/test/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[value=/[^\\x00-\\x7F]/]',
+          message:
+            'Non-ASCII string literal in code — user-facing copy belongs in messages/*.json. ' +
+            'See docs/frontend/i18n-and-errors.md.',
+        },
+        {
+          selector: 'TemplateElement[value.raw=/[^\\x00-\\x7F]/]',
+          message:
+            'Non-ASCII text in a template literal — user-facing copy belongs in messages/*.json. ' +
+            'See docs/frontend/i18n-and-errors.md.',
+        },
+      ],
+    },
+  },
+
   // Next.js rules
   {
     name: 'project/nextjs',
