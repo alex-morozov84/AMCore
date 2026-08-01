@@ -1,5 +1,6 @@
 // UI components public API
 export { Alert, AlertDescription, AlertTitle } from './alert'
+export { ApiErrorAlert } from './api-error-alert'
 export { Button, buttonVariants } from './button'
 export {
   Card,

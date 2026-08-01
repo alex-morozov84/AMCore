@@ -125,6 +125,30 @@ enforces. Translation keys are type-checked against `en.json` via the
 `AppConfig` augmentation in `src/global.d.ts`, so a typo fails `pnpm typecheck`
 rather than surfacing in the browser.
 
+## API errors
+
+The backend emits a stable machine-readable `errorCode` (ADR-023) and an English
+`message` written for developers. **The frontend translates by code and never
+renders the backend's message** — showing it puts developer-facing English in
+front of a Russian user, which is the whole reason the code contract exists.
+
+Render failures with `<ApiErrorAlert error={error} />`, or call `useApiError()`
+for the resolved `{ code, message, correlationId, isUnknown }`. Codes that the
+client does not recognise fall back to a generic message plus the correlation
+ID — that is what support needs to find the request, and it leaks nothing.
+
+`shared/api/errors.ts` is the locale-agnostic layer: it returns codes, never
+prose. Network failures and timeouts get their own client-side codes
+(`NETWORK_ERROR`, `TIMEOUT`) so every failure, wherever it came from, goes
+through one translation path.
+
+**Adding a backend error code** — add it to the enum in `@amcore/shared`, then
+add a message under `errors.<CODE>` in _every_ catalogue.
+`src/shared/api/error-messages.test.ts` derives its expectations from the shared
+enums, so a code with no translation fails the build rather than silently
+degrading to the generic message. It also fails on an orphaned message, which
+catches a typo or a code the backend has since removed.
+
 ## Server/Client Component defaults
 
 **Server Components are the default** for routes and page composition.

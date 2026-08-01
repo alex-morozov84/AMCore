@@ -1,5 +1,6 @@
 import axios, { type AxiosError } from 'axios'
 
+import { ClientErrorCode } from './error-codes'
 import type { ApiErrorResponse, ValidationError } from './types'
 
 /**
@@ -39,44 +40,44 @@ export function getValidationErrors(error: unknown): ValidationError[] {
 }
 
 /**
- * Extract a user-facing message from any error type.
+ * Reduce any thrown value to a single machine-readable code.
  *
- * `fallback` is required and must already be localized by the caller: this
- * module is a locale-agnostic library layer and must not contain user-facing
- * prose. It previously hardcoded Russian strings here, which became visible
- * the moment English shipped as the base locale.
+ * This module is the locale-agnostic library layer: it returns **codes, never
+ * user-facing prose**. Translation happens in the UI via `useApiError`. The
+ * backend's English `message` is developer-facing and deliberately never
+ * surfaced to users — showing it is precisely the defect ADR-023 exists to
+ * prevent.
  *
- * `network`/`timeout` are optional localized overrides; without them those
- * cases collapse into `fallback`, which is correct but less specific.
- *
- * Interim shape only. The full contract — translating by the machine-readable
- * `errorCode` per ADR-023, with network/timeout as their own codes — replaces
- * this function in the API-error-localization PR.
+ * Falls through to `UNKNOWN_ERROR` rather than inventing a message, so an
+ * unmapped failure is visibly generic instead of leaking internals.
  */
-export function getErrorMessage(
-  error: unknown,
-  fallback: string,
-  messages?: { network?: string; timeout?: string }
-): string {
-  // Axios error with API response
-  if (isApiError(error) && error.response) {
-    return error.response.data.message || fallback
-  }
+export function resolveErrorCode(error: unknown): string {
+  const backendCode = getErrorCode(error)
+  if (backendCode) return backendCode
 
-  // Axios error without response (network error)
   if (isAxiosError(error)) {
-    if (error.code === 'ECONNABORTED') return messages?.timeout ?? fallback
-    if (error.code === 'ERR_NETWORK') return messages?.network ?? fallback
-    return error.message || fallback
+    if (error.code === 'ECONNABORTED') return ClientErrorCode.TIMEOUT
+    if (error.code === 'ERR_NETWORK') return ClientErrorCode.NETWORK_ERROR
   }
 
-  // Standard Error
+  return ClientErrorCode.UNKNOWN_ERROR
+}
+
+/**
+ * The raw backend message, for diagnostics only.
+ *
+ * Never render this to a user: it is English-only and written for developers.
+ * `useApiError` uses it solely for a development-mode console warning when a
+ * code has no translation.
+ */
+export function getDiagnosticMessage(error: unknown): string | undefined {
+  if (isApiError(error) && error.response) {
+    return error.response.data.message
+  }
   if (error instanceof Error) {
     return error.message
   }
-
-  // Unknown error
-  return fallback
+  return undefined
 }
 
 /**

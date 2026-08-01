@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **API errors are now localized by `errorCode` instead of showing the
+  backend's own message.** ADR-023 has the backend emit stable machine-readable
+  codes plus an English, developer-facing `message`, and the frontend translate
+  by code — but the frontend half was never built: `getErrorCode()` existed and
+  was called nowhere, the forms rendered `response.data.message` verbatim, and
+  no catalogue had an `errors` section. A Russian user saw English backend prose
+  on every API failure. All 26 codes across the five shared enums are now
+  translated in both catalogues, network failures and timeouts get their own
+  client-side codes so every failure flows through one path, and
+  `shared/api/errors.ts` returns codes only — no user-facing prose remains in
+  that layer. Unrecognised codes fall back to a generic message plus the
+  `correlationId`, never the backend text. Render failures with the new
+  `<ApiErrorAlert>` or `useApiError()`.
+  A coverage test derives its expectations from the shared enums, so adding a
+  backend code without translating it now fails the build instead of silently
+  degrading the UI — which is how the original gap went unnoticed.
+
 ### Changed
 
 - **`apps/web` routes now live under a `[locale]` segment** and the web app

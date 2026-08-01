@@ -97,8 +97,22 @@ refinements such as the API-key scope grammar:
 }
 ```
 
-**Localization:** prefer `errorCode` when present, then `code`, then `message`.
-`message` is English and may change; `errorCode` is stable across API versions.
+**Localization:** translate by `errorCode` when present, else by the Zod `code`
+for field issues. **`message` is diagnostic, not display text** — it is English,
+written for developers, and may change between releases without notice;
+`errorCode` is stable across API versions.
+
+For an unrecognised code, show a generic localized message plus the
+`correlationId` rather than falling through to `message`: the correlation ID is
+what support needs to find the request, and rendering English developer prose to
+a user is the failure this code contract exists to prevent. The bundled
+`apps/web` follows exactly this rule — see
+[`docs/frontend/architecture-and-conventions.md`](../frontend/architecture-and-conventions.md)
+→ "API errors", where a test fails the build if a shared error code has no
+translation.
+
+A raw API consumer (a script, an integration, a log pipeline) may of course read
+`message` for diagnostics — that is what it is for.
 
 ### Top-level error codes
 

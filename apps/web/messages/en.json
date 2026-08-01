@@ -1,4 +1,36 @@
 {
+  "errors": {
+    "EMAIL_ALREADY_EXISTS": "An account with this email already exists.",
+    "PHONE_ALREADY_EXISTS": "An account with this phone number already exists.",
+    "INVALID_CREDENTIALS": "Incorrect email or password.",
+    "TOKEN_INVALID": "This link is invalid or has expired.",
+    "RATE_LIMIT_EXCEEDED": "Too many attempts. Please wait a moment and try again.",
+    "AUTH_ORIGIN_REJECTED": "This request came from an unrecognized origin.",
+    "SESSION_NOT_FOUND": "That session no longer exists.",
+    "UNAUTHORIZED": "Please sign in to continue.",
+    "OAUTH_STATE_INVALID": "The sign-in attempt expired. Please try again.",
+    "OAUTH_PROVIDER_ERROR": "The sign-in provider returned an error. Please try again.",
+    "OAUTH_EMAIL_REQUIRED": "The provider did not share an email address, which is required to sign in.",
+    "OAUTH_PROVIDER_NOT_CONFIGURED": "This sign-in method is not available.",
+    "OAUTH_ACCOUNT_ALREADY_LINKED": "That account is already linked to another user.",
+    "OAUTH_TICKET_INVALID": "The sign-in link expired. Please try again.",
+    "STEP_UP_REQUIRED": "Please confirm your password to continue.",
+    "STEP_UP_METHOD_UNAVAILABLE": "Password confirmation isn't available for this account.",
+    "RESOURCE_ALREADY_EXISTS": "That already exists.",
+    "API_KEY_ALREADY_EXISTS": "An API key with that name already exists.",
+    "DATABASE_POOL_TIMEOUT": "The service is busy. Please try again in a moment.",
+    "API_KEY_SCOPE_INVALID_FORMAT": "A scope must use the action:Subject format.",
+    "API_KEY_SCOPE_UNKNOWN_ACTION": "Unknown scope action.",
+    "API_KEY_SCOPE_UNKNOWN_SUBJECT": "Unknown scope subject.",
+    "API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN": "manage:all is not allowed — it would grant unrestricted access.",
+    "INVITE_INVALID_OR_EXPIRED": "This invitation is invalid or has expired.",
+    "INVITE_ALREADY_MEMBER": "You are already a member of this organization.",
+    "INVITE_EMAIL_NOT_VERIFIED": "Please verify your email address before accepting this invitation.",
+    "NETWORK_ERROR": "Can't reach the server. Check your connection and try again.",
+    "TIMEOUT": "The request took too long. Please try again.",
+    "UNKNOWN_ERROR": "Something went wrong. Please try again.",
+    "correlationHint": "Reference: {id}"
+  },
   "common": {
     "loading": "Loading…",
     "error": "Something went wrong",
@@ -25,9 +57,7 @@
     "loginSubtitle": "Sign in to your account",
     "registerSubtitle": "Create a new account",
     "loggingIn": "Signing in…",
-    "registering": "Signing up…",
-    "loginError": "Could not sign in",
-    "registerError": "Could not sign up"
+    "registering": "Signing up…"
   },
   "dashboard": {
     "welcome": "Welcome!",
