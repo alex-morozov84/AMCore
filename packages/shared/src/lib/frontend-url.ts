@@ -1,5 +1,7 @@
 import type { SupportedLocale } from '../constants'
 
+const SLASH = '/'.charCodeAt(0)
+
 /**
  * Build a link into the web app for a specific locale.
  *
@@ -24,8 +26,9 @@ export function localizedFrontendUrl(
   path = '',
   query?: Record<string, string>
 ): string {
-  const base = baseUrl.replace(/\/+$/, '')
-  const suffix = path ? `/${path.replace(/^\/+/, '')}` : ''
+  const base = trimTrailingSlashes(baseUrl)
+  const trimmedPath = trimLeadingSlashes(path)
+  const suffix = trimmedPath ? `/${trimmedPath}` : ''
 
   // Built by hand rather than via `URL`: this package is consumed by both the
   // browser and the API, and its build target does not expose the global.
@@ -34,4 +37,24 @@ export function localizedFrontendUrl(
     .join('&')
 
   return `${base}/${locale}${suffix}${search ? `?${search}` : ''}`
+}
+
+/**
+ * Slash trimming is done with index arithmetic rather than `/\/+$/` on purpose.
+ * An anchored one-or-more quantifier over a repeated character backtracks
+ * quadratically on a long run of slashes (CodeQL `js/polynomial-redos`). The
+ * inputs here are a configured base URL and a caller-supplied path, so it is
+ * not reachable by an attacker today — but this is a shared library helper, and
+ * the linear version costs nothing.
+ */
+function trimTrailingSlashes(value: string): string {
+  let end = value.length
+  while (end > 0 && value.charCodeAt(end - 1) === SLASH) end--
+  return value.slice(0, end)
+}
+
+function trimLeadingSlashes(value: string): string {
+  let start = 0
+  while (start < value.length && value.charCodeAt(start) === SLASH) start++
+  return value.slice(start)
 }
