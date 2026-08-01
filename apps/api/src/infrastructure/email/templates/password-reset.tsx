@@ -19,14 +19,14 @@ import {
 export interface PasswordResetEmailProps {
   name: string
   resetUrl: string
-  expiresIn: string
+  expiresInMinutes: number
   locale?: Locale
 }
 
 export const PasswordResetEmail = ({
   name,
   resetUrl,
-  expiresIn,
+  expiresInMinutes,
   locale = DEFAULT_LOCALE,
 }: PasswordResetEmailProps) => {
   const intl = createIntl({
@@ -53,7 +53,7 @@ export const PasswordResetEmail = ({
           </Section>
 
           <Text style={text}>
-            {intl.formatMessage({ id: 'passwordReset.expiresInfo' }, { expiresIn })}
+            {intl.formatMessage({ id: 'passwordReset.expiresInfo' }, { minutes: expiresInMinutes })}
           </Text>
 
           <Hr style={hr} />
@@ -72,7 +72,7 @@ export const PasswordResetEmail = ({
 PasswordResetEmail.PreviewProps = {
   name: 'Александр',
   resetUrl: 'https://amcore.alex-morozov.com/reset-password?token=abc123',
-  expiresIn: '1 час',
+  expiresInMinutes: 60,
   locale: DEFAULT_LOCALE,
 } as PasswordResetEmailProps
 

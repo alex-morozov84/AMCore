@@ -161,7 +161,7 @@ describe('EmailService', () => {
       const jobData = {
         template: EmailTemplate.PASSWORD_RESET,
         to: 'test@example.com',
-        data: { name: 'X', resetUrl: 'https://x/reset?token=abc', expiresIn: '1m' },
+        data: { name: 'X', resetUrl: 'https://x/reset?token=abc', expiresInMinutes: 1 },
       } as unknown as SendEmailJobData
 
       await expect(service.queue(jobData)).rejects.toThrow(/non-queueable/)
@@ -185,7 +185,7 @@ describe('EmailService', () => {
       await service.sendNow(EmailTemplate.PASSWORD_RESET, 'to@example.com', {
         name: 'X',
         resetUrl: 'https://x/reset?token=abc',
-        expiresIn: '1m',
+        expiresInMinutes: 1,
       })
 
       expect(emailProvider.send).toHaveBeenCalledTimes(1)
@@ -225,7 +225,7 @@ describe('EmailService', () => {
         service.sendNow(EmailTemplate.EMAIL_VERIFICATION, 'to@example.com', {
           name: 'X',
           verificationUrl: 'https://x/verify?token=xyz',
-          expiresIn: '24h',
+          expiresInHours: 24,
         })
       ).rejects.toThrow('boom')
       expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
@@ -270,7 +270,7 @@ describe('EmailService', () => {
       const data = {
         name: 'John Doe',
         resetUrl: 'https://example.com/reset?token=abc',
-        expiresIn: '1 час',
+        expiresInMinutes: 60,
       }
 
       emailProvider.send.mockResolvedValue({ id: 'e_1', success: true })
@@ -289,7 +289,7 @@ describe('EmailService', () => {
       const data = {
         name: 'John Doe',
         verificationUrl: 'https://example.com/verify?token=xyz',
-        expiresIn: '24 часа',
+        expiresInHours: 24,
       }
 
       emailProvider.send.mockResolvedValue({ id: 'e_1', success: true })
@@ -325,7 +325,7 @@ describe('EmailService', () => {
       const data = {
         name: 'John Doe',
         resetUrl: 'https://example.com/reset?token=abc',
-        expiresIn: '1 час',
+        expiresInMinutes: 60,
       }
 
       const result = await service.renderTemplate(EmailTemplate.PASSWORD_RESET, data)
@@ -339,7 +339,7 @@ describe('EmailService', () => {
       const data = {
         name: 'John Doe',
         verificationUrl: 'https://example.com/verify?token=xyz',
-        expiresIn: '24 часа',
+        expiresInHours: 24,
       }
 
       const result = await service.renderTemplate(EmailTemplate.EMAIL_VERIFICATION, data)
@@ -357,7 +357,7 @@ describe('EmailService', () => {
         roleName: 'MEMBER',
         hasAccount: true,
         acceptUrl: 'https://example.com/invite/accept?token=abc',
-        expiresIn: '7 days',
+        expiresInDays: 7,
       }
 
       const result = await service.renderTemplate(EmailTemplate.ORG_INVITE, data)
@@ -391,7 +391,7 @@ describe('EmailService', () => {
         roleName: 'MEMBER',
         hasAccount: false,
         acceptUrl: 'https://example.com/invite/accept?token=abc',
-        expiresIn: '7 days',
+        expiresInDays: 7,
       }
 
       emailProvider.send.mockResolvedValue({ id: 'e_1', success: true })

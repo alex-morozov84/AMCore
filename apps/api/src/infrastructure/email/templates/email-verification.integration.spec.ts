@@ -15,7 +15,7 @@ import EmailVerificationEmail, { getEmailVerificationSubject } from './email-ver
 const baseProps = {
   name: 'Alexander',
   verificationUrl: 'https://app.example.com/verify-email?token=raw-token-xyz',
-  expiresIn: '24 hours',
+  expiresInHours: 24,
 }
 
 describe('EmailVerificationEmail Template (Integration)', () => {

@@ -110,7 +110,8 @@ describe('TelegramChannelDeliverer', () => {
   it('appends the trusted app link when the notification has a first-party action', async () => {
     client.sendMessage.mockResolvedValue({ status: 'delivered' })
     await deliverer.deliver(context({}, { action: { route: 'account.security' } }))
-    expect(client.sendMessage.mock.calls[0]![0].text).toContain('https://app.example')
+    // Locale-prefixed; 'https://app.example' alone would match a bare URL too.
+    expect(client.sendMessage.mock.calls[0]![0].text).toContain('https://app.example/ru')
   })
 
   it('passes a transient result through with its retryAfterMs floor', async () => {

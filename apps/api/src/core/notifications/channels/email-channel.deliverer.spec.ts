@@ -169,7 +169,9 @@ describe('EmailChannelDeliverer', () => {
     })
     expect(email.renderTemplate).toHaveBeenCalledWith(
       'notification',
-      expect.objectContaining({ actionUrl: 'https://app.example' }),
+      // Locale-prefixed: an email CTA cannot rely on a cookie or Accept-Language
+      // the recipient's browser may not have.
+      expect.objectContaining({ actionUrl: 'https://app.example/ru' }),
       'worker'
     )
   })

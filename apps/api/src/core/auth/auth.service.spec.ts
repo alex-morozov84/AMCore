@@ -386,6 +386,9 @@ describe('AuthService', () => {
         expect(mockEmailService.sendEmailVerificationEmail).toHaveBeenCalledTimes(1)
         const [, payload] = mockEmailService.sendEmailVerificationEmail.mock.calls[0]!
         expect(payload.verificationUrl).toContain('token=verify-token-xyz')
+        // Locale-prefixed: a bare path would be resolved by cookie/Accept-Language,
+        // which an emailed link cannot rely on.
+        expect(payload.verificationUrl).toContain('/ru/verify-email')
       })
 
       it('awaits token generation before returning the auth response', async () => {
@@ -766,8 +769,10 @@ describe('AuthService', () => {
       expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalledWith(
         mockUser.email,
         expect.objectContaining({
-          resetUrl: expect.stringContaining('reset-password?token='),
-          expiresIn: '15 минут',
+          // Full prefixed path — asserting only 'reset-password?token=' would
+          // still pass if the locale prefix regressed away.
+          resetUrl: expect.stringContaining('/ru/reset-password?token='),
+          expiresInMinutes: 15,
         })
       )
     })
@@ -941,8 +946,8 @@ describe('AuthService', () => {
       expect(mockEmailService.sendEmailVerificationEmail).toHaveBeenCalledWith(
         mockUser.email,
         expect.objectContaining({
-          verificationUrl: expect.stringContaining('verify-email?token='),
-          expiresIn: '48 часов',
+          verificationUrl: expect.stringContaining('/ru/verify-email?token='),
+          expiresInHours: 48,
         })
       )
     })

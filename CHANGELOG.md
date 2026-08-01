@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Links in emails and notifications had no locale prefix.** Since routes moved
+  under `/en/...` and `/ru/...`, a server-generated link to a bare path was
+  resolved by cookie or `Accept-Language` — which a link _from an email_ cannot
+  rely on, because the recipient may open it in a browser that has never visited
+  the app. A Russian verification email opened an English page. Verification,
+  password-reset, invite-accept, notification CTAs, and the OAuth callback and
+  account-linking redirects now build their URL with the new
+  `localizedFrontendUrl()` from `@amcore/shared`, using the locale the backend
+  already knows.
+
+- **Email durations were hardcoded in Russian regardless of the recipient's
+  locale.** `auth.service.ts` built the validity window as
+  `` `${hours} часов` `` / `` `${minutes} минут` ``, so an English-locale user
+  received an otherwise-English email reading "This link is valid for 24
+  часов." The invite email had the same problem via an inline
+  `locale === 'en' ? '7 days' : '7 дней'` ternary. Durations are now passed as
+  numbers (`expiresInMinutes` / `expiresInHours` / `expiresInDays`) and
+  pluralized by the message catalogue through ICU, which also fixes the
+  declension — the old strings read "1 часов" and "2 дней" for any count. A test
+  now enforces that every locale supplies the CLDR plural categories its
+  language requires (`few`/`many` for Russian), which the existing email parity
+  guard did not cover.
+- Removed the leftover fitness/finance/subscriptions product copy from the
+  welcome email in both locales.
+
+### Added
+
+- **Public i18n guide: `docs/frontend/i18n-and-errors.md`** — where copy lives,
+  and step-by-step recipes for adding a UI string, adding a backend error code
+  end to end, localizing form validation, adding a third locale, and running a
+  fork single-locale. Includes the rules that are easy to get wrong and hard to
+  notice: never inline user-facing text, never render the backend's `message`,
+  never put a literal `message` in a shared schema, never set a global Zod
+  locale, and never hand-roll pluralization. `AGENTS.md` carries the short
+  version so an agent hits the rules before the guide.
+
 - **Form validation messages are now localized per parse instead of via a
   global Zod locale.** `apps/web` called `z.config(z.locales.ru())` once at
   startup. That setting is process-global, cannot be scoped to a request or a

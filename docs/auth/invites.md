@@ -62,7 +62,7 @@ The email carries a link to the accept page with the raw invite token in
 the query string:
 
 ```
-${FRONTEND_URL}/invite/accept?token=<raw token>
+${FRONTEND_URL}/<locale>/invite/accept?token=<raw token>
 ```
 
 The CTA copy differs by whether the recipient already has an account
@@ -70,8 +70,13 @@ The CTA copy differs by whether the recipient already has an account
 same URL. The raw token exists **only** in this email — the server stores
 just its SHA-256 hash and never returns or logs the raw value.
 
+> The link carries the recipient's locale (`/ru/invite/accept`) because
+> `apps/web` prefixes every locale and an emailed link cannot rely on a cookie
+> the recipient's browser may not have — see
+> [`docs/frontend/i18n-and-errors.md`](../frontend/i18n-and-errors.md).
+>
 > **The accept page is your application's responsibility.** The starter
-> backend issues the link; the frontend route `/invite/accept` (reading
+> backend issues the link; the frontend route `/<locale>/invite/accept` (reading
 > `?token=`, ensuring the user is authenticated, then calling the accept
 > endpoint) is implemented by the app that forks this starter.
 

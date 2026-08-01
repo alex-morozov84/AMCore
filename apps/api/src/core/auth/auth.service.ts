@@ -12,7 +12,12 @@ import type {
   UpdateProfileInput,
   UserResponse,
 } from '@amcore/shared'
-import { AuthErrorCode, coerceSupportedLocale, parseSupportedLocale } from '@amcore/shared'
+import {
+  AuthErrorCode,
+  coerceSupportedLocale,
+  localizedFrontendUrl,
+  parseSupportedLocale,
+} from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
 import { EnvService } from '../../env/env.service'
@@ -128,23 +133,31 @@ export class AuthService {
     const { token: verificationToken } = await this.tokenManager.generateEmailVerificationToken(
       user.id
     )
-    const verificationUrl = `${this.env.get('FRONTEND_URL')}/verify-email?token=${verificationToken}`
-    const expiresIn = `${this.env.get('EMAIL_VERIFICATION_EXPIRY_HOURS')} часов`
+    const userLocale = coerceSupportedLocale(user.locale)
+    const verificationUrl = localizedFrontendUrl(
+      this.env.get('FRONTEND_URL'),
+      userLocale,
+      'verify-email',
+      {
+        token: verificationToken,
+      }
+    )
+    const expiresInHours = Number(this.env.get('EMAIL_VERIFICATION_EXPIRY_HOURS'))
 
     // Queue welcome + verification emails (non-blocking, silent fail)
     void this.emailService
       .sendWelcomeEmail({
         name: user.name ?? user.email,
         email: user.email,
-        locale: coerceSupportedLocale(user.locale),
+        locale: userLocale,
       })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send welcome email'))
     void this.emailService
       .sendEmailVerificationEmail(user.email, {
         name: user.name ?? user.email,
         verificationUrl,
-        expiresIn,
-        locale: coerceSupportedLocale(user.locale),
+        expiresInHours,
+        locale: userLocale,
       })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send verification email'))
 
@@ -398,8 +411,16 @@ export class AuthService {
 
     const { token } = await this.tokenManager.generatePasswordResetToken(user.id)
 
-    const resetUrl = `${this.env.get('FRONTEND_URL')}/reset-password?token=${token}`
-    const expiresIn = `${this.env.get('PASSWORD_RESET_EXPIRY_MINUTES')} минут`
+    const userLocale = coerceSupportedLocale(user.locale)
+    const resetUrl = localizedFrontendUrl(
+      this.env.get('FRONTEND_URL'),
+      userLocale,
+      'reset-password',
+      {
+        token,
+      }
+    )
+    const expiresInMinutes = Number(this.env.get('PASSWORD_RESET_EXPIRY_MINUTES'))
 
     // Best-effort: secret-bearing emails are sent directly (EQS-02) and
     // `sendNow` throws on provider failure. Swallow it here — letting a 500
@@ -410,8 +431,8 @@ export class AuthService {
       await this.emailService.sendPasswordResetEmail(user.email, {
         name: user.name ?? user.email,
         resetUrl,
-        expiresIn,
-        locale: coerceSupportedLocale(user.locale),
+        expiresInMinutes,
+        locale: userLocale,
       })
       this.logger.info({ userId: user.id }, 'Password reset email sent')
     } catch (err) {
@@ -524,8 +545,16 @@ export class AuthService {
 
     const { token } = await this.tokenManager.generateEmailVerificationToken(user.id)
 
-    const verificationUrl = `${this.env.get('FRONTEND_URL')}/verify-email?token=${token}`
-    const expiresIn = `${this.env.get('EMAIL_VERIFICATION_EXPIRY_HOURS')} часов`
+    const userLocale = coerceSupportedLocale(user.locale)
+    const verificationUrl = localizedFrontendUrl(
+      this.env.get('FRONTEND_URL'),
+      userLocale,
+      'verify-email',
+      {
+        token,
+      }
+    )
+    const expiresInHours = Number(this.env.get('EMAIL_VERIFICATION_EXPIRY_HOURS'))
 
     // Best-effort, same enumeration rationale as forgotPassword: a direct-send
     // failure (EQS-02 `sendNow` throws) must not turn into a 500 that reveals
@@ -534,8 +563,8 @@ export class AuthService {
       await this.emailService.sendEmailVerificationEmail(user.email, {
         name: user.name ?? user.email,
         verificationUrl,
-        expiresIn,
-        locale: coerceSupportedLocale(user.locale),
+        expiresInHours,
+        locale: userLocale,
       })
       this.logger.info({ userId: user.id }, 'Verification email sent')
     } catch (err) {

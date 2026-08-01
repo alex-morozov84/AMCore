@@ -61,7 +61,7 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
    │
    ▼
 7. Redirects to frontend:
-   https://amcore.dev/auth/callback?ticket=...
+   https://amcore.dev/{locale}/auth/callback?ticket=...
    + sets refresh_token cookie
    │
    ▼
@@ -210,7 +210,7 @@ The flow is identical to regular OAuth login, except:
 
 1. The state stored in Redis includes `mode: "link"` and the user's `userId`
 2. After the callback, instead of creating a session, the provider is attached to the user
-3. The user is redirected to `/settings/linked-accounts?linked=google`
+3. The user is redirected to `/{locale}/settings/linked-accounts?linked=google`
 
 ### Linking flow
 
@@ -229,7 +229,7 @@ Callback: /api/v1/auth/oauth/github/callback
 Backend:
   - mode == "link" → attach GitHub account to user "cm1abc..."
   - If GitHub account is already linked to a DIFFERENT user → error
-  - Success → redirect to /settings/linked-accounts?linked=github
+  - Success → redirect to /{locale}/settings/linked-accounts?linked=github
 ```
 
 **Errors:**

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { coerceSupportedLocale, type SupportedLocale } from '@amcore/shared'
+import { coerceSupportedLocale, localizedFrontendUrl, type SupportedLocale } from '@amcore/shared'
 
 import { NotificationChannel } from '../notification.constants'
 import { resolveExternalMode } from '../notification-content-policy'
@@ -57,7 +57,7 @@ export class EmailChannelDeliverer implements ChannelDeliverer {
     // never an arbitrary URL.
     const actionUrl =
       notification.action !== null && notification.action !== undefined
-        ? this.env.get('FRONTEND_URL')
+        ? localizedFrontendUrl(this.env.get('FRONTEND_URL'), locale)
         : undefined
 
     let rendered: { html: string; text: string; subject: string }

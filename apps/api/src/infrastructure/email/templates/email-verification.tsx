@@ -19,14 +19,14 @@ import {
 export interface EmailVerificationProps {
   name: string
   verificationUrl: string
-  expiresIn: string
+  expiresInHours: number
   locale?: Locale
 }
 
 export const EmailVerificationEmail = ({
   name,
   verificationUrl,
-  expiresIn,
+  expiresInHours,
   locale = DEFAULT_LOCALE,
 }: EmailVerificationProps) => {
   const intl = createIntl({
@@ -55,7 +55,7 @@ export const EmailVerificationEmail = ({
           </Section>
 
           <Text style={text}>
-            {intl.formatMessage({ id: 'emailVerification.expiresInfo' }, { expiresIn })}
+            {intl.formatMessage({ id: 'emailVerification.expiresInfo' }, { hours: expiresInHours })}
           </Text>
 
           <Hr style={hr} />
@@ -70,7 +70,7 @@ export const EmailVerificationEmail = ({
 EmailVerificationEmail.PreviewProps = {
   name: 'Александр',
   verificationUrl: 'https://amcore.alex-morozov.com/verify-email?token=xyz789',
-  expiresIn: '24 часа',
+  expiresInHours: 24,
   locale: DEFAULT_LOCALE,
 } as EmailVerificationProps
 

@@ -100,8 +100,26 @@ startup.
 
 Define request/response schemas in
 [`packages/shared/src/schemas/<module>.ts`](../../packages/shared/src/schemas) and
-export them from `schemas/index.ts`. Keep them message-free — Zod v4 native i18n
-handles translation. Rebuild shared so the api/web can import it:
+export them from `schemas/index.ts`.
+
+**Keep them message-free.** A literal `message` outranks the frontend's
+per-parse error map (Zod precedence: schema-level → per-parse → global →
+locale), so it silently forces English into a localized UI. When a refinement
+needs a specific meaning, attach a code instead:
+
+```ts
+ctx.addIssue({
+  code: 'custom',
+  params: { errorCode: ApiKeyScopeErrorCode.API_KEY_SCOPE_UNKNOWN_ACTION },
+})
+```
+
+The frontend translates that code through the same catalogue it uses for API
+errors — see
+[`docs/frontend/i18n-and-errors.md`](../frontend/i18n-and-errors.md). Raw API
+consumers branch on `errorCode`; `errors[].message` is diagnostic only.
+
+Rebuild shared so the api/web can import it:
 
 ```bash
 pnpm --filter @amcore/shared build
