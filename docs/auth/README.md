@@ -98,11 +98,11 @@ JWT-only by default; only the explicit API-key allowlist accepts
 
 ## Environments
 
-| Variable                | Description                            |
-| ----------------------- | -------------------------------------- |
-| `JWT_SECRET`            | Signs access tokens — keep this secret |
-| `JWT_ACCESS_EXPIRATION` | Access token lifetime (default: `15m`) |
-| `JWT_REFRESH_DAYS`      | Refresh token lifetime (default: `7`)  |
-| `FRONTEND_URL`          | Where OAuth redirects land             |
+| Variable                | Description                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `JWT_SECRET`            | Signs access tokens — keep this secret                                       |
+| `JWT_ACCESS_EXPIRATION` | Access token lifetime (default: `15m`)                                       |
+| `JWT_REFRESH_DAYS`      | Refresh token lifetime (default: `7`)                                        |
+| `FRONTEND_URL`          | Frontend origin; user-facing paths add the locale via `localizedFrontendUrl` |
 
 See [Auth contracts](./reference.md#environment-variables) for the full list.

@@ -7,13 +7,13 @@ and logs.
 
 ## What Is Included
 
-| Area      | Built-in behavior                                                                     |
-| --------- | ------------------------------------------------------------------------------------- |
-| Templates | React Email + FormatJS messages for RU/EN and shared locale types                     |
-| Delivery  | Direct secret sends, queued non-secret jobs, notification-channel adapter             |
-| Provider  | `EmailProvider` interface with Resend production and mock dev/test drivers            |
-| Safety    | Compile-time and runtime guards that prevent secret templates from entering the queue |
-| Tests     | Unit, schema, processor, render integration, and secret-boundary e2e coverage         |
+| Area      | Built-in behavior                                                                         |
+| --------- | ----------------------------------------------------------------------------------------- |
+| Templates | React Email + FormatJS messages: English source, Russian translation, shared locale types |
+| Delivery  | Direct secret sends, queued non-secret jobs, notification-channel adapter                 |
+| Provider  | `EmailProvider` interface with Resend production and mock dev/test drivers                |
+| Safety    | Compile-time and runtime guards that prevent secret templates from entering the queue     |
+| Tests     | Unit, schema, processor, render integration, and secret-boundary e2e coverage             |
 
 ## Mental Model
 

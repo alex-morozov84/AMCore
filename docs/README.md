@@ -15,6 +15,7 @@ does not express.
 | Add a route/page on the frontend the AMCore way  | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                 |
 | Add an environment variable                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
 | Add an external service / infra dependency       | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
+| Add UI copy, a locale, or an error message       | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
 | Configure auth, OAuth, sessions                  | [`auth/`](auth/README.md)                                                                                                         |
 | Set up RBAC / authorization                      | [`auth/rbac.md`](auth/rbac.md)                                                                                                    |
 | Issue scoped API keys                            | [`auth/api-keys.md`](auth/api-keys.md)                                                                                            |
@@ -35,6 +36,10 @@ does not express.
 - **[Frontend architecture & conventions](frontend/architecture-and-conventions.md)** —
   FSD layer boundaries, route thinness, Server/Client Component defaults,
   state model, and how the frontend consumes the backend.
+- **[i18n & error localization](frontend/i18n-and-errors.md)** — where copy
+  lives, adding strings/locales/error codes, ICU plurals, localized form
+  validation, locale-prefixed links from the backend, and running a fork
+  single-locale.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
   sessions, OAuth, [RBAC](auth/rbac.md), [API keys](auth/api-keys.md), invites,
   CSRF, and the [auth contracts reference](auth/reference.md).
@@ -68,5 +73,8 @@ there, not here.
 - Add an assistant version → [AI · Publish a New Version](ai/assistants.md#publish-a-new-version)
 - Add an artifact-backed run input → [AI · Upload and Use an Artifact](ai/artifacts.md#upload-and-use-an-artifact)
 - Add an email template → [Email · Add a Template](email/templates.md#add-a-template)
+- Add UI copy or a translation → [i18n · Add a UI string](frontend/i18n-and-errors.md#recipe-add-a-ui-string)
+- Add a backend error code end to end → [i18n · Add a backend error code](frontend/i18n-and-errors.md#recipe-add-a-backend-error-code-end-to-end)
+- Add a locale → [i18n · Add a third locale](frontend/i18n-and-errors.md#recipe-add-a-third-locale)
 - Add an audited action → [Operations · Add an audited action](operations/audit-log.md#add-an-audited-action)
 - Add a metric → [Operations · Add a metric](operations/observability.md#add-a-metric)

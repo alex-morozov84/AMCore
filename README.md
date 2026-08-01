@@ -28,6 +28,7 @@ brought up to the same quality bar instead of being removed.
 | **Media**         | ✅ Foundational | Safe image derivatives via `sharp`/libvips; avatar upload/delete is the shipped consumer                                                                                   |
 | **Notifications** | ✅ Shipped      | In-app feed, preferences, durable email + Telegram dispatch, realtime SSE fan-out                                                                                          |
 | **AI Capability** | ✅ Foundational | Provider-agnostic assistants, runs, tools/approvals, takeover, multimodal inputs                                                                                           |
+| **i18n**          | ✅ Shipped      | English + Russian end to end: locale-routed UI, per-user locale, ICU-pluralized email, API errors and form validation localized by machine-readable code                   |
 | **Operations**    | ✅ Shipped      | Health, observability, audit log, idempotency, webhooks, TLS/reverse-proxy (incl. an optional bundled Caddy edge profile), Postgres backup/restore, CI/security automation |
 
 ### Product Modules
@@ -45,6 +46,7 @@ capabilities without inheriting an unrelated sample domain.
 | **Email**        | Resend, React Email 5, FormatJS i18n                                |
 | **Storage**      | S3-compatible storage, local dev driver, memory test driver         |
 | **Frontend**     | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui                     |
+| **i18n**         | next-intl (web) + FormatJS (email), ICU MessageFormat, CLDR plurals |
 | **Architecture** | Feature-Sliced Design (FSD)                                         |
 | **Monorepo**     | pnpm workspaces + Turborepo                                         |
 | **Testing**      | Jest 30 (backend), Vitest 4 (email templates), Testcontainers (E2E) |
@@ -88,6 +90,7 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                                                                                                             |
 | RBAC / authorization  | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                                                                                        |
 | Email                 | [`docs/email/`](docs/email/README.md)                                                                                                                                           |
+| i18n & error copy     | [`docs/frontend/i18n-and-errors.md`](docs/frontend/i18n-and-errors.md)                                                                                                          |
 | Notifications         | [`docs/notifications/`](docs/notifications/README.md)                                                                                                                           |
 | AI capability layer   | [`docs/ai/`](docs/ai/README.md)                                                                                                                                                 |
 | Storage and media     | [`docs/storage/`](docs/storage/README.md), [`docs/media/`](docs/media/README.md)                                                                                                |

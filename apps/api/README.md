@@ -114,6 +114,18 @@ Stack traces are development-only. Validation errors include field-level
 `errors`. Domain exceptions flow through the filter stack in `common/exceptions`
 before reaching the HTTP response.
 
+`errorCode` is the stable field. **`message` is diagnostic English for
+developers and raw API consumers — clients must not display it**; they translate
+by code. Adding a code to a shared enum without translating it fails the web
+build. See
+[`docs/frontend/i18n-and-errors.md`](../../docs/frontend/i18n-and-errors.md).
+
+Any link this API puts in front of a user — email CTA, notification, OAuth
+redirect — must be built with `localizedFrontendUrl()` from `@amcore/shared`,
+never concatenated from `FRONTEND_URL`: web routes are locale-prefixed and an
+emailed link cannot fall back to a browser cookie. A test enforces it per
+occurrence.
+
 ## Logging and Metrics
 
 Logs are structured Pino JSON with correlation IDs, sensitive-field redaction,
