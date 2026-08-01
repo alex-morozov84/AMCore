@@ -1,7 +1,9 @@
+'use client'
+
 import type { UseFormSetError } from 'react-hook-form'
-import { useRouter } from 'next/navigation'
 import type { LoginInput } from '@amcore/shared'
 
+import { useRouter } from '@/i18n/navigation'
 import { authApi, setAccessToken } from '@/shared/api'
 import { useFormMutation } from '@/shared/hooks'
 import { useAuthStore } from '@/shared/store'
@@ -16,7 +18,9 @@ export function useLogin(setError?: UseFormSetError<LoginInput>) {
     onSuccess: (response) => {
       setAccessToken(response.accessToken)
       login(response.user)
-      router.push('/')
+      // Honour the locale stored on the account, so a user whose preference is
+      // Russian does not land on the English default after signing in.
+      router.push('/', { locale: response.user.locale })
     },
   })
 }

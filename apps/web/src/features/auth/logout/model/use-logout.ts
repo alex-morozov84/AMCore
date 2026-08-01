@@ -1,6 +1,8 @@
-import { useRouter } from 'next/navigation'
+'use client'
+
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { useRouter } from '@/i18n/navigation'
 import { authApi, setAccessToken } from '@/shared/api'
 import { useAuthStore } from '@/shared/store'
 

@@ -1,0 +1,46 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "noResults": "Nothing found"
+  },
+  "auth": {
+    "login": "Sign in",
+    "logout": "Sign out",
+    "register": "Sign up",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "namePlaceholder": "Jane Doe",
+    "forgotPassword": "Forgot your password?",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "loginSubtitle": "Sign in to your account",
+    "registerSubtitle": "Create a new account",
+    "loggingIn": "Signing in…",
+    "registering": "Signing up…",
+    "loginError": "Could not sign in",
+    "registerError": "Could not sign up"
+  },
+  "dashboard": {
+    "welcome": "Welcome!",
+    "welcomeNamed": "Welcome, {name}!",
+    "starterNotice": "This is the AMCore starter dashboard. Replace this view with your product's home screen."
+  },
+  "locale": {
+    "label": "Language",
+    "en": "English",
+    "ru": "Русский"
+  },
+  "meta": {
+    "title": "AMCore",
+    "description": "Production-oriented application starter for secure, modular products."
+  }
+}

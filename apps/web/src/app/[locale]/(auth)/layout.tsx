@@ -2,8 +2,9 @@
 
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
+import { LocaleSwitcher } from '@/features'
+import { useRouter } from '@/i18n/navigation'
 import { useAuthStore } from '@/shared/store'
 import { Spinner } from '@/shared/ui'
 
@@ -33,5 +34,10 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     return null
   }
 
-  return <main className="flex min-h-screen items-center justify-center p-4">{children}</main>
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-4">
+      {children}
+      <LocaleSwitcher />
+    </main>
+  )
 }

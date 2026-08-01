@@ -36,12 +36,12 @@ curl -X POST https://api.amcore.dev/api/v1/auth/register \
   }'
 ```
 
-`locale` is optional (`ru` or `en`). It sets the new user's interface/email
+`locale` is optional (`en` or `ru`). It sets the new user's interface/email
 language with this precedence:
 
 1. an explicit `locale` in the body, else
 2. the best supported match negotiated from the `Accept-Language` header, else
-3. the column default (`ru`).
+3. the column default (`en`).
 
 An unsupported `Accept-Language` (e.g. `de`) falls through to the default; an
 unsupported body `locale` is a `400` validation error.
@@ -335,7 +335,7 @@ wins over `Accept-Language`.
 | Field      | Rules                                    |
 | ---------- | ---------------------------------------- |
 | `name`     | ≥ 2 characters                           |
-| `locale`   | `ru` or `en`                             |
+| `locale`   | `en` or `ru`                             |
 | `timezone` | a valid IANA zone (e.g. `Europe/Moscow`) |
 
 **Success response** `200 OK`: the full updated profile in the same `{ user }`

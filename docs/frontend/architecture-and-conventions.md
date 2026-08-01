@@ -26,7 +26,8 @@ The two systems own different things, and the layer names say which:
 
 | Path                   | Owns                                                                                                         | Notes                                                                                                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app/`             | Next App Router files only: `page`, `layout`, `loading`, `error`, metadata, route handlers when truly needed | Thin — see [Route thinness](#route-thinness)                                                                                                                          |
+| `src/app/`             | Next App Router files only: `page`, `layout`, `loading`, `error`, metadata, route handlers when truly needed | Thin — see [Route thinness](#route-thinness). Routes live under a `[locale]` segment — see [Locale routing](#locale-routing)                                          |
+| `src/i18n/`            | Locale routing config, locale-aware navigation helpers, request config, param validation                     | Import navigation from here, never from `next/link` / `next/navigation` — see [Locale routing](#locale-routing)                                                       |
 | `src/_pages/`          | FSD Pages layer: page composition                                                                            | **Target name.** The current tree still uses `src/views/` for this layer — legacy starter drift, not yet migrated. Treat `views/` as `_pages/` until the rename lands |
 | `src/_app/` (optional) | FSD App layer: app-level providers/config that live outside Next's own route files                           | Use only if app-level wiring doesn't fit naturally in `src/app/layout.tsx` / `providers.tsx`                                                                          |
 | `src/widgets/`         | Composed UI blocks made of multiple features/entities                                                        | Canonical FSD meaning, unchanged                                                                                                                                      |
@@ -67,13 +68,62 @@ business UI, direct feature/entity data hooks, substantial JSX, or
 client-only state. Composition belongs in `_pages/` (today: `views/`):
 
 ```
-src/app/(dashboard)/page.tsx        → imports and renders a _pages/ (views/) component
+src/app/[locale]/(dashboard)/page.tsx  → imports and renders a _pages/ (views/) component
 src/_pages/dashboard/DashboardPage.tsx → owns the actual composition
 ```
 
-`src/app/(dashboard)/page.tsx` does not yet follow this rule — it's a known
+`src/app/[locale]/(dashboard)/page.tsx` does not yet follow this rule — it's a known
 gap left for Track 9 (starter cleanup), not fixed by the architecture
 contract itself.
+
+## Locale routing
+
+Every route lives under a `[locale]` segment: `src/app/[locale]/(auth)/login/page.tsx`.
+The locale set and default come from `SUPPORTED_LOCALES` / `DEFAULT_LOCALE` in
+`@amcore/shared` — the same source the API uses for `User.locale`,
+`Accept-Language` negotiation, and email rendering, so the frontend can never
+disagree with the backend about which locales exist.
+
+`localePrefix` is `'always'`: **every** locale is explicit, including the
+default — `/en/login`, `/ru/login`. A request to `/login` redirects to
+`/en/login`; an unsupported locale such as `/de/login` is a 404, never a silent
+fallback to English.
+
+`'as-needed'` (default locale at bare `/login`) looks nicer and is deliberately
+**not** used. It needs the proxy to rewrite `/login` → `/en/login` internally,
+and Next's standalone server — what the Docker image runs — does not consume
+the resulting `x-middleware-rewrite`; it returns it to the client alongside a
+307 to the original path, so `/login` redirects to itself forever
+(vercel/next.js#91844). `'always'` reaches every locale by redirect, which
+standalone handles correctly. Do not switch back without re-testing against the
+standalone server — `next start` does not reproduce the fault.
+
+Two rules that are easy to get wrong:
+
+- **Import navigation from `@/i18n/navigation`, never from `next/link` or
+  `next/navigation`.** The Next.js originals do not know about the `[locale]`
+  segment and drop the prefix silently — a Russian user ends up back on the
+  English route with no error anywhere. An ESLint rule enforces this;
+  `notFound()` and other non-navigating helpers may still come from
+  `next/navigation`.
+- **Call `setRequestLocale(locale)` before any other next-intl call** in each
+  page/layout that should render statically, passing it through
+  `resolveLocaleParam(params)` from `@/i18n/params` so the URL segment is
+  validated. Skipping it makes the route silently opt out of static rendering.
+
+Locale resolution order: URL prefix → the signed-in user's stored
+`User.locale` (applied at the post-login redirect) → the `NEXT_LOCALE` cookie →
+`Accept-Language` → `DEFAULT_LOCALE`. An explicit URL prefix always wins for
+the request it is on, so following a `/ru/...` link is never overridden
+mid-session. The language switcher writes both the cookie and — when signed
+in — `PATCH /auth/me`, so the choice follows the user to other devices and to
+their email.
+
+Message catalogues live in `apps/web/messages/`. **`en.json` is the source of
+truth**; every other catalogue must have exactly the same keys, which a test
+enforces. Translation keys are type-checked against `en.json` via the
+`AppConfig` augmentation in `src/global.d.ts`, so a typo fails `pnpm typecheck`
+rather than surfacing in the browser.
 
 ## Server/Client Component defaults
 
@@ -131,8 +181,10 @@ auth, and query patterns), which should also reconcile the port mismatch in
 
 ## The recipe — adding a route
 
-1. Add the route file under `src/app/` (`page.tsx`, `layout.tsx`, etc.) —
-   metadata and plumbing only.
+1. Add the route file under `src/app/[locale]/` (`page.tsx`, `layout.tsx`,
+   etc.) — metadata and plumbing only. Server Component pages should call
+   `setRequestLocale(await resolveLocaleParam(params))` first; see
+   [Locale routing](#locale-routing).
 2. Build the actual page composition under `src/_pages/<route>/` (today:
    `src/views/<route>/`), importing whatever `widgets`/`features`/`entities`
    it needs through their public APIs.
@@ -144,8 +196,9 @@ auth, and query patterns), which should also reconcile the port mismatch in
 5. Decide Server vs Client for each new component per
    [Server/Client Component defaults](#serverclient-component-defaults)
    before defaulting to `'use client'`.
-6. Add translations under `apps/web/messages/` (next-intl) — see Track 3 for
-   the fuller i18n contract once it lands.
+6. Add copy to **every** catalogue under `apps/web/messages/`, starting from
+   `en.json` — the parity test fails a key that exists in one locale only.
+   Never inline user-facing text in a component.
 7. Update this guide's tables only if the route introduces a new pattern, not
    for routine additions.
 

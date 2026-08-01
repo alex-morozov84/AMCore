@@ -2,9 +2,9 @@
 
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
-import { LogoutButton } from '@/features/auth'
+import { LocaleSwitcher, LogoutButton } from '@/features'
+import { useRouter } from '@/i18n/navigation'
 import { useAuthStore } from '@/shared/store'
 import { Spinner } from '@/shared/ui'
 
@@ -42,6 +42,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <span className="font-semibold">AMCore</span>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">{user?.email}</span>
+            <LocaleSwitcher />
             <LogoutButton variant="ghost" showText={false} />
           </div>
         </div>
