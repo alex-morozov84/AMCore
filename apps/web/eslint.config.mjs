@@ -138,6 +138,29 @@ export default [
     },
   },
 
+  // Validation localization.
+  //
+  // `z.config(z.locales.*)` sets Zod's locale process-globally. It cannot be
+  // scoped to a request or a render (colinhacks/zod#4986), so it cannot serve
+  // two live locales and on the server it races across requests. Localize with
+  // the per-parse error map instead — `useLocalizedForm` / `useZodErrorMap`.
+  {
+    name: 'project/zod-locale',
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='z'][callee.property.name='config']",
+          message:
+            'Do not set a global Zod locale — it cannot represent two locales. ' +
+            'Use useLocalizedForm() / useZodErrorMap() (per-parse error map).',
+        },
+      ],
+    },
+  },
+
   // Next.js rules
   {
     name: 'project/nextjs',

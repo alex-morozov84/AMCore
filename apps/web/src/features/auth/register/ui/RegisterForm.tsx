@@ -1,10 +1,9 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
 import { useTranslations } from 'next-intl'
 import { type RegisterInput, registerSchema } from '@amcore/shared'
-import { zodResolver } from '@hookform/resolvers/zod'
 
+import { useLocalizedForm } from '@/shared/hooks'
 import {
   ApiErrorAlert,
   Button,
@@ -22,8 +21,7 @@ import { useRegister } from '../model/use-register'
 export function RegisterForm() {
   const t = useTranslations('auth')
 
-  const form = useForm<RegisterInput>({
-    resolver: zodResolver(registerSchema),
+  const form = useLocalizedForm<RegisterInput>(registerSchema, {
     defaultValues: {
       email: '',
       password: '',

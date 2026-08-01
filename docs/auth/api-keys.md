@@ -233,7 +233,7 @@ Example response for `{ "scopes": ["read:User", "manage:all"] }`:
   "errors": [
     {
       "field": "scopes.1",
-      "message": "`manage:all` is forbidden — would grant unrestricted access",
+      "message": "Invalid input",
       "code": "custom",
       "errorCode": "API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN"
     }
@@ -242,6 +242,11 @@ Example response for `{ "scopes": ["read:User", "manage:all"] }`:
 ```
 
 Note that the error is at `scopes.1` only — `read:User` at index 0 is valid and not reported.
+
+Branch on **`errorCode`**, not `message`. The scope-grammar rules deliberately
+carry no hand-written message: a literal message in a shared schema outranks the
+frontend's per-parse localization and would force English into a localized UI,
+so the meaning lives in `errorCode` and `message` is Zod's generic default.
 
 ---
 

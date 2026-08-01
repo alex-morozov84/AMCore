@@ -149,6 +149,33 @@ enums, so a code with no translation fails the build rather than silently
 degrading to the generic message. It also fails on an orphaned message, which
 catches a typo or a code the backend has since removed.
 
+## Form validation
+
+Build forms with **`useLocalizedForm(schema, options)`** rather than `useForm` +
+`zodResolver` directly. It wires a per-parse Zod error map so validation
+messages render in the active locale.
+
+Zod's own `z.config(z.locales.*)` is deliberately not used: it sets the locale
+**process-globally**, cannot be scoped to a request or a render
+([colinhacks/zod#4986](https://github.com/colinhacks/zod/issues/4986)), and so
+cannot represent two live locales — on the server it would race across requests.
+An ESLint rule blocks it.
+
+Two rules follow from Zod's precedence (schema-level → per-parse → global →
+locale):
+
+- **Never put a literal `message` in a shared schema.** A schema-level message
+  outranks the per-parse map and silently defeats localization for that field.
+  Schemas stay language-neutral; `superRefine` rules carry `params.errorCode`
+  instead, which the map translates through the same `errors.*` catalogue that
+  API errors use — so a rule enforced on both client and server reads
+  identically wherever it fires.
+- **Server-side field errors are localized by code too.** `useFormMutation`
+  maps `errors[]` entries through `useFieldErrorTranslator`, never the wire
+  `message`. That path is necessarily coarser — the wire format carries no
+  `minimum`/`format` — so it is the backstop, with the client schema catching
+  most issues first.
+
 ## Server/Client Component defaults
 
 **Server Components are the default** for routes and page composition.

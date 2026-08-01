@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Form validation messages are now localized per parse instead of via a
+  global Zod locale.** `apps/web` called `z.config(z.locales.ru())` once at
+  startup. That setting is process-global, cannot be scoped to a request or a
+  render ([colinhacks/zod#4986](https://github.com/colinhacks/zod/issues/4986)),
+  and therefore cannot represent two live locales — and being called from a
+  `useEffect` it never applied during server rendering at all. Replaced with a
+  per-parse error map: build forms with the new `useLocalizedForm(schema)`.
+  Server-returned field errors are localized too — `useFormMutation` now
+  translates `errors[]` by code via `useFieldErrorTranslator` rather than
+  writing the backend's English `message` into the form.
+  **Breaking for forks that added `message:` to a shared Zod schema:** a
+  schema-level message outranks the per-parse map in Zod's precedence and
+  silently defeats localization for that field. The four such messages in
+  `packages/shared/src/schemas/api-keys.ts` were removed; those issues already
+  carry `params.errorCode`, which the frontend translates. Raw API consumers
+  now receive Zod's default `"Invalid input"` in `errors[].message` for those
+  four scope-grammar failures — `errorCode` remains the stable field to branch
+  on, as `docs/auth/reference.md` documents. An ESLint rule blocks
+  reintroducing a global Zod locale.
+
 - **API errors are now localized by `errorCode` instead of showing the
   backend's own message.** ADR-023 has the backend emit stable machine-readable
   codes plus an English, developer-facing `message`, and the frontend translate

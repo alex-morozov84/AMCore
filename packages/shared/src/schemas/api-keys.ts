@@ -34,7 +34,6 @@ const scopeSchema = z.string().superRefine((value, ctx) => {
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Scope must be in `action:Subject` format',
       params: { errorCode: ApiKeyScopeErrorCode.API_KEY_SCOPE_INVALID_FORMAT },
     })
     return
@@ -43,7 +42,6 @@ const scopeSchema = z.string().superRefine((value, ctx) => {
   if (!ACTIONS.includes(action)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Unknown scope action',
       params: { errorCode: ApiKeyScopeErrorCode.API_KEY_SCOPE_UNKNOWN_ACTION },
     })
     return
@@ -51,7 +49,6 @@ const scopeSchema = z.string().superRefine((value, ctx) => {
   if (!SUBJECTS.includes(subject)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Unknown scope subject',
       params: { errorCode: ApiKeyScopeErrorCode.API_KEY_SCOPE_UNKNOWN_SUBJECT },
     })
     return
@@ -59,7 +56,6 @@ const scopeSchema = z.string().superRefine((value, ctx) => {
   if (action === Action.Manage && subject === Subject.All) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: '`manage:all` is forbidden — would grant unrestricted access',
       params: { errorCode: ApiKeyScopeErrorCode.API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN },
     })
   }

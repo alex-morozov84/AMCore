@@ -4,18 +4,25 @@ import { getValidationErrors } from '../api/errors'
 import type { ValidationError } from '../api/types'
 
 /**
- * Set server validation errors on React Hook Form fields
+ * Set server validation errors on React Hook Form fields.
+ *
+ * `translate` is required and must localize by code — see
+ * `useFieldErrorTranslator`. Most callers get this for free through
+ * `useFormMutation` and never call this directly.
  *
  * @example
  * ```tsx
+ * const translateFieldError = useFieldErrorTranslator()
+ *
  * onError: (error) => {
- *   setServerErrors(error, form.setError)
+ *   setServerErrors(error, form.setError, translateFieldError)
  * }
  * ```
  */
 export function setServerErrors<TFieldValues extends FieldValues>(
   error: unknown,
-  setError: UseFormSetError<TFieldValues>
+  setError: UseFormSetError<TFieldValues>,
+  translate: (err: ValidationError) => string
 ): void {
   const validationErrors = getValidationErrors(error)
 
@@ -29,27 +36,9 @@ export function setServerErrors<TFieldValues extends FieldValues>(
 
     setError(fieldName, {
       type: 'server',
-      message: err.message,
+      // `translate`, never `err.message`: the wire message is English and
+      // developer-facing. See `useFieldErrorTranslator`.
+      message: translate(err),
     })
   })
-}
-
-/**
- * Transform server validation errors to React Hook Form errors format
- * Useful for preview/debugging
- *
- * @returns Record of field names to error messages
- */
-export function transformServerErrors<TFieldValues extends FieldValues>(
-  error: unknown
-): Partial<Record<keyof TFieldValues, string>> {
-  const validationErrors = getValidationErrors(error)
-  const errors: Partial<Record<keyof TFieldValues, string>> = {}
-
-  validationErrors.forEach((err) => {
-    const fieldName = err.field as keyof TFieldValues
-    errors[fieldName] = err.message
-  })
-
-  return errors
 }

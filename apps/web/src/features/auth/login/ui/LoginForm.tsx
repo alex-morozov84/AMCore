@@ -1,10 +1,9 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
 import { useTranslations } from 'next-intl'
 import { type LoginInput, loginSchema } from '@amcore/shared'
-import { zodResolver } from '@hookform/resolvers/zod'
 
+import { useLocalizedForm } from '@/shared/hooks'
 import {
   ApiErrorAlert,
   Button,
@@ -22,8 +21,7 @@ import { useLogin } from '../model/use-login'
 export function LoginForm() {
   const t = useTranslations('auth')
 
-  const form = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
+  const form = useLocalizedForm<LoginInput>(loginSchema, {
     defaultValues: {
       email: '',
       password: '',
