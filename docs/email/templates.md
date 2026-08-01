@@ -39,7 +39,20 @@ locale set from `@amcore/shared`. Subjects live beside each template as
 Rules:
 
 - Add every message key for every supported locale.
-- Keep user-facing copy in message catalogs, not service methods.
+- **Keep user-facing copy in message catalogs, not service methods** — including
+  units. Pass a _number_ (`expiresInHours`) and let the catalogue phrase it;
+  building `${hours} часов` in a service hardcodes one language into every
+  recipient's email, which is a defect this starter already shipped once.
+- **Pluralize with ICU in the message**, never a helper in code:
+  `{hours, plural, one {# час} few {# часа} many {# часов} other {# часа}}`.
+  Russian needs four CLDR categories; supplying only `one`/`other` renders with
+  wrong grammar and is invisible when testing in English. `messages.spec.ts`
+  enforces the required categories.
+- **Build links with `localizedFrontendUrl()`** from `@amcore/shared`, never by
+  concatenating `FRONTEND_URL`. Web routes are locale-prefixed, and an emailed
+  link cannot fall back to a browser cookie the recipient may not have. A test
+  (`frontend-url-coverage.spec.ts`) fails any `FRONTEND_URL` read outside that
+  helper. Full rules: [`docs/frontend/i18n-and-errors.md`](../frontend/i18n-and-errors.md).
 - Render HTML and plaintext from the same React Email component.
 - Notification definitions own their own copy and content policy; they do not
   need to use the infrastructure email message catalog.
@@ -48,7 +61,8 @@ Rules:
 
 When adding or changing templates, update tests in the same PR:
 
-- `messages.spec.ts` for locale/message key parity.
+- `messages.spec.ts` for locale/message key parity **and required CLDR plural
+  categories**.
 - `email.schema.spec.ts` for queue schema changes.
 - `email.service.spec.ts` for render/queue/direct behavior.
 - `processors/email.processor.spec.ts` for worker semantics.
