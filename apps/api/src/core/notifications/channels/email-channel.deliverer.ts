@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
+import { coerceSupportedLocale, type SupportedLocale } from '@amcore/shared'
 
 import { NotificationChannel } from '../notification.constants'
 import { resolveExternalMode } from '../notification-content-policy'
@@ -21,12 +21,6 @@ const EmailDeliveryError = {
   PROVIDER_PERMANENT: 'email_provider_permanent',
   PROVIDER_TRANSIENT: 'email_provider_transient',
 } as const
-
-function toLocale(value: string): SupportedLocale {
-  return (SUPPORTED_LOCALES as readonly string[]).includes(value)
-    ? (value as SupportedLocale)
-    : DEFAULT_LOCALE
-}
 
 /**
  * Email channel deliverer (ADR-052, worker-only). Renders the generic notification email
@@ -49,7 +43,7 @@ export class EmailChannelDeliverer implements ChannelDeliverer {
 
   async deliver(context: DeliveryContext): Promise<DeliveryResult> {
     const { delivery, notification } = context
-    const locale = toLocale(delivery.locale)
+    const locale = coerceSupportedLocale(delivery.locale)
 
     const content = this.resolveContent(notification.type, notification.payload, locale)
     if (content === 'forbidden') {

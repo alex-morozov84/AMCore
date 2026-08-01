@@ -420,7 +420,8 @@ describe('InviteService', () => {
       expect(emailService.sendOrgInviteEmail).toHaveBeenCalledTimes(1)
       const [, data] = emailService.sendOrgInviteEmail.mock.calls[0]!
       expect(data.hasAccount).toBe(false)
-      expect(data.locale).toBe('ru')
+      // No account yet, so no stored preference — falls back to the base locale.
+      expect(data.locale).toBe('en')
     })
 
     it('sends an org invite email when rotating an existing active row', async () => {

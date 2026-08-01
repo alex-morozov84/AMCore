@@ -233,7 +233,7 @@ describe('OAuth (e2e)', () => {
       const user = await prisma.user.findUnique({
         where: { emailCanonical: 'oauth-user@example.com' },
       })
-      expect(user?.locale).toBe('ru')
+      expect(user?.locale).toBe('en')
     })
 
     it('should set refresh_token cookie on successful callback', async () => {

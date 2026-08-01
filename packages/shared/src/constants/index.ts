@@ -92,9 +92,15 @@ export const AUTH = {
 // (registration input, profile update, user response, email rendering). Adding a
 // locale here is the only place to extend the set; downstream Zod schemas and the
 // email `Locale` type derive from it. `DEFAULT_LOCALE` mirrors the Prisma
-// `User.locale` column default.
-export const SUPPORTED_LOCALES = ['ru', 'en'] as const
+// `User.locale` column default — keep the two in sync.
+//
+// `en` is first and is the default: AMCore's base locale is English, and `ru`
+// ships as a fully translated second locale. Nothing should depend on the array
+// order — `negotiateLocale` deliberately refuses to negotiate an absent
+// `Accept-Language` header precisely so the result is never coupled to whichever
+// locale happens to be listed first.
+export const SUPPORTED_LOCALES = ['en', 'ru'] as const
 
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 
-export const DEFAULT_LOCALE: SupportedLocale = 'ru'
+export const DEFAULT_LOCALE: SupportedLocale = 'en'

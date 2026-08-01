@@ -13,20 +13,27 @@ import { describe, expect, it } from 'vitest'
 import EmailVerificationEmail, { getEmailVerificationSubject } from './email-verification'
 
 const baseProps = {
-  name: 'Александр',
+  name: 'Alexander',
   verificationUrl: 'https://app.example.com/verify-email?token=raw-token-xyz',
-  expiresIn: '24 часа',
+  expiresIn: '24 hours',
 }
 
 describe('EmailVerificationEmail Template (Integration)', () => {
-  it('should render in Russian by default', async () => {
+  it('should render in the base locale (English) by default', async () => {
     const html = await render(EmailVerificationEmail(baseProps))
 
     expect(html).toBeTruthy()
     expect(typeof html).toBe('string')
 
-    expect(html).toContain('Александр')
-    expect(html).toContain('24 часа')
+    expect(html).toContain('Alexander')
+    expect(html).toContain('24 hours')
+
+    // Assert the translated chrome, not just the interpolated props — props
+    // render identically in every locale, so checking them alone would keep
+    // this test green no matter which locale the template actually used.
+    expect(html).toContain('Verify your email')
+    expect(html).toContain('Verify Email')
+    expect(html).not.toContain('Подтвердите ваш email')
 
     // The raw verification token must reach the recipient via the button href.
     expect(html).toContain('https://app.example.com/verify-email?token=raw-token-xyz')
@@ -35,10 +42,12 @@ describe('EmailVerificationEmail Template (Integration)', () => {
     expect(html).toContain('</html>')
   })
 
-  it('should render in English when locale=en', async () => {
-    const html = await render(EmailVerificationEmail({ ...baseProps, locale: 'en' }))
+  it('should render in Russian when locale=ru', async () => {
+    const html = await render(EmailVerificationEmail({ ...baseProps, locale: 'ru' }))
 
-    expect(html).toContain('Verify')
+    expect(html).toContain('Подтвердите ваш email')
+    expect(html).toContain('Подтвердить email')
+    expect(html).not.toContain('Verify your email')
     expect(html).toContain(baseProps.verificationUrl)
   })
 

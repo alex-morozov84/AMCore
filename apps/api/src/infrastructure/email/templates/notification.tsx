@@ -1,5 +1,7 @@
 import { createIntl } from '@formatjs/intl'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 import { emailMessages, type Locale } from '../messages'
 import {
   Body,
@@ -33,7 +35,7 @@ export const NotificationEmail = ({
   title,
   body,
   actionUrl,
-  locale = 'ru',
+  locale = DEFAULT_LOCALE,
 }: NotificationEmailProps) => {
   const intl = createIntl({ locale, messages: emailMessages[locale] })
 
@@ -68,7 +70,7 @@ NotificationEmail.PreviewProps = {
   title: 'Профиль обновлён',
   body: 'Вы изменили данные профиля.',
   actionUrl: 'https://amcore.alex-morozov.com',
-  locale: 'ru',
+  locale: DEFAULT_LOCALE,
 } as NotificationEmailProps
 
 export default NotificationEmail

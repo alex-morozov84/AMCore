@@ -6,6 +6,7 @@ import { PinoLogger } from 'nestjs-pino'
 import type { CreateInviteInput } from '@amcore/shared'
 import {
   type AcceptInviteResponse,
+  coerceSupportedLocale,
   InviteErrorCode,
   type InviteListResponse,
   type InviteResponse,
@@ -694,7 +695,10 @@ export class InviteService {
         this.prisma.role.findUnique({ where: { id: args.roleId }, select: { name: true } }),
       ])
 
-      const locale: 'ru' | 'en' = args.recipientLocale === 'en' ? 'en' : 'ru'
+      // Fall back to the shared default rather than a hardcoded locale: an
+      // unknown recipient (no account yet) has no stored preference. Coerce
+      // rather than parse — a locale anomaly must not abort invite dispatch.
+      const locale = coerceSupportedLocale(args.recipientLocale)
       const acceptUrl = `${this.env.get('FRONTEND_URL')}/invite/accept?token=${args.rawToken}`
 
       await this.emailService.sendOrgInviteEmail(args.recipientEmail, {

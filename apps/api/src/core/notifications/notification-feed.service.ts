@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
 import {
-  DEFAULT_LOCALE,
+  coerceSupportedLocale,
   type NotificationAction,
   type NotificationFeedItem,
   type NotificationFeedResponse,
@@ -106,7 +106,7 @@ export class NotificationFeedService {
       where: { id: userId },
       select: { locale: true },
     })
-    return (user?.locale ?? DEFAULT_LOCALE) as SupportedLocale
+    return coerceSupportedLocale(user?.locale)
   }
 
   private toFeedItem(row: Notification, locale: SupportedLocale): NotificationFeedItem {

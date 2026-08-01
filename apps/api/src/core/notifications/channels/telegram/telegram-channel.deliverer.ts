@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
+import { coerceSupportedLocale, type SupportedLocale } from '@amcore/shared'
 
 import { PrismaService } from '../../../../prisma'
 import { NotificationChannel } from '../../notification.constants'
@@ -19,12 +19,6 @@ import { telegramGenericMessages } from './telegram-messages'
 
 import { EnvService } from '@/env/env.service'
 import { NotificationDeliveryStatus, TelegramConnectionStatus } from '@/generated/prisma/client'
-
-function toLocale(value: string): SupportedLocale {
-  return (SUPPORTED_LOCALES as readonly string[]).includes(value)
-    ? (value as SupportedLocale)
-    : DEFAULT_LOCALE
-}
 
 /**
  * Telegram channel deliverer (ADR-052 / Arc D, worker-only). Mirrors the email deliverer:
@@ -47,7 +41,7 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
 
   async deliver(context: DeliveryContext): Promise<DeliveryResult> {
     const { delivery, notification } = context
-    const locale = toLocale(delivery.locale)
+    const locale = coerceSupportedLocale(delivery.locale)
 
     const content = this.resolveContent(notification.type, notification.payload, locale)
     if (content === 'forbidden') {

@@ -233,7 +233,7 @@ describe('Auth (e2e)', () => {
         .send({ email: 'deheader@example.com', password: 'StrongP@ss123' })
         .expect(201)
 
-      expect(response.body.user.locale).toBe('ru')
+      expect(response.body.user.locale).toBe('en')
     })
 
     it('returns 400 for an unsupported body locale', async () => {
@@ -592,8 +592,8 @@ describe('Auth (e2e)', () => {
         where: { emailCanonical: 'profile@example.com' },
       })
       expect(user?.name).toBe('Only Name')
-      expect(user?.locale).toBe('ru') // default preserved
-      expect(user?.timezone).toBe('Europe/Moscow') // default preserved
+      expect(user?.locale).toBe('en') // default preserved
+      expect(user?.timezone).toBe('UTC') // default preserved
     })
 
     it('returns 400 for an unsupported locale', async () => {

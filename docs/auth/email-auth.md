@@ -300,8 +300,8 @@ curl https://api.amcore.dev/api/v1/auth/me \
     "avatarUrl": null,
     "phone": null,
     "emailVerified": true,
-    "locale": "ru",
-    "timezone": "Europe/Moscow",
+    "locale": "en",
+    "timezone": "UTC",
     "createdAt": "2024-01-15T10:00:00.000Z",
     "lastLoginAt": "2024-03-20T08:30:00.000Z"
   }

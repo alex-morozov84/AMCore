@@ -13,21 +13,21 @@ import { describe, expect, it } from 'vitest'
 import PasswordResetEmail, { getPasswordResetSubject } from './password-reset'
 
 const baseProps = {
-  name: 'Александр',
+  name: 'Alexander',
   resetUrl: 'https://app.example.com/reset-password?token=raw-token-abc',
-  expiresIn: '1 час',
+  expiresIn: '1 hour',
 }
 
 describe('PasswordResetEmail Template (Integration)', () => {
-  it('should render in Russian by default', async () => {
+  it('should render in the base locale (English) by default', async () => {
     const html = await render(PasswordResetEmail(baseProps))
 
     expect(html).toBeTruthy()
     expect(typeof html).toBe('string')
 
-    expect(html).toContain('Александр')
-    expect(html).toContain('Сброс пароля')
-    expect(html).toContain('1 час')
+    expect(html).toContain('Alexander')
+    expect(html).toContain('Password Reset')
+    expect(html).toContain('1 hour')
 
     // The raw reset token must reach the recipient via the button href.
     expect(html).toContain('https://app.example.com/reset-password?token=raw-token-abc')
@@ -36,10 +36,10 @@ describe('PasswordResetEmail Template (Integration)', () => {
     expect(html).toContain('</html>')
   })
 
-  it('should render in English when locale=en', async () => {
-    const html = await render(PasswordResetEmail({ ...baseProps, locale: 'en' }))
+  it('should render in Russian when locale=ru', async () => {
+    const html = await render(PasswordResetEmail({ ...baseProps, locale: 'ru' }))
 
-    expect(html).toContain('Password Reset')
+    expect(html).toContain('Сброс пароля')
     expect(html).toContain(baseProps.resetUrl)
   })
 

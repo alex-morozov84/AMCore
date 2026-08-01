@@ -1,5 +1,7 @@
 import { createIntl } from '@formatjs/intl'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 import { emailMessages, type Locale } from '../messages'
 import {
   Body,
@@ -25,7 +27,7 @@ export const EmailVerificationEmail = ({
   name,
   verificationUrl,
   expiresIn,
-  locale = 'ru',
+  locale = DEFAULT_LOCALE,
 }: EmailVerificationProps) => {
   const intl = createIntl({
     locale,
@@ -69,7 +71,7 @@ EmailVerificationEmail.PreviewProps = {
   name: 'Александр',
   verificationUrl: 'https://amcore.alex-morozov.com/verify-email?token=xyz789',
   expiresIn: '24 часа',
-  locale: 'ru',
+  locale: DEFAULT_LOCALE,
 } as EmailVerificationProps
 
 export default EmailVerificationEmail
@@ -78,7 +80,7 @@ export default EmailVerificationEmail
  * Get subject for Email Verification Email
  * Used by EmailService to get localized subject line
  */
-export function getEmailVerificationSubject(locale: Locale = 'ru'): string {
+export function getEmailVerificationSubject(locale: Locale = DEFAULT_LOCALE): string {
   const intl = createIntl({
     locale,
     messages: emailMessages[locale],

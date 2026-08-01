@@ -12,7 +12,7 @@ import type {
   UpdateProfileInput,
   UserResponse,
 } from '@amcore/shared'
-import { AuthErrorCode, parseSupportedLocale } from '@amcore/shared'
+import { AuthErrorCode, coerceSupportedLocale, parseSupportedLocale } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
 import { EnvService } from '../../env/env.service'
@@ -136,7 +136,7 @@ export class AuthService {
       .sendWelcomeEmail({
         name: user.name ?? user.email,
         email: user.email,
-        locale: user.locale as 'ru' | 'en',
+        locale: coerceSupportedLocale(user.locale),
       })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send welcome email'))
     void this.emailService
@@ -144,7 +144,7 @@ export class AuthService {
         name: user.name ?? user.email,
         verificationUrl,
         expiresIn,
-        locale: user.locale as 'ru' | 'en',
+        locale: coerceSupportedLocale(user.locale),
       })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send verification email'))
 
@@ -411,7 +411,7 @@ export class AuthService {
         name: user.name ?? user.email,
         resetUrl,
         expiresIn,
-        locale: user.locale as 'ru' | 'en',
+        locale: coerceSupportedLocale(user.locale),
       })
       this.logger.info({ userId: user.id }, 'Password reset email sent')
     } catch (err) {
@@ -535,7 +535,7 @@ export class AuthService {
         name: user.name ?? user.email,
         verificationUrl,
         expiresIn,
-        locale: user.locale as 'ru' | 'en',
+        locale: coerceSupportedLocale(user.locale),
       })
       this.logger.info({ userId: user.id }, 'Verification email sent')
     } catch (err) {
