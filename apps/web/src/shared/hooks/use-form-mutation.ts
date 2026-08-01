@@ -40,7 +40,7 @@ export interface UseFormMutationOptions<
  *   },
  *   onError: (error) => {
  *     // Custom error handling (optional)
- *     toast.error(getErrorMessage(error))
+ *     toast.error(getErrorMessage(error, t('common.error')))
  *   }
  * })
  * ```

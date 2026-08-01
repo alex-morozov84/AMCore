@@ -3,6 +3,7 @@ import type {
   LoginInput,
   RegisterInput,
   SessionsListResponse,
+  UpdateProfileInput,
   UserResponse,
 } from '@amcore/shared'
 
@@ -34,6 +35,11 @@ export const authApi = {
 
   getMe: async (): Promise<MeResponse> => {
     const response = await apiClient.get<MeResponse>('/auth/me')
+    return response.data
+  },
+
+  updateMe: async (data: UpdateProfileInput): Promise<MeResponse> => {
+    const response = await apiClient.patch<MeResponse>('/auth/me', data)
     return response.data
   },
 

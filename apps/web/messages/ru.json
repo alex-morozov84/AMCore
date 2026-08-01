@@ -1,7 +1,7 @@
 {
   "common": {
-    "loading": "Загрузка...",
-    "error": "Произошла ошибка",
+    "loading": "Загрузка…",
+    "error": "Что-то пошло не так",
     "retry": "Повторить",
     "save": "Сохранить",
     "cancel": "Отмена",
@@ -18,31 +18,29 @@
     "email": "Email",
     "password": "Пароль",
     "name": "Имя",
+    "namePlaceholder": "Иван Иванов",
     "forgotPassword": "Забыли пароль?",
     "noAccount": "Нет аккаунта?",
     "hasAccount": "Уже есть аккаунт?",
-    "loginError": "Неверный email или пароль",
-    "registerError": "Ошибка регистрации",
-    "loggingIn": "Вход...",
-    "registering": "Регистрация..."
+    "loginSubtitle": "Войдите в свой аккаунт",
+    "registerSubtitle": "Создайте новый аккаунт",
+    "loggingIn": "Вход…",
+    "registering": "Регистрация…",
+    "loginError": "Не удалось войти",
+    "registerError": "Не удалось зарегистрироваться"
   },
-  "navigation": {
-    "home": "Главная",
-    "fitness": "Фитнес",
-    "finance": "Финансы",
-    "subscriptions": "Подписки",
-    "settings": "Настройки",
-    "profile": "Профиль"
+  "dashboard": {
+    "welcome": "Добро пожаловать!",
+    "welcomeNamed": "Добро пожаловать, {name}!",
+    "starterNotice": "Это стартовый дашборд AMCore. Замените этот экран главной страницей вашего продукта."
   },
-  "fitness": {
-    "workouts": "Тренировки",
-    "exercises": "Упражнения",
-    "progress": "Прогресс",
-    "newWorkout": "Новая тренировка",
-    "startWorkout": "Начать тренировку"
+  "locale": {
+    "label": "Язык",
+    "en": "English",
+    "ru": "Русский"
   },
   "meta": {
-    "title": "AMCore — Персональная продуктивность",
-    "description": "Платформа для фитнеса"
+    "title": "AMCore",
+    "description": "Стартовый шаблон для безопасных модульных приложений."
   }
 }

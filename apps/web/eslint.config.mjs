@@ -105,6 +105,39 @@ export default [
     },
   },
 
+  // Locale-aware navigation.
+  //
+  // `next/link` and `next/navigation` know nothing about the `[locale]`
+  // segment: they drop the prefix silently, sending a Russian user back to the
+  // English route with no error anywhere. Because the failure is invisible, it
+  // is enforced here rather than left to review. `src/i18n/navigation.ts` is
+  // exempt — it is where the locale-aware versions are created.
+  {
+    name: 'project/i18n-navigation',
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/i18n/navigation.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'next/link',
+              message: "Import { Link } from '@/i18n/navigation' — next/link drops the locale.",
+            },
+            {
+              name: 'next/navigation',
+              importNames: ['redirect', 'permanentRedirect', 'usePathname', 'useRouter'],
+              message:
+                "Import locale-aware navigation from '@/i18n/navigation'. " +
+                'Non-navigating helpers such as notFound() may still come from next/navigation.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Next.js rules
   {
     name: 'project/nextjs',

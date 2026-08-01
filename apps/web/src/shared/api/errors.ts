@@ -39,9 +39,25 @@ export function getValidationErrors(error: unknown): ValidationError[] {
 }
 
 /**
- * Extract error message from any error type
+ * Extract a user-facing message from any error type.
+ *
+ * `fallback` is required and must already be localized by the caller: this
+ * module is a locale-agnostic library layer and must not contain user-facing
+ * prose. It previously hardcoded Russian strings here, which became visible
+ * the moment English shipped as the base locale.
+ *
+ * `network`/`timeout` are optional localized overrides; without them those
+ * cases collapse into `fallback`, which is correct but less specific.
+ *
+ * Interim shape only. The full contract — translating by the machine-readable
+ * `errorCode` per ADR-023, with network/timeout as their own codes — replaces
+ * this function in the API-error-localization PR.
  */
-export function getErrorMessage(error: unknown, fallback = 'Произошла ошибка'): string {
+export function getErrorMessage(
+  error: unknown,
+  fallback: string,
+  messages?: { network?: string; timeout?: string }
+): string {
   // Axios error with API response
   if (isApiError(error) && error.response) {
     return error.response.data.message || fallback
@@ -49,8 +65,8 @@ export function getErrorMessage(error: unknown, fallback = 'Произошла �
 
   // Axios error without response (network error)
   if (isAxiosError(error)) {
-    if (error.code === 'ECONNABORTED') return 'Превышено время ожидания'
-    if (error.code === 'ERR_NETWORK') return 'Ошибка сети'
+    if (error.code === 'ECONNABORTED') return messages?.timeout ?? fallback
+    if (error.code === 'ERR_NETWORK') return messages?.network ?? fallback
     return error.message || fallback
   }
 

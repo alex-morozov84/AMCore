@@ -40,7 +40,7 @@ export function RegisterForm() {
     mutate(data)
   }
 
-  const errorMessage = error ? getErrorMessage(error, 'Ошибка регистрации') : null
+  const errorMessage = error ? getErrorMessage(error, t('registerError')) : null
 
   return (
     <Form {...form}>
@@ -56,9 +56,9 @@ export function RegisterForm() {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Имя</FormLabel>
+              <FormLabel>{t('name')}</FormLabel>
               <FormControl>
-                <Input placeholder="Иван Иванов" {...field} />
+                <Input placeholder={t('namePlaceholder')} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -94,7 +94,7 @@ export function RegisterForm() {
         />
 
         <Button type="submit" className="w-full" disabled={isPending}>
-          {isPending ? 'Регистрация...' : t('register')}
+          {isPending ? t('registering') : t('register')}
         </Button>
       </form>
     </Form>

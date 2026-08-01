@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`apps/web` routes now live under a `[locale]` segment** and the web app
+  serves both English and Russian. Previously `src/i18n/request.ts` hardcoded
+  `const locale = 'ru'` and only `messages/ru.json` existed, so the "i18n-ready"
+  setup could not actually render a second language. Every locale is explicit
+  in the URL (`/en/login`, `/ru/login`); `/login` redirects to `/en/login` and
+  an unsupported locale is a 404 rather than a silent fallback. The prefix is
+  deliberately `'always'` rather than the tidier `'as-needed'`, because the
+  latter needs a proxy rewrite that Next's standalone server (what the Docker
+  image runs) does not apply, turning `/login` into an infinite self-redirect —
+  see vercel/next.js#91844. Locale resolution follows URL prefix → the signed-in
+  user's stored `User.locale` → the `NEXT_LOCALE` cookie → `Accept-Language` →
+  the default, and a new language switcher persists the choice to
+  `PATCH /auth/me` so it follows the user across devices and into their email.
+  `messages/en.json` is now the source of truth and `ru.json` a full
+  translation; a test enforces that the catalogues have identical keys, and
+  translation keys are type-checked so a typo fails `pnpm typecheck`. Navigation
+  must be imported from `@/i18n/navigation` — an ESLint rule blocks `next/link`
+  and the locale-unaware `next/navigation` helpers, which drop the locale
+  prefix silently. Also removed the leftover fitness/finance/subscriptions
+  placeholder copy from the dashboard and the message catalogue. See
+  `docs/frontend/architecture-and-conventions.md` → "Locale routing".
 - **Breaking for new installs:** AMCore's base locale is now English. The
   `User.locale` column default changed from `ru` to `en`, `User.timezone` from
   `Europe/Moscow` to `UTC`, and `DEFAULT_LOCALE` in `@amcore/shared` from `ru`

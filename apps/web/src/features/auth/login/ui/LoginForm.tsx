@@ -39,7 +39,7 @@ export function LoginForm() {
     mutate(data)
   }
 
-  const errorMessage = error ? getErrorMessage(error, 'Ошибка входа') : null
+  const errorMessage = error ? getErrorMessage(error, t('loginError')) : null
 
   return (
     <Form {...form}>
@@ -79,7 +79,7 @@ export function LoginForm() {
         />
 
         <Button type="submit" className="w-full" disabled={isPending}>
-          {isPending ? 'Вход...' : t('login')}
+          {isPending ? t('loggingIn') : t('login')}
         </Button>
       </form>
     </Form>
