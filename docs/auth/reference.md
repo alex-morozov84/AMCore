@@ -89,7 +89,7 @@ refinements such as the API-key scope grammar:
   "errors": [
     {
       "field": "scopes.1",
-      "message": "`manage:all` is forbidden — would grant unrestricted access",
+      "message": "Invalid input",
       "code": "custom",
       "errorCode": "API_KEY_SCOPE_MANAGE_ALL_FORBIDDEN"
     }

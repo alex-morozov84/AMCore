@@ -1,7 +1,10 @@
+'use client'
+
 import { type FieldValues, type UseFormSetError } from 'react-hook-form'
 import { useMutation, type UseMutationOptions } from '@tanstack/react-query'
 
 import { setServerErrors } from '../lib/form-utils'
+import { useFieldErrorTranslator } from '../lib/use-field-error-translator'
 
 /**
  * Extended mutation options with form error handling
@@ -28,9 +31,12 @@ export interface UseFormMutationOptions<
  *
  * Automatically maps server validation errors to form fields.
  *
+ * Field errors are localized by code, never by the backend's wire `message`.
+ *
  * @example
  * ```tsx
- * const form = useForm<LoginInput>({ ... })
+ * const form = useLocalizedForm<LoginInput>(loginSchema, { ... })
+ * const describeError = useApiError()
  *
  * const { mutate, isPending, error } = useFormMutation({
  *   mutationFn: authApi.login,
@@ -40,7 +46,7 @@ export interface UseFormMutationOptions<
  *   },
  *   onError: (error) => {
  *     // Custom error handling (optional)
- *     toast.error(describeApiError(error).message) // from useApiError()
+ *     toast.error(describeError(error).message)
  *   }
  * })
  * ```
@@ -53,13 +59,15 @@ export function useFormMutation<
   TFieldValues extends FieldValues = FieldValues,
 >(options: UseFormMutationOptions<TData, TError, TVariables, TContext, TFieldValues>) {
   const { setError, onError, ...mutationOptions } = options
+  const translateFieldError = useFieldErrorTranslator()
 
   return useMutation({
     ...mutationOptions,
     onError: async (error, variables, context) => {
-      // Automatically set server validation errors on form fields
+      // Automatically set server validation errors on form fields, localized
+      // by code — never the backend's English `message`.
       if (setError) {
-        setServerErrors(error, setError)
+        setServerErrors(error, setError, translateFieldError)
       }
 
       // Call custom error handler if provided

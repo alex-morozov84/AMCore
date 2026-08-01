@@ -13,5 +13,6 @@ export {
   subscribeToThemeSetting,
   THEME_STORAGE_KEY,
 } from './theme'
+export { useFieldErrorTranslator } from './use-field-error-translator'
 export { cn } from './utils'
-export { configureZodLocale } from './zod-i18n'
+export { useZodErrorMap } from './zod-error-map'
