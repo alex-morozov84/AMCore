@@ -64,14 +64,16 @@ export interface WelcomeEmailData {
 export interface PasswordResetEmailData {
   name: string
   resetUrl: string
-  expiresIn: string
+  /** Validity window in minutes; the template pluralizes it per locale. */
+  expiresInMinutes: number
   locale?: Locale
 }
 
 export interface EmailVerificationData {
   name: string
   verificationUrl: string
-  expiresIn: string
+  /** Validity window in hours; the template pluralizes it per locale. */
+  expiresInHours: number
   locale?: Locale
 }
 
@@ -91,7 +93,8 @@ export interface OrgInviteEmailData {
   roleName: string
   hasAccount: boolean
   acceptUrl: string
-  expiresIn: string
+  /** Validity window in days; the template pluralizes it per locale. */
+  expiresInDays: number
   locale?: Locale
 }
 

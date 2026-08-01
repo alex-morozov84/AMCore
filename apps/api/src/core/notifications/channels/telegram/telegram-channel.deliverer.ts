@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { coerceSupportedLocale, type SupportedLocale } from '@amcore/shared'
+import { coerceSupportedLocale, localizedFrontendUrl, type SupportedLocale } from '@amcore/shared'
 
 import { PrismaService } from '../../../../prisma'
 import { NotificationChannel } from '../../notification.constants'
@@ -51,7 +51,7 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
       return { status: 'permanent', errorCode: TelegramDeliveryError.PAYLOAD_INVALID }
     }
 
-    const text = this.composeText(content, notification.action !== null)
+    const text = this.composeText(content, notification.action !== null, locale)
     const result = await this.client.sendMessage({ chatId: delivery.targetKey, text })
 
     if (result.status === 'delivered') {
@@ -67,9 +67,16 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
   }
 
   /** Plain-text message: title + body, plus the trusted app link when a first-party action exists. */
-  private composeText(content: RenderedNotificationContent, hasAction: boolean): string {
+  private composeText(
+    content: RenderedNotificationContent,
+    hasAction: boolean,
+    locale: SupportedLocale
+  ): string {
     const base = `${content.title}\n\n${content.body}`
-    return hasAction ? `${base}\n\n${this.env.get('FRONTEND_URL')}` : base
+    // Locale-prefixed: the recipient may open this from a client that has never
+    // visited the app, so cookie/`Accept-Language` cannot be relied on.
+    const url = localizedFrontendUrl(this.env.get('FRONTEND_URL'), locale)
+    return hasAction ? `${base}\n\n${url}` : base
   }
 
   /**

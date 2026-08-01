@@ -17,6 +17,8 @@ import { ZodResponse } from 'nestjs-zod'
 import {
   AuthErrorCode,
   AuthType,
+  coerceSupportedLocale,
+  localizedFrontendUrl,
   type OAuthExchangeResponse,
   type OAuthProvidersResponse,
 } from '@amcore/shared'
@@ -187,7 +189,11 @@ export class OAuthController {
     // One-time binding nonce: clear it once the callback succeeds.
     clearOAuthBindingCookie(res, provider)
 
-    const frontendUrl = this.env.get('FRONTEND_URL')
+    // Locale-prefixed like every other server-generated link: the browser
+    // arriving here may have no locale cookie yet (a fresh OAuth sign-in), so
+    // the bare path would be resolved by Accept-Language instead of the
+    // account's stored preference.
+    const locale = coerceSupportedLocale(result.user.locale)
 
     if (result.mode === 'login') {
       res.cookie('refresh_token', result.refreshToken, {
@@ -205,9 +211,17 @@ export class OAuthController {
         sessionId: result.sessionId,
       })
 
-      res.redirect(`${frontendUrl}/auth/callback?ticket=${ticket}`)
+      res.redirect(
+        localizedFrontendUrl(this.env.get('FRONTEND_URL'), locale, 'auth/callback', {
+          ticket,
+        })
+      )
     } else {
-      res.redirect(`${frontendUrl}/settings/linked-accounts?linked=${provider}`)
+      res.redirect(
+        localizedFrontendUrl(this.env.get('FRONTEND_URL'), locale, 'settings/linked-accounts', {
+          linked: provider,
+        })
+      )
     }
   }
 

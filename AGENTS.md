@@ -112,8 +112,11 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 ## Code conventions
 
 - **Validation: Zod everywhere, never `class-validator`.** Schemas live in
-  `packages/shared` and are **language-agnostic** (no hardcoded messages — Zod v4
-  native i18n handles translation). Backend DTOs use `createZodDto()`.
+  `packages/shared` and are **language-agnostic — never add a literal `message`**.
+  A schema-level message outranks the frontend's per-parse error map (Zod
+  precedence: schema-level → per-parse → global → locale) and silently forces
+  English into a localized UI. A `superRefine` that needs a specific meaning
+  passes `params: { errorCode }` instead. Backend DTOs use `createZodDto()`.
 - **Shared types go in `packages/shared/src/types/`** whenever used by both api
   and web or representing an API contract — single source of truth, no duplication.
 - **Environment config: one Zod schema, split by domain** under
@@ -136,6 +139,25 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `shared/lib/theme.ts` — no `next-themes` dependency. Full contract:
   `docs/frontend/architecture-and-conventions.md`,
   `docs/frontend/brand-theme-and-tokens.md`.
+- **Frontend i18n — English base, Russian second, both live.** Routes sit under
+  `[locale]` with an explicit prefix (`/en/...`, `/ru/...`). Four rules an agent
+  will otherwise break:
+  1. **Never inline user-facing text.** Add the key to `messages/en.json` (the
+     source of truth) and to **every** other catalogue. Keys are type-checked;
+     a catalogue mismatch fails a test.
+  2. **Import navigation from `@/i18n/navigation`**, never `next/link` or
+     locale-unaware `next/navigation` helpers — they drop the locale prefix
+     silently. An ESLint rule enforces this.
+  3. **Translate API failures by `errorCode`**, never the backend's `message`
+     (English, developer-facing). Use `<ApiErrorAlert>` / `useApiError()`. A new
+     shared error code with no translation fails the build.
+  4. **Build forms with `useLocalizedForm()`**, never a global Zod locale.
+     Any backend link shown to a user (email CTA, notification, OAuth redirect)
+     must be built with `localizedFrontendUrl()` from `@amcore/shared`, never
+     string-concatenated from `FRONTEND_URL` — a test enforces this.
+     Plurals go in the message as ICU (`{n, plural, ...}`) — Russian needs
+     `one`/`few`/`many`/`other`; never write a `pluralize()` helper. Full guide:
+     `docs/frontend/i18n-and-errors.md`.
 - **CI dependencies are pinned:** every workflow `uses:` pins a full commit SHA
   (resolve annotated tags via `git ls-remote <repo> <tag> '<tag>^{}'` and use the
   `^{}` commit); CLI tools pin version + sha256. `scripts/verify-action-pins.sh`

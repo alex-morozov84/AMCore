@@ -23,7 +23,7 @@ export interface OrgInviteEmailProps {
   roleName: string
   hasAccount: boolean
   acceptUrl: string
-  expiresIn: string
+  expiresInDays: number
   locale?: Locale
 }
 
@@ -34,7 +34,7 @@ export const OrgInviteEmail = ({
   roleName,
   hasAccount,
   acceptUrl,
-  expiresIn,
+  expiresInDays,
   locale = DEFAULT_LOCALE,
 }: OrgInviteEmailProps) => {
   const intl = createIntl({
@@ -68,7 +68,7 @@ export const OrgInviteEmail = ({
           </Section>
 
           <Text style={text}>
-            {intl.formatMessage({ id: 'orgInvite.expiresInfo' }, { expiresIn })}
+            {intl.formatMessage({ id: 'orgInvite.expiresInfo' }, { days: expiresInDays })}
           </Text>
 
           <Hr style={hr} />
@@ -88,7 +88,7 @@ OrgInviteEmail.PreviewProps = {
   roleName: 'MEMBER',
   hasAccount: true,
   acceptUrl: 'https://amcore.alex-morozov.com/invite/accept?token=abc123',
-  expiresIn: '7 дней',
+  expiresInDays: 7,
   locale: DEFAULT_LOCALE,
 } as OrgInviteEmailProps
 

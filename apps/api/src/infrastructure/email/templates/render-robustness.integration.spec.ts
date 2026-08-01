@@ -43,7 +43,7 @@ const cases: RenderCase[] = [
       PasswordResetEmail({
         name: 'Иван',
         resetUrl: 'https://app.example.com/reset-password?token=abc',
-        expiresIn: '15 минут',
+        expiresInMinutes: 15,
         locale,
       }),
     expect: { ru: 'Сброс пароля', en: 'Password Reset' },
@@ -55,7 +55,7 @@ const cases: RenderCase[] = [
       EmailVerificationEmail({
         name: 'Иван',
         verificationUrl: 'https://app.example.com/verify-email?token=xyz',
-        expiresIn: '48 часов',
+        expiresInHours: 48,
         locale,
       }),
     expect: { ru: 'Подтвердите', en: 'Verify' },
@@ -71,7 +71,7 @@ const cases: RenderCase[] = [
         roleName: 'MEMBER',
         hasAccount: true,
         acceptUrl: 'https://app.example.com/invite/accept?token=abc',
-        expiresIn: '7 дней',
+        expiresInDays: 7,
         locale,
       }),
     expect: { ru: 'пригласил', en: 'invited' },

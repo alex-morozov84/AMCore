@@ -407,7 +407,7 @@ describe('InviteService', () => {
         })
       )
       // Raw token reaches the recipient only via acceptUrl.
-      expect(data.acceptUrl).toMatch(/^https:\/\/app\.example\.com\/invite\/accept\?token=.+/)
+      expect(data.acceptUrl).toMatch(/^https:\/\/app\.example\.com\/ru\/invite\/accept\?token=.+/)
     })
 
     it('sends an org invite email with hasAccount=false for an unknown email', async () => {

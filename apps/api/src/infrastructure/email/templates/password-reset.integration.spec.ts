@@ -15,7 +15,7 @@ import PasswordResetEmail, { getPasswordResetSubject } from './password-reset'
 const baseProps = {
   name: 'Alexander',
   resetUrl: 'https://app.example.com/reset-password?token=raw-token-abc',
-  expiresIn: '1 hour',
+  expiresInMinutes: 60,
 }
 
 describe('PasswordResetEmail Template (Integration)', () => {
@@ -27,7 +27,7 @@ describe('PasswordResetEmail Template (Integration)', () => {
 
     expect(html).toContain('Alexander')
     expect(html).toContain('Password Reset')
-    expect(html).toContain('1 hour')
+    expect(html).toContain('60 minutes')
 
     // The raw reset token must reach the recipient via the button href.
     expect(html).toContain('https://app.example.com/reset-password?token=raw-token-abc')

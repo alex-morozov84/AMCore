@@ -175,7 +175,7 @@ describe('OAuth (e2e)', () => {
         .expect(302)
 
       // Should redirect to frontend with a one-time login ticket, never an access token.
-      expect(res.headers.location).toContain('/auth/callback?ticket=')
+      expect(res.headers.location).toMatch(/\/(en|ru)\/auth\/callback\?ticket=/)
       expect(res.headers.location).not.toContain('token=')
 
       // User should be created in database
@@ -213,6 +213,33 @@ describe('OAuth (e2e)', () => {
         where: { emailCanonical: 'oauth-user@example.com' },
       })
       expect(user?.locale).toBe('en')
+    })
+
+    // The login redirect must carry the locale the account actually ends up
+    // with — not merely *some* locale. An `/(en|ru)/` assertion would pass
+    // against a hardcoded `/en`, so this drives the real Accept-Language path
+    // to `ru` and pins both the stored value and the redirect to it.
+    it('redirects to the callback under the locale the new user was seeded with', async () => {
+      const authorizeRes = await request(app.getHttpServer())
+        .get('/auth/oauth/google')
+        .set('Accept-Language', 'ru-RU,ru;q=0.9')
+        .expect(302)
+
+      const state = new URL(authorizeRes.headers.location!).searchParams.get('state')!
+      const setCookies = authorizeRes.headers['set-cookie'] as unknown as string[]
+      const bindingCookie = setCookies.find((c) => c.startsWith('oauth_state='))!.split(';')[0]!
+
+      const res = await request(app.getHttpServer())
+        .get(`/auth/oauth/google/callback?code=auth-code&state=${state}`)
+        .set('Cookie', bindingCookie)
+        .expect(302)
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'oauth-user@example.com' },
+      })
+      expect(user?.locale).toBe('ru')
+      expect(res.headers.location).toContain('/ru/auth/callback?ticket=')
+      expect(res.headers.location).not.toContain('/en/')
     })
 
     it('falls back to the DB default locale when authorize has no usable Accept-Language', async () => {
@@ -612,6 +639,10 @@ describe('OAuth (e2e)', () => {
           emailCanonical: 'link-flow@example.com',
           emailVerified: true,
           name: 'Link Flow User',
+          // Pinned to a non-default locale on purpose. An `/(en|ru)/` pattern
+          // would still pass against a hardcoded `/en`, so the redirect has to
+          // be tied to the account's actual stored locale.
+          locale: 'ru',
         },
       })
 
@@ -628,7 +659,7 @@ describe('OAuth (e2e)', () => {
         .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
-      expect(res.headers.location).toContain('/settings/linked-accounts?linked=google')
+      expect(res.headers.location).toContain('/ru/settings/linked-accounts?linked=google')
       expect(res.headers.location).not.toContain('ticket=')
       expect(res.headers.location).not.toContain('token=')
     })
@@ -682,7 +713,7 @@ describe('OAuth (e2e)', () => {
         .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
         .expect(302)
 
-      expect(res.headers.location).toContain('/auth/callback?ticket=')
+      expect(res.headers.location).toMatch(/\/(en|ru)\/auth\/callback\?ticket=/)
       expect(res.headers.location).not.toContain('token=')
 
       const user = await prisma.user.findUnique({
@@ -822,7 +853,7 @@ describe('OAuth (e2e)', () => {
         .send({ code: 'auth-code', state, user: APPLE_USER_FIELD })
         .expect(302)
 
-      expect(res.headers.location).toContain('/settings/linked-accounts?linked=apple')
+      expect(res.headers.location).toMatch(/\/(en|ru)\/settings\/linked-accounts\?linked=apple/)
       expect(res.headers.location).not.toContain('ticket=')
 
       const linked = await prisma.user.findUnique({

@@ -20,8 +20,7 @@ export const emailMessages = {
     'welcome.subject': 'Добро пожаловать в AMCore!',
     'welcome.preview': 'Добро пожаловать в AMCore!',
     'welcome.title': '👋 Добро пожаловать, {name}!',
-    'welcome.intro':
-      'Спасибо за регистрацию в AMCore — вашей персональной платформе для управления фитнесом, финансами и подписками.',
+    'welcome.intro': 'Спасибо за регистрацию в AMCore.',
     'welcome.emailLabel': 'Email',
     'welcome.footer': 'С уважением, команда AMCore',
 
@@ -32,7 +31,8 @@ export const emailMessages = {
     'passwordReset.greeting': 'Привет, {name}!',
     'passwordReset.intro': 'Мы получили запрос на сброс пароля для вашего аккаунта.',
     'passwordReset.buttonText': 'Сбросить пароль',
-    'passwordReset.expiresInfo': 'Эта ссылка действительна в течение {expiresIn}.',
+    'passwordReset.expiresInfo':
+      'Ссылка действует {minutes, plural, one {# минуту} few {# минуты} many {# минут} other {# минуты}}.',
     'passwordReset.ignoreInfo': 'Если вы не запрашивали сброс пароля, проигнорируйте это письмо.',
     'passwordReset.footer': 'С уважением, команда AMCore',
 
@@ -44,7 +44,8 @@ export const emailMessages = {
     'emailVerification.intro':
       'Спасибо за регистрацию! Подтвердите ваш email для активации аккаунта.',
     'emailVerification.buttonText': 'Подтвердить email',
-    'emailVerification.expiresInfo': 'Эта ссылка действительна в течение {expiresIn}.',
+    'emailVerification.expiresInfo':
+      'Ссылка действует {hours, plural, one {# час} few {# часа} many {# часов} other {# часа}}.',
     'emailVerification.ignoreInfo':
       'Если вы не регистрировались на AMCore, проигнорируйте это письмо.',
     'emailVerification.footer': 'С уважением, команда AMCore',
@@ -58,7 +59,8 @@ export const emailMessages = {
     'orgInvite.roleInfo': 'Вам будет назначена роль: {roleName}.',
     'orgInvite.ctaSignIn': 'Войти и принять приглашение',
     'orgInvite.ctaSignUp': 'Создать аккаунт и присоединиться',
-    'orgInvite.expiresInfo': 'Это приглашение действительно в течение {expiresIn}.',
+    'orgInvite.expiresInfo':
+      'Приглашение действует {days, plural, one {# день} few {# дня} many {# дней} other {# дня}}.',
     'orgInvite.ignoreInfo': 'Если вы не ожидали это приглашение, просто проигнорируйте письмо.',
     'orgInvite.footer': 'С уважением, команда AMCore',
 
@@ -74,8 +76,7 @@ export const emailMessages = {
     'welcome.subject': 'Welcome to AMCore!',
     'welcome.preview': 'Welcome to AMCore!',
     'welcome.title': '👋 Welcome, {name}!',
-    'welcome.intro':
-      'Thank you for signing up for AMCore — your personal platform for managing fitness, finances, and subscriptions.',
+    'welcome.intro': 'Thank you for signing up for AMCore.',
     'welcome.emailLabel': 'Email',
     'welcome.footer': 'Best regards, AMCore team',
 
@@ -86,7 +87,8 @@ export const emailMessages = {
     'passwordReset.greeting': 'Hi, {name}!',
     'passwordReset.intro': 'We received a request to reset the password for your account.',
     'passwordReset.buttonText': 'Reset Password',
-    'passwordReset.expiresInfo': 'This link is valid for {expiresIn}.',
+    'passwordReset.expiresInfo':
+      'This link is valid for {minutes, plural, one {# minute} other {# minutes}}.',
     'passwordReset.ignoreInfo':
       'If you did not request a password reset, please ignore this email.',
     'passwordReset.footer': 'Best regards, AMCore team',
@@ -99,7 +101,8 @@ export const emailMessages = {
     'emailVerification.intro':
       'Thank you for signing up! Please verify your email to activate your account.',
     'emailVerification.buttonText': 'Verify Email',
-    'emailVerification.expiresInfo': 'This link is valid for {expiresIn}.',
+    'emailVerification.expiresInfo':
+      'This link is valid for {hours, plural, one {# hour} other {# hours}}.',
     'emailVerification.ignoreInfo': 'If you did not sign up for AMCore, please ignore this email.',
     'emailVerification.footer': 'Best regards, AMCore team',
 
@@ -112,7 +115,8 @@ export const emailMessages = {
     'orgInvite.roleInfo': 'You will be assigned the role: {roleName}.',
     'orgInvite.ctaSignIn': 'Sign in to accept the invitation',
     'orgInvite.ctaSignUp': 'Create an account to join',
-    'orgInvite.expiresInfo': 'This invitation is valid for {expiresIn}.',
+    'orgInvite.expiresInfo':
+      'This invitation is valid for {days, plural, one {# day} other {# days}}.',
     'orgInvite.ignoreInfo': 'If you were not expecting this invitation, simply ignore this email.',
     'orgInvite.footer': 'Best regards, AMCore team',
 

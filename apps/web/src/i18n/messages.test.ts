@@ -35,6 +35,12 @@ function leafEntries(value: unknown, prefix = ''): Array<[string, unknown]> {
  * `one`/`other` silently renders wrong grammar for counts like 2 or 5 — and it
  * stays invisible while testing in English, which is exactly why this is a test
  * and not a review checklist item.
+ *
+ * NOTE: this check is currently **idle** — no web message uses an ICU plural
+ * yet, so it passes vacuously. It is kept armed deliberately rather than
+ * backed by an invented pluralized string: it bites the moment the first real
+ * one lands. The backend email catalogue does have real plurals and its
+ * equivalent guard asserts non-vacuity.
  */
 const REQUIRED_PLURAL_CATEGORIES: Record<string, string[]> = {
   en: ['one', 'other'],

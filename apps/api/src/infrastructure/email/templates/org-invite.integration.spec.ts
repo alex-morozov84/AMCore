@@ -18,7 +18,7 @@ const baseProps = {
   inviterEmail: 'alex@example.com',
   roleName: 'MEMBER',
   acceptUrl: 'https://app.example.com/invite/accept?token=raw-token-123',
-  expiresIn: '7 дней',
+  expiresInDays: 7,
 }
 
 describe('OrgInviteEmail Template (Integration)', () => {

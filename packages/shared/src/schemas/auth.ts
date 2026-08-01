@@ -9,7 +9,9 @@ export const emailInputSchema = z.string().trim().pipe(z.email())
 /**
  * Supported locale — derived from the single `SUPPORTED_LOCALES` source so
  * registration, profile update, the user response, and email rendering all
- * validate against the same set. No hardcoded messages (Zod v4 native i18n).
+ * validate against the same set. No hardcoded messages: a schema-level message
+ * outranks the frontend's per-parse error map and would force English into a
+ * localized UI.
  */
 export const supportedLocaleSchema = z.enum(SUPPORTED_LOCALES)
 

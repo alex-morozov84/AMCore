@@ -10,6 +10,7 @@ import {
   InviteErrorCode,
   type InviteListResponse,
   type InviteResponse,
+  localizedFrontendUrl,
   type RequestPrincipal,
 } from '@amcore/shared'
 
@@ -699,7 +700,14 @@ export class InviteService {
       // unknown recipient (no account yet) has no stored preference. Coerce
       // rather than parse — a locale anomaly must not abort invite dispatch.
       const locale = coerceSupportedLocale(args.recipientLocale)
-      const acceptUrl = `${this.env.get('FRONTEND_URL')}/invite/accept?token=${args.rawToken}`
+      const acceptUrl = localizedFrontendUrl(
+        this.env.get('FRONTEND_URL'),
+        locale,
+        'invite/accept',
+        {
+          token: args.rawToken,
+        }
+      )
 
       await this.emailService.sendOrgInviteEmail(args.recipientEmail, {
         orgName: org?.name ?? 'AMCore',
@@ -708,7 +716,7 @@ export class InviteService {
         roleName: role?.name ?? 'MEMBER',
         hasAccount: args.hasAccount,
         acceptUrl,
-        expiresIn: locale === 'en' ? `${INVITE_EXPIRY_DAYS} days` : `${INVITE_EXPIRY_DAYS} дней`,
+        expiresInDays: INVITE_EXPIRY_DAYS,
         locale,
       })
     } catch (err) {
