@@ -22,18 +22,17 @@ const baseProps = {
 }
 
 describe('OrgInviteEmail Template (Integration)', () => {
-  it('should render in Russian by default with the sign-in CTA', async () => {
+  it('should render in the base locale (English) by default with the sign-in CTA', async () => {
     const html = await render(OrgInviteEmail({ ...baseProps, hasAccount: true }))
 
     expect(html).toBeTruthy()
     expect(typeof html).toBe('string')
 
-    // Russian content
+    // English content
     expect(html).toContain('Acme Inc.')
-    expect(html).toContain('Александр Морозов')
     expect(html).toContain('alex@example.com')
     expect(html).toContain('MEMBER')
-    expect(html).toContain('Войти и принять приглашение')
+    expect(html).toContain('Sign in to accept the invitation')
 
     // The raw accept token must reach the recipient via the button href.
     expect(html).toContain('https://app.example.com/invite/accept?token=raw-token-123')
@@ -46,15 +45,15 @@ describe('OrgInviteEmail Template (Integration)', () => {
   it('should render the sign-up CTA when the recipient has no account', async () => {
     const html = await render(OrgInviteEmail({ ...baseProps, hasAccount: false }))
 
-    expect(html).toContain('Создать аккаунт и присоединиться')
-    expect(html).not.toContain('Войти и принять приглашение')
+    expect(html).toContain('Create an account to join')
+    expect(html).not.toContain('Sign in to accept the invitation')
   })
 
-  it('should render in English', async () => {
-    const html = await render(OrgInviteEmail({ ...baseProps, hasAccount: true, locale: 'en' }))
+  it('should render in Russian when locale=ru', async () => {
+    const html = await render(OrgInviteEmail({ ...baseProps, hasAccount: true, locale: 'ru' }))
 
-    expect(html).toContain('You have been invited to Acme Inc.')
-    expect(html).toContain('Sign in to accept the invitation')
+    expect(html).toContain('Войти и принять приглашение')
+    expect(html).not.toContain('Sign in to accept the invitation')
     expect(html).toContain('https://app.example.com/invite/accept?token=raw-token-123')
   })
 

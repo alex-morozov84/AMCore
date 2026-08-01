@@ -117,10 +117,10 @@ describe('email templates — render robustness (EQS-08)', () => {
     )
   })
 
-  it('falls back to Russian when locale is omitted', async () => {
-    const html = await render(WelcomeEmail({ name: 'Иван', email: 'ivan@example.com' }))
+  it('falls back to the base locale (English) when locale is omitted', async () => {
+    const html = await render(WelcomeEmail({ name: 'Ivan', email: 'ivan@example.com' }))
 
-    expect(html).toContain('Добро пожаловать')
-    expect(html).not.toContain('Welcome,')
+    expect(html).toContain('Welcome')
+    expect(html).not.toContain('Добро пожаловать')
   })
 })

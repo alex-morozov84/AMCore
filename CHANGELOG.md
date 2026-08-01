@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking for new installs:** AMCore's base locale is now English. The
+  `User.locale` column default changed from `ru` to `en`, `User.timezone` from
+  `Europe/Moscow` to `UTC`, and `DEFAULT_LOCALE` in `@amcore/shared` from `ru`
+  to `en`. Russian remains a fully supported locale — `SUPPORTED_LOCALES` is
+  unchanged apart from ordering, and a user who registers with
+  `Accept-Language: ru` or an explicit `locale: "ru"` still gets Russian, as do
+  all their emails and notifications.
+  **Upgrade note:** the migration changes column defaults only
+  (`ALTER COLUMN ... SET DEFAULT`); **existing rows are deliberately not
+  backfilled**, because a stored value cannot be distinguished from a
+  preference the user actually chose. If your fork has users who never chose a
+  locale explicitly and you want them moved to the new defaults, that is a
+  separate opt-in data migration you must write yourself.
+- Consolidated locale-default handling onto a single source. The default locale
+  and the supported-locale list were previously re-declared in six places
+  (`@amcore/shared`, a local constant in `notifications.service.ts`, a
+  hardcoded `z.enum` in the email job schema, a `'ru'`-defaulting ternary in
+  `invite.service.ts`, two verbatim copies of a `toLocale()` helper in the
+  notification deliverers, and four inline `as 'ru' | 'en'` casts in
+  `auth.service.ts`), so changing the default in one place silently left the
+  others behind. All now derive from `SUPPORTED_LOCALES`/`DEFAULT_LOCALE`
+  via a new exported `coerceSupportedLocale()` helper, which also replaces an
+  unchecked `as SupportedLocale` cast in the notification feed.
+- An organization invite sent to an email with no AMCore account is now
+  rendered in the base locale rather than always in Russian.
+
 ### Added
 
 - Implemented a working light/dark/system theme for `apps/web`, with a

@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
 
-import { type NotificationAction, notificationActionSchema } from '@amcore/shared'
+import {
+  coerceSupportedLocale,
+  type NotificationAction,
+  notificationActionSchema,
+} from '@amcore/shared'
 
 import { PrismaService } from '../../prisma'
 
@@ -67,8 +71,6 @@ interface InternalNotifyResult {
   result: NotifyResult
   hasPendingExternal: boolean
 }
-
-const DEFAULT_LOCALE = 'ru'
 
 /**
  * Canonical channel order (the `NotificationChannel` enum declaration order) applied to
@@ -233,7 +235,7 @@ export class NotificationsService {
     ])
 
     const channels = this.resolver.resolve(definition, { masterEnabled, userPreferences })
-    const locale = user?.locale ?? DEFAULT_LOCALE
+    const locale = coerceSupportedLocale(user?.locale)
     return {
       definition,
       payload,

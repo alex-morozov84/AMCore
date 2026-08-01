@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SUPPORTED_LOCALES, type SupportedLocale } from '../constants'
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '../constants'
 
 import { paginatedResponseSchema } from './pagination'
 
@@ -23,6 +23,20 @@ export const supportedLocaleSchema = z.enum(SUPPORTED_LOCALES)
  */
 export function parseSupportedLocale(value: string): SupportedLocale {
   return supportedLocaleSchema.parse(value)
+}
+
+/**
+ * Non-throwing counterpart of {@link parseSupportedLocale}: coerce an unknown,
+ * absent, or out-of-contract locale to {@link DEFAULT_LOCALE}.
+ *
+ * Use this on best-effort paths where a locale anomaly must not abort the work
+ * — notification/email dispatch, or a recipient who has no account and
+ * therefore no stored preference. Prefer `parseSupportedLocale` anywhere a bad
+ * stored value should surface as an error instead of being silently defaulted.
+ */
+export function coerceSupportedLocale(value: string | null | undefined): SupportedLocale {
+  const parsed = supportedLocaleSchema.safeParse(value)
+  return parsed.success ? parsed.data : DEFAULT_LOCALE
 }
 
 /**

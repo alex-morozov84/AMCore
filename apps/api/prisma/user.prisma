@@ -79,8 +79,12 @@ model User {
   // sweep, a newer concurrent version. See ADR-049.
   avatarGeneration Int     @default(0)
   phone            String? @unique
-  locale           String  @default("ru")
-  timezone         String  @default("Europe/Moscow")
+  // Neutral starter defaults for a new row only. Mirrors `DEFAULT_LOCALE` in
+  // `packages/shared` — keep the two in sync. Existing rows are deliberately
+  // never backfilled when these defaults change: a stored value cannot be told
+  // apart from a preference the user actually chose.
+  locale           String  @default("en")
+  timezone         String  @default("UTC")
 
   // Timestamps
   createdAt   DateTime  @default(now())

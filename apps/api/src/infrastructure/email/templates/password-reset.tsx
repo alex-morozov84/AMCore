@@ -1,5 +1,7 @@
 import { createIntl } from '@formatjs/intl'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 import { emailMessages, type Locale } from '../messages'
 import {
   Body,
@@ -25,7 +27,7 @@ export const PasswordResetEmail = ({
   name,
   resetUrl,
   expiresIn,
-  locale = 'ru',
+  locale = DEFAULT_LOCALE,
 }: PasswordResetEmailProps) => {
   const intl = createIntl({
     locale,
@@ -71,7 +73,7 @@ PasswordResetEmail.PreviewProps = {
   name: 'Александр',
   resetUrl: 'https://amcore.alex-morozov.com/reset-password?token=abc123',
   expiresIn: '1 час',
-  locale: 'ru',
+  locale: DEFAULT_LOCALE,
 } as PasswordResetEmailProps
 
 export default PasswordResetEmail
@@ -80,7 +82,7 @@ export default PasswordResetEmail
  * Get subject for Password Reset Email
  * Used by EmailService to get localized subject line
  */
-export function getPasswordResetSubject(locale: Locale = 'ru'): string {
+export function getPasswordResetSubject(locale: Locale = DEFAULT_LOCALE): string {
   const intl = createIntl({
     locale,
     messages: emailMessages[locale],

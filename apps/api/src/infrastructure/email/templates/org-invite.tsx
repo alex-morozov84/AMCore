@@ -1,5 +1,7 @@
 import { createIntl } from '@formatjs/intl'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 import { emailMessages, type Locale } from '../messages'
 import {
   Body,
@@ -33,7 +35,7 @@ export const OrgInviteEmail = ({
   hasAccount,
   acceptUrl,
   expiresIn,
-  locale = 'ru',
+  locale = DEFAULT_LOCALE,
 }: OrgInviteEmailProps) => {
   const intl = createIntl({
     locale,
@@ -87,7 +89,7 @@ OrgInviteEmail.PreviewProps = {
   hasAccount: true,
   acceptUrl: 'https://amcore.alex-morozov.com/invite/accept?token=abc123',
   expiresIn: '7 дней',
-  locale: 'ru',
+  locale: DEFAULT_LOCALE,
 } as OrgInviteEmailProps
 
 export default OrgInviteEmail
@@ -96,7 +98,7 @@ export default OrgInviteEmail
  * Get subject for Organization Invite Email.
  * Used by EmailService to get the localized subject line.
  */
-export function getOrgInviteSubject(orgName: string, locale: Locale = 'ru'): string {
+export function getOrgInviteSubject(orgName: string, locale: Locale = DEFAULT_LOCALE): string {
   const intl = createIntl({
     locale,
     messages: emailMessages[locale],

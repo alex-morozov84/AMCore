@@ -1,5 +1,7 @@
 import { createIntl } from '@formatjs/intl'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 import { emailMessages, type Locale } from '../messages'
 import { Body, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '../react-email'
 
@@ -9,7 +11,7 @@ export interface WelcomeEmailProps {
   locale?: Locale
 }
 
-export const WelcomeEmail = ({ name, email, locale = 'ru' }: WelcomeEmailProps) => {
+export const WelcomeEmail = ({ name, email, locale = DEFAULT_LOCALE }: WelcomeEmailProps) => {
   const intl = createIntl({
     locale,
     messages: emailMessages[locale],
@@ -43,7 +45,7 @@ export const WelcomeEmail = ({ name, email, locale = 'ru' }: WelcomeEmailProps) 
 WelcomeEmail.PreviewProps = {
   name: 'Александр',
   email: 'alex@example.com',
-  locale: 'ru',
+  locale: DEFAULT_LOCALE,
 } as WelcomeEmailProps
 
 export default WelcomeEmail
@@ -52,7 +54,7 @@ export default WelcomeEmail
  * Get subject for Welcome Email
  * Used by EmailService to get localized subject line
  */
-export function getWelcomeSubject(locale: Locale = 'ru'): string {
+export function getWelcomeSubject(locale: Locale = DEFAULT_LOCALE): string {
   const intl = createIntl({
     locale,
     messages: emailMessages[locale],

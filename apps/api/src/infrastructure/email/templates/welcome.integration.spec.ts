@@ -13,10 +13,10 @@ import { describe, expect, it } from 'vitest'
 import WelcomeEmail from './welcome'
 
 describe('WelcomeEmail Template (Integration)', () => {
-  it('should render in Russian by default', async () => {
+  it('should render in the base locale (English) by default', async () => {
     const html = await render(
       WelcomeEmail({
-        name: 'Александр Морозов',
+        name: 'Alexander Morozov',
         email: 'alex@example.com',
       })
     )
@@ -25,10 +25,10 @@ describe('WelcomeEmail Template (Integration)', () => {
     expect(html).toBeTruthy()
     expect(typeof html).toBe('string')
 
-    // Check Russian content
-    expect(html).toContain('Александр Морозов')
+    // Check English content
+    expect(html).toContain('Alexander Morozov')
     expect(html).toContain('alex@example.com')
-    expect(html).toContain('Добро пожаловать')
+    expect(html).toContain('Welcome')
     expect(html).toContain('AMCore')
 
     // Check HTML structure
@@ -38,20 +38,19 @@ describe('WelcomeEmail Template (Integration)', () => {
     expect(html).toContain('<body')
   })
 
-  it('should render in English when locale=en', async () => {
+  it('should render in Russian when locale=ru', async () => {
     const html = await render(
       WelcomeEmail({
-        name: 'Alexander Morozov',
+        name: 'Александр Морозов',
         email: 'alex@example.com',
-        locale: 'en',
+        locale: 'ru',
       })
     )
 
-    // Check English content
-    expect(html).toContain('Alexander Morozov')
-    expect(html).toContain('Welcome')
-    expect(html).toContain('Thank you for signing up')
-    expect(html).toContain('Best regards')
+    // Check Russian content
+    expect(html).toContain('Александр Морозов')
+    expect(html).toContain('Добро пожаловать')
+    expect(html).not.toContain('Thank you for signing up')
   })
 
   it('should handle special characters in name', async () => {

@@ -8,6 +8,7 @@ export {
   avatarResponseSchema,
   type ChangePasswordInput,
   changePasswordSchema,
+  coerceSupportedLocale,
   type ForgotPasswordInput,
   forgotPasswordSchema,
   type LoginInput,

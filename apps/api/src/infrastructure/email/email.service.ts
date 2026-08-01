@@ -4,6 +4,8 @@ import { Inject, Injectable } from '@nestjs/common'
 import { render } from '@react-email/render'
 import { PinoLogger } from 'nestjs-pino'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 import type {
   EmailProvider,
   EmailVerificationData,
@@ -203,7 +205,7 @@ export class EmailService {
   ): Promise<{ html: string; text: string; subject: string }> {
     const startedAt = performance.now()
     try {
-      const locale: Locale = data.locale || 'ru'
+      const locale: Locale = data.locale || DEFAULT_LOCALE
       let element: Parameters<typeof render>[0]
       let subject: string
 

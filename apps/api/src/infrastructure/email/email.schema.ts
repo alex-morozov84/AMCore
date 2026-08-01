@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { SUPPORTED_LOCALES } from '@amcore/shared'
+
 import type { WelcomeEmailData } from './email.types'
 import { EmailTemplate } from './email.types'
 
@@ -22,7 +24,9 @@ import { EmailTemplate } from './email.types'
  * contract, not a frontend wire contract.
  */
 
-const localeSchema = z.enum(['ru', 'en'])
+// Derived from the single shared locale source rather than re-listing the
+// locales — a third hardcoded copy would silently drift when a locale is added.
+const localeSchema = z.enum(SUPPORTED_LOCALES)
 
 export const welcomeEmailDataSchema = z.object({
   name: z.string(),
