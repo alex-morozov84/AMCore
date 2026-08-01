@@ -94,6 +94,14 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   changes under `CHANGELOG.md` → `[Unreleased]`; ordinary PRs do not create or
   change release tags. See `CONTRIBUTING.md` → _Changelog & releases_ for the
   release procedure.
+- **Read the docs you are about to update — they find defects.** When a task
+  touches an area, check what the existing docs _claim_ about it against the
+  code. Treat "the system does X" as an assertion to verify, not background.
+  Two claims are worth extra suspicion because they are worse than merely
+  stale: a **documented guard that does not exist** (a reviewer reads the claim
+  and stops looking), and an **example that teaches an antipattern** (sample
+  code gets copied). Both have shipped here. If a doc says something is
+  enforced, confirm the enforcement exists.
 - **OpenAPI is public documentation.** For any `apps/api` controller, auth,
   request/response DTO, upload, or route-contract change, update Swagger
   metadata in the same PR: `@ApiTags`, `@ApiOperation`, auth decorators
