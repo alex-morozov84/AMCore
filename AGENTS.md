@@ -139,8 +139,11 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   Next routing plumbing only (thin), page composition lives in `_pages/`
   (current tree: `views/`, pending migration to the target layer name),
   `widgets`/`features`/`entities`/`shared` keep canonical FSD meanings.
-  Import a slice through its public API only (`@/shared/ui`, not
-  `@/shared/ui/button`). Server Components by default; push `'use client'` to
+  Import a slice through its public API only (`@/features/auth/login`, not
+  `@/features/auth/login/ui/LoginForm`); `shared/ui` and `shared/lib` are
+  collections of modules, so import those directly (`@/shared/ui/button`,
+  `@/shared/lib/utils`) — there is no `@/shared/ui` barrel, and no layer-level
+  barrel anywhere. Server Components by default; push `'use client'` to
   the interactive leaf. TanStack Query for server state, Zustand for local
   client state. Colors via variables (`bg-accent`, `text-foreground`) — never
   `bg-[#hex]`. Theme defaults to `system` (light/dark), owned by

@@ -4,17 +4,10 @@ import { useTranslations } from 'next-intl'
 import { type LoginInput, loginSchema } from '@amcore/shared'
 
 import { useLocalizedForm } from '@/shared/hooks'
-import {
-  ApiErrorAlert,
-  Button,
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  Input,
-} from '@/shared/ui'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
+import { Input } from '@/shared/ui/input'
 
 import { useLogin } from '../model/use-login'
 
