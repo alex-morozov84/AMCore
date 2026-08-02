@@ -5,6 +5,80 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 import nextPlugin from '@next/eslint-plugin-next';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
+import boundaries from 'eslint-plugin-boundaries';
+
+// ---------------------------------------------------------------------------
+// Feature-Sliced Design boundaries
+// ---------------------------------------------------------------------------
+
+// Segment names never occupy the slice position. This exclusion is required
+// because `features/auth/login` (group/slice) and `features/locale-switcher/ui`
+// (slice/segment) are the same path shape with different meanings — without it
+// `ui` and `model` get classified as slices. The grouping under `features/auth`
+// is the root cause and is up for review when the pages layer is renamed.
+const SEGMENTS = 'ui|model|api|lib|config|hooks|store|pwa|providers|stores';
+
+// Sliced layers are entered through their index only. `shared` is deliberately
+// absent: it is a collection of independent modules (`@/shared/ui/button`),
+// which is also the only shape the shadcn CLI generates.
+const PUBLIC_API = 'index.{ts,tsx}';
+
+const ELEMENTS = [
+  { type: 'app', pattern: 'src/app/**/*', partialMatch: false },
+  // Not FSD layers, and imported from everywhere. Left unclassified they would
+  // either be reported or force `no-unknown`-style classification of every asset.
+  { type: 'neutral', pattern: 'src/i18n' },
+  { type: 'neutral', pattern: 'src/test' },
+  { type: 'neutral', pattern: 'messages' },
+  { type: 'pages', pattern: `src/views/*/!(${SEGMENTS})`, capture: ['group', 'slice'] },
+  { type: 'pages', pattern: 'src/views/*', capture: ['slice'] },
+  { type: 'widgets', pattern: 'src/widgets/*', capture: ['slice'] },
+  { type: 'features', pattern: `src/features/*/!(${SEGMENTS})`, capture: ['group', 'slice'] },
+  { type: 'features', pattern: 'src/features/*', capture: ['slice'] },
+  { type: 'entities', pattern: 'src/entities/*', capture: ['slice'] },
+  { type: 'shared', pattern: 'src/shared/*', capture: ['segment'] },
+];
+
+/** Layers below may only be entered at their public API. */
+const below = (...types) =>
+  types.map((type) => ({ element: { type, fileInternalPath: PUBLIC_API } }));
+
+const sharedAndNeutral = [{ element: { type: 'shared' } }, { element: { type: 'neutral' } }];
+
+// A group's own barrel may reach the slices inside it; a slice may not reach a
+// sibling slice in another group. Without the captured-value match, allowing
+// `features -> features` for the barrel's sake also permits arbitrary
+// cross-slice imports — which passes every obvious test case while not guarding.
+const sameGroup = (type) => ({
+  element: {
+    type,
+    captured: { group: '{{ from.element.captured.slice }}' },
+    fileInternalPath: PUBLIC_API,
+  },
+});
+
+// `boundaries` cannot see layer-level barrels: `src/features/index.ts` sits
+// inside no element, so there is nothing for it to police. Banned here instead.
+const LAYER_BARREL = {
+  regex: '^@/(features|entities|widgets|views|shared)$',
+  message:
+    'No layer-level barrels — import the slice public API (@/features/auth/login) ' +
+    'or the shared module (@/shared/ui/button). See docs/frontend/.',
+};
+
+const NAVIGATION_PATHS = [
+  {
+    name: 'next/link',
+    message: "Import { Link } from '@/i18n/navigation' — next/link drops the locale.",
+  },
+  {
+    name: 'next/navigation',
+    importNames: ['redirect', 'permanentRedirect', 'usePathname', 'useRouter'],
+    message:
+      "Import locale-aware navigation from '@/i18n/navigation'. " +
+      'Non-navigating helpers such as notFound() may still come from next/navigation.',
+  },
+];
 
 /** @type {import('typescript-eslint').ConfigArray} */
 export default [
@@ -105,36 +179,90 @@ export default [
     },
   },
 
-  // Locale-aware navigation.
+  // FSD layer direction and slice public API.
   //
-  // `next/link` and `next/navigation` know nothing about the `[locale]`
-  // segment: they drop the prefix silently, sending a Russian user back to the
-  // English route with no error anywhere. Because the failure is invisible, it
-  // is enforced here rather than left to review. `src/i18n/navigation.ts` is
-  // exempt — it is where the locale-aware versions are created.
+  // One rule does both: `boundaries/dependencies` on the current v7 API. The
+  // `entry-point` and `element-types` rules that older examples use — including
+  // the plugin's own docs page, which still shows the pre-v7 `rules:` key — are
+  // deprecated; public API is expressed as `fileInternalPath` on the target.
+  // `src/test/eslint-guards.test.ts` fails the build if this config emits any
+  // deprecation warning at all.
   {
-    name: 'project/i18n-navigation',
+    name: 'project/fsd-boundaries',
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/i18n/navigation.ts'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': ELEMENTS,
+      'boundaries/include': ['src/**/*'],
+      // Resolves the `@/*` tsconfig paths. `boundaries/alias` would also work
+      // but is a legacy setting in v7.
+      'import/resolver': { typescript: { alwaysTryTypes: true } },
+    },
     rules: {
-      'no-restricted-imports': [
+      'boundaries/dependencies': [
         'error',
         {
-          paths: [
+          default: 'disallow',
+          policies: [
             {
-              name: 'next/link',
-              message: "Import { Link } from '@/i18n/navigation' — next/link drops the locale.",
+              from: { element: { type: 'app' } },
+              allow: {
+                to: [
+                  { element: { type: 'app' } },
+                  ...below('pages', 'widgets', 'features', 'entities'),
+                  ...sharedAndNeutral,
+                ],
+              },
             },
             {
-              name: 'next/navigation',
-              importNames: ['redirect', 'permanentRedirect', 'usePathname', 'useRouter'],
-              message:
-                "Import locale-aware navigation from '@/i18n/navigation'. " +
-                'Non-navigating helpers such as notFound() may still come from next/navigation.',
+              from: { element: { type: 'pages' } },
+              allow: {
+                to: [
+                  sameGroup('pages'),
+                  ...below('widgets', 'features', 'entities'),
+                  ...sharedAndNeutral,
+                ],
+              },
             },
+            {
+              from: { element: { type: 'widgets' } },
+              allow: {
+                to: [sameGroup('widgets'), ...below('features', 'entities'), ...sharedAndNeutral],
+              },
+            },
+            {
+              from: { element: { type: 'features' } },
+              allow: { to: [sameGroup('features'), ...below('entities'), ...sharedAndNeutral] },
+            },
+            { from: { element: { type: 'entities' } }, allow: { to: sharedAndNeutral } },
+            { from: { element: { type: 'shared' } }, allow: { to: sharedAndNeutral } },
+            { from: { element: { type: 'neutral' } }, allow: { to: sharedAndNeutral } },
           ],
         },
       ],
+    },
+  },
+
+  // Import guards — ALL of them, in ONE options object. Same rule as the syntax
+  // guards below: a later block configuring `no-restricted-imports` for the same
+  // files replaces these options wholesale rather than adding to them.
+  {
+    name: 'project/import-guards',
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: NAVIGATION_PATHS, patterns: [LAYER_BARREL] }],
+    },
+  },
+
+  // Deliberate relaxation over a strict subset: `src/i18n/navigation.ts` is
+  // where the locale-aware navigation helpers are created, so it is the one
+  // file that must import the originals. It restates the layer-barrel pattern,
+  // which still applies to it.
+  {
+    name: 'project/import-guards-navigation-source',
+    files: ['src/i18n/navigation.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],
     },
   },
 
