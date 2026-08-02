@@ -13,6 +13,7 @@
 // today. The structural one is the reason this cannot silently regress: it
 // derives from the config, so it covers guards that do not exist yet.
 
+import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 
 import { ESLint } from 'eslint'
@@ -154,4 +155,99 @@ describe('no guard can silently replace another', () => {
 
     expect(collisions).toEqual([])
   })
+})
+
+describe('FSD boundaries', () => {
+  // Layer direction and slice public API, both from `boundaries/dependencies`.
+  // Each case was proven by hand against this config before being written down.
+  //
+  // The cross-slice case is the one that matters most: allowing
+  // `features -> features` so a group barrel can reach its own slices also
+  // permits any slice to reach any other, and that version of the config passed
+  // every other case here while not guarding.
+  it.each([
+    ['shared may not import features', 'src/shared/lib/probe.ts', "'@/features/auth'", true],
+    [
+      'features may import entities',
+      'src/features/auth/login/probe.ts',
+      "'@/entities/user'",
+      false,
+    ],
+    ['features may import shared', 'src/features/auth/login/probe.ts', "'@/shared/lib'", false],
+    [
+      'a slice may not be entered past its public API',
+      'src/views/auth/probe.ts',
+      "'@/features/auth/login/ui/LoginForm'",
+      true,
+    ],
+    [
+      'a slice may not import a sibling slice in another group',
+      'src/features/auth/login/probe.ts',
+      "'@/features/locale-switcher'",
+      true,
+    ],
+    ['a shared segment barrel is fine', 'src/views/auth/probe.ts', "'@/shared/lib'", false],
+    ['a shared module import is fine', 'src/views/auth/probe.ts', "'@/shared/ui/button'", false],
+  ])('%s', async (_name, filePath, source, shouldReport) => {
+    const ids = await ruleIds(`import * as x from ${source}\nexport const y = x\n`, filePath)
+    if (shouldReport) {
+      expect(ids).toContain('boundaries/dependencies')
+    } else {
+      expect(ids).toEqual([])
+    }
+  })
+
+  // `boundaries` cannot see a layer-level barrel — `src/features/index.ts` is
+  // inside no element — so this one is the `no-restricted-imports` pattern, and
+  // it is asserted here so the split of responsibility cannot rot unnoticed.
+  it('bans layer-level barrels via the import pattern, not the plugin', async () => {
+    const messages = await lint(
+      `import * as x from '@/features'\nexport const y = x\n`,
+      'src/views/auth/probe.ts'
+    )
+
+    expect(messages.map((m) => m.ruleId)).toContain('no-restricted-imports')
+    expect(messages[0]?.message).toMatch(/No layer-level barrels/)
+  })
+
+  it('still bans layer barrels inside the navigation source file', async () => {
+    // `src/i18n/navigation.ts` is exempted from the navigation ban over a strict
+    // subset of files. That block restates the layer-barrel pattern; if someone
+    // drops it, the exemption silently widens.
+    expect(
+      await ruleIds(
+        `import * as x from '@/features'\nexport const y = x\n`,
+        'src/i18n/navigation.ts'
+      )
+    ).toContain('no-restricted-imports')
+  })
+
+  // The config must not rely on a deprecated plugin API. Run in a child process
+  // on purpose: the plugin warns through `console` once per process, so an
+  // in-process assertion would pass simply because an earlier test consumed it.
+  // Generous timeout on purpose: this spawns a full ESLint run over `src`, which
+  // takes ~1.5 s locally and ~7.5 s on CI. Vitest's 5 s default killed it on the
+  // first CI run. Narrowing the target would be faster but reintroduces the
+  // "no imports, so the plugin never warns" false green this check exists to
+  // avoid, so the run stays wide and the budget is stated instead.
+  it('uses no deprecated boundaries API', () => {
+    const run = spawnSync(
+      'node',
+      // The whole tree on purpose. The plugin only warns once it actually
+      // resolves a dependency, so a file with no imports reports nothing --
+      // an earlier version of this test linted `manifest.ts` and passed with a
+      // deprecated rule reintroduced. Linting `src` also survives the pending
+      // `views` -> `_pages` rename, which a narrower path would not.
+      [path.join(WEB_ROOT, 'node_modules/eslint/bin/eslint.js'), 'src'],
+      { cwd: WEB_ROOT, encoding: 'utf8' }
+    )
+
+    // stdout AND stderr: the plugin warns through `console.warn`, which is
+    // stderr. An earlier version of this assertion read stdout only and passed
+    // happily with a deprecated rule reintroduced.
+    const output = `${run.stdout ?? ''}${run.stderr ?? ''}`
+
+    expect(output).not.toMatch(/\[boundaries]\[warning]/)
+    expect(output).not.toMatch(/deprecated/i)
+  }, 60_000)
 })
