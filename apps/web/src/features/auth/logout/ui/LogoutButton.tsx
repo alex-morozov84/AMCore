@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { LogOut } from 'lucide-react'
 
-import { Button } from '@/shared/ui'
+import { Button } from '@/shared/ui/button'
 
 import { useLogout } from '../model/use-logout'
 

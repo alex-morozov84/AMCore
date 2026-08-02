@@ -2,7 +2,7 @@ import { useTranslations } from 'next-intl'
 
 import { RegisterForm } from '@/features/auth'
 import { Link } from '@/i18n/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 
 export function RegisterPage() {
   const t = useTranslations('auth')

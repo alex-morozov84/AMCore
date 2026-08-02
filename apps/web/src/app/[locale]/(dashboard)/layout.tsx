@@ -3,10 +3,11 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 
-import { LocaleSwitcher, LogoutButton } from '@/features'
+import { LogoutButton } from '@/features/auth/logout'
+import { LocaleSwitcher } from '@/features/locale-switcher'
 import { useRouter } from '@/i18n/navigation'
 import { useAuthStore } from '@/shared/store'
-import { Spinner } from '@/shared/ui'
+import { Spinner } from '@/shared/ui/spinner'
 
 interface DashboardLayoutProps {
   children: ReactNode

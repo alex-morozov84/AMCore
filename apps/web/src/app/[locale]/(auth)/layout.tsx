@@ -3,10 +3,10 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 
-import { LocaleSwitcher } from '@/features'
+import { LocaleSwitcher } from '@/features/locale-switcher'
 import { useRouter } from '@/i18n/navigation'
 import { useAuthStore } from '@/shared/store'
-import { Spinner } from '@/shared/ui'
+import { Spinner } from '@/shared/ui/spinner'
 
 interface AuthLayoutProps {
   children: ReactNode
