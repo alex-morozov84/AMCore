@@ -138,18 +138,38 @@ export default [
     },
   },
 
-  // Validation localization.
+  // Syntax guards — ALL of them, in ONE options object. Read this before adding
+  // another.
   //
-  // `z.config(z.locales.*)` sets Zod's locale process-globally. It cannot be
-  // scoped to a request or a render (colinhacks/zod#4986), so it cannot serve
-  // two live locales and on the server it races across requests. Localize with
-  // the per-parse error map instead — `useLocalizedForm` / `useZodErrorMap`.
+  // ESLint flat config *replaces* a rule's options when a later block
+  // configures the same rule key for the same files; it does not merge them.
+  // Two blocks that each set `no-restricted-syntax` for `src/**` do not add up
+  // — the last one silently wins and the earlier selectors vanish from the
+  // effective config with no warning anywhere.
+  //
+  // That is not hypothetical. The Zod-locale selector below shipped in #267 and
+  // was silently disabled the same day by #270, which added the non-ASCII
+  // selectors in a second block. It survived only in test files — the one place
+  // #270's block was `ignores`d — so it banned `z.config` exactly where nobody
+  // writes it and permitted it everywhere that mattered, for as long as nobody
+  // checked. `src/test/eslint-guards.test.ts` now fails the build on a repeat.
+  //
+  // So: one block, one options object, every selector. A narrower block below
+  // may relax a selector for a *strict subset* of files — that is the mechanism
+  // used deliberately, and the guard test asserts both halves.
   {
-    name: 'project/zod-locale',
+    name: 'project/syntax-guards',
     files: ['src/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
         'error',
+        // Validation localization.
+        //
+        // `z.config(z.locales.*)` sets Zod's locale process-globally. It cannot
+        // be scoped to a request or a render (colinhacks/zod#4986), so it
+        // cannot serve two live locales and on the server it races across
+        // requests. Localize with the per-parse error map instead —
+        // `useLocalizedForm` / `useZodErrorMap`.
         {
           selector:
             "CallExpression[callee.object.name='z'][callee.property.name='config']",
@@ -157,27 +177,13 @@ export default [
             'Do not set a global Zod locale — it cannot represent two locales. ' +
             'Use useLocalizedForm() / useZodErrorMap() (per-parse error map).',
         },
-      ],
-    },
-  },
-
-  // No user-facing copy in code.
-  //
-  // Catches the concrete, mechanical half of the rule: a non-ASCII string
-  // literal in `src/` is almost always Russian copy that belongs in a message
-  // catalogue. It cannot catch hardcoded *English* copy — that still needs
-  // review — but it is what let a half-migrated tree keep shipping Russian
-  // beside correct `useTranslations()` calls.
-  //
-  // Tests and catalogues are exempt: fixtures legitimately contain non-ASCII
-  // input, and the catalogues are where the copy is supposed to live.
-  {
-    name: 'project/no-hardcoded-copy',
-    files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}', 'src/test/**'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
+        // No user-facing copy in code.
+        //
+        // Catches the concrete, mechanical half of the rule: a non-ASCII string
+        // literal in `src/` is almost always Russian copy that belongs in a
+        // message catalogue. It cannot catch hardcoded *English* copy — that
+        // still needs review — but it is what let a half-migrated tree keep
+        // shipping Russian beside correct `useTranslations()` calls.
         {
           selector: 'Literal[value=/[^\\x00-\\x7F]/]',
           message:
@@ -189,6 +195,28 @@ export default [
           message:
             'Non-ASCII text in a template literal — user-facing copy belongs in messages/*.json. ' +
             'See docs/frontend/i18n-and-errors.md.',
+        },
+      ],
+    },
+  },
+
+  // Deliberate relaxation over a STRICT SUBSET of the files above: tests and
+  // catalogues legitimately contain non-ASCII fixture input, so only the
+  // Zod-locale selector applies there. Because this block replaces the options
+  // wholesale (see above), it must restate every selector it still wants — and
+  // the guard test asserts exactly that, so dropping one here fails the build.
+  {
+    name: 'project/syntax-guards-tests',
+    files: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}', 'src/test/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='z'][callee.property.name='config']",
+          message:
+            'Do not set a global Zod locale — it cannot represent two locales. ' +
+            'Use useLocalizedForm() / useZodErrorMap() (per-parse error map).',
         },
       ],
     },
