@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The ESLint rule banning a process-global Zod locale was silently disabled in
+  all application code.** ESLint flat config _replaces_ a rule's options when a
+  later block configures the same rule for the same files — it does not merge
+  them. Two blocks each set `no-restricted-syntax` for `apps/web/src/**`, so the
+  later one won and the `z.config(z.locales.*)` selector vanished from the
+  effective config. It survived only in test files, the one place the later
+  block was `ignores`d, which is why nothing caught it: the ban applied exactly
+  where nobody writes that call and nowhere it mattered. All selectors now live
+  in one options object, with a deliberately narrower block relaxing the
+  non-ASCII copy rule for test fixtures. `apps/web/src/test/eslint-guards.test.ts`
+  now proves each guard fails on the defect it exists for, and fails the build
+  if two blocks ever configure `no-restricted-syntax` or `no-restricted-imports`
+  over an identical file set again.
+
 - **Links in emails and notifications had no locale prefix.** Since routes moved
   under `/en/...` and `/ru/...`, a server-generated link to a bare path was
   resolved by cookie or `Accept-Language` — which a link _from an email_ cannot
