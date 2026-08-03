@@ -218,8 +218,15 @@ describe('token contrast (WCAG AA)', () => {
     return match[1]
   }
 
+  it('reads shorthand hex the same as its expanded form', () => {
+    // `#fff` is valid CSS and is what a formatter produces from `#ffffff`.
+    // The parser used to read it as 4095 and return a wrong colour silently,
+    // which only surfaced because the token regex here rejected it first.
+    expect(contrastRatio('#fff', '#000')).toBeCloseTo(contrastRatio('#ffffff', '#000000'), 10)
+  })
+
   function extractToken(block: string, name: string): string {
-    const match = block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))
+    const match = block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{3,8})`))
     if (!match) {
       throw new Error(`Could not find --${name} in the given globals.css block`)
     }

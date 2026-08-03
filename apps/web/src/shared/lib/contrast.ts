@@ -1,8 +1,18 @@
 /** WCAG 2.x relative luminance + contrast ratio, sRGB hex input only. */
 
 function hexToRgb(hex: string): [number, number, number] {
-  const normalized = hex.replace('#', '')
-  const value = parseInt(normalized, 16)
+  const digits = hex.replace('#', '')
+  // `#fff` and `#ffff` are valid CSS and are what a formatter produces from
+  // `#ffffff`. Expanded rather than parsed as-is: `parseInt('fff', 16)` is 4095,
+  // which yields a plausible-looking but wrong colour with no error at all.
+  const expanded =
+    digits.length <= 4
+      ? digits
+          .split('')
+          .map((d) => d + d)
+          .join('')
+      : digits
+  const value = parseInt(expanded.slice(0, 6), 16)
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
 }
 
