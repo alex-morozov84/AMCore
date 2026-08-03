@@ -251,3 +251,97 @@ describe('FSD boundaries', () => {
     expect(output).not.toMatch(/deprecated/i)
   }, 60_000)
 })
+
+describe('token-only styling', () => {
+  // The palette is the source for tokens; components consume tokens only.
+  // Two ways past them are reachable from code, and both are banned. Half of
+  // these fixtures are permissiveness cases: a colour rule that also rejected
+  // `w-[32px]` or `text-chart-1` would be turned off rather than obeyed.
+  it.each([
+    ['a default-palette utility', `<div className="bg-red-500" />`, true],
+    // Variant prefixes are the likeliest real-world form and were missed by the
+    // first anchor this rule used.
+    [
+      'a palette utility behind variants',
+      `<div className="hover:bg-red-500 dark:text-gray-800" />`,
+      true,
+    ],
+    ['a palette utility behind a breakpoint', `<div className="sm:border-blue-300" />`, true],
+    ['stacked variants', `<div className="dark:md:hover:bg-fuchsia-600" />`, true],
+    ['a group variant', `<div className="group-hover:text-rose-600" />`, true],
+    ['an arbitrary variant', `<div className="[&>*]:text-slate-500" />`, true],
+    // Derived from the installed Tailwind: `mauve` did not exist when a
+    // hand-written hue list was tried, and slipped straight through it.
+    ['a hue that a hand-written list would have missed', `<div className="bg-mauve-500" />`, true],
+    ['a raw hex in an arbitrary value', `<div className="bg-[#8b5cf6]" />`, true],
+    ['a raw oklch() in an arbitrary value', `<div className="ring-[oklch(.5_.2_30)]" />`, true],
+    ['semantic tokens', `<div className="bg-destructive text-muted-foreground" />`, false],
+    // `chart-1` ends in a number but has no palette scale -- the shape that
+    // separates a token from `bg-red-500`.
+    ['a numbered token', `<div className="text-chart-1" />`, false],
+    ['a token whose name resembles a palette class', `<div className="bg-brand-primary" />`, false],
+    ['a numeric spacing utility', `<div className="gap-x-100" />`, false],
+    [
+      'layout utilities and arbitraries',
+      `<div className="w-[32px] grid-cols-[1fr_auto] max-w-md" />`,
+      false,
+    ],
+    ['a CSS variable in an arbitrary value', `<div className="bg-[var(--brand)]" />`, false],
+    // Known gap, asserted so it stays a decision: scale-less white/black are not
+    // banned, because shadcn's destructive variant uses `text-white` and
+    // replacing it is a design call for the shared-UI track.
+    ['scale-less white', `<div className="text-white" />`, false],
+  ])('%s', async (_name, jsx, shouldReport) => {
+    const ids = await ruleIds(`export const P = () => ${jsx}\n`, 'src/probe.tsx')
+
+    if (shouldReport) {
+      expect(ids).toContain('no-restricted-syntax')
+    } else {
+      expect(ids).toEqual([])
+    }
+  })
+
+  it('catches a raw colour in a class string outside JSX', async () => {
+    // `cva()` variant objects are plain strings, and are the likeliest place a
+    // brand colour gets pasted -- a JSX-only rule would have looked thorough
+    // while missing them.
+    expect(
+      await ruleIds(`export const v = { primary: 'bg-[rgb(139,92,246)]' }\n`, 'src/probe.ts')
+    ).toContain('no-restricted-syntax')
+  })
+
+  it('bans the inline style prop outright, via a maintained rule', async () => {
+    // Not a bespoke selector: allowing "only non-colour" inline styles required
+    // a hand-maintained list of CSS colour properties, which is the fragile
+    // shape this track exists to remove.
+    const messages = await lint(
+      `export const P = () => <div style={{ width: '32px' }} />\n`,
+      'src/probe.tsx'
+    )
+
+    expect(messages.map((m) => m.ruleId)).toContain('react/forbid-dom-props')
+    expect(messages[0]?.message).toMatch(/token utilities/)
+  })
+
+  it('rejects even a non-colour inline style, on purpose', async () => {
+    // The ban is deliberately wider than colour. A dynamic transform is a real
+    // use, and it is meant to cost one `eslint-disable` with a reason rather
+    // than be waved through by a rule guessing at intent.
+    expect(
+      await ruleIds(
+        `export const P = () => <div style={{ transform: 'translateX(1px)' }} />\n`,
+        'src/probe.tsx'
+      )
+    ).toContain('react/forbid-dom-props')
+  })
+
+  it('leaves a custom component prop named style alone', async () => {
+    // The ban is about the DOM prop. A component that happens to take `style`
+    // is not a theme violation, and reporting it would make the rule wrong.
+    const code =
+      `const Foo = (_: { style: object }) => null\n` +
+      `export const P = () => <Foo style={{ width: '32px' }} />\n`
+
+    expect(await ruleIds(code, 'src/probe.tsx')).toEqual([])
+  })
+})

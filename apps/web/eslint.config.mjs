@@ -4,6 +4,9 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 import nextPlugin from '@next/eslint-plugin-next';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import boundaries from 'eslint-plugin-boundaries';
 
@@ -65,6 +68,64 @@ const LAYER_BARREL = {
     'No layer-level barrels — import the slice public API (@/features/auth/login) ' +
     'or the shared module (@/shared/ui/button). See docs/frontend/.',
 };
+
+// ---------------------------------------------------------------------------
+// Token-only styling
+// ---------------------------------------------------------------------------
+//
+// The palette is the *source* for tokens; `globals.css` maps it into semantic
+// names. Components consume the tokens only. Two ways to reach past them, and
+// each is banned where it can actually be seen:
+//
+//   1. a default-palette utility  — `bg-red-500`, `dark:text-gray-800`
+//   2. a raw colour in an arbitrary value — `bg-[#8b5cf6]`, `text-[rgb(…)]`
+//
+// Tailwind can delete the palette (`--color-*: initial`) but has no supported
+// way to disable arbitrary values, so lint is the only place invariant 2 can
+// live. Inline `style` is handled by `react/forbid-dom-props`, not here.
+
+/**
+ * Hue names read from the installed Tailwind, never listed by hand.
+ *
+ * A hand-written list was tried first and was already wrong: 4.3.3 ships
+ * `mauve`, `mist`, `olive` and `taupe`, so `bg-mauve-500` passed a rule that
+ * looked complete. Reading the source means a Tailwind upgrade extends the ban
+ * on its own, and a restructure fails loudly here instead of silently opening
+ * a hole.
+ */
+function tailwindHues() {
+  const themePath = fileURLToPath(import.meta.resolve('tailwindcss/theme.css'));
+  const hues = new Set(
+    [...readFileSync(themePath, 'utf8').matchAll(/^\s*--color-([a-z]+)-\d+:/gm)].map((m) => m[1]),
+  );
+
+  if (hues.size === 0) {
+    throw new Error(
+      `No default palette found in ${themePath}. Tailwind changed how the theme is published; ` +
+        'the token-only styling rule cannot be built and would otherwise pass silently.',
+    );
+  }
+
+  return [...hues].join('|');
+}
+
+// `[^a-z-]` rather than a whitespace anchor, so variant prefixes are covered:
+// `hover:bg-red-500`, `dark:text-gray-800`, `[&>*]:bg-red-50`. The scale suffix
+// is what separates a palette colour from a token — `bg-destructive` and
+// `text-chart-1` have no `-500`.
+const PALETTE_CLASS = `(^|[^a-z-])[a-z-]+-(${tailwindHues()})-(50|[1-9]00|950)\\b`;
+const PALETTE_MESSAGE =
+  "Tailwind's default palette bypasses the theme — use a semantic token " +
+  '(bg-destructive, text-muted-foreground). See docs/frontend/brand-theme-and-tokens.md.';
+
+// Keyed on the value, with no list of colour utilities: `-[#…]` is a colour
+// wherever it appears, so `ring-`, `divide-` and any utility a future Tailwind
+// adds are covered without maintaining a list. `w-[32px]` does not match, and
+// `bg-[var(--brand)]` stays legal because a variable is a token reference.
+const ARBITRARY_COLOUR = '-\\[(#|rgba?\\(|hsla?\\(|oklch\\(|lab\\(|lch\\(|color\\()';
+const ARBITRARY_MESSAGE =
+  'Raw colour in a Tailwind arbitrary value — use a semantic token, or a CSS variable ' +
+  'if the value must be computed. See docs/frontend/brand-theme-and-tokens.md.';
 
 const NAVIGATION_PATHS = [
   {
@@ -164,6 +225,26 @@ export default [
       ...reactHooksPlugin.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
+      // Inline styles cannot follow the theme, and a rule that tried to allow
+      // "only non-colour" inline styles turned into a hand-maintained list of
+      // CSS colour properties — the fragile shape this track exists to avoid.
+      // The whole prop is banned instead, using a rule someone else maintains.
+      // A genuinely dynamic value becomes one `eslint-disable` line with a
+      // reason, which is reviewable; a regex silently deciding what counts as
+      // a colour is not. The tree has no inline styles today.
+      'react/forbid-dom-props': [
+        'error',
+        {
+          forbid: [
+            {
+              propName: 'style',
+              message:
+                'Inline styles cannot follow the theme — use token utilities. ' +
+                'See docs/frontend/brand-theme-and-tokens.md.',
+            },
+          ],
+        },
+      ],
     },
   },
 
@@ -324,6 +405,14 @@ export default [
             'Non-ASCII text in a template literal — user-facing copy belongs in messages/*.json. ' +
             'See docs/frontend/i18n-and-errors.md.',
         },
+        // Token-only styling — see the block comment at the top of this file.
+        // Scanned on every string literal rather than only JSX, because class
+        // strings also live in plain objects: the `cva()` variants in
+        // `shared/ui/button.tsx` are the likeliest place for a raw colour.
+        { selector: `Literal[value=/${PALETTE_CLASS}/]`, message: PALETTE_MESSAGE },
+        { selector: `TemplateElement[value.raw=/${PALETTE_CLASS}/]`, message: PALETTE_MESSAGE },
+        { selector: `Literal[value=/${ARBITRARY_COLOUR}/]`, message: ARBITRARY_MESSAGE },
+        { selector: `TemplateElement[value.raw=/${ARBITRARY_COLOUR}/]`, message: ARBITRARY_MESSAGE },
       ],
     },
   },
