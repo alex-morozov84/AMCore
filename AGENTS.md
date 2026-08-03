@@ -35,9 +35,10 @@ pnpm + Turborepo monorepo.
 
 - `apps/api` — NestJS 11 backend (Postgres 16 + Prisma 7, Redis + BullMQ, Zod
   validation, JWT/OAuth/API-keys, CASL RBAC). The starter core.
-- `apps/web` — Next.js 16 frontend, Feature-Sliced Design. It remains a starter
-  shell until the backend surface is complete, then should be finished to the
-  same quality bar.
+- `apps/web` — Next.js 16 frontend/admin starter, Feature-Sliced Design, with
+  locale-routed UI, localized API/form errors, design tokens, theme support, and
+  lint-enforced architecture/styling guardrails. Product-specific admin screens
+  remain downstream-owned.
 - `packages/shared` — Zod schemas, types, constants used by both api and web.
 
 ## Commands
@@ -143,13 +144,33 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `@/features/auth/login/ui/LoginForm`); `shared/ui` and `shared/lib` are
   collections of modules, so import those directly (`@/shared/ui/button`,
   `@/shared/lib/utils`) — there is no `@/shared/ui` barrel, and no layer-level
-  barrel anywhere. Server Components by default; push `'use client'` to
-  the interactive leaf. TanStack Query for server state, Zustand for local
-  client state. Colors via variables (`bg-accent`, `text-foreground`) — never
-  `bg-[#hex]`. Theme defaults to `system` (light/dark), owned by
-  `shared/lib/theme.ts` — no `next-themes` dependency. Full contract:
+  barrel anywhere. A slice may not import a sibling slice in another group.
+  TanStack Query for server state, Zustand for local client state. Theme
+  defaults to `system` (light/dark), owned by `shared/lib/theme.ts` — no
+  `next-themes` dependency. **These import rules fail lint, they are not
+  conventions.** Full contract:
   `docs/frontend/architecture-and-conventions.md`,
-  `docs/frontend/brand-theme-and-tokens.md`.
+  `docs/frontend/brand-theme-and-tokens.md`,
+  `docs/frontend/fsd-boundaries-and-guardrails.md`.
+- **Frontend server/client boundary — two separate decisions.** Server
+  Components are the default; add `'use client'` only at the interactive leaf
+  that owns events, effects, browser APIs, a Zustand store or a Query hook —
+  never on a layout, which makes the whole subtree ship as client JS. For
+  **non-component modules**, mark by capability: `import 'client-only'` when it
+  touches `window`/`document`/`localStorage`/`navigator`/browser SDKs,
+  `import 'server-only'` when it touches secrets, the filesystem, database
+  clients or Node built-ins. Never blanket-style — **a universal module stays
+  universal.** Neither package is installed yet; add the dependency with the
+  first module that needs it.
+- **Frontend styling — the palette is a source, tokens are the public API.**
+  Colors come from semantic tokens (`bg-card`, `text-muted-foreground`). All of
+  these fail lint: Tailwind's default palette (`bg-red-500`, including behind
+  variants like `dark:`/`hover:`), raw colors in arbitrary values
+  (`bg-[#8b5cf6]`), and the DOM `style` prop entirely. A CSS variable stays
+  legal (`bg-[var(--brand)]`) — a variable _is_ a token reference. CSS Modules
+  are supported for local component CSS under the same rule, with camelCase
+  class names; `app/globals.css` is exempt because that is where tokens are
+  declared.
 - **Frontend i18n — English base, Russian second, both live.** Routes sit under
   `[locale]` with an explicit prefix (`/en/...`, `/ru/...`). Four rules an agent
   will otherwise break:

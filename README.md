@@ -9,14 +9,16 @@
 ## Overview
 
 AMCore is a production-oriented application starter for building secure, modular
-SaaS products, internal tools, and AI-enabled systems. The current reusable
-surface is backend-first: a NestJS API foundation with strong application and
-security primitives, broad tests, and a completed production-readiness baseline.
+SaaS products, internal tools, and AI-enabled systems. The reusable surface is
+backend-first: a NestJS API foundation with strong application and security
+primitives, broad tests, and a completed production-readiness baseline.
 Deployment targets and CD environments remain adopter-specific.
 
-The repository also contains a Next.js frontend workspace. It is intentionally
-kept as a starter shell while the backend surface is completed, then will be
-brought up to the same quality bar instead of being removed.
+The repository also contains a Next.js frontend/admin starter workspace. It now
+ships the frontend foundations a downstream product should inherit rather than
+recreate: locale-routed UI, localized API/form errors, design tokens with
+light/dark/system theme support, FSD boundaries, and lint-enforced styling
+guardrails. Feature-specific admin surfaces remain intentionally product-owned.
 
 ### Backend Starter Capabilities
 
@@ -64,6 +66,7 @@ amcore/
 │   └── typescript-config/
 ├── docs/
 │   ├── backend/        # Backend module boundaries and extension conventions
+│   ├── frontend/       # Frontend architecture, i18n, theme, and guardrails
 │   ├── auth/           # Authentication & authorization documentation
 │   ├── ai/             # AI capability layer (assistants, runs, tools, artifacts, providers, security)
 │   ├── email/          # Email extension contract (templates, queueing, secret-bearing sends)
@@ -86,6 +89,7 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | Backend architecture  | [`apps/api/README.md`](apps/api/README.md)                                                                                                                                      |
 | Add a backend module  | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md)                                                                                  |
 | Frontend architecture | [`docs/frontend/architecture-and-conventions.md`](docs/frontend/architecture-and-conventions.md)                                                                                |
+| Frontend guardrails   | [`docs/frontend/fsd-boundaries-and-guardrails.md`](docs/frontend/fsd-boundaries-and-guardrails.md)                                                                              |
 | Add an env variable   | [`docs/backend/architecture-and-conventions.md#adding-an-environment-variable`](docs/backend/architecture-and-conventions.md#adding-an-environment-variable)                    |
 | Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                                                                                                             |
 | RBAC / authorization  | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                                                                                        |

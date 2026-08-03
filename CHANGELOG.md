@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The frontend architecture and styling contracts are now enforced, not just
+  documented.** `docs/frontend/` had promised lint enforcement in four places;
+  this delivers it. Layer direction and slice public APIs are checked by
+  `eslint-plugin-boundaries`; Tailwind's default palette (including behind
+  variants such as `dark:`/`hover:`), raw colours in arbitrary values, and the
+  DOM `style` prop all fail lint; and CSS Modules — now a supported styling
+  surface for local component CSS — are guarded by Stylelint so colour still
+  comes from `var(--token)`. `app/globals.css` is deliberately exempt, since
+  that is where the tokens are declared.
+  Two consequences for anyone updating a fork: `@/shared/ui` and the other
+  layer-level barrels no longer exist as import targets — import the module
+  (`@/shared/ui/button`) or the slice (`@/features/auth/login`) — and inline
+  `style` on DOM elements is rejected outright, so a genuinely dynamic value
+  needs an `eslint-disable` with a reason. New guide:
+  `docs/frontend/fsd-boundaries-and-guardrails.md`, which also documents when to
+  use `'use client'`, `client-only` and `server-only`. **ADR-066.**
+
 ### Fixed
+
+- **Colour contrast was computed from a wrong value for shorthand hex.**
+  `hexToRgb` parsed `#fff` as `4095` and returned a plausible-looking but
+  incorrect colour with no error, so the WCAG AA token checks would have graded
+  the wrong pair had any token used the three-digit form. Shorthand hex is now
+  expanded, with a regression test.
 
 - **The ESLint rule banning a process-global Zod locale was silently disabled in
   all application code.** ESLint flat config _replaces_ a rule's options when a

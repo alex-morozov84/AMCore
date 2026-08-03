@@ -7,20 +7,24 @@ guessing.
 
 ## What's included
 
-| Topic                                                           | What it covers                                                                                                                 |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| [Architecture & conventions](./architecture-and-conventions.md) | FSD layer boundaries, route thinness, Server/Client Component defaults, state model, and how the frontend consumes the backend |
-| [Brand, theme, and design tokens](./brand-theme-and-tokens.md)  | Token architecture, light/dark/system modes, the no-flash mechanism, brand assets, and the downstream rebrand checklist        |
-| [i18n and error localization](./i18n-and-errors.md)             | Where copy lives, adding strings/locales/error codes, plurals, form validation, and running a fork single-locale               |
+| Topic                                                           | What it covers                                                                                                                             |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Architecture & conventions](./architecture-and-conventions.md) | FSD layer boundaries, route thinness, Server/Client Component defaults, state model, and how the frontend consumes the backend             |
+| [Brand, theme, and design tokens](./brand-theme-and-tokens.md)  | Token architecture, light/dark/system modes, the no-flash mechanism, brand assets, and the downstream rebrand checklist                    |
+| [i18n and error localization](./i18n-and-errors.md)             | Where copy lives, adding strings/locales/error codes, plurals, form validation, and running a fork single-locale                           |
+| [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md)   | Which layer, import, server/client and styling rules are enforced, by which tool, what is deliberately not covered, and how to add a guard |
 
 More guides land here as later frontend/admin starter tracks complete
-(FSD lint guardrails, shared UI, API client patterns, testing, Storybook) — see `architecture-and-conventions.md`'s "See also" section for
-the current set.
+(shared UI, API client patterns, testing, Storybook) — see
+`architecture-and-conventions.md`'s "See also" section for the current set.
 
 ## Start here
 
 - Extending or adding a route/page → [Architecture & conventions](./architecture-and-conventions.md#the-recipe--adding-a-route)
 - Adding copy, a locale, or an error message → [i18n and error localization](./i18n-and-errors.md)
+- Wondering whether an import or a colour is allowed → [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md)
+- Deciding between `'use client'`, `client-only` and `server-only` →
+  [Boundaries & guardrails § Server/client boundaries](./fsd-boundaries-and-guardrails.md#serverclient-boundaries)
 - Backend endpoint shapes (paths, request/response bodies, status codes) →
   the Swagger/OpenAPI document at `/docs` in development, not this guide —
   see [Architecture & conventions § Relationship to backend/OpenAPI docs](./architecture-and-conventions.md#relationship-to-backendopenapi-docs)

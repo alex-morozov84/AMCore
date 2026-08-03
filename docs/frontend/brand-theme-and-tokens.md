@@ -232,8 +232,7 @@ no rebrand CLI/init script in this starter (see
    `description` and `app/layout.tsx`'s `metadata`.
 4. **Theme tokens** — edit `globals.css`'s `:root`/`.dark` values. Keep the
    `@theme inline` bridge and the token _names_ stable if you can — other
-   code (and Track 4's future lint rules) depend on the names existing, not
-   their values.
+   code depends on the names existing, not their values.
 5. **Theme mode** — decide whether your product keeps `system` + a toggle,
    or forces `light`/`dark` only. To force one, change
    `DEFAULT_THEME_SETTING` in `theme.ts` and don't expose a toggle in your
@@ -254,12 +253,15 @@ nothing more for now.
 
 ## Inline style and contrast
 
-- **Token-only styling.** No raw Tailwind color literals (`bg-[#8b5cf6]`) or
-  inline `style={{ color: '#...' }}` for anything that should follow the
-  theme. Use the named utilities (`bg-card`, `text-foreground-muted`, ...).
-  Repo-wide lint enforcement of this rule is Track 4 — until then, it's a
-  hard rule in review, same as the FSD import rule in
-  [Architecture & conventions](./architecture-and-conventions.md#import-rule-public-api-only).
+- **Token-only styling, enforced.** Raw Tailwind color literals
+  (`bg-[#8b5cf6]`), the default palette (`bg-red-500`, including behind
+  variants) and the inline `style` prop all fail lint. Use the named utilities
+  (`bg-card`, `text-foreground-muted`, ...); a CSS variable stays legal inside
+  an arbitrary value, because a variable _is_ a token reference. CSS Modules
+  are a supported surface under the same rule — colour comes from
+  `var(--token)` — while `globals.css` is exempt, since it is where the tokens
+  are declared. Full detail:
+  [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md#styling-the-palette-is-a-source-tokens-are-the-public-api).
 - **Contrast.** <a id="contrast"></a>Every shipped token pair
   (`background`/`foreground`, `card`/`card-foreground`, `primary`/
   `primary-foreground`, the status `-soft`/solid pairs, etc.) must clear
@@ -281,5 +283,6 @@ nothing more for now.
   routing, Server/Client Component defaults.
 - `AGENTS.md` → Code conventions — the condensed cross-tool version of the
   token-only-styling rule.
-- Track 4 (FSD boundaries and agent guardrails) — where the "no hardcoded
-  colors" rule above becomes an enforced lint rule, not just a review rule.
+- [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md) — the lint and
+  Stylelint rules that enforce the token-only rule above, what they
+  deliberately do not cover, and how to add one.

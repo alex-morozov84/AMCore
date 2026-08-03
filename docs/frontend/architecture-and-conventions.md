@@ -52,13 +52,19 @@ import { LoginForm } from '@/features/auth/login/ui/LoginForm'
 ```
 
 Each slice folder's `index.ts` is the contract for what other layers may use.
-Enforcing this with lint tooling (rather than convention alone) is Track 4
-(FSD boundaries and agent guardrails) — until then, treat it as a hard rule in
-review.
+This is enforced by `eslint-plugin-boundaries`, not by convention — see
+[Boundaries & guardrails](./fsd-boundaries-and-guardrails.md#import-rules) for
+what each rule catches, including the `shared` exception below.
 
 A layer may only import from layers below it in the table above (e.g.
 `features` may import `entities`/`shared`, never the reverse, and never a
 sibling `feature`'s internals).
+
+**`shared/ui` and `shared/lib` are the exception**: they are collections of
+independent modules, imported per module (`@/shared/ui/button`,
+`@/shared/lib/utils`), which is also the only shape the shadcn CLI generates.
+There is no layer-level barrel anywhere — `@/features`, `@/shared` and friends
+are not import targets.
 
 ## Route thinness
 
@@ -270,6 +276,5 @@ architectural structure.
 - `AGENTS.md` → Code conventions — the condensed cross-tool version of the
   rules on this page.
 - Later frontend/admin starter tracks add their own guide here as they land:
-  i18n and error localization, FSD lint guardrails, shared UI/shadcn
-  baseline, API client/auth/query patterns, the testing pyramid, and
-  Storybook.
+  shared UI/shadcn baseline, API client/auth/query patterns, the testing
+  pyramid, and Storybook.
