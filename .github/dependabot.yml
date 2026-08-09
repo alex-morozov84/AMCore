@@ -19,6 +19,13 @@ updates:
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
+      # jest-mock-extended: 4.0.1+ breaks Prisma 7's generic-overloaded groupBy
+      # mock type inference (ai/BACKLOG.md has the full trace: PR #243, #275,
+      # #280/#283, #286 all reverted the same failure). Upstream root cause is
+      # confirmed (marchaos/jest-mock-extended#147) with a fix already written
+      # (#148), but the repo's been inactive since 2026-04-20 with no ETA.
+      # Remove this entry once a clean version is confirmed and re-pinned.
+      - dependency-name: 'jest-mock-extended'
     commit-message:
       prefix: 'chore(deps)'
       include: 'scope'
