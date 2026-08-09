@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-09
+
+### Upgrading
+
+This release changes default behavior and import paths that a fork built on
+`v0.2.0` may depend on:
+
+- **Default locale changed from Russian to English.** `User.locale`'s column
+  default, `User.timezone` (`Europe/Moscow` → `UTC`), and `@amcore/shared`'s
+  `DEFAULT_LOCALE` all flipped for _new_ installs. Russian remains a fully
+  supported locale — a user who registers with `Accept-Language: ru` or an
+  explicit `locale: "ru"` still gets Russian throughout, including email. The
+  migration changes column defaults only; existing rows are deliberately not
+  backfilled, since a stored value cannot be told apart from a preference the
+  user actually chose. If your fork wants existing users moved to the new
+  defaults, that is a separate opt-in data migration you must write yourself.
+- **Every `apps/web` route now lives under an explicit `/en/...` or `/ru/...`
+  locale prefix.** A bare path (e.g. `/login`) redirects to the prefixed
+  route rather than rendering directly. Any hardcoded links to unprefixed
+  paths need updating.
+- **Layer-level barrel imports no longer exist.** `@/features`, `@/shared`,
+  and other layer-level import targets were removed. Import the concrete
+  module (`@/shared/ui/button`) or the slice's public API
+  (`@/features/auth/login`) instead.
+- **The DOM `style` prop is now rejected by lint.** Colors must come from
+  design tokens; a genuinely dynamic inline style needs an explicit
+  `eslint-disable` with a reason.
+- **Breaking for forks that added a `message:` string to a shared Zod
+  schema.** A schema-level message outranks the frontend's per-parse error
+  map and silently defeats localization for that field. Use
+  `params: { errorCode }` in a `superRefine` instead.
+
 ### Added
 
 - **The frontend architecture and styling contracts are now enforced, not just
@@ -879,6 +911,7 @@ production-readiness work and the platform foundation built so far.
 
 ---
 
-[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/alex-morozov84/AMCore/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/alex-morozov84/AMCore/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/alex-morozov84/AMCore/releases/tag/v0.1.0
