@@ -152,6 +152,15 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `docs/frontend/architecture-and-conventions.md`,
   `docs/frontend/brand-theme-and-tokens.md`,
   `docs/frontend/fsd-boundaries-and-guardrails.md`.
+- **Next.js reference: read the installed docs, not training data.** Before
+  any Next.js-specific work in `apps/web` (routing, caching/`use cache`,
+  config, App Router APIs, upgrades), read the version-matched bundled docs at
+  `apps/web/node_modules/next/dist/docs/` — a Next.js major/minor can differ
+  substantially from what a model was trained on. `apps/web/next.config.ts`
+  sets `agentRules: false` specifically so this bullet — not Next's own
+  auto-generated block — is the source of that instruction. **Do not create or
+  commit `apps/web/AGENTS.md` or `apps/web/CLAUDE.md`**; this file is the
+  single source of truth for agent instructions across the whole repo.
 - **Frontend server/client boundary — two separate decisions.** Server
   Components are the default; add `'use client'` only at the interactive leaf
   that owns events, effects, browser APIs, a Zustand store or a Query hook —
