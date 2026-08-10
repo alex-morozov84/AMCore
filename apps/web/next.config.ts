@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
   // React Compiler (stable in Next.js 16)
   reactCompiler: true,
 
+  // AMCore keeps agent instructions in the root AGENTS.md / CLAUDE.md as the
+  // single source of truth (see AGENTS.md). Without this, `next dev` would
+  // auto-generate a second, nested apps/web/AGENTS.md / CLAUDE.md the first
+  // time it detects an AI coding agent.
+  agentRules: false,
+
   // API proxy to backend
   async rewrites() {
     return [
