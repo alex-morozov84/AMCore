@@ -6,7 +6,7 @@ import { useEffect } from 'react'
 import { LocaleSwitcher } from '@/features/locale-switcher'
 import { useRouter } from '@/i18n/navigation'
 import { useAuthStore } from '@/shared/store'
-import { Spinner } from '@/shared/ui/spinner'
+import { PageLoading } from '@/shared/ui/page-loading'
 
 interface AuthLayoutProps {
   children: ReactNode
@@ -23,11 +23,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   }, [status, router])
 
   if (status === 'loading' || status === 'idle') {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    )
+    return <PageLoading />
   }
 
   if (status === 'authenticated') {
