@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`apps/web`:** the destructive button variant's text color now uses a
+  proper `--destructive-foreground` token instead of a raw `text-white`
+  literal. This also fixes a pre-existing WCAG AA contrast failure in dark
+  mode (white text on `--destructive` in dark mode was 3.6:1, below the
+  required 4.5:1) — dark mode now uses a dark foreground (`#171717`) against
+  the lighter dark-mode destructive red, which passes at 4.76:1. Light mode
+  is unchanged (`#fafafa`, 4.63:1).
+
 ## [0.3.0] - 2026-08-09
 
 ### Upgrading
