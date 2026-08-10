@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the lighter dark-mode destructive red, which passes at 4.76:1. Light mode
   is unchanged (`#fafafa`, 4.63:1).
 
+### Changed
+
+- **`apps/web`:** `shared/ui`'s `Button` and `Label` primitives are now built
+  on Base UI (`@base-ui/react`) instead of Radix, per the shared-UI/shadcn
+  baseline track. **`Button`'s `asChild` prop is removed** — Base UI has no
+  equivalent under that name. A fork rendering `<Button asChild><a .../></Button>`
+  needs to switch to composing the link/anchor directly, matching whatever
+  render-prop pattern the eventual `docs/frontend/shared-ui-and-shadcn.md`
+  guide documents. No other `shared/ui` primitive is affected yet.
+
 ## [0.3.0] - 2026-08-09
 
 ### Upgrading
