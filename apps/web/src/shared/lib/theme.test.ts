@@ -244,6 +244,7 @@ describe('token contrast (WCAG AA)', () => {
     ['secondary', 'secondary-foreground'],
     ['muted', 'muted-foreground'],
     ['accent', 'accent-foreground'],
+    ['destructive', 'destructive-foreground'],
     ['success-soft', 'success'],
     ['warning-soft', 'warning'],
     ['info-soft', 'info'],
@@ -261,6 +262,37 @@ describe('token contrast (WCAG AA)', () => {
       const bg = extractToken(darkBlock, bgName)
       const fg = extractToken(darkBlock, fgName)
       expect(contrastRatio(bg, fg)).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT)
+    })
+  })
+
+  describe('chart and font tokens are protected from silent regeneration', () => {
+    // A live shadcn CLI preset switch (spiked for Track 5's Base UI migration,
+    // never merged) was observed silently rewriting these exact values —
+    // distinguishable chart hues collapsed to five shades of the same gray,
+    // and a working --font-sans reference became an unresolvable
+    // self-reference — with no warning in the CLI output. These are pinned
+    // exact values, not a contrast check, specifically to catch that class of
+    // regression if it's ever reintroduced (see ai/models-talk.md, Track 5,
+    // F23-F25).
+    const chartTokens: Array<[string, string, string]> = [
+      ['chart-1', '#2563eb', '#60a5fa'],
+      ['chart-2', '#16a34a', '#4ade80'],
+      ['chart-3', '#ca8a04', '#facc15'],
+      ['chart-4', '#dc2626', '#f87171'],
+      ['chart-5', '#525252', '#a3a3a3'],
+    ]
+
+    it.each(chartTokens)(
+      '--%s keeps its distinguishable hue (light: %s, dark: %s)',
+      (name, light, dark) => {
+        expect(extractToken(lightBlock, name)).toBe(light)
+        expect(extractToken(darkBlock, name)).toBe(dark)
+      }
+    )
+
+    it('--font-sans still resolves to the real Geist Sans variable, not a self-reference', () => {
+      expect(globalsCss).toContain('--font-sans: var(--font-geist-sans);')
+      expect(globalsCss).not.toContain('--font-sans: var(--font-sans);')
     })
   })
 })
