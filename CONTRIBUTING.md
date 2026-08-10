@@ -86,7 +86,12 @@ chore: unify github repository url
    needed, say so in the PR.
 5. Add notable user-facing changes to `CHANGELOG.md` under `[Unreleased]`. Skip
    internal refactors, tests, and typo-only documentation changes.
-6. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
+6. **Next.js-specific changes** (see the trigger list in root `AGENTS.md` →
+   _Next.js reference_ bullet): list the installed Next.js docs pages checked
+   in the PR description or handoff, or say explicitly why none applied. This
+   is a review expectation, not a CI check — reviewers should expect to see
+   this list for a Next.js-specific PR, not find it enforced automatically.
+7. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
 
 CI runs the same checks on push; fixing any failures before opening a PR saves time.
 
