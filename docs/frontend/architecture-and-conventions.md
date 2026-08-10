@@ -18,6 +18,12 @@ conventions, see [`docs/backend/architecture-and-conventions.md`](../backend/arc
   schemes) live in the Swagger/OpenAPI document at `/docs` in development —
   see [Relationship to backend/OpenAPI docs](#relationship-to-backendopenapi-docs).
   This guide does not re-document individual endpoints.
+- **Framework-level Next.js APIs and behavior** (routing, caching, App Router
+  conventions, config options) live in the version-matched docs bundled with
+  the installed package at `apps/web/node_modules/next/dist/docs/`, not in
+  this guide or in a model's training data. See the root `AGENTS.md` →
+  _Next.js reference_ bullet for exactly when this applies and what's expected
+  in a PR.
 
 ## Layers: Next App Router vs FSD
 

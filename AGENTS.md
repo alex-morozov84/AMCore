@@ -152,11 +152,18 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `docs/frontend/architecture-and-conventions.md`,
   `docs/frontend/brand-theme-and-tokens.md`,
   `docs/frontend/fsd-boundaries-and-guardrails.md`.
-- **Next.js reference: read the installed docs, not training data.** Before
-  any Next.js-specific work in `apps/web` (routing, caching/`use cache`,
-  config, App Router APIs, upgrades), read the version-matched bundled docs at
+- **Next.js reference: read the installed docs, not training data — and say
+  which ones.** For any change touching `apps/web/next.config.ts`,
+  `apps/web/src/app/**`, `apps/web/src/proxy.ts`, routing, caching/`use cache`,
+  App Router APIs, Server/Client Component boundaries, or a Next.js upgrade:
+  first find and read the relevant version-matched bundled docs at
   `apps/web/node_modules/next/dist/docs/` — a Next.js major/minor can differ
-  substantially from what a model was trained on. `apps/web/next.config.ts`
+  substantially from what a model was trained on — then name the specific
+  docs pages you read in your plan or final response. **This is a
+  process/review expectation, not a CI check** — nothing technically blocks a
+  commit that skips it, but a reviewer should expect that list in the PR
+  description or handoff for any Next.js-specific change (see
+  `CONTRIBUTING.md` → _Before Submitting a PR_). `apps/web/next.config.ts`
   sets `agentRules: false` specifically so this bullet — not Next's own
   auto-generated block — is the source of that instruction. **Do not create or
   commit `apps/web/AGENTS.md` or `apps/web/CLAUDE.md`**; this file is the
