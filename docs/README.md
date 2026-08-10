@@ -14,6 +14,7 @@ does not express.
 | Add a backend module the AMCore way              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                              |
 | Add a route/page on the frontend the AMCore way  | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                 |
 | Know which import/styling rules are enforced     | [`frontend/fsd-boundaries-and-guardrails.md`](frontend/fsd-boundaries-and-guardrails.md)                                          |
+| Reuse or add a shared UI primitive (shadcn)      | [`frontend/shared-ui-and-shadcn.md`](frontend/shared-ui-and-shadcn.md)                                                            |
 | Add an environment variable                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
 | Add an external service / infra dependency       | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
 | Add UI copy, a locale, or an error message       | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
@@ -40,6 +41,10 @@ does not express.
 - **[Boundaries & guardrails](frontend/fsd-boundaries-and-guardrails.md)** —
   what the layer, import, server/client and token rules are, which tool enforces
   each, what is deliberately not covered, and how to add a guard.
+- **[Shared UI & shadcn](frontend/shared-ui-and-shadcn.md)** — the `shared/ui`
+  reuse rule, the current primitive inventory, and the safe procedure for
+  running the shadcn CLI (why a bare `shadcn add` against the live tree isn't
+  safe).
 - **[i18n & error localization](frontend/i18n-and-errors.md)** — where copy
   lives, adding strings/locales/error codes, ICU plurals, localized form
   validation, locale-prefixed links from the backend, and running a fork

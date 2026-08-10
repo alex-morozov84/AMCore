@@ -181,9 +181,9 @@ Stated so nobody assumes coverage that does not exist:
   there is no lint rule that proves a component is the smallest interactive
   leaf.
 - **Hardcoded English copy.** The non-ASCII rule catches the mechanical half;
-  English strings still need review. See [i18n](./i18n-and-errors.md).
-- **Scale-less `text-white` / `bg-black`.** Legal today because shadcn's
-  destructive button variant uses `text-white`.
+  English strings still need review. See [i18n](./i18n-and-errors.md) and
+  [Shared UI & shadcn](./shared-ui-and-shadcn.md#hardcoded-copy-still-slips-in)
+  for a real example a shadcn port produced.
 - **Misused Tailwind at-rules in CSS.** Stylelint is told to accept `@theme`,
   `@apply` and friends rather than validate them; a typo like `@thme` is caught,
   a malformed `@theme` is not.
@@ -212,3 +212,6 @@ Stated so nobody assumes coverage that does not exist:
 - [Brand, theme & tokens](./brand-theme-and-tokens.md) — the tokens these rules
   protect.
 - [i18n & errors](./i18n-and-errors.md) — the copy and error-code guards.
+- [Shared UI & shadcn](./shared-ui-and-shadcn.md) — the `shared/ui` reuse
+  rule the "collection of modules" section above assumes, and the safe
+  procedure for touching shadcn-generated files.
