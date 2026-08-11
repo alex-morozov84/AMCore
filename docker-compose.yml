@@ -196,6 +196,14 @@ services:
       # BFF session vault (ADR-068) — required for authenticated flows, not
       # just the API. Same COMPOSE_REDIS_URL override as `x-app-env` above.
       REDIS_URL: ${COMPOSE_REDIS_URL:-redis://redis:6379}
+      # CSRF trusted-origin allowlist (ADR-068) for the browser<->Next
+      # boundary. Defaults to THIS service's own published origin
+      # (localhost:3000) — deliberately different from origin-guard.ts's
+      # bare-`pnpm dev` default (localhost:3002, matching `next dev --port
+      # 3002`). The two dev entry points publish on different ports; each
+      # environment's WEB_TRUSTED_ORIGINS must match how the browser
+      # actually reaches this stack.
+      WEB_TRUSTED_ORIGINS: ${WEB_TRUSTED_ORIGINS:-http://localhost:3000}
     depends_on:
       api:
         condition: service_healthy
