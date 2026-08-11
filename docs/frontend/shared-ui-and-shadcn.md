@@ -213,6 +213,30 @@ generated output bakes in visible or screen-reader-only English text — check
 every new primitive for this before it ships, the same way you'd check it
 for hardcoded English anywhere else in `apps/web`.
 
+## If generated code fails lint
+
+Treat shadcn output as upstream reference code, not as automatically
+AMCore-ready code. AMCore's frontend contract is stricter than shadcn's
+general-purpose registry, so a freshly generated file may fail lint or review
+for valid reasons:
+
+- raw Tailwind palette classes (`bg-red-500`, `dark:text-gray-800`) must become
+  semantic tokens (`bg-destructive`, `text-muted-foreground`);
+- inline `style` must be replaced with classes, a CSS Module, or a reviewed
+  one-line `eslint-disable` only for a genuinely dynamic value;
+- hardcoded user-facing English, including `sr-only` labels, must move to the
+  caller as translated props or children;
+- imports must follow FSD paths (`@/shared/ui/button`, feature public APIs,
+  locale-aware navigation), even if the generated example uses a different
+  shape.
+
+Do **not** accept a shadcn component by disabling lint just because the CLI
+generated it. A scoped `eslint-disable` is a last-resort exception with a
+reason, visible in review; it is not the normal path for importing registry
+code into the starter. If the generated code needs a color that has no
+semantic token yet, either choose an existing token or make a surgical token
+change using the procedure above.
+
 ## Testing convention
 
 Vitest + React Testing Library, matching the existing pattern in

@@ -13,15 +13,17 @@ guessing.
 | [Brand, theme, and design tokens](./brand-theme-and-tokens.md)  | Token architecture, light/dark/system modes, the no-flash mechanism, brand assets, and the downstream rebrand checklist                    |
 | [i18n and error localization](./i18n-and-errors.md)             | Where copy lives, adding strings/locales/error codes, plurals, form validation, and running a fork single-locale                           |
 | [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md)   | Which layer, import, server/client and styling rules are enforced, by which tool, what is deliberately not covered, and how to add a guard |
+| [Shared UI and shadcn](./shared-ui-and-shadcn.md)               | Reusing `shared/ui`, safely adding shadcn primitives, and adapting generated output to AMCore's lint/i18n/token contract                   |
 
 More guides land here as later frontend/admin starter tracks complete
-(shared UI, API client patterns, testing, Storybook) — see
-`architecture-and-conventions.md`'s "See also" section for the current set.
+(API client patterns, testing, Storybook) — see `architecture-and-conventions.md`'s
+"See also" section for the current set.
 
 ## Start here
 
 - Extending or adding a route/page → [Architecture & conventions](./architecture-and-conventions.md#the-recipe--adding-a-route)
 - Adding copy, a locale, or an error message → [i18n and error localization](./i18n-and-errors.md)
+- Reusing or adding a shared UI primitive → [Shared UI and shadcn](./shared-ui-and-shadcn.md)
 - Wondering whether an import or a colour is allowed → [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md)
 - Deciding between `'use client'`, `client-only` and `server-only` →
   [Boundaries & guardrails § Server/client boundaries](./fsd-boundaries-and-guardrails.md#serverclient-boundaries)

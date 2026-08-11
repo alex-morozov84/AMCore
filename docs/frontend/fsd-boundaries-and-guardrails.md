@@ -184,6 +184,11 @@ Stated so nobody assumes coverage that does not exist:
   English strings still need review. See [i18n](./i18n-and-errors.md) and
   [Shared UI & shadcn](./shared-ui-and-shadcn.md#hardcoded-copy-still-slips-in)
   for a real example a shadcn port produced.
+- **Scale-less `white` / `black` utilities.** Palette-scale classes such as
+  `bg-red-500` fail lint, but Tailwind's `text-white`/`bg-black/10` shape is
+  not fully distinguishable from ordinary utility names by the current guard.
+  Treat it as reviewed-only: prefer semantic tokens, and do not reintroduce
+  `text-white` where a `*-foreground` token exists.
 - **Misused Tailwind at-rules in CSS.** Stylelint is told to accept `@theme`,
   `@apply` and friends rather than validate them; a typo like `@thme` is caught,
   a malformed `@theme` is not.
