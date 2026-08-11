@@ -66,6 +66,14 @@ docker compose up             # postgres+redis → migrate (once) → api + web
 `api` waits for the `migrate` service to complete, then becomes healthy on
 `/api/v1/health/ready`. `web` waits for `api` to be healthy.
 
+**`web` now also talks to Redis directly (ADR-068).** The BFF session vault
+that authenticates browser requests lives in Redis, not just in `api` — so
+`REDIS_URL` (or `COMPOSE_REDIS_URL` for the Docker stack) is required for
+`web`'s authenticated flows, the same as it already is for `api`. If Redis is
+unreachable, `web` fails closed on those flows (no session can be created or
+verified) rather than falling back to an insecure path; unauthenticated pages
+keep working.
+
 ### Managed / VPS DB, remote Redis, real S3
 
 Edit `.env`:

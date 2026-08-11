@@ -193,9 +193,15 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       API_URL: ${API_URL:-http://api:5002}
+      # BFF session vault (ADR-068) — required for authenticated flows, not
+      # just the API. Same COMPOSE_REDIS_URL override as `x-app-env` above.
+      REDIS_URL: ${COMPOSE_REDIS_URL:-redis://redis:6379}
     depends_on:
       api:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+        required: false
 
   # ---------------------------------------------------------------------------
   # Optional bundled edge — OPTIONAL, only with COMPOSE_PROFILES=...,edge.
