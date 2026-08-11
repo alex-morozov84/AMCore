@@ -116,6 +116,7 @@ jobs:
         run: |
           pnpm test
           pnpm --filter api test:e2e -- process-role.e2e-spec.ts shutdown-drain.e2e-spec.ts
+          pnpm --filter web test:integration
 
   docker-image-smoke:
     name: Docker production image smoke

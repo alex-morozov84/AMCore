@@ -34,6 +34,13 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 > **Note:** Never use `npx jest` directly for E2E tests — the `test:e2e` script sets `NODE_OPTIONS='--experimental-vm-modules'` required for ESM packages.
 
+### Web-specific test commands
+
+| Command                              | Description                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| `pnpm --filter web test`             | All unit tests (mocked infra)                                                         |
+| `pnpm --filter web test:integration` | Testcontainers-backed tests — real Redis (requires Docker), excluded from `pnpm test` |
+
 ## Commit Messages
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) and commitlint.

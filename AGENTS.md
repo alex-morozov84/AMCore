@@ -232,5 +232,9 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 
 ## Testing
 
-API: Jest (unit) + Jest/Testcontainers (e2e). Email templates: Vitest. Focus on
-critical paths. See the relevant `docs/` and existing specs for patterns.
+API: Jest (unit) + Jest/Testcontainers (e2e). Web: Vitest (unit, mocked
+infra) + Vitest/Testcontainers (`pnpm --filter web test:integration`, real
+Redis — proves Lua scripts like the BFF session vault's CAS actually work,
+not just what a mocked `eval()` assumes; needs Docker, excluded from the
+default `pnpm test`). Email templates: Vitest. Focus on critical paths. See
+the relevant `docs/` and existing specs for patterns.

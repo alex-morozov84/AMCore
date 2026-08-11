@@ -426,6 +426,9 @@ importers:
       '@tanstack/react-query-devtools':
         specifier: ^5.101.4
         version: 5.101.4(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)
+      '@testcontainers/redis':
+        specifier: ^12.1.0
+        version: 12.1.0
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1
@@ -492,6 +495,9 @@ importers:
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
+      testcontainers:
+        specifier: ^12.1.0
+        version: 12.1.0
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0

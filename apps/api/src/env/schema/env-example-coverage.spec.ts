@@ -45,6 +45,10 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // compose service's own environment, not the app's env schema.
   'BACKUP_INTERVAL_SECONDS',
   'BACKUP_RETENTION_DAYS',
+  // apps/web-only (ADR-068): the browser<->Next CSRF trusted-origin
+  // allowlist, read directly via `process.env` in apps/web (no EnvService
+  // there yet) — not part of apps/api's own runtime env at all.
+  'WEB_TRUSTED_ORIGINS',
 ])
 const WEBHOOK_SECRET_PATTERN = /^WEBHOOK_[A-Z0-9_]+_SECRET$/
 

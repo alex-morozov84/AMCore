@@ -1,14 +1,9 @@
 import { SessionVaultUnavailableError } from './errors'
 import { getWebRedisClient } from './redis-client'
 import type { VaultEntry, VaultStore } from './session-vault.types'
+import { VAULT_TTL_SECONDS } from './vault-constants'
 
 import 'server-only'
-
-// Matches the backend refresh-token lifetime (ADR-007) — the vault entry
-// should not outlive what a fresh login would produce. This TTL is a
-// last-resort cleanup bound, not the primary revocation mechanism (see
-// ADR-068's bounded-staleness decision for backend-session desync).
-const VAULT_TTL_SECONDS = 7 * 24 * 60 * 60
 
 // Atomic compare-and-set on the `version` field, guarding against a lock
 // holder that lost its lease and resumed (RedisLockService/VaultLock is
