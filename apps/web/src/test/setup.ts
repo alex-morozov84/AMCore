@@ -26,17 +26,21 @@ vi.mock('next/navigation', () => ({
 // ThemeProvider (system-preference detection). Defaults to "no preference
 // matched"; override per-test with window.matchMedia mockImplementationOnce
 // where a test needs prefers-color-scheme: dark to be true.
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  configurable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-})
+// Guarded: this setup file also runs for `@vitest-environment node` suites
+// (server-only modules, e.g. shared/api/bff), where `window` doesn't exist.
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
