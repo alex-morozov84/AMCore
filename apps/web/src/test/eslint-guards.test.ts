@@ -287,9 +287,10 @@ describe('token-only styling', () => {
       false,
     ],
     ['a CSS variable in an arbitrary value', `<div className="bg-[var(--brand)]" />`, false],
-    // Known gap, asserted so it stays a decision: scale-less white/black are not
-    // banned, because shadcn's destructive variant uses `text-white` and
-    // replacing it is a design call for the shared-UI track.
+    // Known guard limitation, asserted so nobody mistakes it for coverage:
+    // palette-scale colours are banned, but scale-less white/black still need
+    // review. `text-white` is no longer needed by the destructive button after
+    // Track 5's `--destructive-foreground` token fix.
     ['scale-less white', `<div className="text-white" />`, false],
   ])('%s', async (_name, jsx, shouldReport) => {
     const ids = await ruleIds(`export const P = () => ${jsx}\n`, 'src/probe.tsx')
