@@ -5,6 +5,7 @@ import 'server-only'
 export { type ApiErrorParams, apiErrorResponse, zodValidationErrors } from './api-error-response'
 export { proxyToBackend } from './authenticated-proxy'
 export { type CredentialAuthOptions, handleCredentialAuth } from './credential-auth-handler'
+export { type CurrentVaultSession, getCurrentVaultSession } from './current-session'
 export { ensureFreshSession, type EnsureFreshSessionDeps } from './ensure-fresh-session'
 export {
   isInvalidRefreshError,
@@ -13,6 +14,7 @@ export {
   SessionRefreshUnsafeError,
   SessionVaultUnavailableError,
 } from './errors'
+export { handleLogout } from './logout-handler'
 export { type MintedSession, mintSession, type MintSessionParams } from './mint-session'
 export { isTrustedOrigin } from './origin-guard'
 export { forwardRequestHeaders, forwardResponseHeaders } from './proxy-headers'
