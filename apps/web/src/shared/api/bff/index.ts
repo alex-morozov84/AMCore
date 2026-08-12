@@ -6,6 +6,7 @@ export { type ApiErrorParams, apiErrorResponse, zodValidationErrors } from './ap
 export { proxyToBackend } from './authenticated-proxy'
 export { type CredentialAuthOptions, handleCredentialAuth } from './credential-auth-handler'
 export { type CurrentVaultSession, getCurrentVaultSession } from './current-session'
+export { type DalSession, getOptionalSession, redirectIfAuthenticated, requireSession } from './dal'
 export { ensureFreshSession, type EnsureFreshSessionDeps } from './ensure-fresh-session'
 export {
   isInvalidRefreshError,
