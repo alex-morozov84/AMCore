@@ -74,7 +74,8 @@
   "dashboard": {
     "welcome": "Welcome!",
     "welcomeNamed": "Welcome, {name}!",
-    "starterNotice": "This is the AMCore starter dashboard. Replace this view with your product's home screen."
+    "starterNotice": "This is the AMCore starter dashboard. Replace this view with your product's home screen.",
+    "unavailable": "We couldn't verify your session right now. This is usually temporary."
   },
   "locale": {
     "label": "Language",

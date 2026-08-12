@@ -1,35 +1,33 @@
-'use client'
-
 import type { ReactNode } from 'react'
-import { useEffect } from 'react'
 
 import { LogoutButton } from '@/features/auth/logout'
 import { LocaleSwitcher } from '@/features/locale-switcher'
-import { useRouter } from '@/i18n/navigation'
-import { useAuthStore } from '@/shared/store'
-import { PageLoading } from '@/shared/ui/page-loading'
+import { getOptionalSession } from '@/shared/api/bff/dal'
 
 interface DashboardLayoutProps {
   children: ReactNode
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const router = useRouter()
-  const status = useAuthStore((state) => state.status)
-  const user = useAuthStore((state) => state.user)
+// See `page.tsx`'s identical export — this layout also reads `cookies()`
+// (via `getOptionalSession()`) on every render.
+export const dynamic = 'force-dynamic'
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login')
-    }
-  }, [status, router])
-
-  if (status === 'loading' || status === 'idle') {
-    return <PageLoading />
-  }
-
-  if (status === 'unauthenticated') {
-    return null
+/**
+ * Display-only — not the auth gate (`(dashboard)/page.tsx`'s own
+ * `requireSession()` is). This read is wrapped locally so a Redis
+ * blip degrades the header (no email shown) instead of crashing the whole
+ * segment: `getOptionalSession()` is `cache()`-wrapped, so the page's own
+ * `requireSession()` call in the same request still observes and correctly
+ * surfaces the same underlying failure via `(dashboard)/error.tsx` — this
+ * catch only protects the *header's* rendering, not the real gate.
+ */
+export default async function DashboardLayout({ children }: DashboardLayoutProps) {
+  let email: string | undefined
+  try {
+    const session = await getOptionalSession()
+    email = session?.user.email
+  } catch (error) {
+    console.error('[dashboard layout] session read failed, degrading header only', error)
   }
 
   return (
@@ -38,7 +36,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
           <span className="font-semibold">AMCore</span>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
+            <span className="text-sm text-muted-foreground">{email}</span>
             <LocaleSwitcher />
             <LogoutButton variant="ghost" showText={false} />
           </div>
