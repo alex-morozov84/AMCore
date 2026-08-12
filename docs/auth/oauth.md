@@ -81,6 +81,51 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
 with a short-lived browser binding cookie, so the callback is tied both to the
 server-side flow state and to the browser that started the login/link flow.
 
+**How `apps/web`'s reference implementation adapts this (ADR-068).** The
+diagram above is this API's own contract — accurate for any client with its
+own cookie jar (a mobile app, a different frontend). `apps/web` is a BFF: for
+every other flow (login, register, an authenticated request), the browser
+never holds a backend cookie or access token in any form — only its own
+opaque `amcore_session`. OAuth has one narrow, deliberate exception to that.
+Steps 2–3 and 5–7 above involve the browser hitting this API _directly_
+(Google's `redirect_uri` is a fixed, provider-registered URL — it can't be
+redirected through anything else), and step 7's `refresh_token` cookie is
+host-only to whatever origin actually answered that request. `apps/web`
+proxies those legs through its own origin (below) precisely so that cookie
+lands scoped to the frontend instead of this API — which means, for the
+few seconds between the callback landing and step 8's exchange completing,
+the browser genuinely does hold that raw backend `refresh_token`, as a
+normal (httpOnly, host-only) cookie in its jar. It is never readable by page
+JS, it is single-purpose (bound to one just-issued, single-use ticket), and
+`apps/web`'s exchange handler deletes it as its very next step — but it is
+real, and this doc should say so rather than imply otherwise. Without this
+proxying, `apps/web`'s server — on whatever origin the _unproxied_ callback
+would have landed the cookie on — would never see it on the subsequent
+request to `/{locale}/auth/callback`, and step 8's exchange would always
+fail with `OAUTH_TICKET_INVALID`.
+
+So `apps/web` proxies steps 2 and 5–7 through its own origin instead of
+linking/registering this API's URLs directly:
+
+- `*_CALLBACK_URL` (and the provider console's redirect URI) point at
+  `{FRONTEND_URL}/api/auth/oauth/:provider/callback`, not this API.
+- `apps/web`'s `GET /api/auth/oauth/:provider` and
+  `GET|POST /api/auth/oauth/:provider/callback` forward the request to this
+  API's equivalent endpoints below with `redirect: 'manual'`, then relay the
+  response (`Location`, `Set-Cookie`, status) back to the browser unchanged —
+  except Apple's `oauth_state_apple` cookie, whose `Path` gets rewritten from
+  this API's callback path to the frontend's, since it's narrower than `/`
+  and wouldn't otherwise survive the origin change.
+- Step 8's exchange is `apps/web`'s own `/{locale}/auth/callback` Route
+  Handler calling this API server-side — the request now legitimately carries
+  the (frontend-origin-scoped) `refresh_token` cookie relayed above. It also
+  fetches `GET /auth/me` for the profile, mints its Redis session-vault
+  entry, sets its own `amcore_session` cookie, and clears the temporary
+  `refresh_token` cookie — the browser never keeps it.
+
+Source: `apps/web/src/shared/api/bff/oauth-provider-proxy.ts`,
+`oauth-cookie-relay.ts`, `oauth-exchange-handler.ts`.
+
 ---
 
 ## Initiating OAuth login
@@ -95,7 +140,7 @@ GET /api/v1/auth/oauth/github
 GET /api/v1/auth/oauth/apple
 ```
 
-The server redirects to the provider's consent screen. Your frontend just needs a link or button that points to this URL.
+The server redirects to the provider's consent screen. Your frontend just needs a link or button that points to this URL — in `apps/web`'s reference implementation, that's its own `/api/auth/oauth/:provider` proxy path (see the ADR-068 note above), not this URL directly.
 
 ---
 
@@ -125,6 +170,8 @@ After a successful login, the frontend receives:
 
 The frontend should exchange the ticket with `POST /api/v1/auth/oauth/exchange`.
 The access token is returned in the response body and is never placed in a URL.
+(`apps/web`'s reference implementation does this exchange server-side — see the
+ADR-068 note above — so its own browser-facing surface never sees this call at all.)
 
 The ticket is single-use, stored in Redis under a SHA-256-derived key, and expires
 after 60 seconds. The exchange also requires the `refresh_token` cookie and

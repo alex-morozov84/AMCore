@@ -341,7 +341,10 @@ TRUST_PROXY=1                    # Caddy is exactly one hop in front of the app
 example above, and consistent with `apps/web` being a deliberate starter
 shell rather than a required production surface. A commented block in that
 file shows how to also front `apps/web` on a second domain if you want to
-expose it too.
+expose it too. **OAuth login needs that second domain fronted**: per
+`docs/auth/oauth.md`'s ADR-068 note, provider callback URLs
+(`GOOGLE_CALLBACK_URL` etc.) point at `apps/web`'s own origin, not `api`'s —
+fronting only `api:5002` leaves OAuth's callback URL unreachable.
 
 A few things that differ from the nginx example on purpose:
 
