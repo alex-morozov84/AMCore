@@ -1,3 +1,5 @@
+import { extractCookieValue } from './set-cookie'
+
 import 'server-only'
 
 const API_URL = process.env.API_URL ?? 'http://localhost:5002'
@@ -25,14 +27,23 @@ export interface UpstreamAuthResult<TUser> {
  * `/auth/register`) server-side and extracts the `refresh_token` the
  * backend set via `Set-Cookie` — that value is what gets stored in the
  * Redis vault (ADR-068); it never reaches the browser in any form.
+ * Forwards `Accept-Language` from the original browser request so the
+ * backend's registration-locale negotiation (`negotiateLocale`) sees the
+ * real browser preference instead of always falling back to its default.
  */
 export async function callUpstreamAuth<TUser>(
   path: string,
-  body: unknown
+  body: unknown,
+  originalRequest?: Request
 ): Promise<UpstreamAuthResult<TUser>> {
+  const acceptLanguage = originalRequest?.headers.get('accept-language')
+
   const response = await fetch(`${API_URL}/api/v1${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(acceptLanguage ? { 'Accept-Language': acceptLanguage } : {}),
+    },
     body: JSON.stringify(body),
   })
 
@@ -47,25 +58,6 @@ export async function callUpstreamAuth<TUser>(
   }
 
   return { user: data.user, accessToken: data.accessToken, refreshToken }
-}
-
-function extractCookieValue(response: Response, name: string): string | null {
-  const setCookieHeaders =
-    typeof response.headers.getSetCookie === 'function'
-      ? response.headers.getSetCookie()
-      : [response.headers.get('set-cookie')].filter((value): value is string => value !== null)
-
-  for (const header of setCookieHeaders) {
-    const [pair] = header.split(';')
-    const separatorIndex = pair?.indexOf('=') ?? -1
-    if (separatorIndex <= 0) continue
-
-    const cookieName = pair!.slice(0, separatorIndex).trim()
-    const cookieValue = pair!.slice(separatorIndex + 1).trim()
-    if (cookieName === name && cookieValue) return cookieValue
-  }
-
-  return null
 }
 
 async function safeJson(response: Response): Promise<unknown> {

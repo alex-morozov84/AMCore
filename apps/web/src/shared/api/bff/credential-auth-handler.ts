@@ -46,7 +46,7 @@ export async function handleCredentialAuth<TInput>(
 
   let upstream
   try {
-    upstream = await callUpstreamAuth<UserResponse>(options.backendPath, parsed.data)
+    upstream = await callUpstreamAuth<UserResponse>(options.backendPath, parsed.data, request)
   } catch (error) {
     if (error instanceof UpstreamAuthError) {
       return NextResponse.json(error.body as object, { status: error.status })
