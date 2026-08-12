@@ -87,4 +87,41 @@ describe('callUpstreamAuth', () => {
 
     await expect(callUpstreamAuth('/auth/login', {})).rejects.toThrow(/did not set/)
   })
+
+  it('forwards Accept-Language from the original browser request', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      fakeResponse({
+        ok: true,
+        status: 201,
+        body: { user: { id: 'u1' }, accessToken: 'at-1' },
+        setCookieHeaders: ['refresh_token=rt-1; Path=/'],
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const originalRequest = new Request('http://next.internal/api/auth/register', {
+      headers: { 'accept-language': 'ru-RU,ru;q=0.9' },
+    })
+
+    await callUpstreamAuth('/auth/register', {}, originalRequest)
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect((init.headers as Record<string, string>)['Accept-Language']).toBe('ru-RU,ru;q=0.9')
+  })
+
+  it('omits Accept-Language when the original request has none', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      fakeResponse({
+        ok: true,
+        status: 200,
+        body: { user: { id: 'u1' }, accessToken: 'at-1' },
+        setCookieHeaders: ['refresh_token=rt-1; Path=/'],
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await callUpstreamAuth('/auth/login', {})
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect((init.headers as Record<string, string>)['Accept-Language']).toBeUndefined()
+  })
 })
