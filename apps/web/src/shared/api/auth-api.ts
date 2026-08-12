@@ -1,63 +1,37 @@
-import type {
-  AuthResponse,
-  LoginInput,
-  RegisterInput,
-  SessionsListResponse,
-  UpdateProfileInput,
-  UserResponse,
-} from '@amcore/shared'
+import type { LoginInput, RegisterInput, UpdateProfileInput, UserResponse } from '@amcore/shared'
 
-import { apiClient } from './client'
+import { apiClient } from './http-client'
+
+interface UserEnvelope {
+  user: UserResponse
+}
 
 interface MeResponse {
-  user: UserResponse
+  /** `null` when the access token is valid but its user no longer exists. */
+  user: UserResponse | null
 }
 
 interface MessageResponse {
   message: string
 }
 
+/**
+ * All calls go through this app's own same-origin `/api/*` Route Handlers
+ * (ADR-068), never `apps/api` directly — no access token ever reaches this
+ * client. `login`/`register` return `{ user }` only, by design: the BFF
+ * mints the session server-side and sets `amcore_session` itself.
+ */
 export const authApi = {
-  register: async (data: RegisterInput): Promise<AuthResponse> => {
-    const response = await apiClient.post<AuthResponse>('/auth/register', data)
-    return response.data
-  },
+  register: (data: RegisterInput): Promise<UserEnvelope> =>
+    apiClient.post<UserEnvelope>('/auth/register', data),
 
-  login: async (data: LoginInput): Promise<AuthResponse> => {
-    const response = await apiClient.post<AuthResponse>('/auth/login', data)
-    return response.data
-  },
+  login: (data: LoginInput): Promise<UserEnvelope> =>
+    apiClient.post<UserEnvelope>('/auth/login', data),
 
-  logout: async (): Promise<MessageResponse> => {
-    const response = await apiClient.post<MessageResponse>('/auth/logout')
-    return response.data
-  },
+  logout: (): Promise<MessageResponse> => apiClient.post<MessageResponse>('/auth/logout'),
 
-  getMe: async (): Promise<MeResponse> => {
-    const response = await apiClient.get<MeResponse>('/auth/me')
-    return response.data
-  },
+  getMe: (): Promise<MeResponse> => apiClient.get<MeResponse>('/auth/me'),
 
-  updateMe: async (data: UpdateProfileInput): Promise<MeResponse> => {
-    const response = await apiClient.patch<MeResponse>('/auth/me', data)
-    return response.data
-  },
-
-  // OB-05: `/auth/sessions` returns the canonical paginated envelope
-  // `{ data, total, page, limit }` per ADR-036. Read `body.data[i]`,
-  // not the legacy `body.sessions[i]`.
-  getSessions: async (): Promise<SessionsListResponse> => {
-    const response = await apiClient.get<SessionsListResponse>('/auth/sessions')
-    return response.data
-  },
-
-  revokeSession: async (sessionId: string): Promise<MessageResponse> => {
-    const response = await apiClient.delete<MessageResponse>(`/auth/sessions/${sessionId}`)
-    return response.data
-  },
-
-  revokeOtherSessions: async (): Promise<MessageResponse> => {
-    const response = await apiClient.delete<MessageResponse>('/auth/sessions')
-    return response.data
-  },
+  updateMe: (data: UpdateProfileInput): Promise<UserEnvelope> =>
+    apiClient.patch<UserEnvelope>('/auth/me', data),
 }

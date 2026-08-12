@@ -1,32 +1,23 @@
-import axios, { type AxiosError } from 'axios'
-
 import { ClientErrorCode } from './error-codes'
-import type { ApiErrorResponse, ValidationError } from './types'
+import { ApiNetworkError, ApiRequestError } from './http-client'
+import type { ValidationError } from './types'
 
 /**
- * Type guard: Check if error is an Axios error
+ * Type guard: does this error carry a parsed `ApiErrorResponse` body?
  */
-export function isAxiosError(error: unknown): error is AxiosError {
-  return axios.isAxiosError(error)
+export function isApiError(
+  error: unknown
+): error is ApiRequestError & { body: NonNullable<ApiRequestError['body']> } {
+  return error instanceof ApiRequestError && error.body !== undefined
 }
 
 /**
- * Type guard: Check if Axios error has API error response
+ * Type guard: does this error carry field-level validation errors?
  */
-export function isApiError(error: unknown): error is AxiosError<ApiErrorResponse> {
-  return axios.isAxiosError(error) && error.response?.data !== undefined
-}
-
-/**
- * Type guard: Check if error has validation errors
- */
-export function hasValidationErrors(error: unknown): error is AxiosError<ApiErrorResponse> {
-  return (
-    isApiError(error) &&
-    error.response?.data.errors !== undefined &&
-    Array.isArray(error.response.data.errors) &&
-    error.response.data.errors.length > 0
-  )
+export function hasValidationErrors(
+  error: unknown
+): error is ApiRequestError & { body: NonNullable<ApiRequestError['body']> } {
+  return isApiError(error) && Array.isArray(error.body.errors) && error.body.errors.length > 0
 }
 
 /**
@@ -34,7 +25,7 @@ export function hasValidationErrors(error: unknown): error is AxiosError<ApiErro
  */
 export function getValidationErrors(error: unknown): ValidationError[] {
   if (hasValidationErrors(error)) {
-    return error.response!.data.errors!
+    return error.body.errors!
   }
   return []
 }
@@ -55,10 +46,7 @@ export function resolveErrorCode(error: unknown): string {
   const backendCode = getErrorCode(error)
   if (backendCode) return backendCode
 
-  if (isAxiosError(error)) {
-    if (error.code === 'ECONNABORTED') return ClientErrorCode.TIMEOUT
-    if (error.code === 'ERR_NETWORK') return ClientErrorCode.NETWORK_ERROR
-  }
+  if (error instanceof ApiNetworkError) return ClientErrorCode.NETWORK_ERROR
 
   return ClientErrorCode.UNKNOWN_ERROR
 }
@@ -71,8 +59,8 @@ export function resolveErrorCode(error: unknown): string {
  * code has no translation.
  */
 export function getDiagnosticMessage(error: unknown): string | undefined {
-  if (isApiError(error) && error.response) {
-    return error.response.data.message
+  if (isApiError(error)) {
+    return error.body.message
   }
   if (error instanceof Error) {
     return error.message
@@ -84,8 +72,8 @@ export function getDiagnosticMessage(error: unknown): string | undefined {
  * Get HTTP status code from error
  */
 export function getErrorStatus(error: unknown): number | undefined {
-  if (isAxiosError(error)) {
-    return error.response?.status
+  if (error instanceof ApiRequestError) {
+    return error.status
   }
   return undefined
 }
@@ -94,8 +82,8 @@ export function getErrorStatus(error: unknown): number | undefined {
  * Get error code from API error response
  */
 export function getErrorCode(error: unknown): string | undefined {
-  if (isApiError(error) && error.response) {
-    return error.response.data.errorCode
+  if (isApiError(error)) {
+    return error.body.errorCode
   }
   return undefined
 }
@@ -104,8 +92,8 @@ export function getErrorCode(error: unknown): string | undefined {
  * Get correlation ID from error (for debugging)
  */
 export function getCorrelationId(error: unknown): string | undefined {
-  if (isApiError(error) && error.response) {
-    return error.response.data.correlationId
+  if (isApiError(error)) {
+    return error.body.correlationId
   }
   return undefined
 }

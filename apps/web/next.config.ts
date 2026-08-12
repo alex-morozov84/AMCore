@@ -23,15 +23,16 @@ const nextConfig: NextConfig = {
   // time it detects an AI coding agent.
   agentRules: false,
 
-  // API proxy to backend
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.API_URL || 'http://localhost:5002'}/api/:path*`,
-      },
-    ]
-  },
+  // API proxy to backend: NO `rewrites()` here — Route Handlers under
+  // `app/api/**` (four dedicated auth routes + the `[...path]` catch-all,
+  // ADR-068) own the entire `/api/*` surface now. An array-form `rewrites()`
+  // is checked as `afterFiles` — after static/non-dynamic pages but
+  // *before* dynamic routes — so a stale rewrite here would silently
+  // shadow the catch-all for any path that isn't one of the few static
+  // routes, proxying straight to `apps/api` (missing the `/api/v1` prefix
+  // Route Handlers add) instead of ever reaching it. Confirmed live: this
+  // exact rewrite previously intercepted `GET /api/auth/me` and returned
+  // the backend's raw 404 instead of the BFF's proxied response.
 
   // Headers for PWA service worker
   async headers() {

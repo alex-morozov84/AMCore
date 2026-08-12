@@ -200,9 +200,10 @@ locale):
 
 `app/providers.tsx` is the reference client boundary: everything above it
 (`app/layout.tsx`) stays a Server Component (it can `await getLocale()` /
-`getMessages()` directly), and the client-only providers (query client, auth
-store, PWA) are isolated below that one boundary rather than marking the
-whole tree client-side.
+`getMessages()` directly), and the client-only providers (query client, PWA)
+are isolated below that one boundary rather than marking the whole tree
+client-side. There is no separate client-side auth store — see "State
+model" below.
 
 ## State model
 
@@ -214,7 +215,13 @@ whole tree client-side.
 Don't duplicate server state into a Zustand store "for convenience" — that's
 how the two fall out of sync. If a value needs to survive a page navigation
 and isn't server data, it's a Zustand candidate; if it comes from the API,
-it's a query.
+it's a query. The current user used to live in a parallel Zustand
+`useAuthStore`, populated by a mount-time effect — a hand-rolled duplicate of
+what `useCurrentUser()` already did declaratively. Removed once nothing
+else needed the store (ADR-068 UI-rewiring slice, `ai/models-talk.md`):
+`useCurrentUser()`/`userKeys.me()` is the one source now, and
+login/register/logout mutate it directly via `queryClient.setQueryData`/
+`queryClient.clear()` rather than an imperative store action.
 
 ## Relationship to backend/OpenAPI docs
 
@@ -226,21 +233,46 @@ documentation" rule. When in doubt about a request/response shape, the
 answer is `/docs` or the shared Zod schema in `packages/shared`, not this
 guide.
 
-### Browser API reach (target)
+### Browser API reach
 
-Browser-side calls should go through the same-origin Next rewrite proxy
-(`next.config.ts` → `rewrites()`, `/api/:path*` → the backend) by default —
-same-origin avoids a class of CORS/cookie problems for free, and Next already
-configures the proxy. A direct backend base URL is reserved for server-side/
-internal fetches (Server Components, Route Handlers) or an explicit,
-documented deployment exception.
+All browser-side calls go through this app's own same-origin `/api/*` Route
+Handlers (ADR-068) — never a `next.config.ts` `rewrites()` proxy, and never
+a direct cross-origin client against `apps/api`. Same-origin avoids a class
+of CORS/cookie problems for free, and it's what lets the browser hold only
+one opaque `amcore_session` cookie instead of a backend access token in any
+form.
 
-`apps/web/src/shared/api/client.ts` does not yet follow this: it builds a
-direct cross-origin axios client against `NEXT_PUBLIC_API_URL`, whose default
-port also disagrees with the proxy's default. This is a known implementation
-gap, not fixed by this contract — it's in scope for Track 6 (API client,
-auth, and query patterns), which should also reconcile the port mismatch in
-`.env.example`.
+Two shapes of Route Handler cover the whole surface, both under
+`apps/web/src/app/api/`:
+
+- **Dedicated handlers** for auth-specific concerns that need the raw
+  backend `refresh_token` server-side (`/api/auth/login`, `/register`,
+  `/logout`, the OAuth init/callback/exchange routes) — see
+  `shared/api/bff/`.
+- **The generic catch-all** (`/api/[...path]`) for everything else: reads
+  `amcore_session`, refreshes the access token if needed
+  (`ensureFreshSession`), and proxies to `apps/api` with `Authorization:
+Bearer` attached server-side.
+
+`apps/web/src/shared/api/http-client.ts` is the reference client for
+Client Components: same-origin relative paths (`fetch('/api' + path)`), no
+manual `Authorization` header, no manual `credentials` option (`fetch`
+already defaults to `credentials: 'same-origin'`). `ApiRequestError`/
+`ApiNetworkError` replace what used to be `AxiosError` detection in
+`shared/api/errors.ts` — same public function signatures
+(`isApiError`/`getValidationErrors`/etc.), so `ApiErrorAlert`/
+`useFormMutation` never needed to change.
+
+**Historical note, resolved:** earlier revisions of this guide flagged
+`shared/api/client.ts` as a known gap — a direct cross-origin axios client
+against `NEXT_PUBLIC_API_URL`, predating ADR-068. It's deleted; `axios` is
+no longer a dependency of `apps/web` at all. A stale `next.config.ts`
+`rewrites()` block that once forwarded `/api/:path*` straight to `apps/api`
+(missing the `/api/v1` prefix Route Handlers add, and silently shadowing
+the `[...path]` catch-all for any path that isn't one of the few static
+routes — Next checks array-form `rewrites()` _before_ dynamic routes) was
+removed in the same slice; confirmed live via a `GET /api/auth/me` that had
+been quietly 404ing through the stale rewrite.
 
 ## The recipe — adding a route
 
