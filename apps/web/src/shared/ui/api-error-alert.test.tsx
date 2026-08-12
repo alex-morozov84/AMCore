@@ -1,27 +1,18 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { AuthErrorCode } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
-import { AxiosError, AxiosHeaders } from 'axios'
 import { describe, expect, it } from 'vitest'
 
 import en from '../../../messages/en.json'
 import ru from '../../../messages/ru.json'
+import { ApiNetworkError, ApiRequestError } from '../api/http-client'
 
 import { ApiErrorAlert } from './api-error-alert'
 
 const catalogues = { en, ru } as const
 
-/** Minimal Axios error carrying an AMCore error envelope. */
 function apiError(body: Record<string, unknown>, status = 400) {
-  const error = new AxiosError('Request failed')
-  error.response = {
-    data: body,
-    status,
-    statusText: '',
-    headers: new AxiosHeaders(),
-    config: { headers: new AxiosHeaders() },
-  }
-  return error
+  return new ApiRequestError(status, body as never)
 }
 
 function renderAlert(error: unknown, locale: keyof typeof catalogues = 'en') {
@@ -88,26 +79,14 @@ describe('ApiErrorAlert', () => {
   })
 
   it('maps a network failure to its own code', () => {
-    const error = new AxiosError('Network Error')
-    error.code = 'ERR_NETWORK'
-
-    renderAlert(error)
+    renderAlert(new ApiNetworkError(new TypeError('Failed to fetch')))
 
     expect(
       screen.getByText("Can't reach the server. Check your connection and try again.")
     ).toBeInTheDocument()
   })
 
-  it('maps a timeout to its own code', () => {
-    const error = new AxiosError('timeout exceeded')
-    error.code = 'ECONNABORTED'
-
-    renderAlert(error)
-
-    expect(screen.getByText('The request took too long. Please try again.')).toBeInTheDocument()
-  })
-
-  it('falls back generically for a non-Axios throw', () => {
+  it('falls back generically for a non-fetch-client throw', () => {
     renderAlert(new Error('boom'))
 
     expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument()

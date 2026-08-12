@@ -1,10 +1,10 @@
 'use client'
 
 import type { SupportedLocale } from '@amcore/shared'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { userKeys } from '@/entities/user'
 import { authApi } from '@/shared/api'
-import { useAuthStore } from '@/shared/store'
 
 /**
  * Persist the chosen locale to the signed-in user's profile.
@@ -15,11 +15,11 @@ import { useAuthStore } from '@/shared/store'
  * until the next successful update.
  */
 export function usePersistLocale() {
-  const setUser = useAuthStore((state) => state.setUser)
+  const queryClient = useQueryClient()
 
   const { mutate } = useMutation({
     mutationFn: (locale: SupportedLocale) => authApi.updateMe({ locale }),
-    onSuccess: (response) => setUser(response.user),
+    onSuccess: (response) => queryClient.setQueryData(userKeys.me(), response),
   })
 
   return mutate

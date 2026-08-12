@@ -4,8 +4,8 @@ import { useTransition } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
 
+import { useCurrentUser } from '@/entities/user'
 import { usePathname, useRouter } from '@/i18n/navigation'
-import { useAuthStore } from '@/shared/store'
 
 import { usePersistLocale } from '../model/use-persist-locale'
 
@@ -29,13 +29,15 @@ export function LocaleSwitcher({ className }: LocaleSwitcherProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
-  const status = useAuthStore((state) => state.status)
+  // `data` is `undefined` both while loading and on a 401 (no session) —
+  // either way there's no authenticated user to persist a locale for.
+  const { data } = useCurrentUser()
   const persistLocale = usePersistLocale()
 
   function onSelect(next: SupportedLocale) {
     if (next === locale) return
 
-    if (status === 'authenticated') {
+    if (data?.user) {
       // Deliberately not awaited and not blocking the navigation: the UI
       // language must switch immediately even if the profile write fails.
       persistLocale(next)

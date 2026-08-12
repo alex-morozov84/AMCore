@@ -2,22 +2,24 @@
 
 import type { UseFormSetError } from 'react-hook-form'
 import type { RegisterInput } from '@amcore/shared'
+import { useQueryClient } from '@tanstack/react-query'
 
+import { userKeys } from '@/entities/user'
 import { useRouter } from '@/i18n/navigation'
-import { authApi, setAccessToken } from '@/shared/api'
+import { authApi } from '@/shared/api'
 import { useFormMutation } from '@/shared/hooks'
-import { useAuthStore } from '@/shared/store'
 
 export function useRegister(setError?: UseFormSetError<RegisterInput>) {
   const router = useRouter()
-  const login = useAuthStore((state) => state.login)
+  const queryClient = useQueryClient()
 
   return useFormMutation({
     mutationFn: (data: RegisterInput) => authApi.register(data),
     setError, // Automatically set field-level errors from server
     onSuccess: (response) => {
-      setAccessToken(response.accessToken)
-      login(response.user)
+      // The current user is server state — TanStack Query owns it, not a
+      // separate client store (ai/models-talk.md "UI-rewiring slice").
+      queryClient.setQueryData(userKeys.me(), response)
       // Honour the locale stored on the account, so a user whose preference is
       // Russian does not land on the English default after signing in.
       router.push('/', { locale: response.user.locale })

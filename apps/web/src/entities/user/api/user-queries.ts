@@ -17,10 +17,8 @@ export function useCurrentUser() {
   })
 }
 
-export function useSessions() {
-  return useQuery({
-    queryKey: userKeys.sessions(),
-    queryFn: () => authApi.getSessions(),
-    staleTime: 60 * 1000, // 1 minute
-  })
-}
+// `userKeys.sessions()` is kept as forward-looking key infra for the
+// sessions-list slice; `useSessions()` itself is deferred until then —
+// listing needs dedicated `GET /api/auth/sessions` BFF handlers (raw
+// `refresh_token` to identify the "current" session), not built yet. See
+// `ai/models-talk.md` "Iteration 2, slice 3" for the recorded contract.
