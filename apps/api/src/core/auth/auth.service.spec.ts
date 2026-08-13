@@ -708,6 +708,12 @@ describe('AuthService', () => {
   })
 
   describe('updateProfile', () => {
+    beforeEach(() => {
+      // The "previous" read the profile-updated diff compares against — individual
+      // tests override this when they need a specific before/after pair.
+      mockCtx.prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser)
+    })
+
     it('writes only the supplied fields and invalidates the user cache', async () => {
       const updated = { ...mockUser, name: 'Renamed', locale: 'en' }
       mockCtx.prisma.user.update.mockResolvedValue(updated)
@@ -739,6 +745,78 @@ describe('AuthService', () => {
       const result = await authService.updateProfile('user-123', { name: 'X' })
 
       expect(result).not.toHaveProperty('passwordHash')
+    })
+
+    it('emits account.profile_updated when a field actually changes', async () => {
+      mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, name: 'Renamed' })
+
+      await authService.updateProfile('user-123', { name: 'Renamed' })
+
+      // Idempotency key is a generated occurrence id, not `user.updatedAt` — see the
+      // dedicated collision test below for why.
+      expect(mockNotifications.notify).toHaveBeenCalledWith({
+        recipientUserId: 'user-123',
+        type: 'account.profile_updated',
+        payload: { updatedFields: ['name'] },
+        idempotencyKey: expect.stringMatching(/^account\.profile_updated:[0-9a-f-]{36}$/),
+      })
+    })
+
+    it('gives two real edits landing in the same updatedAt millisecond distinct idempotency keys', async () => {
+      // `user.updatedAt` is TIMESTAMP(3) (millisecond precision) — two genuine edits can
+      // share the same stored timestamp. If that timestamp were the idempotency key,
+      // the second notify() would collide on a *different* payload/fingerprint, which
+      // `NotificationsService.notify()` treats as a real conflict
+      // (`NotificationIdempotencyConflictError`) — and this best-effort `catch` would
+      // swallow it as a warning, silently dropping the second alert.
+      const sameInstant = new Date('2024-06-01T00:00:00.001Z')
+      mockCtx.prisma.user.update
+        .mockResolvedValueOnce({ ...mockUser, name: 'First Edit', updatedAt: sameInstant })
+        .mockResolvedValueOnce({ ...mockUser, name: 'Second Edit', updatedAt: sameInstant })
+
+      await authService.updateProfile('user-123', { name: 'First Edit' })
+      await authService.updateProfile('user-123', { name: 'Second Edit' })
+
+      const keys = mockNotifications.notify.mock.calls.map(
+        (call) => (call[0] as { idempotencyKey: string }).idempotencyKey
+      )
+      expect(keys).toHaveLength(2)
+      expect(keys[0]).not.toBe(keys[1])
+    })
+
+    it('only includes fields whose value actually changed in the payload', async () => {
+      // `locale` is supplied but set to the same value the user already has (`mockUser.locale`
+      // is 'ru') — only `name` genuinely changed.
+      mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, name: 'Renamed' })
+
+      await authService.updateProfile('user-123', { name: 'Renamed', locale: 'ru' })
+
+      expect(mockNotifications.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: { updatedFields: ['name'] } })
+      )
+    })
+
+    it('does not emit a notification when the PATCH changes nothing', async () => {
+      // Re-submitting the current name: `data` is non-empty, but nothing differs.
+      mockCtx.prisma.user.update.mockResolvedValue(mockUser)
+
+      await authService.updateProfile('user-123', { name: mockUser.name! })
+
+      expect(mockNotifications.notify).not.toHaveBeenCalled()
+    })
+
+    it('still resolves when the profile-updated notification fails (best-effort)', async () => {
+      mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, name: 'Renamed' })
+      mockNotifications.notify.mockRejectedValue(new Error('db down'))
+
+      await expect(
+        authService.updateProfile('user-123', { name: 'Renamed' })
+      ).resolves.toMatchObject({ name: 'Renamed' })
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-123' }),
+        expect.stringContaining('Failed to emit profile-updated notification')
+      )
     })
   })
 

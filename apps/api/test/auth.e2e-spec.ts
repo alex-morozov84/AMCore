@@ -661,6 +661,46 @@ describe('Auth (e2e)', () => {
       })
       expect(user?.name).toBe('Profile User')
     })
+
+    // Real HTTP round trip through the actual DI graph, not the mocked
+    // `NotificationsService` the unit tests use — proves the definition is
+    // registered and the payload really validates against its Zod schema,
+    // neither of which a mock would catch.
+    it('creates an account.profile_updated notification when a field actually changes', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Real Change' })
+        .expect(200)
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'profile@example.com' },
+      })
+      const created = await prisma.notification.findMany({
+        where: { recipientUserId: user!.id, type: 'account.profile_updated' },
+      })
+
+      expect(created).toHaveLength(1)
+      expect(created[0]).toMatchObject({ payload: { updatedFields: ['name'] } })
+    })
+
+    it('does not create a notification when the PATCH does not change anything', async () => {
+      // The user was just registered with this exact name — nothing actually changes.
+      await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Profile User' })
+        .expect(200)
+
+      const user = await prisma.user.findUnique({
+        where: { emailCanonical: 'profile@example.com' },
+      })
+      const created = await prisma.notification.findMany({
+        where: { recipientUserId: user!.id, type: 'account.profile_updated' },
+      })
+
+      expect(created).toHaveLength(0)
+    })
   })
 
   describe('GET /auth/sessions', () => {
