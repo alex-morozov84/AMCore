@@ -2,8 +2,8 @@ import { cookies } from 'next/headers'
 import { AuthErrorCode } from '@amcore/shared'
 
 import { apiErrorResponse } from './api-error-response'
+import { authFailureResponse } from './auth-failure-response'
 import { ensureFreshSession } from './ensure-fresh-session'
-import { isInvalidRefreshError, SessionNotFoundError, SessionRefreshUnsafeError } from './errors'
 import { isTrustedOrigin } from './origin-guard'
 import { forwardRequestHeaders, forwardResponseHeaders } from './proxy-headers'
 import { SESSION_COOKIE_NAME } from './session-cookie'
@@ -70,29 +70,4 @@ function buildUpstreamUrl(pathSegments: string[], request: Request): string {
   const upstream = new URL(`${API_URL}/api/v1/${pathSegments.map(encodeURIComponent).join('/')}`)
   upstream.search = new URL(request.url).search
   return upstream.toString()
-}
-
-/**
- * Only an explicit "this credential is dead" signal (`SessionNotFoundError`,
- * `SessionRefreshUnsafeError`, or `isInvalidRefreshError` — backend
- * `401 TOKEN_INVALID`) maps to 401. Everything else — Redis/lock trouble,
- * or a transient `upstreamRefresh` failure (`code: 'network'`, an uncoded
- * fetch exception, a backend 5xx) — fails closed as 503 rather than either
- * logging the user out or crashing into an unhandled 500 (round 2 finding:
- * the previous version mapped *any* `Error` with a `code` property to 401,
- * which included transient network failures).
- */
-function authFailureResponse(request: Request, error: unknown): Response {
-  if (error instanceof SessionNotFoundError || error instanceof SessionRefreshUnsafeError) {
-    return apiErrorResponse(request, { statusCode: 401, message: 'Not authenticated' })
-  }
-  if (isInvalidRefreshError(error)) {
-    return apiErrorResponse(request, { statusCode: 401, message: 'Not authenticated' })
-  }
-  // SessionVaultUnavailableError, SessionLockTimeoutError, or a transient
-  // upstreamRefresh failure — cannot prove auth right now, not "logged out."
-  return apiErrorResponse(request, {
-    statusCode: 503,
-    message: 'Authentication temporarily unavailable',
-  })
 }

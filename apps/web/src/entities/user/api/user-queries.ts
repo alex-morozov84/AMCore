@@ -1,11 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 
 import { authApi } from '@/shared/api'
 
 export const userKeys = {
   all: ['user'] as const,
   me: () => [...userKeys.all, 'me'] as const,
-  sessions: () => [...userKeys.all, 'sessions'] as const,
+  // Prefix shared by every `sessions(page, limit)` variant — pass this to
+  // `invalidateQueries` after a revoke to match all pages/limits at once
+  // without also invalidating `me()`.
+  sessionsAll: () => [...userKeys.all, 'sessions'] as const,
+  sessions: (page: number, limit: number) => [...userKeys.sessionsAll(), page, limit] as const,
 }
 
 export function useCurrentUser() {
@@ -17,8 +21,18 @@ export function useCurrentUser() {
   })
 }
 
-// `userKeys.sessions()` is kept as forward-looking key infra for the
-// sessions-list slice; `useSessions()` itself is deferred until then —
-// listing needs dedicated `GET /api/auth/sessions` BFF handlers (raw
-// `refresh_token` to identify the "current" session), not built yet. See
-// `ai/models-talk.md` "Iteration 2, slice 3" for the recorded contract.
+/**
+ * `page`/`limit` are plain query-key params, not a TanStack Table
+ * client-side pagination feature — the backend already paginates
+ * server-side (`sessionsListResponseSchema`); this hook just fetches
+ * whichever page is asked for. `keepPreviousData` avoids a loading flash
+ * between pages.
+ */
+export function useSessions(page: number, limit: number) {
+  return useQuery({
+    queryKey: userKeys.sessions(page, limit),
+    queryFn: () => authApi.getSessions(page, limit),
+    staleTime: 60 * 1000, // 1 minute
+    placeholderData: keepPreviousData,
+  })
+}

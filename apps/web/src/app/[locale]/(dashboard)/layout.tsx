@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
+import { getTranslations } from 'next-intl/server'
 
 import { LogoutButton } from '@/features/auth/logout'
 import { LocaleSwitcher } from '@/features/locale-switcher'
+import { Link } from '@/i18n/navigation'
 import { getOptionalSession } from '@/shared/api/bff/dal'
 
 interface DashboardLayoutProps {
@@ -22,6 +24,7 @@ export const dynamic = 'force-dynamic'
  * catch only protects the *header's* rendering, not the real gate.
  */
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
+  const t = await getTranslations('sessions')
   let email: string | undefined
   try {
     const session = await getOptionalSession()
@@ -36,6 +39,14 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
           <span className="font-semibold">AMCore</span>
           <div className="flex items-center gap-4">
+            {/* Full nav/shell is Track 9's scope — this is the minimal
+             * reachable link the sessions-list reference needs until then. */}
+            <Link
+              href="/settings/sessions"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t('title')}
+            </Link>
             <span className="text-sm text-muted-foreground">{email}</span>
             <LocaleSwitcher />
             <LogoutButton variant="ghost" showText={false} />
