@@ -71,7 +71,9 @@
     "loginSubtitle": "Sign in to your account",
     "registerSubtitle": "Create a new account",
     "loggingIn": "Signing in…",
-    "registering": "Signing up…"
+    "registering": "Signing up…",
+    "continueWithGoogle": "Continue with Google",
+    "orContinueWith": "or"
   },
   "dashboard": {
     "welcome": "Welcome!",

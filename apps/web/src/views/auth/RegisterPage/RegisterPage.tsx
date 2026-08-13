@@ -1,10 +1,15 @@
 import { useTranslations } from 'next-intl'
 
 import { RegisterForm } from '@/features/auth'
+import { OAuthSection } from '@/features/auth/oauth'
 import { Link } from '@/i18n/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 
-export function RegisterPage() {
+interface RegisterPageProps {
+  oauthProviders: string[]
+}
+
+export function RegisterPage({ oauthProviders }: RegisterPageProps) {
   const t = useTranslations('auth')
 
   return (
@@ -14,6 +19,7 @@ export function RegisterPage() {
         <CardDescription>{t('registerSubtitle')}</CardDescription>
       </CardHeader>
       <CardContent>
+        <OAuthSection providers={oauthProviders} />
         <RegisterForm />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {t('hasAccount')}{' '}

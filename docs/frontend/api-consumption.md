@@ -23,6 +23,21 @@ is only worth adding when the backend needs something the generic proxy
 can't forward — the one existing example is `/auth/sessions*`, which needs
 the raw `refresh_token` cookie to identify the caller's own session.
 
+## What is enabled by default vs. reference-only
+
+The starter includes two different kinds of frontend surface:
+
+- **Default UI:** email/password login and registration, Google OAuth entry
+  point when the backend reports Google as configured, logout, current-user
+  reads/updates, locale switching, and the active-sessions page at
+  `/{locale}/settings/sessions`.
+- **Reference consumption hooks, no product UI yet:** avatar upload/delete,
+  notifications feed/preferences/realtime, and AI conversations/runs/messages.
+  These hooks are production-quality examples of how a downstream product should
+  consume the backend through the BFF, but AMCore does not guess the product UI
+  that should sit on top of notifications or AI. Build that UI in the owning
+  product slice and reuse the hooks below.
+
 ## Media — avatar upload/delete
 
 The only shipped media consumer is the user entity's avatar field

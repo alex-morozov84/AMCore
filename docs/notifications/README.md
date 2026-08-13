@@ -245,6 +245,11 @@ ships `account.profile_updated` (in-app only, best-effort, produced by
 actually changed), `account.telegram_linked`, and `account.password_changed`
 (in-app **and** email mandatory), which exercises the resolver end-to-end.
 
+All three shipped definitions have real producers in the current backend:
+`account.profile_updated` from `PATCH /auth/me`, `account.password_changed`
+from a completed password reset, and `account.telegram_linked` from a
+completed Telegram link. None are demo-only.
+
 ## Content & security rules
 
 - **Language-neutral, bounded payloads.** The durable `payload` is the allowlisted

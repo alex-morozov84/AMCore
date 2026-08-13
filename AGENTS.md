@@ -176,8 +176,9 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   touches `window`/`document`/`localStorage`/`navigator`/browser SDKs,
   `import 'server-only'` when it touches secrets, the filesystem, database
   clients or Node built-ins. Never blanket-style — **a universal module stays
-  universal.** Neither package is installed yet; add the dependency with the
-  first module that needs it.
+  universal.** Both marker packages are installed in `apps/web`; use them when
+  the capability boundary applies, and do not add marker imports to ordinary
+  universal modules.
 - **Frontend styling — the palette is a source, tokens are the public API.**
   Colors come from semantic tokens (`bg-card`, `text-muted-foreground`). All of
   these fail lint: Tailwind's default palette (`bg-red-500`, including behind

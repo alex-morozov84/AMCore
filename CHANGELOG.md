@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in-app notification when a real change was made (best-effort, never for a
   no-op request). The `account.profile_updated` definition previously
   existed with no producer wired to it.
+- **`apps/web`:** browser API access now uses a BFF / Token Handler pattern
+  backed by a Redis session vault. The browser holds only the opaque
+  `amcore_session` cookie; backend access/refresh tokens stay server-side in
+  Next Route Handlers. The reference UI now includes BFF-backed login,
+  register, logout, Google OAuth entry point (shown only when configured),
+  current-user reads/updates, locale persistence, and an active-sessions page.
+- **`apps/web`:** added production-style frontend consumption hooks for avatar
+  upload/delete, notifications feed/preferences/realtime, and AI
+  conversations/runs/messages through the BFF. These are reference hooks, not
+  product-specific notification or AI screens.
 
 ### Fixed
 

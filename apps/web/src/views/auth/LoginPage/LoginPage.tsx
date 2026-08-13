@@ -1,10 +1,17 @@
 import { useTranslations } from 'next-intl'
 
 import { LoginForm } from '@/features/auth'
+import { OAuthErrorAlert, OAuthSection } from '@/features/auth/oauth'
 import { Link } from '@/i18n/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 
-export function LoginPage() {
+interface LoginPageProps {
+  oauthProviders: string[]
+  /** The raw `?oauthError=` query value — see `OAuthErrorAlert` for normalization/allowlisting. */
+  oauthError?: string | string[]
+}
+
+export function LoginPage({ oauthProviders, oauthError }: LoginPageProps) {
   const t = useTranslations('auth')
 
   return (
@@ -14,6 +21,8 @@ export function LoginPage() {
         <CardDescription>{t('loginSubtitle')}</CardDescription>
       </CardHeader>
       <CardContent>
+        <OAuthErrorAlert code={oauthError} className="mb-4" />
+        <OAuthSection providers={oauthProviders} />
         <LoginForm />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {t('noAccount')}{' '}

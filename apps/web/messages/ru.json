@@ -71,7 +71,9 @@
     "loginSubtitle": "Войдите в свой аккаунт",
     "registerSubtitle": "Создайте новый аккаунт",
     "loggingIn": "Вход…",
-    "registering": "Регистрация…"
+    "registering": "Регистрация…",
+    "continueWithGoogle": "Продолжить с Google",
+    "orContinueWith": "или"
   },
   "dashboard": {
     "welcome": "Добро пожаловать!",

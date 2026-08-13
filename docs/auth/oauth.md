@@ -226,7 +226,11 @@ curl https://api.amcore.dev/api/v1/auth/oauth/providers
 }
 ```
 
-Use this to dynamically show/hide OAuth buttons in the UI.
+Use this to dynamically show/hide OAuth buttons in the UI. The bundled
+`apps/web` login/register pages do exactly that for Google: the button is
+hidden unless this endpoint returns `"google"`, and the button links to the
+same-origin BFF path `/api/auth/oauth/google` rather than to `apps/api`
+directly.
 
 ---
 
