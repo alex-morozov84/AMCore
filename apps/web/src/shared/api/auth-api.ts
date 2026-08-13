@@ -1,4 +1,10 @@
-import type { LoginInput, RegisterInput, UpdateProfileInput, UserResponse } from '@amcore/shared'
+import type {
+  LoginInput,
+  RegisterInput,
+  SessionsListResponse,
+  UpdateProfileInput,
+  UserResponse,
+} from '@amcore/shared'
 
 import { apiClient } from './http-client'
 
@@ -34,4 +40,16 @@ export const authApi = {
 
   updateMe: (data: UpdateProfileInput): Promise<UserEnvelope> =>
     apiClient.patch<UserEnvelope>('/auth/me', data),
+
+  // `/auth/sessions*` are dedicated Route Handlers, not the generic proxy —
+  // the backend identifies the "current" session from the raw
+  // `refresh_token` cookie, which the generic proxy never forwards. See
+  // `shared/api/bff/sessions-handler.ts`.
+  getSessions: (page: number, limit: number): Promise<SessionsListResponse> =>
+    apiClient.get<SessionsListResponse>(`/auth/sessions?page=${page}&limit=${limit}`),
+
+  revokeSession: (sessionId: string): Promise<void> =>
+    apiClient.delete<void>(`/auth/sessions/${encodeURIComponent(sessionId)}`),
+
+  revokeOtherSessions: (): Promise<void> => apiClient.delete<void>('/auth/sessions'),
 }

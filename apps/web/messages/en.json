@@ -53,7 +53,9 @@
     "edit": "Edit",
     "create": "Create",
     "search": "Search",
-    "noResults": "Nothing found"
+    "noResults": "Nothing found",
+    "close": "Close",
+    "notAvailable": "—"
   },
   "auth": {
     "login": "Sign in",
@@ -76,6 +78,25 @@
     "welcomeNamed": "Welcome, {name}!",
     "starterNotice": "This is the AMCore starter dashboard. Replace this view with your product's home screen.",
     "unavailable": "We couldn't verify your session right now. This is usually temporary."
+  },
+  "sessions": {
+    "title": "Active sessions",
+    "description": "Devices currently signed in to your account.",
+    "device": "Device",
+    "ipAddress": "IP address",
+    "createdAt": "Signed in",
+    "current": "This device",
+    "actions": "Actions",
+    "revoke": "Revoke",
+    "revokeOthers": "Revoke other sessions",
+    "revokeOthersConfirmTitle": "Revoke all other sessions?",
+    "revokeOthersConfirmDescription": "Every other device will be signed out. This device stays signed in.",
+    "revoked": "Session revoked",
+    "othersRevoked": "Other sessions revoked",
+    "loadError": "Couldn't load your sessions.",
+    "noSessions": "No other active sessions",
+    "previous": "Previous",
+    "next": "Next"
   },
   "locale": {
     "label": "Language",

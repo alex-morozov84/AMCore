@@ -28,16 +28,19 @@ for why.
 
 ## Current inventory
 
-| Component                            | Source                                      | Notes                                                                                                                                                                                                                                                                                  |
-| ------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `button.tsx`                         | shadcn (Base UI), customized                | Extra sizes (`xs`/`icon-xs`/`icon-sm`/`icon-lg`), `cursor-pointer`, `data-variant`/`data-size` attributes, solid-fill destructive variant (see [Base UI, not Radix](#base-ui-not-radix)). No `asChild` — dropped, no equivalent in Base UI.                                            |
-| `label.tsx`                          | shadcn (Base UI), stock                     | Plain native `<label>` — Base UI has no dedicated Label primitive.                                                                                                                                                                                                                     |
-| `form.tsx`                           | shadcn (Radix era), customized              | `Form`/`FormField`/`FormItem`/`FormLabel`/`FormControl`/`FormDescription`/`FormMessage`, plus an inline error icon. **Not migrated to Base UI** — still imports `@radix-ui/react-label`/`@radix-ui/react-slot`; see [Radix packages still installed](#radix-packages-still-installed). |
-| `alert.tsx`, `card.tsx`, `input.tsx` | shadcn (Radix era), stock                   | Not yet touched by the Base UI migration; safe to regenerate under Base UI when next customized.                                                                                                                                                                                       |
-| `dialog.tsx`, `alert-dialog.tsx`     | shadcn (Base UI), stock + one required prop | `DialogContent` requires a caller-provided `closeLabel` — see [Hardcoded copy still slips in](#hardcoded-copy-still-slips-in).                                                                                                                                                         |
-| `skeleton.tsx`, `empty.tsx`          | shadcn (Base UI), stock                     | `empty.tsx`'s `EmptyDescription` prop type corrected from the registry's `<p>` to the `<div>` it actually renders — an upstream mismatch, not an AMCore change.                                                                                                                        |
-| `spinner.tsx`                        | AMCore-authored                             | Not a shadcn generate. shadcn _does_ now ship an official `Spinner` under the same filename — see [Protected files](#protected-files-check-before-every-run).                                                                                                                          |
-| `api-error-alert.tsx`                | AMCore-authored                             | Not a shadcn generate; built on `alert.tsx`, wired to `useApiError()`. See [Protected files](#protected-files-check-before-every-run).                                                                                                                                                 |
+| Component                            | Source                                      | Notes                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `button.tsx`                         | shadcn (Base UI), customized                | Extra sizes (`xs`/`icon-xs`/`icon-sm`/`icon-lg`), `cursor-pointer`, `data-variant`/`data-size` attributes, solid-fill destructive variant (see [Base UI, not Radix](#base-ui-not-radix)). No `asChild` — dropped, no equivalent in Base UI.                                                            |
+| `label.tsx`                          | shadcn (Base UI), stock                     | Plain native `<label>` — Base UI has no dedicated Label primitive.                                                                                                                                                                                                                                     |
+| `form.tsx`                           | shadcn (Radix era), customized              | `Form`/`FormField`/`FormItem`/`FormLabel`/`FormControl`/`FormDescription`/`FormMessage`, plus an inline error icon. **Not migrated to Base UI** — still imports `@radix-ui/react-label`/`@radix-ui/react-slot`; see [Radix packages still installed](#radix-packages-still-installed).                 |
+| `alert.tsx`, `card.tsx`, `input.tsx` | shadcn (Radix era), stock                   | Not yet touched by the Base UI migration; safe to regenerate under Base UI when next customized.                                                                                                                                                                                                       |
+| `dialog.tsx`, `alert-dialog.tsx`     | shadcn (Base UI), stock + one required prop | `DialogContent` requires a caller-provided `closeLabel` — see [Hardcoded copy still slips in](#hardcoded-copy-still-slips-in).                                                                                                                                                                         |
+| `skeleton.tsx`, `empty.tsx`          | shadcn (Base UI), stock                     | `empty.tsx`'s `EmptyDescription` prop type corrected from the registry's `<p>` to the `<div>` it actually renders — an upstream mismatch, not an AMCore change.                                                                                                                                        |
+| `table.tsx`                          | shadcn (Base UI), stock                     | Plain semantic wrappers; no customization needed. Reference consumer: the active-sessions list, built on `@tanstack/react-table` **v9** (`useTable`/`tableFeatures()` — verified against the installed version and shadcn's current data-table guide; v8's `useReactTable` is a different, older API). |
+| `dropdown-menu.tsx`                  | shadcn (Base UI), stock                     | Row-actions menu for the sessions table. `DropdownMenuTrigger` composes via Base UI's `render` prop, not Radix's `asChild`.                                                                                                                                                                            |
+| `toast.tsx`                          | shadcn (Base UI), customized                | `Toaster`/`ToastClose` require a caller-provided `closeLabel` — the generated version hardcoded `aria-label="Close toast"` on every toast's close button; same fix pattern as `DialogContent`'s `closeLabel`, see [Hardcoded copy still slips in](#hardcoded-copy-still-slips-in).                     |
+| `spinner.tsx`                        | AMCore-authored                             | Not a shadcn generate. shadcn _does_ now ship an official `Spinner` under the same filename — see [Protected files](#protected-files-check-before-every-run).                                                                                                                                          |
+| `api-error-alert.tsx`                | AMCore-authored                             | Not a shadcn generate; built on `alert.tsx`, wired to `useApiError()`. See [Protected files](#protected-files-check-before-every-run).                                                                                                                                                                 |
 
 ## Base UI, not Radix
 
@@ -244,22 +247,22 @@ component, assert on `data-slot`/`data-variant` attributes and behavior
 (click, open/close, variant switching), not implementation detail. No
 Storybook yet — that's a separate, dedicated track.
 
-## Sidebar and Toast: deliberately not here yet
+## Sidebar: deliberately not here yet
 
-Two primitives from shadcn's catalog are **not** in `shared/ui`, on purpose:
+**Sidebar** — the low-level primitive is deferred entirely to the starter
+cleanup track, which owns the `(dashboard)/layout.tsx` route-thinness fix
+it would compose into. Building an unused app-shell API ahead of that work
+risks guessing a shape the real nav/locale/auth requirements would
+contradict.
 
-- **Sidebar** — the low-level primitive was deferred entirely to the starter
-  cleanup track, which owns the `(dashboard)/layout.tsx` route-thinness fix
-  it would compose into. Building an unused app-shell API ahead of that
-  work risked guessing a shape the real nav/locale/auth requirements would
-  contradict.
-- **Toast** — deferred to the API-client/query-patterns track. No mutation
-  flow exists anywhere in `apps/web` yet (form submissions currently surface
-  errors through `api-error-alert.tsx`, not a toast); adding Sonner with
-  nothing to trigger it would be speculative. When it's picked up, add it
-  citing shadcn's current Sonner docs directly — Base UI does ship its own
-  stable Toast primitive, so "Base UI has no Toast" is not valid reasoning
-  for the choice.
+**Toast** was deferred the same way, for the same reason (no mutation flow
+existed anywhere in `apps/web`), and has since been added: the sessions
+list's revoke action (Track 6) is that first real trigger. Re-verified
+live at add-time that shadcn's current docs describe **Toast**, not the
+older Sonner naming/API (`/docs/components/sonner` now redirects to
+`/docs/components/toast`; the API is `toast.add(...)`, not `toast(...)`) —
+worth re-checking again before any future shadcn primitive add, since this
+had already changed once mid-project (Track 5's carry-in note).
 
 ## See also
 
