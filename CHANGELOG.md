@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`apps/api`:** `PATCH /auth/me` now emits an `account.profile_updated`
+  in-app notification when a real change was made (best-effort, never for a
+  no-op request). The `account.profile_updated` definition previously
+  existed with no producer wired to it.
+
 ### Fixed
 
 - **`apps/web`:** the destructive button variant's text color now uses a
