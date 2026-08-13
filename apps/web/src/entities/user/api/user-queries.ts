@@ -1,4 +1,5 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import type { UserResponse } from '@amcore/shared'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { authApi } from '@/shared/api'
 
@@ -34,5 +35,38 @@ export function useSessions(page: number, limit: number) {
     queryFn: () => authApi.getSessions(page, limit),
     staleTime: 60 * 1000, // 1 minute
     placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * Merges `avatarUrl` into the cached current user rather than invalidating
+ * `me()` — the upload response carries only the new URL, and the current
+ * user is already in cache from the mount that renders whatever triggers
+ * this upload.
+ */
+function setCachedAvatarUrl(
+  queryClient: ReturnType<typeof useQueryClient>,
+  avatarUrl: string | null
+): void {
+  queryClient.setQueryData<{ user: UserResponse | null }>(userKeys.me(), (old) =>
+    old?.user ? { user: { ...old.user, avatarUrl } } : old
+  )
+}
+
+export function useUploadAvatar() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (file: File) => authApi.uploadAvatar(file),
+    onSuccess: (response) => setCachedAvatarUrl(queryClient, response.avatarUrl),
+  })
+}
+
+export function useDeleteAvatar() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: () => authApi.deleteAvatar(),
+    onSuccess: () => setCachedAvatarUrl(queryClient, null),
   })
 }

@@ -14,10 +14,11 @@ guessing.
 | [i18n and error localization](./i18n-and-errors.md)             | Where copy lives, adding strings/locales/error codes, plurals, form validation, and running a fork single-locale                           |
 | [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md)   | Which layer, import, server/client and styling rules are enforced, by which tool, what is deliberately not covered, and how to add a guard |
 | [Shared UI and shadcn](./shared-ui-and-shadcn.md)               | Reusing `shared/ui`, safely adding shadcn primitives, and adapting generated output to AMCore's lint/i18n/token contract                   |
+| [API consumption](./api-consumption.md)                         | The hooks that consume media/notifications/AI through the BFF, and the `EventSource`-based realtime pattern shared by notifications and AI |
 
 More guides land here as later frontend/admin starter tracks complete
-(API client patterns, testing, Storybook) — see `architecture-and-conventions.md`'s
-"See also" section for the current set.
+(testing, Storybook) — see `architecture-and-conventions.md`'s "See also"
+section for the current set.
 
 ## Start here
 

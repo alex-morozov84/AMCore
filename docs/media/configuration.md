@@ -77,3 +77,7 @@ export function Avatar({ user }: { user: { avatarUrl: string } }) {
   them aggressively — a new upload yields a new URL.
 - If you later expose multiple variants with width/height, clients can build a
   `srcSet`; the backend stays the source of truth for which variants exist.
+
+This covers the **display** side. For the upload/delete request itself (the
+`useUploadAvatar`/`useDeleteAvatar` hooks and the BFF's multipart pass-through),
+see [Frontend API consumption](../frontend/api-consumption.md#media--avatar-uploaddelete).

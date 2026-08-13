@@ -316,6 +316,9 @@ and **digests, quiet hours, timezone scheduling, and frequency caps**.
 - [Webhooks](../operations/webhooks.md) — the secret-header verifier behind Telegram.
 - [Idempotency](../operations/idempotency.md) — the separate HTTP primitive.
 - [Deployment](../operations/deployment.md) — SSE proxy/buffering guidance.
+- [Frontend API consumption](../frontend/api-consumption.md) — the feed/
+  preferences hooks and why `apps/web` consumes the SSE stream with native
+  `EventSource` instead of the fetch-stream reader a direct consumer needs.
 - Source & tests — [`core/notifications/`](../../apps/api/src/core/notifications/)
   (unit specs alongside the module; e2e in
   [`apps/api/test/`](../../apps/api/test/) against real Postgres + Redis).
