@@ -112,4 +112,6 @@ assistant registry API.
 - [Backend architecture & conventions](../backend/architecture-and-conventions.md)
 - [Notifications](../notifications/README.md) — the durable-run pattern reused here.
 - [Observability](../operations/observability.md) — the AI metrics catalog.
+- [Frontend API consumption](../frontend/api-consumption.md) — the
+  conversation/run/message hooks and the run-status stream consumption pattern.
 - Shared schemas — [`packages/shared/src/schemas/`](../../packages/shared/src/schemas/)

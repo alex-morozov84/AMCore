@@ -17,8 +17,10 @@ Deployment targets and CD environments remain adopter-specific.
 The repository also contains a Next.js frontend/admin starter workspace. It now
 ships the frontend foundations a downstream product should inherit rather than
 recreate: locale-routed UI, localized API/form errors, design tokens with
-light/dark/system theme support, FSD boundaries, and lint-enforced styling
-guardrails. Feature-specific admin surfaces remain intentionally product-owned.
+light/dark/system theme support, FSD boundaries, lint-enforced styling
+guardrails, BFF/Token-Handler auth with an active-sessions reference screen,
+and documented hooks for consuming media, notifications, and AI through the
+BFF. Feature-specific admin surfaces remain intentionally product-owned.
 
 ### Backend Starter Capabilities
 

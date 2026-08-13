@@ -1,4 +1,5 @@
 import type {
+  AvatarResponse,
   LoginInput,
   RegisterInput,
   SessionsListResponse,
@@ -52,4 +53,15 @@ export const authApi = {
     apiClient.delete<void>(`/auth/sessions/${encodeURIComponent(sessionId)}`),
 
   revokeOtherSessions: (): Promise<void> => apiClient.delete<void>('/auth/sessions'),
+
+  // `/auth/me/avatar` needs no dedicated Route Handler — the generic proxy
+  // already streams request bodies unmodified, which is exactly what a
+  // multipart upload needs.
+  uploadAvatar: (file: File): Promise<AvatarResponse> => {
+    const form = new FormData()
+    form.set('file', file)
+    return apiClient.postForm<AvatarResponse>('/auth/me/avatar', form)
+  },
+
+  deleteAvatar: (): Promise<void> => apiClient.delete<void>('/auth/me/avatar'),
 }

@@ -86,4 +86,36 @@ describe('apiClient', () => {
 
     await expect(apiClient.get('/auth/me')).rejects.toBeInstanceOf(ApiNetworkError)
   })
+
+  it('PUT sends a JSON body with Content-Type', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await apiClient.put('/notifications/preferences', { category: 'security', channel: 'email' })
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/notifications/preferences')
+    expect(init.method).toBe('PUT')
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
+  })
+
+  it('postForm sends the FormData body with no Content-Type header', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ avatarUrl: 'https://x/a.png' }), { status: 201 })
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const form = new FormData()
+    form.set('file', new File(['x'], 'a.png'))
+    const result = await apiClient.postForm<{ avatarUrl: string }>('/auth/me/avatar', form)
+
+    expect(result).toEqual({ avatarUrl: 'https://x/a.png' })
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/auth/me/avatar')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe(form)
+    expect(init.headers).toBeUndefined()
+  })
 })

@@ -20,7 +20,15 @@ Session {
 }
 ```
 
-The raw refresh token is sent to the browser as an `httpOnly` cookie. The session record only holds the hash — even if someone got direct database access, they couldn't reconstruct the raw token.
+For a direct API client, the raw refresh token is sent as an `httpOnly` cookie.
+The session record only holds the hash — even if someone got direct database
+access, they couldn't reconstruct the raw token.
+
+`apps/web` uses ADR-068's BFF session vault instead: the browser holds only
+`amcore_session`, while the Next.js server stores the raw backend refresh token
+in Redis and sends it to `apps/api` only on server-to-server calls. The session
+model below is still the backend source of truth; the difference is where the
+raw token lives in the bundled web client.
 
 One user can have many sessions (one per device). They're fully independent.
 
@@ -112,7 +120,13 @@ curl 'https://api.amcore.dev/api/v1/auth/sessions?page=1&limit=20' \
 }
 ```
 
-The `current: true` flag marks the session being used for this request. Revoked or expired refresh tokens are not listed here.
+The `current: true` flag marks the session being used for this request. The
+backend determines that from the request's `refresh_token` cookie, not from the
+JWT alone. In `apps/web`, the dedicated BFF handler for
+`/api/auth/sessions*` therefore attaches both `Authorization: Bearer ...` and
+`Cookie: refresh_token=<vault token>` on its server-to-server call. The generic
+`/api/[...path]` proxy intentionally never forwards browser cookies. Revoked or
+expired refresh tokens are not listed here.
 
 ---
 
@@ -143,6 +157,11 @@ curl -X DELETE https://api.amcore.dev/api/v1/auth/sessions \
 ```
 
 **Success response:** `204 No Content`
+
+As with the list endpoint, `apps/web` uses dedicated BFF handlers for session
+revocation so the backend can still identify the current session from the
+vault-held refresh token. Product code should call the same-origin
+`/api/auth/sessions*` paths from the browser, not `apps/api` directly.
 
 ---
 

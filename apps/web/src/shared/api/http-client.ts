@@ -62,6 +62,15 @@ function jsonInit(method: string, body?: unknown): RequestInit {
 }
 
 /**
+ * No `Content-Type` header: the browser must set its own
+ * `multipart/form-data; boundary=...` from the `FormData` object, which a
+ * manually-set header would override and break.
+ */
+function formInit(method: string, body: FormData): RequestInit {
+  return { method, body }
+}
+
+/**
  * Same-origin BFF client (ADR-068). No `baseURL` (relative paths land on
  * this Next app's own `/api/*` Route Handlers, never `apps/api` directly),
  * no manual `Authorization` header (the BFF attaches it server-side from
@@ -73,5 +82,8 @@ export const apiClient = {
   get: <T>(path: string): Promise<T> => request<T>(path, { method: 'GET' }),
   post: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('POST', body)),
   patch: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('PATCH', body)),
+  put: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('PUT', body)),
   delete: <T>(path: string): Promise<T> => request<T>(path, { method: 'DELETE' }),
+  postForm: <T>(path: string, body: FormData): Promise<T> =>
+    request<T>(path, formInit('POST', body)),
 }

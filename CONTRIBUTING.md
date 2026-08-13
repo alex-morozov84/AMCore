@@ -5,7 +5,9 @@ Thanks for your interest in contributing. This document explains how to set up t
 ## Getting Started
 
 1. **Clone and install** — See [README → Quick Start](README.md#quick-start) for prerequisites, clone, `pnpm install`, Docker, and migrations.
-2. **Environment** — Copy `.env.example` to `.env` (root) and `apps/web/.env.example` to `apps/web/.env.local`.
+2. **Environment** — Copy `.env.example` to `.env` at the repository root.
+   That single file configures both `apps/api` and `apps/web` for local
+   development; there is no separate `apps/web/.env.example`.
 3. **Run locally** — `pnpm dev` starts API and web in development mode.
 
 ## Development Commands

@@ -1,10 +1,16 @@
 # CSRF Posture
 
-AMCore is a bearer-first API. Most routes authenticate with an explicit
+AMCore's backend API is bearer-first. Most routes authenticate with an explicit
 `Authorization: Bearer ...` header, so they are not vulnerable to classic CSRF:
 an attacker's page cannot cause the browser to invent that header.
 
-The only ambient browser credential is the `refresh_token` cookie.
+For direct `apps/api` browser consumers, the only ambient browser credential is
+the `refresh_token` cookie. The bundled Next.js app (`apps/web`) adds a second
+browser boundary of its own: the browser holds an opaque `amcore_session` cookie
+for `apps/web`, while the backend access/refresh tokens live in the web
+server's Redis session vault (ADR-068). That shifts CSRF protection for
+same-origin `/api/*` web calls to the browser→Next layer; see
+[Frontend architecture → Browser API reach](../frontend/architecture-and-conventions.md#browser-api-reach).
 
 ## What is actually in scope
 
@@ -15,8 +21,15 @@ Cookie-backed browser surfaces are intentionally narrow:
 - `POST /auth/oauth/exchange`
 - Bull Board at `/admin/queues`
 
-The refresh cookie is `httpOnly` and `SameSite=Strict`, so browsers do not send it
-on normal cross-site requests. That is the primary CSRF layer.
+The backend refresh cookie is `httpOnly` and `SameSite=Strict`, so browsers do
+not send it on normal cross-site requests. That is the primary CSRF layer for
+direct API consumers.
+
+For `apps/web`, state-changing same-origin BFF Route Handlers apply the same
+Origin/Referer reasoning with a web-owned allowlist (`WEB_TRUSTED_ORIGINS`),
+not `apps/api`'s `CORS_ORIGIN`. Keep those two configs aligned in deployment,
+but do not treat them as the same setting: one protects browser→Next, the other
+protects browser→API.
 
 ## Why AMCore does not use blanket CSRF middleware
 

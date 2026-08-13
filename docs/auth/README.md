@@ -24,6 +24,9 @@ This guide covers everything — from "how do I log a user in" to "how do I rest
 
 ## The 30-second mental model
 
+For direct API consumers (mobile apps, scripts, or a custom frontend that talks
+to `apps/api` itself), AMCore is a bearer-token API:
+
 ```
 Who are you?  →  Authentication  →  JWT access token (15 min)
                                      + refresh token in cookie (7 days)
@@ -34,6 +37,16 @@ What can you do?  →  Authorization  →  System role (USER / SUPER_ADMIN)
 ```
 
 You send the access token with every request. When it expires, the refresh token silently gets you a new one — no re-login needed.
+
+The bundled Next.js app (`apps/web`) deliberately wraps that API contract in a
+BFF / Token Handler layer (ADR-068): the browser never receives the backend
+access token or long-lived refresh token. It holds only `amcore_session`, an
+opaque httpOnly cookie for `apps/web`; Next Route Handlers keep the backend
+tokens in a Redis session vault and attach `Authorization: Bearer ...`
+server-side. The only short exception is the OAuth callback handoff described in
+[OAuth](./oauth.md), where a temporary httpOnly `refresh_token` cookie is relayed
+onto the frontend origin and immediately consumed/deleted by
+`/{locale}/auth/callback`.
 
 ---
 

@@ -83,6 +83,9 @@ generation-fence approach (and `RedisMutexService` for serialization).
 
 - [Configuration](./configuration.md) — `MEDIA_*` env vars, presets, Next.js consumption.
 - [Security](./security.md) — accepted formats, limits, EXIF, isolation, deferred scope.
+- [Frontend API consumption](../frontend/api-consumption.md) — the
+  `useUploadAvatar`/`useDeleteAvatar` hooks and why the avatar upload needs no
+  dedicated BFF route.
 
 ## Status
 

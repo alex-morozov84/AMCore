@@ -245,6 +245,11 @@ ships `account.profile_updated` (in-app only, best-effort, produced by
 actually changed), `account.telegram_linked`, and `account.password_changed`
 (in-app **and** email mandatory), which exercises the resolver end-to-end.
 
+All three shipped definitions have real producers in the current backend:
+`account.profile_updated` from `PATCH /auth/me`, `account.password_changed`
+from a completed password reset, and `account.telegram_linked` from a
+completed Telegram link. None are demo-only.
+
 ## Content & security rules
 
 - **Language-neutral, bounded payloads.** The durable `payload` is the allowlisted
@@ -317,6 +322,9 @@ and **digests, quiet hours, timezone scheduling, and frequency caps**.
 - [Webhooks](../operations/webhooks.md) — the secret-header verifier behind Telegram.
 - [Idempotency](../operations/idempotency.md) — the separate HTTP primitive.
 - [Deployment](../operations/deployment.md) — SSE proxy/buffering guidance.
+- [Frontend API consumption](../frontend/api-consumption.md) — the feed/
+  preferences hooks and why `apps/web` consumes the SSE stream with native
+  `EventSource` instead of the fetch-stream reader a direct consumer needs.
 - Source & tests — [`core/notifications/`](../../apps/api/src/core/notifications/)
   (unit specs alongside the module; e2e in
   [`apps/api/test/`](../../apps/api/test/) against real Postgres + Redis).

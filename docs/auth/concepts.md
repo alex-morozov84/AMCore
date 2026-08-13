@@ -64,6 +64,13 @@ When a password is reset, **all sessions are destroyed** — every device gets s
 
 ## The token lifecycle
 
+This is `apps/api`'s own contract, for a direct API consumer (mobile app,
+script, or a custom frontend talking to the backend itself). The bundled
+`apps/web` frontend does **not** work this way — see
+[README → The 30-second mental model](./README.md#the-30-second-mental-model)
+for why: the browser there never holds either token, only an opaque BFF
+session cookie.
+
 ```
 LOGIN
   │
@@ -170,6 +177,12 @@ The refresh token lives in a cookie with these flags:
 | `maxAge`   | 7 days               | Browser discards it after this             |
 
 The access token is stored in application memory (never in `localStorage`) and cleared on page close.
+
+This cookie table describes `apps/api`'s own `refresh_token` cookie for a
+direct API consumer. `apps/web` additionally sets its own `amcore_session`
+cookie on its own origin — see
+[Sessions → How sessions work](./sessions.md#how-sessions-work) — and never
+receives `apps/api`'s cookie or either token itself.
 
 See [CSRF Posture](./csrf.md) for the narrow cookie-surface policy, the
 Origin/Referer second layer, and the frontend-agnostic rationale for allow-on-missing.
