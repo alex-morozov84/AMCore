@@ -9,8 +9,10 @@ import type { NotificationDefinition } from '../notification-definition.types'
 
 /**
  * Starter in-app-only informational notification: the user's profile was updated.
- * Demonstrates the definition contract (payload validation, safe projection,
- * localized render) without an external channel — external adapters arrive in Arc B+.
+ * Produced by `AuthService.updateProfile` (`PATCH /auth/me`) — best-effort, only
+ * when a field's value actually changed, never for a no-op PATCH. No external
+ * channel: this is informational, not a security alert (contrast
+ * `account.password_changed`) — external adapters arrive in Arc B+ if ever needed.
  */
 
 /**

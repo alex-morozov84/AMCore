@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 import * as argon2 from 'argon2'
@@ -393,10 +395,47 @@ export class AuthService {
     if (input.locale !== undefined) data.locale = input.locale
     if (input.timezone !== undefined) data.timezone = input.timezone
 
+    // Read before write so the alert below can tell "field was in the request" apart
+    // from "field's value actually changed" (a no-op PATCH — e.g. re-submitting the
+    // current name — must not notify).
+    const previous = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } })
     const user = await this.prisma.user.update({ where: { id: userId }, data })
     await this.userCacheService.invalidateUser(userId)
 
     this.logger.info({ userId, fields: Object.keys(data) }, 'User profile updated')
+
+    const updatedFields = (Object.keys(data) as Array<keyof typeof data>).filter(
+      (field) => user[field] !== previous[field]
+    )
+
+    if (updatedFields.length > 0) {
+      // Informational, non-security in-app alert via the durable subsystem (ADR-052) —
+      // mirrors resetPassword's account.password_changed emission below, but best-effort
+      // only (not mandatory/multi-channel): a notifications hiccup must not fail an
+      // already-committed profile update. Idempotency key uses a generated occurrence id,
+      // not `user.updatedAt` — that column is TIMESTAMP(3) (millisecond precision), so two
+      // real edits landing in the same millisecond would collide on the same key with
+      // different payloads/fingerprints. `notify()` treats that as a genuine conflict
+      // (`NotificationIdempotencyConflictError`), which this best-effort catch would then
+      // swallow as a warning, silently dropping the second real alert. There is no natural
+      // retry-stable business id for this operation (unlike password reset's consumed
+      // token id) and no retry path if this notify() call itself fails, so a fresh
+      // `randomUUID()` per call is more honest than a false idempotency guarantee built on
+      // a timestamp that can repeat.
+      try {
+        await this.notifications.notify({
+          recipientUserId: userId,
+          type: 'account.profile_updated',
+          payload: { updatedFields },
+          idempotencyKey: `account.profile_updated:${randomUUID()}`,
+        })
+      } catch (err) {
+        this.logger.warn(
+          { userId, err: err instanceof Error ? err.message : 'unknown' },
+          'Failed to emit profile-updated notification'
+        )
+      }
+    }
 
     return this.mapUserToResponse(user)
   }

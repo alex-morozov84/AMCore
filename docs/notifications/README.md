@@ -240,9 +240,10 @@ Resolving which channels deliver a notification is **top wins**:
 In the read response, `enabled: null` means no override is stored (definition
 default applies) and `mandatory: true` means a definition in the category forces
 the channel, so a `PUT` attempting to disable it is rejected `400`. The starter
-ships `account.profile_updated`, `account.telegram_linked`, and
-`account.password_changed` (in-app **and** email mandatory), which exercises the
-resolver end-to-end.
+ships `account.profile_updated` (in-app only, best-effort, produced by
+`AuthService.updateProfile` — `PATCH /auth/me` — only when a field's value
+actually changed), `account.telegram_linked`, and `account.password_changed`
+(in-app **and** email mandatory), which exercises the resolver end-to-end.
 
 ## Content & security rules
 
