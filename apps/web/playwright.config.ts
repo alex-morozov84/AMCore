@@ -11,8 +11,11 @@ import { defineConfig, devices } from '@playwright/test'
  * - `real-stack` (PR4): the full `docker-compose.yml` `local-infra` profile,
  *   the only lane that proves auth/BFF/cookies/Redis/App Router end to end.
  *
- * Only `mocked` exists yet — the other two `projects` entries land with
- * their own PRs rather than being stubbed out empty here.
+ * `server-mocked` shares the same dev server as `mocked` (both fine with
+ * `experimental.testProxy` enabled, `next.config.ts` — interception is
+ * opt-in per request via a header the msw testmode fixture injects, so it's
+ * inert for every plain `mocked`-lane test). `real-stack` (PR4) still lands
+ * separately: it targets a different, full-infra server entirely.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -37,11 +40,19 @@ export default defineConfig({
       testDir: './e2e/mocked',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'server-mocked',
+      testDir: './e2e/server-mocked',
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: {
     command: 'pnpm dev',
     url: 'http://localhost:3002',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      PLAYWRIGHT_TEST_PROXY: 'true',
+    },
   },
 })

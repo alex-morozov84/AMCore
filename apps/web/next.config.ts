@@ -23,6 +23,17 @@ const nextConfig: NextConfig = {
   // time it detects an AI coding agent.
   agentRules: false,
 
+  experimental: {
+    // Enables Next's first-party Playwright+MSW server-side test fixture
+    // (`next/experimental/testmode/playwright/msw`, Track 7 FINAL PLAN §3,
+    // `ai/models-talk.md`) — intercepts server-side `fetch` calls the Next
+    // server makes to `apps/api` (a boundary browser-side `page.route()`
+    // can't reach). `PLAYWRIGHT_TEST_PROXY` is only ever set by
+    // `playwright.config.ts`'s `webServer.env`, never by a real dev/prod
+    // boot, so this adds no interception surface to the shipped app.
+    testProxy: process.env.PLAYWRIGHT_TEST_PROXY === 'true',
+  },
+
   // API proxy to backend: NO `rewrites()` here — Route Handlers under
   // `app/api/**` (four dedicated auth routes + the `[...path]` catch-all,
   // ADR-068) own the entire `/api/*` surface now. An array-form `rewrites()`
