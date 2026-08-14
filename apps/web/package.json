@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
+    "test:e2e:real-stack": "playwright test --config=playwright.real-stack.config.ts",
     "lint:css": "stylelint \"src/**/*.css\""
   },
   "dependencies": {

@@ -344,3 +344,92 @@ jobs:
       - name: Tear down boot smoke stack
         if: always()
         run: docker compose down -v
+
+  web-e2e:
+    name: Web E2E
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `pnpm test:e2e` runs Playwright directly in apps/web, bypassing
+      # turbo (whose own `test` task depends on `^build` and builds this
+      # transparently for the `test` job). apps/web imports the built
+      # dist, not source, so this is required here too.
+      - name: Build @amcore/shared
+        run: pnpm --filter @amcore/shared build
+
+      - name: Install Playwright Chromium
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      # Mocked + server-mocked lanes (Track 7 FINAL PLAN §1/§4,
+      # ai/models-talk.md): infra-free, Playwright manages its own `next dev`
+      # via playwright.config.ts's webServer. No env file needed — verified
+      # empirically that both lanes boot and pass with none present.
+      - name: Run mocked + server-mocked E2E lanes
+        working-directory: apps/web
+        run: pnpm test:e2e
+
+      # Real-stack lane: the only one that proves auth/BFF/cookies/Redis/App
+      # Router end to end (§4). Builds fresh rather than reusing another
+      # job's image — this job's own point is the E2E suite, not image
+      # provenance (that's `docker-image-smoke`'s job).
+      - name: Boot the real-stack profile
+        run: docker compose --profile local-infra up -d --build
+
+      - name: Wait for web readiness
+        run: |
+          for attempt in $(seq 1 60); do
+            # -L follows the locale redirect (`localePrefix: 'always'`).
+            status="$(curl -fsSL -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/ || true)"
+            if [ "$status" = "200" ]; then
+              echo "web 200"
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "web readiness check timed out"
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Run real-stack E2E lane
+        working-directory: apps/web
+        run: pnpm test:e2e:real-stack
+
+      - name: Dump compose logs on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color
+
+      - name: Upload Playwright reports on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-reports
+          path: |
+            apps/web/playwright-report/
+            apps/web/playwright-report-real-stack/
+            apps/web/test-results/
+          retention-days: 7
+
+      - name: Tear down real-stack stack
+        if: always()
+        run: docker compose down -v
