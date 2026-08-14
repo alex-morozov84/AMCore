@@ -367,6 +367,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # `pnpm test:e2e` runs Playwright directly in apps/web, bypassing
+      # turbo (whose own `test` task depends on `^build` and builds this
+      # transparently for the `test` job). apps/web imports the built
+      # dist, not source, so this is required here too.
+      - name: Build @amcore/shared
+        run: pnpm --filter @amcore/shared build
+
       - name: Install Playwright Chromium
         working-directory: apps/web
         run: npx playwright install --with-deps chromium
