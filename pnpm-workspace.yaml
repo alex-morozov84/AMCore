@@ -11,6 +11,7 @@ allowBuilds:
   cpu-features: true
   esbuild: true
   msgpackr-extract: true
+  msw: true
   prisma: true
   protobufjs: true
   sharp: true
