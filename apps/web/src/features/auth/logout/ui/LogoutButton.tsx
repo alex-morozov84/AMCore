@@ -24,7 +24,16 @@ export function LogoutButton({
   const { mutate, isPending } = useLogout()
 
   return (
-    <Button variant={variant} onClick={() => mutate()} disabled={isPending} className={className}>
+    <Button
+      variant={variant}
+      onClick={() => mutate()}
+      disabled={isPending}
+      className={className}
+      // Icon-only (`showText={false}`, `(dashboard)/layout.tsx`'s header)
+      // otherwise has no accessible name at all — found while writing the
+      // Track 7 real-stack E2E logout flow.
+      aria-label={showText ? undefined : t('logout')}
+    >
       {showIcon && <LogOut className="size-4" />}
       {showText && t('logout')}
     </Button>
