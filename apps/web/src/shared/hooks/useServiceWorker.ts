@@ -17,10 +17,20 @@ export function useServiceWorker() {
     // Register service worker
     const registerSW = async () => {
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js', {
+        // Cast, not trust: `lib.dom`'s type promises a real
+        // `ServiceWorkerRegistration`, but Playwright's `serviceWorkers:
+        // 'block'` (this repo's own mocked E2E lane, `playwright.config.ts`)
+        // resolves `register()` with `undefined` instead of rejecting —
+        // real observed behavior outside the documented contract, not a
+        // hypothetical to skip guarding.
+        const reg = (await navigator.serviceWorker.register('/sw.js', {
           scope: '/',
           updateViaCache: 'none',
-        })
+        })) as ServiceWorkerRegistration | undefined
+
+        if (!reg) {
+          return
+        }
 
         setRegistration(reg)
 
