@@ -18,15 +18,21 @@ export function uniqueEmail(prefix: string): string {
 export const TEST_PASSWORD = 'Test1234Secure'
 
 /**
- * `registerSchema`'s `name` is `z.string().min(2).optional()` — optional
- * means the field may be omitted entirely (`undefined`), not that an empty
- * string passes; `RegisterForm`'s default value is `''`, which fails the
- * `min(2)` check the moment the form validates on submit. A real name is
- * simplest here, not a workaround for an app bug.
+ * `name` is genuinely optional (`registerSchema`, `packages/shared`) — the
+ * name field is left blank when `options.name` is omitted, exercising the
+ * real optional-field contract end to end. `register-and-logout.spec.ts`
+ * does exactly that; the other specs pass a name because filling it isn't
+ * what they're testing.
  */
-export async function registerViaUi(page: Page, email: string): Promise<void> {
+export async function registerViaUi(
+  page: Page,
+  email: string,
+  options: { name?: string } = {}
+): Promise<void> {
   await page.goto('/en/register')
-  await page.getByLabel(/name/i).fill('E2E Test')
+  if (options.name) {
+    await page.getByLabel(/name/i).fill(options.name)
+  }
   await page.getByRole('textbox', { name: /email/i }).fill(email)
   await page.getByLabel(/password/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign up/i }).click()

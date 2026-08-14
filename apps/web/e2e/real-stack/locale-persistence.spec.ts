@@ -8,10 +8,22 @@ test('a locale switch persists to a fresh session on another device/browser', as
 }) => {
   const email = uniqueEmail('locale')
 
-  await registerViaUi(page, email)
+  await registerViaUi(page, email, { name: 'E2E Test' })
   await expect(page).toHaveURL(/\/en\/?$/)
 
+  // `LocaleSwitcher.persistLocale()` is a deliberately-not-awaited
+  // best-effort write ("the UI language must switch immediately even if
+  // the profile write fails") — the client-side navigation to /ru can
+  // complete before the PATCH the assertion below actually depends on
+  // does. Wait for that specific response, not just the URL change.
+  const localePersisted = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/auth/me') &&
+      response.request().method() === 'PATCH' &&
+      response.ok()
+  )
   await page.getByLabel(/language/i).selectOption('ru')
+  await localePersisted
   await expect(page).toHaveURL(/\/ru\/?$/)
 
   // A completely fresh context (no cookies, no localStorage) logging in

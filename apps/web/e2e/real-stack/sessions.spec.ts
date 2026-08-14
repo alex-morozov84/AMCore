@@ -8,7 +8,7 @@ test('active sessions: no revoke control on the current session, can revoke anot
 }) => {
   const email = uniqueEmail('sessions')
 
-  await registerViaUi(page, email)
+  await registerViaUi(page, email, { name: 'E2E Test' })
   await expect(page).toHaveURL(/\/en\/?$/)
 
   await page.goto('/en/settings/sessions')

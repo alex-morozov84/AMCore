@@ -70,7 +70,18 @@ export const timezoneSchema = z.string().refine((tz) => {
 export const registerSchema = z.object({
   email: emailInputSchema,
   password: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/),
-  name: z.string().min(2).optional(),
+  // Optional means the field may be omitted — an empty string is not the
+  // same thing and would otherwise fail this same field's own `min(2)`,
+  // which is exactly the state a form's default `name: ''` starts in.
+  // Built from a literal/union rather than `z.preprocess()`: preprocess's
+  // input type collapses to `unknown`, which breaks `useLocalizedForm`'s
+  // `$ZodType<unknown, TFieldValues>` constraint (react-hook-form needs a
+  // concrete `string | undefined` input type for this field, not `unknown`).
+  name: z
+    .literal('')
+    .transform(() => undefined)
+    .or(z.string().min(2))
+    .optional(),
   // Optional explicit locale; when omitted the API falls back to
   // `Accept-Language` negotiation, then the DB default (see AuthService.register).
   locale: supportedLocaleSchema.optional(),
