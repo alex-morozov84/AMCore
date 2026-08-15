@@ -28,9 +28,21 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
+/**
+ * `as` defaults to `'div'` — most `Card`s sit inside a page that already has
+ * its own heading elsewhere, and forcing a heading tag here would create a
+ * duplicate/wrong-level one. Pass `as="h1"` when this `Card` **is** the
+ * page's primary content and nothing else provides a heading (e.g. the
+ * login/register cards) — an axe `page-has-heading-one` finding on exactly
+ * that shape is what this option exists to fix.
+ */
+function CardTitle({
+  className,
+  as: Component = 'div',
+  ...props
+}: React.ComponentProps<'div'> & { as?: 'div' | 'h1' | 'h2' | 'h3' }) {
   return (
-    <div
+    <Component
       data-slot="card-title"
       className={cn('leading-none font-semibold', className)}
       {...props}
