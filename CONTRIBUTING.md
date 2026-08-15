@@ -38,10 +38,17 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 ### Web-specific test commands
 
-| Command                              | Description                                                                           |
-| ------------------------------------ | ------------------------------------------------------------------------------------- |
-| `pnpm --filter web test`             | All unit tests (mocked infra)                                                         |
-| `pnpm --filter web test:integration` | Testcontainers-backed tests — real Redis (requires Docker), excluded from `pnpm test` |
+| Command                                 | Description                                                                                                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm --filter web test`                | All unit/component/integration tests (mocked infra)                                                                                                          |
+| `pnpm --filter web test:integration`    | Testcontainers-backed tests — real Redis (requires Docker), excluded from `pnpm test`                                                                        |
+| `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked E2E lanes (auto-starts `next dev`)                                                                                         |
+| `pnpm --filter web test:e2e:real-stack` | Playwright real-stack E2E lane — boot `docker compose --profile local-infra up -d --build` first, see [`docs/frontend/testing.md`](docs/frontend/testing.md) |
+
+On a clean checkout, build the shared package before running Playwright
+directly: `pnpm --filter @amcore/shared build`. The CI `web-e2e` job does this
+explicitly; turbo does it automatically for `pnpm test`, `pnpm lint`, and
+`pnpm typecheck`.
 
 ## Commit Messages
 

@@ -314,9 +314,13 @@ architectural structure.
 - [API consumption](./api-consumption.md) — the hooks that consume media,
   notifications, and AI through the BFF Route Handler layer this page
   describes.
+- [Testing](./testing.md) — the frontend test taxonomy; in particular, why
+  `async` Server Components and `requireSession()`-gated pages need the
+  real-stack E2E lane rather than a Vitest unit test (Vitest cannot test
+  `async` Server Components at all — Next's own bundled docs say so).
 - [Backend architecture & conventions](../backend/architecture-and-conventions.md) —
   the equivalent contract for `apps/api`.
 - `AGENTS.md` → Code conventions — the condensed cross-tool version of the
   rules on this page.
 - Later frontend/admin starter tracks add their own guide here as they land:
-  the testing pyramid and Storybook.
+  Storybook.

@@ -23,9 +23,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   upload/delete, notifications feed/preferences/realtime, and AI
   conversations/runs/messages through the BFF. These are reference hooks, not
   product-specific notification or AI screens.
+- **`apps/web`:** a four-layer frontend testing pyramid (ADR-069) —
+  `msw/node`-backed integration tests for the real `/api/*` request
+  contract; Playwright E2E split into a mocked lane (`page.route()` +
+  Next's `experimental/testmode/playwright/msw` fixture, no real infra)
+  and a real-stack lane (`docker-compose.yml`'s `local-infra` profile —
+  the only layer that proves auth/BFF/cookies/Redis/App Router end to
+  end); and `@axe-core/playwright` accessibility scanning (WCAG A/AA
+  through 2.2) on the pages/states those E2E lanes already visit. New CI
+  job `web-e2e`. Public guide: `docs/frontend/testing.md`.
 
 ### Fixed
 
+- **`apps/web`:** four accessibility/correctness defects found while
+  building the new E2E and axe layers above, not shipped speculatively:
+  the login/register pages had no `<h1>`; the "Sign up"/"Sign in" links
+  inside body text relied on color alone at rest, below 3:1 contrast;
+  `Alert`'s destructive variant text was below the 4.5:1 AA contrast
+  minimum; and the icon-only `LogoutButton` (dashboard header) had no
+  accessible name at all.
+- **`packages/shared`:** `registerSchema`'s `name` field is optional (may
+  be omitted) but `RegisterForm` defaulted it to `''`, which failed that
+  same field's own `min(2)` the moment the form validated on submit —
+  silently blocking every registration attempt that left the name field
+  untouched. A blank string now normalizes to unset before the length
+  check runs.
 - **`apps/web`:** the destructive button variant's text color now uses a
   proper `--destructive-foreground` token instead of a raw `text-white`
   literal. This also fixes a pre-existing WCAG AA contrast failure in dark
