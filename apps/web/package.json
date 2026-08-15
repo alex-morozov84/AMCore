@@ -14,7 +14,9 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:real-stack": "playwright test --config=playwright.real-stack.config.ts",
-    "lint:css": "stylelint \"src/**/*.css\""
+    "lint:css": "stylelint \"src/**/*.css\"",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@amcore/shared": "workspace:^",
@@ -46,6 +48,8 @@
     "@eslint/js": "^9.39.5",
     "@next/eslint-plugin-next": "^16.3.0",
     "@playwright/test": "^1.62.1",
+    "@storybook/addon-docs": "^10.5.8",
+    "@storybook/nextjs-vite": "^10.5.8",
     "@tailwindcss/postcss": "^4.3.3",
     "@tanstack/react-query-devtools": "^5.101.4",
     "@testcontainers/redis": "^12.1.0",
@@ -67,9 +71,11 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-simple-import-sort": "^14.0.0",
+    "eslint-plugin-storybook": "^10.5.8",
     "jsdom": "^30.0.1",
     "msw": "^2.15.0",
     "shadcn": "^4.16.2",
+    "storybook": "^10.5.8",
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
     "tailwindcss": "^4.3.3",

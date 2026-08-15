@@ -4,6 +4,7 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 import nextPlugin from '@next/eslint-plugin-next';
+import storybookPlugin from 'eslint-plugin-storybook';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -146,7 +147,14 @@ export default [
   // Global ignores
   {
     name: 'project/ignores',
-    ignores: ['.next/**', 'out/**', 'build/**', 'node_modules/**', 'public/sw.js'],
+    ignores: [
+      '.next/**',
+      'out/**',
+      'build/**',
+      'node_modules/**',
+      'public/sw.js',
+      'storybook-static/**',
+    ],
   },
 
   // Base JavaScript rules
@@ -451,4 +459,8 @@ export default [
       ...nextPlugin.configs['core-web-vitals'].rules,
     },
   },
+
+  // Storybook rules — story-file/`.storybook/main.ts` linting from the
+  // plugin's own recommended flat config, not hand-restated here.
+  ...storybookPlugin.configs['flat/recommended'],
 ];
