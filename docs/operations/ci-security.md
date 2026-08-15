@@ -20,7 +20,8 @@ of workflow self-hardening to keep the example forkable.
 - **CodeQL** proves the repo is analyzed by GitHub's SAST pipeline and findings
   flow into the Security tab.
 - **Dependency Review** blocks new high/critical dependency risk introduced by a
-  PR diff.
+  PR diff. See [Handling Dependency Review exceptions](#handling-dependency-review-exceptions-allow-ghsas)
+  for the narrow, documented `allow-ghsas` escape hatch.
 - **gitleaks** blocks newly introduced secrets on `push`/`pull_request`; the
   weekly full-history scan is the backstop for historical drift.
 - **OSV-Scanner** produces repository-level vulnerability SARIF on the weekly
@@ -55,6 +56,30 @@ Inline `// codeql[…]` / `// lgtm` comments are **not** honored by GitHub code 
 ([github/codeql#11427](https://github.com/github/codeql/issues/11427)) — they do not dismiss
 alerts. Avoid a repo-wide `query-filters` exclusion for a local false positive: it disables
 the query everywhere and hides real future findings.
+
+## Handling Dependency Review exceptions (`allow-ghsas`)
+
+Dependency Review blocks on `high+`, with no exceptions by default. An
+`allow-ghsas` entry in `dependency-review.yml` is a **narrow, temporary,
+documented exception**, not a way to silence the gate — use it only when all
+of the following hold, and remove it the moment any one stops holding:
+
+1. The flagged advisory genuinely has **no fixed version to upgrade to**
+   (check `first_patched_version` via `gh api /advisories/<GHSA-id>` — don't
+   assume from the dependency-review log alone).
+2. The vulnerable package's actual reachability in **this repo's own usage**
+   meaningfully lowers the risk (e.g. dev-only tooling that never reaches a
+   production build artifact, or no untrusted-input path it would need to
+   process).
+3. The exception is recorded in **two places**: an inline comment on the
+   `allow-ghsas` line in the workflow file (the advisory IDs, why they're
+   allowed, and the removal condition), and an entry in `ai/BACKLOG.md` with
+   a trigger to re-check on the next relevant dependency bump.
+
+Current example: `image-size@2.0.2` (transitive via
+`@storybook/nextjs-vite`, Track 8) — see the comment above `allow-ghsas` in
+`.github/workflows/dependency-review.yml` and `ai/BACKLOG.md`'s "image-size"
+entry.
 
 ## What a fork inherits (and what it doesn't)
 

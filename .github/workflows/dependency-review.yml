@@ -25,3 +25,21 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
+          # Temporary, narrow exception — not a gate bypass. Both advisories
+          # are `image-size@2.0.2`, pulled in transitively via
+          # `@storybook/nextjs-vite` -> `vite-plugin-storybook-nextjs`
+          # (`apps/web` devDependency only). Neither has a fixed version
+          # upstream as of 2026-08-15 (`vulnerable_version_range: <= 2.0.2`,
+          # `first_patched_version: null` on both advisories — every
+          # published `image-size` release is affected, so bumping cannot
+          # fix this). Risk here is low, not zero: this dependency never
+          # reaches `apps/web`'s production build (`next build`,
+          # `output: 'standalone'`, no Storybook code in that path) or an
+          # untrusted-input path — Storybook's `next/image` decorator only
+          # ever parses this repo's own static assets under
+          # `apps/web/public`. Remove this allowlist entry the moment either
+          # advisory gets a patched version or the dependency chain changes
+          # — see `ai/BACKLOG.md`'s "image-size" entry for the re-check
+          # trigger, and `docs/operations/ci-security.md` for the general
+          # policy this follows.
+          allow-ghsas: GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr
