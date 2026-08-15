@@ -168,6 +168,20 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   auto-generated block — is the source of that instruction. **Do not create or
   commit `apps/web/AGENTS.md` or `apps/web/CLAUDE.md`**; this file is the
   single source of truth for agent instructions across the whole repo.
+- **Frontend runtime verification: prove an `apps/web` change against a
+  running app, not a diff you never ran.** Check compilation/errors first
+  (Next's MCP server at `/_next/mcp`, bridged via `next-devtools-mcp` in
+  `.mcp.json` — `get_compilation_issues`/`compile_route` for the build,
+  `get_logs` for server-side Route Handler errors specifically, since
+  `get_errors` only covers client/config errors), then drive the page with
+  whatever browser automation is available in your agent environment and
+  assert the intended behavior. `docs/frontend/testing.md` documents this
+  loop tool-neutrally on purpose — no browser-automation vendor is named as
+  required. `pnpm --filter web test:e2e` (mocked + server-mocked lanes,
+  infra-free) and `pnpm --filter web test:e2e:real-stack` (the full
+  `docker-compose.yml` stack — the only lane that proves auth/BFF/cookies/
+  Redis/App Router end to end) are the two Playwright entry points; see
+  that guide for which layer a given change belongs in.
 - **Frontend server/client boundary — two separate decisions.** Server
   Components are the default; add `'use client'` only at the interactive leaf
   that owns events, effects, browser APIs, a Zustand store or a Query hook —

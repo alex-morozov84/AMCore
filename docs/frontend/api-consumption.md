@@ -145,9 +145,21 @@ protocol-relative URL (which would bypass the BFF and hit `apps/api` directly,
 where `EventSource` can't attach the required `Authorization` header) fails
 loudly instead of silently shipping a broken connection.
 
+## Testing these hooks
+
+Frontend mocks always target `/api/*` BFF paths, never `apps/api` directly —
+matches the "one rule everything below follows" above. A component/
+integration test intercepts `/api/notifications/*`, `/api/ai/*`, etc.
+(`msw/node`'s `setupServer()`); an E2E test mocking a server-side fetch this
+page describes (e.g. `getOAuthProviders()`) uses Next's
+`experimental/testmode/playwright/msw` fixture instead, since `page.route()`
+never sees a request that never crosses the browser. See
+[Testing](./testing.md) for the full taxonomy.
+
 ## See also
 
 - [Architecture & conventions](architecture-and-conventions.md#browser-api-reach) —
   the BFF Route Handler layer and the auth flows built on it.
+- [Testing](./testing.md) — which layer to test a given hook/flow at.
 - [Media](../media/README.md), [Notifications](../notifications/README.md),
   [AI](../ai/README.md) — the backend contracts these hooks consume.

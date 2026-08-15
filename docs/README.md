@@ -16,6 +16,7 @@ does not express.
 | Know which import/styling rules are enforced     | [`frontend/fsd-boundaries-and-guardrails.md`](frontend/fsd-boundaries-and-guardrails.md)                                          |
 | Reuse or add a shared UI primitive (shadcn)      | [`frontend/shared-ui-and-shadcn.md`](frontend/shared-ui-and-shadcn.md)                                                            |
 | Consume media/notifications/AI from the frontend | [`frontend/api-consumption.md`](frontend/api-consumption.md)                                                                      |
+| Add a frontend test / pick the right layer       | [`frontend/testing.md`](frontend/testing.md)                                                                                      |
 | Add an environment variable                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
 | Add an external service / infra dependency       | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
 | Add UI copy, a locale, or an error message       | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
@@ -54,6 +55,10 @@ does not express.
   hooks consume the media, notifications, and AI backend surfaces through the
   BFF, and why the realtime hooks use native `EventSource` instead of the
   custom fetch-stream reader a direct (non-BFF) SSE consumer needs.
+- **[Frontend testing](frontend/testing.md)** — the four-layer taxonomy
+  (unit/component, MSW integration, mocked E2E, real-stack E2E), the
+  technical boundary the E2E split is drawn on, automated accessibility
+  scanning, and the tool-neutral runtime-verification workflow.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
   sessions, OAuth, [RBAC](auth/rbac.md), [API keys](auth/api-keys.md), invites,
   CSRF, and the [auth contracts reference](auth/reference.md).
