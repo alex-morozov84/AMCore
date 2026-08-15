@@ -38,8 +38,10 @@ jobs:
           # untrusted-input path — Storybook's `next/image` decorator only
           # ever parses this repo's own static assets under
           # `apps/web/public`. Remove this allowlist entry the moment either
-          # advisory gets a patched version or the dependency chain changes
-          # — see `ai/BACKLOG.md`'s "image-size" entry for the re-check
-          # trigger, and `docs/operations/ci-security.md` for the general
-          # policy this follows.
+          # advisory gets a patched version or the dependency chain changes —
+          # re-check with `gh api /advisories/<id>` on any
+          # storybook/@storybook/nextjs-vite/vite-plugin-storybook-nextjs/
+          # image-size version bump. Tracked in the maintainer backlog; see
+          # `docs/operations/ci-security.md` for the general policy this
+          # follows.
           allow-ghsas: GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr

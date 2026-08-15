@@ -73,13 +73,19 @@ of the following hold, and remove it the moment any one stops holding:
    process).
 3. The exception is recorded in **two places**: an inline comment on the
    `allow-ghsas` line in the workflow file (the advisory IDs, why they're
-   allowed, and the removal condition), and an entry in `ai/BACKLOG.md` with
-   a trigger to re-check on the next relevant dependency bump.
+   allowed, and the removal condition — including the exact command to
+   re-check), and a tracked backlog/issue entry with a trigger to re-check on
+   the next relevant dependency bump. AMCore's own maintainer backlog is
+   private and absent from public forks (see `ai/README.md`'s private-repo
+   boundary) — a fork following this policy should use whatever public
+   issue tracker or `docs/` note it already uses for this kind of follow-up;
+   the inline workflow comment alone should always be self-sufficient to
+   understand and re-verify the exception, since that's the part every fork
+   actually gets.
 
 Current example: `image-size@2.0.2` (transitive via
 `@storybook/nextjs-vite`, Track 8) — see the comment above `allow-ghsas` in
-`.github/workflows/dependency-review.yml` and `ai/BACKLOG.md`'s "image-size"
-entry.
+`.github/workflows/dependency-review.yml`.
 
 ## What a fork inherits (and what it doesn't)
 
