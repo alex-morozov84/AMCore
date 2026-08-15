@@ -170,18 +170,19 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   single source of truth for agent instructions across the whole repo.
 - **Frontend runtime verification: prove an `apps/web` change against a
   running app, not a diff you never ran.** Check compilation/errors first
-  (Next's MCP server at `/_next/mcp`, bridged via `next-devtools-mcp` in
-  `.mcp.json` — `get_compilation_issues`/`compile_route` for the build,
-  `get_logs` for server-side Route Handler errors specifically, since
-  `get_errors` only covers client/config errors), then drive the page with
-  whatever browser automation is available in your agent environment and
-  assert the intended behavior. `docs/frontend/testing.md` documents this
-  loop tool-neutrally on purpose — no browser-automation vendor is named as
-  required. `pnpm --filter web test:e2e` (mocked + server-mocked lanes,
-  infra-free) and `pnpm --filter web test:e2e:real-stack` (the full
-  `docker-compose.yml` stack — the only lane that proves auth/BFF/cookies/
-  Redis/App Router end to end) are the two Playwright entry points; see
-  that guide for which layer a given change belongs in.
+  (Next's MCP server at `/_next/mcp`, which can be bridged through
+  `next-devtools-mcp` in an agent/workspace MCP config when one is present —
+  `get_compilation_issues`/`compile_route` for the build, `get_logs` for
+  server-side Route Handler errors specifically, since `get_errors` only
+  covers client/config errors), then drive the page with whatever browser
+  automation is available in your agent environment and assert the intended
+  behavior. `docs/frontend/testing.md` documents this loop tool-neutrally on
+  purpose — no browser-automation vendor is named as required.
+  `pnpm --filter web test:e2e` (mocked + server-mocked lanes, infra-free) and
+  `pnpm --filter web test:e2e:real-stack` (the full `docker-compose.yml` stack
+  — the only lane that proves auth/BFF/cookies/Redis/App Router end to end)
+  are the two Playwright entry points; see that guide for which layer a given
+  change belongs in.
 - **Frontend server/client boundary — two separate decisions.** Server
   Components are the default; add `'use client'` only at the interactive leaf
   that owns events, effects, browser APIs, a Zustand store or a Query hook —
@@ -237,6 +238,9 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - `CONTRIBUTING.md` — contributor process (commands, commit format, PR checklist).
 - `docs/backend/architecture-and-conventions.md` — how to add a backend module
   (boundaries, shared contracts, process roles, required tests).
+- `docs/frontend/` — frontend architecture, i18n/error localization, theme,
+  FSD guardrails, shared UI, API consumption, and the testing pyramid; start
+  with [`docs/frontend/README.md`](docs/frontend/README.md).
 - `docs/email/` — email extension contract: `NotificationsService` vs
   `EmailService`, React Email templates, queueing, and secret-link rules.
 - `docs/auth/`, `docs/storage/`, `docs/media/` — feature guides.
@@ -247,9 +251,13 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 
 ## Testing
 
-API: Jest (unit) + Jest/Testcontainers (e2e). Web: Vitest (unit, mocked
-infra) + Vitest/Testcontainers (`pnpm --filter web test:integration`, real
-Redis — proves Lua scripts like the BFF session vault's CAS actually work,
-not just what a mocked `eval()` assumes; needs Docker, excluded from the
-default `pnpm test`). Email templates: Vitest. Focus on critical paths. See
-the relevant `docs/` and existing specs for patterns.
+API: Jest (unit) + Jest/Testcontainers (e2e). Web: Vitest for unit/component
+tests, `msw/node` for selected same-origin `/api/*` integration tests,
+Vitest/Testcontainers for real-Redis BFF session-vault tests
+(`pnpm --filter web test:integration`, needs Docker, excluded from the default
+`pnpm test`), Playwright for mocked/server-mocked browser flows
+(`pnpm --filter web test:e2e`), Playwright against the full Docker stack for
+auth/BFF/cookies/Redis/App Router flows (`pnpm --filter web test:e2e:real-stack`),
+and `@axe-core/playwright` for automated WCAG A/AA scans. Email templates:
+Vitest. Focus on critical paths; see [`docs/frontend/testing.md`](docs/frontend/testing.md)
+for the web taxonomy.

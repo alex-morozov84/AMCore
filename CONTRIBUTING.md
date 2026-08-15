@@ -45,6 +45,11 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 | `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked E2E lanes (auto-starts `next dev`)                                                                                         |
 | `pnpm --filter web test:e2e:real-stack` | Playwright real-stack E2E lane — boot `docker compose --profile local-infra up -d --build` first, see [`docs/frontend/testing.md`](docs/frontend/testing.md) |
 
+On a clean checkout, build the shared package before running Playwright
+directly: `pnpm --filter @amcore/shared build`. The CI `web-e2e` job does this
+explicitly; turbo does it automatically for `pnpm test`, `pnpm lint`, and
+`pnpm typecheck`.
+
 ## Commit Messages
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) and commitlint.

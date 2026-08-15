@@ -55,10 +55,10 @@ does not express.
   hooks consume the media, notifications, and AI backend surfaces through the
   BFF, and why the realtime hooks use native `EventSource` instead of the
   custom fetch-stream reader a direct (non-BFF) SSE consumer needs.
-- **[Frontend testing](frontend/testing.md)** — the four-layer taxonomy
-  (unit/component, MSW integration, mocked E2E, real-stack E2E), the
-  technical boundary the E2E split is drawn on, automated accessibility
-  scanning, and the tool-neutral runtime-verification workflow.
+- **[Frontend testing](frontend/testing.md)** — the test taxonomy
+  (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/
+  real-stack E2E, and axe scans), the technical boundary the E2E split is
+  drawn on, and the tool-neutral runtime-verification workflow.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
   sessions, OAuth, [RBAC](auth/rbac.md), [API keys](auth/api-keys.md), invites,
   CSRF, and the [auth contracts reference](auth/reference.md).

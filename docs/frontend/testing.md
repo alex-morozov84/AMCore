@@ -1,8 +1,10 @@
 # Frontend Testing
 
-`apps/web`'s test surface (Track 7, **ADR-069**). Four layers, each owned by
-one mechanism — this guide says which layer a new test belongs in and why,
-not just how to run the suite.
+`apps/web`'s test surface (Track 7, **ADR-069**). The pyramid has four
+families — Vitest unit/component, Vitest integration, Playwright E2E, and
+accessibility scanning — with infra integration called out separately because
+it has a Docker cost. This guide says which layer a new test belongs in and
+why, not just how to run the suite.
 
 ## The taxonomy
 
@@ -69,13 +71,27 @@ Use this layer when a hook/component's behavior depends on what actually
 gets sent or on how a non-2xx response is handled — not for every hook;
 `vi.mock` unit tests stay the default for pure branch logic.
 
-## E2E — two lanes, split at a real technical boundary
+## Infra integration — real Redis
+
+`pnpm --filter web test:integration` runs Vitest against Testcontainers-backed
+Redis. This layer is intentionally narrow: use it when the behavior depends on
+Redis semantics a fake cannot prove, such as the BFF session vault's Lua CAS
+scripts, locks, TTLs, or atomic multi-step updates. It is excluded from the
+default `pnpm test` and needs Docker.
+
+Do not move browser flows here. If the risk is “does a real user session,
+cookie, Server Component, and backend work together”, use the real-stack
+Playwright lane instead.
+
+## E2E — three projects, two runtime targets
 
 `page.route()` only intercepts **browser-originating** requests — it cannot
 fake a server-side `requireSession()`/Redis read a Server Component or
 Route Handler makes before the browser ever sees a response. That's the
-actual line the two lanes are split on, not an arbitrary cost/confidence
-tradeoff:
+actual line the E2E split is drawn on, not an arbitrary cost/confidence
+tradeoff. In code this is three Playwright projects (`mocked`,
+`server-mocked`, `real-stack`), grouped under two runtime targets:
+infra-free `next dev`, and the full Docker stack.
 
 ### Mocked lane (`apps/web/e2e/mocked/`, `.../server-mocked/`)
 
@@ -94,6 +110,7 @@ the OAuth entry-point's visibility (shown/hidden based on a mocked
 `apps/api` response).
 
 ```bash
+pnpm --filter @amcore/shared build    # needed on a clean checkout before direct Playwright runs
 pnpm --filter web test:e2e            # runs both "mocked" and "server-mocked" projects
 ```
 
@@ -106,6 +123,7 @@ never tries to start or reuse-detect against the unrelated `next dev`
 server the mocked lane uses.
 
 ```bash
+pnpm --filter @amcore/shared build
 docker compose --profile local-infra up -d --build
 pnpm --filter web test:e2e:real-stack
 docker compose down -v
@@ -180,8 +198,9 @@ calling a surface WCAG-reviewed.
 Two views, framework-neutral wording deliberately — this repo doesn't
 require one specific agent's browser-automation tool:
 
-1. **The framework's view** — Next's built-in MCP server at `/_next/mcp`
-   (bridged via `next-devtools-mcp` in `.mcp.json`). `get_compilation_issues`/
+1. **The framework's view** — Next's built-in MCP server at `/_next/mcp`,
+   which can be bridged through `next-devtools-mcp` in an agent/workspace MCP
+   config when that environment provides one. `get_compilation_issues`/
    `compile_route` report whether a route compiles; `get_errors` reports
    client-side and config errors once a browser session is connected —
    **it does not surface server-side Route Handler errors**; use `get_logs`
@@ -210,6 +229,11 @@ environment, not a portable requirement for every fork.
 | `pnpm --filter web test:integration`    | Testcontainers-backed real-Redis tests (needs Docker)                                        |
 | `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked lanes (auto-starts `next dev`)                             |
 | `pnpm --filter web test:e2e:real-stack` | Playwright real-stack lane — boot `docker compose --profile local-infra up -d --build` first |
+
+On a clean checkout, run `pnpm --filter @amcore/shared build` before either
+Playwright command. `apps/web` imports `@amcore/shared` through its built
+`dist/` export, and direct Playwright commands bypass turbo's `^build`
+dependency graph. The CI `web-e2e` job has this as an explicit step.
 
 ## Which layer should I add a test at?
 
