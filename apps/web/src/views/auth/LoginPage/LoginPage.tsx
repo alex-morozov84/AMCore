@@ -17,7 +17,9 @@ export function LoginPage({ oauthProviders, oauthError }: LoginPageProps) {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">{t('login')}</CardTitle>
+        <CardTitle as="h1" className="text-2xl">
+          {t('login')}
+        </CardTitle>
         <CardDescription>{t('loginSubtitle')}</CardDescription>
       </CardHeader>
       <CardContent>
@@ -26,7 +28,11 @@ export function LoginPage({ oauthProviders, oauthError }: LoginPageProps) {
         <LoginForm />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {t('noAccount')}{' '}
-          <Link href="/register" className="text-primary hover:underline">
+          {/* `underline`, not `hover:underline`: a link inside body text needs
+          a non-color way to be told apart from plain text at rest, not only
+          on hover/focus (axe `link-in-text-block`) — this text/link pair is
+          also below the 3:1 contrast ratio the color-only cue would need. */}
+          <Link href="/register" className="text-primary underline">
             {t('register')}
           </Link>
         </p>

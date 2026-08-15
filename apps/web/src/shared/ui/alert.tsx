@@ -9,8 +9,11 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: 'bg-card text-card-foreground',
-        destructive:
-          'text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90',
+        // Full-strength `text-destructive`, not `/90`: the 90%-opacity
+        // description text measured 4.3:1 against `bg-card` — below the
+        // 4.5:1 WCAG AA minimum for normal-size text (axe `color-contrast`,
+        // found scanning the real login error state).
+        destructive: 'text-destructive bg-card [&>svg]:text-current',
       },
     },
     defaultVariants: {

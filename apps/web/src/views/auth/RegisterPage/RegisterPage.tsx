@@ -15,7 +15,9 @@ export function RegisterPage({ oauthProviders }: RegisterPageProps) {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">{t('register')}</CardTitle>
+        <CardTitle as="h1" className="text-2xl">
+          {t('register')}
+        </CardTitle>
         <CardDescription>{t('registerSubtitle')}</CardDescription>
       </CardHeader>
       <CardContent>
@@ -23,7 +25,11 @@ export function RegisterPage({ oauthProviders }: RegisterPageProps) {
         <RegisterForm />
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {t('hasAccount')}{' '}
-          <Link href="/login" className="text-primary hover:underline">
+          {/* `underline`, not `hover:underline`: a link inside body text needs
+          a non-color way to be told apart from plain text at rest, not only
+          on hover/focus (axe `link-in-text-block`) — this text/link pair is
+          also below the 3:1 contrast ratio the color-only cue would need. */}
+          <Link href="/login" className="text-primary underline">
             {t('login')}
           </Link>
         </p>
