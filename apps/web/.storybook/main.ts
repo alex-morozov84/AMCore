@@ -16,6 +16,13 @@ const config: StorybookConfig = {
     getAbsolutePath('@storybook/addon-docs'),
     getAbsolutePath('@storybook/addon-a11y'),
     getAbsolutePath('@storybook/addon-vitest'),
+    getAbsolutePath('@storybook/addon-themes'),
+    // Not getAbsolutePath() here: msw-storybook-addon's package.json
+    // `exports` map has no `./package.json` entry, so
+    // `import.meta.resolve('msw-storybook-addon/package.json')` throws
+    // ERR_PACKAGE_PATH_NOT_EXPORTED (confirmed live). The bare specifier
+    // resolves fine — this is what the addon's own README shows too.
+    'msw-storybook-addon',
   ],
   framework: getAbsolutePath('@storybook/nextjs-vite'),
   staticDirs: ['../public'],

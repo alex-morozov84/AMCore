@@ -153,6 +153,7 @@ export default [
       'build/**',
       'node_modules/**',
       'public/sw.js',
+      'public/mockServiceWorker.js',
       'storybook-static/**',
     ],
   },
