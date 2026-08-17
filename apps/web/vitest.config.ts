@@ -69,20 +69,22 @@ export default defineConfig({
             // pnpm already resolves elsewhere in the workspace, purely so
             // Vite's optimizer can find it.
             'path-to-regexp',
-            // First-time discovery of each of these mid-run (as the shared/ui
-            // story tranches added components that pull them in — PR4, PR5)
-            // triggered "Vite unexpectedly reloaded a test" and cascading
-            // failures on a cold run — Vite's own logged suggestion was to
-            // list them here explicitly. All are direct `apps/web`
-            // dependencies, so no monorepo-resolution workaround needed,
-            // unlike `path-to-regexp` above. Add the next one here the same
-            // way if a future story tranche reproduces this again — don't
-            // assume the list above is exhaustive.
+            // First-time discovery of these mid-run (once real component
+            // stories existed, PR4) triggered "Vite unexpectedly reloaded a
+            // test" and cascading failures on a cold run — Vite's own
+            // logged suggestion was to list them here explicitly. All are
+            // direct `apps/web` dependencies, so no monorepo-resolution
+            // workaround needed, unlike `path-to-regexp` above.
+            //
+            // PR5 added four more Base UI subpaths (dialog, alert-dialog,
+            // menu, toast) on the same reasoning, but that was disproven in
+            // diff review: removing them and clearing both
+            // node_modules/.vite and node_modules/.cache/storybook still
+            // passed clean, twice, independently by two people. Add a new
+            // entry here only once a cold-run failure actually reproduces
+            // with it added — don't add one preemptively just because a
+            // tranche introduces a new dependency; check first.
             '@base-ui/react/button',
-            '@base-ui/react/dialog',
-            '@base-ui/react/alert-dialog',
-            '@base-ui/react/menu',
-            '@base-ui/react/toast',
             '@hookform/resolvers/zod',
             '@radix-ui/react-slot',
             'class-variance-authority',
