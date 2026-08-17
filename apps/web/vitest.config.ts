@@ -75,6 +75,15 @@ export default defineConfig({
             // logged suggestion was to list them here explicitly. All are
             // direct `apps/web` dependencies, so no monorepo-resolution
             // workaround needed, unlike `path-to-regexp` above.
+            //
+            // PR5 added four more Base UI subpaths (dialog, alert-dialog,
+            // menu, toast) on the same reasoning, but that was disproven in
+            // diff review: removing them and clearing both
+            // node_modules/.vite and node_modules/.cache/storybook still
+            // passed clean, twice, independently by two people. Add a new
+            // entry here only once a cold-run failure actually reproduces
+            // with it added — don't add one preemptively just because a
+            // tranche introduces a new dependency; check first.
             '@base-ui/react/button',
             '@hookform/resolvers/zod',
             '@radix-ui/react-slot',
