@@ -12,7 +12,11 @@ function getAbsolutePath(value: string): string {
 
 const config: StorybookConfig = {
   stories: ['../src/**/*.stories.@(ts|tsx)'],
-  addons: [getAbsolutePath('@storybook/addon-docs')],
+  addons: [
+    getAbsolutePath('@storybook/addon-docs'),
+    getAbsolutePath('@storybook/addon-a11y'),
+    getAbsolutePath('@storybook/addon-vitest'),
+  ],
   framework: getAbsolutePath('@storybook/nextjs-vite'),
   staticDirs: ['../public'],
   // A starter shouldn't phone home for downstream forks by default.

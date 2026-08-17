@@ -31,6 +31,13 @@ const preview: Preview = {
     nextjs: {
       appDirectory: true,
     },
+    // CI-gating default (runs via addon-vitest's `test:storybook`). A
+    // per-story `'todo'` override is for a real, tracked gap — not a way to
+    // silence a violation. Complements, not replaces, the full-page
+    // @axe-core/playwright scans in docs/frontend/testing.md.
+    a11y: {
+      test: 'error',
+    },
   },
   decorators: [
     (Story) => (
