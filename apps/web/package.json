@@ -51,6 +51,7 @@
     "@playwright/test": "^1.62.1",
     "@storybook/addon-a11y": "^10.5.8",
     "@storybook/addon-docs": "^10.5.8",
+    "@storybook/addon-themes": "^10.5.8",
     "@storybook/addon-vitest": "^10.5.8",
     "@storybook/nextjs-vite": "^10.5.8",
     "@tailwindcss/postcss": "^4.3.3",
@@ -78,6 +79,8 @@
     "eslint-plugin-storybook": "^10.5.8",
     "jsdom": "^30.0.1",
     "msw": "^2.15.0",
+    "msw-storybook-addon": "^3.0.0",
+    "path-to-regexp": "8.4.2",
     "shadcn": "^4.16.2",
     "storybook": "^10.5.8",
     "stylelint": "^17.14.1",
@@ -89,5 +92,10 @@
     "typescript-eslint": "^8.66.0",
     "vite": "8.2.1",
     "vitest": "^4.1.10"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }
