@@ -229,6 +229,9 @@ environment, not a portable requirement for every fork.
 | `pnpm --filter web test:run`            | Same, single run                                                                             |
 | `pnpm --filter web test:coverage`       | Same, with a coverage report (informational, no gate)                                        |
 | `pnpm --filter web test:integration`    | Testcontainers-backed real-Redis tests (needs Docker)                                        |
+| `pnpm --filter web storybook`           | Storybook component workshop dev server (`http://localhost:6006`)                            |
+| `pnpm --filter web build-storybook`     | Static Storybook build — compile/broken-story smoke                                          |
+| `pnpm --filter web test:storybook`      | Storybook interaction + accessibility gate (browser-mode Vitest/Playwright Chromium)         |
 | `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked lanes (auto-starts `next dev`)                             |
 | `pnpm --filter web test:e2e:real-stack` | Playwright real-stack lane — boot `docker compose --profile local-infra up -d --build` first |
 

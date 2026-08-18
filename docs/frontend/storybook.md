@@ -117,7 +117,8 @@ rendered.
 
 `parameters.a11y.test: 'error'` (`.storybook/preview.tsx`) is a **CI-gating
 default** — a violation fails `pnpm test:storybook` and the `storybook` CI
-job, the same way any other gate does. This is genuinely a fifth layer of
+job, the same way any other gate does. In AMCore upstream strict mode this is
+mandatory, not an optional local workshop. This is genuinely a fifth layer of
 [Testing](./testing.md)'s pyramid, not a side tool: add or extend a story
 here when a **`shared/ui` primitive or its isolated states** change: see
 that guide's "Which layer should I add a test at?" section. It complements,
@@ -163,15 +164,16 @@ codemod's output verbatim.
 
 Vitest's browser mode occasionally needs a package explicitly listed in
 `optimizeDeps.include` to pre-bundle it correctly — a real, cold-run-only
-failure this track hit twice (`path-to-regexp`, a transitive `msw`
-dependency with a monorepo-resolution wrinkle of its own; several Base UI
-subpaths and other direct dependencies, discovered the first time a new
-component's story pulled them in). **Do not add an entry here because a
-new story tranche merely introduces a new dependency** — adding a
-component or story on its own never requires touching this file. A version
-of this rule that looked plausible but wasn't checked live shipped once
-during this track's own PR5 and was caught in diff review: removing the
-unproven entries and clearing caches still passed clean, twice.
+failure this track proved in two places: `path-to-regexp` (a transitive
+`msw` dependency with a monorepo-resolution wrinkle of its own) and PR4's
+first real component-story tranche (`@base-ui/react/button`,
+`@hookform/resolvers/zod`, `@radix-ui/react-slot`,
+`class-variance-authority`, `lucide-react`, `react-hook-form`). **Do not add
+an entry here because a new story tranche merely introduces a new
+dependency** — adding a component or story on its own never requires touching
+this file. A version of this rule that looked plausible but wasn't checked
+live shipped once during this track's own PR5 and was caught in diff review:
+removing the unproven entries and clearing caches still passed clean, twice.
 
 The only valid reason to add an entry:
 

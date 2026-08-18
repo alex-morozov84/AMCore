@@ -247,7 +247,9 @@ component, assert on `data-slot`/`data-variant` attributes and behavior
 (click, open/close, variant switching), not implementation detail. Every
 primitive in the inventory above also has a Storybook story — see
 [Storybook](./storybook.md) for story conventions and the CLI-safety
-procedure that page's own section mirrors from this one.
+procedure that page's own section mirrors from this one. Adding or changing a
+`shared/ui` primitive means adding or updating its co-located `*.stories.tsx`
+file in the same PR; `test:storybook` is a CI gate in strict upstream mode.
 
 ## Sidebar: deliberately not here yet
 

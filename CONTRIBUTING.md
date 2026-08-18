@@ -42,13 +42,16 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `pnpm --filter web test`                | All unit/component/integration tests (mocked infra)                                                                                                          |
 | `pnpm --filter web test:integration`    | Testcontainers-backed tests — real Redis (requires Docker), excluded from `pnpm test`                                                                        |
+| `pnpm --filter web storybook`           | Storybook component workshop dev server (`http://localhost:6006`)                                                                                            |
+| `pnpm --filter web build-storybook`     | Static Storybook build — cheap compile/broken-story smoke                                                                                                    |
+| `pnpm --filter web test:storybook`      | Storybook interaction + accessibility gate (browser-mode Vitest/Playwright Chromium)                                                                         |
 | `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked E2E lanes (auto-starts `next dev`)                                                                                         |
 | `pnpm --filter web test:e2e:real-stack` | Playwright real-stack E2E lane — boot `docker compose --profile local-infra up -d --build` first, see [`docs/frontend/testing.md`](docs/frontend/testing.md) |
 
-On a clean checkout, build the shared package before running Playwright
-directly: `pnpm --filter @amcore/shared build`. The CI `web-e2e` job does this
-explicitly; turbo does it automatically for `pnpm test`, `pnpm lint`, and
-`pnpm typecheck`.
+On a clean checkout, build the shared package before running Playwright or
+Storybook's browser test runner directly: `pnpm --filter @amcore/shared build`.
+The CI `web-e2e` and `storybook` jobs do this explicitly; turbo does it
+automatically for `pnpm test`, `pnpm lint`, and `pnpm typecheck`.
 
 ## Commit Messages
 
