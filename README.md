@@ -92,7 +92,8 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | Add a backend module  | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md)                                                                                  |
 | Frontend architecture | [`docs/frontend/architecture-and-conventions.md`](docs/frontend/architecture-and-conventions.md)                                                                                |
 | Frontend guardrails   | [`docs/frontend/fsd-boundaries-and-guardrails.md`](docs/frontend/fsd-boundaries-and-guardrails.md)                                                                              |
-| Frontend testing      | [`docs/frontend/testing.md`](docs/frontend/testing.md) — Vitest/MSW, Playwright mocked/server-mocked/real-stack lanes, and automated a11y scans                                 |
+| Frontend testing      | [`docs/frontend/testing.md`](docs/frontend/testing.md) — Vitest/MSW, Storybook, Playwright mocked/server-mocked/real-stack lanes, and automated a11y scans                      |
+| Storybook             | [`docs/frontend/storybook.md`](docs/frontend/storybook.md) — component workshop, story conventions, a11y gate, and maintenance procedures                                       |
 | Add an env variable   | [`docs/backend/architecture-and-conventions.md#adding-an-environment-variable`](docs/backend/architecture-and-conventions.md#adding-an-environment-variable)                    |
 | Auth, OAuth, sessions | [`docs/auth/`](docs/auth/README.md)                                                                                                                                             |
 | RBAC / authorization  | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                                                                                        |
@@ -108,9 +109,10 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 
 Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
 Vitest for React Email template rendering and frontend unit/integration tests,
-Playwright for frontend browser flows, and `@axe-core/playwright` for automated
-accessibility scans. See [`docs/frontend/testing.md`](docs/frontend/testing.md)
-for the frontend test taxonomy and command choices.
+Storybook for isolated component-state/interaction/a11y checks, Playwright for
+frontend browser flows, and `@axe-core/playwright` for automated accessibility
+scans. See [`docs/frontend/testing.md`](docs/frontend/testing.md) for the
+frontend test taxonomy and command choices.
 
 ## Quick Start
 

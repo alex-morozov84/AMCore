@@ -32,6 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   end); and `@axe-core/playwright` accessibility scanning (WCAG A/AA
   through 2.2) on the pages/states those E2E lanes already visit. New CI
   job `web-e2e`. Public guide: `docs/frontend/testing.md`.
+- **`apps/web`:** Storybook component workshop (ADR-070) — `@storybook/nextjs-vite`
+  with theme (`.dark` toggle matching the real app), i18n
+  (`NextIntlClientProvider`), query, and MSW decorators (reusing the same
+  `msw` handlers as the Vitest integration layer); `@storybook/addon-a11y`
+  - `@storybook/addon-vitest` turn every story into a CI-gated
+    accessibility check, a fifth layer of the testing pyramid above. Stories
+    for all 15 `shared/ui` primitives and three feature-flow references
+    (login, register, session revoke — the last is the reference for this
+    starter's real toast/mutation/query-invalidation pattern). New CI job
+    `storybook`. Public guide: `docs/frontend/storybook.md`.
 
 ### Fixed
 

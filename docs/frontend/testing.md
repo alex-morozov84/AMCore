@@ -1,21 +1,23 @@
 # Frontend Testing
 
-`apps/web`'s test surface (Track 7, **ADR-069**). The pyramid has four
-families — Vitest unit/component, Vitest integration, Playwright E2E, and
-accessibility scanning — with infra integration called out separately because
-it has a Docker cost. This guide says which layer a new test belongs in and
-why, not just how to run the suite.
+`apps/web`'s test surface (Track 7, **ADR-069**; Storybook layer added in
+Track 8, **ADR-070**). The pyramid has five families — Vitest unit/component,
+Vitest integration, Playwright E2E, accessibility scanning, and Storybook —
+with infra integration called out separately because it has a Docker cost.
+This guide says which layer a new test belongs in and why, not just how to
+run the suite.
 
 ## The taxonomy
 
-| Layer                 | Tool                                                     | Boundary it proves                                                                                                                                | Where                                                                         |
-| --------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Unit / component      | Vitest + `jsdom`, `vi.mock`/`vi.stubGlobal('fetch')`     | Isolated logic, rendered components with mocked collaborators                                                                                     | `apps/web/src/**/*.test.{ts,tsx}`, co-located                                 |
-| Integration           | Vitest + `jsdom` + `msw/node`'s `setupServer()`          | The real same-origin `/api/*` request contract (URL, method, query params, error shape)                                                           | co-located, e.g. `*.msw-integration.test.tsx`                                 |
-| Infra integration     | Vitest + Testcontainers, real Redis                      | The BFF session vault's Lua CAS scripts and locking, unreachable by a mocked client                                                               | `apps/web/src/**/*.integration.test.ts`, `pnpm --filter web test:integration` |
-| E2E — mocked lane     | Playwright, `next dev`, no real backend                  | Browser-originating requests (`page.route()`) and server-side BFF boundaries (Next's `testProxy`/MSW fixture) — no real Postgres/Redis/`apps/api` | `apps/web/e2e/mocked/`, `apps/web/e2e/server-mocked/`                         |
-| E2E — real-stack lane | Playwright, `docker-compose.yml`'s `local-infra` profile | Auth/BFF/cookies/Redis/App Router end to end — the only lane that proves this                                                                     | `apps/web/e2e/real-stack/`                                                    |
-| Accessibility         | `@axe-core/playwright`, riding on the E2E layers above   | WCAG A/AA structural/semantic rules on a fully-rendered page                                                                                      | `apps/web/e2e/shared/axe.ts` helper, used from either E2E lane                |
+| Layer                 | Tool                                                                     | Boundary it proves                                                                                                                                       | Where                                                                           |
+| --------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Unit / component      | Vitest + `jsdom`, `vi.mock`/`vi.stubGlobal('fetch')`                     | Isolated logic, rendered components with mocked collaborators                                                                                            | `apps/web/src/**/*.test.{ts,tsx}`, co-located                                   |
+| Integration           | Vitest + `jsdom` + `msw/node`'s `setupServer()`                          | The real same-origin `/api/*` request contract (URL, method, query params, error shape)                                                                  | co-located, e.g. `*.msw-integration.test.tsx`                                   |
+| Infra integration     | Vitest + Testcontainers, real Redis                                      | The BFF session vault's Lua CAS scripts and locking, unreachable by a mocked client                                                                      | `apps/web/src/**/*.integration.test.ts`, `pnpm --filter web test:integration`   |
+| E2E — mocked lane     | Playwright, `next dev`, no real backend                                  | Browser-originating requests (`page.route()`) and server-side BFF boundaries (Next's `testProxy`/MSW fixture) — no real Postgres/Redis/`apps/api`        | `apps/web/e2e/mocked/`, `apps/web/e2e/server-mocked/`                           |
+| E2E — real-stack lane | Playwright, `docker-compose.yml`'s `local-infra` profile                 | Auth/BFF/cookies/Redis/App Router end to end — the only lane that proves this                                                                            | `apps/web/e2e/real-stack/`                                                      |
+| Accessibility         | `@axe-core/playwright`, riding on the E2E layers above                   | WCAG A/AA structural/semantic rules on a fully-rendered page                                                                                             | `apps/web/e2e/shared/axe.ts` helper, used from either E2E lane                  |
+| Storybook             | `@storybook/addon-vitest` + `@storybook/addon-a11y`, browser-mode Vitest | Isolated `shared/ui`/feature-flow component states — variant/loading/error/empty/disabled — plus the same axe ruleset at component-isolation granularity | `apps/web/src/**/*.stories.tsx`, co-located; `pnpm --filter web test:storybook` |
 
 No global coverage percentage gate. Confidence comes from the critical-path
 flow lists below being real and current, not a line-coverage number —
@@ -227,6 +229,9 @@ environment, not a portable requirement for every fork.
 | `pnpm --filter web test:run`            | Same, single run                                                                             |
 | `pnpm --filter web test:coverage`       | Same, with a coverage report (informational, no gate)                                        |
 | `pnpm --filter web test:integration`    | Testcontainers-backed real-Redis tests (needs Docker)                                        |
+| `pnpm --filter web storybook`           | Storybook component workshop dev server (`http://localhost:6006`)                            |
+| `pnpm --filter web build-storybook`     | Static Storybook build — compile/broken-story smoke                                          |
+| `pnpm --filter web test:storybook`      | Storybook interaction + accessibility gate (browser-mode Vitest/Playwright Chromium)         |
 | `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked lanes (auto-starts `next dev`)                             |
 | `pnpm --filter web test:e2e:real-stack` | Playwright real-stack lane — boot `docker compose --profile local-infra up -d --build` first |
 
@@ -250,6 +255,12 @@ dependency graph. The CI `web-e2e` job has this as an explicit step.
   prove it.
 - Adding or touching a page/component with visible copy or a popup →
   add or extend an axe scan on the E2E layer that already visits it.
+- Adding or changing a `shared/ui` primitive's variant/state, or a
+  feature-flow's reference composition → add or extend a **Storybook
+  story** ([Storybook](./storybook.md)). Full pages, auth/BFF/session
+  flows, and anything crossing `requireSession()` stay owned by the E2E
+  lanes above — Storybook's own React Server Component support is
+  experimental and deliberately not enabled here.
 
 ## See also
 
@@ -258,8 +269,12 @@ dependency graph. The CI `web-e2e` job has this as an explicit step.
   exercise.
 - [API consumption](./api-consumption.md) — the hooks the integration
   layer's contract tests target.
+- [Storybook](./storybook.md) — the fifth pyramid layer added in Track 8:
+  component-isolation states and its own accessibility gate.
 - **ADR-069** (`ai/decisions/adr-069-frontend-testing-pyramid.md`) — the
   full decision record: every mechanism choice, the two pre-implementation
   spikes, and why each was made.
+- **ADR-070** (`ai/decisions/adr-070-storybook-component-workshop.md`) —
+  the Storybook layer's own decision record.
 - `ai/TESTING.md` — the maintainer-facing mirror of this guide, alongside
   the backend/email testing conventions.
