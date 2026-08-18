@@ -433,3 +433,51 @@ jobs:
       - name: Tear down real-stack stack
         if: always()
         run: docker compose down -v
+
+  storybook:
+    name: Storybook
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Stories import @amcore/shared directly (AuthErrorCode, DEFAULT_LOCALE);
+      # apps/web resolves it through its built dist, same reasoning as
+      # web-e2e's own "Build @amcore/shared" step.
+      - name: Build @amcore/shared
+        run: pnpm --filter @amcore/shared build
+
+      # No Docker/real-stack needed here — every story's API surface is
+      # mocked via msw-storybook-addon, not a real apps/api. Much lighter
+      # than web-e2e for that reason.
+      - name: Install Playwright Chromium
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      # Cheap compile/broken-story smoke first — catches a decorator or
+      # import error fast, before paying for the full browser test run.
+      - name: Build Storybook
+        working-directory: apps/web
+        run: pnpm build-storybook
+
+      # The actual gate: every story as a Vitest test (smoke render + any
+      # play function), with addon-a11y's checks running inside the same
+      # run via parameters.a11y.test: 'error' (.storybook/preview.tsx).
+      - name: Run Storybook a11y/interaction tests
+        working-directory: apps/web
+        run: pnpm test:storybook

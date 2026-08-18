@@ -244,8 +244,10 @@ change using the procedure above.
 Vitest + React Testing Library, matching the existing pattern in
 `button.test.tsx`/`skeleton.test.tsx`/`dialog.test.tsx`: render the
 component, assert on `data-slot`/`data-variant` attributes and behavior
-(click, open/close, variant switching), not implementation detail. No
-Storybook yet — that's a separate, dedicated track.
+(click, open/close, variant switching), not implementation detail. Every
+primitive in the inventory above also has a Storybook story — see
+[Storybook](./storybook.md) for story conventions and the CLI-safety
+procedure that page's own section mirrors from this one.
 
 ## Sidebar: deliberately not here yet
 

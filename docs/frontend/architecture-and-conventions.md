@@ -318,9 +318,10 @@ architectural structure.
   `async` Server Components and `requireSession()`-gated pages need the
   real-stack E2E lane rather than a Vitest unit test (Vitest cannot test
   `async` Server Components at all — Next's own bundled docs say so).
+- [Storybook](./storybook.md) — the component workshop and its own
+  accessibility gate, a fifth layer of the testing pyramid above.
 - [Backend architecture & conventions](../backend/architecture-and-conventions.md) —
   the equivalent contract for `apps/api`.
 - `AGENTS.md` → Code conventions — the condensed cross-tool version of the
   rules on this page.
-- Later frontend/admin starter tracks add their own guide here as they land:
-  Storybook.
+- Later frontend/admin starter tracks add their own guide here as they land.

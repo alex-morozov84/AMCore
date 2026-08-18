@@ -16,16 +16,17 @@ guessing.
 | [Shared UI and shadcn](./shared-ui-and-shadcn.md)               | Reusing `shared/ui`, safely adding shadcn primitives, and adapting generated output to AMCore's lint/i18n/token contract                   |
 | [API consumption](./api-consumption.md)                         | The hooks that consume media/notifications/AI through the BFF, and the `EventSource`-based realtime pattern shared by notifications and AI |
 | [Testing](./testing.md)                                         | The frontend test taxonomy, Playwright mocked/server-mocked/real-stack lanes, accessibility scanning, and the tool-neutral dev loop        |
+| [Storybook](./storybook.md)                                     | The component workshop: what's wired (a11y/theme/MSW/i18n decorators), story conventions, the CLI-safety and `optimizeDeps.include` rules  |
 
-More guides land here as later frontend/admin starter tracks complete
-(Storybook) — see `architecture-and-conventions.md`'s "See also" section
-for the current set.
+More guides land here as later frontend/admin starter tracks complete — see
+`architecture-and-conventions.md`'s "See also" section for the current set.
 
 ## Start here
 
 - Extending or adding a route/page → [Architecture & conventions](./architecture-and-conventions.md#the-recipe--adding-a-route)
 - Adding copy, a locale, or an error message → [i18n and error localization](./i18n-and-errors.md)
 - Reusing or adding a shared UI primitive → [Shared UI and shadcn](./shared-ui-and-shadcn.md)
+- Writing or reviewing a `shared/ui`/feature-flow story → [Storybook](./storybook.md)
 - Wondering whether an import or a colour is allowed → [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md)
 - Deciding between `'use client'`, `client-only` and `server-only` →
   [Boundaries & guardrails § Server/client boundaries](./fsd-boundaries-and-guardrails.md#serverclient-boundaries)
