@@ -13,7 +13,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 // The "no rows" state a table like
-// views/settings/SessionsPage/SessionsTable.tsx would show once loading
+// _pages/settings/SessionsPage/SessionsTable.tsx would show once loading
 // resolves with zero results.
 export const NoActiveSessions: Story = {
   render: () => (

@@ -1,2 +1,2 @@
-// Settings views public API
+// Settings pages public API
 export { SessionsPage } from './SessionsPage'

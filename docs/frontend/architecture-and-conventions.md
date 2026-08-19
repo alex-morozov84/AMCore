@@ -30,16 +30,16 @@ conventions, see [`docs/backend/architecture-and-conventions.md`](../backend/arc
 `apps/web` follows Feature-Sliced Design (FSD) on top of Next's App Router.
 The two systems own different things, and the layer names say which:
 
-| Path                   | Owns                                                                                                         | Notes                                                                                                                                                                 |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app/`             | Next App Router files only: `page`, `layout`, `loading`, `error`, metadata, route handlers when truly needed | Thin — see [Route thinness](#route-thinness). Routes live under a `[locale]` segment — see [Locale routing](#locale-routing)                                          |
-| `src/i18n/`            | Locale routing config, locale-aware navigation helpers, request config, param validation                     | Import navigation from here, never from `next/link` / `next/navigation` — see [Locale routing](#locale-routing)                                                       |
-| `src/_pages/`          | FSD Pages layer: page composition                                                                            | **Target name.** The current tree still uses `src/views/` for this layer — legacy starter drift, not yet migrated. Treat `views/` as `_pages/` until the rename lands |
-| `src/_app/` (optional) | FSD App layer: app-level providers/config that live outside Next's own route files                           | Use only if app-level wiring doesn't fit naturally in `src/app/layout.tsx` / `providers.tsx`                                                                          |
-| `src/widgets/`         | Composed UI blocks made of multiple features/entities                                                        | Canonical FSD meaning, unchanged                                                                                                                                      |
-| `src/features/`        | Single user-interaction-driven slices (e.g. `auth/login`)                                                    | Canonical FSD meaning, unchanged                                                                                                                                      |
-| `src/entities/`        | Business-domain data + its UI (e.g. `user`)                                                                  | Canonical FSD meaning, unchanged                                                                                                                                      |
-| `src/shared/`          | Generic reusable code with no business meaning: UI primitives, API client, hooks, lib, store                 | Canonical FSD meaning, unchanged                                                                                                                                      |
+| Path                   | Owns                                                                                                         | Notes                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/`             | Next App Router files only: `page`, `layout`, `loading`, `error`, metadata, route handlers when truly needed | Thin — see [Route thinness](#route-thinness). Routes live under a `[locale]` segment — see [Locale routing](#locale-routing) |
+| `src/i18n/`            | Locale routing config, locale-aware navigation helpers, request config, param validation                     | Import navigation from here, never from `next/link` / `next/navigation` — see [Locale routing](#locale-routing)              |
+| `src/_pages/`          | FSD Pages layer: page composition                                                                            | Canonical FSD meaning, unchanged                                                                                             |
+| `src/_app/` (optional) | FSD App layer: app-level providers/config that live outside Next's own route files                           | Use only if app-level wiring doesn't fit naturally in `src/app/layout.tsx` / `providers.tsx`                                 |
+| `src/widgets/`         | Composed UI blocks made of multiple features/entities                                                        | Canonical FSD meaning, unchanged                                                                                             |
+| `src/features/`        | Single user-interaction-driven slices (e.g. `auth/login`)                                                    | Canonical FSD meaning, unchanged                                                                                             |
+| `src/entities/`        | Business-domain data + its UI (e.g. `user`)                                                                  | Canonical FSD meaning, unchanged                                                                                             |
+| `src/shared/`          | Generic reusable code with no business meaning: UI primitives, API client, hooks, lib, store                 | Canonical FSD meaning, unchanged                                                                                             |
 
 The underscore prefix on `_pages`/`_app` exists so the FSD layer names don't
 read as Next reserved directories — Next's own routing only ever looks inside
@@ -77,16 +77,12 @@ are not import targets.
 Files under `src/app/` handle **plumbing only**: metadata, route params,
 `redirect`, `notFound`, and provider/layout wiring. They must not contain
 business UI, direct feature/entity data hooks, substantial JSX, or
-client-only state. Composition belongs in `_pages/` (today: `views/`):
+client-only state. Composition belongs in `_pages/`:
 
 ```
-src/app/[locale]/(dashboard)/page.tsx  → imports and renders a _pages/ (views/) component
-src/_pages/dashboard/DashboardPage.tsx → owns the actual composition
+src/app/[locale]/(dashboard)/page.tsx               → imports and renders a _pages/ component
+src/_pages/dashboard/DashboardPage/DashboardPage.tsx → owns the actual composition
 ```
-
-`src/app/[locale]/(dashboard)/page.tsx` does not yet follow this rule — it's a known
-gap left for Track 9 (starter cleanup), not fixed by the architecture
-contract itself.
 
 ## Locale routing
 
@@ -280,9 +276,9 @@ been quietly 404ing through the stale rewrite.
    etc.) — metadata and plumbing only. Server Component pages should call
    `setRequestLocale(await resolveLocaleParam(params))` first; see
    [Locale routing](#locale-routing).
-2. Build the actual page composition under `src/_pages/<route>/` (today:
-   `src/views/<route>/`), importing whatever `widgets`/`features`/`entities`
-   it needs through their public APIs.
+2. Build the actual page composition under `src/_pages/<route>/`, importing
+   whatever `widgets`/`features`/`entities` it needs through their public
+   APIs.
 3. If the route needs new server state, add a query (and query keys) in the
    owning `entities/` slice, following `entities/user/api/user-queries.ts`.
 4. If the route needs new local UI state, add it to `shared/store` or a

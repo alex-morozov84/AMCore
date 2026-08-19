@@ -68,6 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`apps/web`:** the FSD Pages layer directory is renamed `src/views/` →
+  `src/_pages/`, matching the target name `docs/frontend/architecture-and-conventions.md`
+  already documented. A fork importing `@/views/...` directly needs to switch
+  to `@/_pages/...`. Alongside the rename, `(dashboard)/page.tsx` now follows
+  the route-thinness rule: the route file only reads the session and renders
+  a `_pages/dashboard/DashboardPage` composition, rather than inlining JSX
+  itself (Track 9, starter cleanup).
 - **`apps/web`:** `shared/ui`'s `Button` and `Label` primitives are now built
   on Base UI (`@base-ui/react`) instead of Radix, per the shared-UI/shadcn
   baseline track. **`Button`'s `asChild` prop is removed** — Base UI has no

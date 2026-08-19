@@ -26,7 +26,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 // Mirrors the real reference consumer:
-// views/settings/SessionsPage/SessionsTable.tsx.
+// _pages/settings/SessionsPage/SessionsTable.tsx.
 export const Default: Story = {
   render: () => (
     <Table>

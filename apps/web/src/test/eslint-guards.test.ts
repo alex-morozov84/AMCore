@@ -176,7 +176,7 @@ describe('FSD boundaries', () => {
     ['features may import shared', 'src/features/auth/login/probe.ts', "'@/shared/lib'", false],
     [
       'a slice may not be entered past its public API',
-      'src/views/auth/probe.ts',
+      'src/_pages/auth/probe.ts',
       "'@/features/auth/login/ui/LoginForm'",
       true,
     ],
@@ -186,8 +186,8 @@ describe('FSD boundaries', () => {
       "'@/features/locale-switcher'",
       true,
     ],
-    ['a shared segment barrel is fine', 'src/views/auth/probe.ts', "'@/shared/lib'", false],
-    ['a shared module import is fine', 'src/views/auth/probe.ts', "'@/shared/ui/button'", false],
+    ['a shared segment barrel is fine', 'src/_pages/auth/probe.ts', "'@/shared/lib'", false],
+    ['a shared module import is fine', 'src/_pages/auth/probe.ts', "'@/shared/ui/button'", false],
   ])('%s', async (_name, filePath, source, shouldReport) => {
     const ids = await ruleIds(`import * as x from ${source}\nexport const y = x\n`, filePath)
     if (shouldReport) {
@@ -203,7 +203,7 @@ describe('FSD boundaries', () => {
   it('bans layer-level barrels via the import pattern, not the plugin', async () => {
     const messages = await lint(
       `import * as x from '@/features'\nexport const y = x\n`,
-      'src/views/auth/probe.ts'
+      'src/_pages/auth/probe.ts'
     )
 
     expect(messages.map((m) => m.ruleId)).toContain('no-restricted-imports')
@@ -236,8 +236,8 @@ describe('FSD boundaries', () => {
       // The whole tree on purpose. The plugin only warns once it actually
       // resolves a dependency, so a file with no imports reports nothing --
       // an earlier version of this test linted `manifest.ts` and passed with a
-      // deprecated rule reintroduced. Linting `src` also survives the pending
-      // `views` -> `_pages` rename, which a narrower path would not.
+      // deprecated rule reintroduced. Linting `src` also survived the `views`
+      // -> `_pages` rename (Track 9), which a narrower path would not have.
       [path.join(WEB_ROOT, 'node_modules/eslint/bin/eslint.js'), 'src'],
       { cwd: WEB_ROOT, encoding: 'utf8' }
     )

@@ -34,8 +34,8 @@ const ELEMENTS = [
   { type: 'neutral', pattern: 'src/i18n' },
   { type: 'neutral', pattern: 'src/test' },
   { type: 'neutral', pattern: 'messages' },
-  { type: 'pages', pattern: `src/views/*/!(${SEGMENTS})`, capture: ['group', 'slice'] },
-  { type: 'pages', pattern: 'src/views/*', capture: ['slice'] },
+  { type: 'pages', pattern: `src/_pages/*/!(${SEGMENTS})`, capture: ['group', 'slice'] },
+  { type: 'pages', pattern: 'src/_pages/*', capture: ['slice'] },
   { type: 'widgets', pattern: 'src/widgets/*', capture: ['slice'] },
   { type: 'features', pattern: `src/features/*/!(${SEGMENTS})`, capture: ['group', 'slice'] },
   { type: 'features', pattern: 'src/features/*', capture: ['slice'] },
@@ -64,7 +64,7 @@ const sameGroup = (type) => ({
 // `boundaries` cannot see layer-level barrels: `src/features/index.ts` sits
 // inside no element, so there is nothing for it to police. Banned here instead.
 const LAYER_BARREL = {
-  regex: '^@/(features|entities|widgets|views|shared)$',
+  regex: '^@/(features|entities|widgets|_pages|shared)$',
   message:
     'No layer-level barrels — import the slice public API (@/features/auth/login) ' +
     'or the shared module (@/shared/ui/button). See docs/frontend/.',

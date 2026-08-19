@@ -137,8 +137,7 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - **Redis caching** for frequently-read entities (cache-aside + tag invalidation +
   distributed lock); pattern in `apps/api/src/core/auth/user-cache.service.ts`.
 - **Frontend (web):** Feature-Sliced Design on Next.js App Router — `app/` is
-  Next routing plumbing only (thin), page composition lives in `_pages/`
-  (current tree: `views/`, pending migration to the target layer name),
+  Next routing plumbing only (thin), page composition lives in `_pages/`,
   `widgets`/`features`/`entities`/`shared` keep canonical FSD meanings.
   Import a slice through its public API only (`@/features/auth/login`, not
   `@/features/auth/login/ui/LoginForm`); `shared/ui` and `shared/lib` are

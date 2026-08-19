@@ -63,7 +63,7 @@ repo's Vitest builder and only the Vite framework gets first-class
   experimental, and route-level `async` Server Component compositions
   (`requireSession()`-gated pages) stay owned by the real-stack Playwright
   lane per [Testing](./testing.md) — nothing else can prove that boundary.
-  Don't story a `views/*Page` composition here; story its client-side
+  Don't story a `_pages/*Page` composition here; story its client-side
   `features/*`/`shared/ui` pieces instead.
 - `core.disableTelemetry: true` — a starter shouldn't phone home for
   downstream forks by default.
@@ -92,7 +92,7 @@ Story files are **co-located** next to source (`button.stories.tsx` beside
 Not storied, and not an oversight: `entities/*` UI (thin/hook-heavy right
 now), `widgets/*` (layer is empty), any dashboard/settings page-level
 composition, Sidebar (deferred to the starter-cleanup track), and any
-`views/*Page` route composition (Server-Component-owned, see above).
+`_pages/*Page` route composition (Server-Component-owned, see above).
 
 Write stories in **CSF3**, not CSF Factories (`defineConfig`-style) — CSF
 Factories are Preview status in the installed Storybook major and not
