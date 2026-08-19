@@ -75,6 +75,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the route-thinness rule: the route file only reads the session and renders
   a `_pages/dashboard/DashboardPage` composition, rather than inlining JSX
   itself (Track 9, starter cleanup).
+- **`apps/web`:** the grouped `features/auth/*` and `features/sessions/*`
+  slices are flattened to ungrouped slices — `features/auth/login` →
+  `features/auth-login`, `.../logout` → `features/auth-logout`, `.../oauth` →
+  `features/auth-oauth`, `.../register` → `features/auth-register`,
+  `features/sessions/revoke-session` → `features/sessions-revoke`,
+  `features/sessions/revoke-other-sessions` → `features/sessions-revoke-other`
+  — matching `features/locale-switcher`'s existing flat shape. The
+  `features/auth` group barrel is removed; a fork importing
+  `@/features/auth/...` or `@/features/auth` needs to switch to the specific
+  flattened slice path (Track 9, starter cleanup).
 - **`apps/web`:** `shared/ui`'s `Button` and `Label` primitives are now built
   on Base UI (`@base-ui/react`) instead of Radix, per the shared-UI/shadcn
   baseline track. **`Button`'s `asChild` prop is removed** — Base UI has no

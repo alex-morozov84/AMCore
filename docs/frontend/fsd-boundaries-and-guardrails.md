@@ -37,7 +37,7 @@ import { useCurrentUser } from '@/entities/user'
 import { cn } from '@/shared/lib/utils'
 
 // Inside shared: shared may not reach features — it has no business meaning
-import { LoginForm } from '@/features/auth' // ✗ boundaries/dependencies
+import { LoginForm } from '@/features/auth-login' // ✗ boundaries/dependencies
 ```
 
 ### Slice public API
@@ -45,20 +45,23 @@ import { LoginForm } from '@/features/auth' // ✗ boundaries/dependencies
 A slice is entered at its `index.ts` and nowhere else:
 
 ```ts
-import { LoginForm } from '@/features/auth/login' // ✓
-import { LoginForm } from '@/features/auth/login/ui/LoginForm' // ✗
+import { LoginForm } from '@/features/auth-login' // ✓
+import { LoginForm } from '@/features/auth-login/ui/LoginForm' // ✗
 ```
 
-A slice may not reach a sibling slice in another group. A group's own barrel
-(`features/auth/index.ts`) may re-export the slices inside it — that is what the
-group is for:
+A slice may not reach a sibling slice, even within the same layer:
 
 ```ts
-import { LoginForm } from '@/features/auth' // ✓ group barrel
-
-// inside features/auth/login
+// inside features/auth-login
 import { LocaleSwitcher } from '@/features/locale-switcher' // ✗ cross-slice
 ```
+
+Grouped layers are the one exception: a group's own barrel may re-export the
+slices inside it — `_pages/auth/index.ts` re-exports `LoginPage`/`RegisterPage`,
+which the login/register routes import as `@/_pages/auth`. `features` has no
+grouped slices today (Track 9 flattened `auth`/`sessions`, the only two that
+existed) — the mechanism (`sameGroup` in the `boundaries` policy) stays in
+place for `pages` and for whichever `features` group appears next.
 
 ### `shared` is a collection of modules
 

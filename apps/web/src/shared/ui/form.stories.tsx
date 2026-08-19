@@ -12,7 +12,7 @@ import { Input } from './input'
 // Minimal local schema — this story demonstrates the Form/FormField/
 // FormItem/FormLabel/FormControl/FormMessage compound API itself, not a
 // specific feature's validation rules. The real usage pattern this mirrors:
-// features/auth/login/ui/LoginForm.tsx composes the same primitives with
+// features/auth-login/ui/LoginForm.tsx composes the same primitives with
 // `@amcore/shared`'s `loginSchema` and `useLocalizedForm()`.
 const demoSchema = z.object({
   email: z.string().trim().pipe(z.email()),

@@ -1,7 +1,7 @@
 import { useTranslations } from 'next-intl'
 
-import { LoginForm } from '@/features/auth'
-import { OAuthErrorAlert, OAuthSection } from '@/features/auth/oauth'
+import { LoginForm } from '@/features/auth-login'
+import { OAuthErrorAlert, OAuthSection } from '@/features/auth-oauth'
 import { Link } from '@/i18n/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 

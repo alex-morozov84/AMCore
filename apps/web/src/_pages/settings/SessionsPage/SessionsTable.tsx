@@ -7,7 +7,7 @@ import { createColumnHelper, type SortingState, useTable } from '@tanstack/react
 import { MoreHorizontal } from 'lucide-react'
 
 import { useSessions } from '@/entities/user'
-import { RevokeSessionMenuItem } from '@/features/sessions/revoke-session'
+import { RevokeSessionMenuItem } from '@/features/sessions-revoke'
 import { Button } from '@/shared/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'

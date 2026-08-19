@@ -139,8 +139,8 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - **Frontend (web):** Feature-Sliced Design on Next.js App Router — `app/` is
   Next routing plumbing only (thin), page composition lives in `_pages/`,
   `widgets`/`features`/`entities`/`shared` keep canonical FSD meanings.
-  Import a slice through its public API only (`@/features/auth/login`, not
-  `@/features/auth/login/ui/LoginForm`); `shared/ui` and `shared/lib` are
+  Import a slice through its public API only (`@/features/auth-login`, not
+  `@/features/auth-login/ui/LoginForm`); `shared/ui` and `shared/lib` are
   collections of modules, so import those directly (`@/shared/ui/button`,
   `@/shared/lib/utils`) — there is no `@/shared/ui` barrel, and no layer-level
   barrel anywhere. A slice may not import a sibling slice in another group.

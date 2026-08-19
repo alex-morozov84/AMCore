@@ -51,10 +51,10 @@ Import a slice through its `index.ts`, never a file inside it:
 
 ```ts
 // Correct
-import { LoginForm } from '@/features/auth/login'
+import { LoginForm } from '@/features/auth-login'
 
 // Wrong — reaches past the slice's public API
-import { LoginForm } from '@/features/auth/login/ui/LoginForm'
+import { LoginForm } from '@/features/auth-login/ui/LoginForm'
 ```
 
 Each slice folder's `index.ts` is the contract for what other layers may use.

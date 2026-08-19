@@ -16,10 +16,13 @@ import boundaries from 'eslint-plugin-boundaries';
 // ---------------------------------------------------------------------------
 
 // Segment names never occupy the slice position. This exclusion is required
-// because `features/auth/login` (group/slice) and `features/locale-switcher/ui`
-// (slice/segment) are the same path shape with different meanings — without it
-// `ui` and `model` get classified as slices. The grouping under `features/auth`
-// is the root cause and is up for review when the pages layer is renamed.
+// because a grouped page such as `_pages/auth/LoginPage` (group/slice) and a
+// flat slice's own segment folder (slice/segment) would be the same path
+// shape with different meanings — without it `ui`/`model` could get
+// classified as a slice. `features` no longer needs this: Track 9 flattened
+// `features/auth/*` and `features/sessions/*`, the only two feature groups,
+// so every feature is now a flat, single-level slice matching
+// `widgets`/`entities`'s shape below.
 const SEGMENTS = 'ui|model|api|lib|config|hooks|store|pwa|providers|stores';
 
 // Sliced layers are entered through their index only. `shared` is deliberately
@@ -37,7 +40,6 @@ const ELEMENTS = [
   { type: 'pages', pattern: `src/_pages/*/!(${SEGMENTS})`, capture: ['group', 'slice'] },
   { type: 'pages', pattern: 'src/_pages/*', capture: ['slice'] },
   { type: 'widgets', pattern: 'src/widgets/*', capture: ['slice'] },
-  { type: 'features', pattern: `src/features/*/!(${SEGMENTS})`, capture: ['group', 'slice'] },
   { type: 'features', pattern: 'src/features/*', capture: ['slice'] },
   { type: 'entities', pattern: 'src/entities/*', capture: ['slice'] },
   { type: 'shared', pattern: 'src/shared/*', capture: ['segment'] },
