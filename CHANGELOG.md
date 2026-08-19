@@ -116,7 +116,7 @@ This release changes default behavior and import paths that a fork built on
 - **Layer-level barrel imports no longer exist.** `@/features`, `@/shared`,
   and other layer-level import targets were removed. Import the concrete
   module (`@/shared/ui/button`) or the slice's public API
-  (`@/features/auth/login`) instead.
+  (`@/features/auth-login`) instead.
 - **The DOM `style` prop is now rejected by lint.** Colors must come from
   design tokens; a genuinely dynamic inline style needs an explicit
   `eslint-disable` with a reason.
@@ -138,7 +138,7 @@ This release changes default behavior and import paths that a fork built on
   that is where the tokens are declared.
   Two consequences for anyone updating a fork: `@/shared/ui` and the other
   layer-level barrels no longer exist as import targets — import the module
-  (`@/shared/ui/button`) or the slice (`@/features/auth/login`) — and inline
+  (`@/shared/ui/button`) or the slice (`@/features/auth-login`) — and inline
   `style` on DOM elements is rejected outright, so a genuinely dynamic value
   needs an `eslint-disable` with a reason. New guide:
   `docs/frontend/fsd-boundaries-and-guardrails.md`, which also documents when to

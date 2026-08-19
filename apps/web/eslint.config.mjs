@@ -68,7 +68,7 @@ const sameGroup = (type) => ({
 const LAYER_BARREL = {
   regex: '^@/(features|entities|widgets|_pages|shared)$',
   message:
-    'No layer-level barrels — import the slice public API (@/features/auth/login) ' +
+    'No layer-level barrels — import the slice public API (@/features/auth-login) ' +
     'or the shared module (@/shared/ui/button). See docs/frontend/.',
 };
 
