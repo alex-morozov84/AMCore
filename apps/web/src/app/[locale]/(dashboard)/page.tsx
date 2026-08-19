@@ -1,5 +1,4 @@
-import { getTranslations } from 'next-intl/server'
-
+import { DashboardPage } from '@/_pages/dashboard'
 import { requireSession } from '@/shared/api/bff/dal'
 
 // `requireSession()` always reads `cookies()` — without this, `next build`
@@ -14,22 +13,9 @@ export const dynamic = 'force-dynamic'
  * See `dal.ts`'s doc: layouts don't re-render on client-side navigation
  * between sibling routes underneath them, so a check that only lived there
  * would stop being a real gate the moment a second protected page exists.
- *
- * `getTranslations` (async), not the `useTranslations` hook: this component
- * is itself `async`, and `react-hooks/rules-of-hooks` flags a hook call
- * inside one regardless of the Server Component exception next-intl relies
- * on.
  */
-export default async function DashboardPage() {
-  const t = await getTranslations('dashboard')
+export default async function Dashboard() {
   const { user } = await requireSession()
 
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">
-        {user.name ? t('welcomeNamed', { name: user.name }) : t('welcome')}
-      </h1>
-      <p className="text-muted-foreground">{t('starterNotice')}</p>
-    </div>
-  )
+  return <DashboardPage userName={user.name} />
 }

@@ -23,7 +23,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 // Mirrors the real reference consumer: the sessions table's row-actions
-// menu (views/settings/SessionsPage/SessionsTable.tsx) — an icon-only
+// menu (_pages/settings/SessionsPage/SessionsTable.tsx) — an icon-only
 // trigger with an `sr-only` accessible name.
 export const Default: Story = {
   render: () => (

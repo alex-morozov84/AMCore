@@ -28,7 +28,7 @@ Three tools, chosen by what each can actually see:
 A layer may import layers below it, never above:
 
 ```
-app  →  _pages (views)  →  widgets  →  features  →  entities  →  shared
+app  →  _pages  →  widgets  →  features  →  entities  →  shared
 ```
 
 ```ts

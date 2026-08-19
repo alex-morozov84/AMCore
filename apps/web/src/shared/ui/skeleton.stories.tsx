@@ -17,7 +17,7 @@ export const Default: Story = {
 }
 
 // A composed loading-state example — the "loading" placeholder for a row
-// like the one views/settings/SessionsPage/SessionsTable.tsx renders once
+// like the one _pages/settings/SessionsPage/SessionsTable.tsx renders once
 // data resolves.
 export const TableRowLoading: Story = {
   render: () => (

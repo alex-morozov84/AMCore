@@ -10,7 +10,7 @@ import { Toaster } from '@/shared/ui/toast'
 import { RevokeSessionMenuItem } from './RevokeSessionMenuItem'
 
 // Mirrors the real reference consumer's composition exactly:
-// views/settings/SessionsPage/SessionsTable.tsx's row-actions menu.
+// _pages/settings/SessionsPage/SessionsTable.tsx's row-actions menu.
 // `Toaster` isn't global in .storybook/preview.tsx — mounted per-story,
 // same as shared/ui/toast.stories.tsx.
 function RevokeSessionMenuItemDemo({ sessionId }: { sessionId: string }) {
