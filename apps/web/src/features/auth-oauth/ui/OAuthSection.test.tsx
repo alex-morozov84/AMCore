@@ -2,7 +2,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import en from '../../../../../messages/en.json'
+import en from '../../../../messages/en.json'
 
 import { OAuthSection } from './OAuthSection'
 

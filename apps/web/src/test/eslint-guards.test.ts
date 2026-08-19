@@ -164,25 +164,28 @@ describe('FSD boundaries', () => {
   // The cross-slice case is the one that matters most: allowing
   // `features -> features` so a group barrel can reach its own slices also
   // permits any slice to reach any other, and that version of the config passed
-  // every other case here while not guarding.
+  // every other case here while not guarding. No feature slice is grouped
+  // today (Track 9 flattened `auth`/`sessions`, the only two), but the
+  // `sameGroup` mechanism stays in the policy for `pages` and a future
+  // feature group, so this case stays asserted rather than deleted.
   it.each([
-    ['shared may not import features', 'src/shared/lib/probe.ts', "'@/features/auth'", true],
+    ['shared may not import features', 'src/shared/lib/probe.ts', "'@/features/auth-login'", true],
     [
       'features may import entities',
-      'src/features/auth/login/probe.ts',
+      'src/features/auth-login/probe.ts',
       "'@/entities/user'",
       false,
     ],
-    ['features may import shared', 'src/features/auth/login/probe.ts', "'@/shared/lib'", false],
+    ['features may import shared', 'src/features/auth-login/probe.ts', "'@/shared/lib'", false],
     [
       'a slice may not be entered past its public API',
       'src/_pages/auth/probe.ts',
-      "'@/features/auth/login/ui/LoginForm'",
+      "'@/features/auth-login/ui/LoginForm'",
       true,
     ],
     [
-      'a slice may not import a sibling slice in another group',
-      'src/features/auth/login/probe.ts',
+      'a slice may not import a sibling feature slice',
+      'src/features/auth-login/probe.ts',
       "'@/features/locale-switcher'",
       true,
     ],

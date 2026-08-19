@@ -75,6 +75,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the route-thinness rule: the route file only reads the session and renders
   a `_pages/dashboard/DashboardPage` composition, rather than inlining JSX
   itself (Track 9, starter cleanup).
+- **`apps/web`:** the grouped `features/auth/*` and `features/sessions/*`
+  slices are flattened to ungrouped slices — `features/auth/login` →
+  `features/auth-login`, `.../logout` → `features/auth-logout`, `.../oauth` →
+  `features/auth-oauth`, `.../register` → `features/auth-register`,
+  `features/sessions/revoke-session` → `features/sessions-revoke`,
+  `features/sessions/revoke-other-sessions` → `features/sessions-revoke-other`
+  — matching `features/locale-switcher`'s existing flat shape. The
+  `features/auth` group barrel is removed; a fork importing
+  `@/features/auth/...` or `@/features/auth` needs to switch to the specific
+  flattened slice path (Track 9, starter cleanup).
 - **`apps/web`:** `shared/ui`'s `Button` and `Label` primitives are now built
   on Base UI (`@base-ui/react`) instead of Radix, per the shared-UI/shadcn
   baseline track. **`Button`'s `asChild` prop is removed** — Base UI has no
@@ -106,7 +116,7 @@ This release changes default behavior and import paths that a fork built on
 - **Layer-level barrel imports no longer exist.** `@/features`, `@/shared`,
   and other layer-level import targets were removed. Import the concrete
   module (`@/shared/ui/button`) or the slice's public API
-  (`@/features/auth/login`) instead.
+  (`@/features/auth-login`) instead.
 - **The DOM `style` prop is now rejected by lint.** Colors must come from
   design tokens; a genuinely dynamic inline style needs an explicit
   `eslint-disable` with a reason.
@@ -128,7 +138,7 @@ This release changes default behavior and import paths that a fork built on
   that is where the tokens are declared.
   Two consequences for anyone updating a fork: `@/shared/ui` and the other
   layer-level barrels no longer exist as import targets — import the module
-  (`@/shared/ui/button`) or the slice (`@/features/auth/login`) — and inline
+  (`@/shared/ui/button`) or the slice (`@/features/auth-login`) — and inline
   `style` on DOM elements is rejected outright, so a genuinely dynamic value
   needs an `eslint-disable` with a reason. New guide:
   `docs/frontend/fsd-boundaries-and-guardrails.md`, which also documents when to

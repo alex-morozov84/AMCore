@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { getTranslations } from 'next-intl/server'
 
-import { LogoutButton } from '@/features/auth/logout'
+import { LogoutButton } from '@/features/auth-logout'
 import { LocaleSwitcher } from '@/features/locale-switcher'
 import { Link } from '@/i18n/navigation'
 import { getOptionalSession } from '@/shared/api/bff/dal'

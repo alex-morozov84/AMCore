@@ -3,8 +3,8 @@ import { AuthErrorCode } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import en from '../../../../../messages/en.json'
-import ru from '../../../../../messages/ru.json'
+import en from '../../../../messages/en.json'
+import ru from '../../../../messages/ru.json'
 
 import { OAuthErrorAlert } from './OAuthErrorAlert'
 

@@ -6,7 +6,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 import { RegisterForm } from './RegisterForm'
 
 const meta = {
-  title: 'features/auth/register/RegisterForm',
+  title: 'features/auth-register/RegisterForm',
   component: RegisterForm,
 } satisfies Meta<typeof RegisterForm>
 

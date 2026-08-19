@@ -38,7 +38,7 @@ export const Invalid: Story = {
 }
 
 // No placeholder (matches the real usage in
-// features/auth/login/ui/LoginForm.tsx, which relies on FormLabel) —
+// features/auth-login/ui/LoginForm.tsx, which relies on FormLabel) —
 // needs its own accessible name via aria-label instead, same as any bare
 // Input used outside a Form/FormLabel pairing.
 export const Password: Story = {

@@ -83,9 +83,9 @@ Story files are **co-located** next to source (`button.stories.tsx` beside
 `stories/` tree. Current coverage:
 
 - All 15 `shared/ui` primitives.
-- Three feature-flow references: `features/auth/login/ui/LoginForm`,
-  `features/auth/register/ui/RegisterForm`,
-  `features/sessions/revoke-session/ui/RevokeSessionMenuItem` — the last one
+- Three feature-flow references: `features/auth-login/ui/LoginForm`,
+  `features/auth-register/ui/RegisterForm`,
+  `features/sessions-revoke/ui/RevokeSessionMenuItem` — the last one
   is the reference for the real toast/mutation/query-invalidation pattern
   (Track 6) this starter wants downstream mutation flows to copy.
 

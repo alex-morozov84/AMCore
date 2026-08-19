@@ -1,6 +1,6 @@
 import { useTranslations } from 'next-intl'
 
-import { RevokeOtherSessionsButton } from '@/features/sessions/revoke-other-sessions'
+import { RevokeOtherSessionsButton } from '@/features/sessions-revoke-other'
 
 import { SessionsTable } from './SessionsTable'
 

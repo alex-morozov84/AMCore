@@ -24,7 +24,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 // Mirrors the real reference consumer:
-// features/sessions/revoke-other-sessions/ui/RevokeOtherSessionsButton.tsx.
+// features/sessions-revoke-other/ui/RevokeOtherSessionsButton.tsx.
 // `AlertDialogAction` is a plain Button — it does not close the dialog on
 // its own, unlike `AlertDialogCancel` (Base UI's own self-closing `Close`).
 export const Default: Story = {

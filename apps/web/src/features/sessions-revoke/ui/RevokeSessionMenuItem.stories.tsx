@@ -31,7 +31,7 @@ function RevokeSessionMenuItemDemo({ sessionId }: { sessionId: string }) {
 }
 
 const meta = {
-  title: 'features/sessions/revoke-session/RevokeSessionMenuItem',
+  title: 'features/sessions-revoke/RevokeSessionMenuItem',
   component: RevokeSessionMenuItemDemo,
   args: {
     sessionId: 'session-123',
@@ -51,7 +51,7 @@ async function openMenuAndRevoke(canvasElement: HTMLElement) {
 }
 
 // Real BFF mutation — DELETE /api/auth/sessions/:id — then the real toast +
-// query-invalidation pattern (features/sessions/revoke-session/model/use-revoke-session.ts),
+// query-invalidation pattern (features/sessions-revoke/model/use-revoke-session.ts),
 // the reference this starter wants downstream mutation/toast flows to copy.
 export const Success: Story = {
   beforeEach({ msw }) {
