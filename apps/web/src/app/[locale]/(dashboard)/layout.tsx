@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
+import { cookies } from 'next/headers'
 
 import { getOptionalSession } from '@/shared/api/bff/dal'
+import { SIDEBAR_COOKIE_NAME } from '@/shared/ui/sidebar-cookie'
 import { AppShell } from '@/widgets/app-shell'
 
 interface DashboardLayoutProps {
@@ -29,5 +31,19 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     console.error('[dashboard layout] session read failed, degrading shell only', error)
   }
 
-  return <AppShell email={email}>{children}</AppShell>
+  // `SidebarProvider` writes this cookie client-side on every toggle
+  // (shared/ui/sidebar.tsx). Reading it here and passing it back in as
+  // `defaultOpen` is what makes the collapsed/expanded choice survive a
+  // reload — without this read, every render would silently discard it and
+  // fall back to `SidebarProvider`'s own `defaultOpen={true}`. `undefined`
+  // (no cookie yet, e.g. first visit) intentionally falls through to that
+  // same default rather than being coerced to `false`.
+  const sidebarCookie = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value
+  const defaultSidebarOpen = sidebarCookie === undefined ? undefined : sidebarCookie === 'true'
+
+  return (
+    <AppShell email={email} defaultSidebarOpen={defaultSidebarOpen}>
+      {children}
+    </AppShell>
+  )
 }

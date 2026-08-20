@@ -100,7 +100,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed — shadcn's `SidebarProvider`/`useSidebar()` now owns that state
   directly, and `UIStoreProvider` is removed from the app/Storybook since
   nothing else used the store. A fork importing `useUIStore`/`UIStoreProvider`
-  from `@/shared/store` needs its own replacement (Track 9, starter cleanup).
+  from `@/shared/store` needs its own replacement. The collapsed/expanded
+  choice persists across reloads: `(dashboard)/layout.tsx` reads the
+  `sidebar_state` cookie server-side (`await cookies()`) and passes it back
+  as `defaultOpen`, and the mobile Sheet closes itself on navigate — both
+  covered by `e2e/real-stack/app-shell.spec.ts` (Track 9, starter cleanup).
 - **`apps/web`:** `shared/ui`'s `Button` and `Label` primitives are now built
   on Base UI (`@base-ui/react`) instead of Radix, per the shared-UI/shadcn
   baseline track. **`Button`'s `asChild` prop is removed** — Base UI has no

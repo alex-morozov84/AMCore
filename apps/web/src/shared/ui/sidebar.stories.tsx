@@ -23,6 +23,12 @@ import {
 // real auth/locale/logout features. `mobileTitle`/`mobileDescription`/
 // `toggleLabel` are required props (no baked-in English) — see
 // docs/frontend/shared-ui-and-shadcn.md → "Hardcoded copy still slips in".
+//
+// Two things the real composition adds that this demo deliberately doesn't:
+// real `Link` navigation, and the `setOpenMobile(false)` call that closes
+// the mobile Sheet on navigate (the primitive does not do it for you). Both
+// need a router, so they're proven in `e2e/real-stack/app-shell.spec.ts`
+// instead.
 function SidebarDemo() {
   return (
     <SidebarProvider>

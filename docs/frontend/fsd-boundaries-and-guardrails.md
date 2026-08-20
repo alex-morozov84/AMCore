@@ -123,9 +123,30 @@ which is why they are worth more than a comment.
 
 **Do not apply either blanket-style.** A module that works in both places is
 universal and should stay universal; marking it narrows where it can be used for
-no benefit. `apps/web` currently has no module in either category, which is why
-neither package is installed yet — add the dependency when the first module
-needs it, not before.
+no benefit. `shared/hooks/use-mobile.ts` is the current `client-only` example
+(it reads `window.matchMedia`/`window.innerWidth`); nothing needs `server-only`
+yet.
+
+### A shared constant does not survive a `'use client'` boundary
+
+A value a Server Component needs must not be exported from a `'use client'`
+module. Next replaces **every** export of a client module with a client
+_reference_ when a Server Component imports it — so the server sees a proxy
+object, not your string, and there is no type error to warn you:
+
+```ts
+// shared/ui/sidebar.tsx — 'use client'
+export const SIDEBAR_COOKIE_NAME = 'sidebar_state' // ✗ do not read this from a layout
+
+// app/[locale]/(dashboard)/layout.tsx — Server Component
+const value = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value // always undefined
+```
+
+Put the constant in its own plain module (`shared/ui/sidebar-cookie.ts`) and
+import it from both sides. This shipped as a real defect in Track 9: the
+cookie was written correctly, arrived on the request, and the server still
+rendered the sidebar expanded — caught only by a real-stack E2E assertion on
+the state surviving a reload, not by typecheck, lint, or a component test.
 
 ## Styling: the palette is a source, tokens are the public API
 
