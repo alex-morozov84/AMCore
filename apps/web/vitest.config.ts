@@ -90,6 +90,17 @@ export default defineConfig({
             'class-variance-authority',
             'lucide-react',
             'react-hook-form',
+            // Track 9's `sidebar.tsx`/`sheet.tsx`/`tooltip.tsx`/`separator.tsx`
+            // (dashboard app shell) reproduced the identical cold-run
+            // failure Vite named these four exact specifiers for — same
+            // "add only once it actually reproduces" discipline as above.
+            // `@base-ui/react/dialog` (also a `sheet.tsx` dependency) was
+            // NOT named in that failure and was not added, matching the
+            // PR5 precedent that not every new Base UI subpath needs this.
+            '@base-ui/react/merge-props',
+            '@base-ui/react/separator',
+            '@base-ui/react/tooltip',
+            '@base-ui/react/use-render',
           ],
         },
         test: {

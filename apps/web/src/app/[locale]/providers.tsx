@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 
 import { QueryProvider } from '@/shared/api'
 import { PWAProvider } from '@/shared/pwa'
-import { ThemeProvider, UIStoreProvider } from '@/shared/store'
+import { ThemeProvider } from '@/shared/store'
 import { Toaster } from '@/shared/ui/toast'
 
 interface ProvidersProps {
@@ -18,9 +18,7 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <ThemeProvider>
       <QueryProvider>
-        <UIStoreProvider>
-          <PWAProvider>{children}</PWAProvider>
-        </UIStoreProvider>
+        <PWAProvider>{children}</PWAProvider>
         <Toaster closeLabel={t('close')} />
       </QueryProvider>
     </ThemeProvider>

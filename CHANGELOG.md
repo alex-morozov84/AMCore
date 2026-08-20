@@ -85,6 +85,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `features/auth` group barrel is removed; a fork importing
   `@/features/auth/...` or `@/features/auth` needs to switch to the specific
   flattened slice path (Track 9, starter cleanup).
+- **`apps/web`:** `(dashboard)/layout.tsx` is now a real Sidebar app shell
+  instead of a fixed header bar — `shadcn add sidebar` (Base UI) via the
+  documented scratch-worktree procedure, hand-ported into `shared/ui/sidebar.tsx`
+  (plus its `sheet.tsx`/`tooltip.tsx`/`separator.tsx` dependencies), with a
+  new `widgets/app-shell` composition (nav, account footer, locale switcher,
+  sign-out). The generated primitives shipped with hardcoded English text
+  (`Sidebar`'s mobile sr-only heading, `SidebarTrigger`/`SidebarRail`'s
+  toggle label, `Sheet`'s close button) — fixed the same way as the existing
+  `DialogContent`/`Toaster` `closeLabel` pattern: `Sidebar` requires
+  `mobileTitle`/`mobileDescription`, `SidebarTrigger`/`SidebarRail` require
+  `toggleLabel`, `SheetContent` requires `closeLabel`. The Zustand
+  `sidebarOpen`/`toggleSidebar` UI-store state it used to stand in for is
+  removed — shadcn's `SidebarProvider`/`useSidebar()` now owns that state
+  directly, and `UIStoreProvider` is removed from the app/Storybook since
+  nothing else used the store. A fork importing `useUIStore`/`UIStoreProvider`
+  from `@/shared/store` needs its own replacement (Track 9, starter cleanup).
 - **`apps/web`:** `shared/ui`'s `Button` and `Label` primitives are now built
   on Base UI (`@base-ui/react`) instead of Radix, per the shared-UI/shadcn
   baseline track. **`Button`'s `asChild` prop is removed** — Base UI has no

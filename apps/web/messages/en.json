@@ -75,6 +75,12 @@
     "continueWithGoogle": "Continue with Google",
     "orContinueWith": "or"
   },
+  "nav": {
+    "dashboard": "Dashboard",
+    "toggleSidebar": "Toggle sidebar",
+    "mobileTitle": "Navigation",
+    "mobileDescription": "Site navigation menu"
+  },
   "dashboard": {
     "welcome": "Welcome!",
     "welcomeNamed": "Welcome, {name}!",

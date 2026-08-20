@@ -52,11 +52,13 @@ repo's Vitest builder and only the Vite framework gets first-class
 
 - A fresh `QueryClient` **per story render** (not the app's shared
   `getQueryClient()` singleton) so one story's cache never bleeds into the
-  next in the same browser session; `UIStoreProvider` wrapped globally
-  (trivial today, one unconsumed field); a manual `NextIntlClientProvider`
+  next in the same browser session; a manual `NextIntlClientProvider`
   (see [i18n & errors](./i18n-and-errors.md)) rather than a community
   locale-switcher addon — no such addon's maintenance status has been
-  independently verified, and the manual decorator is a few lines.
+  independently verified, and the manual decorator is a few lines. There is
+  no global Zustand provider — `UIStoreProvider` was removed in Track 9 once
+  shadcn's `Sidebar` took over the one piece of state it held; add a
+  provider back here if a future Zustand store needs one.
 - `parameters.nextjs.appDirectory: true` globally — every real component
   here lives under `app/[locale]`. `experimentalRSC` is **not** enabled —
   React Server Component support in `@storybook/nextjs-vite` is explicitly
@@ -82,7 +84,8 @@ Story files are **co-located** next to source (`button.stories.tsx` beside
 `button.tsx`), matching the existing `*.test.tsx` convention — no separate
 `stories/` tree. Current coverage:
 
-- All 15 `shared/ui` primitives.
+- All 19 `shared/ui` primitives, including `sidebar.tsx`/`sheet.tsx`/
+  `tooltip.tsx`/`separator.tsx` (added Track 9 for the dashboard app shell).
 - Three feature-flow references: `features/auth-login/ui/LoginForm`,
   `features/auth-register/ui/RegisterForm`,
   `features/sessions-revoke/ui/RevokeSessionMenuItem` — the last one
@@ -90,8 +93,10 @@ Story files are **co-located** next to source (`button.stories.tsx` beside
   (Track 6) this starter wants downstream mutation flows to copy.
 
 Not storied, and not an oversight: `entities/*` UI (thin/hook-heavy right
-now), `widgets/*` (layer is empty), any dashboard/settings page-level
-composition, Sidebar (deferred to the starter-cleanup track), and any
+now), any dashboard/settings page-level composition, `widgets/app-shell`
+itself (a real-auth/locale/logout composition — `sidebar.stories.tsx`
+demonstrates the underlying primitive with stand-in nav items instead, same
+split as `_pages/*Page` below), and any
 `_pages/*Page` route composition (Server-Component-owned, see above).
 
 Write stories in **CSF3**, not CSF Factories (`defineConfig`-style) — CSF
