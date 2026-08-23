@@ -131,11 +131,17 @@ than guessing:
 - **`client-only`** — `shared/hooks/use-mobile.ts` (`window.matchMedia` /
   `window.innerWidth`), `shared/api/sse/use-event-source.ts` and the two
   entity SSE hooks built on it (`EventSource`).
-- **`server-only`** — every module under `shared/api/bff/**`: the DAL
+- **`server-only`** — the BFF **runtime** modules under `shared/api/bff/**`
+  that actually touch a secret, Redis, or an upstream credential: the DAL
   (`dal.ts`), the Redis session vault (`redis-client.ts`,
   `session-vault-store.ts`), the authenticated proxy, and the OAuth/token
-  upstream calls. These hold the real backend tokens, so a stray client
-  import must fail the build, not leak at runtime.
+  upstream calls. Not every file in that directory qualifies — its tests,
+  and a handful of pure types/constants/error classes with no runtime
+  dependency of their own (`session-vault.types.ts`, `vault-constants.ts`,
+  `proxy-headers.ts`, `errors.ts`, `lock-renewal.ts`,
+  `api-error-response.ts`), stay unmarked on purpose: they are genuinely
+  universal, and marking them would be exactly the blanket-style habit
+  this section says not to fall into.
 
 ### A shared constant does not survive a `'use client'` boundary
 
