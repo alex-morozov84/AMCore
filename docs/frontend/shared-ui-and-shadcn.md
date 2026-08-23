@@ -28,19 +28,22 @@ for why.
 
 ## Current inventory
 
-| Component                            | Source                                      | Notes                                                                                                                                                                                                                                                                                                  |
-| ------------------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `button.tsx`                         | shadcn (Base UI), customized                | Extra sizes (`xs`/`icon-xs`/`icon-sm`/`icon-lg`), `cursor-pointer`, `data-variant`/`data-size` attributes, solid-fill destructive variant (see [Base UI, not Radix](#base-ui-not-radix)). No `asChild` — dropped, no equivalent in Base UI.                                                            |
-| `label.tsx`                          | shadcn (Base UI), stock                     | Plain native `<label>` — Base UI has no dedicated Label primitive.                                                                                                                                                                                                                                     |
-| `form.tsx`                           | shadcn (Radix era), customized              | `Form`/`FormField`/`FormItem`/`FormLabel`/`FormControl`/`FormDescription`/`FormMessage`, plus an inline error icon. **Not migrated to Base UI** — still imports `@radix-ui/react-label`/`@radix-ui/react-slot`; see [Radix packages still installed](#radix-packages-still-installed).                 |
-| `alert.tsx`, `card.tsx`, `input.tsx` | shadcn (Radix era), stock                   | Not yet touched by the Base UI migration; safe to regenerate under Base UI when next customized.                                                                                                                                                                                                       |
-| `dialog.tsx`, `alert-dialog.tsx`     | shadcn (Base UI), stock + one required prop | `DialogContent` requires a caller-provided `closeLabel` — see [Hardcoded copy still slips in](#hardcoded-copy-still-slips-in).                                                                                                                                                                         |
-| `skeleton.tsx`, `empty.tsx`          | shadcn (Base UI), stock                     | `empty.tsx`'s `EmptyDescription` prop type corrected from the registry's `<p>` to the `<div>` it actually renders — an upstream mismatch, not an AMCore change.                                                                                                                                        |
-| `table.tsx`                          | shadcn (Base UI), stock                     | Plain semantic wrappers; no customization needed. Reference consumer: the active-sessions list, built on `@tanstack/react-table` **v9** (`useTable`/`tableFeatures()` — verified against the installed version and shadcn's current data-table guide; v8's `useReactTable` is a different, older API). |
-| `dropdown-menu.tsx`                  | shadcn (Base UI), stock                     | Row-actions menu for the sessions table. `DropdownMenuTrigger` composes via Base UI's `render` prop, not Radix's `asChild`.                                                                                                                                                                            |
-| `toast.tsx`                          | shadcn (Base UI), customized                | `Toaster`/`ToastClose` require a caller-provided `closeLabel` — the generated version hardcoded `aria-label="Close toast"` on every toast's close button; same fix pattern as `DialogContent`'s `closeLabel`, see [Hardcoded copy still slips in](#hardcoded-copy-still-slips-in).                     |
-| `spinner.tsx`                        | AMCore-authored                             | Not a shadcn generate. shadcn _does_ now ship an official `Spinner` under the same filename — see [Protected files](#protected-files-check-before-every-run).                                                                                                                                          |
-| `api-error-alert.tsx`                | AMCore-authored                             | Not a shadcn generate; built on `alert.tsx`, wired to `useApiError()`. See [Protected files](#protected-files-check-before-every-run).                                                                                                                                                                 |
+| Component                            | Source                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `button.tsx`                         | shadcn (Base UI), customized                | Extra sizes (`xs`/`icon-xs`/`icon-sm`/`icon-lg`), `cursor-pointer`, `data-variant`/`data-size` attributes, solid-fill destructive variant (see [Base UI, not Radix](#base-ui-not-radix)). No `asChild` — dropped, no equivalent in Base UI.                                                                                                                                                                                               |
+| `label.tsx`                          | shadcn (Base UI), stock                     | Plain native `<label>` — Base UI has no dedicated Label primitive.                                                                                                                                                                                                                                                                                                                                                                        |
+| `form.tsx`                           | shadcn (Radix era), customized              | `Form`/`FormField`/`FormItem`/`FormLabel`/`FormControl`/`FormDescription`/`FormMessage`, plus an inline error icon. **Not migrated to Base UI** — still imports `@radix-ui/react-label`/`@radix-ui/react-slot`; see [Radix packages still installed](#radix-packages-still-installed).                                                                                                                                                    |
+| `alert.tsx`, `card.tsx`, `input.tsx` | shadcn (Radix era), stock                   | Not yet touched by the Base UI migration; safe to regenerate under Base UI when next customized.                                                                                                                                                                                                                                                                                                                                          |
+| `dialog.tsx`, `alert-dialog.tsx`     | shadcn (Base UI), stock + one required prop | `DialogContent` requires a caller-provided `closeLabel` — see [Hardcoded copy still slips in](#hardcoded-copy-still-slips-in).                                                                                                                                                                                                                                                                                                            |
+| `skeleton.tsx`, `empty.tsx`          | shadcn (Base UI), stock                     | `empty.tsx`'s `EmptyDescription` prop type corrected from the registry's `<p>` to the `<div>` it actually renders — an upstream mismatch, not an AMCore change.                                                                                                                                                                                                                                                                           |
+| `table.tsx`                          | shadcn (Base UI), stock                     | Plain semantic wrappers; no customization needed. Reference consumer: the active-sessions list, built on `@tanstack/react-table` **v9** (`useTable`/`tableFeatures()` — verified against the installed version and shadcn's current data-table guide; v8's `useReactTable` is a different, older API).                                                                                                                                    |
+| `dropdown-menu.tsx`                  | shadcn (Base UI), stock                     | Row-actions menu for the sessions table. `DropdownMenuTrigger` composes via Base UI's `render` prop, not Radix's `asChild`.                                                                                                                                                                                                                                                                                                               |
+| `toast.tsx`                          | shadcn (Base UI), customized                | `Toaster`/`ToastClose` require a caller-provided `closeLabel` — the generated version hardcoded `aria-label="Close toast"` on every toast's close button; same fix pattern as `DialogContent`'s `closeLabel`, see [Hardcoded copy still slips in](#hardcoded-copy-still-slips-in).                                                                                                                                                        |
+| `spinner.tsx`                        | AMCore-authored                             | Not a shadcn generate. shadcn _does_ now ship an official `Spinner` under the same filename — see [Protected files](#protected-files-check-before-every-run).                                                                                                                                                                                                                                                                             |
+| `api-error-alert.tsx`                | AMCore-authored                             | Not a shadcn generate; built on `alert.tsx`, wired to `useApiError()`. See [Protected files](#protected-files-check-before-every-run).                                                                                                                                                                                                                                                                                                    |
+| `sidebar.tsx`                        | shadcn (Base UI), customized                | Added Track 9 for the dashboard app shell. `Sidebar` requires caller-provided `mobileTitle`/`mobileDescription`; `SidebarTrigger`/`SidebarRail` require a caller-provided `toggleLabel` — the generated version hardcoded all four as English text, same fix pattern as `DialogContent`'s `closeLabel`. Composition (`widgets/app-shell`) lives outside `shared/ui`, per [Architecture & conventions](./architecture-and-conventions.md). |
+| `sheet.tsx`                          | shadcn (Base UI), customized                | Pulled in as `sidebar.tsx`'s mobile-breakpoint dependency. `SheetContent` requires a caller-provided `closeLabel`, mirroring `dialog.tsx`.                                                                                                                                                                                                                                                                                                |
+| `tooltip.tsx`, `separator.tsx`       | shadcn (Base UI), stock                     | Pulled in as `sidebar.tsx` dependencies (`SidebarMenuButton`'s collapsed-state tooltip, `SidebarSeparator`). No customization needed.                                                                                                                                                                                                                                                                                                     |
 
 ## Base UI, not Radix
 
@@ -251,22 +254,64 @@ procedure that page's own section mirrors from this one. Adding or changing a
 `shared/ui` primitive means adding or updating its co-located `*.stories.tsx`
 file in the same PR; `test:storybook` is a CI gate in strict upstream mode.
 
-## Sidebar: deliberately not here yet
+## Sidebar
 
-**Sidebar** — the low-level primitive is deferred entirely to the starter
-cleanup track, which owns the `(dashboard)/layout.tsx` route-thinness fix
-it would compose into. Building an unused app-shell API ahead of that work
-risks guessing a shape the real nav/locale/auth requirements would
-contradict.
-
-**Toast** was deferred the same way, for the same reason (no mutation flow
-existed anywhere in `apps/web`), and has since been added: the sessions
-list's revoke action (Track 6) is that first real trigger. Re-verified
-live at add-time that shadcn's current docs describe **Toast**, not the
-older Sonner naming/API (`/docs/components/sonner` now redirects to
+**Toast** was deferred until a real mutation flow existed and has since been
+added: the sessions list's revoke action (Track 6) was that first trigger.
+Re-verified live at add-time that shadcn's current docs describe **Toast**,
+not the older Sonner naming/API (`/docs/components/sonner` now redirects to
 `/docs/components/toast`; the API is `toast.add(...)`, not `toast(...)`) —
 worth re-checking again before any future shadcn primitive add, since this
 had already changed once mid-project (Track 5's carry-in note).
+
+**Sidebar** was deferred the same way — no concrete consumer existed until
+Track 9's `(dashboard)/layout.tsx` route-thinness fix needed one — and has
+now been added via `shadcn add sidebar` through the scratch-worktree
+procedure above. Confirmed findings from that spike, kept here for the next
+time this file is touched:
+
+- **`sidebar` pulls in `button.tsx`, `input.tsx`, and `skeleton.tsx` as
+  overwrite targets.** The `button.tsx` diff would have reverted PR1's
+  (#294) `--destructive-foreground` token, `cursor-pointer`, and
+  `data-variant`/`data-size` — declined outright, exactly the CLI-safety
+  risk this page's procedure exists to catch. `input.tsx`'s diff was an
+  unrelated Base UI migration (still on the Radix-era generation per the
+  inventory above) — declined as out of scope for this change, not because
+  it's wrong; migrate it opportunistically like `form.tsx`/`alert.tsx`/
+  `card.tsx` when it's next customized. `skeleton.tsx`'s diff was a trivial
+  unused-import removal with no behavioral change — also declined, since
+  the existing file already works and touching it wasn't this change's job.
+- **Hardcoded English copy, again.** `SidebarTrigger`'s sr-only "Toggle
+  Sidebar", `SidebarRail`'s `aria-label`/`title="Toggle Sidebar"`, the
+  mobile `Sheet`'s `SheetTitle`/`SheetDescription` ("Sidebar"/"Displays the
+  mobile sidebar."), and `sheet.tsx`'s own `SheetContent` close button
+  ("Close") were all generated with literal English text. Fixed the same
+  way as `DialogContent`'s `closeLabel`: `Sidebar` requires
+  `mobileTitle`/`mobileDescription`, `SidebarTrigger`/`SidebarRail` require
+  `toggleLabel`, `SheetContent` requires `closeLabel` (discriminated union,
+  same shape as `DialogContent`'s). This is now the fourth shadcn
+  registry item to ship with baked-in English (`dialog.tsx`, `toast.tsx`,
+  now `sheet.tsx`/`sidebar.tsx`) — check every new primitive add for this
+  before it ships, not just the ones that already burned us.
+- **Known open upstream issues on the Base UI variant, not fixed here:**
+  [shadcn-ui/ui#9668](https://github.com/shadcn-ui/ui/issues/9668) — in the
+  collapsed state, `SidebarGroupLabel`/menu icon elements can render
+  off-center because Base UI's generated markup wraps them in
+  `sidebar-group` (`p-2`) where the Radix variant used `sidebar-menu`.
+  [shadcn-ui/ui#9049](https://github.com/shadcn-ui/ui/issues/9049) confirms
+  `SidebarMenuButton`/`DropdownMenuTrigger`-style `asChild` composition
+  doesn't exist under Base UI even though some shadcn docs pages still show
+  it — consistent with `button.tsx` having already dropped it. This repo's
+  copy of `sidebar.tsx` never uses `asChild` (it uses Base UI's own
+  `render`/`useRender`/`mergeProps`), so #9049 doesn't apply here; #9668 is
+  a real upstream layout quirk to watch for once a consumer adds icons to
+  collapsed-state menu items — not reproduced or worked around yet since
+  AMCore's own `widgets/app-shell` composition doesn't currently use
+  `collapsible="icon"`.
+- **No new dependency.** `pnpm-lock.yaml`/`package.json` were untouched by
+  the real invocation — every package `sidebar.tsx`'s dependency chain
+  needs (`@base-ui/react/merge-props`, `@base-ui/react/use-render`,
+  `class-variance-authority`, `lucide-react`) was already installed.
 
 ## See also
 

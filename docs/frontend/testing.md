@@ -135,8 +135,19 @@ Current flows: register → authenticated landing → logout; login with real
 credentials; active sessions list/revoke (no revoke control on the current
 session); a locale switch persisting to a **fresh session** via
 `PATCH /auth/me` (proven by waiting for that specific response, not racing
-the client-side navigation against it); and the `requireSession()` redirect
-gate on two protected routes.
+the client-side navigation against it); the `requireSession()` redirect
+gate on two protected routes; and the dashboard app shell — the mobile
+(`375px`) Sheet variant and the sidebar's collapsed state surviving a
+reload through the `sidebar_state` cookie.
+
+That last one earns its place here rather than in a cheaper layer: the
+cookie is written client-side and read **server-side** in a layout, so
+only a real server closes the loop. It caught a real defect — the constant
+naming the cookie was exported from a `'use client'` module, which Next
+turns into a client reference on the server, so the read silently always
+missed (see [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md#a-shared-constant-does-not-survive-a-use-client-boundary)).
+Typecheck, lint, unit tests and the Storybook a11y gate were all green
+throughout.
 
 **Not automated yet, named rather than silently skipped:** a BFF SSE smoke
 test. Track 6 proved `EventSource` survives the standalone proxy manually;

@@ -123,9 +123,46 @@ which is why they are worth more than a comment.
 
 **Do not apply either blanket-style.** A module that works in both places is
 universal and should stay universal; marking it narrows where it can be used for
-no benefit. `apps/web` currently has no module in either category, which is why
-neither package is installed yet — add the dependency when the first module
-needs it, not before.
+no benefit.
+
+Both markers are in real use here, so copy the nearest existing example rather
+than guessing:
+
+- **`client-only`** — `shared/hooks/use-mobile.ts` (`window.matchMedia` /
+  `window.innerWidth`), `shared/api/sse/use-event-source.ts` and the two
+  entity SSE hooks built on it (`EventSource`).
+- **`server-only`** — the BFF **runtime** modules under `shared/api/bff/**`
+  that actually touch a secret, Redis, or an upstream credential: the DAL
+  (`dal.ts`), the Redis session vault (`redis-client.ts`,
+  `session-vault-store.ts`), the authenticated proxy, and the OAuth/token
+  upstream calls. Not every file in that directory qualifies — its tests,
+  and a handful of pure types/constants/error classes with no runtime
+  dependency of their own (`session-vault.types.ts`, `vault-constants.ts`,
+  `proxy-headers.ts`, `errors.ts`, `lock-renewal.ts`,
+  `api-error-response.ts`), stay unmarked on purpose: they are genuinely
+  universal, and marking them would be exactly the blanket-style habit
+  this section says not to fall into.
+
+### A shared constant does not survive a `'use client'` boundary
+
+A value a Server Component needs must not be exported from a `'use client'`
+module. Next replaces **every** export of a client module with a client
+_reference_ when a Server Component imports it — so the server sees a proxy
+object, not your string, and there is no type error to warn you:
+
+```ts
+// shared/ui/sidebar.tsx — 'use client'
+export const SIDEBAR_COOKIE_NAME = 'sidebar_state' // ✗ do not read this from a layout
+
+// app/[locale]/(dashboard)/layout.tsx — Server Component
+const value = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value // always undefined
+```
+
+Put the constant in its own plain module (`shared/ui/sidebar-cookie.ts`) and
+import it from both sides. This shipped as a real defect in Track 9: the
+cookie was written correctly, arrived on the request, and the server still
+rendered the sidebar expanded — caught only by a real-stack E2E assertion on
+the state surviving a reload, not by typecheck, lint, or a component test.
 
 ## Styling: the palette is a source, tokens are the public API
 

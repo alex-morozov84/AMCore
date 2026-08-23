@@ -206,12 +206,25 @@ model" below.
 | Kind                                                        | Use            | Example                             |
 | ----------------------------------------------------------- | -------------- | ----------------------------------- |
 | **Server state** (data owned by the backend)                | TanStack Query | `entities/user/api/user-queries.ts` |
-| **Local client state** (UI-only, not persisted server-side) | Zustand        | `shared/store/stores/ui.ts`         |
+| **Local client state** (UI-only, not persisted server-side) | Zustand        | none live currently — see below     |
 
 Don't duplicate server state into a Zustand store "for convenience" — that's
 how the two fall out of sync. If a value needs to survive a page navigation
 and isn't server data, it's a Zustand candidate; if it comes from the API,
-it's a query. The current user used to live in a parallel Zustand
+it's a query. `shared/store/stores/ui.ts` used to hold the dashboard
+sidebar's `sidebarOpen`/`toggleSidebar` — removed in Track 9 once shadcn's
+`Sidebar` (`shared/ui/sidebar.tsx`) took over that state through its own
+`SidebarProvider`/`useSidebar()`, so nothing duplicated it. Zustand remains
+the pattern for local client state that genuinely needs to survive a
+navigation; add a store under `shared/store/stores/` the next time one is
+needed, following `ThemeProvider`'s context/provider shape (though that one
+is `useSyncExternalStore`-based, not Zustand, since it syncs an external
+`localStorage`/`matchMedia` source rather than owning in-memory state).
+The `zustand` dependency is **deliberately kept** with no live store: it is
+the documented answer for this row, and a fork adding its first store
+should not have to re-pick a library. Remove it only if that decision is
+revisited.
+The current user used to live in a parallel Zustand
 `useAuthStore`, populated by a mount-time effect — a hand-rolled duplicate of
 what `useCurrentUser()` already did declaratively. Removed once nothing
 else needed the store (ADR-068 UI-rewiring slice, `ai/models-talk.md`):

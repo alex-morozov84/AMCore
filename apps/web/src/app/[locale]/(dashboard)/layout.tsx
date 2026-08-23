@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react'
-import { getTranslations } from 'next-intl/server'
+import { cookies } from 'next/headers'
 
-import { LogoutButton } from '@/features/auth-logout'
-import { LocaleSwitcher } from '@/features/locale-switcher'
-import { Link } from '@/i18n/navigation'
 import { getOptionalSession } from '@/shared/api/bff/dal'
+import { SIDEBAR_COOKIE_NAME } from '@/shared/ui/sidebar-cookie'
+import { AppShell } from '@/widgets/app-shell'
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -21,39 +20,30 @@ export const dynamic = 'force-dynamic'
  * segment: `getOptionalSession()` is `cache()`-wrapped, so the page's own
  * `requireSession()` call in the same request still observes and correctly
  * surfaces the same underlying failure via `(dashboard)/error.tsx` — this
- * catch only protects the *header's* rendering, not the real gate.
+ * catch only protects the *shell's* rendering, not the real gate.
  */
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
-  const t = await getTranslations('sessions')
   let email: string | undefined
   try {
     const session = await getOptionalSession()
     email = session?.user.email
   } catch (error) {
-    console.error('[dashboard layout] session read failed, degrading header only', error)
+    console.error('[dashboard layout] session read failed, degrading shell only', error)
   }
 
+  // `SidebarProvider` writes this cookie client-side on every toggle
+  // (shared/ui/sidebar.tsx). Reading it here and passing it back in as
+  // `defaultOpen` is what makes the collapsed/expanded choice survive a
+  // reload — without this read, every render would silently discard it and
+  // fall back to `SidebarProvider`'s own `defaultOpen={true}`. `undefined`
+  // (no cookie yet, e.g. first visit) intentionally falls through to that
+  // same default rather than being coerced to `false`.
+  const sidebarCookie = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value
+  const defaultSidebarOpen = sidebarCookie === undefined ? undefined : sidebarCookie === 'true'
+
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-          <span className="font-semibold">AMCore</span>
-          <div className="flex items-center gap-4">
-            {/* Full nav/shell is Track 9's scope — this is the minimal
-             * reachable link the sessions-list reference needs until then. */}
-            <Link
-              href="/settings/sessions"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {t('title')}
-            </Link>
-            <span className="text-sm text-muted-foreground">{email}</span>
-            <LocaleSwitcher />
-            <LogoutButton variant="ghost" showText={false} />
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-7xl p-4">{children}</main>
-    </div>
+    <AppShell email={email} defaultSidebarOpen={defaultSidebarOpen}>
+      {children}
+    </AppShell>
   )
 }

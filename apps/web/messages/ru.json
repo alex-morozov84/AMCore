@@ -75,6 +75,12 @@
     "continueWithGoogle": "Продолжить с Google",
     "orContinueWith": "или"
   },
+  "nav": {
+    "dashboard": "Дашборд",
+    "toggleSidebar": "Переключить боковую панель",
+    "mobileTitle": "Навигация",
+    "mobileDescription": "Меню навигации по сайту"
+  },
   "dashboard": {
     "welcome": "Добро пожаловать!",
     "welcomeNamed": "Добро пожаловать, {name}!",

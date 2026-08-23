@@ -6,7 +6,6 @@ import type { Preview } from '@storybook/nextjs-vite'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { mswLoader } from 'msw-storybook-addon/csf3'
 
-import { UIStoreProvider } from '@/shared/store'
 import { handlers } from '@/test/msw/handlers'
 
 import defaultMessages from '../messages/en.json'
@@ -57,9 +56,7 @@ const preview: Preview = {
     (Story) => (
       <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={defaultMessages}>
         <QueryDecorator>
-          <UIStoreProvider>
-            <Story />
-          </UIStoreProvider>
+          <Story />
         </QueryDecorator>
       </NextIntlClientProvider>
     ),
