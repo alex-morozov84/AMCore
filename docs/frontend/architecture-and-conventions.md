@@ -220,6 +220,10 @@ navigation; add a store under `shared/store/stores/` the next time one is
 needed, following `ThemeProvider`'s context/provider shape (though that one
 is `useSyncExternalStore`-based, not Zustand, since it syncs an external
 `localStorage`/`matchMedia` source rather than owning in-memory state).
+The `zustand` dependency is **deliberately kept** with no live store: it is
+the documented answer for this row, and a fork adding its first store
+should not have to re-pick a library. Remove it only if that decision is
+revisited.
 The current user used to live in a parallel Zustand
 `useAuthStore`, populated by a mount-time effect — a hand-rolled duplicate of
 what `useCurrentUser()` already did declaratively. Removed once nothing

@@ -123,9 +123,19 @@ which is why they are worth more than a comment.
 
 **Do not apply either blanket-style.** A module that works in both places is
 universal and should stay universal; marking it narrows where it can be used for
-no benefit. `shared/hooks/use-mobile.ts` is the current `client-only` example
-(it reads `window.matchMedia`/`window.innerWidth`); nothing needs `server-only`
-yet.
+no benefit.
+
+Both markers are in real use here, so copy the nearest existing example rather
+than guessing:
+
+- **`client-only`** — `shared/hooks/use-mobile.ts` (`window.matchMedia` /
+  `window.innerWidth`), `shared/api/sse/use-event-source.ts` and the two
+  entity SSE hooks built on it (`EventSource`).
+- **`server-only`** — every module under `shared/api/bff/**`: the DAL
+  (`dal.ts`), the Redis session vault (`redis-client.ts`,
+  `session-vault-store.ts`), the authenticated proxy, and the OAuth/token
+  upstream calls. These hold the real backend tokens, so a stray client
+  import must fail the build, not leak at runtime.
 
 ### A shared constant does not survive a `'use client'` boundary
 
