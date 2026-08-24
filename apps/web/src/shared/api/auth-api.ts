@@ -1,10 +1,14 @@
 import type {
   AvatarResponse,
+  ForgotPasswordInput,
   LoginInput,
   RegisterInput,
+  ResendVerificationInput,
+  ResetPasswordInput,
   SessionsListResponse,
   UpdateProfileInput,
   UserResponse,
+  VerifyEmailInput,
 } from '@amcore/shared'
 
 import { apiClient } from './http-client'
@@ -36,6 +40,21 @@ export const authApi = {
     apiClient.post<UserEnvelope>('/auth/login', data),
 
   logout: (): Promise<MessageResponse> => apiClient.post<MessageResponse>('/auth/logout'),
+
+  // Always the same enumeration-safe message regardless of whether the
+  // account exists — never rendered as-is (it's backend English prose);
+  // the frontend shows its own translated confirmation on success instead.
+  forgotPassword: (data: ForgotPasswordInput): Promise<MessageResponse> =>
+    apiClient.post<MessageResponse>('/auth/forgot-password', data),
+
+  resetPassword: (data: ResetPasswordInput): Promise<void> =>
+    apiClient.post<void>('/auth/reset-password', data),
+
+  verifyEmail: (data: VerifyEmailInput): Promise<void> =>
+    apiClient.post<void>('/auth/verify-email', data),
+
+  resendVerification: (data: ResendVerificationInput): Promise<MessageResponse> =>
+    apiClient.post<MessageResponse>('/auth/resend-verification', data),
 
   getMe: (): Promise<MeResponse> => apiClient.get<MeResponse>('/auth/me'),
 

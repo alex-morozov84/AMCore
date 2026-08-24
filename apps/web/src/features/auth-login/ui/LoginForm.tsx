@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { type LoginInput, loginSchema } from '@amcore/shared'
 
+import { Link } from '@/i18n/navigation'
 import { useLocalizedForm } from '@/shared/hooks'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
@@ -52,7 +53,14 @@ export function LoginForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('password')}</FormLabel>
+              <div className="flex items-center justify-between">
+                <FormLabel>{t('password')}</FormLabel>
+                {/* `underline`, not `hover:underline` — see LoginPage's
+                identical link-in-text-block reasoning below. */}
+                <Link href="/forgot-password" className="text-sm text-primary underline">
+                  {t('forgotPassword')}
+                </Link>
+              </div>
               <FormControl>
                 <Input type="password" {...field} />
               </FormControl>

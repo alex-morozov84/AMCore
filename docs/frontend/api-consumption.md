@@ -15,21 +15,39 @@ Every browser→backend call goes through this app's own same-origin `/api/*`
 Route Handlers (ADR-068), never `apps/api` directly. The browser never holds
 an access token — the BFF's Redis-held session vault does — so a frontend
 hook never sets an `Authorization` header or attaches a bearer token itself.
-Most surfaces need no dedicated Route Handler at all: the generic proxy
-(`shared/api/bff/authenticated-proxy.ts`, mounted at `/api/[...path]`)
-streams both the request and response body unmodified, which already covers
-a plain JSON call, a multipart upload, and an SSE stream. A dedicated route
-is only worth adding when the backend needs something the generic proxy
-can't forward — the one existing example is `/auth/sessions*`, which needs
-the raw `refresh_token` cookie to identify the caller's own session.
+Most surfaces need no dedicated Route Handler at all: the generic
+authenticated proxy (`shared/api/bff/authenticated-proxy.ts`, mounted at
+`/api/[...path]`) streams both the request and response body unmodified,
+which already covers a plain JSON call, a multipart upload, and an SSE
+stream.
+
+A dedicated route is worth adding for two distinct reasons, not one:
+
+- **The backend needs something the generic proxy can't forward.**
+  `/auth/sessions*` needs the raw `refresh_token` cookie to identify the
+  caller's own session, which the generic proxy never sees.
+- **The caller has no session at all.** The generic proxy requires an
+  existing `amcore_session` cookie and 401s without one — unusable for
+  login/register (nothing to be a session of yet) or the four email-link
+  auth actions (`forgot-password`, `reset-password`, `verify-email`,
+  `resend-verification` — a user resetting a forgotten password isn't
+  logged in, and a verification link may be opened in a browser holding no
+  cookies at all). `credential-auth-handler.ts` covers the first two
+  (mints a session from the backend's `refresh_token`);
+  `public-auth-action.ts` covers the latter four (forwards the backend's
+  response verbatim, mints nothing — none of them authenticate anyone).
 
 ## What is enabled by default vs. reference-only
 
 The starter includes two different kinds of frontend surface:
 
-- **Default UI:** email/password login and registration, Google OAuth entry
-  point when the backend reports Google as configured, logout, current-user
-  reads/updates, locale switching, and the active-sessions page at
+- **Default UI:** email/password login and registration, the full
+  password-reset/email-verification email-link flow (`/forgot-password`,
+  `/reset-password`, `/verify-email`, `/resend-verification` — the
+  backend has supported these since the auth foundation was built; the
+  frontend reference flows landed later), Google OAuth entry point when the
+  backend reports Google as configured, logout, current-user reads/updates,
+  locale switching, and the active-sessions page at
   `/{locale}/settings/sessions`.
 - **Reference consumption hooks, no product UI yet:** avatar upload/delete,
   notifications feed/preferences/realtime, and AI conversations/runs/messages.
