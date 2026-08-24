@@ -17,6 +17,7 @@ guessing.
 | [API consumption](./api-consumption.md)                         | The hooks that consume media/notifications/AI through the BFF, and the `EventSource`-based realtime pattern shared by notifications and AI |
 | [Testing](./testing.md)                                         | The frontend test taxonomy, Playwright mocked/server-mocked/real-stack lanes, accessibility scanning, and the tool-neutral dev loop        |
 | [Storybook](./storybook.md)                                     | The component workshop: what's wired (a11y/theme/MSW/i18n decorators), story conventions, the CLI-safety and `optimizeDeps.include` rules  |
+| [Bundle baseline and budget](./bundle-budget.md)                | Per-route client bundle size methodology, the current baseline, the non-vacuity proof, and why CI enforcement is deferred                  |
 
 More guides land here as later frontend/admin starter tracks complete — see
 `architecture-and-conventions.md`'s "See also" section for the current set.
