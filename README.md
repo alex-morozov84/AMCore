@@ -18,9 +18,11 @@ The repository also contains a Next.js frontend/admin starter workspace. It now
 ships the frontend foundations a downstream product should inherit rather than
 recreate: locale-routed UI, localized API/form errors, design tokens with
 light/dark/system theme support, FSD boundaries, lint-enforced styling
-guardrails, BFF/Token-Handler auth with an active-sessions reference screen,
-and documented hooks for consuming media, notifications, and AI through the
-BFF. Feature-specific admin surfaces remain intentionally product-owned.
+guardrails, a shadcn/Base UI Sidebar app shell, BFF/Token-Handler auth with
+the full email/password reference flow (login, register, forgot/reset
+password, email verification/resend) plus an active-sessions screen, and
+documented hooks for consuming media, notifications, and AI through the BFF.
+Feature-specific admin surfaces remain intentionally product-owned.
 
 ### Backend Starter Capabilities
 

@@ -49,12 +49,18 @@ The starter includes two different kinds of frontend surface:
   backend reports Google as configured, logout, current-user reads/updates,
   locale switching, and the active-sessions page at
   `/{locale}/settings/sessions`.
-- **Reference consumption hooks, no product UI yet:** avatar upload/delete,
-  notifications feed/preferences/realtime, and AI conversations/runs/messages.
-  These hooks are production-quality examples of how a downstream product should
-  consume the backend through the BFF, but AMCore does not guess the product UI
-  that should sit on top of notifications or AI. Build that UI in the owning
-  product slice and reuse the hooks below.
+- **Reference consumption hooks, deliberately no product UI:** avatar
+  upload/delete, notifications feed/preferences/realtime, and AI
+  conversations/runs/messages. These hooks are production-quality examples
+  of how a downstream product should consume the backend through the BFF,
+  but AMCore does not guess the product UI that should sit on top of
+  notifications or AI — that would mean inventing a UI shape with no real
+  consumer driving it, exactly the kind of speculative design this starter
+  avoids elsewhere. This is a standing decision, not a placeholder waiting
+  to be filled in: `entities/ai`/`entities/notifications` having zero
+  internal consumers in `apps/web` is intentional, confirmed at Track 9's
+  closeout, not an oversight to "finish." Build the product UI in the
+  owning product slice and reuse the hooks below.
 
 ## Media — avatar upload/delete
 
