@@ -255,15 +255,15 @@ Three shapes of Route Handler cover the whole surface, all under
 `apps/web/src/app/api/`:
 
 - **Session-minting handlers** for auth-specific concerns that need the raw
-  backend `refresh_token` server-side (`/api/auth/login`, `/register`,
-  `/logout`, the OAuth init/callback/exchange routes) — see
-  `shared/api/bff/credential-auth-handler.ts`.
+  backend `refresh_token` server-side
+  (`/api/auth/{login,register,logout}`, the OAuth init/callback/exchange
+  routes) — see `shared/api/bff/credential-auth-handler.ts`.
 - **Public action handlers** for the four email-link auth flows
-  (`/api/auth/forgot-password`, `/reset-password`, `/verify-email`,
-  `/resend-verification`) — `shared/api/bff/public-auth-action.ts`. These
-  don't mint a session (none of the four authenticate anyone); they exist
-  because the caller may have **no** `amcore_session` cookie at all, which
-  the generic catch-all below requires and 401s without.
+  (`/api/auth/{forgot-password,reset-password,verify-email,resend-verification}`)
+  — `shared/api/bff/public-auth-action.ts`. These don't mint a session
+  (none of the four authenticate anyone); they exist because the caller may
+  have **no** `amcore_session` cookie at all, which the generic catch-all
+  below requires and 401s without.
 - **The generic catch-all** (`/api/[...path]`) for everything else that
   _does_ have a session already: reads `amcore_session`, refreshes the
   access token if needed (`ensureFreshSession`), and proxies to `apps/api`
