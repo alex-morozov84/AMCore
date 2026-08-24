@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`apps/web`:** the full password-reset/email-verification email-link
+  flow now has a frontend reference implementation — `/forgot-password`,
+  `/reset-password`, `/verify-email`, `/resend-verification`. The backend
+  has supported all four since the auth foundation was built; only the
+  frontend consumer was missing. New BFF layer
+  (`shared/api/bff/public-auth-action.ts`) for the two dedicated-route
+  categories that need one (see `docs/frontend/api-consumption.md`);
+  `LoginForm` gains its first real "Forgot your password?" link (the
+  message key existed unused since i18n foundation work).
 - **`apps/api`:** `PATCH /auth/me` now emits an `account.profile_updated`
   in-app notification when a real change was made (best-effort, never for a
   no-op request). The `account.profile_updated` definition previously

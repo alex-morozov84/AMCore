@@ -251,17 +251,23 @@ of CORS/cookie problems for free, and it's what lets the browser hold only
 one opaque `amcore_session` cookie instead of a backend access token in any
 form.
 
-Two shapes of Route Handler cover the whole surface, both under
+Three shapes of Route Handler cover the whole surface, all under
 `apps/web/src/app/api/`:
 
-- **Dedicated handlers** for auth-specific concerns that need the raw
+- **Session-minting handlers** for auth-specific concerns that need the raw
   backend `refresh_token` server-side (`/api/auth/login`, `/register`,
   `/logout`, the OAuth init/callback/exchange routes) — see
-  `shared/api/bff/`.
-- **The generic catch-all** (`/api/[...path]`) for everything else: reads
-  `amcore_session`, refreshes the access token if needed
-  (`ensureFreshSession`), and proxies to `apps/api` with `Authorization:
-Bearer` attached server-side.
+  `shared/api/bff/credential-auth-handler.ts`.
+- **Public action handlers** for the four email-link auth flows
+  (`/api/auth/forgot-password`, `/reset-password`, `/verify-email`,
+  `/resend-verification`) — `shared/api/bff/public-auth-action.ts`. These
+  don't mint a session (none of the four authenticate anyone); they exist
+  because the caller may have **no** `amcore_session` cookie at all, which
+  the generic catch-all below requires and 401s without.
+- **The generic catch-all** (`/api/[...path]`) for everything else that
+  _does_ have a session already: reads `amcore_session`, refreshes the
+  access token if needed (`ensureFreshSession`), and proxies to `apps/api`
+  with `Authorization: Bearer` attached server-side.
 
 `apps/web/src/shared/api/http-client.ts` is the reference client for
 Client Components: same-origin relative paths (`fetch('/api' + path)`), no
