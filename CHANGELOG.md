@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`apps/web`:** documented per-route client bundle baseline and
+  methodology (`docs/frontend/bundle-budget.md`), re-derivable via
+  `next experimental-analyze` and the build-native
+  `route-bundle-stats.json`. CI-enforced bundle budget is deliberately
+  deferred in this PR (data proven stable/non-vacuous via a real regression
+  injection, but the analyzer's own size figures are interactive-UI-only
+  with no JSON form) — see the doc's "CI enforcement: deferred" section for
+  the self-contained reopening condition.
 - **`apps/web`:** the full password-reset/email-verification email-link
   flow now has a frontend reference implementation — `/forgot-password`,
   `/reset-password`, `/verify-email`, `/resend-verification`. The backend
