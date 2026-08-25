@@ -37,7 +37,7 @@ The two systems own different things, and the layer names say which:
 | `src/_pages/`          | FSD Pages layer: page composition                                                                            | Canonical FSD meaning, unchanged                                                                                             |
 | `src/_app/` (optional) | FSD App layer: app-level providers/config that live outside Next's own route files                           | Use only if app-level wiring doesn't fit naturally in `src/app/layout.tsx` / `providers.tsx`                                 |
 | `src/widgets/`         | Composed UI blocks made of multiple features/entities                                                        | Canonical FSD meaning, unchanged                                                                                             |
-| `src/features/`        | Single user-interaction-driven slices (e.g. `auth/login`)                                                    | Canonical FSD meaning, unchanged                                                                                             |
+| `src/features/`        | Single user-interaction-driven slices (e.g. `auth-login`)                                                    | Canonical FSD meaning, unchanged                                                                                             |
 | `src/entities/`        | Business-domain data + its UI (e.g. `user`)                                                                  | Canonical FSD meaning, unchanged                                                                                             |
 | `src/shared/`          | Generic reusable code with no business meaning: UI primitives, API client, hooks, lib, store                 | Canonical FSD meaning, unchanged                                                                                             |
 
@@ -339,4 +339,5 @@ architectural structure.
   the equivalent contract for `apps/api`.
 - `AGENTS.md` → Code conventions — the condensed cross-tool version of the
   rules on this page.
-- Later frontend/admin starter tracks add their own guide here as they land.
+- [Bundle baseline and budget](./bundle-budget.md) — current per-route client
+  bundle measurements and the deferred CI-budget reopening path.

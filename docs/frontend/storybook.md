@@ -86,11 +86,17 @@ Story files are **co-located** next to source (`button.stories.tsx` beside
 
 - All 19 `shared/ui` primitives, including `sidebar.tsx`/`sheet.tsx`/
   `tooltip.tsx`/`separator.tsx` (added Track 9 for the dashboard app shell).
-- Three feature-flow references: `features/auth-login/ui/LoginForm`,
+- Seven feature-flow references:
+  `features/auth-login/ui/LoginForm`,
   `features/auth-register/ui/RegisterForm`,
-  `features/sessions-revoke/ui/RevokeSessionMenuItem` — the last one
-  is the reference for the real toast/mutation/query-invalidation pattern
-  (Track 6) this starter wants downstream mutation flows to copy.
+  `features/auth-forgot-password/ui/ForgotPasswordForm`,
+  `features/auth-reset-password/ui/ResetPasswordForm`,
+  `features/auth-verify-email/ui/VerifyEmailStatus`,
+  `features/auth-resend-verification/ui/ResendVerificationForm`, and
+  `features/sessions-revoke/ui/RevokeSessionMenuItem` — the sessions story is
+  the reference for the real toast/mutation/query-invalidation pattern
+  (Track 6), while the auth email-link stories are the reference for
+  enumeration-safe public-auth actions that don't mint a session.
 
 Not storied, and not an oversight: `entities/*` UI (thin/hook-heavy right
 now), any dashboard/settings page-level composition, `widgets/app-shell`

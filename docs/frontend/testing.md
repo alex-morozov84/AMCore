@@ -132,7 +132,9 @@ docker compose down -v
 ```
 
 Current flows: register → authenticated landing → logout; login with real
-credentials; active sessions list/revoke (no revoke control on the current
+credentials; forgot-password, reset-password, verify-email, and
+resend-verification public-auth actions against the real BFF/backend error
+contract; active sessions list/revoke (no revoke control on the current
 session); a locale switch persisting to a **fresh session** via
 `PATCH /auth/me` (proven by waiting for that specific response, not racing
 the client-side navigation against it); the `requireSession()` redirect

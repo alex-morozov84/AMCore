@@ -146,7 +146,7 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   barrel anywhere. A slice may not import a sibling slice in another group.
   TanStack Query for server state, Zustand for local client state (kept as
   the convention; no live store exists today — see
-  `architecture-and-conventions.md` → State model). Theme
+  `docs/frontend/architecture-and-conventions.md` → State model). Theme
   defaults to `system` (light/dark), owned by `shared/lib/theme.ts` — no
   `next-themes` dependency. **These import rules fail lint, they are not
   conventions.** Full contract:
