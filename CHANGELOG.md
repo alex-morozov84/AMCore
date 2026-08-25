@@ -54,11 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`NextIntlClientProvider`), query, and MSW decorators (reusing the same
   `msw` handlers as the Vitest integration layer); `@storybook/addon-a11y`
   - `@storybook/addon-vitest` turn every story into a CI-gated
-    accessibility check, a fifth layer of the testing pyramid above. Stories
-    for all 15 `shared/ui` primitives and three feature-flow references
-    (login, register, session revoke — the last is the reference for this
-    starter's real toast/mutation/query-invalidation pattern). New CI job
-    `storybook`. Public guide: `docs/frontend/storybook.md`.
+    accessibility check, a fifth layer of the testing pyramid above. Current
+    coverage is all 19 `shared/ui` primitives and seven feature-flow references
+    (login, register, forgot/reset password, verify/resend email, session
+    revoke — the session story is the reference for this starter's real
+    toast/mutation/query-invalidation pattern). New CI job `storybook`.
+    Public guide: `docs/frontend/storybook.md`.
 
 ### Fixed
 

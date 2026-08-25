@@ -1,7 +1,7 @@
 # Frontend
 
-`apps/web` is AMCore's Next.js frontend/admin starter. It is being brought up
-to the same production-starter standard as `apps/api`: documented contracts,
+`apps/web` is AMCore's Next.js frontend/admin starter. It has the same
+production-starter shape expected from the backend: documented contracts,
 enforceable conventions, and a test surface a cold agent can extend without
 guessing.
 
@@ -19,8 +19,8 @@ guessing.
 | [Storybook](./storybook.md)                                     | The component workshop: what's wired (a11y/theme/MSW/i18n decorators), story conventions, the CLI-safety and `optimizeDeps.include` rules  |
 | [Bundle baseline and budget](./bundle-budget.md)                | Per-route client bundle size methodology, the current baseline, the non-vacuity proof, and why CI enforcement is deferred                  |
 
-More guides land here as later frontend/admin starter tracks complete — see
-`architecture-and-conventions.md`'s "See also" section for the current set.
+This index is the public entry point for the current frontend starter surface;
+see `architecture-and-conventions.md`'s "See also" section for related guides.
 
 ## Start here
 

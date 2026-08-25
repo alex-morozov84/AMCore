@@ -132,7 +132,9 @@ docker compose down -v
 ```
 
 Current flows: register → authenticated landing → logout; login with real
-credentials; active sessions list/revoke (no revoke control on the current
+credentials; forgot-password, reset-password, verify-email, and
+resend-verification public-auth actions against the real BFF/backend error
+contract; active sessions list/revoke (no revoke control on the current
 session); a locale switch persisting to a **fresh session** via
 `PATCH /auth/me` (proven by waiting for that specific response, not racing
 the client-side navigation against it); the `requireSession()` redirect
@@ -282,6 +284,9 @@ dependency graph. The CI `web-e2e` job has this as an explicit step.
   layer's contract tests target.
 - [Storybook](./storybook.md) — the fifth pyramid layer added in Track 8:
   component-isolation states and its own accessibility gate.
+- [Bundle baseline and budget](./bundle-budget.md) — the per-route client
+  bundle methodology this verification loop sits alongside, and why it
+  rides on a documented baseline rather than a CI-enforced gate today.
 - **ADR-069** (`ai/decisions/adr-069-frontend-testing-pyramid.md`) — the
   full decision record: every mechanism choice, the two pre-implementation
   spikes, and why each was made.

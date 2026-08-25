@@ -3,9 +3,12 @@
 Standard username/password auth — register, log in, reset your password, verify your email.
 
 This page documents the backend API contract at `/api/v1/auth/*`. The bundled
-Next.js app (`apps/web`) calls its same-origin BFF routes from the browser
-(`/api/auth/login`, `/api/auth/register`, `/api/auth/logout`) so backend tokens
-stay in the Redis session vault; see
+Next.js app (`apps/web`) calls same-origin BFF routes from the browser:
+session-minting auth actions (`/api/auth/login`, `/api/auth/register`,
+`/api/auth/logout`) keep backend tokens in the Redis session vault, while
+public email-link actions (`/api/auth/forgot-password`,
+`/api/auth/reset-password`, `/api/auth/verify-email`,
+`/api/auth/resend-verification`) forward without minting a session; see
 [Frontend architecture → Browser API reach](../frontend/architecture-and-conventions.md#browser-api-reach).
 
 ---
