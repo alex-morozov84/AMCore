@@ -18,6 +18,7 @@ does not express.
 | Consume media/notifications/AI from the frontend | [`frontend/api-consumption.md`](frontend/api-consumption.md)                                                                      |
 | Add a frontend test / pick the right layer       | [`frontend/testing.md`](frontend/testing.md)                                                                                      |
 | Write or review a Storybook story                | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |
+| Check or update the frontend bundle baseline     | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                          |
 | Add an environment variable                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
 | Add an external service / infra dependency       | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
 | Add UI copy, a locale, or an error message       | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
@@ -63,6 +64,9 @@ does not express.
 - **[Storybook](frontend/storybook.md)** — the `shared/ui`/feature-flow
   component workshop: decorators, story conventions, the accessibility
   gate, and the CLI-safety/`optimizeDeps.include` procedures.
+- **[Bundle baseline and budget](frontend/bundle-budget.md)** — the
+  per-route client bundle size methodology, the current baseline, the
+  non-vacuity proof, and why CI enforcement is deferred.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
   sessions, OAuth, [RBAC](auth/rbac.md), [API keys](auth/api-keys.md), invites,
   CSRF, and the [auth contracts reference](auth/reference.md).

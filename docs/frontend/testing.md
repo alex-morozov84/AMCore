@@ -282,6 +282,9 @@ dependency graph. The CI `web-e2e` job has this as an explicit step.
   layer's contract tests target.
 - [Storybook](./storybook.md) — the fifth pyramid layer added in Track 8:
   component-isolation states and its own accessibility gate.
+- [Bundle baseline and budget](./bundle-budget.md) — the per-route client
+  bundle methodology this verification loop sits alongside, and why it
+  rides on a documented baseline rather than a CI-enforced gate today.
 - **ADR-069** (`ai/decisions/adr-069-frontend-testing-pyramid.md`) — the
   full decision record: every mechanism choice, the two pre-implementation
   spikes, and why each was made.
