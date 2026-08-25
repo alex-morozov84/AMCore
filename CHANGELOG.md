@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-25
+
+### Upgrading
+
+This release lands the frontend/admin starter phase (Tracks 1-9). Several
+changes are fork-breaking if you built on `v0.3.0`'s `apps/web`:
+
+- **`src/views/` is renamed to `src/_pages/`.** A fork importing
+  `@/views/...` directly needs to switch to `@/_pages/...`.
+- **The grouped `features/auth/*` and `features/sessions/*` slices are
+  flattened.** `features/auth/login` → `features/auth-login`, `.../logout`
+  → `features/auth-logout`, `.../oauth` → `features/auth-oauth`,
+  `.../register` → `features/auth-register`,
+  `features/sessions/revoke-session` → `features/sessions-revoke`,
+  `features/sessions/revoke-other-sessions` → `features/sessions-revoke-other`.
+  The `features/auth` group barrel is removed — a fork importing
+  `@/features/auth/...` or `@/features/auth` needs the specific flattened
+  slice path.
+- **The dashboard's Zustand UI-store sidebar state is removed.**
+  `useUIStore`/`UIStoreProvider` no longer exist; shadcn's own
+  `SidebarProvider`/`useSidebar()` now owns that state. A fork importing
+  either from `@/shared/store` needs its own replacement.
+- **`shared/ui`'s `Button` and `Label` are now built on Base UI, not
+  Radix.** `Button`'s `asChild` prop is removed — Base UI has no
+  equivalent under that name. A fork rendering
+  `<Button asChild><a .../></Button>` needs to compose the link/anchor
+  directly instead.
+
+See the `### Changed` entries below for the full detail on each.
+
 ### Added
 
 - **`apps/web`:** documented per-route client bundle baseline and
@@ -1035,7 +1065,8 @@ production-readiness work and the platform foundation built so far.
 
 ---
 
-[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/alex-morozov84/AMCore/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/alex-morozov84/AMCore/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/alex-morozov84/AMCore/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/alex-morozov84/AMCore/releases/tag/v0.1.0
