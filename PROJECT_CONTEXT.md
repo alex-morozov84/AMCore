@@ -11,12 +11,20 @@ separate product from the starter.
 - **Purpose:** Continue development of AMCore and its reusable, production-oriented
   NestJS API starter.
 - **Canonical upstream:** https://github.com/alex-morozov84/AMCore
+- **Upstream sync policy:** N/A — this checkout is the canonical upstream.
 - **Workflow mode:** `strict` (protected `main`, PR-only, squash-only, required CI).
 - **Public workflow:** See `AGENTS.md` and `CONTRIBUTING.md`.
 - **Current maintainer status:** If `ai/` exists, read `ai/STATUS.md`.
-- **Frontend starter choices:** `i18n_mode: multi` (`base_locale: en`,
-  `supported_locales: [en, ru]`), `frontend_storybook: enabled`,
-  `theme_persistence: local-storage`. See "Frontend starter choices" below.
+- **i18n_mode:** multi
+- **base_locale:** en
+- **supported_locales:** [en, ru]
+- **frontend_storybook:** enabled
+- **theme_persistence:** local-storage
+- **initialized_from_amcore_version:** N/A — this checkout is AMCore itself.
+
+One field per line, machine-editable by the fork initialization tooling (see
+"Frontend Starter Choices" below) — do not fold multiple fields back into a
+single prose bullet.
 
 ## Mode Contract
 
