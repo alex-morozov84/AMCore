@@ -10,6 +10,7 @@ import { unifiedDiff } from './diff.mjs'
 import { runVerification } from './verify.mjs'
 
 export * from './actions.mjs'
+export * from './content-blocks.mjs'
 export * from './plan-steps.mjs'
 export { SafetyError, clack, runVerification }
 

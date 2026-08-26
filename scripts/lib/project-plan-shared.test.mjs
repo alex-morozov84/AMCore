@@ -6,7 +6,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { EngineError, trimLocaleRecordLiteral } from './actions.mjs'
+import { EngineError } from './actions.mjs'
 import { buildSharedLocaleSteps } from './project-plan-shared.mjs'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -27,29 +27,5 @@ describe('buildSharedLocaleSteps (against the real repo, read-only)', () => {
 
   test('fails closed for a locale that has no block to keep', () => {
     assert.throws(() => buildSharedLocaleSteps(REPO_ROOT, 'fr'), EngineError)
-  })
-})
-
-describe('trimLocaleRecordLiteral', () => {
-  const content = [
-    'export const x = {',
-    '  en: {',
-    "    title: 'Hi',",
-    '  },',
-    '  ru: {',
-    "    title: 'Привет',",
-    '  },',
-    '}',
-    '',
-  ].join('\n')
-
-  test('keeps only the requested locale block', () => {
-    const after = trimLocaleRecordLiteral(content, 'ru')
-    assert.doesNotMatch(after, /en: \{/)
-    assert.match(after, /ru: \{\n {4}title: 'Привет',\n {2}\},\n/)
-  })
-
-  test('fails closed when the requested locale has no block', () => {
-    assert.throws(() => trimLocaleRecordLiteral(content, 'fr'), EngineError)
   })
 })
