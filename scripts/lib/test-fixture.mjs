@@ -93,6 +93,28 @@ export function createFixtureRepo() {
   return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
 
+/**
+ * A real, git-tracked-files-only copy of this repo's current `HEAD` in a
+ * disposable tmpdir — for init:project tests, where a hand-written fixture
+ * can't stand in for `apps/web`'s actual route tree (see
+ * project-plan-web-structure.test.mjs and friends). `git archive` only
+ * copies tracked files, so `ai/` (gitignored) is never present — same
+ * safety property `createFixtureRepo()`'s guard tests rely on.
+ */
+export function createRealRepoCopy() {
+  const root = mkdtempSync(path.join(tmpdir(), 'amcore-real-repo-copy-'))
+  const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  }).trim()
+
+  execFileSync('sh', ['-c', `git archive HEAD | tar -x -C "${root}"`], {
+    cwd: repoRoot,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+
+  return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) }
+}
+
 export function git(root, args) {
   return execFileSync('git', args, {
     cwd: root,
