@@ -1,4 +1,4 @@
-import type { SupportedLocale } from '../constants'
+import { SUPPORTED_LOCALES, type SupportedLocale } from '../constants'
 
 const SLASH = '/'.charCodeAt(0)
 
@@ -14,7 +14,9 @@ const SLASH = '/'.charCodeAt(0)
  * an English page.
  *
  * So any URL the backend puts in front of a user must carry the locale the
- * backend already knows — the recipient's stored `User.locale`.
+ * backend already knows — the recipient's stored `User.locale`. That only
+ * holds while more than one locale actually exists — see
+ * {@link localePathPrefix}.
  *
  * Lives in `packages/shared` deliberately: the prefix strategy is a contract
  * both apps must agree on, like `SUPPORTED_LOCALES` itself. If the frontend
@@ -36,7 +38,28 @@ export function localizedFrontendUrl(
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
     .join('&')
 
-  return `${base}/${locale}${suffix}${search ? `?${search}` : ''}`
+  return `${base}${localePathPrefix(locale)}${suffix}${search ? `?${search}` : ''}`
+}
+
+/**
+ * The URL segment a locale contributes — `/en`, `/ru`, ... — or `''` once a
+ * downstream fork has trimmed `SUPPORTED_LOCALES` to exactly one entry (see
+ * `pnpm init:project --mode=single`, ADR-071). A single-locale `apps/web`
+ * removes the `[locale]` route segment entirely
+ * (`docs/frontend/i18n-and-errors.md` → "Downstream: running a single-locale
+ * app"), so a link still carrying `/en/...` would 404.
+ *
+ * `locales` defaults to the live `SUPPORTED_LOCALES` and is only a parameter
+ * so this decision is independently testable — `packages/shared` has no test
+ * runner of its own (see the maintainer backlog), and AMCore upstream's own
+ * `SUPPORTED_LOCALES` never actually shrinks to one entry, so a test relying
+ * on the real constant could never exercise this branch.
+ */
+export function localePathPrefix(
+  locale: SupportedLocale,
+  locales: readonly string[] = SUPPORTED_LOCALES
+): string {
+  return locales.length > 1 ? `/${locale}` : ''
 }
 
 /**
