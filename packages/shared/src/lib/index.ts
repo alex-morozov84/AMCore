@@ -1,2 +1,2 @@
 // Shared helpers public API
-export { localizedFrontendUrl } from './frontend-url'
+export { localePathPrefix, localizedFrontendUrl } from './frontend-url'
