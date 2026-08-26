@@ -46,4 +46,22 @@ describe('validateAnswers', () => {
       assert.throws(() => validateAnswers({ [key]: 'a\nb' }), EngineError)
     })
   }
+
+  describe('packageName', () => {
+    for (const valid of ['acme', 'acme-app', 'acme.app', '@acme/app']) {
+      test(`accepts "${valid}"`, () => {
+        assert.doesNotThrow(() => validateAnswers({ packageName: valid }))
+      })
+    }
+
+    for (const invalid of ['Bad Name!', 'UPPERCASE', 'has spaces', '.starts-with-dot', '']) {
+      test(`rejects "${invalid}"`, () => {
+        assert.throws(() => validateAnswers({ packageName: invalid }), EngineError)
+      })
+    }
+
+    test('rejects a name over 214 characters', () => {
+      assert.throws(() => validateAnswers({ packageName: 'a'.repeat(215) }), EngineError)
+    })
+  })
 })

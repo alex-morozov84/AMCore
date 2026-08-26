@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   initialization tooling (ADR-071). AMCore upstream's own current choices are
   now recorded explicitly (`i18n_mode: multi`, `frontend_storybook: enabled`,
   `theme_persistence: local-storage`) rather than left implicit in the code.
+- **`pnpm init:brand`** (ADR-071): a repeatable, non-destructive brand/
+  identity initializer for downstream forks. Records product identity,
+  upstream sync policy, workflow mode, and theme choices into
+  `PROJECT_CONTEXT.md`; updates `apps/web`'s PWA manifest and the en/ru
+  message catalogues; optionally copies user-supplied logo/icon files,
+  validating icon pixel dimensions before copying. `--dry-run` computes and
+  prints the full plan plus unified diffs without writing anything; apply
+  mode refuses on a dirty git tree or an `ai/` maintainer checkout and runs
+  `pnpm typecheck`/`pnpm lint` after writing to catch a broken result before
+  it's committed. New root `devDependency`: `@clack/prompts` (interactive
+  prompts only; flags use `node:util.parseArgs`). Root `scripts/**/*.mjs`
+  also gained lint coverage (`pnpm lint` now runs `eslint scripts`),
+  closing a pre-existing gap that let `scripts/dependency-freshness.mjs`
+  slip through unlinted.
 
 ## [0.4.0] - 2026-08-25
 

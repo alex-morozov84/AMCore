@@ -21,7 +21,7 @@ const BASE_FLAGS = [
 function runInitBrand(root, args) {
   return spawnSync('node', [INIT_BRAND, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, AMCORE_INIT_ROOT: root, AMCORE_INIT_SKIP_VERIFY: '1' },
+    env: { ...process.env, NODE_ENV: 'test', AMCORE_INIT_ROOT: root, AMCORE_INIT_SKIP_VERIFY: '1' },
   })
 }
 

@@ -13,7 +13,7 @@ const BASE_FLAGS = ['--yes', '--product-name=Acme']
 function runInitBrand(root, args) {
   return spawnSync('node', [INIT_BRAND, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, AMCORE_INIT_ROOT: root, AMCORE_INIT_SKIP_VERIFY: '1' },
+    env: { ...process.env, NODE_ENV: 'test', AMCORE_INIT_ROOT: root, AMCORE_INIT_SKIP_VERIFY: '1' },
   })
 }
 
@@ -25,6 +25,24 @@ afterEach(() => {
 })
 
 describe('init-brand safety guards', () => {
+  test('testability env vars are inert without NODE_ENV=test (no real-run backdoor)', () => {
+    fixture = createFixtureRepo()
+    const env = { ...process.env, AMCORE_INIT_ROOT: fixture.root, AMCORE_INIT_SKIP_VERIFY: '1' }
+    delete env.NODE_ENV
+
+    const result = spawnSync('node', [INIT_BRAND, '--dry-run', ...BASE_FLAGS], {
+      encoding: 'utf8',
+      env,
+    })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.doesNotMatch(
+      result.stdout,
+      new RegExp(fixture.root),
+      'AMCORE_INIT_ROOT was ignored, as it should be'
+    )
+  })
+
   test('refuses to apply on a dirty working tree', () => {
     fixture = createFixtureRepo()
     writeFileSync(path.join(fixture.root, 'untracked.txt'), 'x')

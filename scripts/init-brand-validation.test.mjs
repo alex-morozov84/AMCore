@@ -14,7 +14,7 @@ const INIT_BRAND = path.join(path.dirname(fileURLToPath(import.meta.url)), 'init
 function runInitBrand(root, args, extraEnv = {}) {
   return spawnSync('node', [INIT_BRAND, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, AMCORE_INIT_ROOT: root, ...extraEnv },
+    env: { ...process.env, NODE_ENV: 'test', AMCORE_INIT_ROOT: root, ...extraEnv },
   })
 }
 
@@ -33,6 +33,15 @@ describe('init-brand input validation', () => {
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /--theme-mode=neon is not one of: system, light, dark/)
     assert.doesNotMatch(readFixtureFile(fixture.root, 'apps/web/src/shared/lib/theme.ts'), /neon/)
+  })
+
+  test('rejects an invalid npm package name before building a plan', () => {
+    fixture = createFixtureRepo()
+    const result = runInitBrand(fixture.root, ['--dry-run', '--package-name=Bad Name!'])
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /--package-name=Bad Name! is not a valid npm package name/)
+    assert.doesNotMatch(readFixtureFile(fixture.root, 'package.json'), /Bad Name!/)
   })
 
   test('rejects a newline embedded in a single-line answer', () => {
