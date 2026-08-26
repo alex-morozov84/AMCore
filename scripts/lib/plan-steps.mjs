@@ -48,6 +48,39 @@ export function exactContentStep(filePath, { expectedBefore, after }, summary) {
   }
 }
 
+/**
+ * A step that both moves a file AND rewrites its content in one operation —
+ * for files that need a structural edit as part of relocating (e.g. a page
+ * that loses its locale-resolution boilerplate when it moves out from under
+ * `[locale]/`). A plain `moveFileStep` followed by a separate
+ * `exactContentStep(newPath, ...)` cannot express this: the plan is built by
+ * reading the *current* disk state before any step runs, so the second step
+ * would try to read a file at `newPath` that doesn't exist yet. Fails closed
+ * exactly like `exactContentStep` if `oldPath`'s content has drifted.
+ */
+export function moveAndRewriteStep(oldPath, newPath, { expectedBefore, after }, summary) {
+  const before = readFileSync(oldPath, 'utf8')
+  if (before !== expectedBefore) {
+    throw new EngineError(
+      `${oldPath} does not match the content this transform expects — refusing to move/rewrite ` +
+        '(the file may have drifted since this step was written)'
+    )
+  }
+  return {
+    kind: 'edit',
+    target: newPath,
+    summary,
+    changed: true,
+    before,
+    after,
+    write: () => {
+      mkdirSync(dirname(newPath), { recursive: true })
+      writeFileSync(newPath, after, 'utf8')
+      if (oldPath !== newPath) rmSync(oldPath, { force: true })
+    },
+  }
+}
+
 /** A step that copies a binary file (logo/icon) into place. Always reported as a change. */
 export function copyFileStep(srcPath, destPath, summary) {
   return {
