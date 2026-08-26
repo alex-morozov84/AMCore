@@ -67,6 +67,28 @@ export function setMarkdownField(content, { label, value, insertAfterLabel }) {
   return `${content.slice(0, insertAt)}\n- **${label}:** ${value}${content.slice(insertAt)}`
 }
 
+/**
+ * Keeps only `locale`'s block inside a flat, one-level-deep
+ * `{ <locale>: { ... }, <locale>: { ... } }` object literal whose blocks
+ * don't themselves contain `{`/`}` (true for every locale-keyed message map
+ * in this codebase today). Used to trim a `Record<SupportedLocale, ...>`
+ * literal to one entry for `init:project --mode=single` — a regex can't
+ * express "reserved," but it can express "one block per known locale key."
+ * Fails closed if `locale`'s block isn't found.
+ */
+export function trimLocaleRecordLiteral(content, locale) {
+  const blockRe = /^( {2})(\w+): \{\n([\s\S]*?)\n\1\},?\n/gm
+  const blocks = [...content.matchAll(blockRe)]
+  const kept = blocks.find((block) => block[2] === locale)
+  if (!kept) {
+    throw new EngineError(`no "${locale}" block found to keep in this locale-keyed object literal`)
+  }
+  const start = blocks[0].index
+  const end = blocks.at(-1).index + blocks.at(-1)[0].length
+  const keptBlock = `${kept[1]}${kept[2]}: {\n${kept[3]}\n${kept[1]}},\n`
+  return content.slice(0, start) + keptBlock + content.slice(end)
+}
+
 /** Sets a dotted path (`meta.title`) on a plain object, creating intermediate objects as needed. */
 export function setJsonPath(obj, dottedPath, value) {
   const keys = dottedPath.split('.')
