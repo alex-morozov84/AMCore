@@ -22,6 +22,11 @@ const SINGLE_LINE_ANSWERS = [
 // to bypass that promise: lowercase, URL-safe characters, optional scope.
 const NPM_PACKAGE_NAME = /^(?:@[a-z0-9-*~][a-z0-9-*._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
 
+// npm's validate-npm-package-name carries an explicit denylist for names
+// that are syntactically valid but reserved — a regex alone won't catch
+// these two.
+const NPM_RESERVED_PACKAGE_NAMES = ['node_modules', 'favicon.ico']
+
 /**
  * Fails closed on anything a flag can smuggle past the interactive
  * prompts' own constraints: an out-of-range enum value, a newline in a
@@ -41,10 +46,15 @@ export function validateAnswers(answers) {
     }
   }
   if (answers.packageName !== undefined) {
-    if (answers.packageName.length > 214 || !NPM_PACKAGE_NAME.test(answers.packageName)) {
+    const invalid =
+      answers.packageName.length > 214 ||
+      !NPM_PACKAGE_NAME.test(answers.packageName) ||
+      NPM_RESERVED_PACKAGE_NAMES.includes(answers.packageName)
+    if (invalid) {
       throw new EngineError(
         `--package-name=${answers.packageName} is not a valid npm package name ` +
-          '(lowercase, URL-safe characters only, optionally scoped as @scope/name)'
+          '(lowercase, URL-safe characters only, optionally scoped as @scope/name, ' +
+          `and not a reserved name: ${NPM_RESERVED_PACKAGE_NAMES.join(', ')})`
       )
     }
   }

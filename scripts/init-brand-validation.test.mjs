@@ -44,6 +44,20 @@ describe('init-brand input validation', () => {
     assert.doesNotMatch(readFixtureFile(fixture.root, 'package.json'), /Bad Name!/)
   })
 
+  for (const reserved of ['node_modules', 'favicon.ico']) {
+    test(`rejects the reserved npm package name "${reserved}" before building a plan`, () => {
+      fixture = createFixtureRepo()
+      const result = runInitBrand(fixture.root, ['--dry-run', `--package-name=${reserved}`])
+
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, /is not a valid npm package name/)
+      assert.doesNotMatch(
+        readFixtureFile(fixture.root, 'package.json'),
+        new RegExp(`"name": "${reserved}"`)
+      )
+    })
+  }
+
   test('rejects a newline embedded in a single-line answer', () => {
     fixture = createFixtureRepo()
     const result = runInitBrand(fixture.root, [

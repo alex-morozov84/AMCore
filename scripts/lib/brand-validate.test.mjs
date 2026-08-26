@@ -63,5 +63,11 @@ describe('validateAnswers', () => {
     test('rejects a name over 214 characters', () => {
       assert.throws(() => validateAnswers({ packageName: 'a'.repeat(215) }), EngineError)
     })
+
+    for (const reserved of ['node_modules', 'favicon.ico']) {
+      test(`rejects the reserved name "${reserved}" (syntactically valid but denylisted by npm)`, () => {
+        assert.throws(() => validateAnswers({ packageName: reserved }), EngineError)
+      })
+    }
   })
 })
