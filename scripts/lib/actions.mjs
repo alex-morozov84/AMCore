@@ -15,18 +15,20 @@ export function escapeRegExp(value) {
  * every edit safe to compute ahead of time and safe to re-run.
  */
 export function replaceCapturedField(content, regex, newValue) {
-  const globalRegex = new RegExp(
-    regex.source,
-    regex.flags.includes('g') ? regex.flags : `${regex.flags}g`
-  )
+  // `d` (hasIndices) gives the capture group's own [start, end] span. Do not
+  // locate it by searching the matched text for the captured substring —
+  // if the current value's text also appears earlier in the match (e.g. a
+  // field whose label and value happen to share a word), that finds the
+  // wrong occurrence and corrupts the line instead of the value.
+  let flags = regex.flags.includes('g') ? regex.flags : `${regex.flags}g`
+  flags = flags.includes('d') ? flags : `${flags}d`
+  const globalRegex = new RegExp(regex.source, flags)
   const matches = [...content.matchAll(globalRegex)]
   if (matches.length !== 1) {
     throw new EngineError(`expected exactly one match for ${regex}, found ${matches.length}`)
   }
-  const match = matches[0]
-  const captured = match[1]
-  const start = match.index + match[0].indexOf(captured)
-  return content.slice(0, start) + newValue + content.slice(start + captured.length)
+  const [start, end] = matches[0].indices[1]
+  return content.slice(0, start) + newValue + content.slice(end)
 }
 
 const markdownFieldRegex = (label) =>
@@ -46,6 +48,9 @@ export function readMarkdownField(content, label) {
  * can't be found.
  */
 export function setMarkdownField(content, { label, value, insertAfterLabel }) {
+  if (/[\r\n]/.test(value)) {
+    throw new EngineError(`field "${label}": value cannot contain a newline (one field per line)`)
+  }
   const fieldRe = markdownFieldRegex(label)
   if (fieldRe.test(content)) {
     return replaceCapturedField(content, markdownFieldRegex(label), value)
@@ -77,6 +82,20 @@ export function setJsonPath(obj, dottedPath, value) {
 export function readCapturedField(content, regex) {
   const match = content.match(regex)
   return match ? match[1] : undefined
+}
+
+/**
+ * Escapes `value` for insertion as the *inner content* of an existing
+ * single-quoted TS/JS string literal (the surrounding quotes are already
+ * in the file and stay put). Rejects newlines — these fields are always
+ * meant to be single-line, and a literal newline would either break the
+ * statement or silently span multiple lines.
+ */
+export function escapeTsSingleQuoteInner(value) {
+  if (/[\r\n]/.test(value)) {
+    throw new EngineError('value cannot contain a newline inside a single-line TS string literal')
+  }
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 }
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])

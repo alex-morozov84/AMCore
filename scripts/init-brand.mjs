@@ -14,6 +14,17 @@ const ROOT = process.env.AMCORE_INIT_ROOT
   ? path.resolve(process.env.AMCORE_INIT_ROOT)
   : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
+// AMCORE_INIT_SKIP_VERIFY lets tests skip pnpm typecheck/lint, which can't
+// run meaningfully against a disposable fixture tree that isn't a real
+// pnpm/turbo workspace. AMCORE_INIT_FAKE_VERIFY_FAIL lets a test exercise
+// the "verification failed" reporting/exit-code path without needing a
+// real broken workspace. Both are unset in normal use.
+const verify = process.env.AMCORE_INIT_FAKE_VERIFY_FAIL
+  ? () => [{ label: 'fake', ok: false, output: 'boom' }]
+  : process.env.AMCORE_INIT_SKIP_VERIFY
+    ? () => []
+    : undefined
+
 async function main() {
   const flags = parseCommonFlags(process.argv.slice(2), BRAND_FLAG_OPTIONS)
   const answers = await collectAnswers({ root: ROOT, flags })
@@ -23,6 +34,7 @@ async function main() {
     flags,
     steps,
     confirmMessage: 'Apply these brand/identity changes?',
+    ...(verify ? { verify } : {}),
   })
 }
 

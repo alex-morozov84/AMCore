@@ -15,6 +15,8 @@ export function fileStep(filePath, transform, summary) {
     target: filePath,
     summary: changed ? summary : `${summary} (already up to date)`,
     changed,
+    before,
+    after,
     write: () => writeFileSync(filePath, after, 'utf8'),
   }
 }

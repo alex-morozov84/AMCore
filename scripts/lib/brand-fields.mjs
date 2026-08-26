@@ -9,6 +9,7 @@ import {
   THEME_MODES,
   THEME_PERSISTENCE_MODES,
 } from './brand-config.mjs'
+import { validateAnswers } from './brand-validate.mjs'
 
 const FLAG_TO_ANSWER = {
   'product-name': 'productName',
@@ -61,10 +62,11 @@ function answersFromFlags(flags) {
 
 export async function collectAnswers({ root, flags }) {
   const amcoreVersion = detectAmcoreVersion(root)
-  if (!process.stdin.isTTY || hasAnyValueFlag(flags)) {
-    return { ...answersFromFlags(flags), amcoreVersion }
-  }
-  const answers = await promptAnswers(root)
+  const answers =
+    !process.stdin.isTTY || hasAnyValueFlag(flags)
+      ? answersFromFlags(flags)
+      : await promptAnswers(root)
+  validateAnswers(answers)
   return { ...answers, amcoreVersion }
 }
 
@@ -84,7 +86,7 @@ async function promptAnswers(root) {
       productDescription: () =>
         clack.text({
           message: 'Product description / PWA tagline (leave empty to keep current)',
-          initialValue: readCapturedField(manifest, /description: '([^']*)',/),
+          initialValue: readCapturedField(manifest, /description: '((?:[^'\\]|\\.)*)',/),
         }),
       purpose: () =>
         clack.text({

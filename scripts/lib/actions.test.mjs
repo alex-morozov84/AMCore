@@ -8,6 +8,7 @@ import {
   readMarkdownField,
   setJsonPath,
   readPngDimensions,
+  escapeTsSingleQuoteInner,
 } from './actions.mjs'
 
 describe('escapeRegExp', () => {
@@ -29,6 +30,14 @@ describe('replaceCapturedField', () => {
   test('fails closed on more than one match (proof-fail for ambiguous edits)', () => {
     const content = "name: 'A',\nname: 'B',"
     assert.throws(() => replaceCapturedField(content, /name: '([^']*)',/g, 'x'), EngineError)
+  })
+
+  test('regression: does not corrupt the line when the captured value text also appears earlier in the match', () => {
+    // Agent 2's repro: label "Product" and value "Product" collide under a
+    // naive `match[0].indexOf(captured)` search, which finds "Product"
+    // inside "**Product:**" instead of the actual value at the end.
+    const out = replaceCapturedField('- **Product:** Product', /^- \*\*Product:\*\* (.*)$/, 'Acme')
+    assert.equal(out, '- **Product:** Acme')
   })
 })
 
@@ -69,6 +78,27 @@ describe('setMarkdownField', () => {
     const once = setMarkdownField(content, { label: 'Product', value: 'Acme' })
     const twice = setMarkdownField(once, { label: 'Product', value: 'Acme' })
     assert.equal(once, twice)
+  })
+
+  test('fails closed on a value containing a newline', () => {
+    assert.throws(() => setMarkdownField(content, { label: 'Product', value: 'a\nb' }), EngineError)
+  })
+})
+
+describe('escapeTsSingleQuoteInner', () => {
+  test('escapes an embedded single quote so the result is a valid string literal', () => {
+    const escaped = escapeTsSingleQuoteInner("Bob's App")
+    assert.equal(escaped, "Bob\\'s App")
+    // Proves it round-trips as valid JS, not just visually plausible.
+    assert.equal(new Function(`return '${escaped}'`)(), "Bob's App")
+  })
+
+  test('escapes a backslash', () => {
+    assert.equal(escapeTsSingleQuoteInner('a\\b'), 'a\\\\b')
+  })
+
+  test('fails closed on a newline', () => {
+    assert.throws(() => escapeTsSingleQuoteInner('a\nb'), EngineError)
   })
 })
 
