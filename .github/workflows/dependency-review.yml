@@ -25,6 +25,7 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
+          # amcore:sentinel-block start=storybook-allowlist
           # Temporary, narrow exception — not a gate bypass. Both advisories
           # are `image-size@2.0.2`, pulled in transitively via
           # `@storybook/nextjs-vite` -> `vite-plugin-storybook-nextjs`
@@ -45,3 +46,4 @@ jobs:
           # `docs/operations/ci-security.md` for the general policy this
           # follows.
           allow-ghsas: GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr
+          # amcore:sentinel-block end=storybook-allowlist

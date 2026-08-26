@@ -434,6 +434,7 @@ jobs:
         if: always()
         run: docker compose down -v
 
+  # amcore:sentinel-block start=storybook-job
   storybook:
     name: Storybook
     runs-on: ubuntu-latest
@@ -502,3 +503,4 @@ jobs:
       - name: Run Storybook a11y/interaction tests
         working-directory: apps/web
         run: pnpm test:storybook
+  # amcore:sentinel-block end=storybook-job

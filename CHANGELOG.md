@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`PROJECT_CONTEXT.md`:** new downstream-product contract fields —
+  `i18n_mode`, `base_locale`, `supported_locales`, `frontend_storybook`,
+  `theme_persistence`, `initialized_from_amcore_version` — laying the
+  groundwork for the upcoming `pnpm init:brand`/`pnpm init:project` fork
+  initialization tooling (ADR-071). AMCore upstream's own current choices are
+  now recorded explicitly (`i18n_mode: multi`, `frontend_storybook: enabled`,
+  `theme_persistence: local-storage`) rather than left implicit in the code.
+
 ## [0.4.0] - 2026-08-25
 
 ### Upgrading
