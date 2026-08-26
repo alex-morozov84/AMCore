@@ -73,11 +73,10 @@ actually made instead of leaving them implicit in deleted/kept files:
   was initialized from, e.g. `v0.4.0`. Lets later tooling and upstream-sync
   decisions know the fork's starting baseline.
 
-These fields are set by `pnpm init:brand` / `pnpm init:project` when a fork
-initializes itself (see `ai/BACKLOG.md` — Track 10, and
-`ai/decisions/adr-071-frontend-project-scaffolding-and-rebrand-initialization.md`);
-until that tooling exists or a fork sets them by hand, absence of these
-fields means "AMCore's shipped defaults apply," not "undecided."
+These fields are maintained by the fork initialization tooling
+(`pnpm init:brand` / `pnpm init:project`) once it exists, or by hand in a
+downstream fork until then. Their absence means "AMCore's shipped defaults
+apply," not "undecided."
 
 ## Workflow Modes
 
