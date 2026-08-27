@@ -6,7 +6,7 @@
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { createRealRepoCopy } from './test-fixture.mjs'
 import {
@@ -15,6 +15,7 @@ import {
 } from './project-plan-web-structure.mjs'
 import { buildWebConfigSteps } from './project-plan-web-config.mjs'
 import { buildWebPagesSteps } from './project-plan-web-pages.mjs'
+import { buildWebNavSteps } from './project-plan-web-nav.mjs'
 import { buildSharedLocaleSteps } from './project-plan-shared.mjs'
 
 let copy
@@ -33,6 +34,7 @@ function applyAllSteps(root, locale) {
     ...buildWebStructureSteps(root),
     ...buildWebConfigSteps(root),
     ...buildWebPagesSteps(root),
+    ...buildWebNavSteps(root),
     ...buildWebLocaleDirCleanupSteps(root),
   ]
   for (const step of steps) step.write()
@@ -87,5 +89,17 @@ describe('the full init:project --mode=single transform (against a real repo cop
       assert.match(content, /redirectIfAuthenticated\(\)/)
       assert.doesNotMatch(content, /resolveLocaleParam/)
     }
+  })
+
+  test('no apps/web source file imports @/i18n/navigation afterward', () => {
+    copy = createRealRepoCopy()
+    applyAllSteps(copy.root, 'en')
+
+    const offenders = globSync('apps/web/src/**/*.{ts,tsx}', { cwd: copy.root })
+      .map((rel) => [rel, readFileSync(path.join(copy.root, rel), 'utf8')])
+      .filter(([, content]) => content.includes('@/i18n/navigation'))
+      .map(([rel]) => rel)
+
+    assert.deepEqual(offenders, [])
   })
 })
