@@ -7,7 +7,10 @@ import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { createRealRepoCopy } from './test-fixture.mjs'
-import { buildWebStructureSteps } from './project-plan-web-structure.mjs'
+import {
+  buildWebStructureSteps,
+  buildWebLocaleDirCleanupSteps,
+} from './project-plan-web-structure.mjs'
 
 let copy
 
@@ -63,5 +66,24 @@ describe('buildWebStructureSteps (against a real repo copy)', () => {
     // i18n/request.ts and i18n/messages.test.ts are rewritten/kept by a
     // different slice, not deleted by this one.
     assert.equal(existsSync(path.join(copy.root, 'apps/web/src/i18n/request.ts')), true)
+
+    // [locale] itself is not removed by this slice -- other files inside it
+    // (the pages/layout move-and-rewrites) haven't run yet in isolation here.
+    assert.equal(existsSync(path.join(copy.root, 'apps/web/src/app/[locale]')), true)
+  })
+})
+
+describe('buildWebLocaleDirCleanupSteps (against a real repo copy)', () => {
+  // This step deletes recursively regardless of remaining content -- it is
+  // meant to run last, after every other apps/web slice has already moved
+  // its files out. The ordering guarantee itself is exercised by
+  // project-plan-web-pages.test.mjs's full-sequence test, not here.
+  test('removes the [locale] directory', () => {
+    copy = createRealRepoCopy()
+    assert.equal(existsSync(path.join(copy.root, 'apps/web/src/app/[locale]')), true)
+
+    for (const step of buildWebLocaleDirCleanupSteps(copy.root)) step.write()
+
+    assert.equal(existsSync(path.join(copy.root, 'apps/web/src/app/[locale]')), false)
   })
 })
