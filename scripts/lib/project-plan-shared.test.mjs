@@ -12,17 +12,20 @@ import { buildSharedLocaleSteps } from './project-plan-shared.mjs'
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 describe('buildSharedLocaleSteps (against the real repo, read-only)', () => {
-  test('trims SUPPORTED_LOCALES/DEFAULT_LOCALE and the telegram message map to one locale', () => {
+  test('trims SUPPORTED_LOCALES/DEFAULT_LOCALE and the telegram/email message maps to one locale', () => {
     const steps = buildSharedLocaleSteps(REPO_ROOT, 'ru')
-    assert.equal(steps.length, 2)
+    assert.equal(steps.length, 3)
 
-    const [constants, telegram] = steps
+    const [constants, telegram, email] = steps
     assert.match(constants.after, /export const SUPPORTED_LOCALES = \['ru'\] as const/)
     assert.match(constants.after, /export const DEFAULT_LOCALE: SupportedLocale = 'ru'/)
     assert.doesNotMatch(constants.after, /'en'/)
 
     assert.match(telegram.after, /ru: \{/)
     assert.doesNotMatch(telegram.after, /en: \{/)
+
+    assert.match(email.after, /ru: \{/)
+    assert.doesNotMatch(email.after, /en: \{/)
   })
 
   test('fails closed for a locale that has no block to keep', () => {

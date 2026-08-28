@@ -28,6 +28,21 @@ export function replaceExactBlock(content, before, after) {
 }
 
 /**
+ * Replaces every occurrence of `before` with `after` — unlike
+ * {@link replaceExactBlock}, repetition here is not ambiguity to guard
+ * against but the expected shape (e.g. the same `locale: 'ru',` fixture
+ * line repeated across several unrelated mocks in one spec file). Still
+ * fails closed if `before` is absent, so a drifted source file aborts
+ * rather than silently becoming a no-op.
+ */
+export function replaceAllExactText(content, before, after) {
+  if (!content.includes(before)) {
+    throw new EngineError(`expected at least one occurrence of "${before}", found none`)
+  }
+  return content.split(before).join(after)
+}
+
+/**
  * Keeps only `locale`'s block inside a flat, one-level-deep
  * `{ <locale>: { ... }, <locale>: { ... } }` object literal whose blocks
  * don't themselves contain `{`/`}` (true for every locale-keyed message map

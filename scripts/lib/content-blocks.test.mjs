@@ -1,7 +1,12 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { EngineError } from './actions.mjs'
-import { removeExactBlock, replaceExactBlock, trimLocaleRecordLiteral } from './content-blocks.mjs'
+import {
+  removeExactBlock,
+  replaceAllExactText,
+  replaceExactBlock,
+  trimLocaleRecordLiteral,
+} from './content-blocks.mjs'
 
 describe('removeExactBlock', () => {
   test('removes the one occurrence of the block', () => {
@@ -24,6 +29,16 @@ describe('replaceExactBlock', () => {
 
   test('fails closed when the target text is absent', () => {
     assert.throws(() => replaceExactBlock('a\nb\n', 'old\n', 'new\n'), EngineError)
+  })
+})
+
+describe('replaceAllExactText', () => {
+  test('replaces every occurrence, not just one', () => {
+    assert.equal(replaceAllExactText('ru, ru, ru', 'ru', 'en'), 'en, en, en')
+  })
+
+  test('fails closed when the target text is absent', () => {
+    assert.throws(() => replaceAllExactText('a\nb\n', 'old', 'new'), EngineError)
   })
 })
 
