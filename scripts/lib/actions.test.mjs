@@ -7,6 +7,7 @@ import {
   setMarkdownField,
   readMarkdownField,
   setJsonPath,
+  deleteJsonPath,
   readPngDimensions,
   escapeTsSingleQuoteInner,
 } from './actions.mjs'
@@ -126,6 +127,31 @@ describe('setJsonPath', () => {
     const obj = { meta: { title: 'AMCore', description: 'old' } }
     setJsonPath(obj, 'meta.title', 'Acme')
     assert.deepEqual(obj, { meta: { title: 'Acme', description: 'old' } })
+  })
+})
+
+describe('deleteJsonPath', () => {
+  test('deletes a top-level key', () => {
+    const obj = { name: 'Acme', version: '1.0.0' }
+    deleteJsonPath(obj, 'version')
+    assert.deepEqual(obj, { name: 'Acme' })
+  })
+
+  test('deletes a dotted-path key, preserving siblings', () => {
+    const obj = { scripts: { dev: 'x', storybook: 'y' } }
+    deleteJsonPath(obj, 'scripts.storybook')
+    assert.deepEqual(obj, { scripts: { dev: 'x' } })
+  })
+
+  test('fails closed when the key is absent', () => {
+    assert.throws(() => deleteJsonPath({ scripts: {} }, 'scripts.storybook'), EngineError)
+  })
+
+  test('fails closed when an intermediate segment is not an object', () => {
+    assert.throws(
+      () => deleteJsonPath({ scripts: 'not-an-object' }, 'scripts.storybook'),
+      EngineError
+    )
   })
 })
 

@@ -1,10 +1,13 @@
 #!/usr/bin/env node
-// `pnpm init:project --mode=single --locale=<code>` (Track 10, ADR-071) — the
-// one-time, destructive structural transform that removes locale routing
-// from a downstream fork. See ai/models-talk.md's FINAL PLAN and
-// ai/decisions/adr-071-*.md for the full design. Unlike init:brand, this is
-// not repeatable: re-running after a successful apply is refused by
-// assertMultiLocaleAppStructure (see its doc comment).
+// `pnpm init:project` (Track 10, ADR-071) — one-time, destructive structural
+// transforms for a downstream fork. See ai/models-talk.md's FINAL PLAN and
+// ai/decisions/adr-071-*.md for the full design. Two independent dimensions,
+// each with its own reinitialize guard, usable alone or together:
+//   --mode=single --locale=<code>   removes apps/web's locale routing
+//   --storybook=disabled            removes the Storybook surface entirely
+// Unlike init:brand, neither is repeatable: re-running a dimension already
+// applied is refused by its own assert* guard (see project-config.mjs and
+// project-config-storybook.mjs).
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -19,7 +22,9 @@ import {
   assertMultiLocaleAppStructure,
   prismaFollowUpMessage,
 } from './lib/project-config.mjs'
+import { STORYBOOK_VALUES, assertStorybookEnabled } from './lib/project-config-storybook.mjs'
 import { buildProjectSteps } from './lib/project-plan.mjs'
+import { buildStorybookDisableSteps } from './lib/project-plan-storybook.mjs'
 
 // Testability seams for scripts/*.test.mjs — see init-brand.mjs's header for
 // why these three are inert unless NODE_ENV=test is also set.
@@ -41,31 +46,67 @@ function parseProjectFlags(argv) {
   const flags = parseCommonFlags(argv, {
     mode: { type: 'string' },
     locale: { type: 'string' },
+    storybook: { type: 'string' },
   })
-  if (!flags.mode) throw new EngineError('--mode is required, e.g. --mode=single')
-  if (!PROJECT_MODES.includes(flags.mode)) {
-    throw new EngineError(`--mode=${flags.mode} is not one of: ${PROJECT_MODES.join(', ')}`)
+
+  if (!flags.mode && !flags.storybook) {
+    throw new EngineError(
+      'at least one of --mode or --storybook is required, e.g. --mode=single --locale=en, ' +
+        'or --storybook=disabled, or both together'
+    )
   }
-  if (!flags.locale) throw new EngineError('--locale is required, e.g. --locale=en')
+
+  if (flags.mode) {
+    if (!PROJECT_MODES.includes(flags.mode)) {
+      throw new EngineError(`--mode=${flags.mode} is not one of: ${PROJECT_MODES.join(', ')}`)
+    }
+    if (!flags.locale) {
+      throw new EngineError('--locale is required when --mode is given, e.g. --locale=en')
+    }
+  }
+
+  if (flags.storybook && !STORYBOOK_VALUES.includes(flags.storybook)) {
+    throw new EngineError(
+      `--storybook=${flags.storybook} is not one of: ${STORYBOOK_VALUES.join(', ')}`
+    )
+  }
+
   return flags
 }
 
 async function main() {
   const flags = parseProjectFlags(process.argv.slice(2))
-  assertKnownLocale(ROOT, flags.locale)
-  assertMultiLocaleAppStructure(ROOT)
-  const steps = buildProjectSteps(ROOT, { locale: flags.locale })
 
-  console.log(prismaFollowUpMessage(flags.locale))
-  console.log()
+  if (flags.mode) {
+    assertKnownLocale(ROOT, flags.locale)
+    assertMultiLocaleAppStructure(ROOT)
+  }
+  if (flags.storybook) {
+    assertStorybookEnabled(ROOT)
+  }
+
+  const steps = [
+    ...(flags.mode ? buildProjectSteps(ROOT, { locale: flags.locale }) : []),
+    ...(flags.storybook ? buildStorybookDisableSteps(ROOT) : []),
+  ]
+
+  if (flags.mode) {
+    console.log(prismaFollowUpMessage(flags.locale))
+    console.log()
+  }
+
+  const dimensions = [
+    flags.mode && `single-locale (--locale=${flags.locale})`,
+    flags.storybook && 'Storybook-disable',
+  ].filter(Boolean)
 
   await runInitCommand({
     cwd: ROOT,
     flags,
     steps,
     confirmMessage:
-      `Apply the single-locale (--locale=${flags.locale}) transform? ` +
-      'This moves and deletes many apps/web files and cannot be undone by re-running this command.',
+      `Apply the ${dimensions.join(' + ')} transform? ` +
+      'This moves/deletes files and cannot be undone by re-running this command.',
     verify: verify ?? runProjectVerification,
   })
 }

@@ -9,6 +9,7 @@ import {
   markdownFieldsTransform,
   linePatchesTransform,
   jsonPatchTransform,
+  jsonDeleteTransform,
 } from './plan-steps.mjs'
 
 let dir
@@ -72,6 +73,15 @@ describe('jsonPatchTransform', () => {
       '{\n  "meta": {\n    "title": "AMCore"\n  }\n}'
     )
     assert.equal(after, '{\n  "meta": {\n    "title": "Acme"\n  }\n}\n')
+  })
+})
+
+describe('jsonDeleteTransform', () => {
+  test('deletes dotted-path keys and re-serializes at 2-space indent with a trailing newline', () => {
+    const after = jsonDeleteTransform(['scripts.storybook', 'devDependencies.storybook'])(
+      '{\n  "scripts": {\n    "dev": "x",\n    "storybook": "y"\n  },\n  "devDependencies": {\n    "storybook": "^1.0.0"\n  }\n}'
+    )
+    assert.equal(after, '{\n  "scripts": {\n    "dev": "x"\n  },\n  "devDependencies": {}\n}\n')
   })
 })
 

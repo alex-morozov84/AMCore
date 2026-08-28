@@ -5,41 +5,11 @@
 // than calling step.write() directly like project-plan-web-*.test.mjs.
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { fileURLToPath } from 'node:url'
 import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
-
-const INIT_PROJECT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'init-project.mjs')
-
-function commit(root) {
-  git(root, ['init', '--quiet', '--initial-branch=main'])
-  git(root, ['add', '-A'])
-  git(root, [
-    '-c',
-    'user.name=t',
-    '-c',
-    'user.email=t@example.com',
-    'commit',
-    '-m',
-    'fixture',
-    '--quiet',
-  ])
-}
-
-function runInitProject(root, args, { skipVerify = true } = {}) {
-  return spawnSync('node', [INIT_PROJECT, ...args], {
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      AMCORE_INIT_ROOT: root,
-      ...(skipVerify ? { AMCORE_INIT_SKIP_VERIFY: '1' } : {}),
-    },
-  })
-}
+import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
 
 let copy
 

@@ -3,7 +3,13 @@
 // `--dry-run` exact and `apply()` a pure "replay the already-computed plan."
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { setMarkdownField, replaceCapturedField, setJsonPath, EngineError } from './actions.mjs'
+import {
+  setMarkdownField,
+  replaceCapturedField,
+  setJsonPath,
+  deleteJsonPath,
+  EngineError,
+} from './actions.mjs'
 
 /** A step that rewrites one text file via a pure `content => content` transform. */
 export function fileStep(filePath, transform, summary) {
@@ -136,6 +142,15 @@ export function jsonPatchTransform(patches) {
   return (content) => {
     const obj = JSON.parse(content)
     for (const [key, value] of Object.entries(patches)) setJsonPath(obj, key, value)
+    return `${JSON.stringify(obj, null, 2)}\n`
+  }
+}
+
+/** `content => content` parsing JSON, deleting dotted-path keys, and re-serializing at 2-space indent. */
+export function jsonDeleteTransform(paths) {
+  return (content) => {
+    const obj = JSON.parse(content)
+    for (const path of paths) deleteJsonPath(obj, path)
     return `${JSON.stringify(obj, null, 2)}\n`
   }
 }
