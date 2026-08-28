@@ -21,13 +21,14 @@
     "lint": "turbo lint && eslint scripts",
     "lint:fix": "turbo run lint -- --fix",
     "test": "turbo test",
-    "test:scripts": "node --test scripts/lib/*.test.mjs scripts/*.test.mjs",
+    "test:scripts": "node --test --test-concurrency=1 scripts/lib/*.test.mjs scripts/*.test.mjs",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "prepare": "husky",
-    "init:brand": "node scripts/init-brand.mjs"
+    "init:brand": "node scripts/init-brand.mjs",
+    "init:project": "node scripts/init-project.mjs"
   },
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",

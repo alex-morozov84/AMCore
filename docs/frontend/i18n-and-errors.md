@@ -173,18 +173,28 @@ Consider whether the backend should keep accepting the new locale from
 ## Downstream: running a single-locale app
 
 A fork that only ever needs one language should **remove** the locale routing
-rather than configure it away:
+rather than configure it away. `pnpm init:project --mode=single --locale=<code>`
+automates this — a one-time, destructive transform; see its own `--dry-run`
+output and ADR-071 for the safety model. It does:
 
 1. Move everything from `src/app/[locale]/` up into `src/app/`.
 2. Delete `src/proxy.ts`, `src/i18n/routing.ts`, `src/i18n/navigation.ts`, and
-   `src/i18n/params.ts`; import `Link` and navigation hooks from `next/link` and
-   `next/navigation` again, and drop the ESLint rule that blocks them.
+   `src/i18n/params.ts`; rewrite `Link` and navigation hooks to import from
+   `next/link` and `next/navigation` again, and drop the ESLint rule that
+   blocks them.
 3. Return a static locale from `src/i18n/request.ts` — next-intl's
    ["without i18n routing"](https://next-intl.dev/docs/getting-started/app-router/without-i18n-routing)
    setup.
-4. Remove `LocaleSwitcher` and its `PATCH /auth/me` persistence.
-5. Keep one catalogue. Trim `SUPPORTED_LOCALES` to that locale so the backend,
-   emails, and notifications agree.
+4. Remove the `LocaleSwitcher` feature and every render call site. The
+   backend's `PATCH /auth/me` locale persistence is **not** removed — it
+   becomes dead (no caller), not incorrect, and is a manual follow-up if you
+   want it gone too.
+5. Keep one catalogue (deletes the other locale's message file) and trim
+   `SUPPORTED_LOCALES`/`DEFAULT_LOCALE` so the backend, emails, and
+   notifications agree. Prints a manual-follow-up reminder for
+   `apps/api/prisma/user.prisma`'s `locale` column default, which it does
+   not touch — that needs a real `prisma migrate dev` against a live
+   database.
 
 **Do not instead set `localePrefix: 'never'`.** It looks like the obvious way to
 get unprefixed URLs, and it is a trap: next-intl implements `'never'` by
