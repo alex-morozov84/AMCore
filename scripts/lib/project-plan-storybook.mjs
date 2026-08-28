@@ -5,6 +5,7 @@ import { buildStorybookCiSteps } from './project-plan-storybook-ci.mjs'
 import { buildStorybookPackageSteps } from './project-plan-storybook-package.mjs'
 import { buildStorybookEslintSteps } from './project-plan-storybook-eslint.mjs'
 import { buildStorybookVitestSteps } from './project-plan-storybook-vitest.mjs'
+import { buildStorybookFilesSteps } from './project-plan-storybook-files.mjs'
 
 export function buildStorybookDisableSteps(root) {
   return [
@@ -12,5 +13,6 @@ export function buildStorybookDisableSteps(root) {
     ...buildStorybookPackageSteps(root),
     ...buildStorybookEslintSteps(root),
     ...buildStorybookVitestSteps(root),
+    ...buildStorybookFilesSteps(root),
   ]
 }
