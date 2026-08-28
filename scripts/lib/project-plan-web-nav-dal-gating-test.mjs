@@ -97,9 +97,8 @@ describe('redirectIfAuthenticated — the auth-pages redirect-away check', () =>
 
 const AFTER = `// @vitest-environment node
 import type * as ReactModule from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-
 import { redirect } from 'next/navigation'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { redirectIfAuthenticated, requireSession } from './dal'
 import { fakeUser, fakeVaultEntry, mockSessionCookie } from './dal.test-helpers'

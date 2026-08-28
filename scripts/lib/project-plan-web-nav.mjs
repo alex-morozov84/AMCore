@@ -6,6 +6,7 @@ import { buildWebNavHooksSteps } from './project-plan-web-nav-hooks.mjs'
 import { buildWebNavLogoutSteps } from './project-plan-web-nav-logout.mjs'
 import { buildWebNavBffSteps } from './project-plan-web-nav-bff.mjs'
 import { buildWebNavOauthSteps } from './project-plan-web-nav-oauth.mjs'
+import { buildWebNavOauthTestSteps } from './project-plan-web-nav-oauth-test.mjs'
 import { buildWebNavAppShellSteps } from './project-plan-web-nav-appshell.mjs'
 import { buildWebNavEslintGuardsSteps } from './project-plan-web-nav-eslint-guards.mjs'
 import { buildWebNavDalGatingTestSteps } from './project-plan-web-nav-dal-gating-test.mjs'
@@ -18,6 +19,7 @@ export function buildWebNavSteps(root) {
     ...buildWebNavLogoutSteps(root),
     ...buildWebNavBffSteps(root),
     ...buildWebNavOauthSteps(root),
+    ...buildWebNavOauthTestSteps(root),
     ...buildWebNavAppShellSteps(root),
     ...buildWebNavEslintGuardsSteps(root),
     ...buildWebNavDalGatingTestSteps(root),

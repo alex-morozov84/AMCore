@@ -4,9 +4,12 @@
 // and i18n/navigation.ts are gone, so the 4 tests asserting it still exists
 // would fail against the post-transform config. Targeted block removal, not
 // exactContentStep: this file's Zod-locale, FSD-boundaries, and
-// token-styling coverage is unrelated and must survive untouched.
+// token-styling coverage is unrelated and must survive untouched. Also
+// fixes the FSD cross-slice-import test, found via the real `pnpm --filter
+// web test` in init-project.test.mjs: it used the deleted
+// `@/features/locale-switcher` slice as its "some other feature" probe.
 import path from 'node:path'
-import { fileStep, removeExactBlock } from './init-engine.mjs'
+import { fileStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
 
 const NAVIGATION_IMPORT_BAN_TESTS = `  it('bans locale-unaware navigation imports', async () => {
     const messages = await lint(
@@ -56,7 +59,12 @@ const NAVIGATION_SOURCE_EXEMPTION_TEST = `  it('still bans layer barrels inside 
 function eslintGuardsTransform(content) {
   let next = removeExactBlock(content, NAVIGATION_IMPORT_BAN_TESTS)
   next = removeExactBlock(next, LEAVES_COMPLIANT_CODE_ALONE_TEST)
-  return removeExactBlock(next, NAVIGATION_SOURCE_EXEMPTION_TEST)
+  next = removeExactBlock(next, NAVIGATION_SOURCE_EXEMPTION_TEST)
+  return replaceExactBlock(
+    next,
+    "      'a slice may not import a sibling feature slice',\n      'src/features/auth-login/probe.ts',\n      \"'@/features/locale-switcher'\",\n",
+    "      'a slice may not import a sibling feature slice',\n      'src/features/auth-login/probe.ts',\n      \"'@/features/auth-logout'\",\n"
+  )
 }
 
 export function buildWebNavEslintGuardsSteps(root) {
