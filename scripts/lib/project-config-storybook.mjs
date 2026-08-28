@@ -34,3 +34,24 @@ export function assertStorybookEnabled(root) {
     )
   }
 }
+
+/**
+ * Unlike the locale dimension, this one edits apps/web/package.json's
+ * dependency list — which leaves pnpm-lock.yaml stale the moment the apply
+ * writes. Running `pnpm install` to fix that is exactly the production
+ * network/node_modules-mutation hazard runProjectVerification is built to
+ * never cause (see verify.mjs's header) — confirmed live: CI=true's
+ * --frozen-lockfile-like behavior makes every later typecheck/lint/build/
+ * test step fail immediately on the mismatch, before doing any real work.
+ * Printed instead of running that automated verification for this
+ * dimension; init-project.mjs skips it (verify: () => []) whenever
+ * --storybook is part of the apply.
+ */
+export function storybookInstallFollowUpMessage() {
+  return (
+    'Storybook: apps/web/package.json dependencies changed. Automated post-apply ' +
+    'verification was skipped for this reason — run `pnpm install`, then verify manually: ' +
+    'pnpm typecheck && pnpm lint && pnpm --filter web build && pnpm --filter api test && ' +
+    'pnpm --filter web test.'
+  )
+}

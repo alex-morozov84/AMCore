@@ -130,15 +130,18 @@ export function git(root, args) {
  * does itself (see verify.mjs's header): the real `init:project`/`init:brand`
  * CLIs run against a fork the owner already has installed, and must not
  * reach the network or rewrite `node_modules` as a side effect of a
- * migration. `CI=true` answers pnpm's own deps-status confirmation
- * non-interactively; resolved from the local store, so this does not hit
- * the network when the real repo's lockfile is already satisfied.
+ * migration. Deliberately *not* `CI=true`: that forces pnpm's
+ * `--frozen-lockfile`-like behavior, which is right for verify.mjs's
+ * read-only typecheck/lint/build/test steps but wrong here — this helper
+ * must also represent the ordinary `pnpm install` a real user runs after a
+ * transform that changed a package.json's dependencies (e.g.
+ * --storybook=disabled), which needs to update the now-stale lockfile, not
+ * refuse on the mismatch.
  */
 export function installDependencies(root) {
   execFileSync('pnpm', ['install'], {
     cwd: root,
     encoding: 'utf8',
-    env: { ...process.env, CI: 'true' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 }

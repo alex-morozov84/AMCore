@@ -22,7 +22,11 @@ import {
   assertMultiLocaleAppStructure,
   prismaFollowUpMessage,
 } from './lib/project-config.mjs'
-import { STORYBOOK_VALUES, assertStorybookEnabled } from './lib/project-config-storybook.mjs'
+import {
+  STORYBOOK_VALUES,
+  assertStorybookEnabled,
+  storybookInstallFollowUpMessage,
+} from './lib/project-config-storybook.mjs'
 import { buildProjectSteps } from './lib/project-plan.mjs'
 import { buildStorybookDisableSteps } from './lib/project-plan-storybook.mjs'
 import { combinedTargets, buildCombinedSteps } from './lib/project-plan-combined.mjs'
@@ -36,7 +40,7 @@ const ROOT =
     ? path.resolve(process.env.AMCORE_INIT_ROOT)
     : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-const verify =
+const testVerifyOverride =
   isTestEnv && process.env.AMCORE_INIT_FAKE_VERIFY_FAIL
     ? () => [{ label: 'fake', ok: false, output: 'boom' }]
     : isTestEnv && process.env.AMCORE_INIT_SKIP_VERIFY
@@ -107,11 +111,23 @@ async function main() {
     console.log(prismaFollowUpMessage(flags.locale))
     console.log()
   }
+  if (flags.storybook) {
+    console.log(storybookInstallFollowUpMessage())
+    console.log()
+  }
 
   const dimensions = [
     flags.mode && `single-locale (--locale=${flags.locale})`,
     flags.storybook && 'Storybook-disable',
   ].filter(Boolean)
+
+  // --storybook edits apps/web/package.json's dependency list, which
+  // leaves pnpm-lock.yaml stale the moment apply writes — automated
+  // typecheck/lint/build/test would fail on that mismatch before doing any
+  // real work, not because the transform is wrong. Skipped in favor of the
+  // printed manual follow-up above; see storybookInstallFollowUpMessage's
+  // doc comment for why running `pnpm install` here isn't the fix either.
+  const defaultVerify = flags.storybook ? () => [] : runProjectVerification
 
   await runInitCommand({
     cwd: ROOT,
@@ -120,7 +136,7 @@ async function main() {
     confirmMessage:
       `Apply the ${dimensions.join(' + ')} transform? ` +
       'This moves/deletes files and cannot be undone by re-running this command.',
-    verify: verify ?? runProjectVerification,
+    verify: testVerifyOverride ?? defaultVerify,
   })
 }
 
