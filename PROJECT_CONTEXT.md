@@ -81,10 +81,14 @@ actually made instead of leaving them implicit in deleted/kept files:
   was initialized from, e.g. `v0.4.0`. Lets later tooling and upstream-sync
   decisions know the fork's starting baseline.
 
-These fields are maintained by the fork initialization tooling
-(`pnpm init:brand` / `pnpm init:project`) once it exists, or by hand in a
-downstream fork until then. Their absence means "AMCore's shipped defaults
-apply," not "undecided."
+These fields are maintained by the fork initialization tooling: `pnpm
+init:brand` for everything above `i18n_mode`, and `pnpm init:project
+--mode=single --locale=<code>` for `i18n_mode`/`base_locale`/
+`supported_locales` specifically (the one-time, destructive route-topology
+transform described in `docs/frontend/i18n-and-errors.md` → "Downstream:
+running a single-locale app"). A field can also be set by hand in a
+downstream fork. Their absence means "AMCore's shipped defaults apply," not
+"undecided."
 
 ## Workflow Modes
 

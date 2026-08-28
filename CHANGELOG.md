@@ -30,6 +30,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   also gained lint coverage (`pnpm lint` now runs `eslint scripts`),
   closing a pre-existing gap that let `scripts/dependency-freshness.mjs`
   slip through unlinted.
+- **`pnpm init:project --mode=single --locale=<code>`** (ADR-071): a
+  one-time, destructive transform that removes locale routing entirely for
+  a downstream fork that only ever needs one language — see
+  `docs/frontend/i18n-and-errors.md` → "Downstream: running a single-locale
+  app". Moves `app/[locale]/*` up, deletes `proxy.ts`/`routing.ts`/
+  `navigation.ts`/`params.ts` and the `LocaleSwitcher` feature, rewrites
+  every affected import/call site, trims `SUPPORTED_LOCALES`/
+  `DEFAULT_LOCALE` (and the `emailMessages`/`telegramGenericMessages`
+  catalogues) to the chosen locale, and updates `PROJECT_CONTEXT.md`'s
+  `i18n_mode`/`base_locale`/`supported_locales`. Unlike `init:brand`, not
+  repeatable — a second run refuses with a clear message rather than
+  re-reading files the first run already moved. `--dry-run` computes and
+  prints the full plan plus unified diffs without writing anything; apply
+  mode runs the same safety guards as `init:brand` plus a real
+  `pnpm --filter web build` and the `api`/`web` unit-test suites after
+  writing.
 
 ## [0.4.0] - 2026-08-25
 
