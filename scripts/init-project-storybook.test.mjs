@@ -89,6 +89,9 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     const context = readFileSync(path.join(copy.root, 'PROJECT_CONTEXT.md'), 'utf8')
     assert.match(context, /- \*\*i18n_mode:\*\* single/)
     assert.match(context, /- \*\*frontend_storybook:\*\* disabled/)
+    // Regression: the frontend_storybook bullet used to cite
+    // docs/frontend/storybook.md, which this same apply deletes.
+    assert.doesNotMatch(context, /docs\/frontend\/storybook\.md/)
 
     const eslintConfig = readFileSync(path.join(copy.root, 'apps/web/eslint.config.mjs'), 'utf8')
     assert.doesNotMatch(eslintConfig, /storybook/i)
@@ -122,6 +125,9 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
 
     const context = readFileSync(path.join(copy.root, 'PROJECT_CONTEXT.md'), 'utf8')
     assert.match(context, /- \*\*frontend_storybook:\*\* disabled/)
+    // Regression: the frontend_storybook bullet used to cite
+    // docs/frontend/storybook.md, which this same apply deletes.
+    assert.doesNotMatch(context, /docs\/frontend\/storybook\.md/)
   })
 
   test('after the manual pnpm install the follow-up asks for, real typecheck/lint/build/test all pass', () => {

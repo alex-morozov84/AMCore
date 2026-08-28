@@ -10,7 +10,10 @@
 import path from 'node:path'
 import { fileStep, markdownFieldsTransform } from './init-engine.mjs'
 import { localeContextOps } from './project-plan-context.mjs'
-import { storybookContextOps } from './project-plan-storybook-context.mjs'
+import {
+  storybookContextOps,
+  removeStorybookDocLinkFromContext,
+} from './project-plan-storybook-context.mjs'
 import { removeNavigationBanFromEslintConfig } from './project-plan-web-config.mjs'
 import { removeStorybookFromEslintConfig } from './project-plan-storybook-eslint.mjs'
 
@@ -23,8 +26,11 @@ export function buildCombinedSteps(root, locale) {
   return [
     fileStep(
       path.join(root, 'PROJECT_CONTEXT.md'),
-      markdownFieldsTransform([...localeContextOps(locale), ...storybookContextOps()]),
-      'update PROJECT_CONTEXT.md fields (single-locale + storybook-disabled)'
+      (content) =>
+        removeStorybookDocLinkFromContext(
+          markdownFieldsTransform([...localeContextOps(locale), ...storybookContextOps()])(content)
+        ),
+      'update PROJECT_CONTEXT.md fields (single-locale + storybook-disabled) and drop the dead doc link'
     ),
     fileStep(
       path.join(root, 'apps/web/eslint.config.mjs'),
