@@ -82,13 +82,16 @@ actually made instead of leaving them implicit in deleted/kept files:
   decisions know the fork's starting baseline.
 
 These fields are maintained by the fork initialization tooling: `pnpm
-init:brand` for everything above `i18n_mode`, and `pnpm init:project
+init:brand` for everything above `i18n_mode`; `pnpm init:project
 --mode=single --locale=<code>` for `i18n_mode`/`base_locale`/
 `supported_locales` specifically (the one-time, destructive route-topology
 transform described in `docs/frontend/i18n-and-errors.md` → "Downstream:
-running a single-locale app"). A field can also be set by hand in a
-downstream fork. Their absence means "AMCore's shipped defaults apply," not
-"undecided."
+running a single-locale app"); and `pnpm init:project --storybook=disabled`
+for `frontend_storybook` (the one-time, destructive removal described
+above). The two `init:project` dimensions are independent — either flag
+works alone or both together in one invocation. A field can also be set by
+hand in a downstream fork. Their absence means "AMCore's shipped defaults
+apply," not "undecided."
 
 ## Workflow Modes
 

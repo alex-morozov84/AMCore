@@ -46,6 +46,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mode runs the same safety guards as `init:brand` plus a real
   `pnpm --filter web build` and the `api`/`web` unit-test suites after
   writing.
+- **`pnpm init:project --storybook=disabled`** (ADR-071): a one-time,
+  destructive removal of the Storybook surface entirely, for a downstream
+  fork that doesn't want the component workshop — see
+  `PROJECT_CONTEXT.md`'s `frontend_storybook` field. Deletes `.storybook/`
+  and every co-located `*.stories.tsx` file, the CI `storybook` job and its
+  Dependency Review advisory allowlist, the `storybook`/`build-storybook`/
+  `test:storybook` scripts and every Storybook-only devDependency, the
+  `eslint-plugin-storybook` config block, the Storybook Vitest project, and
+  `docs/frontend/storybook.md` (updating every other doc that linked to
+  it). Independent of the `--mode=single` locale dimension — either flag
+  works alone or both together in one `init:project` invocation. Because
+  this dimension edits `apps/web/package.json`'s dependencies (unlike the
+  locale dimension), automated post-apply verification is skipped in favor
+  of a printed manual follow-up: run `pnpm install`, then verify by hand.
 
 ## [0.4.0] - 2026-08-25
 
