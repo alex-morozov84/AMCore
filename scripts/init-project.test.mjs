@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
-import { createRealRepoCopy, git } from './lib/test-fixture.mjs'
+import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
 
 const INIT_PROJECT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'init-project.mjs')
 
@@ -61,6 +61,16 @@ describe('init-project (end-to-end against a real-repo copy)', () => {
     assert.equal(git(copy.root, ['status', '--porcelain']).trim(), '')
   })
 
+  test('rejects an unsupported --locale early, with a clear message', () => {
+    copy = createRealRepoCopy()
+    commit(copy.root)
+
+    const result = runInitProject(copy.root, ['--dry-run', '--mode=single', '--locale=de'])
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /--locale=de is not one of the current supported locales: en, ru/)
+  })
+
   test('--dry-run for a non-en locale prints the stricter Prisma note', () => {
     copy = createRealRepoCopy()
     commit(copy.root)
@@ -75,6 +85,9 @@ describe('init-project (end-to-end against a real-repo copy)', () => {
   test('apply (--locale=en): PROJECT_CONTEXT.md, a real typecheck/lint/build, and an unprefixed link', async () => {
     copy = createRealRepoCopy()
     commit(copy.root)
+    // Test-harness setup, not production behavior -- runProjectVerification
+    // itself never installs (see verify.mjs's header).
+    installDependencies(copy.root)
 
     const result = runInitProject(copy.root, ['--mode=single', '--locale=en', '--yes'], {
       skipVerify: false,

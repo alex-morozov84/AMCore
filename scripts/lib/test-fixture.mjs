@@ -123,6 +123,26 @@ export function git(root, args) {
   })
 }
 
+/**
+ * Installs a {@link createRealRepoCopy} copy's dependencies — `git archive`
+ * only copies tracked files, so there is no `node_modules` yet. This is
+ * test-harness setup, deliberately not something `runProjectVerification`
+ * does itself (see verify.mjs's header): the real `init:project`/`init:brand`
+ * CLIs run against a fork the owner already has installed, and must not
+ * reach the network or rewrite `node_modules` as a side effect of a
+ * migration. `CI=true` answers pnpm's own deps-status confirmation
+ * non-interactively; resolved from the local store, so this does not hit
+ * the network when the real repo's lockfile is already satisfied.
+ */
+export function installDependencies(root) {
+  execFileSync('pnpm', ['install'], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, CI: 'true' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+}
+
 export function readFixtureFile(root, relPath) {
   return readFileSync(path.join(root, relPath), 'utf8')
 }

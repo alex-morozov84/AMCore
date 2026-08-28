@@ -1,6 +1,6 @@
 // Path/mode tables for init:project, mirroring brand-config.mjs's role for
 // init:brand.
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { EngineError } from './actions.mjs'
 
@@ -23,6 +23,41 @@ export function assertMultiLocaleAppStructure(root) {
       `${localeDir} does not exist — either init:project --mode=single has already been ` +
         'applied to this checkout, or this is not an AMCore checkout with the default ' +
         'multi-locale app structure.'
+    )
+  }
+}
+
+/**
+ * Reads the current `SUPPORTED_LOCALES` directly from its source file —
+ * not an `@amcore/shared` import, since this script runs against `root`
+ * (a disposable copy in tests, or the real checkout), not necessarily a
+ * resolvable installed package. Same regex `buildSharedLocaleSteps` already
+ * parses this line with.
+ */
+export function readCurrentSupportedLocales(root) {
+  const constantsPath = path.join(root, 'packages/shared/src/constants/index.ts')
+  const content = readFileSync(constantsPath, 'utf8')
+  const match = content.match(/^export const SUPPORTED_LOCALES = \[([^\]]*)\] as const$/m)
+  if (!match) {
+    throw new EngineError(`could not find SUPPORTED_LOCALES in ${constantsPath}`)
+  }
+  return match[1]
+    .split(',')
+    .map((entry) => entry.trim().replace(/^'|'$/g, ''))
+    .filter(Boolean)
+}
+
+/**
+ * Fails closed with a clear, early message for an unsupported `--locale`
+ * instead of the confusing `no "<locale>" block found` that would
+ * otherwise surface deep inside trimLocaleRecordLiteral once the plan
+ * starts building.
+ */
+export function assertKnownLocale(root, locale) {
+  const known = readCurrentSupportedLocales(root)
+  if (!known.includes(locale)) {
+    throw new EngineError(
+      `--locale=${locale} is not one of the current supported locales: ${known.join(', ')}`
     )
   }
 }

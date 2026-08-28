@@ -15,6 +15,7 @@ import {
 } from './lib/init-engine.mjs'
 import {
   PROJECT_MODES,
+  assertKnownLocale,
   assertMultiLocaleAppStructure,
   prismaFollowUpMessage,
 } from './lib/project-config.mjs'
@@ -51,6 +52,7 @@ function parseProjectFlags(argv) {
 
 async function main() {
   const flags = parseProjectFlags(process.argv.slice(2))
+  assertKnownLocale(ROOT, flags.locale)
   assertMultiLocaleAppStructure(ROOT)
   const steps = buildProjectSteps(ROOT, { locale: flags.locale })
 

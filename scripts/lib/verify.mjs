@@ -10,6 +10,14 @@
 // holds, with nothing in the type system to catch it. `test:e2e` stays out
 // on purpose — it needs Docker/Testcontainers, which this verification step
 // cannot assume is available.
+//
+// Deliberately never runs `pnpm install`: this module runs as part of the
+// real `init:project`/`init:brand` CLIs against a fork the owner already
+// has installed, and a migration tool reaching out to the network and
+// rewriting node_modules on every real run is its own hazard, independent
+// of whether trimming it helps. A disposable test copy with no
+// node_modules is the test harness's own setup problem — see
+// init-project.test.mjs, which installs once before invoking the CLI.
 import { spawnSync } from 'node:child_process'
 
 const VERIFY_STEPS = [
@@ -18,23 +26,12 @@ const VERIFY_STEPS = [
 ]
 
 const PROJECT_VERIFY_STEPS = [
-  { label: 'install', args: ['install'] },
   ...VERIFY_STEPS,
   { label: 'web build', args: ['--filter', 'web', 'build'] },
   { label: 'api test', args: ['--filter', 'api', 'test'] },
   { label: 'web test', args: ['--filter', 'web', 'test'] },
 ]
 
-// CI=true: on a disposable copy whose node_modules doesn't match the
-// lockfile bit-for-bit (e.g. it doesn't exist yet), pnpm's own deps-status
-// check aborts asking for an interactive confirmation rather than just
-// reinstalling — harmless to set unconditionally, since it is a no-op
-// against an already-consistent checkout. The explicit 'install' step in
-// PROJECT_VERIFY_STEPS exists because relying only on each later command's
-// own implicit deps-status-check proved unreliable under concurrent runs
-// (a later step could still report "node_modules missing" even with CI=true
-// set) — an explicit, checked install step surfaces that failure as its own
-// labelled result instead of a confusing cascade of "command not found."
 function runSteps(cwd, steps) {
   return steps.map(({ label, args }) => {
     const result = spawnSync('pnpm', args, {
