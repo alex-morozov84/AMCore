@@ -4,6 +4,8 @@
 // come from lib/init-project-test-helpers.mjs.
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { createRealRepoCopy, git } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
 
@@ -61,5 +63,34 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /Prisma: no DB default change needed/)
     assert.match(result.stdout, /ci\.yml: remove the storybook job/)
+    // Proves the combined-step path (project-plan-combined.mjs) ran, not
+    // two separate fileSteps that would have silently clobbered each other.
+    assert.match(
+      result.stdout,
+      /update PROJECT_CONTEXT\.md fields \(single-locale \+ storybook-disabled\)/
+    )
+    assert.match(result.stdout, /remove the navigation ban and the Storybook plugin\/rules/)
+  })
+
+  test("applying both together leaves both dimensions' edits in PROJECT_CONTEXT.md and eslint.config.mjs", () => {
+    copy = createRealRepoCopy()
+    commit(copy.root)
+
+    const result = runInitProject(copy.root, [
+      '--mode=single',
+      '--locale=en',
+      '--storybook=disabled',
+      '--yes',
+    ])
+
+    assert.equal(result.status, 0, result.stdout + result.stderr)
+
+    const context = readFileSync(path.join(copy.root, 'PROJECT_CONTEXT.md'), 'utf8')
+    assert.match(context, /- \*\*i18n_mode:\*\* single/)
+    assert.match(context, /- \*\*frontend_storybook:\*\* disabled/)
+
+    const eslintConfig = readFileSync(path.join(copy.root, 'apps/web/eslint.config.mjs'), 'utf8')
+    assert.doesNotMatch(eslintConfig, /storybook/i)
+    assert.doesNotMatch(eslintConfig, /NAVIGATION_PATHS/)
   })
 })

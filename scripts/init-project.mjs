@@ -25,6 +25,7 @@ import {
 import { STORYBOOK_VALUES, assertStorybookEnabled } from './lib/project-config-storybook.mjs'
 import { buildProjectSteps } from './lib/project-plan.mjs'
 import { buildStorybookDisableSteps } from './lib/project-plan-storybook.mjs'
+import { combinedTargets, buildCombinedSteps } from './lib/project-plan-combined.mjs'
 
 // Testability seams for scripts/*.test.mjs — see init-brand.mjs's header for
 // why these three are inert unless NODE_ENV=test is also set.
@@ -85,9 +86,21 @@ async function main() {
     assertStorybookEnabled(ROOT)
   }
 
+  // --mode and --storybook, when both given, each independently want to
+  // edit PROJECT_CONTEXT.md and apps/web/eslint.config.mjs — see
+  // project-plan-combined.mjs's header. Drop those targets from each
+  // dimension's own steps and use the combined replacement instead.
+  const both = Boolean(flags.mode && flags.storybook)
+  const overlap = both ? new Set(combinedTargets(ROOT)) : new Set()
+
   const steps = [
-    ...(flags.mode ? buildProjectSteps(ROOT, { locale: flags.locale }) : []),
-    ...(flags.storybook ? buildStorybookDisableSteps(ROOT) : []),
+    ...(flags.mode
+      ? buildProjectSteps(ROOT, { locale: flags.locale }).filter((s) => !overlap.has(s.target))
+      : []),
+    ...(flags.storybook
+      ? buildStorybookDisableSteps(ROOT).filter((s) => !overlap.has(s.target))
+      : []),
+    ...(both ? buildCombinedSteps(ROOT, flags.locale) : []),
   ]
 
   if (flags.mode) {

@@ -13,7 +13,14 @@ const RULES_BLOCK = `
   ...storybookPlugin.configs['flat/recommended'],
 `
 
-function transform(content) {
+/**
+ * Exported on its own (not just a buildStorybookEslintSteps closure) so
+ * project-plan-combined.mjs can compose it with
+ * removeNavigationBanFromEslintConfig into one fileStep when --mode and
+ * --storybook are both given — see that file's header for why two
+ * independent fileSteps on the same target silently clobber each other.
+ */
+export function removeStorybookFromEslintConfig(content) {
   let next = removeExactBlock(content, IMPORT_LINE)
   next = removeExactBlock(next, IGNORE_ENTRY)
   return removeExactBlock(next, RULES_BLOCK)
@@ -23,7 +30,7 @@ export function buildStorybookEslintSteps(root) {
   return [
     fileStep(
       path.join(root, 'apps/web/eslint.config.mjs'),
-      transform,
+      removeStorybookFromEslintConfig,
       'apps/web/eslint.config.mjs: remove the Storybook plugin import, ignore entry, and rules block'
     ),
   ]

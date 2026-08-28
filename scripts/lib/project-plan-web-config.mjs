@@ -102,20 +102,26 @@ const NAVIGATION_SOURCE_EXEMPTION_BLOCK = `  // Deliberate relaxation over a str
 
 `
 
+/**
+ * Exported on its own (not just a buildWebConfigSteps closure) so
+ * project-plan-combined.mjs can compose it with
+ * removeStorybookFromEslintConfig into one fileStep when --mode and
+ * --storybook are both given — see that file's header for why two
+ * independent fileSteps on the same target silently clobber each other.
+ */
+export function removeNavigationBanFromEslintConfig(content) {
+  let next = removeExactBlock(content, NAVIGATION_PATHS_BLOCK)
+  next = removeExactBlock(next, NAVIGATION_SOURCE_EXEMPTION_BLOCK)
+  return replaceExactBlock(
+    next,
+    "      'no-restricted-imports': ['error', { paths: NAVIGATION_PATHS, patterns: [LAYER_BARREL] }],\n",
+    "      'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],\n"
+  )
+}
+
 export function buildWebConfigSteps(root) {
   const requestPath = path.join(root, 'apps/web/src/i18n/request.ts')
   const eslintPath = path.join(root, 'apps/web/eslint.config.mjs')
-
-  const eslintTransform = (content) => {
-    let next = removeExactBlock(content, NAVIGATION_PATHS_BLOCK)
-    next = removeExactBlock(next, NAVIGATION_SOURCE_EXEMPTION_BLOCK)
-    next = replaceExactBlock(
-      next,
-      "      'no-restricted-imports': ['error', { paths: NAVIGATION_PATHS, patterns: [LAYER_BARREL] }],\n",
-      "      'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],\n"
-    )
-    return next
-  }
 
   return [
     exactContentStep(
@@ -125,7 +131,7 @@ export function buildWebConfigSteps(root) {
     ),
     fileStep(
       eslintPath,
-      eslintTransform,
+      removeNavigationBanFromEslintConfig,
       'remove the navigation-import ban and its navigation.ts-scoped exemption'
     ),
   ]
