@@ -1,5 +1,5 @@
 // init:project --storybook=disabled: the root README.md's doc-map row,
-// index row, and test-tooling sentence.
+// index row, test-tooling sentence, and fork-onboarding callout mentions.
 import path from 'node:path'
 import { fileStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
 
@@ -11,6 +11,19 @@ const FRONTEND_TESTING_ROW_AFTER =
 
 const STORYBOOK_ROW =
   '| Storybook             | [`docs/frontend/storybook.md`](docs/frontend/storybook.md) — component workshop, story conventions, a11y gate, and maintenance procedures                                       |\n'
+
+const ONBOARDING_FLAGS_BEFORE =
+  '> `pnpm init:project` (single-locale and/or disabling Storybook) — see\n'
+
+const ONBOARDING_FLAGS_AFTER = '> `pnpm init:project` (single-locale) — see\n'
+
+const ONBOARDING_STRUCTURAL_BEFORE = `> flags. \`init:project\` records structural choices such as single-locale mode
+> and Storybook removal. Still set by hand: where the
+`
+
+const ONBOARDING_STRUCTURAL_AFTER = `> flags. \`init:project\` records structural choices such as single-locale mode.
+> Still set by hand: where the
+`
 
 const TOOLING_SENTENCE_BEFORE = `Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
 Vitest for React Email template rendering and frontend unit/integration tests,
@@ -38,9 +51,11 @@ export function buildStorybookDocsRootSteps(root) {
           FRONTEND_TESTING_ROW_AFTER
         )
         next = removeExactBlock(next, STORYBOOK_ROW)
-        return replaceExactBlock(next, TOOLING_SENTENCE_BEFORE, TOOLING_SENTENCE_AFTER)
+        next = replaceExactBlock(next, TOOLING_SENTENCE_BEFORE, TOOLING_SENTENCE_AFTER)
+        next = replaceExactBlock(next, ONBOARDING_FLAGS_BEFORE, ONBOARDING_FLAGS_AFTER)
+        return replaceExactBlock(next, ONBOARDING_STRUCTURAL_BEFORE, ONBOARDING_STRUCTURAL_AFTER)
       },
-      'README.md: remove the Storybook doc-map row, index row, and tooling mention'
+      'README.md: remove the Storybook doc-map row, index row, tooling mention, and onboarding-callout mentions'
     ),
   ]
 }

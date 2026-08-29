@@ -1,8 +1,23 @@
 // init:project --storybook=disabled: CONTRIBUTING.md's web test-command
-// table rows and the shared-package-build paragraph that names the now-gone
-// CI storybook job.
+// table rows, the shared-package-build paragraph that names the now-gone
+// CI storybook job, and the Development Commands table/flag-note mentions.
 import path from 'node:path'
 import { fileStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
+
+const INIT_PROJECT_ROW_BEFORE =
+  '| `pnpm init:project` | Apply downstream structural choices such as single-locale mode or disabling Storybook |\n'
+
+const INIT_PROJECT_ROW_AFTER =
+  '| `pnpm init:project` | Apply downstream structural choices such as single-locale mode                        |\n'
+
+const FLAG_NOTE_BEFORE = `\`pnpm init:project\` requires explicit flags. Use
+\`--mode=single --locale=<code>\` to remove locale routing, and/or
+\`--storybook=disabled\` to remove Storybook. See
+`
+
+const FLAG_NOTE_AFTER = `\`pnpm init:project\` requires explicit flags. Use
+\`--mode=single --locale=<code>\` to remove locale routing. See
+`
 
 const COMMAND_ROWS =
   '| `pnpm --filter web storybook`           | Storybook component workshop dev server (`http://localhost:6006`)                                                                                            |\n' +
@@ -26,10 +41,12 @@ export function buildStorybookDocsContributingSteps(root) {
     fileStep(
       path.join(root, 'CONTRIBUTING.md'),
       (content) => {
-        const next = removeExactBlock(content, COMMAND_ROWS)
+        let next = replaceExactBlock(content, INIT_PROJECT_ROW_BEFORE, INIT_PROJECT_ROW_AFTER)
+        next = replaceExactBlock(next, FLAG_NOTE_BEFORE, FLAG_NOTE_AFTER)
+        next = removeExactBlock(next, COMMAND_ROWS)
         return replaceExactBlock(next, BUILD_PARAGRAPH_BEFORE, BUILD_PARAGRAPH_AFTER)
       },
-      'CONTRIBUTING.md: remove the Storybook command rows and CI job mention'
+      'CONTRIBUTING.md: remove Storybook from init:project docs, command rows, and CI job mention'
     ),
   ]
 }
