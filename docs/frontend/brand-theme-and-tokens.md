@@ -219,37 +219,56 @@ migration mirror. If a product keeps AMCore's default strategy, do not call
 ## Downstream rebrand checklist
 
 A downstream product forks `apps/web` in place (per ADR-063's fork-in-place
-model) and replaces these deliberately, by hand or with an agent — there is
-no rebrand CLI/init script in this starter (see
-[Project scaffolding](#project-scaffolding-not-in-this-starter-yet)):
+model). `pnpm init:brand` (ADR-071) automates most of this — a repeatable,
+non-destructive prompt/flag-driven script — leaving only what a script
+cannot safely do for you:
 
-1. **Logo** — replace `public/logo-dark.png` / `logo-light.png` with your
-   own light/dark variants.
-2. **PWA icons** — regenerate `public/icons/*.png` from your new logo (see
-   `public/icons/README.md`); update `manifest.ts`'s `background_color`/
-   `theme_color` to match your new palette.
-3. **Site metadata** — update `manifest.ts`'s `name`/`short_name`/
-   `description` and `app/layout.tsx`'s `metadata`.
-4. **Theme tokens** — edit `globals.css`'s `:root`/`.dark` values. Keep the
-   `@theme inline` bridge and the token _names_ stable if you can — other
-   code depends on the names existing, not their values.
-5. **Theme mode** — decide whether your product keeps `system` + a toggle,
-   or forces `light`/`dark` only. To force one, change
-   `DEFAULT_THEME_SETTING` in `theme.ts` and don't expose a toggle in your
-   UI; the resolution logic already supports a fixed setting with no code
-   changes beyond that.
-6. **Theme persistence strategy** — keep AMCore's default static-friendly
-   `localStorage` strategy unless your product intentionally wants the
-   [cookie-backed SSR variant](#cookie-backed-ssr-theme-advanced-variant).
+1. **Logo** — supply your own light/dark PNGs; `init:brand` validates and
+   copies them to `public/logo-dark.png` / `logo-light.png` for you (never
+   generates them).
+2. **PWA icons** — supply each size from `public/icons/README.md`;
+   `init:brand` validates exact pixel dimensions and copies them into place.
+   `manifest.ts`'s `background_color`/`theme_color` are **not** automated —
+   update those by hand to match your new palette.
+3. **Site metadata** — `init:brand` updates `manifest.ts`'s `name`/
+   `short_name`/`description`, root `package.json`'s `name`/`description`,
+   and `app/layout.tsx`'s actual metadata source
+   (`messages/en.json`'s `meta.title`/`meta.description`; `ru.json`'s
+   `meta.title` only — `meta.description` is never auto-translated, update
+   it by hand).
+4. **Theme tokens** — edit `globals.css`'s `:root`/`.dark` values by hand;
+   not automated. Keep the `@theme inline` bridge and the token _names_
+   stable if you can — other code depends on the names existing, not their
+   values.
+5. **Theme mode** — `init:brand` can set `DEFAULT_THEME_SETTING` in
+   `theme.ts` for you (pass the mode, or answer the prompt) if your product
+   forces `light`/`dark` only instead of `system` + a toggle; the resolution
+   logic already supports a fixed setting with no further code changes.
+   Not exposing a toggle in your UI stays a manual step.
+6. **Theme persistence strategy** — `init:brand` records your choice
+   (AMCore's default static-friendly `localStorage`, or the
+   [cookie-backed SSR variant](#cookie-backed-ssr-theme-advanced-variant))
+   in `PROJECT_CONTEXT.md`'s `theme_persistence` field. It does not generate
+   the cookie-backed SSR variant's code — that stays the manual recipe
+   linked above if you choose it.
 
-### Project scaffolding (not in this starter yet)
+It also records `PROJECT_CONTEXT.md`'s identity fields (`Mode`, `Product`,
+`Purpose`, upstream-sync policy, workflow mode, `initialized_from_amcore_version`)
+when you answer the corresponding prompts.
 
-Whether AMCore should grow an interactive rebrand/project initializer (prompts,
-automatic file replacement, dry-run) is a deliberately separate, deferred
-decision — see the maintainer backlog. If it is built, one prompt should choose
-the theme persistence strategy: AMCore's static-friendly default or the
-cookie-backed SSR variant above. This starter ships the checklist above and
-nothing more for now.
+### Project scaffolding
+
+`pnpm init:project` (ADR-071) is the separate, one-time, **destructive**
+sibling command for structural choices `init:brand` deliberately never
+touches — `init:project --mode=single --locale=<code>` removes locale
+routing entirely (see
+[i18n & errors § Downstream: running a single-locale app](./i18n-and-errors.md#downstream-running-a-single-locale-app))
+and `init:project --storybook=disabled` removes the Storybook surface (see
+[Storybook § Downstream: disabling Storybook](./storybook.md#downstream-disabling-storybook)).
+Either flag works alone or both together in one invocation. See
+`PROJECT_CONTEXT.md`'s "Frontend Starter Choices" section and ADR-071 for
+the full contract and safety model (dry-run, typed confirmation, fail-closed
+on drift).
 
 ## Inline style and contrast
 
