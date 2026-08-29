@@ -61,6 +61,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   locale dimension), automated post-apply verification is skipped in favor
   of a printed manual follow-up: run `pnpm install`, then verify by hand.
 
+### Changed
+
+- **Docs closeout for `pnpm init:brand`/`pnpm init:project` (ADR-071):**
+  the root `README.md` fork-onboarding callout, `docs/README.md`,
+  `docs/frontend/README.md`, and `docs/frontend/brand-theme-and-tokens.md`'s
+  downstream rebrand checklist now point at the actual commands instead of
+  a stale "no rebrand CLI/init script in this starter" claim.
+  `docs/frontend/storybook.md` gained the parallel "Downstream: disabling
+  Storybook" section `docs/frontend/i18n-and-errors.md` already had for the
+  single-locale transform.
+
 ## [0.4.0] - 2026-08-25
 
 ### Upgrading
