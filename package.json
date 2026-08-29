@@ -33,14 +33,14 @@
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",
     "@clack/prompts": "^1.7.0",
-    "@commitlint/cli": "^21.2.1",
-    "@commitlint/config-conventional": "^21.2.0",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "@eslint/js": "^9.39.5",
     "eslint": "^9.39.5",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "prettier": "^3.9.6",
-    "turbo": "^2.10.8",
+    "turbo": "^2.10.11",
     "typescript": "^5.9.3"
   },
   "lint-staged": {
