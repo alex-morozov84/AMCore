@@ -205,6 +205,34 @@ this dependency here, and where's the negative proof it actually failed
 without it?" CI cannot catch an unnecessary, preemptive entry the way it
 catches a missing one — it just silently sits there as debt.
 
+## Downstream: disabling Storybook
+
+A downstream product that does not want the component-workshop surface
+should **remove** it rather than leave it present but unused.
+`pnpm init:project --storybook=disabled` automates this — a one-time,
+destructive transform; see its own `--dry-run` output and **ADR-071** for
+the safety model. It works alone, or together with
+`--mode=single --locale=<code>` in one invocation. It does:
+
+1. Delete `.storybook/` and every co-located `*.stories.tsx` file.
+2. Remove Storybook's scripts and devDependencies from
+   `apps/web/package.json`, the Storybook plugin/rules block from
+   `eslint.config.mjs`, and the `storybook` project from `vitest.config.ts`.
+3. Remove the CI `storybook` job (`.github/workflows/ci.yml`) and its
+   Dependency Review allowlist entry (`.github/workflows/dependency-review.yml`),
+   both anchored by `amcore:sentinel-block` marker comments added ahead of
+   time for exactly this.
+4. Delete this page and every other Storybook-specific public doc
+   reference, and update `PROJECT_CONTEXT.md`'s `frontend_storybook` field
+   and its descriptive bullet to a self-contained "disabled" description.
+
+Because removing `apps/web/package.json` dependencies leaves
+`pnpm-lock.yaml` stale the instant apply writes, automated post-apply
+verification is skipped for this dimension — the command prints a manual
+follow-up (`pnpm install`, then `pnpm typecheck && pnpm lint && pnpm
+--filter web build && pnpm --filter api test && pnpm --filter web test`)
+instead of running it for you.
+
 ## Commands
 
 | Command                             | What it runs                                                                                                   |

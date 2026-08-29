@@ -149,16 +149,25 @@ pnpm dev
 > `COMPOSE_REDIS_URL` (and the S3 vars) in `.env`. See
 > [`docs/operations/deployment.md`](docs/operations/deployment.md).
 
-> **Building a product from this starter?** First update
-> [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) from `upstream-starter` to
-> `downstream-product` and record the product identity, roadmap location, upstream-sync
-> policy, and workflow mode: `strict`, `flexible`, or `custom`. Repository files
-> _declare_ the technical policy; GitHub-side enforcement is separate external state.
-> For `strict` mode, apply the supported settings with one command (`gh` + `jq` +
-> repo admin): `bash scripts/setup-repo-security.sh`. `flexible` and `custom`
-> forks may choose different repository protections, but should document their
-> rules in `PROJECT_CONTEXT.md` or their contributor guide. Deployment environments
-> and secrets are configured separately. See
+> **Building a product from this starter?** Run `pnpm init:brand` (product
+> identity, logo/icons, theme) and, if needed, the one-time, destructive
+> `pnpm init:project` (single-locale and/or disabling Storybook) — see
+> [`docs/frontend/brand-theme-and-tokens.md` → Project scaffolding](docs/frontend/brand-theme-and-tokens.md#project-scaffolding).
+> `init:brand` updates [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) from
+> `upstream-starter` to `downstream-product` when you provide a product
+> name, and records the product identity, upstream-sync policy, and workflow
+> mode (`strict`, `flexible`, or `custom`) from the corresponding prompts or
+> flags. `init:project` records structural choices such as single-locale mode
+> and Storybook removal. Still set by hand: where the
+> roadmap/status/product-specific decisions live, and anything GitHub-side
+> (branch protection, secrets, environments). Repository files _declare_ the
+> technical policy; GitHub-side enforcement is separate external state. For
+> `strict` mode, apply the supported settings with one command (`gh` + `jq` +
+> repo admin): `bash scripts/setup-repo-security.sh`.
+> `flexible` and `custom` forks may choose different repository
+> protections, but should document their rules in `PROJECT_CONTEXT.md` or
+> their contributor guide. Deployment environments and secrets are
+> configured separately. See
 > [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.

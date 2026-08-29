@@ -93,8 +93,53 @@ export function createFixtureRepo() {
   return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
 
+/**
+ * A real, git-tracked-files-only copy of this repo's current `HEAD` in a
+ * disposable tmpdir — for init:project tests, where a hand-written fixture
+ * can't stand in for `apps/web`'s actual route tree (see
+ * project-plan-web-structure.test.mjs and friends). `git archive` only
+ * copies tracked files, so `ai/` (gitignored) is never present — same
+ * safety property `createFixtureRepo()`'s guard tests rely on.
+ */
+export function createRealRepoCopy() {
+  const root = mkdtempSync(path.join(tmpdir(), 'amcore-real-repo-copy-'))
+  const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  }).trim()
+
+  execFileSync('sh', ['-c', `git archive HEAD | tar -x -C "${root}"`], {
+    cwd: repoRoot,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+
+  return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) }
+}
+
 export function git(root, args) {
   return execFileSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+}
+
+/**
+ * Installs a {@link createRealRepoCopy} copy's dependencies — `git archive`
+ * only copies tracked files, so there is no `node_modules` yet. This is
+ * test-harness setup, deliberately not something `runProjectVerification`
+ * does itself (see verify.mjs's header): the real `init:project`/`init:brand`
+ * CLIs run against a fork the owner already has installed, and must not
+ * reach the network or rewrite `node_modules` as a side effect of a
+ * migration. Deliberately *not* `CI=true`: that forces pnpm's
+ * `--frozen-lockfile`-like behavior, which is right for verify.mjs's
+ * read-only typecheck/lint/build/test steps but wrong here — this helper
+ * must also represent the ordinary `pnpm install` a real user runs after a
+ * transform that changed a package.json's dependencies (e.g.
+ * --storybook=disabled), which needs to update the now-stale lockfile, not
+ * refuse on the mismatch.
+ */
+export function installDependencies(root) {
+  execFileSync('pnpm', ['install'], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],

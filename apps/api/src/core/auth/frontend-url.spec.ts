@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
+import { DEFAULT_LOCALE, localePathPrefix, localizedFrontendUrl } from '@amcore/shared'
 
 /**
  * Lives in `apps/api` rather than beside the helper because `packages/shared`
@@ -45,5 +45,25 @@ describe('localizedFrontendUrl', () => {
     expect(localizedFrontendUrl('https://app.example.com', 'ru', 'invite/accept')).toBe(
       'https://app.example.com/ru/invite/accept'
     )
+  })
+})
+
+describe('localePathPrefix', () => {
+  // AMCore upstream's own SUPPORTED_LOCALES never shrinks to one entry, so
+  // these pass an explicit `locales` array rather than relying on the real
+  // constant — otherwise the single-locale branch could never be exercised
+  // and this test would pass vacuously forever. See the doc comment on
+  // `localePathPrefix` for why the parameter exists at all.
+  it('prefixes the locale when more than one is supported', () => {
+    expect(localePathPrefix('en', ['en', 'ru'])).toBe('/en')
+    expect(localePathPrefix('ru', ['en', 'ru'])).toBe('/ru')
+  })
+
+  it('omits the prefix once exactly one locale is supported (pnpm init:project --mode=single)', () => {
+    expect(localePathPrefix('en', ['en'])).toBe('')
+  })
+
+  it('defaults to the real SUPPORTED_LOCALES, which is multi-locale on AMCore upstream today', () => {
+    expect(localePathPrefix('en')).toBe('/en')
   })
 })

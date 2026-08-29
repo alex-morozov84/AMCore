@@ -78,6 +78,25 @@ export function setJsonPath(obj, dottedPath, value) {
   cursor[keys.at(-1)] = value
 }
 
+/** Deletes a dotted path (`scripts.storybook`) from a plain object. Fails closed if absent. */
+export function deleteJsonPath(obj, dottedPath) {
+  const keys = dottedPath.split('.')
+  let cursor = obj
+  for (let i = 0; i < keys.length - 1; i += 1) {
+    if (typeof cursor[keys[i]] !== 'object' || cursor[keys[i]] === null) {
+      throw new EngineError(
+        `cannot delete "${dottedPath}": "${keys.slice(0, i + 1).join('.')}" is not an object`
+      )
+    }
+    cursor = cursor[keys[i]]
+  }
+  const lastKey = keys.at(-1)
+  if (!(lastKey in cursor)) {
+    throw new EngineError(`cannot delete "${dottedPath}": key not found`)
+  }
+  delete cursor[lastKey]
+}
+
 /** Reads the single capture group of the first match of `regex` in `content`, or undefined. */
 export function readCapturedField(content, regex) {
   const match = content.match(regex)
