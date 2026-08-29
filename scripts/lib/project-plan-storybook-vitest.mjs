@@ -1,0 +1,177 @@
+// init:project --storybook=disabled: apps/web/vitest.config.ts. Whole-file
+// exactContentStep, not a patch: removing the storybook project also drops
+// its only reason for the `path`/`fileURLToPath`/`dirname` imports (used
+// solely for `.storybook`'s configDir), so most of the file's import block
+// changes too.
+import path from 'node:path'
+import { exactContentStep } from './init-engine.mjs'
+
+const BEFORE = `import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { storybookTest } from '@storybook/addon-vitest/vitest-plugin'
+import react from '@vitejs/plugin-react'
+import { playwright } from '@vitest/browser-playwright'
+import { defineConfig } from 'vitest/config'
+
+const dirname = path.dirname(fileURLToPath(import.meta.url))
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    tsconfigPaths: true,
+  },
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/test/**', 'src/**/*.d.ts'],
+    },
+    // Two named projects, not one shared config — the Storybook project runs
+    // in real-browser mode (Playwright/Chromium), a fundamentally different
+    // runtime from the jsdom unit project. Named explicitly so \`--project\`
+    // filtering is unambiguous in both directions: \`test\`/\`test:run\` target
+    // \`unit\` only (this repo's fast default suite), \`test:storybook\` targets
+    // \`storybook\` only. Unnamed, a plain \`vitest run\` would run both.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          globals: true,
+          setupFiles: ['./src/test/setup.ts'],
+          include: ['src/**/*.{test,spec}.{ts,tsx}'],
+          // Testcontainers-backed tests (real Redis, not mocked) run
+          // separately via \`pnpm test:integration\` — needs Docker, too
+          // slow/heavy for the default fast unit run. See
+          // vitest.integration.config.ts.
+          exclude: ['**/node_modules/**', 'src/**/*.integration.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        plugins: [
+          // Turns every story into a Vitest test (a smoke render, plus any
+          // \`play\` function's assertions) and runs addon-a11y's checks
+          // inside the same run — see .storybook/preview.tsx's
+          // \`parameters.a11y.test\`.
+          storybookTest({
+            configDir: path.join(dirname, '.storybook'),
+          }),
+        ],
+        optimizeDeps: {
+          include: [
+            // msw's browser handler-matching pulls in \`path-to-regexp\`, a
+            // CJS package. Without this, Vitest's browser mode serves it
+            // raw via \`/@fs/\` instead of pre-bundling it, and the browser's
+            // real ESM loader then fails on \`exports.match = ...\` with
+            // "does not provide an export named 'match'" — confirmed live
+            // once msw-storybook-addon was wired in (PR3).
+            // \`optimizeDeps.include\` alone isn't enough in this pnpm
+            // monorepo: it's a transitive-only package (via \`msw\`), not
+            // resolvable as a bare specifier from \`apps/web\`'s own
+            // node_modules — hence the direct \`path-to-regexp\`
+            // devDependency in package.json, pinned to the same version
+            // pnpm already resolves elsewhere in the workspace, purely so
+            // Vite's optimizer can find it.
+            'path-to-regexp',
+            // First-time discovery of these mid-run (once real component
+            // stories existed, PR4) triggered "Vite unexpectedly reloaded a
+            // test" and cascading failures on a cold run — Vite's own
+            // logged suggestion was to list them here explicitly. All are
+            // direct \`apps/web\` dependencies, so no monorepo-resolution
+            // workaround needed, unlike \`path-to-regexp\` above.
+            //
+            // PR5 added four more Base UI subpaths (dialog, alert-dialog,
+            // menu, toast) on the same reasoning, but that was disproven in
+            // diff review: removing them and clearing both
+            // node_modules/.vite and node_modules/.cache/storybook still
+            // passed clean, twice, independently by two people. Add a new
+            // entry here only once a cold-run failure actually reproduces
+            // with it added — don't add one preemptively just because a
+            // tranche introduces a new dependency; check first.
+            '@base-ui/react/button',
+            '@hookform/resolvers/zod',
+            '@radix-ui/react-slot',
+            'class-variance-authority',
+            'lucide-react',
+            'react-hook-form',
+            // Track 9's \`sidebar.tsx\`/\`sheet.tsx\`/\`tooltip.tsx\`/\`separator.tsx\`
+            // (dashboard app shell) reproduced the identical cold-run
+            // failure Vite named these four exact specifiers for — same
+            // "add only once it actually reproduces" discipline as above.
+            // \`@base-ui/react/dialog\` (also a \`sheet.tsx\` dependency) was
+            // NOT named in that failure and was not added, matching the
+            // PR5 precedent that not every new Base UI subpath needs this.
+            '@base-ui/react/merge-props',
+            '@base-ui/react/separator',
+            '@base-ui/react/tooltip',
+            '@base-ui/react/use-render',
+          ],
+        },
+        test: {
+          name: 'storybook',
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+    ],
+  },
+})
+`
+
+const AFTER = `import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    tsconfigPaths: true,
+  },
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/test/**', 'src/**/*.d.ts'],
+    },
+    // A one-entry array, not a flat test block — keeps \`--project=unit\`
+    // (package.json's test/test:run/test:coverage scripts) working
+    // unchanged, and this file's shape stable if a second project is ever
+    // added back.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          globals: true,
+          setupFiles: ['./src/test/setup.ts'],
+          include: ['src/**/*.{test,spec}.{ts,tsx}'],
+          // Testcontainers-backed tests (real Redis, not mocked) run
+          // separately via \`pnpm test:integration\` — needs Docker, too
+          // slow/heavy for the default fast unit run. See
+          // vitest.integration.config.ts.
+          exclude: ['**/node_modules/**', 'src/**/*.integration.test.ts'],
+        },
+      },
+    ],
+  },
+})
+`
+
+export function buildStorybookVitestSteps(root) {
+  return [
+    exactContentStep(
+      path.join(root, 'apps/web/vitest.config.ts'),
+      { expectedBefore: BEFORE, after: AFTER },
+      'apps/web/vitest.config.ts: remove the storybook project'
+    ),
+  ]
+}
