@@ -12,17 +12,24 @@ Thanks for your interest in contributing. This document explains how to set up t
 
 ## Development Commands
 
-| Command             | Description                |
-| ------------------- | -------------------------- |
-| `pnpm dev`          | Start all apps in dev mode |
-| `pnpm build`        | Build all apps             |
-| `pnpm lint`         | Run ESLint                 |
-| `pnpm typecheck`    | Run TypeScript check       |
-| `pnpm test`         | Run all unit tests         |
-| `pnpm format:check` | Check Prettier formatting  |
-| `pnpm format`       | Format code with Prettier  |
+| Command             | Description                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `pnpm dev`          | Start all apps in dev mode                                                            |
+| `pnpm build`        | Build all apps                                                                        |
+| `pnpm lint`         | Run ESLint                                                                            |
+| `pnpm typecheck`    | Run TypeScript check                                                                  |
+| `pnpm test`         | Run all unit tests                                                                    |
+| `pnpm format:check` | Check Prettier formatting                                                             |
+| `pnpm format`       | Format code with Prettier                                                             |
+| `pnpm init:brand`   | Initialize a downstream fork's identity, brand, assets, and theme choices             |
+| `pnpm init:project` | Apply downstream structural choices such as single-locale mode or disabling Storybook |
 
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
+
+`pnpm init:project` requires explicit flags. Use
+`--mode=single --locale=<code>` to remove locale routing, and/or
+`--storybook=disabled` to remove Storybook. See
+[`docs/frontend/brand-theme-and-tokens.md` → Project scaffolding](docs/frontend/brand-theme-and-tokens.md#project-scaffolding).
 
 ### API-specific test commands
 

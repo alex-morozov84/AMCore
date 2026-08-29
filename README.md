@@ -153,16 +153,17 @@ pnpm dev
 > identity, logo/icons, theme) and, if needed, the one-time, destructive
 > `pnpm init:project` (single-locale and/or disabling Storybook) — see
 > [`docs/frontend/brand-theme-and-tokens.md` → Project scaffolding](docs/frontend/brand-theme-and-tokens.md#project-scaffolding).
-> These update [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) from
-> `upstream-starter` to `downstream-product` and record the product
-> identity, upstream-sync policy, and workflow mode (`strict`, `flexible`,
-> or `custom`) automatically when you answer the corresponding prompts or
-> flags; still set by hand: where the roadmap/status/product-specific
-> decisions live, and anything GitHub-side (branch protection, secrets,
-> environments). Repository files _declare_ the technical policy;
-> GitHub-side enforcement is separate external state. For `strict` mode,
-> apply the supported settings with one command (`gh` + `jq` + repo admin):
-> `bash scripts/setup-repo-security.sh`.
+> `init:brand` updates [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) from
+> `upstream-starter` to `downstream-product` when you provide a product
+> name, and records the product identity, upstream-sync policy, and workflow
+> mode (`strict`, `flexible`, or `custom`) from the corresponding prompts or
+> flags. `init:project` records structural choices such as single-locale mode
+> and Storybook removal. Still set by hand: where the
+> roadmap/status/product-specific decisions live, and anything GitHub-side
+> (branch protection, secrets, environments). Repository files _declare_ the
+> technical policy; GitHub-side enforcement is separate external state. For
+> `strict` mode, apply the supported settings with one command (`gh` + `jq` +
+> repo admin): `bash scripts/setup-repo-security.sh`.
 > `flexible` and `custom` forks may choose different repository
 > protections, but should document their rules in `PROJECT_CONTEXT.md` or
 > their contributor guide. Deployment environments and secrets are
