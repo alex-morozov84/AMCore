@@ -7,7 +7,7 @@
 # with the repo's `engines` / `packageManager`. A CI-gated smoke test
 # (.github/workflows/ci.yml) verifies a real sharp WebP encode plus module
 # resolution inside the final runner image.
-FROM node:24-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS base
+FROM node:24-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e AS base
 
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
@@ -99,7 +99,7 @@ CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 # Shipping Corepack's bundled pnpm would also
 # drag its vulnerable bundled `undici` into the image (CVE-2026-12151) and bloat
 # the attack surface for no runtime benefit.
-FROM node:24-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runner
+FROM node:24-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e AS runner
 
 WORKDIR /app
 

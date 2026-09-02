@@ -4,7 +4,7 @@
 # Node 24 + pnpm 11.1.2 to match the repo's engines/packageManager (the root
 # package.json's `packageManager` drives the corepack version regardless of what
 # is prepared here, so they must agree — a Node 20 base broke pnpm 11).
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS base
+FROM node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf AS base
 
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
@@ -38,7 +38,7 @@ RUN pnpm --filter web build
 # ===========================================
 # Runner — minimal, self-contained, non-root
 # ===========================================
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS runner
+FROM node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf AS runner
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
