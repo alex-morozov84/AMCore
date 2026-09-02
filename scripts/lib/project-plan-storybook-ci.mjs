@@ -16,9 +16,9 @@ const CI_JOB_BLOCK = `  # amcore:sentinel-block start=storybook-job
     # unanswered interactive prompt — a known needrestart/Ubuntu-runner issue
     # that ignores DEBIAN_FRONTEND on its own apt post-invoke hook — and ran
     # until GitHub's default 6-hour job timeout killed it instead of failing
-    # fast. \`web-e2e\` runs the identical install command and shares this
-    # exposure; not touched here since it's outside this track's scope, but
-    # flagged in ai/BACKLOG.md as a real follow-up, not a hypothetical one.
+    # fast. \`web-e2e\` runs the identical install command and shared this
+    # exposure until it got the same fix (timeout-minutes + env vars on its
+    # own install step) per the ai/BACKLOG.md follow-up.
     timeout-minutes: 20
     steps:
       - name: Checkout
