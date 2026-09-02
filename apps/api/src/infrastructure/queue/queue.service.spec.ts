@@ -22,8 +22,9 @@ describe('QueueService', () => {
 
   beforeEach(async () => {
     // Create mock queues. EventEmitter-based so the synchronous `queue.on('error')`
-    // wiring in onModuleInit works; `client` resolves to a raw-client emitter for
-    // the fire-and-forget `reconnecting` listener.
+    // wiring in onModuleInit works; `getBackend().client` resolves to a
+    // raw-client emitter for the fire-and-forget `reconnecting` listener
+    // (BullMQ 6's replacement for the removed `Queue#client`).
     const createMockQueue = (): jest.Mocked<Queue> =>
       Object.assign(new EventEmitter(), {
         add: jest.fn(),
@@ -33,7 +34,7 @@ describe('QueueService', () => {
         pause: jest.fn(),
         resume: jest.fn(),
         clean: jest.fn(),
-        client: Promise.resolve(new EventEmitter()),
+        getBackend: jest.fn(() => ({ client: Promise.resolve(new EventEmitter()) })),
       }) as unknown as jest.Mocked<Queue>
 
     defaultQueue = createMockQueue()
@@ -106,9 +107,11 @@ describe('QueueService', () => {
 
     it('returns synchronously without awaiting the (possibly-never-ready) client', () => {
       // A client promise that never settles must not hang onModuleInit.
-      ;(emailQueue as unknown as { client: Promise<EventEmitter> }).client = new Promise(() => {
-        /* never settles — simulates Redis down with unbounded retryStrategy */
-      })
+      emailQueue.getBackend.mockReturnValue({
+        client: new Promise(() => {
+          /* never settles — simulates Redis down with unbounded retryStrategy */
+        }),
+      } as never)
 
       expect(() => service.onModuleInit()).not.toThrow()
       // Synchronous error wiring still works on the never-ready queue.
@@ -121,11 +124,12 @@ describe('QueueService', () => {
 
     it('attaches a reconnecting listener once the client is ready (fire-and-forget)', async () => {
       const client = new EventEmitter()
-      ;(emailQueue as unknown as { client: Promise<EventEmitter> }).client = Promise.resolve(client)
+      const clientPromise = Promise.resolve(client)
+      emailQueue.getBackend.mockReturnValue({ client: clientPromise } as never)
 
       service.onModuleInit()
-      // Flush the queue.client.then microtask so the listener is attached.
-      await (emailQueue as unknown as { client: Promise<EventEmitter> }).client
+      // Flush the queue.getBackend().client.then microtask so the listener is attached.
+      await clientPromise
 
       client.emit('reconnecting')
 
@@ -139,7 +143,7 @@ describe('QueueService', () => {
 
     it('swallows a rejected client without breaking boot', async () => {
       const rejected = Promise.reject(new Error('no connection'))
-      ;(emailQueue as unknown as { client: Promise<EventEmitter> }).client = rejected
+      emailQueue.getBackend.mockReturnValue({ client: rejected } as never)
 
       expect(() => service.onModuleInit()).not.toThrow()
       await rejected.catch(() => undefined)

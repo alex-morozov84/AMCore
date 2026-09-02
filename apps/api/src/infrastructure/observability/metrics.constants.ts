@@ -11,6 +11,7 @@ export const METRIC_NAMES = {
   dbSlowQueriesTotal: 'amcore_db_slow_queries_total',
   redisClientEventsTotal: 'amcore_redis_client_events_total',
   queueJobs: 'amcore_queue_jobs',
+  queuePaused: 'amcore_queue_paused',
   queueEventsTotal: 'amcore_queue_events_total',
   cacheOperationsTotal: 'amcore_cache_operations_total',
   storageOperationsTotal: 'amcore_storage_operations_total',

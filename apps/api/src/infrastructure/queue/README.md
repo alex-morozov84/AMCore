@@ -419,9 +419,11 @@ options (EQS-06):
     **synchronously on the BullMQ `Queue`** (QueueBase re-emits connection
     errors) → `event: 'queue.redis_error'`. The `reconnecting` listener (only on
     the raw ioredis client) is attached **fire-and-forget** via
-    `void queue.client.then(...)` → `queue.redis_reconnecting` (warn). It is
-    **never awaited**: `queue.client` is BullMQ's ready-gated promise and may
-    never settle while Redis is down, so awaiting it would hang bootstrap.
+    `void queue.getBackend().client.then(...)` → `queue.redis_reconnecting`
+    (warn). It is **never awaited**: `queue.getBackend().client` (BullMQ 6's
+    Redis-specific escape hatch, replacing the removed `Queue#client`) is
+    BullMQ's ready-gated promise and may never settle while Redis is down, so
+    awaiting it would hang bootstrap.
   - worker — `EmailProcessor` `@OnWorkerEvent('error')` →
     `event: 'queue.worker_error'` (the worker holds a separate blocking
     connection; without this a Redis outage can stall processing with no
