@@ -349,6 +349,14 @@ jobs:
     name: Web E2E
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
+    # Same apt-hang exposure as the storybook job below (see its comment):
+    # `playwright install --with-deps chromium` can hang indefinitely on an
+    # unanswered needrestart prompt instead of failing fast, and this job had
+    # no timeout-minutes, so a hang would run until GitHub's default 6-hour
+    # job timeout. 30 minutes is a reasoned bound, not a measured one — this
+    # job runs both Playwright E2E lanes plus a full real-stack docker compose
+    # boot, so it needs more headroom than storybook's 20.
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -374,8 +382,14 @@ jobs:
       - name: Build @amcore/shared
         run: pnpm --filter @amcore/shared build
 
+      # DEBIAN_FRONTEND/NEEDRESTART_MODE: see the storybook job's identical
+      # step below for why these are needed (`--with-deps` can otherwise hang
+      # on an unanswered apt prompt).
       - name: Install Playwright Chromium
         working-directory: apps/web
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          NEEDRESTART_MODE: a
         run: npx playwright install --with-deps chromium
 
       # Mocked + server-mocked lanes (Track 7 FINAL PLAN §1/§4,
@@ -445,9 +459,9 @@ jobs:
     # unanswered interactive prompt — a known needrestart/Ubuntu-runner issue
     # that ignores DEBIAN_FRONTEND on its own apt post-invoke hook — and ran
     # until GitHub's default 6-hour job timeout killed it instead of failing
-    # fast. `web-e2e` runs the identical install command and shares this
-    # exposure; not touched here since it's outside this track's scope, but
-    # flagged in ai/BACKLOG.md as a real follow-up, not a hypothetical one.
+    # fast. `web-e2e` runs the identical install command and shared this
+    # exposure until it got the same fix (timeout-minutes + env vars on its
+    # own install step) per the ai/BACKLOG.md follow-up.
     timeout-minutes: 20
     steps:
       - name: Checkout
