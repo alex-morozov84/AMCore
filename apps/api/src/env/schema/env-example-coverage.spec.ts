@@ -53,6 +53,10 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // real visitor IP before relaying it to apps/api — same reasoning as
   // WEB_TRUSTED_ORIGINS above.
   'WEB_TRUSTED_CLIENT_IP_HEADER',
+  // docker-compose.yml only (ADR-072): which host interface api's published
+  // port binds to — consumed by compose's own `ports:` mapping, not the
+  // app's env schema at all.
+  'API_PUBLISH_HOST',
 ])
 const WEBHOOK_SECRET_PATTERN = /^WEBHOOK_[A-Z0-9_]+_SECRET$/
 

@@ -18,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   downstream configuration that trusts that hop. First slice of Track 2
   (BFF client identity, throttling, and forwarded-header spoofing); the
   trusted client-IP relay and API-side verified-peer guard land separately.
+- **`docker-compose.yml`'s `api` service now publishes its port to
+  `127.0.0.1` by default, not `0.0.0.0`** (ADR-072, final slice of Track 2).
+  Previously `api:5002` was reachable from any interface, including the
+  public internet on a directly-exposed host — combined with a numeric
+  `TRUST_PROXY` hop count (e.g. the documented Caddy quick start,
+  `TRUST_PROXY=1`), this created a "multiple, different-length paths to the
+  app" condition Express's own docs warn is spoofable. Nothing documented
+  needs the broader binding: the bundled Caddy profile and the reference
+  nginx config both reach `api` by its Docker network name, never through
+  this published port. **If your deployment relies on `api:5002` being
+  reachable from another host** (an external reverse proxy not on this
+  compose network), set `API_PUBLISH_HOST=0.0.0.0` in `.env` and firewall
+  the port yourself — see `docs/operations/deployment.md` → "BFF client-IP
+  relay".
 
 ### Added
 

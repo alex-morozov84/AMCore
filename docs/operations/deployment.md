@@ -293,15 +293,20 @@ global throttler is. Full contract and current status:
 [`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
 "Client-IP relay to `apps/api`".
 
-**Honesty caveat — read before enabling in production.** The reference
-`docker-compose.yml` still publishes `api`'s port (`5002:5002`)
-unconditionally as of this section (the single-path production default
-ADR-072 also records is tracked separately). Pairing a broad
-`TRUSTED_WEB_PEERS` range with a directly-reachable, unfirewalled API port
-recreates the exact "multiple, different-length paths" spoofing condition
-the `TRUST_PROXY` numeric-hop warning above describes — verify your actual
-network topology before enabling this, don't assume the compose defaults
-already close that gap.
+**The reference `docker-compose.yml` closes the topology gap this relies
+on.** `api`'s published port binds to `127.0.0.1` by default (not
+`0.0.0.0`) — reachable as `localhost:5002` on the compose host for local
+dev, but not from another host or the internet. This removes the
+"multiple, different-length paths to the app" condition the `TRUST_PROXY`
+numeric-hop warning above describes: with the default, the _only_ path to
+`apps/api` from outside the host is through whatever edge you run (the
+bundled Caddy profile and the documented nginx config both already reach
+`api` by its Docker network name, never through this published port, so
+neither depends on it being broader). If you override
+`API_PUBLISH_HOST=0.0.0.0` (`.env.example`) — e.g. an external reverse
+proxy that is _not_ on this compose network — you re-open that condition
+yourself and must firewall the port independently; don't pair a broad
+`TRUSTED_WEB_PEERS` range with that override unless you have.
 
 ### Reference nginx config
 
