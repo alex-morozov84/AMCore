@@ -3,7 +3,7 @@ import { CacheModule } from '@nestjs/cache-manager'
 import type { ModuleMetadata, Provider } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
+import { ThrottlerModule } from '@nestjs/throttler'
 import { Request } from 'express'
 import { ClsModule, ClsService } from 'nestjs-cls'
 import { LoggerModule } from 'nestjs-pino'
@@ -37,7 +37,11 @@ import { QueueMetricsModule, QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
 import { StorageModule } from './infrastructure/storage'
-import { RedisThrottlerStorage, ThrottlingModule } from './infrastructure/throttling'
+import {
+  RedisThrottlerStorage,
+  ThrottlingModule,
+  TrustedWebPeerThrottlerGuard,
+} from './infrastructure/throttling'
 import { WebhooksModule } from './infrastructure/webhooks'
 import { PrismaModule } from './prisma'
 import { ShutdownService } from './shutdown.service'
@@ -225,7 +229,11 @@ export const appProviders: Provider[] = [
   { provide: APP_PIPE, useClass: ZodValidationPipe },
   // Zod serializer (auto-validates responses)
   { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
-  // Apply rate limiting globally
-  { provide: APP_GUARD, useClass: ThrottlerGuard },
+  // Apply rate limiting globally. TrustedWebPeerThrottlerGuard (not the stock
+  // ThrottlerGuard) keys on the BFF-relayed AMCORE_CLIENT_IP_HEADER instead
+  // of req.ip, but ONLY when TRUSTED_WEB_PEERS is configured AND the actual
+  // socket peer is trusted (ADR-072) — with either unset (default), this is
+  // behaviorally identical to the stock guard.
+  { provide: APP_GUARD, useClass: TrustedWebPeerThrottlerGuard },
   ShutdownService,
 ]

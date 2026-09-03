@@ -56,14 +56,33 @@ Handlers/Proxy expose no raw socket address to verify a hop's identity
 against, unlike `apps/api`'s `TRUST_PROXY` (ADR-060), so this is
 trust-by-header-name only.
 
-**Honesty caveat:** as of this section, `apps/api` does not yet consume
-`X-AMCore-Client-Ip` for anything — the global throttler still keys on
-`req.ip` for the `apps/web → apps/api` hop exactly as before. Enabling
-`WEB_TRUSTED_CLIENT_IP_HEADER` today only relays the header; it has no
-effect until the API-side verified-web-peer guard (ADR-072, tracked
-separately) also trusts it. This half is documented now because the
-contract (which header, when it's safe to enable) is stable and reviewable
-independently of the API-side follow-up.
+On the `apps/api` side, `TrustedWebPeerThrottlerGuard` (replacing the stock
+global `ThrottlerGuard`, ADR-039) trusts the relayed header only when **both**
+(a) `TRUSTED_WEB_PEERS` is configured (`.env.example`) **and** (b) the
+inbound request's _actual_ socket peer — `req.socket.remoteAddress`, never a
+forwarded header, and independent of Express's own `TRUST_PROXY` — is in
+that trusted set (real IPv4/IPv6 CIDR matching via Node's built-in
+`net.BlockList`). Either half missing → falls back to stock `req.ip`,
+identical to pre-ADR-072 behavior; a request that never went through
+`apps/web` at all (a direct API-key/OAuth caller) is unaffected either way.
+
+**Both env vars must be set together** to get an effect —
+`WEB_TRUSTED_CLIENT_IP_HEADER` (which inbound header `apps/web` trusts) and
+`TRUSTED_WEB_PEERS` (which socket peer `apps/api` trusts) are independent
+knobs on independent trust boundaries, not one setting. `getClientIp()`/
+audit-log IP and the invite-abuse limiter are **not** wired to this — they
+remain scoped to `req.ip` exactly as before; extending them is a deliberate,
+separately-reviewed future decision, not an implicit side effect.
+
+**Honesty caveat:** `docker-compose.yml` still publishes `api`'s port
+(`5002:5002`) unconditionally as of this section — the reference compose
+stack has not yet moved to the single-path production default ADR-072 also
+records (tracked separately). Until that lands, an operator enabling both
+vars above must independently ensure `TRUSTED_WEB_PEERS` doesn't end up
+trusting a subnet also reachable by a client bypassing `apps/web` entirely
+(e.g. don't pair a broad trusted-peer range with a directly-published API
+port and no firewall) — see `docs/operations/deployment.md` → "TLS &
+reverse proxy" for the general reasoning this mirrors.
 
 ## What is enabled by default vs. reference-only
 

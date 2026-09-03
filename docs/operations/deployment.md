@@ -258,6 +258,51 @@ its own listener/annotation configuration instead of an `nginx.conf`.
    proxy's own IP, not the client's. Avoid broad `TRUST_PROXY=true` unless the
    edge is guaranteed to sanitize (not append to) forwarded headers.
 
+### BFF client-IP relay (`apps/web` → `apps/api`) — a separate contract from `TRUST_PROXY`
+
+`TRUST_PROXY` above governs only the edge → app hop. Browser traffic
+proxied through `apps/web`'s BFF (ADR-068) is a _second_, internal hop
+(`apps/web`'s Route Handler → `apps/api`, typically over the compose/private
+network) that `TRUST_PROXY` says nothing about — without additional
+configuration, the global throttler sees every BFF-proxied visitor as the
+same address (the `web` container's), and `req.ip`/audit-log IP for that hop
+reflect the same limitation.
+
+ADR-072 adds an **independent, opt-in** two-key contract for this hop,
+disabled by default so a fresh checkout is unaffected:
+
+- **`WEB_TRUSTED_CLIENT_IP_HEADER`** (`apps/web`) — names a single inbound
+  header (`x-real-ip`, `x-forwarded-for`, `cf-connecting-ip`,
+  `true-client-ip`, or `fastly-client-ip`) that `apps/web` itself trusts as
+  the real visitor IP, from whatever edge terminates TLS in front of
+  `apps/web`. Enable this only when that edge overwrites (never appends to)
+  the named header — the same rule as `TRUST_PROXY` above, one hop further
+  out. `apps/web` relays the resolved value to `apps/api` as a new,
+  purpose-specific `X-AMCore-Client-Ip` header; a browser can never set this
+  header itself (stripped unconditionally, regardless of configuration).
+- **`TRUSTED_WEB_PEERS`** (`apps/api`) — names the real socket address(es)
+  `apps/web` connects from (a preset, IP, or CIDR — same grammar as
+  `TRUST_PROXY`'s presets). `TrustedWebPeerThrottlerGuard` trusts
+  `X-AMCore-Client-Ip` only when the inbound request's actual TCP peer (not
+  a forwarded header) matches this set; otherwise it falls back to stock
+  `req.ip`, identical to before ADR-072.
+
+**Both must be set for either to have an effect.** `getClientIp()`/audit-log
+IP and the invite-abuse limiter are not wired to this relay — only the
+global throttler is. Full contract and current status:
+[`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
+"Client-IP relay to `apps/api`".
+
+**Honesty caveat — read before enabling in production.** The reference
+`docker-compose.yml` still publishes `api`'s port (`5002:5002`)
+unconditionally as of this section (the single-path production default
+ADR-072 also records is tracked separately). Pairing a broad
+`TRUSTED_WEB_PEERS` range with a directly-reachable, unfirewalled API port
+recreates the exact "multiple, different-length paths" spoofing condition
+the `TRUST_PROXY` numeric-hop warning above describes — verify your actual
+network topology before enabling this, don't assume the compose defaults
+already close that gap.
+
 ### Reference nginx config
 
 ```nginx

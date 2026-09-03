@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { resolveTrustProxy } from '../../common/utils/trust-proxy'
+import { resolveTrustedWebPeers } from '../../common/utils/trusted-web-peer'
 
 // Core runtime/process wiring: environment, process role, HTTP surface.
 export const runtimeEnv = z.object({
@@ -27,6 +28,24 @@ export const runtimeEnv = z.object({
     .transform((value, ctx) => {
       try {
         return resolveTrustProxy(value)
+      } catch (error) {
+        ctx.addIssue({ code: 'custom', message: (error as Error).message })
+        return z.NEVER
+      }
+    }),
+  // Trusted apps/web peer(s) for the BFF client-IP relay (ADR-072). Default
+  // "" — disabled: TrustedWebPeerThrottlerGuard never trusts
+  // AMCORE_CLIENT_IP_HEADER regardless of value until this names the real
+  // socket address(es) apps/web connects from. Validated + compiled to a
+  // `net.BlockList` by `resolveTrustedWebPeers` (see
+  // common/utils/trusted-web-peer.ts) — never Express's own TRUST_PROXY
+  // machinery, which this is independent of.
+  TRUSTED_WEB_PEERS: z
+    .string()
+    .default('')
+    .transform((value, ctx) => {
+      try {
+        return resolveTrustedWebPeers(value)
       } catch (error) {
         ctx.addIssue({ code: 'custom', message: (error as Error).message })
         return z.NEVER

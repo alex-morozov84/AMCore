@@ -38,6 +38,12 @@ x-app-env: &app-env
   # Default off (safe with no proxy in front). Set TRUST_PROXY=1 in .env when
   # enabling the `edge` Caddy profile — Caddy is exactly one hop.
   TRUST_PROXY: ${TRUST_PROXY:-false}
+  # Trusted apps/web peer(s) for the BFF client-IP relay (ADR-072) — a
+  # SEPARATE contract from TRUST_PROXY above (edge -> app hop only). Disabled
+  # by default; only meaningful together with WEB_TRUSTED_CLIENT_IP_HEADER on
+  # the `web` service below. See docs/operations/deployment.md -> "BFF
+  # client-IP relay".
+  TRUSTED_WEB_PEERS: ${TRUSTED_WEB_PEERS:-}
   # COMPOSE_* are decoupled from the host DATABASE_URL/REDIS_URL (which are for
   # `pnpm dev`), so a host `.env` can never poison the container config. Unset →
   # bundled services; set COMPOSE_DATABASE_URL/COMPOSE_REDIS_URL for managed DB/Redis.

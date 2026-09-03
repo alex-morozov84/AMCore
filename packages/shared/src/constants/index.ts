@@ -104,3 +104,11 @@ export const SUPPORTED_LOCALES = ['en', 'ru'] as const
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 
 export const DEFAULT_LOCALE: SupportedLocale = 'en'
+
+// BFF -> API trusted client-IP relay (ADR-072). apps/web sets this only from
+// a value it independently resolved as trustworthy (never a browser-supplied
+// one — see apps/web's proxy-headers.ts); apps/api's throttler guard trusts
+// it only from a configured trusted web-peer socket address. Shared so both
+// sides reference one literal instead of duplicating (and risking drift on)
+// the header name.
+export const AMCORE_CLIENT_IP_HEADER = 'x-amcore-client-ip'
