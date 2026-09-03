@@ -204,6 +204,12 @@ services:
       # environment's WEB_TRUSTED_ORIGINS must match how the browser
       # actually reaches this stack.
       WEB_TRUSTED_ORIGINS: ${WEB_TRUSTED_ORIGINS:-http://localhost:3000}
+      # Trusted inbound client-IP header (ADR-072) — disabled by default
+      # (empty), matching apps/web's own safe default. Only set this when an
+      # edge proxy/LB sits directly in front of THIS web container and
+      # overwrites (never appends to) the named header; see .env.example and
+      # docs/frontend/api-consumption.md.
+      WEB_TRUSTED_CLIENT_IP_HEADER: ${WEB_TRUSTED_CLIENT_IP_HEADER:-}
     depends_on:
       api:
         condition: service_healthy
