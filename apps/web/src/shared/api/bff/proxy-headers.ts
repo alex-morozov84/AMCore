@@ -1,3 +1,10 @@
+// The internal, verified-peer-gated client-IP signal (ADR-072) `apps/web`
+// sets on its own outgoing request — never something a browser is allowed
+// to set directly. Exported so the trusted-inbound-IP resolver (ADR-072
+// item 3) and any consumer can reference the same name instead of
+// duplicating the literal.
+export const AMCORE_CLIENT_IP_HEADER = 'x-amcore-client-ip'
+
 // Hop-by-hop / connection-specific — meaningless or wrong to replay verbatim
 // on a new outgoing request. `origin`/`referer` are stripped too: the CSRF
 // boundary is browser<->Next (already checked by `isTrustedOrigin` before
@@ -13,6 +20,32 @@ const STRIP_REQUEST_HEADERS = new Set([
   'origin',
   'referer',
 ])
+
+// Forwarded/client-IP signals a browser could set on its own request to
+// `apps/web`. Never relay these upstream verbatim (ADR-072): apps/api must
+// only ever see a client-IP claim that `apps/web` itself derived from a
+// trusted source, via `AMCORE_CLIENT_IP_HEADER` — never one the browser
+// supplied. `X-Forwarded-*` is matched by prefix since the set of variants
+// (`-For`, `-Host`, `-Proto`, `-Port`, ...) is open-ended; the rest are
+// known lookalikes used by common proxies/CDNs (OWASP's IP-spoofing guide).
+const FORWARDED_HEADER_PREFIX = 'x-forwarded-'
+const CLIENT_IP_LOOKALIKE_HEADERS = new Set([
+  'forwarded',
+  'x-real-ip',
+  'x-client-ip',
+  'client-ip',
+  'true-client-ip',
+  'cf-connecting-ip',
+  'fastly-client-ip',
+  'x-original-forwarded-for',
+  'x-original-remote-addr',
+  'via',
+  AMCORE_CLIENT_IP_HEADER,
+])
+
+function isSpoofableForwardingHeader(name: string): boolean {
+  return name.startsWith(FORWARDED_HEADER_PREFIX) || CLIENT_IP_LOOKALIKE_HEADERS.has(name)
+}
 
 // `content-encoding`/`content-length` describe the *upstream's* compressed
 // bytes, but Node's `fetch` (undici) transparently decompresses
@@ -36,7 +69,8 @@ const STRIP_RESPONSE_HEADERS = new Set([
 export function forwardRequestHeaders(source: Headers, accessToken: string): Headers {
   const headers = new Headers()
   for (const [name, value] of source.entries()) {
-    if (STRIP_REQUEST_HEADERS.has(name.toLowerCase())) continue
+    const lower = name.toLowerCase()
+    if (STRIP_REQUEST_HEADERS.has(lower) || isSpoofableForwardingHeader(lower)) continue
     headers.set(name, value)
   }
   headers.set('Authorization', `Bearer ${accessToken}`)

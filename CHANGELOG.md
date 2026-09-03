@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`apps/web`'s generic authenticated BFF proxy no longer relays inbound
+  forwarded/client-IP headers to `apps/api`** (ADR-072). Previously, a
+  browser's own `X-Forwarded-For`, `X-Real-IP`, `Forwarded`, and similar
+  headers passed through `forwardRequestHeaders()` unmodified — harmless
+  today (nothing on the `apps/api` side yet trusts them for the
+  `apps/web → apps/api` hop), but a real spoofing vector for any future or
+  downstream configuration that trusts that hop. First slice of Track 2
+  (BFF client identity, throttling, and forwarded-header spoofing); the
+  trusted client-IP relay and API-side verified-peer guard land separately.
+
 ### Changed
 
 - **`bullmq` bumped to 6** (`apps/api`). Added `ioredis` as an explicit
