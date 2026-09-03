@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`bullmq` bumped to 6** (`apps/api`). Added `ioredis` as an explicit
+  dependency (BullMQ 6 no longer bundles it directly). Replaced the removed
+  `Queue#client` with the v6 `queue.getBackend().client` escape hatch in
+  `QueueService`'s producer-side Redis observability — behavior unchanged.
+
+### Removed
+
+- **`amcore_queue_jobs{state="paused"}` label value.** BullMQ 6 no longer
+  reports a per-job `paused` state — a paused queue's jobs are now counted
+  as `waiting`. Any downstream Grafana panel or alert keyed on
+  `state="paused"` needs updating to the new gauge below.
+
+### Added
+
+- **`amcore_queue_paused{queue,role}` metric** — `1` if a queue is currently
+  paused, `0` otherwise (`Queue.isPaused()`), replacing the pause signal
+  lost from `amcore_queue_jobs` above.
+
 ## [0.5.0] - 2026-08-29
 
 ### Added

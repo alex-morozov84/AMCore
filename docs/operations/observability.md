@@ -74,7 +74,11 @@ are the hard contract every label must satisfy.
 **Queues** (exported by `worker`/`all` only — absent on `web`)
 
 - `queue_jobs{queue,state,role}` —
-  `state=waiting|active|delayed|completed|failed|paused|prioritized|waiting_children`.
+  `state=waiting|active|delayed|completed|failed|prioritized|waiting_children`.
+  BullMQ 6 removed `paused` as a per-job state — jobs in a paused queue are
+  counted as `waiting`. Use `queue_paused` below for pause/resume observability.
+- `queue_paused{queue,role}` — `1` if the queue is currently paused, `0`
+  otherwise, from `Queue.isPaused()`.
 - `queue_events_total{queue,event,role}` —
   `event=job_added|redis_error|redis_reconnecting|worker_error|dead_letter`. Job
   IDs and job names are never labels.

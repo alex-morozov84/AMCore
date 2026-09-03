@@ -34,7 +34,7 @@ describe('QueueDepthMetricsCollector', () => {
 
   it('exports bounded queue states and normalizes waiting-children', async () => {
     const metrics = makeMetrics()
-    const queues = new Map<QueueName, Pick<Queue, 'getJobCounts'>>([
+    const queues = new Map<QueueName, Pick<Queue, 'getJobCounts' | 'isPaused'>>([
       [
         QueueName.DEFAULT,
         {
@@ -43,6 +43,7 @@ describe('QueueDepthMetricsCollector', () => {
             active: 1,
             'waiting-children': 3,
           }),
+          isPaused: jest.fn().mockResolvedValue(false),
         },
       ],
       [
@@ -52,6 +53,7 @@ describe('QueueDepthMetricsCollector', () => {
             completed: 5,
             failed: 1,
           }),
+          isPaused: jest.fn().mockResolvedValue(true),
         },
       ],
       [
@@ -60,6 +62,7 @@ describe('QueueDepthMetricsCollector', () => {
           getJobCounts: jest.fn().mockResolvedValue({
             waiting: 1,
           }),
+          isPaused: jest.fn().mockResolvedValue(false),
         },
       ],
       [
@@ -68,6 +71,7 @@ describe('QueueDepthMetricsCollector', () => {
           getJobCounts: jest.fn().mockResolvedValue({
             waiting: 1,
           }),
+          isPaused: jest.fn().mockResolvedValue(false),
         },
       ],
     ])
@@ -82,15 +86,21 @@ describe('QueueDepthMetricsCollector', () => {
     expect(output).toContain('queue="default",state="waiting_children"')
     expect(output).toContain('queue="email",state="completed"')
     expect(output).not.toContain('state="waiting-children"')
+    expect(output).not.toContain('state="paused"')
+    expect(output).toContain(`${METRIC_NAMES.queuePaused}{queue="default"`)
+    expect(output).toMatch(new RegExp(`${METRIC_NAMES.queuePaused}\\{queue="default"[^}]*\\} 0`))
+    expect(output).toMatch(new RegExp(`${METRIC_NAMES.queuePaused}\\{queue="email"[^}]*\\} 1`))
   })
 
   it('bounds stalled BullMQ calls and exposes a collector error without stale gauges', async () => {
     jest.useFakeTimers()
     const metrics = makeMetrics()
     const getJobCounts = jest.fn(() => new Promise<Record<string, number>>(() => undefined))
+    const isPaused = jest.fn().mockResolvedValue(false)
     const queueService = {
       getQueue: jest.fn(() => ({
         getJobCounts,
+        isPaused,
       })),
     } as unknown as QueueService
 

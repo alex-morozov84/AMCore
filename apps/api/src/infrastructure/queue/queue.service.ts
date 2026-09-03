@@ -40,16 +40,17 @@ export class QueueService implements IQueueService, OnModuleInit {
    * visibly stop. The worker's blocking connection is observed separately via
    * `EmailProcessor`'s `@OnWorkerEvent('error')`.
    *
-   * MUST NOT block bootstrap. `queue.client` is BullMQ's ready-gated
-   * `initializing` promise — with Redis down and our (deliberately unbounded)
-   * `retryStrategy`, it may never settle, so awaiting it here would hang Nest
-   * boot. Therefore:
+   * MUST NOT block bootstrap. `queue.getBackend().client` (BullMQ 6's Redis-
+   * specific escape hatch, replacing the removed `Queue#client`) is BullMQ's
+   * ready-gated `initializing` promise — with Redis down and our (deliberately
+   * unbounded) `retryStrategy`, it may never settle, so awaiting it here would
+   * hang Nest boot. Therefore:
    * - `error` is attached **synchronously** on the BullMQ `Queue` (QueueBase
    *   re-emits underlying connection errors; attaching also prevents the
    *   default throw-on-unhandled-`error`).
    * - `reconnecting` (only on the raw ioredis client) is attached
-   *   **fire-and-forget** via `void queue.client.then(...)` — never awaited;
-   *   the `.catch` swallows a rejected/never-ready client.
+   *   **fire-and-forget** via `void queue.getBackend().client.then(...)` —
+   *   never awaited; the `.catch` swallows a rejected/never-ready client.
    */
   onModuleInit(): void {
     for (const [queueName, queue] of this.queues) {
@@ -62,8 +63,9 @@ export class QueueService implements IQueueService, OnModuleInit {
         this.logger.error({ event: 'queue.redis_error', queueName, err }, 'Queue Redis error')
       })
 
-      void queue.client
-        .then((client) => {
+      void queue
+        .getBackend()
+        .client.then((client) => {
           client.on('reconnecting', () => {
             this.metrics.incRedisClientEvent('queue_producer', 'reconnecting')
             this.metrics.incQueueEvent(queueName, 'redis_reconnecting')
