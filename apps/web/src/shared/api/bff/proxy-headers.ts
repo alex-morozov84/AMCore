@@ -69,8 +69,17 @@ const STRIP_RESPONSE_HEADERS = new Set([
 ])
 
 /** Request headers to send upstream: the browser's own, minus hop-by-hop/
- * cookie ones, plus the vault-derived bearer token (never the browser's). */
-export function forwardRequestHeaders(source: Headers, accessToken: string): Headers {
+ * cookie/forwarded-header ones, plus the vault-derived bearer token (never
+ * the browser's) and — when `trustedClientIp` was resolved from a
+ * configured trusted source (ADR-072) — the internal client-IP header. This
+ * is the only place `AMCORE_CLIENT_IP_HEADER` is ever set on an outgoing
+ * request; it runs after stripping, so a browser-supplied copy of the same
+ * header name is discarded first, never merged with or overridden by it. */
+export function forwardRequestHeaders(
+  source: Headers,
+  accessToken: string,
+  trustedClientIp?: string | null
+): Headers {
   const headers = new Headers()
   for (const [name, value] of source.entries()) {
     const lower = name.toLowerCase()
@@ -78,6 +87,9 @@ export function forwardRequestHeaders(source: Headers, accessToken: string): Hea
     headers.set(name, value)
   }
   headers.set('Authorization', `Bearer ${accessToken}`)
+  if (trustedClientIp) {
+    headers.set(AMCORE_CLIENT_IP_HEADER, trustedClientIp)
+  }
   return headers
 }
 

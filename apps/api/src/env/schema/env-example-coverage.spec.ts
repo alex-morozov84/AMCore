@@ -49,6 +49,10 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // allowlist, read directly via `process.env` in apps/web (no EnvService
   // there yet) — not part of apps/api's own runtime env at all.
   'WEB_TRUSTED_ORIGINS',
+  // apps/web-only (ADR-072): which inbound header apps/web trusts as the
+  // real visitor IP before relaying it to apps/api — same reasoning as
+  // WEB_TRUSTED_ORIGINS above.
+  'WEB_TRUSTED_CLIENT_IP_HEADER',
 ])
 const WEBHOOK_SECRET_PATTERN = /^WEBHOOK_[A-Z0-9_]+_SECRET$/
 

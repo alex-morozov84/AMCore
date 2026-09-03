@@ -9,6 +9,7 @@ import { forwardRequestHeaders, forwardResponseHeaders } from './proxy-headers'
 import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultLock } from './session-lock'
 import { redisVaultStore } from './session-vault-store'
+import { resolveTrustedClientIp } from './trusted-client-ip'
 import { upstreamRefresh } from './upstream-refresh'
 
 import 'server-only'
@@ -51,10 +52,11 @@ export async function proxyToBackend(request: Request, pathSegments: string[]): 
 
   const upstreamUrl = buildUpstreamUrl(pathSegments, request)
   const hasBody = !SAFE_METHODS.has(request.method) && request.body !== null
+  const trustedClientIp = resolveTrustedClientIp(request.headers)
 
   const upstreamResponse = await fetch(upstreamUrl, {
     method: request.method,
-    headers: forwardRequestHeaders(request.headers, accessToken),
+    headers: forwardRequestHeaders(request.headers, accessToken, trustedClientIp),
     body: hasBody ? request.body : undefined,
     // Required by Node's fetch (undici) whenever `body` is a stream.
     ...(hasBody ? { duplex: 'half' } : {}),

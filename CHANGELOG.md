@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (BFF client identity, throttling, and forwarded-header spoofing); the
   trusted client-IP relay and API-side verified-peer guard land separately.
 
+### Added
+
+- **`WEB_TRUSTED_CLIENT_IP_HEADER`** (`apps/web`, ADR-072, disabled by
+  default). When set to one of `x-real-ip`/`x-forwarded-for`/
+  `cf-connecting-ip`/`true-client-ip`/`fastly-client-ip`, `apps/web`'s BFF
+  proxy relays that inbound header's value to `apps/api` as a new,
+  purpose-specific `X-AMCore-Client-Ip` header — only ever set from this
+  resolved value, never a browser-supplied one. Inert on its own until the
+  forthcoming API-side verified-web-peer guard also trusts it; see
+  `docs/frontend/api-consumption.md` → "Client-IP relay to `apps/api`".
+
 ### Changed
 
 - **`bullmq` bumped to 6** (`apps/api`). Added `ioredis` as an explicit
