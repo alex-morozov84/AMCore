@@ -1,7 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 
-import { forwardRequestHeaders, forwardResponseHeaders } from './proxy-headers'
+import {
+  AMCORE_CLIENT_IP_HEADER,
+  forwardRequestHeaders,
+  forwardResponseHeaders,
+} from './proxy-headers'
 
 describe('forwardRequestHeaders', () => {
   it('strips host/connection/cookie/content-length and sets the bearer token', () => {
@@ -43,6 +47,47 @@ describe('forwardRequestHeaders', () => {
 
     expect(forwarded.has('origin')).toBe(false)
     expect(forwarded.has('referer')).toBe(false)
+  })
+
+  it('strips every forwarded/client-IP lookalike a browser could set — ADR-072', () => {
+    const source = new Headers({
+      forwarded: 'for=1.2.3.4',
+      'x-forwarded': '1.2.3.4',
+      'x-forwarded-for': '1.2.3.4',
+      'x-forwarded-host': 'evil.example',
+      'x-forwarded-proto': 'https',
+      'x-real-ip': '1.2.3.4',
+      'x-client-ip': '1.2.3.4',
+      'client-ip': '1.2.3.4',
+      'true-client-ip': '1.2.3.4',
+      'cf-connecting-ip': '1.2.3.4',
+      'fastly-client-ip': '1.2.3.4',
+      'x-original-forwarded-for': '1.2.3.4',
+      'x-original-remote-addr': '1.2.3.4',
+      via: '1.1 proxy',
+      [AMCORE_CLIENT_IP_HEADER]: '9.9.9.9',
+      'content-type': 'application/json',
+    })
+
+    const forwarded = forwardRequestHeaders(source, 'at-1')
+
+    expect(forwarded.has('forwarded')).toBe(false)
+    expect(forwarded.has('x-forwarded')).toBe(false)
+    expect(forwarded.has('x-forwarded-for')).toBe(false)
+    expect(forwarded.has('x-forwarded-host')).toBe(false)
+    expect(forwarded.has('x-forwarded-proto')).toBe(false)
+    expect(forwarded.has('x-real-ip')).toBe(false)
+    expect(forwarded.has('x-client-ip')).toBe(false)
+    expect(forwarded.has('client-ip')).toBe(false)
+    expect(forwarded.has('true-client-ip')).toBe(false)
+    expect(forwarded.has('cf-connecting-ip')).toBe(false)
+    expect(forwarded.has('fastly-client-ip')).toBe(false)
+    expect(forwarded.has('x-original-forwarded-for')).toBe(false)
+    expect(forwarded.has('x-original-remote-addr')).toBe(false)
+    expect(forwarded.has('via')).toBe(false)
+    expect(forwarded.has(AMCORE_CLIENT_IP_HEADER)).toBe(false)
+    // Unrelated headers survive — this isn't a blanket strip.
+    expect(forwarded.get('content-type')).toBe('application/json')
   })
 })
 
