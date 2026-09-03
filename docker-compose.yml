@@ -155,7 +155,18 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     ports:
-      - '5002:5002'
+      # Loopback-only by default (ADR-072): reachable as localhost:5002 on
+      # THIS host for local dev/curl, but not from other hosts or the
+      # internet. This is the single-path production default — the bundled
+      # Caddy (`edge` profile) and the documented nginx reference config
+      # both reach api by its Docker network name (api:5002), never through
+      # this published host port, so nothing documented depends on it being
+      # broader. If your own topology genuinely needs api reachable on all
+      # interfaces (e.g. an external reverse proxy NOT on this compose
+      # network), set API_PUBLISH_HOST=0.0.0.0 in .env — you then own
+      # firewalling/access control for that port yourself. See
+      # docs/operations/deployment.md → "BFF client-IP relay".
+      - '${API_PUBLISH_HOST:-127.0.0.1}:5002:5002'
     environment:
       <<: *app-env
       PROCESS_ROLE: web

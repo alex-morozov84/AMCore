@@ -74,15 +74,12 @@ audit-log IP and the invite-abuse limiter are **not** wired to this — they
 remain scoped to `req.ip` exactly as before; extending them is a deliberate,
 separately-reviewed future decision, not an implicit side effect.
 
-**Honesty caveat:** `docker-compose.yml` still publishes `api`'s port
-(`5002:5002`) unconditionally as of this section — the reference compose
-stack has not yet moved to the single-path production default ADR-072 also
-records (tracked separately). Until that lands, an operator enabling both
-vars above must independently ensure `TRUSTED_WEB_PEERS` doesn't end up
-trusting a subnet also reachable by a client bypassing `apps/web` entirely
-(e.g. don't pair a broad trusted-peer range with a directly-published API
-port and no firewall) — see `docs/operations/deployment.md` → "TLS &
-reverse proxy" for the general reasoning this mirrors.
+The reference `docker-compose.yml` supports this: `api`'s published port
+binds to `127.0.0.1` by default (not `0.0.0.0`, ADR-072), so the only path
+to `apps/api` from outside the compose host is through whichever edge you
+run — see `docs/operations/deployment.md` → "BFF client-IP relay" for the
+full topology reasoning and the `API_PUBLISH_HOST` override for a
+non-default network setup.
 
 ## What is enabled by default vs. reference-only
 
