@@ -26,9 +26,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cf-connecting-ip`/`true-client-ip`/`fastly-client-ip`, `apps/web`'s BFF
   proxy relays that inbound header's value to `apps/api` as a new,
   purpose-specific `X-AMCore-Client-Ip` header — only ever set from this
-  resolved value, never a browser-supplied one. Inert on its own until the
-  forthcoming API-side verified-web-peer guard also trusts it; see
-  `docs/frontend/api-consumption.md` → "Client-IP relay to `apps/api`".
+  resolved value, never a browser-supplied one.
+- **`TRUSTED_WEB_PEERS`** (`apps/api`, ADR-072, disabled by default) and a
+  new `TrustedWebPeerThrottlerGuard` replacing the stock global
+  `ThrottlerGuard`. Trusts the relayed `X-AMCore-Client-Ip` header only when
+  the inbound request's actual socket peer (never a forwarded header) is in
+  this configured trusted set (real IPv4/IPv6 CIDR matching via Node's
+  built-in `net.BlockList`); otherwise falls back to stock `req.ip`,
+  identical to pre-ADR-072 behavior. Both this and
+  `WEB_TRUSTED_CLIENT_IP_HEADER` above must be set together to get an
+  effect — see `docs/frontend/api-consumption.md` → "Client-IP relay to
+  `apps/api`" and `docs/operations/deployment.md` → "BFF client-IP relay".
+  `getClientIp()`/audit-log IP and the invite-abuse limiter are unaffected.
 - **`amcore_queue_paused{queue,role}` metric** — `1` if a queue is currently
   paused, `0` otherwise (`Queue.isPaused()`), replacing the pause signal
   lost from `amcore_queue_jobs` below.

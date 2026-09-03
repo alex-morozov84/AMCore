@@ -280,6 +280,21 @@ Apply these only when your module needs them:
   ([`core/auth/avatar.service.ts`](../../apps/api/src/core/auth/avatar.service.ts),
   [`infrastructure/redis/redis-lock.service.ts`](../../apps/api/src/infrastructure/redis/redis-lock.service.ts))
   before designing your own. It is **not** required for every upload.
+- **Rate limiting — override the global bucket for costly or abuse-prone
+  routes, don't invent a new limiter.** The global `@nestjs/throttler` guard
+  (`short`/`long`, ADR-039) is a coarse per-visitor volumetric backstop, not
+  precise per-actor protection — that's what dedicated limiters
+  (`LoginRateLimiterService`, invite-accept, etc.) are for. For a route that's
+  unusually expensive or abuse-prone but doesn't warrant its own dedicated
+  limiter, tighten the global bucket per-handler with
+  `@Throttle({ long: { limit: N, ttl: N } })` (see the OB-03 admin-override
+  precedent in `app-imports.ts`) rather than registering a third named
+  throttler, which would apply its default limit to every route. This only
+  meaningfully protects real visitors once `TRUSTED_WEB_PEERS` +
+  `WEB_TRUSTED_CLIENT_IP_HEADER` are configured (ADR-072) — see
+  [`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
+  "Client-IP relay to `apps/api`"; without them every BFF-proxied visitor
+  still shares one bucket, same as before ADR-072.
 
 ## Tests
 

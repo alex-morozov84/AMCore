@@ -1,9 +1,9 @@
-// The internal, verified-peer-gated client-IP signal (ADR-072) `apps/web`
-// sets on its own outgoing request — never something a browser is allowed
-// to set directly. Exported so the trusted-inbound-IP resolver (ADR-072
-// item 3) and any consumer can reference the same name instead of
-// duplicating the literal.
-export const AMCORE_CLIENT_IP_HEADER = 'x-amcore-client-ip'
+import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
+
+// Re-exported so existing local imports (`./proxy-headers`) keep working;
+// `apps/api`'s throttler guard imports the same shared constant directly
+// (ADR-072) — never a locally duplicated literal on either side.
+export { AMCORE_CLIENT_IP_HEADER }
 
 // Hop-by-hop / connection-specific — meaningless or wrong to replay verbatim
 // on a new outgoing request. `origin`/`referer` are stripped too: the CSRF
