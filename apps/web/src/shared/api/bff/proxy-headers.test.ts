@@ -52,6 +52,7 @@ describe('forwardRequestHeaders', () => {
   it('strips every forwarded/client-IP lookalike a browser could set — ADR-072', () => {
     const source = new Headers({
       forwarded: 'for=1.2.3.4',
+      'x-forwarded': '1.2.3.4',
       'x-forwarded-for': '1.2.3.4',
       'x-forwarded-host': 'evil.example',
       'x-forwarded-proto': 'https',
@@ -71,6 +72,7 @@ describe('forwardRequestHeaders', () => {
     const forwarded = forwardRequestHeaders(source, 'at-1')
 
     expect(forwarded.has('forwarded')).toBe(false)
+    expect(forwarded.has('x-forwarded')).toBe(false)
     expect(forwarded.has('x-forwarded-for')).toBe(false)
     expect(forwarded.has('x-forwarded-host')).toBe(false)
     expect(forwarded.has('x-forwarded-proto')).toBe(false)

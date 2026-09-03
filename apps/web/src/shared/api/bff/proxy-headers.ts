@@ -31,6 +31,10 @@ const STRIP_REQUEST_HEADERS = new Set([
 const FORWARDED_HEADER_PREFIX = 'x-forwarded-'
 const CLIENT_IP_LOOKALIKE_HEADERS = new Set([
   'forwarded',
+  // Bare `X-Forwarded` (no `-For`/`-Host`/`-Proto` suffix) isn't matched by
+  // the prefix above but is a real, if rare, legacy header some proxies
+  // still send — list it explicitly for maximum conservatism.
+  'x-forwarded',
   'x-real-ip',
   'x-client-ip',
   'client-ip',
