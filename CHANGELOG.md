@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (BFF client identity, throttling, and forwarded-header spoofing); the
   trusted client-IP relay and API-side verified-peer guard land separately.
 
+### Added
+
+- **`WEB_TRUSTED_CLIENT_IP_HEADER`** (`apps/web`, ADR-072, disabled by
+  default). When set to one of `x-real-ip`/`x-forwarded-for`/
+  `cf-connecting-ip`/`true-client-ip`/`fastly-client-ip`, `apps/web`'s BFF
+  proxy relays that inbound header's value to `apps/api` as a new,
+  purpose-specific `X-AMCore-Client-Ip` header — only ever set from this
+  resolved value, never a browser-supplied one. Inert on its own until the
+  forthcoming API-side verified-web-peer guard also trusts it; see
+  `docs/frontend/api-consumption.md` → "Client-IP relay to `apps/api`".
+- **`amcore_queue_paused{queue,role}` metric** — `1` if a queue is currently
+  paused, `0` otherwise (`Queue.isPaused()`), replacing the pause signal
+  lost from `amcore_queue_jobs` below.
+
 ### Changed
 
 - **`bullmq` bumped to 6** (`apps/api`). Added `ioredis` as an explicit
@@ -31,13 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`amcore_queue_jobs{state="paused"}` label value.** BullMQ 6 no longer
   reports a per-job `paused` state — a paused queue's jobs are now counted
   as `waiting`. Any downstream Grafana panel or alert keyed on
-  `state="paused"` needs updating to the new gauge below.
-
-### Added
-
-- **`amcore_queue_paused{queue,role}` metric** — `1` if a queue is currently
-  paused, `0` otherwise (`Queue.isPaused()`), replacing the pause signal
-  lost from `amcore_queue_jobs` above.
+  `state="paused"` needs updating to the new gauge above.
 
 ## [0.5.0] - 2026-08-29
 

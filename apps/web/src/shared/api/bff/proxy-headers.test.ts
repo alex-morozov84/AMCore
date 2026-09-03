@@ -37,6 +37,17 @@ describe('forwardRequestHeaders', () => {
     expect(forwarded.get('authorization')).toBe('Bearer at-1')
   })
 
+  it('does not set x-amcore-client-ip when no trusted client IP was resolved', () => {
+    const forwarded = forwardRequestHeaders(new Headers(), 'at-1', null)
+    expect(forwarded.has(AMCORE_CLIENT_IP_HEADER)).toBe(false)
+  })
+
+  it('sets x-amcore-client-ip from the resolved trusted client IP, not any browser-supplied one', () => {
+    const source = new Headers({ [AMCORE_CLIENT_IP_HEADER]: '9.9.9.9' })
+    const forwarded = forwardRequestHeaders(source, 'at-1', '203.0.113.7')
+    expect(forwarded.get(AMCORE_CLIENT_IP_HEADER)).toBe('203.0.113.7')
+  })
+
   it('strips Origin/Referer — the CSRF boundary is browser<->Next, not Next<->apps/api', () => {
     const source = new Headers({
       origin: 'http://localhost:3002',

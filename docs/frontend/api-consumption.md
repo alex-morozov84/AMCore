@@ -37,6 +37,34 @@ A dedicated route is worth adding for two distinct reasons, not one:
   `public-auth-action.ts` covers the latter four (forwards the backend's
   response verbatim, mints nothing — none of them authenticate anyone).
 
+## Client-IP relay to `apps/api` (ADR-072)
+
+The generic authenticated proxy (`authenticated-proxy.ts`) never relays a
+browser-supplied `X-Forwarded-For`/`X-Real-IP`/`Forwarded`/etc. header to
+`apps/api` — `proxy-headers.ts`'s `forwardRequestHeaders()` strips every
+forwarded/client-IP lookalike unconditionally, regardless of configuration.
+This is always on, not opt-in.
+
+Separately, `apps/web` can optionally relay the _real_ visitor IP to
+`apps/api` as a purpose-specific `X-AMCore-Client-Ip` header, derived by
+`trusted-client-ip.ts`'s `resolveTrustedClientIp()` from a single inbound
+header you name via `WEB_TRUSTED_CLIENT_IP_HEADER` (`.env.example`) —
+**disabled by default**. Turning it on is an assertion that whatever edge
+proxy/LB sits directly in front of `apps/web` itself overwrites (never
+appends to) that header before it reaches `apps/web`; Next.js Route
+Handlers/Proxy expose no raw socket address to verify a hop's identity
+against, unlike `apps/api`'s `TRUST_PROXY` (ADR-060), so this is
+trust-by-header-name only.
+
+**Honesty caveat:** as of this section, `apps/api` does not yet consume
+`X-AMCore-Client-Ip` for anything — the global throttler still keys on
+`req.ip` for the `apps/web → apps/api` hop exactly as before. Enabling
+`WEB_TRUSTED_CLIENT_IP_HEADER` today only relays the header; it has no
+effect until the API-side verified-web-peer guard (ADR-072, tracked
+separately) also trusts it. This half is documented now because the
+contract (which header, when it's safe to enable) is stable and reviewable
+independently of the API-side follow-up.
+
 ## What is enabled by default vs. reference-only
 
 The starter includes two different kinds of frontend surface:

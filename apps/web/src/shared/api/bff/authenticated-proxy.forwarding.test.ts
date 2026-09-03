@@ -21,6 +21,7 @@ describe('proxyToBackend — request/response forwarding once authenticated', ()
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    delete process.env.WEB_TRUSTED_CLIENT_IP_HEADER
   })
 
   it('does not CSRF-check a safe GET request even from an untrusted origin', async () => {
@@ -91,5 +92,41 @@ describe('proxyToBackend — request/response forwarding once authenticated', ()
     const headers = init.headers as Headers
     expect(headers.has('origin')).toBe(false)
     expect(headers.has('referer')).toBe(false)
+  })
+
+  it('does not set x-amcore-client-ip upstream when the web-side resolver is disabled (default)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = makeRequest('users/me', { headers: { 'x-real-ip': '203.0.113.7' } })
+    await proxyToBackend(request, ['users', 'me'])
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect((init.headers as Headers).has('x-amcore-client-ip')).toBe(false)
+  })
+
+  it('relays the trusted inbound IP as x-amcore-client-ip once the web-side resolver is enabled', async () => {
+    process.env.WEB_TRUSTED_CLIENT_IP_HEADER = 'x-real-ip'
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = makeRequest('users/me', { headers: { 'x-real-ip': '203.0.113.7' } })
+    await proxyToBackend(request, ['users', 'me'])
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect((init.headers as Headers).get('x-amcore-client-ip')).toBe('203.0.113.7')
+  })
+
+  it('never relays a browser-supplied x-amcore-client-ip, resolver enabled or not', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    // No WEB_TRUSTED_CLIENT_IP_HEADER configured — the browser's own claim
+    // must not survive even though nothing legitimate replaces it either.
+    const request = makeRequest('users/me', { headers: { 'x-amcore-client-ip': '9.9.9.9' } })
+    await proxyToBackend(request, ['users', 'me'])
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect((init.headers as Headers).has('x-amcore-client-ip')).toBe(false)
   })
 })
