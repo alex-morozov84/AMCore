@@ -8,7 +8,9 @@ specific concern comes up.
   and in production. One-shot `prisma migrate deploy`, production env
   requirements, the `web` / `worker` / `all` process roles, TLS/reverse-proxy
   setup (nginx example, the optional bundled Caddy `edge` profile, and
-  `TRUST_PROXY`), the Redis queue profile, database pool sizing, and
+  `TRUST_PROXY`), the opt-in BFF client-IP relay that lets the global
+  rate limiter tell visitors apart (`WEB_TRUSTED_CLIENT_IP_HEADER` +
+  `TRUSTED_WEB_PEERS`), the Redis queue profile, database pool sizing, and
   SSE-behind-a-proxy guidance.
 - **[Backup & restore](backup-restore.md)** — which backup strategy fits your
   deployment (managed-provider PITR, self-hosted WAL archiving, or the
