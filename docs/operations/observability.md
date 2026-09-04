@@ -73,10 +73,10 @@ are the hard contract every label must satisfy.
   appear distinctly, e.g. `notif-subscriber`, `ai-run-subscriber`);
   `event=error|reconnecting|degraded`.
 - `rate_limit_decisions_total{policy,outcome,role}` (ADR-073) — every global
-  rate-limit admission decision. `policy=default|privileged_mutation|
-expensive_action|custom` (object-identity match against
-  `RATE_LIMIT_POLICIES`, never a route/tracker/free-text label — `custom`
-  covers an inline policy, e.g. the Telegram webhook's);
+  rate-limit admission decision. `policy` is bounded to `default`,
+  `privileged_mutation`, `expensive_action`, or `custom` (object-identity
+  match against `RATE_LIMIT_POLICIES`, never a route/tracker/free-text
+  label — `custom` covers an inline policy, e.g. the Telegram webhook's);
   `outcome=allowed|refused`. The calibration signal for revisiting
   `DEFAULT.burst` against real production traffic.
 
