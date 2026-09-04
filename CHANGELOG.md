@@ -41,10 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   proxy relays that inbound header's value to `apps/api` as a new,
   purpose-specific `X-AMCore-Client-Ip` header — only ever set from this
   resolved value, never a browser-supplied one.
-- **`TRUSTED_WEB_PEERS`** (`apps/api`, ADR-072, disabled by default) and a
-  new `TrustedWebPeerThrottlerGuard` replacing the stock global
-  `ThrottlerGuard`. Trusts the relayed `X-AMCore-Client-Ip` header only when
-  the inbound request's actual socket peer (never a forwarded header) is in
+- **`TRUSTED_WEB_PEERS`** (`apps/api`, ADR-072, disabled by default) —
+  trusted by the global rate limiter's tracker resolver only when the
+  inbound request's actual socket peer (never a forwarded header) is in
   this configured trusted set (real IPv4/IPv6 CIDR matching via Node's
   built-in `net.BlockList`); otherwise falls back to stock `req.ip`,
   identical to pre-ADR-072 behavior. Both this and
@@ -94,6 +93,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Limit = rate` would be self-contradictory). A global rate-limit refusal
   now also carries a real `errorCode: "RATE_LIMIT_EXCEEDED"` in the
   response body — previously it carried none.
+- **`bullmq` bumped to 6** (`apps/api`). Added `ioredis` as an explicit
+  dependency (BullMQ 6 no longer bundles it directly). Replaced the removed
+  `Queue#client` with the v6 `queue.getBackend().client` escape hatch in
+  `QueueService`'s producer-side Redis observability — behavior unchanged.
 
 ### Fixed
 
@@ -107,23 +110,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - **`@nestjs/throttler` dependency** (ADR-073) — replaced by AMCore's own
-  GCRA-based rate-limit mechanism (see Added above). `RedisThrottlerStorage`
-  and `TrustedWebPeerThrottlerGuard` (added under `[Unreleased]` earlier in
-  this same file, ADR-072) are replaced by `GcraRedisLimiter`/
-  `GcraMemoryLimiter` and `RateLimitGuard`; the ADR-072 client-IP-relay
-  trust behavior these classes implemented is unchanged, only the
-  implementing classes moved. See ADR-073 for the full "what this gives up
+  GCRA-based rate-limit mechanism (see Added above): `GcraRedisLimiter`/
+  `GcraMemoryLimiter` and `RateLimitGuard`. The ADR-072 client-IP-relay
+  trust behavior (`TRUSTED_WEB_PEERS` above) is unchanged, only the
+  implementing class moved. See ADR-073 for the full "what this gives up
   vs. gains" rationale.
-
-### Changed
-
-- **`bullmq` bumped to 6** (`apps/api`). Added `ioredis` as an explicit
-  dependency (BullMQ 6 no longer bundles it directly). Replaced the removed
-  `Queue#client` with the v6 `queue.getBackend().client` escape hatch in
-  `QueueService`'s producer-side Redis observability — behavior unchanged.
-
-### Removed
-
 - **`amcore_queue_jobs{state="paused"}` label value.** BullMQ 6 no longer
   reports a per-job `paused` state — a paused queue's jobs are now counted
   as `waiting`. Any downstream Grafana panel or alert keyed on

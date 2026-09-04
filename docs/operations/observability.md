@@ -66,11 +66,10 @@ are the hard contract every label must satisfy.
 - `db_pool_connections{state,role}` (`state=total|idle|waiting`),
   `db_slow_queries_total{role}` — collected from the process-local pool; no query
   text or model names.
-- `redis_client_events_total{client,event,role}` —
-  `client=shared|queue_producer|queue_worker|throttler` (the `throttler` label
-  name is unchanged since ADR-073 — it describes the Redis-client role, not
-  the specific storage implementation behind it; SSE Pub/Sub subscribers
-  appear distinctly, e.g. `notif-subscriber`, `ai-run-subscriber`);
+- `redis_client_events_total{client,event,role}` — `client` is one of
+  `shared`, `queue_producer`, `queue_worker`, `throttler` (unchanged since
+  ADR-073 — it describes the Redis-client role, not the specific storage
+  implementation behind it), `notif_subscriber`, or `ai_run_subscriber`;
   `event=error|reconnecting|degraded`.
 - `rate_limit_decisions_total{policy,outcome,role}` (ADR-073) — every global
   rate-limit admission decision. `policy` is bounded to `default`,

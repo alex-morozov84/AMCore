@@ -469,7 +469,7 @@ off` on the stream location (and never gzip a `text/event-stream`).
 - **Recommended:** a **separate Redis instance** for queues vs cache/throttler in
   larger deployments (different memory/eviction needs). The starter shares one
   instance — fine if it is `noeviction` + persistent. Keys are namespaced
-  (`amcore` BullMQ prefix, `throttle:v1:*`, `auth:*`, `rate:*`).
+  (`amcore` BullMQ prefix, `ratelimit:v1:*` (ADR-073), `auth:*`, `rate:*`).
 - Managed Redis: use `rediss://` (TLS) with ACL user/password in `REDIS_URL` /
   `COMPOSE_REDIS_URL`.
 
