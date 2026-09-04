@@ -41,7 +41,9 @@ export default [
   },
   {
     // Exception filters and their tests must reference raw NestJS HttpException
-    // subclasses because the framework still throws them; only the Logger ban applies here.
+    // subclasses because the framework still throws them; only the Logger ban
+    // is lifted here — the throttler ban still applies (this dir has no reason
+    // to import raw @nestjs/throttler decorators).
     files: ['src/common/exceptions/**/*.ts'],
     rules: {
       'no-restricted-imports': [
@@ -53,6 +55,12 @@ export default [
               importNames: ['Logger'],
               message:
                 'Use PinoLogger from nestjs-pino via dependency injection in runtime API code.',
+            },
+            {
+              name: '@nestjs/throttler',
+              importNames: ['Throttle', 'SkipThrottle'],
+              message:
+                'Use @RateLimit/@SkipRateLimit from infrastructure/throttling instead of raw @nestjs/throttler decorators.',
             },
           ],
         },

@@ -16,6 +16,20 @@
  *    **all** of them — a partial skip (e.g. only `short`) would silently
  *    leave the route bucketed against the other, which is never the
  *    intent of `@SkipRateLimit()`.
+ * 3. Every controller in `MUST_SKIP_CONTROLLERS` actually carries a
+ *    class-level skip covering every registered throttler. (1) and (2)
+ *    alone only check *consistency* of whatever metadata happens to be
+ *    present — if `@SkipRateLimit()` were deleted from `HealthController`
+ *    entirely, there would be no metadata at all to find inconsistent,
+ *    and the test would stay green. This assertion pins the actual
+ *    regression this guardrail exists for: the health/metrics probes
+ *    must stay unthrottled, not just "consistently" throttled.
+ *
+ * A companion `it()` below asserts the hardcoded metadata-key prefixes
+ * (next paragraph) still match what a real `@Throttle`/`@SkipThrottle`
+ * call produces today, so a future `@nestjs/throttler` version that
+ * changes its internal constant format fails loudly here instead of
+ * silently disabling every check above.
  *
  * `@nestjs/throttler`'s `THROTTLER_LIMIT`/`THROTTLER_SKIP` metadata-key
  * constants are not re-exported from the package's public `index`
@@ -38,12 +52,20 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
 import { PATH_METADATA } from '@nestjs/common/constants'
+import { SkipThrottle, Throttle } from '@nestjs/throttler'
 
 import { THROTTLER_NAMES } from './rate-limit-policies'
 
 const SRC_DIR = path.resolve(__dirname, '..', '..')
 const THROTTLER_LIMIT_PREFIX = 'THROTTLER:LIMIT'
 const THROTTLER_SKIP_PREFIX = 'THROTTLER:SKIP'
+
+/**
+ * Controllers that must stay fully unthrottled — a class-level skip
+ * covering every registered throttler. Exported class names, not file
+ * paths, since that's what the walk below keys findings on.
+ */
+const MUST_SKIP_CONTROLLERS = ['HealthController', 'MetricsController']
 
 async function findControllerFiles(dir: string): Promise<string[]> {
   const out: string[] = []
@@ -101,6 +123,7 @@ describe('Controllers — rate-limit decorator coverage (starter-grade guardrail
     const unregistered: UnregisteredNameFinding[] = []
     const partialSkips: PartialSkipFinding[] = []
     const inspectedControllers: string[] = []
+    const classSkipCoverage = new Map<string, number>()
 
     const registeredNames = new Set<string>(THROTTLER_NAMES)
 
@@ -139,6 +162,7 @@ describe('Controllers — rate-limit decorator coverage (starter-grade guardrail
         const relFile = path.relative(SRC_DIR, file)
 
         checkTarget(cls, exportName, '(class)', relFile)
+        classSkipCoverage.set(exportName, throttlerNamesOnTarget(cls).skipped.size)
 
         const proto = cls.prototype as Record<string, unknown> | undefined
         if (!proto) continue
@@ -153,7 +177,24 @@ describe('Controllers — rate-limit decorator coverage (starter-grade guardrail
 
     expect(inspectedControllers.length).toBeGreaterThan(0)
 
+    const missingMustSkip = MUST_SKIP_CONTROLLERS.filter(
+      (name) => (classSkipCoverage.get(name) ?? 0) !== registeredNames.size
+    )
+
     const errors: string[] = []
+
+    if (missingMustSkip.length > 0) {
+      errors.push(
+        `${missingMustSkip.length} controller(s) in MUST_SKIP_CONTROLLERS no longer carry a full class-level @SkipRateLimit():`,
+        ...missingMustSkip.map((name) => {
+          const found = classSkipCoverage.has(name)
+          return `  - ${name}   (${found ? `skips ${classSkipCoverage.get(name)}/${registeredNames.size} registered throttlers` : 'not found among inspected controllers — was it renamed or moved?'})`
+        }),
+        '',
+        'These controllers must stay fully unthrottled. Add (or restore)',
+        '@SkipRateLimit() at the class level.'
+      )
+    }
 
     if (unregistered.length > 0) {
       errors.push(
@@ -188,5 +229,15 @@ describe('Controllers — rate-limit decorator coverage (starter-grade guardrail
     if (errors.length > 0) {
       throw new Error(errors.join('\n'))
     }
+  })
+
+  it('THROTTLER_LIMIT_PREFIX/THROTTLER_SKIP_PREFIX still match real @nestjs/throttler output', () => {
+    class Canary {}
+    Throttle({ long: { limit: 1, ttl: 1000 } })(Canary)
+    SkipThrottle({ short: true })(Canary)
+
+    const keys = Reflect.getMetadataKeys(Canary) as string[]
+    expect(keys.some((k) => k.startsWith(THROTTLER_LIMIT_PREFIX) && k.endsWith('long'))).toBe(true)
+    expect(keys.some((k) => k.startsWith(THROTTLER_SKIP_PREFIX) && k.endsWith('short'))).toBe(true)
   })
 })

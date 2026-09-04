@@ -300,17 +300,32 @@ Apply these only when your module needs them:
     only skips a throttler named `'default'`; AMCore registers `short`/
     `long`, so a bare `@SkipThrottle()` silently does nothing. This was a
     real, shipped bug before the wrapper existed.
-  - **Buckets are per-route-per-visitor, precisely.** One visitor calling
-    several _different_ routes doesn't share one budget — each route has
-    its own bucket. One visitor calling the _same_ route many times
-    rapidly does share a budget, and a single request can itself hit the
-    `short` bucket if it fans out into many _other_ routes' handlers being
-    hit in the same second by the same visitor. This precision only holds
-    for real visitors once `TRUSTED_WEB_PEERS` + `WEB_TRUSTED_CLIENT_IP_HEADER`
-    are configured (ADR-072) — see
+  - **Buckets are per-route-per-visitor, precisely — for both `short` and
+    `long`.** Both buckets key on the same (class, handler, throttler
+    name, visitor) tuple, so they behave identically in this respect: one
+    visitor calling several _different_ routes doesn't share one budget —
+    each route tracks its own `short` and `long` counts independently,
+    completely unaffected by that visitor's traffic to any other route.
+    One visitor calling the _same_ route many times rapidly shares that
+    route's budget. This precision only holds for real visitors once
+    `TRUSTED_WEB_PEERS` + `WEB_TRUSTED_CLIENT_IP_HEADER` are configured
+    (ADR-072) — see
     [`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
     "Client-IP relay to `apps/api`"; without them every BFF-proxied visitor
     still shares one bucket.
+  - **`@RateLimit(...)` only overrides the `long` (per-minute) bucket —
+    the global `short` (10 req/s) backstop is never overridden and still
+    applies to every route, decorated or not.** A policy's `per`-minute
+    rate is only actually reachable if a visitor's requests to that route
+    are spread out: e.g. the Telegram webhook's `{ rate: 600, per: 60_000
+}` policy still 429s on an 11th request to that route within the same
+    second, because `short` is untouched. There is currently no supported
+    way to raise this per-second ceiling for one route — a route that
+    legitimately needs sustained bursts above 10 req/s from a single
+    source isn't fully served by `@RateLimit` today. Don't assume an
+    override makes a route's effective ceiling equal to what you wrote;
+    the burst-tolerant (GCRA) limiter described below removes this
+    constraint without changing this decorator's contract.
   - **Classifying a new route** (stop at the first match):
     1. Does it need per-actor/per-identity protection rather than a
        per-visitor volumetric one (login, invite-accept, password reset)?
@@ -319,13 +334,16 @@ Apply these only when your module needs them:
        common case.
     3. Is it unusually expensive (heavy DB/CPU work) or privileged
        (destructive/admin) but rarely called in bursts by a legitimate
-       user? Narrow it with `@RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION
-| .PRIVILEGED_MUTATION)`, or an inline policy with cited evidence for
-       the chosen numbers (see the Telegram webhook controller).
+       user? Narrow it with `@RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)`
+       or `.PRIVILEGED_MUTATION`, or an inline policy with cited evidence
+       for the chosen numbers (see the Telegram webhook controller) —
+       remembering the `short`-bucket ceiling above.
     4. Is it a public, unauthenticated ingress needing its own bounded rate
        distinct from the global default (a webhook)? Inline `@RateLimit`
        with a comment naming the source's documented rate, never
-       `@SkipRateLimit()`.
+       `@SkipRateLimit()` — and note in that comment if the source's rate
+       exceeds 10 req/s, since the `short` bucket caps it regardless of
+       what the policy says.
     5. Does one legitimate user action _legitimately_ fan out into many
        rapid calls to the _same_ route (e.g. a filterable list a user
        clicks through quickly)? Don't paper over it by loosening the global

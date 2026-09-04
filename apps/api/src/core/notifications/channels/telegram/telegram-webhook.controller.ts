@@ -24,6 +24,10 @@ export class TelegramWebhookController {
   @Post()
   @Auth(AuthType.None)
   @VerifyWebhook('telegram')
+  // Effective ceiling is 10 req/s, not 600/min: @RateLimit only overrides the
+  // `long` (per-minute) bucket — the global `short` (10 req/s) backstop is
+  // never overridden and still applies. Fine for Telegram's own update rate;
+  // don't read `per: 60_000` as "up to 10 in the same second is safe."
   @RateLimit({ rate: 600, per: 60_000 })
   @HttpCode(HttpStatus.OK)
   @ApiExcludeEndpoint()

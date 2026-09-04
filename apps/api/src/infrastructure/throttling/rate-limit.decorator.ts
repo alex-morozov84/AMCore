@@ -11,8 +11,13 @@ import { RateLimitPolicy, THROTTLER_NAMES } from './rate-limit-policies'
  * throttler/per-route-per-visitor bucket model to use this safely.
  *
  * Only overrides the `long` (sustained-rate) bucket; the `short` burst
- * backstop stays the untouched global default. `policy.burst` is part of
- * the policy shape but not yet read here — see `RateLimitPolicy`.
+ * backstop (10 req/s, global default) stays untouched and still applies —
+ * a route's effective per-second ceiling is NOT what `policy.rate`/`per`
+ * says if that implies more than 10 req/s. A `{ rate: 600, per: 60_000 }`
+ * policy still 429s an 11th request within the same second; there is
+ * currently no supported way to raise that per-second ceiling for one
+ * route. `policy.burst` is part of the policy shape but not yet read here
+ * — see `RateLimitPolicy`.
  */
 export function RateLimit(policy: RateLimitPolicy): MethodDecorator & ClassDecorator {
   return Throttle({ long: { limit: policy.rate, ttl: policy.per } })
