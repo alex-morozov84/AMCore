@@ -341,17 +341,17 @@ Apply these only when your module needs them:
     route's fan-out — that weakens the backstop for every route to fix a
     problem only one route has; narrow a specific route's policy instead.
   - **Why GCRA, not fixed-window.** A fixed-window counter (what this
-    mechanism used before ADR-073) can only express one number — it cannot
-    distinguish "50 requests in the same instant from one idle visitor"
-    from "50 requests per second sustained from an attacker." No amount of
-    `@RateLimit` tuning fixes that; only a capacity-aware algorithm can.
-    GCRA is that algorithm — see ADR-073 for the full rationale, the
-    default policy table, and a measured before/after (the exact
-    originally-reported production symptom this mechanism exists to
-    prevent: 28 of 60 requests refused under the old fixed-window
-    defaults, 0 of 60 under this one, for the identical traffic pattern —
-    permanent regression coverage in
-    `apps/api/test/rate-limit-symptom-reproduction.e2e-spec.ts`).
+    mechanism used before ADR-073) can only express one number — a limit
+    per window — so it cannot distinguish a one-time burst from an idle
+    visitor from the same request count arriving continuously, request
+    after request, from an attacker. No amount of `@RateLimit` tuning
+    fixes that; only a capacity-aware algorithm can. GCRA is that
+    algorithm — see ADR-073 for the full rationale, the default policy
+    table, and a measured before/after (the exact originally-reported
+    production symptom this mechanism exists to prevent: 28 of 60
+    requests refused under the old fixed-window defaults, 0 of 60 under
+    this one, for the identical traffic pattern — permanent regression
+    coverage in `apps/api/test/rate-limit-symptom-reproduction.e2e-spec.ts`).
 
 ## Tests
 

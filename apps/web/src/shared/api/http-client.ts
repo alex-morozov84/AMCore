@@ -9,11 +9,27 @@ import type { ApiErrorResponse } from './types'
 export class ApiRequestError extends Error {
   constructor(
     public readonly status: number,
-    public readonly body: ApiErrorResponse | undefined
+    public readonly body: ApiErrorResponse | undefined,
+    /** Whole seconds from a `Retry-After` response header (RFC 9110, ADR-073), when present. */
+    public readonly retryAfterSeconds?: number
   ) {
     super(body?.message ?? `Request failed with status ${status}`)
     this.name = 'ApiRequestError'
   }
+}
+
+/**
+ * Parse a `Retry-After` header (RFC 9110 §10.2.3). AMCore's own global
+ * rate-limit guard only ever emits the delay-seconds form (a non-negative
+ * integer), never the HTTP-date form, so that's the only shape parsed here
+ * — an HTTP-date value (or anything else non-numeric) is intentionally
+ * ignored rather than guessed at.
+ */
+function parseRetryAfterSeconds(headers: Headers): number | undefined {
+  const raw = headers.get('Retry-After')
+  if (raw === null) return undefined
+  const seconds = Number(raw)
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined
 }
 
 /** `fetch()` itself rejected — offline, DNS, a dropped connection. Replaces axios's `ERR_NETWORK`. */
@@ -41,7 +57,11 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    throw new ApiRequestError(response.status, await safeJson(response))
+    throw new ApiRequestError(
+      response.status,
+      await safeJson(response),
+      parseRetryAfterSeconds(response.headers)
+    )
   }
 
   // Matches `/api/auth/logout`'s own contract, but written generically —

@@ -20,6 +20,7 @@ shape is generated from Swagger/OpenAPI at `/docs` in development.
 | Email          | Resend/mock providers, React Email, FormatJS                 |
 | Storage        | S3-compatible, local, and memory drivers                     |
 | Observability  | Pino logs, Prometheus metrics, health probes                 |
+| Rate limiting  | Redis-backed GCRA global backstop with per-route policies    |
 
 ## Commands
 
@@ -71,6 +72,7 @@ Important areas:
 | `infrastructure/email`                                           | React Email rendering, providers, queue worker, direct secret sends               |
 | `infrastructure/storage`, `infrastructure/media`                 | object storage and image processing primitives                                    |
 | `infrastructure/queue`, `infrastructure/schedule`                | BullMQ, Bull Board, cron coordination                                             |
+| `infrastructure/throttling`                                      | GCRA rate-limit guard, Redis/memory limiters, `@RateLimit`/`@SkipRateLimit`       |
 
 ## Module Boundaries
 

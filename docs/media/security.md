@@ -59,7 +59,9 @@ arbitrary dimensions/quality; only named, server-defined preset variants exist.
 Avatar processing runs **synchronously** in the API process. Mitigations:
 
 - strict byte/dimension/pixel caps (above);
-- a per-route throttle on `POST /auth/me/avatar` (5/min/IP) for the heavy decode;
+- a per-route `@RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)` override on
+  `POST /auth/me/avatar` (5/min sustained, burst 5, per route per tracker) for
+  the heavy decode;
 - no arbitrary transform parameters; no remote URL fetching; no SVG;
 - no ImageMagick delegates / shell execution.
 

@@ -37,6 +37,31 @@ A dedicated route is worth adding for two distinct reasons, not one:
   `public-auth-action.ts` covers the latter four (forwards the backend's
   response verbatim, mints nothing — none of them authenticate anyone).
 
+## Retry policy: 429 and `Retry-After` (ADR-073)
+
+`getQueryClient()`'s `defaultOptions.queries` (`shared/api/query-client.ts`)
+applies one retry policy to every `useQuery` call in the app — TanStack
+Query's own default retries _any_ error up to 3 times, including a genuine
+client-input error (400/404/422/...) that will never succeed unchanged.
+This starter's default instead:
+
+- **Never retries a 4xx, except 429.** A rate-limit refusal is retryable by
+  definition ("try again later"); every other 4xx means the request itself
+  is wrong and retrying it changes nothing.
+- **Retries a 429 up to 3 times, honouring a real `Retry-After` header**
+  (RFC 9110) when the backend sent one — `apps/api`'s global rate limiter
+  always does (ADR-073). `ApiRequestError.retryAfterSeconds`
+  (`http-client.ts`) captures it; `getRetryAfterMs()` (`errors.ts`) reads
+  it back. No `Retry-After` (a 429 from somewhere else, or a 5xx/network
+  error) falls back to TanStack Query's own exponential backoff.
+- `<ApiErrorAlert>`/`useApiError()` already localize `RATE_LIMIT_EXCEEDED`
+  in both catalogues — nothing else to wire up for a query that exhausts
+  its retries and surfaces the error to a component.
+
+Only `useQuery`/`useInfiniteQuery` are affected — `useMutation` never
+retries by default in TanStack Query, and this starter doesn't override
+that.
+
 ## Client-IP relay to `apps/api` (ADR-072)
 
 The generic authenticated proxy (`authenticated-proxy.ts`) never relays a
@@ -228,6 +253,9 @@ never sees a request that never crosses the browser. See
 
 - [Architecture & conventions](architecture-and-conventions.md#browser-api-reach) —
   the BFF Route Handler layer and the auth flows built on it.
+- [Backend rate limiting](../backend/architecture-and-conventions.md#cross-cutting-decision-points) —
+  the `@RateLimit`/`@SkipRateLimit` policies and GCRA algorithm this page's
+  retry policy responds to.
 - [Testing](./testing.md) — which layer to test a given hook/flow at.
 - [Media](../media/README.md), [Notifications](../notifications/README.md),
   [AI](../ai/README.md) — the backend contracts these hooks consume.

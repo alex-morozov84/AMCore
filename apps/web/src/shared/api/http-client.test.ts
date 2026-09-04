@@ -72,6 +72,34 @@ describe('apiClient', () => {
     })
   })
 
+  it('ApiRequestError captures retryAfterSeconds from a Retry-After header', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ statusCode: 429, errorCode: 'RATE_LIMIT_EXCEEDED' }), {
+          status: 429,
+          headers: { 'Retry-After': '2' },
+        })
+      )
+    )
+
+    const error = await apiClient.get('/auth/me').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiRequestError)
+    expect((error as ApiRequestError).retryAfterSeconds).toBe(2)
+  })
+
+  it('ApiRequestError has an undefined retryAfterSeconds when there is no Retry-After header', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ statusCode: 404 }), { status: 404 }))
+    )
+
+    const error = await apiClient.get('/auth/me').catch((e: unknown) => e)
+
+    expect((error as ApiRequestError).retryAfterSeconds).toBeUndefined()
+  })
+
   it('ApiRequestError has an undefined body when the response has no parseable JSON', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not json', { status: 500 })))
 

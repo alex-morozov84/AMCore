@@ -79,6 +79,18 @@ export function getErrorStatus(error: unknown): number | undefined {
 }
 
 /**
+ * Get the `Retry-After` delay in milliseconds, when the error carried one
+ * (ADR-073's global rate-limit 429 today; any future `Retry-After`-bearing
+ * response transparently benefits too).
+ */
+export function getRetryAfterMs(error: unknown): number | undefined {
+  if (error instanceof ApiRequestError && error.retryAfterSeconds !== undefined) {
+    return error.retryAfterSeconds * 1000
+  }
+  return undefined
+}
+
+/**
  * Get error code from API error response
  */
 export function getErrorCode(error: unknown): string | undefined {

@@ -83,6 +83,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`apps/web`'s default query retry policy no longer blindly retries every
+  error** (ADR-073). TanStack Query's own default retries any error,
+  including a genuine client-input 4xx, up to 3 times; `getQueryClient()`
+  now never retries a 4xx except `429`, and honours a real `Retry-After`
+  header (`ApiRequestError.retryAfterSeconds`) for the retry delay when the
+  backend sent one — `apps/api`'s global rate limiter always does. Falls
+  back to exponential backoff otherwise. Only `useQuery`/`useInfiniteQuery`
+  are affected; `useMutation` never retried by default.
 - **Rate-limit headers are now standard and unsuffixed** (ADR-073):
   `X-RateLimit-Limit`/`-Remaining`/`-Reset` and a real `Retry-After`
   (RFC 9110), replacing `@nestjs/throttler`'s non-standard
