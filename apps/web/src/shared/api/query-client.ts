@@ -21,16 +21,23 @@ function shouldRetry(failureCount: number, error: unknown): boolean {
   return true
 }
 
+const MAX_RETRY_DELAY_MS = 30_000
+
 /**
  * Honour a real `Retry-After` (ADR-073) when the error carried one — set
  * only on the global rate-limit 429 today, transparently applies to any
- * future `Retry-After`-bearing response. Otherwise TanStack Query's own
+ * future `Retry-After`-bearing response. Capped at `MAX_RETRY_DELAY_MS`,
+ * same as the fallback below: a `Retry-After` is server-supplied and this
+ * client has no control over its value — a proxy/CDN in front of `apps/api`
+ * emitting a 503 + a minutes/hours-long `Retry-After` (standard practice
+ * for nginx/ALB/Cloudflare maintenance windows) must not turn into a
+ * multi-hour hung retry with no error shown. Otherwise TanStack Query's own
  * default exponential backoff.
  */
 function retryDelay(failureCount: number, error: unknown): number {
   const retryAfterMs = getRetryAfterMs(error)
-  if (retryAfterMs !== undefined) return retryAfterMs
-  return Math.min(1000 * 2 ** failureCount, 30_000)
+  if (retryAfterMs !== undefined) return Math.min(retryAfterMs, MAX_RETRY_DELAY_MS)
+  return Math.min(1000 * 2 ** failureCount, MAX_RETRY_DELAY_MS)
 }
 
 function makeQueryClient() {

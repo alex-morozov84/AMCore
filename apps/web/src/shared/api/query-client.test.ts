@@ -47,6 +47,18 @@ describe('query-client default retry policy (C1/C2, ADR-073)', () => {
     expect(retryDelay(0, error)).toBe(2000)
   })
 
+  it('caps an oversized Retry-After at 30s — a 503 + a minutes/hours-long Retry-After (standard for nginx/ALB/Cloudflare maintenance windows) must not hang a retry for hours', () => {
+    const { retryDelay } = retryFns()
+    const error = new ApiRequestError(503, undefined, 3600)
+    expect(retryDelay(0, error)).toBe(30_000)
+  })
+
+  it('honours a zero-second Retry-After as an immediate retry', () => {
+    const { retryDelay } = retryFns()
+    const error = new ApiRequestError(429, undefined, 0)
+    expect(retryDelay(0, error)).toBe(0)
+  })
+
   it('falls back to exponential backoff when there is no Retry-After', () => {
     const { retryDelay } = retryFns()
     const error = new ApiRequestError(503, undefined)

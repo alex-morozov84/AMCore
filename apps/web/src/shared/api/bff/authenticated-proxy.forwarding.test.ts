@@ -51,6 +51,21 @@ describe('proxyToBackend — request/response forwarding once authenticated', ()
     expect((init.headers as Headers).get('authorization')).toBe('Bearer at-1')
   })
 
+  it('forwards a Retry-After response header verbatim (ADR-073) — the client-side retry policy depends on it surviving this hop', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ errorCode: 'RATE_LIMIT_EXCEEDED' }), {
+        status: 429,
+        headers: { 'Retry-After': '2' },
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await proxyToBackend(makeRequest('users/me'), ['users', 'me'])
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBe('2')
+  })
+
   it('forwards the query string to the upstream URL', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
