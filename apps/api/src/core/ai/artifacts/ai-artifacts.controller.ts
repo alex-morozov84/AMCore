@@ -20,7 +20,6 @@ import {
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger'
-import { Throttle } from '@nestjs/throttler'
 import type { Response } from 'express'
 import { ZodResponse } from 'nestjs-zod'
 
@@ -31,6 +30,7 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling'
 import { Auth } from '../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator'
 import { AiArtifactResponseDto } from '../dto/ai.dto'
@@ -60,7 +60,7 @@ export class AiArtifactsController {
   @Post(':id/artifacts')
   // Per-handler throttle, mirroring the avatar upload's 5/min/IP (narrows the global `long`
   // bucket for this heavy, rarely-repeated multipart write).
-  @Throttle({ long: { limit: 5, ttl: 60_000 } })
+  @RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: AI_ARTIFACT_UPLOAD_HARD_LIMIT_BYTES } })
   )

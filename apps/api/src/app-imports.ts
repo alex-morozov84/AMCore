@@ -3,7 +3,6 @@ import { CacheModule } from '@nestjs/cache-manager'
 import type { ModuleMetadata, Provider } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
-import { ThrottlerModule } from '@nestjs/throttler'
 import { Request } from 'express'
 import { ClsModule, ClsService } from 'nestjs-cls'
 import { LoggerModule } from 'nestjs-pino'
@@ -37,11 +36,7 @@ import { QueueMetricsModule, QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
 import { StorageModule } from './infrastructure/storage'
-import {
-  RedisThrottlerStorage,
-  ThrottlingModule,
-  TrustedWebPeerThrottlerGuard,
-} from './infrastructure/throttling'
+import { ThrottlingModule, TrustedWebPeerThrottlerGuard } from './infrastructure/throttling'
 import { WebhooksModule } from './infrastructure/webhooks'
 import { PrismaModule } from './prisma'
 import { ShutdownService } from './shutdown.service'
@@ -132,26 +127,10 @@ export function coreImports(): Imports {
       }),
     }),
 
-    // Rate limiting (Redis-backed global throttler — ADR-039)
-    //
-    // Storage is Redis-backed via RedisThrottlerStorage so the short/long
-    // limits are shared across API replicas instead of being process-local.
-    //
-    // OB-03 note: privileged admin operations override the `long` bucket
-    // per-handler via `@Throttle({ long: { ... } })` rather than registering a
-    // third global named throttler — a third named throttler here would apply
-    // its default limit to every route.
-    ThrottlerModule.forRootAsync({
-      imports: [ThrottlingModule],
-      inject: [RedisThrottlerStorage],
-      useFactory: (storage: RedisThrottlerStorage) => ({
-        throttlers: [
-          { name: 'short', ttl: 1000, limit: 10 }, // 10 requests per second
-          { name: 'long', ttl: 60000, limit: 100 }, // 100 requests per minute
-        ],
-        storage,
-      }),
-    }),
+    // Rate limiting (Redis-backed global throttler — ADR-039). Registration,
+    // named throttlers, RedisThrottlerStorage, and the @RateLimit/
+    // @SkipRateLimit decorators all live inside ThrottlingModule.
+    ThrottlingModule,
 
     // Database
     PrismaModule,

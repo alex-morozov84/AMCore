@@ -9,7 +9,7 @@ Use it on public webhook routes together with explicit public auth:
 ```ts
 @Post('webhooks/stripe')
 @Auth(AuthType.None)
-@Throttle({ long: { limit: 5, ttl: 60_000 } })
+@RateLimit({ rate: 5, per: 60_000 })
 @VerifyWebhook('stripe')
 handleStripe(@Req() req: RawBodyRequest<Request>) {
   return { received: true }
@@ -112,8 +112,10 @@ Current replay-ID extraction:
 
 ## Throttling
 
-Webhook routes should use a dedicated `@Throttle(...)` override. Do not use
-`@SkipThrottle()` for webhooks.
+Webhook routes should use a dedicated `@RateLimit(...)` override (see
+`docs/backend/architecture-and-conventions.md` → Rate limiting), sized to the
+source's documented rate. Never `@SkipThrottle()`/`@SkipRateLimit()` for a
+webhook — an unthrottled public ingress is an open volumetric target.
 
 ## Request body size limit
 

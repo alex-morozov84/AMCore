@@ -255,19 +255,19 @@ describe('Admin (e2e)', () => {
 
   /**
    * OB-03: privileged admin operations narrow the existing `long`
-   * bucket per-handler via `@Throttle({ long: { ... } })`. Storage
-   * is reset between tests via `cleanDatabase` ->
+   * bucket per-handler via `@RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)`.
+   * Storage is reset between tests via `cleanDatabase` ->
    * `resetThrottlerStorage`, so the 6th call here is the first one
    * to exhaust the per-handler 5/min override — the test does NOT
    * depend on what the first 5 cleanups actually did (counts vary
    * because cleanup mutates DB state), only that the throttle gate
    * fires.
    *
-   * Why per-handler `@Throttle({ long: ... })` and not a third
-   * named bucket: registering a third `admin` bucket in
-   * `ThrottlerModule.forRoot` would apply its limit to every route
-   * in the API (caught in Stage 7 final-e2e when login-burst tests
-   * regressed). The per-handler override stays local.
+   * Why per-handler `@RateLimit(...)` and not a third named bucket:
+   * registering a third `admin` bucket in `ThrottlerModule.forRoot`
+   * would apply its limit to every route in the API (caught in
+   * Stage 7 final-e2e when login-burst tests regressed). The
+   * per-handler override stays local.
    *
    * If this test ever proves flaky on CI under load, drop it — the
    * `@nestjs/throttler` runtime is covered by its own suite, and the

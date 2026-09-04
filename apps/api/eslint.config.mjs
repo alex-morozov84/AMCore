@@ -16,7 +16,7 @@ export default [
     ignores: ['src/generated/prisma/**'],
   },
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'test/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -27,6 +27,12 @@ export default [
               importNames: ['Logger', ...bannedExceptionImports],
               message:
                 'Use PinoLogger via DI for logging, and domain exceptions from common/exceptions (or AppException with an explicit errorCode) instead of raw NestJS HttpException subclasses.',
+            },
+            {
+              name: '@nestjs/throttler',
+              importNames: ['Throttle', 'SkipThrottle'],
+              message:
+                'Use @RateLimit/@SkipRateLimit from infrastructure/throttling instead of raw @nestjs/throttler decorators.',
             },
           ],
         },
@@ -47,6 +53,26 @@ export default [
               importNames: ['Logger'],
               message:
                 'Use PinoLogger from nestjs-pino via dependency injection in runtime API code.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The rate-limit decorator wrapper is the one place allowed to import the
+    // raw @nestjs/throttler decorators/registration it wraps.
+    files: ['src/infrastructure/throttling/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@nestjs/common',
+              importNames: ['Logger', ...bannedExceptionImports],
+              message:
+                'Use PinoLogger via DI for logging, and domain exceptions from common/exceptions (or AppException with an explicit errorCode) instead of raw NestJS HttpException subclasses.',
             },
           ],
         },

@@ -2,12 +2,12 @@ import { createHmac } from 'node:crypto'
 
 import type { INestApplication } from '@nestjs/common'
 import { Controller, HttpCode, Post, Req } from '@nestjs/common'
-import { Throttle } from '@nestjs/throttler'
 import request from 'supertest'
 
 import { AuthType } from '@amcore/shared'
 
 import { Auth } from '../src/core/auth/decorators/auth.decorator'
+import { RATE_LIMIT_POLICIES, RateLimit } from '../src/infrastructure/throttling'
 import { VerifyWebhook } from '../src/infrastructure/webhooks'
 import type { PrismaService } from '../src/prisma'
 
@@ -19,7 +19,7 @@ class SampleWebhookController {
   @Post('stripe')
   @HttpCode(200)
   @Auth(AuthType.None)
-  @Throttle({ long: { limit: 5, ttl: 60_000 } })
+  @RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)
   @VerifyWebhook('stripe')
   handle(@Req() req: { body: { id: string } }): { ok: true; id: string } {
     return { ok: true, id: req.body.id }

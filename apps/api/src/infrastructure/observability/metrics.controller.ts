@@ -1,6 +1,5 @@
 import { Controller, Get, HttpStatus, Res, UseGuards } from '@nestjs/common'
 import { ApiOkResponse, ApiProduces } from '@nestjs/swagger'
-import { SkipThrottle } from '@nestjs/throttler'
 import type { Response } from 'express'
 
 import { AuthType } from '@amcore/shared'
@@ -11,10 +10,11 @@ import { MetricsAuthGuard } from './metrics-auth.guard'
 
 import { AppException } from '@/common/exceptions'
 import { Auth } from '@/core/auth/decorators/auth.decorator'
+import { SkipRateLimit } from '@/infrastructure/throttling'
 
 @Controller(METRICS_ROUTE)
 @Auth(AuthType.None)
-@SkipThrottle()
+@SkipRateLimit()
 @UseGuards(MetricsAuthGuard)
 export class MetricsController {
   constructor(private readonly metrics: MetricsService) {}

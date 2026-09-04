@@ -280,21 +280,69 @@ Apply these only when your module needs them:
   ([`core/auth/avatar.service.ts`](../../apps/api/src/core/auth/avatar.service.ts),
   [`infrastructure/redis/redis-lock.service.ts`](../../apps/api/src/infrastructure/redis/redis-lock.service.ts))
   before designing your own. It is **not** required for every upload.
-- **Rate limiting — override the global bucket for costly or abuse-prone
-  routes, don't invent a new limiter.** The global `@nestjs/throttler` guard
-  (`short`/`long`, ADR-039) is a coarse per-visitor volumetric backstop, not
-  precise per-actor protection — that's what dedicated limiters
-  (`LoginRateLimiterService`, invite-accept, etc.) are for. For a route that's
-  unusually expensive or abuse-prone but doesn't warrant its own dedicated
-  limiter, tighten the global bucket per-handler with
-  `@Throttle({ long: { limit: N, ttl: N } })` (see the OB-03 admin-override
-  precedent in `app-imports.ts`) rather than registering a third named
-  throttler, which would apply its default limit to every route. This only
-  meaningfully protects real visitors once `TRUSTED_WEB_PEERS` +
-  `WEB_TRUSTED_CLIENT_IP_HEADER` are configured (ADR-072) — see
-  [`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
-  "Client-IP relay to `apps/api`"; without them every BFF-proxied visitor
-  still shares one bucket, same as before ADR-072.
+- **Rate limiting — every route is protected for free; override through
+  `@RateLimit`/`@SkipRateLimit`, never the raw library.** The global
+  guard (`short`/`long` buckets, ADR-039) covers every route with zero code
+  required — you only add a decorator when a route needs something
+  _different_ from the default. `infrastructure/throttling/` owns the
+  entire mechanism (named throttlers, storage, decorators, guard); eslint's
+  `no-restricted-imports` blocks importing `Throttle`/`SkipThrottle` from
+  `@nestjs/throttler` anywhere outside that directory, so you never need to
+  learn the underlying library to use this safely.
+  - **Override a route** with `@RateLimit(policy)` — either a named policy
+    from `RATE_LIMIT_POLICIES` (`PRIVILEGED_MUTATION`, `EXPENSIVE_ACTION`)
+    or an inline `{ rate, per }` (see the Telegram webhook controller for an
+    inline example). This is a coarse per-visitor volumetric backstop, not
+    precise per-actor protection — that's what dedicated limiters
+    (`LoginRateLimiterService`, invite-accept, etc.) are for.
+  - **Exempt a route** with `@SkipRateLimit()` (health/metrics probes only,
+    normally) — never the bare `@nestjs/throttler` `@SkipThrottle()`, which
+    only skips a throttler named `'default'`; AMCore registers `short`/
+    `long`, so a bare `@SkipThrottle()` silently does nothing. This was a
+    real, shipped bug before the wrapper existed.
+  - **Buckets are per-route-per-visitor, precisely.** One visitor calling
+    several _different_ routes doesn't share one budget — each route has
+    its own bucket. One visitor calling the _same_ route many times
+    rapidly does share a budget, and a single request can itself hit the
+    `short` bucket if it fans out into many _other_ routes' handlers being
+    hit in the same second by the same visitor. This precision only holds
+    for real visitors once `TRUSTED_WEB_PEERS` + `WEB_TRUSTED_CLIENT_IP_HEADER`
+    are configured (ADR-072) — see
+    [`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
+    "Client-IP relay to `apps/api`"; without them every BFF-proxied visitor
+    still shares one bucket.
+  - **Classifying a new route** (stop at the first match):
+    1. Does it need per-actor/per-identity protection rather than a
+       per-visitor volumetric one (login, invite-accept, password reset)?
+       Use a dedicated limiter, not `@RateLimit`.
+    2. Is it fine under the global default? Add no decorator — that's the
+       common case.
+    3. Is it unusually expensive (heavy DB/CPU work) or privileged
+       (destructive/admin) but rarely called in bursts by a legitimate
+       user? Narrow it with `@RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION
+| .PRIVILEGED_MUTATION)`, or an inline policy with cited evidence for
+       the chosen numbers (see the Telegram webhook controller).
+    4. Is it a public, unauthenticated ingress needing its own bounded rate
+       distinct from the global default (a webhook)? Inline `@RateLimit`
+       with a comment naming the source's documented rate, never
+       `@SkipRateLimit()`.
+    5. Does one legitimate user action _legitimately_ fan out into many
+       rapid calls to the _same_ route (e.g. a filterable list a user
+       clicks through quickly)? Don't paper over it by loosening the global
+       default for everyone — that's a burst-tolerance problem, tracked
+       separately (below), not a per-route policy choice.
+  - **Never widen the global `short`/`long` defaults** to work around a
+    specific route's fan-out — that weakens the backstop for every route to
+    fix a problem only one route has.
+  - **Instantaneous browser-burst tolerance** (many rapid calls to the
+    _same_ route from one real visitor, e.g. clicking through catalog
+    filters quickly) is a known, separate gap in the current fixed-window
+    algorithm — no combination of `@RateLimit` numbers fixes it, since a
+    fixed window cannot distinguish a burst from sustained abuse. A
+    burst-tolerant (GCRA) limiter is a dedicated, already-designed
+    follow-up to replace the current fixed-window storage without changing
+    this decorator contract — not a permanent limitation of this
+    mechanism.
 
 ## Tests
 
