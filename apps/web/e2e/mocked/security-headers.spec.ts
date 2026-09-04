@@ -15,9 +15,17 @@ import { expect, test } from '@playwright/test'
  * never touches).
  */
 
+// Full expected values, not substring checks — a partial assertion (e.g.
+// `toContain('camera=()')`) would stay green if a directive were silently
+// dropped from `next.config.ts` as long as one other survived. Kept as a
+// literal object here (not imported from `next.config.ts`) deliberately:
+// the point of this spec is to pin down what a real HTTP response contains,
+// independent of the config source that produced it.
 const EXPECTED_STATIC_HEADERS = {
   'referrer-policy': 'strict-origin-when-cross-origin',
   'x-content-type-options': 'nosniff',
+  'permissions-policy':
+    'camera=(), microphone=(), geolocation=(), gyroscope=(), magnetometer=(), payment=(), usb=(), interest-cohort=(), browsing-topics=()',
   'x-frame-options': 'DENY',
   'strict-transport-security': 'max-age=63072000; includeSubDomains',
 } as const
@@ -30,8 +38,6 @@ test('a page route response carries the static security headers', async ({ page 
   for (const [key, value] of Object.entries(EXPECTED_STATIC_HEADERS)) {
     expect(headers[key], `missing/incorrect ${key}`).toBe(value)
   }
-  expect(headers['permissions-policy']).toContain('camera=()')
-  expect(headers['permissions-policy']).toContain('geolocation=()')
 })
 
 test('a BFF Route Handler response (outside the proxy matcher) also carries the static security headers', async ({
