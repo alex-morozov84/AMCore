@@ -9,7 +9,7 @@ Use it on public webhook routes together with explicit public auth:
 ```ts
 @Post('webhooks/stripe')
 @Auth(AuthType.None)
-@RateLimit({ rate: 5, per: 60_000 })
+@RateLimit({ rate: 5, per: 60_000, burst: 5 })
 @VerifyWebhook('stripe')
 handleStripe(@Req() req: RawBodyRequest<Request>) {
   return { received: true }

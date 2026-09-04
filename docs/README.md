@@ -32,7 +32,9 @@ does not express.
 | Add a storage- or media-backed feature                                   | [`storage/`](storage/README.md), [`media/`](media/README.md)                                                                      |
 | Deploy, run, or operate the system                                       | [`operations/`](operations/README.md)                                                                                             |
 | Set up TLS / a reverse proxy                                             | [`operations/deployment.md`](operations/deployment.md#tls--reverse-proxy)                                                         |
-| Let the global throttler tell BFF visitors apart (rate limiting)         | [`operations/deployment.md`](operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy) |
+| Understand or override route rate limits                                 | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#cross-cutting-decision-points)                |
+| Let the global limiter tell BFF visitors apart                           | [`operations/deployment.md`](operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy) |
+| Understand frontend retry behavior for `429`                             | [`frontend/api-consumption.md`](frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073)                             |
 | Back up or restore the database                                          | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
 | Understand the CI / repo-security workflow                               | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
 
@@ -62,9 +64,9 @@ does not express.
 - **[Frontend API consumption](frontend/api-consumption.md)** — how `apps/web`
   hooks consume the media, notifications, and AI backend surfaces through the
   BFF, why the realtime hooks use native `EventSource` instead of the custom
-  fetch-stream reader a direct (non-BFF) SSE consumer needs, and the opt-in
-  client-IP relay that lets `apps/api`'s rate limiter tell BFF visitors
-  apart.
+  fetch-stream reader a direct (non-BFF) SSE consumer needs, the frontend
+  `429`/`Retry-After` retry policy, and the opt-in client-IP relay that lets
+  `apps/api`'s rate limiter tell BFF visitors apart.
 - **[Frontend testing](frontend/testing.md)** — the test taxonomy
   (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/
   real-stack E2E, Storybook, and axe scans), the technical boundary the E2E

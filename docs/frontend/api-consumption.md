@@ -253,6 +253,9 @@ never sees a request that never crosses the browser. See
 
 - [Architecture & conventions](architecture-and-conventions.md#browser-api-reach) —
   the BFF Route Handler layer and the auth flows built on it.
+- [Backend rate limiting](../backend/architecture-and-conventions.md#cross-cutting-decision-points) —
+  the `@RateLimit`/`@SkipRateLimit` policies and GCRA algorithm this page's
+  retry policy responds to.
 - [Testing](./testing.md) — which layer to test a given hook/flow at.
 - [Media](../media/README.md), [Notifications](../notifications/README.md),
   [AI](../ai/README.md) — the backend contracts these hooks consume.
