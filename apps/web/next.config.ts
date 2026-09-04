@@ -45,9 +45,74 @@ const nextConfig: NextConfig = {
   // exact rewrite previously intercepted `GET /api/auth/me` and returned
   // the backend's raw 404 instead of the BFF's proxied response.
 
-  // Headers for PWA service worker
+  // Browser security-header baseline (Track 3 PR1, ai/models-talk.md FINAL
+  // PLAN §3). Static and environment-independent — no per-request state, so
+  // it belongs in `headers()` rather than `src/proxy.ts`. `source: '/(.*)'`
+  // is deliberate: `proxy.ts`'s matcher excludes `/api/*`, `_next`,
+  // `_vercel`, and any dotted path (see its own comment), so this is the
+  // only layer that reaches the BFF's `/api/*` Route Handlers and public
+  // static files (including `/sw.js` below) — `headers()` has no such
+  // exclusion. CSP itself (nonce-based `script-src`, `frame-ancestors`) is
+  // deliberately NOT here: it needs a fresh nonce per request, which only
+  // `proxy.ts` can generate — that lands in a later PR of this track.
   async headers() {
     return [
+      {
+        source: '/(.*)',
+        headers: [
+          // Fallback referrer policy: send full URL same-origin, origin-only
+          // cross-origin, nothing on a downgrade (HTTPS -> HTTP). OWASP's
+          // recommended default.
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          // Stop browsers from MIME-sniffing a response away from the
+          // Content-Type the server declared (the classic vector: an
+          // uploaded/served file sniffed as HTML/JS instead of its real type).
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          // Deny browser features AMCore doesn't use. Not an exhaustive
+          // enumeration of every Permissions-Policy feature — the well-known
+          // sensor/payment/tracking APIs plus both FLoC (`interest-cohort`)
+          // and its successor Topics API (`browsing-topics`), since an
+          // unrecognized token is simply ignored by browsers that lack it.
+          // Extend this if a feature (e.g. `publickey-credentials-get` for
+          // WebAuthn/passkeys) is genuinely adopted later.
+          {
+            key: 'Permissions-Policy',
+            value:
+              'camera=(), microphone=(), geolocation=(), gyroscope=(), magnetometer=(), payment=(), usb=(), interest-cohort=(), browsing-topics=()',
+          },
+          // Legacy companion to CSP's `frame-ancestors` (not set until the
+          // CSP PR): blocks this origin from being framed by anyone,
+          // including same-origin, since AMCore has no legitimate framing
+          // use case today. `frame-ancestors` will supersede this for
+          // CSP-aware browsers once it ships; kept for browsers that only
+          // honour the older header.
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          // HSTS: pins this origin to HTTPS-only for 2 years, including
+          // subdomains. Deliberately emitted unconditionally rather than
+          // gated on `NODE_ENV` — per RFC 6797 §8.1, a user agent MUST
+          // ignore the header entirely when it arrives over plain HTTP, so
+          // it is a no-op (and harmless) under `next dev`/local HTTP and only
+          // takes effect once a deployment actually terminates TLS in front
+          // of this origin. No `preload`: that's a domain-wide,
+          // effectively-irreversible-for-months commitment (owner decision,
+          // `ai/models-talk.md` FINAL PLAN §0.2) — documented as an opt-in
+          // hardening step for a production deployment that wants it, not a
+          // starter default.
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains',
+          },
+        ],
+      },
       {
         source: '/sw.js',
         headers: [
