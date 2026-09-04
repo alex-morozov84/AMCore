@@ -16,7 +16,7 @@ export default [
     ignores: ['src/generated/prisma/**'],
   },
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'test/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
