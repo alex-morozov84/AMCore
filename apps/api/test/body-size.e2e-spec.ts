@@ -1,13 +1,13 @@
 import { createHmac } from 'node:crypto'
 
 import { Body, Controller, HttpCode, type INestApplication, Post, Req } from '@nestjs/common'
-import { SkipThrottle, Throttle } from '@nestjs/throttler'
 import request from 'supertest'
 
 import { AuthType } from '@amcore/shared'
 
 import { REQUEST_BODY_LIMIT_BYTES } from '../src/bootstrap/configure-body-parser'
 import { Auth } from '../src/core/auth/decorators/auth.decorator'
+import { RATE_LIMIT_POLICIES, RateLimit, SkipRateLimit } from '../src/infrastructure/throttling'
 import { VerifyWebhook } from '../src/infrastructure/webhooks'
 import type { PrismaService } from '../src/prisma'
 
@@ -16,7 +16,7 @@ import { setupWebhookTestApp } from './webhook-test-app'
 
 /** Ordinary JSON route: echoes a fixed body so a parsed request returns 200. */
 @Controller('body-size')
-@SkipThrottle()
+@SkipRateLimit()
 class EchoController {
   @Post('echo')
   @HttpCode(200)
@@ -32,7 +32,7 @@ class WebhookSizeController {
   @Post('stripe')
   @HttpCode(200)
   @Auth(AuthType.None)
-  @Throttle({ long: { limit: 20, ttl: 60_000 } })
+  @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @VerifyWebhook('stripe')
   handle(@Req() req: { body: { id: string } }): { ok: true; id: string } {
     return { ok: true, id: req.body.id }

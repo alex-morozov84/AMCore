@@ -55,6 +55,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`amcore_queue_paused{queue,role}` metric** — `1` if a queue is currently
   paused, `0` otherwise (`Queue.isPaused()`), replacing the pause signal
   lost from `amcore_queue_jobs` below.
+- **`@RateLimit(policy)`/`@SkipRateLimit()`** (`apps/api`,
+  `infrastructure/throttling/`) — the only supported way to override or
+  exempt a route from the global rate-limit backstop. `RATE_LIMIT_POLICIES`
+  exports two named policies (`PRIVILEGED_MUTATION`, `EXPENSIVE_ACTION`)
+  replacing seven duplicated raw `@Throttle(...)` literals. Importing
+  `Throttle`/`SkipThrottle` from `@nestjs/throttler` directly is now an
+  eslint error outside `infrastructure/throttling/`, and a metadata
+  regression test scans every controller to catch a decorator override
+  targeting an unregistered throttler name or a partial skip.
+
+### Fixed
+
+- **Bare `@SkipThrottle()` was a silent no-op** on `HealthController` and
+  `MetricsController` — `@nestjs/throttler`'s bare `@SkipThrottle()` only
+  skips a throttler named `'default'`, which AMCore never registers
+  (`short`/`long`). Both now use `@SkipRateLimit()`, which skips every
+  registered throttler; the new metadata regression test above prevents
+  this class of bug from recurring.
 
 ### Changed
 

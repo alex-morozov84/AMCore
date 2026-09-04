@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { Throttle } from '@nestjs/throttler'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
@@ -11,6 +10,7 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling'
 import { Auth } from '../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator'
 import { RequireFreshAuth } from '../../auth/decorators/require-fresh-auth.decorator'
@@ -62,7 +62,7 @@ export class AiAssistantAdminController {
   @Post()
   @ApiOperation({ summary: 'Create a new assistant (version 1) — SUPER_ADMIN only' })
   @RequireFreshAuth()
-  @Throttle({ long: { limit: 20, ttl: 60_000 } })
+  @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ZodResponse({ type: AiAssistantResponseDto, status: 201, description: 'Created assistant' })
   create(
     @CurrentUser() actor: RequestPrincipal,
@@ -74,7 +74,7 @@ export class AiAssistantAdminController {
   @Post(':slug/versions')
   @ApiOperation({ summary: 'Publish a new immutable assistant version — SUPER_ADMIN only' })
   @RequireFreshAuth()
-  @Throttle({ long: { limit: 20, ttl: 60_000 } })
+  @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ZodResponse({ type: AiAssistantResponseDto, status: 201, description: 'Published version' })
   publishVersion(
     @CurrentUser() actor: RequestPrincipal,
@@ -87,7 +87,7 @@ export class AiAssistantAdminController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update assistant enabled/displayName in place — SUPER_ADMIN only' })
   @RequireFreshAuth()
-  @Throttle({ long: { limit: 20, ttl: 60_000 } })
+  @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ZodResponse({ type: AiAssistantResponseDto, status: 200, description: 'Updated assistant' })
   update(
     @CurrentUser() actor: RequestPrincipal,

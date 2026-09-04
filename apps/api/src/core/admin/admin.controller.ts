@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
-import { Throttle } from '@nestjs/throttler'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
@@ -15,6 +14,7 @@ import {
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator'
@@ -87,7 +87,7 @@ export class AdminController {
   // bucket in `ThrottlerModule.forRoot` would cap every route in
   // the API at the admin limit (caught in Stage 7 final-e2e), so
   // we narrow the existing `long` bucket per-handler instead.
-  @Throttle({ long: { limit: 20, ttl: 60_000 } })
+  @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ZodResponse({ type: AdminUserResponseDto, status: 200, description: 'Updated user' })
   updateUserSystemRole(
     @CurrentUser() actor: RequestPrincipal,
@@ -103,7 +103,7 @@ export class AdminController {
   @RequireFreshAuth()
   // OB-03: heavy DB sweep — override `long` to 5/min for this
   // handler. Same per-handler-override pattern as above.
-  @Throttle({ long: { limit: 5, ttl: 60_000 } })
+  @RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)
   @ZodResponse({ type: CleanupResultDto, status: 200, description: 'Cleanup counts' })
   runCleanup(@CurrentUser() actor: RequestPrincipal): Promise<CleanupResult> {
     return this.adminService.runCleanup(actor)

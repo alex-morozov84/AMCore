@@ -1,0 +1,33 @@
+import { SkipThrottle, Throttle } from '@nestjs/throttler'
+
+import { RateLimitPolicy, THROTTLER_NAMES } from './rate-limit-policies'
+
+/**
+ * The only supported way to override the global rate-limit backstop on a
+ * route or controller. Wraps `@nestjs/throttler`'s `@Throttle` internally —
+ * importing `Throttle`/`SkipThrottle` directly from `@nestjs/throttler`
+ * outside this directory is banned by eslint (`no-restricted-imports`), so
+ * a downstream user never needs to learn the underlying library's named-
+ * throttler/per-route-per-visitor bucket model to use this safely.
+ *
+ * Only overrides the `long` (sustained-rate) bucket; the `short` burst
+ * backstop (10 req/s, global default) stays untouched and still applies —
+ * a route's effective per-second ceiling is NOT what `policy.rate`/`per`
+ * says if that implies more than 10 req/s. A `{ rate: 600, per: 60_000 }`
+ * policy still 429s an 11th request within the same second; there is
+ * currently no supported way to raise that per-second ceiling for one
+ * route.
+ */
+export function RateLimit(policy: RateLimitPolicy): MethodDecorator & ClassDecorator {
+  return Throttle({ long: { limit: policy.rate, ttl: policy.per } })
+}
+
+/**
+ * The only supported way to exempt a route or controller from the global
+ * rate-limit backstop. Unlike bare `@SkipThrottle()` — which only skips a
+ * throttler named `'default'`, never registered in this app, making it a
+ * silent no-op — this skips every registered named throttler.
+ */
+export function SkipRateLimit(): MethodDecorator & ClassDecorator {
+  return SkipThrottle(Object.fromEntries(THROTTLER_NAMES.map((name) => [name, true])))
+}

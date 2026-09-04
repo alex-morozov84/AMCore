@@ -8,7 +8,6 @@ import {
   type HealthIndicatorFunction,
   MemoryHealthIndicator,
 } from '@nestjs/terminus'
-import { SkipThrottle } from '@nestjs/throttler'
 
 import { AuthType } from '@amcore/shared'
 
@@ -18,11 +17,12 @@ import { RedisHealthIndicator } from './indicators/redis.health'
 import { Auth } from '@/core/auth/decorators/auth.decorator'
 import { EnvService } from '@/env/env.service'
 import { StorageHealthIndicator } from '@/infrastructure/storage'
+import { SkipRateLimit } from '@/infrastructure/throttling'
 
 @ApiTags('health')
 @Controller('health')
 @Auth(AuthType.None)
-@SkipThrottle()
+@SkipRateLimit()
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,

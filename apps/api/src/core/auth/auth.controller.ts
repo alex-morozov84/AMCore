@@ -27,7 +27,6 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger'
-import { Throttle } from '@nestjs/throttler'
 import type { Request, Response } from 'express'
 import { ZodResponse } from 'nestjs-zod'
 
@@ -73,6 +72,7 @@ import { TokenService } from './token.service'
 
 import type { User } from '@/generated/prisma/client'
 import { AVATAR_VALIDATION, FileValidationPipe } from '@/infrastructure/storage'
+import { RATE_LIMIT_POLICIES, RateLimit } from '@/infrastructure/throttling'
 
 // Multer hard stop for the avatar upload. Set above AVATAR_VALIDATION.maxSize
 // (2 MB) so the FileValidationPipe produces the clean 413 for files between the
@@ -258,7 +258,7 @@ export class AuthController {
   // up to MEDIA_AVATAR_MAX_PIXELS, so narrow the global `long` bucket (100/min)
   // to 5/min/IP for this heavy, rarely-repeated action. Mirrors the OB-03 admin
   // throttle pattern.
-  @Throttle({ long: { limit: 5, ttl: 60_000 } })
+  @RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: AVATAR_UPLOAD_HARD_LIMIT_BYTES },
