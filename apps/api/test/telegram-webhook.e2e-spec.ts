@@ -123,4 +123,28 @@ describe('Telegram webhook (e2e)', () => {
     expect(cancelled.status).toBe('CANCELLED')
     expect(cancelled.terminalReasonCode).toBe('telegram_connection_replaced')
   })
+
+  /**
+   * ADR-073 regression: `@RateLimit({ rate: 600, per: 60_000, burst: 30 })`
+   * on this route requires an explicit `burst` — omitting it defaults to
+   * `burst = rate = 600`, letting 600 requests through instantly from idle
+   * (600 signature checks + body parses in one burst) on this starter's
+   * only public, unauthenticated route. Caught in review before it shipped;
+   * this pins the fix.
+   */
+  it('caps instantaneous admission at burst=30, not the full 600/min rate', async () => {
+    // Explicit listen before parallel traffic — an un-listened server races
+    // supertest's own implicit `.listen(0)` under concurrent requests,
+    // producing spurious ECONNRESET (same fix as
+    // rate-limit-symptom-reproduction.e2e-spec.ts). Idempotent: later
+    // sequential tests in this file already tolerate an already-listening app.
+    if (!tg.app.getHttpServer().listening) await tg.app.listen(0, '127.0.0.1')
+
+    const responses = await Promise.all(
+      Array.from({ length: 31 }, (_, i) => postUpdate(tg.app, { update_id: 9000 + i }))
+    )
+    const statuses = responses.map((res) => res.status)
+    expect(statuses.filter((s) => s === 200)).toHaveLength(30)
+    expect(statuses.filter((s) => s === 429)).toHaveLength(1)
+  })
 })

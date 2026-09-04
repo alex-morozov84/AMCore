@@ -51,8 +51,11 @@ describe('Observability metrics (e2e)', () => {
 
     await request(app.getHttpServer()).get('/not-found/raw-resource-id').expect(404)
 
+    // DEFAULT policy's burst (ADR-073) admits 50 requests instantly from
+    // idle — well past this loop's old fixed-window-era count of 15, which
+    // never tripped the new GCRA backstop at all. 55 exceeds burst=50.
     let sawTooManyRequests = false
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 55; i++) {
       const response = await request(app.getHttpServer()).get('/auth/oauth/providers')
       if (response.status === 429) {
         sawTooManyRequests = true

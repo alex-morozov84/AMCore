@@ -34,9 +34,9 @@ export const runtimeEnv = z.object({
       }
     }),
   // Trusted apps/web peer(s) for the BFF client-IP relay (ADR-072). Default
-  // "" — disabled: TrustedWebPeerThrottlerGuard never trusts
-  // AMCORE_CLIENT_IP_HEADER regardless of value until this names the real
-  // socket address(es) apps/web connects from. Validated + compiled to a
+  // "" — disabled: RateLimitGuard's tracker resolver (client-tracker.ts)
+  // never trusts AMCORE_CLIENT_IP_HEADER regardless of value until this
+  // names the real socket address(es) apps/web connects from. Validated + compiled to a
   // `net.BlockList` by `resolveTrustedWebPeers` (see
   // common/utils/trusted-web-peer.ts) — never Express's own TRUST_PROXY
   // machinery, which this is independent of.

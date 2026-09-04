@@ -1,54 +1,51 @@
 /**
- * Names of every throttler registered with `ThrottlerModule` (see
- * `throttling.module.ts`). Single source of truth for both the runtime
- * registration and `rate-limit-decorator-coverage.spec.ts`'s metadata
- * introspection, so the two cannot drift.
- */
-export const THROTTLER_NAMES = ['short', 'long'] as const
-
-export type ThrottlerName = (typeof THROTTLER_NAMES)[number]
-
-interface ThrottlerDefault {
-  name: ThrottlerName
-  /** Window size in milliseconds. */
-  ttl: number
-  limit: number
-}
-
-/**
- * Global backstop every route gets for free with zero code required —
- * `short` catches request floods within a second, `long` catches sustained
- * abuse over a minute. `@RateLimit(...)` overrides only the `long` bucket
- * per-route; `short` stays the untouched global backstop.
- */
-export const DEFAULT_THROTTLERS: readonly ThrottlerDefault[] = [
-  { name: 'short', ttl: 1000, limit: 10 }, // 10 requests per second
-  { name: 'long', ttl: 60_000, limit: 100 }, // 100 requests per minute
-]
-
-/**
- * `@RateLimit(...)`'s policy shape. Deliberately `rate`/`per`-shaped rather
- * than `@nestjs/throttler`'s `{ short?, long? }` — a downstream user of this
- * decorator should never need to know which underlying library or algorithm
- * enforces it.
+ * `@RateLimit(...)`'s policy shape. `rate`/`per`-shaped rather than any
+ * particular library's named-throttler concept — a downstream user of this
+ * decorator never needs to know the storage/algorithm behind it.
  *
- * Intentionally has no `burst` field yet: a burst-tolerant limiter is a
- * planned follow-up, but until it's live, accepting `burst` here would be a
- * parameter that looks like it works and silently does nothing — exactly
- * the class of bug this decorator exists to eliminate. It will be added
- * once it has a real effect, additively (existing call sites are
- * unaffected, since it will be optional).
+ * `burst` is the number of requests admitted instantly from idle, above the
+ * sustained `rate`. Omitted, it defaults to `rate` (no extra burst
+ * headroom beyond the sustained rate itself) — see `resolveBurst`.
  */
 export interface RateLimitPolicy {
-  /** Max requests allowed within `per` milliseconds. */
+  /** Sustained requests allowed per `per` milliseconds, once idle headroom is spent. */
   rate: number
   /** Window size in milliseconds. */
   per: number
+  /** Instantaneous burst capacity above the sustained `rate`. Defaults to `rate`. */
+  burst?: number
+}
+
+/** `policy.burst ?? policy.rate` — the actual admission capacity from idle. */
+export function resolveBurst(policy: RateLimitPolicy): number {
+  return policy.burst ?? policy.rate
 }
 
 export const RATE_LIMIT_POLICIES = {
+  /** Global backstop every route gets for free with zero code required. */
+  DEFAULT: { rate: 100, per: 60_000, burst: 50 },
   /** Privileged mutations an authenticated actor rarely repeats quickly. */
-  PRIVILEGED_MUTATION: { rate: 20, per: 60_000 },
+  PRIVILEGED_MUTATION: { rate: 20, per: 60_000, burst: 20 },
   /** Expensive, resource-intensive actions (e.g. bulk/admin operations). */
-  EXPENSIVE_ACTION: { rate: 5, per: 60_000 },
+  EXPENSIVE_ACTION: { rate: 5, per: 60_000, burst: 5 },
 } as const satisfies Record<string, RateLimitPolicy>
+
+/**
+ * Bounded classification of a resolved policy for metrics only (never a
+ * route/tracker/free-text label — cardinality must stay fixed). Matches by
+ * object identity against the named policies above, since
+ * `Reflector.getAllAndOverride` returns the exact object a decorator was
+ * given; any other policy (an inline literal, e.g. the Telegram webhook's)
+ * classifies as `'custom'`. Return type intentionally matches (but doesn't
+ * import) `RateLimitMetricsPolicy` in `infrastructure/observability` —
+ * `throttling` depends on `observability`'s `MetricsService`, so the metric
+ * label type is owned there, not here.
+ */
+export function classifyPolicy(
+  policy: RateLimitPolicy
+): 'default' | 'privileged_mutation' | 'expensive_action' | 'custom' {
+  if (policy === RATE_LIMIT_POLICIES.DEFAULT) return 'default'
+  if (policy === RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION) return 'privileged_mutation'
+  if (policy === RATE_LIMIT_POLICIES.EXPENSIVE_ACTION) return 'expensive_action'
+  return 'custom'
+}

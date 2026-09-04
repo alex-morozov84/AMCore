@@ -10,7 +10,12 @@ import { MetricsAuthGuard } from './metrics-auth.guard'
 
 import { AppException } from '@/common/exceptions'
 import { Auth } from '@/core/auth/decorators/auth.decorator'
-import { SkipRateLimit } from '@/infrastructure/throttling'
+// Import the decorator file directly, NOT the `infrastructure/throttling`
+// barrel: the barrel re-exports GcraRedisLimiter, which imports
+// MetricsService from this module (`../observability`) — going through the
+// barrel here would close that cycle back on itself. rate-limit.decorator.ts
+// has no transitive dependency on observability, so this is cycle-free.
+import { SkipRateLimit } from '@/infrastructure/throttling/rate-limit.decorator'
 
 @Controller(METRICS_ROUTE)
 @Auth(AuthType.None)

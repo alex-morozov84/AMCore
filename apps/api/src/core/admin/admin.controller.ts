@@ -82,11 +82,10 @@ export class AdminController {
   // OB-06b: destructive privileged op — require a recently re-authenticated
   // session (step-up) on top of the OB-06a current-role check.
   @RequireFreshAuth()
-  // OB-03: override the global `long` bucket (default 100/min) to
-  // 20/min for this privileged operation. Adding a new named
-  // bucket in `ThrottlerModule.forRoot` would cap every route in
-  // the API at the admin limit (caught in Stage 7 final-e2e), so
-  // we narrow the existing `long` bucket per-handler instead.
+  // OB-03: narrow the global default (100/min) to 20/min for this
+  // privileged operation, per-handler. Changing the global DEFAULT policy
+  // itself would cap every route in the API at the admin limit (caught in
+  // Stage 7 final-e2e).
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
   @ZodResponse({ type: AdminUserResponseDto, status: 200, description: 'Updated user' })
   updateUserSystemRole(
@@ -101,8 +100,8 @@ export class AdminController {
   @ApiOperation({ summary: 'Manually trigger expired records cleanup — SUPER_ADMIN only' })
   // OB-06b: destructive privileged op — require step-up freshness.
   @RequireFreshAuth()
-  // OB-03: heavy DB sweep — override `long` to 5/min for this
-  // handler. Same per-handler-override pattern as above.
+  // OB-03: heavy DB sweep — narrow to 5/min for this handler. Same
+  // per-handler-override pattern as above.
   @RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)
   @ZodResponse({ type: CleanupResultDto, status: 200, description: 'Cleanup counts' })
   runCleanup(@CurrentUser() actor: RequestPrincipal): Promise<CleanupResult> {

@@ -41,10 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   proxy relays that inbound header's value to `apps/api` as a new,
   purpose-specific `X-AMCore-Client-Ip` header — only ever set from this
   resolved value, never a browser-supplied one.
-- **`TRUSTED_WEB_PEERS`** (`apps/api`, ADR-072, disabled by default) and a
-  new `TrustedWebPeerThrottlerGuard` replacing the stock global
-  `ThrottlerGuard`. Trusts the relayed `X-AMCore-Client-Ip` header only when
-  the inbound request's actual socket peer (never a forwarded header) is in
+- **`TRUSTED_WEB_PEERS`** (`apps/api`, ADR-072, disabled by default) —
+  trusted by the global rate limiter's tracker resolver only when the
+  inbound request's actual socket peer (never a forwarded header) is in
   this configured trusted set (real IPv4/IPv6 CIDR matching via Node's
   built-in `net.BlockList`); otherwise falls back to stock `req.ip`,
   identical to pre-ADR-072 behavior. Both this and
@@ -57,32 +56,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lost from `amcore_queue_jobs` below.
 - **`@RateLimit(policy)`/`@SkipRateLimit()`** (`apps/api`,
   `infrastructure/throttling/`) — the only supported way to override or
-  exempt a route from the global rate-limit backstop. `RATE_LIMIT_POLICIES`
-  exports two named policies (`PRIVILEGED_MUTATION`, `EXPENSIVE_ACTION`)
-  replacing seven duplicated raw `@Throttle(...)` literals. Importing
-  `Throttle`/`SkipThrottle` from `@nestjs/throttler` directly is now an
-  eslint error outside `infrastructure/throttling/`, and a metadata
-  regression test scans every controller to catch a decorator override
-  targeting an unregistered throttler name or a partial skip.
-
-### Fixed
-
-- **Bare `@SkipThrottle()` was a silent no-op** on `HealthController` and
-  `MetricsController` — `@nestjs/throttler`'s bare `@SkipThrottle()` only
-  skips a throttler named `'default'`, which AMCore never registers
-  (`short`/`long`). Both now use `@SkipRateLimit()`, which skips every
-  registered throttler; the new metadata regression test above prevents
-  this class of bug from recurring.
+  exempt a route from the global rate-limit backstop, replacing seven
+  duplicated raw literal overrides with two named policies
+  (`RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION`, `.EXPENSIVE_ACTION`). A
+  metadata regression test (`rate-limit-decorator-coverage.spec.ts`) scans
+  every controller and pins that `HealthController`/`MetricsController`
+  stay fully exempt.
+- **GCRA (Generic Cell Rate Algorithm) rate limiter** (ADR-073) —
+  `infrastructure/throttling/` now owns the entire rate-limit mechanism.
+  Every policy has a sustained `rate` and an instantaneous `burst`
+  (defaults to `rate`) — the capacity concept a fixed-window counter
+  cannot express at all, and the actual fix for the originally-reported
+  production symptom this starter is meant to prevent by default (a real
+  visitor's own page firing several parallel calls, or a few page visits
+  in quick succession, tripping the global backstop even with fully
+  correct per-visitor identity). Measured, not asserted: the identical
+  reported traffic pattern against the old fixed-window defaults produced
+  28 of 60 requests refused; against this one, 0 of 60 — permanent
+  regression coverage in
+  `apps/api/test/rate-limit-symptom-reproduction.e2e-spec.ts`.
+- **`amcore_rate_limit_decisions_total{policy,outcome,role}` metric** —
+  every global rate-limit admission decision, bounded `policy`
+  classification (`default`/`privileged_mutation`/`expensive_action`/
+  `custom`) and `outcome` (`allowed`/`refused`) — the calibration signal
+  for revisiting `DEFAULT.burst` against real production traffic.
 
 ### Changed
 
+- **Rate-limit headers are now standard and unsuffixed** (ADR-073):
+  `X-RateLimit-Limit`/`-Remaining`/`-Reset` and a real `Retry-After`
+  (RFC 9110), replacing `@nestjs/throttler`'s non-standard
+  `-short`/`-long`-suffixed forms — an unsuffixed `Retry-After` did not
+  exist at all before this change. `X-RateLimit-Limit` reports a policy's
+  `burst`, not its sustained `rate` (`remaining` counts down from
+  `burst - 1` on the very first request from idle, so pairing it with
+  `Limit = rate` would be self-contradictory). A global rate-limit refusal
+  now also carries a real `errorCode: "RATE_LIMIT_EXCEEDED"` in the
+  response body — previously it carried none.
 - **`bullmq` bumped to 6** (`apps/api`). Added `ioredis` as an explicit
   dependency (BullMQ 6 no longer bundles it directly). Replaced the removed
   `Queue#client` with the v6 `queue.getBackend().client` escape hatch in
   `QueueService`'s producer-side Redis observability — behavior unchanged.
 
+### Fixed
+
+- **Bare `@SkipThrottle()` was a silent no-op** on `HealthController` and
+  `MetricsController` — `@nestjs/throttler`'s bare `@SkipThrottle()` only
+  skips a throttler named `'default'`, which AMCore never registered
+  (`short`/`long`). Both now use `@SkipRateLimit()`, which is not scoped to
+  any named-throttler concept at all; the metadata regression test above
+  prevents this class of bug from recurring.
+
 ### Removed
 
+- **`@nestjs/throttler` dependency** (ADR-073) — replaced by AMCore's own
+  GCRA-based rate-limit mechanism (see Added above): `GcraRedisLimiter`/
+  `GcraMemoryLimiter` and `RateLimitGuard`. The ADR-072 client-IP-relay
+  trust behavior (`TRUSTED_WEB_PEERS` above) is unchanged, only the
+  implementing class moved. See ADR-073 for the full "what this gives up
+  vs. gains" rationale.
 - **`amcore_queue_jobs{state="paused"}` label value.** BullMQ 6 no longer
   reports a per-job `paused` state — a paused queue's jobs are now counted
   as `waiting`. Any downstream Grafana panel or alert keyed on

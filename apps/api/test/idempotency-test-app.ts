@@ -2,7 +2,6 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { Provider, Type } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { Test, type TestingModule } from '@nestjs/testing'
-import { ThrottlerStorage } from '@nestjs/throttler'
 import type { Cache } from 'cache-manager'
 import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
@@ -11,7 +10,7 @@ import { ZodValidationPipe } from 'nestjs-zod'
 
 import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
 import { IdempotencyModule } from '../src/infrastructure/idempotency'
-import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
+import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
 import { type E2ETestContext, noopPinoLogger, setupE2ETestInfrastructure } from './helpers'
@@ -47,7 +46,7 @@ export async function setupIdempotencyTestApp(
 
   const prisma = app.get(PrismaService)
   const cache = app.get<Cache>(CACHE_MANAGER)
-  const throttlerStorage = app.get<RedisThrottlerStorage>(ThrottlerStorage as never)
+  const throttlerStorage = app.get(GcraRedisLimiter)
   await ensureSchemas(prisma, databaseUrl)
   return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
 }

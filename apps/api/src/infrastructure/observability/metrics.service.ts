@@ -85,6 +85,16 @@ export type AiMetricsArtifactResolutionResult =
   'success' | 'not_found' | 'capability_unsupported' | 'storage_error'
 
 /**
+ * Bounded rate-limit policy classification (ADR-073) — object-identity match
+ * against `RATE_LIMIT_POLICIES`, never a route/tracker/free-text label. See
+ * `infrastructure/throttling/rate-limit-policies.ts`'s `classifyPolicy`.
+ */
+export type RateLimitMetricsPolicy =
+  'default' | 'privileged_mutation' | 'expensive_action' | 'custom'
+/** GCRA admission outcome for one guarded request (ADR-073). */
+export type RateLimitMetricsOutcome = 'allowed' | 'refused'
+
+/**
  * Defensive bound on the `tool_id` metric label — mirrors the code-owned tool-id grammar (Arc E).
  * Callers pass registered ids, but an out-of-grammar/overlong value is coerced to `unknown` so a
  * malformed id can never explode the label cardinality.
@@ -160,6 +170,7 @@ export class MetricsService implements OnModuleDestroy {
   private readonly aiConversationControlTotal: Counter<'action' | 'actor_role' | 'role'>
   private readonly aiArtifactUploadsTotal: Counter<'kind' | 'result' | 'role'>
   private readonly aiArtifactResolutionTotal: Counter<'result' | 'role'>
+  private readonly rateLimitDecisionsTotal: Counter<'policy' | 'outcome' | 'role'>
 
   constructor(private readonly env: EnvService) {
     this.role = env.get('PROCESS_ROLE')
@@ -336,6 +347,10 @@ export class MetricsService implements OnModuleDestroy {
         labelNames: ['result', 'role'],
       }
     )
+    this.rateLimitDecisionsTotal = this.getOrCreateCounter(METRIC_NAMES.rateLimitDecisionsTotal, {
+      help: 'Total rate-limit admission decisions by bounded policy classification and outcome (+ process role). policy classifies by object identity against RATE_LIMIT_POLICIES, never a route/tracker.',
+      labelNames: ['policy', 'outcome', 'role'],
+    })
   }
 
   get enabled(): boolean {
@@ -529,6 +544,11 @@ export class MetricsService implements OnModuleDestroy {
   incAiArtifactResolution(result: AiMetricsArtifactResolutionResult): void {
     if (!this.enabled) return
     this.aiArtifactResolutionTotal.inc({ result, role: this.role })
+  }
+
+  incRateLimitDecision(policy: RateLimitMetricsPolicy, outcome: RateLimitMetricsOutcome): void {
+    if (!this.enabled) return
+    this.rateLimitDecisionsTotal.inc({ policy, outcome, role: this.role })
   }
 
   /**

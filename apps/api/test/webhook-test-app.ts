@@ -3,7 +3,6 @@ import type { Type } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import { ThrottlerStorage } from '@nestjs/throttler'
 import type { Cache } from 'cache-manager'
 import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
@@ -11,7 +10,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 
 import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
-import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
+import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
 import { type E2ETestContext, noopPinoLogger } from './helpers'
@@ -48,7 +47,7 @@ export async function setupWebhookTestApp(
 
   const prisma = app.get(PrismaService)
   const cache = app.get<Cache>(CACHE_MANAGER)
-  const throttlerStorage = app.get<RedisThrottlerStorage>(ThrottlerStorage as never)
+  const throttlerStorage = app.get(GcraRedisLimiter)
   await ensureSchemas(prisma, databaseUrl)
   return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
 }

@@ -18,6 +18,8 @@ export type {
   AiMetricsToolRiskClass,
   EmailMetricsMode,
   EmailMetricsTemplate,
+  RateLimitMetricsOutcome,
+  RateLimitMetricsPolicy,
   StorageMetricsOperation,
 } from './metrics.service'
 export { MetricsService } from './metrics.service'
