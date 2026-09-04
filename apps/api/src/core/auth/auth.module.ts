@@ -91,7 +91,7 @@ import { UserCacheService } from './user-cache.service'
     FreshAuthGuard,
     AuthenticationGuard,
     // Single global guard: authenticate → build ability → authorize
-    // Registered in AuthModule so it runs AFTER ThrottlerGuard (AppModule)
+    // Registered in AuthModule so it runs AFTER RateLimitGuard (ThrottlingModule)
     { provide: APP_GUARD, useClass: AuthenticationGuard },
   ],
   exports: [

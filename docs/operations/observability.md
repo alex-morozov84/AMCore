@@ -67,9 +67,18 @@ are the hard contract every label must satisfy.
   `db_slow_queries_total{role}` — collected from the process-local pool; no query
   text or model names.
 - `redis_client_events_total{client,event,role}` —
-  `client=shared|queue_producer|queue_worker|throttler` (SSE Pub/Sub subscribers
+  `client=shared|queue_producer|queue_worker|throttler` (the `throttler` label
+  name is unchanged since ADR-073 — it describes the Redis-client role, not
+  the specific storage implementation behind it; SSE Pub/Sub subscribers
   appear distinctly, e.g. `notif-subscriber`, `ai-run-subscriber`);
   `event=error|reconnecting|degraded`.
+- `rate_limit_decisions_total{policy,outcome,role}` (ADR-073) — every global
+  rate-limit admission decision. `policy=default|privileged_mutation|
+expensive_action|custom` (object-identity match against
+  `RATE_LIMIT_POLICIES`, never a route/tracker/free-text label — `custom`
+  covers an inline policy, e.g. the Telegram webhook's);
+  `outcome=allowed|refused`. The calibration signal for revisiting
+  `DEFAULT.burst` against real production traffic.
 
 **Queues** (exported by `worker`/`all` only — absent on `web`)
 

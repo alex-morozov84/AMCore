@@ -37,4 +37,5 @@ export const METRIC_NAMES = {
   aiConversationControlTotal: 'amcore_ai_conversation_control_total',
   aiArtifactUploadsTotal: 'amcore_ai_artifact_uploads_total',
   aiArtifactResolutionTotal: 'amcore_ai_artifact_resolution_total',
+  rateLimitDecisionsTotal: 'amcore_rate_limit_decisions_total',
 } as const

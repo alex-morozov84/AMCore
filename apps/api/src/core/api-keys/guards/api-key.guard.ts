@@ -30,7 +30,7 @@ export class ApiKeyGuard implements CanActivate {
 
     // Not our header (missing, JWT, or malformed prefix). The limiter is
     // intentionally not consulted here: pre-parse failures are too noisy
-    // (typos, clients sending JWT) and the global ThrottlerGuard already
+    // (typos, clients sending JWT) and the global RateLimitGuard already
     // bounds per-IP request volume.
     if (!parsed) return false
 

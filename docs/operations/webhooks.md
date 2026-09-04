@@ -114,8 +114,8 @@ Current replay-ID extraction:
 
 Webhook routes should use a dedicated `@RateLimit(...)` override (see
 `docs/backend/architecture-and-conventions.md` → Rate limiting), sized to the
-source's documented rate. Never `@SkipThrottle()`/`@SkipRateLimit()` for a
-webhook — an unthrottled public ingress is an open volumetric target.
+source's documented rate. Never `@SkipRateLimit()` for a webhook — an
+unthrottled public ingress is an open volumetric target.
 
 ## Request body size limit
 

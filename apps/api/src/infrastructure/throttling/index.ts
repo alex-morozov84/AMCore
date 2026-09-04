@@ -1,11 +1,11 @@
+export { GcraRedisLimiter } from './gcra-redis-limiter.service'
 export { RateLimit, SkipRateLimit } from './rate-limit.decorator'
+export { RateLimitGuard } from './rate-limit.guard'
+export type { RateLimitDecision, RateLimiter } from './rate-limit-decision'
 export {
-  DEFAULT_THROTTLERS,
+  classifyPolicy,
   RATE_LIMIT_POLICIES,
   type RateLimitPolicy,
-  THROTTLER_NAMES,
-  type ThrottlerName,
+  resolveBurst,
 } from './rate-limit-policies'
-export { RedisThrottlerStorage } from './redis-throttler-storage.service'
 export { ThrottlingModule } from './throttling.module'
-export { TrustedWebPeerThrottlerGuard } from './trusted-web-peer-throttler.guard'

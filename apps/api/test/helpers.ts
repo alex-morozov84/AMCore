@@ -5,7 +5,6 @@ import { JwtService } from '@nestjs/jwt'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { TestingModule, TestingModuleBuilder } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import { ThrottlerStorage } from '@nestjs/throttler'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import type { Cache } from 'cache-manager'
@@ -18,7 +17,7 @@ import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
 import { NotificationDispatchProcessor } from '../src/core/notifications/dispatch/notification-dispatch.processor'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
-import { RedisThrottlerStorage } from '../src/infrastructure/throttling'
+import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
 import type { Role } from '@/generated/prisma/client'
@@ -50,7 +49,7 @@ export interface E2ETestContext {
   app: INestApplication
   prisma: PrismaService
   cache: Cache
-  throttlerStorage: RedisThrottlerStorage
+  throttlerStorage: GcraRedisLimiter
   postgresContainer: StartedPostgreSqlContainer
   redisContainer: StartedRedisContainer
 }
@@ -135,10 +134,10 @@ export async function setupE2ETest(
   // Get Prisma service and cache
   const prisma = app.get(PrismaService)
   const cache = app.get<Cache>(CACHE_MANAGER)
-  // Resolve via the ThrottlerStorage token (what the guard actually uses), so
-  // the e2e wiring assertion proves the guard is backed by the Redis storage,
-  // not the in-memory fallback.
-  const throttlerStorage = app.get<RedisThrottlerStorage>(ThrottlerStorage as never)
+  // GcraRedisLimiter is a plain injectable (no custom-token indirection like
+  // the old @nestjs/throttler storage needed) — the guard resolves the exact
+  // same instance via its own constructor injection.
+  const throttlerStorage = app.get(GcraRedisLimiter)
 
   // Run migrations
   await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS core')
@@ -202,7 +201,7 @@ async function closeBullWorker(
 export async function cleanDatabase(
   prisma: PrismaService,
   cache: Cache,
-  throttlerStorage?: RedisThrottlerStorage
+  throttlerStorage?: GcraRedisLimiter
 ): Promise<void> {
   // Delete in correct order (respecting foreign keys)
   await prisma.passwordResetToken.deleteMany()
@@ -246,7 +245,7 @@ export async function cleanDatabase(
     }
   }
 
-  // Scoped throttler cleanup: delete only `throttle:v1:*` keys (never FLUSHDB).
+  // Scoped rate-limiter cleanup: delete only `ratelimit:v1:*` keys (never FLUSHDB).
   if (throttlerStorage) {
     await throttlerStorage.reset()
   }

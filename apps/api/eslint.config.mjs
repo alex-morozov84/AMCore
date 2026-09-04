@@ -16,7 +16,7 @@ export default [
     ignores: ['src/generated/prisma/**'],
   },
   {
-    files: ['src/**/*.ts', 'test/**/*.ts'],
+    files: ['src/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -28,12 +28,6 @@ export default [
               message:
                 'Use PinoLogger via DI for logging, and domain exceptions from common/exceptions (or AppException with an explicit errorCode) instead of raw NestJS HttpException subclasses.',
             },
-            {
-              name: '@nestjs/throttler',
-              importNames: ['Throttle', 'SkipThrottle'],
-              message:
-                'Use @RateLimit/@SkipRateLimit from infrastructure/throttling instead of raw @nestjs/throttler decorators.',
-            },
           ],
         },
       ],
@@ -41,9 +35,7 @@ export default [
   },
   {
     // Exception filters and their tests must reference raw NestJS HttpException
-    // subclasses because the framework still throws them; only the Logger ban
-    // is lifted here — the throttler ban still applies (this dir has no reason
-    // to import raw @nestjs/throttler decorators).
+    // subclasses because the framework still throws them; only the Logger ban applies here.
     files: ['src/common/exceptions/**/*.ts'],
     rules: {
       'no-restricted-imports': [
@@ -55,32 +47,6 @@ export default [
               importNames: ['Logger'],
               message:
                 'Use PinoLogger from nestjs-pino via dependency injection in runtime API code.',
-            },
-            {
-              name: '@nestjs/throttler',
-              importNames: ['Throttle', 'SkipThrottle'],
-              message:
-                'Use @RateLimit/@SkipRateLimit from infrastructure/throttling instead of raw @nestjs/throttler decorators.',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    // The rate-limit decorator wrapper is the one place allowed to import the
-    // raw @nestjs/throttler decorators/registration it wraps.
-    files: ['src/infrastructure/throttling/**/*.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            {
-              name: '@nestjs/common',
-              importNames: ['Logger', ...bannedExceptionImports],
-              message:
-                'Use PinoLogger via DI for logging, and domain exceptions from common/exceptions (or AppException with an explicit errorCode) instead of raw NestJS HttpException subclasses.',
             },
           ],
         },

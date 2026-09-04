@@ -2,7 +2,7 @@ import KeyvRedis from '@keyv/redis'
 import { CacheModule } from '@nestjs/cache-manager'
 import type { ModuleMetadata, Provider } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
-import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
 import { Request } from 'express'
 import { ClsModule, ClsService } from 'nestjs-cls'
 import { LoggerModule } from 'nestjs-pino'
@@ -36,7 +36,7 @@ import { QueueMetricsModule, QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
 import { StorageModule } from './infrastructure/storage'
-import { ThrottlingModule, TrustedWebPeerThrottlerGuard } from './infrastructure/throttling'
+import { ThrottlingModule } from './infrastructure/throttling'
 import { WebhooksModule } from './infrastructure/webhooks'
 import { PrismaModule } from './prisma'
 import { ShutdownService } from './shutdown.service'
@@ -127,9 +127,11 @@ export function coreImports(): Imports {
       }),
     }),
 
-    // Rate limiting (Redis-backed global throttler — ADR-039). Registration,
-    // named throttlers, RedisThrottlerStorage, and the @RateLimit/
-    // @SkipRateLimit decorators all live inside ThrottlingModule.
+    // Rate limiting (GCRA, Option O — ADR-039/ADR-073). Registration, the
+    // Redis-backed limiter, the global guard, and the @RateLimit/
+    // @SkipRateLimit decorators all live inside ThrottlingModule. Imported
+    // ahead of AuthModule (webImports) so RateLimitGuard runs before
+    // AuthenticationGuard.
     ThrottlingModule,
 
     // Database
@@ -208,11 +210,7 @@ export const appProviders: Provider[] = [
   { provide: APP_PIPE, useClass: ZodValidationPipe },
   // Zod serializer (auto-validates responses)
   { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
-  // Apply rate limiting globally. TrustedWebPeerThrottlerGuard (not the stock
-  // ThrottlerGuard) keys on the BFF-relayed AMCORE_CLIENT_IP_HEADER instead
-  // of req.ip, but ONLY when TRUSTED_WEB_PEERS is configured AND the actual
-  // socket peer is trusted (ADR-072) — with either unset (default), this is
-  // behaviorally identical to the stock guard.
-  { provide: APP_GUARD, useClass: TrustedWebPeerThrottlerGuard },
+  // Rate limiting's global guard (RateLimitGuard) is registered inside
+  // ThrottlingModule itself, not here — see its own module doc.
   ShutdownService,
 ]

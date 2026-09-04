@@ -56,8 +56,8 @@ Handlers/Proxy expose no raw socket address to verify a hop's identity
 against, unlike `apps/api`'s `TRUST_PROXY` (ADR-060), so this is
 trust-by-header-name only.
 
-On the `apps/api` side, `TrustedWebPeerThrottlerGuard` (replacing the stock
-global `ThrottlerGuard`, ADR-039) trusts the relayed header only when **both**
+On the `apps/api` side, the global `RateLimitGuard`'s tracker resolver
+(`client-tracker.ts`, ADR-039/ADR-073) trusts the relayed header only when **both**
 (a) `TRUSTED_WEB_PEERS` is configured (`.env.example`) **and** (b) the
 inbound request's _actual_ socket peer — `req.socket.remoteAddress`, never a
 forwarded header, and independent of Express's own `TRUST_PROXY` — is in

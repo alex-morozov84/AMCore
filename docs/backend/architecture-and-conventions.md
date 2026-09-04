@@ -281,51 +281,42 @@ Apply these only when your module needs them:
   [`infrastructure/redis/redis-lock.service.ts`](../../apps/api/src/infrastructure/redis/redis-lock.service.ts))
   before designing your own. It is **not** required for every upload.
 - **Rate limiting — every route is protected for free; override through
-  `@RateLimit`/`@SkipRateLimit`, never the raw library.** The global
-  guard (`short`/`long` buckets, ADR-039) covers every route with zero code
-  required — you only add a decorator when a route needs something
-  _different_ from the default. `infrastructure/throttling/` owns the
-  entire mechanism (named throttlers, storage, decorators, guard); eslint's
-  `no-restricted-imports` blocks importing `Throttle`/`SkipThrottle` from
-  `@nestjs/throttler` anywhere outside that directory, so you never need to
-  learn the underlying library to use this safely.
+  `@RateLimit`/`@SkipRateLimit`.** `infrastructure/throttling/` owns the
+  entire mechanism (ADR-039/ADR-073): a GCRA (Generic Cell Rate Algorithm)
+  limiter, Redis-backed with an in-memory degrade path, its own guard —
+  there is no third-party rate-limit library at all, so there is nothing
+  to learn beyond this decorator pair.
   - **Override a route** with `@RateLimit(policy)` — either a named policy
     from `RATE_LIMIT_POLICIES` (`PRIVILEGED_MUTATION`, `EXPENSIVE_ACTION`)
-    or an inline `{ rate, per }` (see the Telegram webhook controller for an
-    inline example). This is a coarse per-visitor volumetric backstop, not
-    precise per-actor protection — that's what dedicated limiters
-    (`LoginRateLimiterService`, invite-accept, etc.) are for.
+    or an inline `{ rate, per, burst? }` (see the Telegram webhook
+    controller for an inline example). This is a coarse per-visitor
+    volumetric backstop, not precise per-actor protection — that's what
+    dedicated limiters (`LoginRateLimiterService`, invite-accept, etc.)
+    are for.
   - **Exempt a route** with `@SkipRateLimit()` (health/metrics probes only,
-    normally) — never the bare `@nestjs/throttler` `@SkipThrottle()`, which
-    only skips a throttler named `'default'`; AMCore registers `short`/
-    `long`, so a bare `@SkipThrottle()` silently does nothing. This was a
-    real, shipped bug before the wrapper existed.
-  - **Buckets are per-route-per-visitor, precisely — for both `short` and
-    `long`.** Both buckets key on the same (class, handler, throttler
-    name, visitor) tuple, so they behave identically in this respect: one
-    visitor calling several _different_ routes doesn't share one budget —
-    each route tracks its own `short` and `long` counts independently,
-    completely unaffected by that visitor's traffic to any other route.
-    One visitor calling the _same_ route many times rapidly shares that
-    route's budget. This precision only holds for real visitors once
-    `TRUSTED_WEB_PEERS` + `WEB_TRUSTED_CLIENT_IP_HEADER` are configured
-    (ADR-072) — see
+    normally).
+  - **Buckets are per-route-per-visitor, precisely.** One visitor calling
+    several _different_ routes doesn't share one budget — each route
+    tracks its own bucket independently, completely unaffected by that
+    visitor's traffic to any other route. One visitor calling the _same_
+    route many times rapidly shares that route's budget. This precision
+    only holds for real visitors once `TRUSTED_WEB_PEERS` +
+    `WEB_TRUSTED_CLIENT_IP_HEADER` are configured (ADR-072) — see
     [`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
     "Client-IP relay to `apps/api`"; without them every BFF-proxied visitor
     still shares one bucket.
-  - **`@RateLimit(...)` only overrides the `long` (per-minute) bucket —
-    the global `short` (10 req/s) backstop is never overridden and still
-    applies to every route, decorated or not.** A policy's `per`-minute
-    rate is only actually reachable if a visitor's requests to that route
-    are spread out: e.g. the Telegram webhook's `600`-per-minute policy
-    still 429s an 11th request to that route within the same second,
-    because `short` is untouched. There is currently no supported
-    way to raise this per-second ceiling for one route — a route that
-    legitimately needs sustained bursts above 10 req/s from a single
-    source isn't fully served by `@RateLimit` today. Don't assume an
-    override makes a route's effective ceiling equal to what you wrote;
-    the burst-tolerant (GCRA) limiter described below removes this
-    constraint without changing this decorator's contract.
+  - **A policy has a sustained `rate` and an instantaneous `burst`** (the
+    number of requests admitted immediately from idle, above the sustained
+    rate — defaults to `rate` when omitted). This is what makes normal
+    browsing safe by default: one real visitor's page firing several
+    parallel calls to the same route, or clicking through a filterable
+    list quickly across a few page visits, is absorbed by `burst` without
+    tripping the backstop — while a route called continuously well above
+    its sustained `rate` still gets throttled. `DEFAULT`'s `burst: 50`
+    means an idle visitor can fire up to 50 requests to one route
+    instantly and still be admitted; a fixed-window algorithm cannot
+    express this distinction at all (see "Why GCRA, not fixed-window"
+    below).
   - **Classifying a new route** (stop at the first match):
     1. Does it need per-actor/per-identity protection rather than a
        per-visitor volumetric one (login, invite-accept, password reset)?
@@ -336,31 +327,31 @@ Apply these only when your module needs them:
        (destructive/admin) but rarely called in bursts by a legitimate
        user? Narrow it with `@RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)`
        or `.PRIVILEGED_MUTATION`, or an inline policy with cited evidence
-       for the chosen numbers (see the Telegram webhook controller) —
-       remembering the `short`-bucket ceiling above.
+       for the chosen numbers (see the Telegram webhook controller).
     4. Is it a public, unauthenticated ingress needing its own bounded rate
        distinct from the global default (a webhook)? Inline `@RateLimit`
        with a comment naming the source's documented rate, never
-       `@SkipRateLimit()` — and note in that comment if the source's rate
-       exceeds 10 req/s, since the `short` bucket caps it regardless of
-       what the policy says.
+       `@SkipRateLimit()`.
     5. Does one legitimate user action _legitimately_ fan out into many
        rapid calls to the _same_ route (e.g. a filterable list a user
-       clicks through quickly)? Don't paper over it by loosening the global
-       default for everyone — that's a burst-tolerance problem, tracked
-       separately (below), not a per-route policy choice.
-  - **Never widen the global `short`/`long` defaults** to work around a
-    specific route's fan-out — that weakens the backstop for every route to
-    fix a problem only one route has.
-  - **Instantaneous browser-burst tolerance** (many rapid calls to the
-    _same_ route from one real visitor, e.g. clicking through catalog
-    filters quickly) is a known, separate gap in the current fixed-window
-    algorithm — no combination of `@RateLimit` numbers fixes it, since a
-    fixed window cannot distinguish a burst from sustained abuse. A
-    burst-tolerant (GCRA) limiter is a dedicated, already-designed
-    follow-up to replace the current fixed-window storage without changing
-    this decorator contract — not a permanent limitation of this
-    mechanism.
+       clicks through quickly)? This is exactly what `burst` exists for —
+       size it to the real fan-out with cited evidence, don't widen `rate`
+       (the sustained ceiling) to paper over it.
+  - **Never widen the global `DEFAULT` policy** to work around a specific
+    route's fan-out — that weakens the backstop for every route to fix a
+    problem only one route has; narrow a specific route's policy instead.
+  - **Why GCRA, not fixed-window.** A fixed-window counter (what this
+    mechanism used before ADR-073) can only express one number — it cannot
+    distinguish "50 requests in the same instant from one idle visitor"
+    from "50 requests per second sustained from an attacker." No amount of
+    `@RateLimit` tuning fixes that; only a capacity-aware algorithm can.
+    GCRA is that algorithm — see ADR-073 for the full rationale, the
+    default policy table, and a measured before/after (the exact
+    originally-reported production symptom this mechanism exists to
+    prevent: 28 of 60 requests refused under the old fixed-window
+    defaults, 0 of 60 under this one, for the identical traffic pattern —
+    permanent regression coverage in
+    `apps/api/test/rate-limit-symptom-reproduction.e2e-spec.ts`).
 
 ## Tests
 

@@ -282,10 +282,10 @@ disabled by default so a fresh checkout is unaffected:
   header itself (stripped unconditionally, regardless of configuration).
 - **`TRUSTED_WEB_PEERS`** (`apps/api`) — names the real socket address(es)
   `apps/web` connects from (a preset, IP, or CIDR — same grammar as
-  `TRUST_PROXY`'s presets). `TrustedWebPeerThrottlerGuard` trusts
-  `X-AMCore-Client-Ip` only when the inbound request's actual TCP peer (not
-  a forwarded header) matches this set; otherwise it falls back to stock
-  `req.ip`, identical to before ADR-072.
+  `TRUST_PROXY`'s presets). The global `RateLimitGuard`'s tracker resolver
+  trusts `X-AMCore-Client-Ip` only when the inbound request's actual TCP
+  peer (not a forwarded header) matches this set; otherwise it falls back
+  to stock `req.ip`, identical to before ADR-072.
 
 **Both must be set for either to have an effect.** `getClientIp()`/audit-log
 IP and the invite-abuse limiter are not wired to this relay — only the

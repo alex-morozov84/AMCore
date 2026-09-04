@@ -254,30 +254,28 @@ describe('Admin (e2e)', () => {
   })
 
   /**
-   * OB-03: privileged admin operations narrow the existing `long`
-   * bucket per-handler via `@RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)`.
-   * Storage is reset between tests via `cleanDatabase` ->
-   * `resetThrottlerStorage`, so the 6th call here is the first one
-   * to exhaust the per-handler 5/min override — the test does NOT
-   * depend on what the first 5 cleanups actually did (counts vary
-   * because cleanup mutates DB state), only that the throttle gate
-   * fires.
+   * OB-03: privileged admin operations narrow the global default policy
+   * per-handler via `@RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)`
+   * (`rate: 5, per: 60_000, burst: 5`, ADR-073). Storage is reset between
+   * tests via `cleanDatabase`, so the 6th call here is the first one to
+   * exhaust the per-handler override — the test does NOT depend on what
+   * the first 5 cleanups actually did (counts vary because cleanup
+   * mutates DB state), only that the rate-limit gate fires.
    *
-   * Why per-handler `@RateLimit(...)` and not a third named bucket:
-   * registering a third `admin` bucket in `ThrottlerModule.forRoot`
-   * would apply its limit to every route in the API (caught in
-   * Stage 7 final-e2e when login-burst tests regressed). The
-   * per-handler override stays local.
+   * Why per-handler `@RateLimit(...)` and not a global policy change:
+   * narrowing the global `DEFAULT` policy itself would apply the admin
+   * limit to every route in the API (caught in Stage 7 final-e2e when
+   * login-burst tests regressed). The per-handler override stays local.
    *
-   * If this test ever proves flaky on CI under load, drop it — the
-   * `@nestjs/throttler` runtime is covered by its own suite, and the
-   * decorator metadata is verified by typecheck. We prefer one
-   * focused e2e over a fragile metadata-key probe because the
-   * THROTTLER_* constants are not re-exported from the package's
-   * public `index` and a metadata test would couple us to internals.
+   * If this test ever proves flaky on CI under load, drop it — the GCRA
+   * limiter's own properties are covered by
+   * `gcra-redis-limiter.service.e2e-spec.ts`/`gcra-memory-limiter.spec.ts`,
+   * and the decorator metadata is verified by
+   * `rate-limit-decorator-coverage.spec.ts`. We prefer one focused e2e
+   * over duplicating that coverage here.
    */
   describe('OB-03: admin operations throttle on 6th rapid call', () => {
-    it('POST /admin/cleanup → 429 on the 6th call within the 5/min long-bucket override', async () => {
+    it('POST /admin/cleanup → 429 on the 6th call within the EXPENSIVE_ACTION override', async () => {
       const { userId } = await registerAndGetToken('superadmin@example.com')
       const superToken = await promoteToSuperAdmin(userId)
 
@@ -292,6 +290,25 @@ describe('Admin (e2e)', () => {
         .post('/admin/cleanup')
         .set('Authorization', `Bearer ${superToken}`)
         .expect(429)
+    })
+
+    /**
+     * ADR-073: RateLimitGuard must run before AuthenticationGuard
+     * (ThrottlingModule is imported ahead of AuthModule in app-imports.ts).
+     * Proven structurally, not asserted: every one of 6 *unauthenticated*
+     * requests to this EXPENSIVE_ACTION-limited route would 401 if
+     * AuthenticationGuard ran first — none would ever reach the rate
+     * limiter, so none could ever 429. Getting a 429 on the 6th call proves
+     * the opposite order: the first 5 were admitted by the rate limiter and
+     * only then rejected as unauthenticated (401); the 6th never reached
+     * AuthenticationGuard at all.
+     */
+    it('rate-limits before authenticating — 401 on calls 1-5, 429 on call 6, all unauthenticated', async () => {
+      for (let i = 0; i < 5; i++) {
+        await request(app.getHttpServer()).post('/admin/cleanup').expect(401)
+      }
+
+      await request(app.getHttpServer()).post('/admin/cleanup').expect(429)
     })
   })
 
