@@ -27,23 +27,23 @@ export const DEFAULT_THROTTLERS: readonly ThrottlerDefault[] = [
 ]
 
 /**
- * `@RateLimit(...)`'s policy shape. Deliberately GCRA-shaped (`rate`/`per`/
- * `burst`) rather than `@nestjs/throttler`'s `{ short?, long? }` — a
- * downstream user of this decorator should never need to know which
- * underlying library or algorithm enforces it, and this shape stays valid
- * once the burst-tolerant limiter lands.
+ * `@RateLimit(...)`'s policy shape. Deliberately `rate`/`per`-shaped rather
+ * than `@nestjs/throttler`'s `{ short?, long? }` — a downstream user of this
+ * decorator should never need to know which underlying library or algorithm
+ * enforces it.
  *
- * `burst` is accepted today but not yet read by `RateLimit()`'s mapping;
- * it becomes a live field once the burst-tolerant limiter replaces the
- * current fixed-window enforcement, with no call-site changes required.
+ * Intentionally has no `burst` field yet: a burst-tolerant limiter is a
+ * planned follow-up, but until it's live, accepting `burst` here would be a
+ * parameter that looks like it works and silently does nothing — exactly
+ * the class of bug this decorator exists to eliminate. It will be added
+ * once it has a real effect, additively (existing call sites are
+ * unaffected, since it will be optional).
  */
 export interface RateLimitPolicy {
   /** Max requests allowed within `per` milliseconds. */
   rate: number
   /** Window size in milliseconds. */
   per: number
-  /** Reserved: instantaneous burst capacity above the sustained `rate`. */
-  burst?: number
 }
 
 export const RATE_LIMIT_POLICIES = {

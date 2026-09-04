@@ -26,8 +26,11 @@ export class TelegramWebhookController {
   @VerifyWebhook('telegram')
   // Effective ceiling is 10 req/s, not 600/min: @RateLimit only overrides the
   // `long` (per-minute) bucket — the global `short` (10 req/s) backstop is
-  // never overridden and still applies. Fine for Telegram's own update rate;
-  // don't read `per: 60_000` as "up to 10 in the same second is safe."
+  // never overridden and still applies. 600/min is exactly 10 req/s * 60, so
+  // this `long` override can never bind before `short` does — today it's a
+  // documented statement of intent, not an active ceiling. It starts doing
+  // real work once the burst-tolerant limiter (planned) replaces `short`'s
+  // fixed window; kept now so the call site doesn't need to change later.
   @RateLimit({ rate: 600, per: 60_000 })
   @HttpCode(HttpStatus.OK)
   @ApiExcludeEndpoint()

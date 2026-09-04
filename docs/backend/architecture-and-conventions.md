@@ -317,9 +317,9 @@ Apply these only when your module needs them:
     the global `short` (10 req/s) backstop is never overridden and still
     applies to every route, decorated or not.** A policy's `per`-minute
     rate is only actually reachable if a visitor's requests to that route
-    are spread out: e.g. the Telegram webhook's `{ rate: 600, per: 60_000
-}` policy still 429s on an 11th request to that route within the same
-    second, because `short` is untouched. There is currently no supported
+    are spread out: e.g. the Telegram webhook's `600`-per-minute policy
+    still 429s an 11th request to that route within the same second,
+    because `short` is untouched. There is currently no supported
     way to raise this per-second ceiling for one route — a route that
     legitimately needs sustained bursts above 10 req/s from a single
     source isn't fully served by `@RateLimit` today. Don't assume an
