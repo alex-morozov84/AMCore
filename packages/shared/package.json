@@ -22,7 +22,8 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "zod": "^4.5.4"
@@ -31,6 +32,7 @@
     "@amcore/eslint-config": "workspace:*",
     "@amcore/typescript-config": "workspace:*",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   }
 }

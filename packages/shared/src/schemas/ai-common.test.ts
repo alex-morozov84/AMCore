@@ -1,3 +1,5 @@
+import { describe, expect, it } from 'vitest'
+
 import {
   AI_PROVIDER_TYPES,
   aiCapabilityMapSchema,
@@ -5,7 +7,7 @@ import {
   aiDecimalStringSchema,
   aiProviderTypeSchema,
   aiSlugSchema,
-} from '@amcore/shared'
+} from './ai-common'
 
 /**
  * Contract tests for the AI vocabulary primitives (Track C — ADR-054, Arc A): bounded

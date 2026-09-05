@@ -1,13 +1,11 @@
-import {
-  aiModelSelectionSchema,
-  createAiAssistantSchema,
-  createAiModelSchema,
-  createAiProviderSchema,
-} from '@amcore/shared'
+import { describe, expect, it } from 'vitest'
+
+import { createAiModelSchema, createAiProviderSchema } from './ai-catalog'
 
 /**
- * Contract tests for the AI admin catalog inputs (Track C — ADR-054, Arc A): provider, model,
- * and assistant create schemas. Proves malformed catalog input is rejected and defaults apply.
+ * Contract tests for the AI admin catalog provider/model inputs (Track C —
+ * ADR-054, Arc A). Proves malformed catalog input is rejected and defaults
+ * apply.
  */
 
 describe('createAiProviderSchema', () => {
@@ -68,24 +66,5 @@ describe('createAiModelSchema', () => {
         contextLimit: 200000,
       }).success
     ).toBe(true)
-  })
-})
-
-describe('aiModelSelectionSchema', () => {
-  it('defaults the fallback chain to empty', () => {
-    const parsed = aiModelSelectionSchema.parse({ modelSlug: 'claude-default' })
-    expect(parsed.fallback).toEqual([])
-  })
-})
-
-describe('createAiAssistantSchema', () => {
-  it('defaults modalities to text and tools to none', () => {
-    const parsed = createAiAssistantSchema.parse({
-      slug: 'support',
-      displayName: 'Support',
-      modelSelection: { modelSlug: 'claude-default' },
-    })
-    expect(parsed.allowedModalities).toEqual(['text'])
-    expect(parsed.toolAllowlist).toEqual([])
   })
 })

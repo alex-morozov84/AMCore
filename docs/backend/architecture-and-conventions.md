@@ -119,6 +119,13 @@ errors — see
 [`docs/frontend/i18n-and-errors.md`](../frontend/i18n-and-errors.md). Raw API
 consumers branch on `errorCode`; `errors[].message` is diagnostic only.
 
+**Test the schema's own validation boundary beside it**, in
+`packages/shared/src/schemas/<module>.test.ts` (Vitest) — accepted/rejected
+inputs, defaults, and any custom `errorCode`. It runs standalone against the
+schema's source, with no NestJS/DTO/HTTP setup, and the same module both the
+api DTO and any frontend form import validates identically. Don't duplicate
+this coverage as an `apps/api` Jest spec.
+
 Rebuild shared so the api/web can import it:
 
 ```bash
@@ -358,6 +365,8 @@ Apply these only when your module needs them:
 Cover the critical paths and the project-specific gates:
 
 - **Unit** — service logic in isolation.
+- **Shared contract** (Vitest, `packages/shared`) — a new or changed Zod
+  schema's own validation-boundary test lives beside it, per step 2 above.
 - **E2E** (Jest + Testcontainers, needs Docker) — the HTTP contract end to end.
 - **OpenAPI inventory** — a new public handler **must** be added to the expected
   inventory in [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts).

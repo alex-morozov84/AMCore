@@ -50,10 +50,9 @@ export function localizedFrontendUrl(
  * app"), so a link still carrying `/en/...` would 404.
  *
  * `locales` defaults to the live `SUPPORTED_LOCALES` and is only a parameter
- * so this decision is independently testable — `packages/shared` has no test
- * runner of its own (see the maintainer backlog), and AMCore upstream's own
+ * so this branch is independently testable: AMCore upstream's own
  * `SUPPORTED_LOCALES` never actually shrinks to one entry, so a test relying
- * on the real constant could never exercise this branch.
+ * on the real constant could never exercise it.
  */
 export function localePathPrefix(
   locale: SupportedLocale,

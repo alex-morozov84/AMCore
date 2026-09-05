@@ -43,6 +43,17 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 > **Note:** Never use `npx jest` directly for E2E tests — the `test:e2e` script sets `NODE_OPTIONS='--experimental-vm-modules'` required for ESM packages.
 
+### Shared-package test commands
+
+| Command                                             | Description                               |
+| --------------------------------------------------- | ----------------------------------------- |
+| `pnpm --filter shared test`                         | All `packages/shared` unit tests (Vitest) |
+| `pnpm --filter shared test -- path/to/file.test.ts` | Single test file                          |
+
+Pure schema/lib contract tests for `packages/shared` live beside their source
+(`packages/shared/src/**/*.test.ts`), not in `apps/api` or `apps/web` — see
+[`docs/backend/architecture-and-conventions.md` → Contract (shared Zod)](docs/backend/architecture-and-conventions.md#2-contract-shared-zod).
+
 ### Web-specific test commands
 
 | Command                                 | Description                                                                                                                                                  |

@@ -1,4 +1,6 @@
-import { telegramConnectionResponseSchema, telegramLinkResponseSchema } from '@amcore/shared'
+import { describe, expect, it } from 'vitest'
+
+import { telegramConnectionResponseSchema, telegramLinkResponseSchema } from './telegram'
 
 /**
  * Contract tests for the shared Telegram linking responses. The connection status is a

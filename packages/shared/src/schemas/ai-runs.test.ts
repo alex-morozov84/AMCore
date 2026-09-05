@@ -1,4 +1,6 @@
-import { aiMessageContentSchema, aiUsageSummarySchema, createAiRunSchema } from '@amcore/shared'
+import { describe, expect, it } from 'vitest'
+
+import { aiMessageContentSchema, aiUsageSummarySchema, createAiRunSchema } from './ai-runs'
 
 /**
  * Contract tests for the AI run/message contracts (Track C — ADR-054, Arc A): the multimodal

@@ -1,4 +1,10 @@
-import { NOTIFICATION_ACTION_MAX_PARAMS, notificationActionSchema } from '@amcore/shared'
+import { describe, expect, it } from 'vitest'
+
+import {
+  NOTIFICATION_ACTION_MAX_PARAMS,
+  notificationActionSchema,
+  notificationSseEventSchema,
+} from './notifications'
 
 /**
  * Contract tests for the shared notification action descriptor. The action is a
@@ -42,5 +48,48 @@ describe('notificationActionSchema', () => {
     )
 
     expect(notificationActionSchema.safeParse({ route: 'a', params }).success).toBe(false)
+  })
+})
+
+/**
+ * `notificationSseEventSchema` is the public SSE hint contract. `apps/api`'s
+ * internal Redis Pub/Sub envelope (`notificationRealtimeEnvelopeSchema`)
+ * extends it and is tested there — it is not a client-facing schema and never
+ * lives in this package (ADR-053).
+ */
+describe('notificationSseEventSchema (public hint)', () => {
+  const valid = { eventId: 'evt_1', reason: 'created', notificationId: 'ntf_1' }
+
+  it('accepts an aggregate hint without notificationId', () => {
+    expect(
+      notificationSseEventSchema.parse({ eventId: 'evt_1', reason: 'unread_changed' })
+    ).toEqual({
+      eventId: 'evt_1',
+      reason: 'unread_changed',
+    })
+  })
+
+  it('rejects an unknown reason (e.g. the unadopted "read-all")', () => {
+    expect(notificationSseEventSchema.safeParse({ ...valid, reason: 'read-all' }).success).toBe(
+      false
+    )
+  })
+
+  it('rejects extra fields (.strict)', () => {
+    expect(notificationSseEventSchema.safeParse({ ...valid, recipientUserId: 'u1' }).success).toBe(
+      false
+    )
+  })
+
+  it('rejects an over-long eventId', () => {
+    expect(
+      notificationSseEventSchema.safeParse({ ...valid, eventId: 'x'.repeat(65) }).success
+    ).toBe(false)
+  })
+
+  it('rejects an empty notificationId', () => {
+    expect(notificationSseEventSchema.safeParse({ ...valid, notificationId: '' }).success).toBe(
+      false
+    )
   })
 })

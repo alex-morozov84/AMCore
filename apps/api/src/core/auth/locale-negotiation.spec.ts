@@ -1,7 +1,5 @@
 import type { Request } from 'express'
 
-import { supportedLocaleSchema, timezoneSchema } from '@amcore/shared'
-
 import { negotiateLocale } from './locale-negotiation'
 
 /**
@@ -37,31 +35,5 @@ describe('negotiateLocale', () => {
   it('returns the negotiated supported locale for a matching header', () => {
     const req = makeReq('en-US,en;q=0.9', 'en')
     expect(negotiateLocale(req)).toBe('en')
-  })
-})
-
-describe('supportedLocaleSchema', () => {
-  it('accepts supported locales and rejects others', () => {
-    expect(supportedLocaleSchema.safeParse('ru').success).toBe(true)
-    expect(supportedLocaleSchema.safeParse('en').success).toBe(true)
-    expect(supportedLocaleSchema.safeParse('de').success).toBe(false)
-    expect(supportedLocaleSchema.safeParse('EN').success).toBe(false)
-  })
-})
-
-describe('timezoneSchema', () => {
-  it.each(['UTC', 'Europe/Moscow', 'America/New_York', 'US/Eastern'])(
-    'accepts the named IANA zone %s',
-    (tz) => {
-      expect(timezoneSchema.safeParse(tz).success).toBe(true)
-    }
-  )
-
-  it.each(['+01:00', '-0500', '+23', '-2359'])('rejects the numeric offset %s', (tz) => {
-    expect(timezoneSchema.safeParse(tz).success).toBe(false)
-  })
-
-  it('rejects an unknown zone name', () => {
-    expect(timezoneSchema.safeParse('Mars/Phobos').success).toBe(false)
   })
 })

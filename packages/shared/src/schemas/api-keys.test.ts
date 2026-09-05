@@ -1,14 +1,16 @@
-import { z } from 'zod'
+import { describe, expect, it, test } from 'vitest'
+import type { z } from 'zod'
 
-import { Action, ApiKeyScopeErrorCode, createApiKeySchema, Subject } from '@amcore/shared'
+import { ApiKeyScopeErrorCode } from '../constants'
+import { Action, Subject } from '../enums/permissions'
+
+import { createApiKeySchema } from './api-keys'
 
 // AK-05 schema validation tests.
 //
 // The Cartesian product of `Action × Subject` minus `manage:all` is the
-// scope registry. These tests live in the API workspace (not in
-// `packages/shared`) to avoid adding a test runner to the shared
-// package; the schema is imported through `@amcore/shared`'s public API
-// the same way the API DTO and the frontend form do.
+// scope registry. The schema is imported the same way the API DTO and the
+// frontend form do — through this package's own source.
 
 const VALID_PAYLOAD = {
   name: 'test',

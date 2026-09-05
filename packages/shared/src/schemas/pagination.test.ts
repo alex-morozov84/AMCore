@@ -1,4 +1,6 @@
-import { paginationQuerySchema } from '@amcore/shared'
+import { describe, expect, it } from 'vitest'
+
+import { paginationQuerySchema } from './pagination'
 
 describe('paginationQuerySchema (OA-08)', () => {
   describe('happy path', () => {
