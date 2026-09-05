@@ -62,6 +62,16 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // `process.env` in apps/web (no EnvService there) — same reasoning as
   // WEB_TRUSTED_ORIGINS above.
   'WEB_CSP_MODE',
+  // docker-compose.prod.yml only (production deploy profile track): which
+  // promoted image digest each service pulls, and the bounded/rotating log
+  // driver options — consumed by the production overlay's own
+  // interpolation, not the app's env schema at all.
+  'COMPOSE_API_IMAGE',
+  'COMPOSE_API_MIGRATOR_IMAGE',
+  'COMPOSE_WEB_IMAGE',
+  'COMPOSE_LOG_DRIVER',
+  'COMPOSE_LOG_MAX_SIZE',
+  'COMPOSE_LOG_MAX_FILE',
 ])
 const WEBHOOK_SECRET_PATTERN = /^WEBHOOK_[A-Z0-9_]+_SECRET$/
 

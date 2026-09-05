@@ -128,8 +128,16 @@ jobs:
 
       - name: Deploy (placeholder — replace with your real staging deploy)
         run: |
-          echo "This step is a placeholder. Replace it with your real deploy command, e.g.:"
-          echo "  ssh deploy@staging-host 'API_IMAGE=ghcr.io/.../api@<digest> docker compose pull && docker compose up -d'"
+          echo "This step is a placeholder. Replace it with your real deploy command, e.g."
+          echo "(VPS/Compose path — docker-compose.prod.yml, see docs/operations/deployment.md):"
+          echo "  ssh deploy@staging-host '"
+          echo "    export COMPOSE_API_IMAGE=ghcr.io/.../api@<api digest>"
+          echo "    export COMPOSE_API_MIGRATOR_IMAGE=ghcr.io/.../api-migrator@<migrator digest>"
+          echo "    export COMPOSE_WEB_IMAGE=ghcr.io/.../web@<web digest>"
+          echo "    docker compose -f docker-compose.yml -f docker-compose.prod.yml pull"
+          echo "    docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate"
+          echo "    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps api worker web"
+          echo "  '"
           echo "Never rebuild here — pull the exact digests captured by the build job above."
 
   resolve-production-digests:
@@ -243,4 +251,5 @@ jobs:
       - name: Deploy (placeholder — replace with your real production deploy)
         run: |
           echo "This step is a placeholder. Replace it with your real deploy command."
-          echo "Pull by digest, not by tag, on the production host."
+          echo "Same shape as the staging deploy step above, against your production host."
+          echo "Pull by digest, not by tag — never rebuild here."

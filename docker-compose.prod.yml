@@ -1,0 +1,117 @@
+# Production overlay for docker-compose.yml (docs/operations/deployment.md ->
+# "Production rollout via registry (image-pull path)"). Apply on top of the
+# base file, never in place of it:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps api worker web
+#
+# What this changes vs. the base file (which builds locally by default, for
+# the zero-config quick start in the root README):
+#
+#   - migrate/api/worker/web: replace `build:` with `image:` pinned to the
+#     immutable digest a registry + digest promotion pipeline already
+#     published (docs/operations/production-deploy-profile.md). Each image
+#     var below is REQUIRED here (no default) — an unset var fails `compose
+#     config`/`up` immediately with a clear message, rather than silently
+#     falling back to a locally built dev image in production. Safe to do
+#     here specifically because these four services are always-on (no
+#     `profiles:` gate) — Compose interpolates every service's variables
+#     regardless of which profile is active, so a required (`:?`) var on a
+#     *profile-gated* service (like `caddy`'s `CADDY_DOMAIN` in the base
+#     file, which deliberately avoids `:?` for exactly this reason) would
+#     break `compose config`/`up` even when that profile is off. This
+#     overlay only uses `:?` on migrate/api/worker/web; `postgres`/`redis`/
+#     `caddy`/`backup`/`restore` below stay optional, matching the base
+#     file's own rule.
+#   - `pull_policy: always` means Compose always asks the registry for the
+#     named digest before starting a container. Since the reference is a
+#     content-addressed digest (not a mutable tag), this never re-fetches
+#     different bytes — it exists to fail loudly if the digest is missing or
+#     unreachable, instead of silently building a fresh image locally. This
+#     is the same "never silently rebuild" rule
+#     `.github/workflows/deploy-template.yml`'s promote path enforces.
+#   - Every long-running service gets an explicit restart policy. The base
+#     file leaves this unset (Docker's default is effectively "never
+#     restart"), which is fine for local dev but not for a host that must
+#     recover from a crash or reboot unattended.
+#   - Every service gets a bounded, rotating log driver. Docker's default
+#     `json-file` driver has NO size cap at all — an unconfigured production
+#     host can fill its disk with container logs alone. Docker's own docs
+#     recommend `local` instead: it rotates automatically and uses a more
+#     efficient format; `json-file` stays Docker's own default only for
+#     backward compatibility and Kubernetes-runtime scenarios (Docker docs,
+#     "Configure logging drivers"). `local`'s own caveat: its files are for
+#     the Docker daemon and `docker logs`/`docker compose logs` only — don't
+#     point an external log-shipping tool at them directly (Docker docs,
+#     "local file logging driver"); use `json-file` instead if you need that.
+#     COMPOSE_LOG_DRIVER only accepts `local` or `json-file` here — both
+#     understand the same `max-size`/`max-file` options this file sets. A
+#     different driver (`syslog`, `journald`, ...) uses different option
+#     names entirely and will fail at container **start**, not at `compose
+#     config` time, so a cheap pre-flight will not catch a bad value here.
+#
+# Requires a Compose CLI that supports the `!reset` merge tag (Compose
+# Specification's "reset value" extension) — supported since Compose CLI
+# v2.17.3 (docker/compose#10697), well below this repo's documented
+# v2.20.2+ minimum, and already relied on by this repo's own CI,
+# `.github/compose.boot-smoke.override.yml`.
+#
+# This file does not touch ports, volumes, application environment, or
+# profiles — only image sourcing and service supervision/logging.
+
+x-logging: &logging
+  driver: ${COMPOSE_LOG_DRIVER:-local}
+  options:
+    max-size: ${COMPOSE_LOG_MAX_SIZE:-20m}
+    max-file: '${COMPOSE_LOG_MAX_FILE:-5}'
+
+services:
+  postgres:
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    build: !reset null
+    image: ${COMPOSE_API_MIGRATOR_IMAGE:?Set COMPOSE_API_MIGRATOR_IMAGE to the promoted api-migrator image digest, e.g. ghcr.io/<org>/<repo>/api-migrator@sha256:...}
+    pull_policy: always
+    logging: *logging
+
+  api:
+    build: !reset null
+    image: ${COMPOSE_API_IMAGE:?Set COMPOSE_API_IMAGE to the promoted api image digest, e.g. ghcr.io/<org>/<repo>/api@sha256:...}
+    pull_policy: always
+    restart: unless-stopped
+    logging: *logging
+
+  # Worker restart policy is a product decision, not a fact. Default here:
+  # unless-stopped (a stalled queue is worse than a noisy restart loop).
+  # Override to `restart: on-failure:5` in your own overlay if you'd rather a
+  # crash-looping worker surface loudly and stop instead of retrying forever.
+  worker:
+    build: !reset null
+    image: ${COMPOSE_API_IMAGE:?Set COMPOSE_API_IMAGE to the promoted api image digest, e.g. ghcr.io/<org>/<repo>/api@sha256:...}
+    pull_policy: always
+    restart: unless-stopped
+    logging: *logging
+
+  web:
+    build: !reset null
+    image: ${COMPOSE_WEB_IMAGE:?Set COMPOSE_WEB_IMAGE to the promoted web image digest, e.g. ghcr.io/<org>/<repo>/web@sha256:...}
+    pull_policy: always
+    restart: unless-stopped
+    logging: *logging
+
+  caddy:
+    restart: unless-stopped
+    logging: *logging
+
+  backup:
+    logging: *logging
+
+  restore:
+    logging: *logging

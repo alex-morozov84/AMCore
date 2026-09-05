@@ -98,8 +98,10 @@ does not express.
 - **[Operations](operations/README.md)** — deployment, migrations, process
   roles, TLS/reverse-proxy setup (nginx or the optional bundled Caddy
   profile), the production deploy profile (build-once/promote-by-digest,
-  GitHub Environments), Postgres backup/restore, observability, CI/repo
-  security, audit log, webhooks, and idempotency.
+  GitHub Environments), the `docker-compose.prod.yml` image-pull production
+  overlay (immutable digests, restart policies, log rotation), Postgres
+  backup/restore, observability, CI/repo security, audit log, webhooks, and
+  idempotency.
 
 ## Common extension tasks
 

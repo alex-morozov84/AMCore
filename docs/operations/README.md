@@ -11,8 +11,10 @@ specific concern comes up.
   `TRUST_PROXY`), the opt-in BFF client-IP relay that lets the global
   rate limiter tell visitors apart (`WEB_TRUSTED_CLIENT_IP_HEADER` +
   `TRUSTED_WEB_PEERS`), the Redis-backed GCRA rate limiter's production
-  assumptions, the Redis queue profile, database pool sizing, and
-  SSE-behind-a-proxy guidance.
+  assumptions, the Redis queue profile, database pool sizing,
+  SSE-behind-a-proxy guidance, and the `docker-compose.prod.yml` image-pull
+  rollout (immutable digests, restart policies, log rotation, honest
+  zero/low-downtime guidance).
 - **[Production deploy profile](production-deploy-profile.md)** — the
   build-once/promote-by-digest contract, the `staging`/`production` GitHub
   Environments setup, and the secrets/variables checklist that gates a
