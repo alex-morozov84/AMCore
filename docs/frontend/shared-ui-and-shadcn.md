@@ -5,9 +5,7 @@
 directly for AMCore where shadcn has no equivalent. This page is the reuse
 rule, the safe operating procedure for the CLI, and the reasons behind both —
 written after a live CLI run found regressions neither research nor review
-predicted. Full deliberation, including the spike transcript, lives in the
-maintainer-only `ai/models-talk.md` (Track 5) if you need the _why_ in more
-depth than this page carries.
+predicted.
 
 ## Reuse-first rule
 

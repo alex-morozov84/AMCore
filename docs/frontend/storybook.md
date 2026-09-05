@@ -255,5 +255,3 @@ Docker/Postgres/Redis needed since every story's API surface is mocked.
   "Which layer should I add a test at?" for routing a new test correctly.
 - [i18n & errors](./i18n-and-errors.md) — the `NextIntlClientProvider`
   decorator pattern.
-- **ADR-070** (`ai/decisions/adr-070-storybook-component-workshop.md`) —
-  the full decision record.

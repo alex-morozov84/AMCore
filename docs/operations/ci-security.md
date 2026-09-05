@@ -76,8 +76,8 @@ of the following hold, and remove it the moment any one stops holding:
    allowed, and the removal condition — including the exact command to
    re-check), and a tracked backlog/issue entry with a trigger to re-check on
    the next relevant dependency bump. AMCore's own maintainer backlog is
-   private and absent from public forks (see `ai/README.md`'s private-repo
-   boundary) — a fork following this policy should use whatever public
+   private and absent from public forks — a fork following this policy
+   should use whatever public
    issue tracker or `docs/` note it already uses for this kind of follow-up;
    the inline workflow comment alone should always be self-sufficient to
    understand and re-verify the exception, since that's the part every fork
