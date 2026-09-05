@@ -57,6 +57,11 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // port binds to — consumed by compose's own `ports:` mapping, not the
   // app's env schema at all.
   'API_PUBLISH_HOST',
+  // apps/web-only (Track 3, ai/models-talk.md FINAL PLAN §3): the browser
+  // Content-Security-Policy mode (report-only/enforce), read directly via
+  // `process.env` in apps/web (no EnvService there) — same reasoning as
+  // WEB_TRUSTED_ORIGINS above.
+  'WEB_CSP_MODE',
 ])
 const WEBHOOK_SECRET_PATTERN = /^WEBHOOK_[A-Z0-9_]+_SECRET$/
 
