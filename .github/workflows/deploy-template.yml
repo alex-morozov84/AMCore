@@ -57,6 +57,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Resolve image tag
         id: tag
@@ -115,10 +117,14 @@ jobs:
     environment: staging
     steps:
       - name: Show the digests staging is about to run
+        env:
+          API_DIGEST: ${{ needs.build.outputs.api_digest }}
+          API_MIGRATOR_DIGEST: ${{ needs.build.outputs.api_migrator_digest }}
+          WEB_DIGEST: ${{ needs.build.outputs.web_digest }}
         run: |
-          echo "api:            ${{ needs.build.outputs.api_digest }}"
-          echo "api-migrator:   ${{ needs.build.outputs.api_migrator_digest }}"
-          echo "web:            ${{ needs.build.outputs.web_digest }}"
+          echo "api:            $API_DIGEST"
+          echo "api-migrator:   $API_MIGRATOR_DIGEST"
+          echo "web:            $WEB_DIGEST"
 
       - name: Deploy (placeholder — replace with your real staging deploy)
         run: |
@@ -223,12 +229,16 @@ jobs:
     environment: production
     steps:
       - name: Confirm the exact digests staging already validated
+        env:
+          API_DIGEST: ${{ needs.resolve-production-digests.outputs.api_digest }}
+          API_MIGRATOR_DIGEST: ${{ needs.resolve-production-digests.outputs.api_migrator_digest }}
+          WEB_DIGEST: ${{ needs.resolve-production-digests.outputs.web_digest }}
         run: |
           echo "This job only runs after production's required-reviewer approval."
           echo "It deploys the same digests already published by a prior main run — nothing here was rebuilt."
-          echo "api:            ${{ needs.resolve-production-digests.outputs.api_digest }}"
-          echo "api-migrator:   ${{ needs.resolve-production-digests.outputs.api_migrator_digest }}"
-          echo "web:            ${{ needs.resolve-production-digests.outputs.web_digest }}"
+          echo "api:            $API_DIGEST"
+          echo "api-migrator:   $API_MIGRATOR_DIGEST"
+          echo "web:            $WEB_DIGEST"
 
       - name: Deploy (placeholder — replace with your real production deploy)
         run: |
