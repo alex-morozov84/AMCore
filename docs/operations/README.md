@@ -28,6 +28,11 @@ specific concern comes up.
   migrator/owner role for `prisma migrate deploy` versus a DML-only runtime
   role for the running app, the setup script, and adopting it on an existing
   database.
+- **[Secret rotation](secret-rotation.md)** — what actually happens (verified
+  against this repo's real request path and a real Postgres) when you rotate
+  `JWT_SECRET`, database credentials, `REDIS_URL`, OAuth secrets, or
+  third-party API keys: what breaks, what doesn't, and how to bound or avoid a
+  maintenance window for each.
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
   rules, structured logging and redaction, and operator interpretation of the
   key metrics.
