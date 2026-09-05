@@ -42,7 +42,7 @@ test('every inline <script> the server returns carries the CSP nonce, none are b
   expect(nonce).toBeTruthy()
 
   const html = await response.text()
-  const scriptTags = html.match(/<script\b[^>]*>/g) ?? []
+  const scriptTags = html.match(/<script\b[^>]*>/gi) ?? []
   expect(scriptTags.length).toBeGreaterThan(0)
 
   const withoutThisNonce = scriptTags.filter((tag) => !tag.includes(`nonce="${nonce}"`))
