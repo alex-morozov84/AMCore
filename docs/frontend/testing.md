@@ -20,9 +20,8 @@ run the suite.
 | Storybook             | `@storybook/addon-vitest` + `@storybook/addon-a11y`, browser-mode Vitest | Isolated `shared/ui`/feature-flow component states — variant/loading/error/empty/disabled — plus the same axe ruleset at component-isolation granularity | `apps/web/src/**/*.stories.tsx`, co-located; `pnpm --filter web test:storybook` |
 
 No global coverage percentage gate. Confidence comes from the critical-path
-flow lists below being real and current, not a line-coverage number —
-matches `ai/TESTING.md`'s "confidence over coverage" philosophy for the
-backend suite.
+flow lists below being real and current, not a line-coverage number — the
+same "confidence over coverage" philosophy the backend test suite follows.
 
 ## Unit and component tests
 
@@ -272,11 +271,11 @@ Check compilation/errors first, then drive the page and assert the
 intended behavior — the same four-question loop as Next's own
 `next-dev-loop` skill (compiles? no server errors? correct in the browser?
 does framework-internal state make sense?), without requiring the specific
-tool that skill's published form hard-depends on. `ai/CLAUDE.md` documents
-an optional, maintainer-installable tool with additional React-internals
-capabilities (component-tree inspection, Suspense-boundary analysis) for
-sessions that need it — not named here because it's tied to one agent
-environment, not a portable requirement for every fork.
+tool that skill's published form hard-depends on. Some maintainer sessions
+additionally install a tool with extra React-internals capabilities
+(component-tree inspection, Suspense-boundary analysis) — not named here
+because it's tied to one agent environment, not a portable requirement for
+every fork.
 
 ## Commands
 
@@ -333,10 +332,3 @@ dependency graph. The CI `web-e2e` job has this as an explicit step.
 - [Bundle baseline and budget](./bundle-budget.md) — the per-route client
   bundle methodology this verification loop sits alongside, and why it
   rides on a documented baseline rather than a CI-enforced gate today.
-- **ADR-069** (`ai/decisions/adr-069-frontend-testing-pyramid.md`) — the
-  full decision record: every mechanism choice, the two pre-implementation
-  spikes, and why each was made.
-- **ADR-070** (`ai/decisions/adr-070-storybook-component-workshop.md`) —
-  the Storybook layer's own decision record.
-- `ai/TESTING.md` — the maintainer-facing mirror of this guide, alongside
-  the backend/email testing conventions.

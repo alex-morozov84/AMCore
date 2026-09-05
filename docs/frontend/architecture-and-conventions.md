@@ -240,7 +240,7 @@ revisited.
 The current user used to live in a parallel Zustand
 `useAuthStore`, populated by a mount-time effect — a hand-rolled duplicate of
 what `useCurrentUser()` already did declaratively. Removed once nothing
-else needed the store (ADR-068 UI-rewiring slice, `ai/models-talk.md`):
+else needed the store:
 `useCurrentUser()`/`userKeys.me()` is the one source now, and
 login/register/logout mutate it directly via `queryClient.setQueryData`/
 `queryClient.clear()` rather than an imperative store action.
