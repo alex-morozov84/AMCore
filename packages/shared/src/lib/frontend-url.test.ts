@@ -1,10 +1,9 @@
-import { DEFAULT_LOCALE, localePathPrefix, localizedFrontendUrl } from '@amcore/shared'
+import { describe, expect, it } from 'vitest'
 
-/**
- * Lives in `apps/api` rather than beside the helper because `packages/shared`
- * has no test runner configured — see the backlog item on that gap. The API is
- * the helper's main consumer (every user-facing link it emails).
- */
+import { DEFAULT_LOCALE } from '../constants'
+
+import { localePathPrefix, localizedFrontendUrl } from './frontend-url'
+
 describe('localizedFrontendUrl', () => {
   it('prefixes the locale, including the default one', () => {
     // `localePrefix: 'always'` — the default locale is prefixed too, so a link
