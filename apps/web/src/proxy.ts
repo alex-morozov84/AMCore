@@ -56,6 +56,21 @@ const handleI18nRouting = createMiddleware(routing)
  * `-Report-Only` header, not the response — a response-only CSP would
  * silently leave Next's own inline Flight-payload script unnoned and
  * self-block under enforcement.
+ *
+ * **Both possible header names must be cleared before setting the active
+ * one**, not just overwritten by name. Next's nonce extraction
+ * (`app-render.js`) prefers `content-security-policy` over
+ * `content-security-policy-report-only` if *both* are present. This proxy
+ * only ever sets one of the two (`cspHeaderName`, chosen by `getCspMode()`)
+ * — `.set()` on the *other* name is a no-op, so an inbound request that
+ * already carries the header AMCore isn't currently using (e.g. a stray or
+ * spoofed `Content-Security-Policy` while shipping `-Report-Only`) would
+ * survive untouched and win the framework's own preference order, handing
+ * Next's internal scripts a nonce this server never generated. Found by
+ * Agent 2's diff review (`ai/models-talk.md`), reproduced with a single
+ * `curl -H "Content-Security-Policy: script-src 'nonce-attacker'"` against
+ * `next dev` before this fix, confirmed absent after — see
+ * `csp-nonce.spec.ts`'s hostile-inbound-header regression test.
  */
 export default function proxy(request: NextRequest) {
   const nonce = generateNonce()
@@ -64,6 +79,8 @@ export default function proxy(request: NextRequest) {
   const cspHeaderName = mode === 'enforce' ? CSP_ENFORCE_HEADER : CSP_REPORT_ONLY_HEADER
   const cspHeaderValue = buildCspDirectives({ nonce, isDev })
 
+  request.headers.delete(CSP_ENFORCE_HEADER)
+  request.headers.delete(CSP_REPORT_ONLY_HEADER)
   request.headers.set(NONCE_REQUEST_HEADER, nonce)
   request.headers.set(cspHeaderName, cspHeaderValue)
 

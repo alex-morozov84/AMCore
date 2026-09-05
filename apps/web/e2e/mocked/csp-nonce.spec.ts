@@ -69,6 +69,57 @@ test('the theme-init script carries the CSP nonce and still applies the theme be
   expect(isDark).toBe(true)
 })
 
+test('a hostile inbound Content-Security-Policy request header cannot override the framework nonce', async ({
+  request,
+}) => {
+  // Agent 2's diff review (ai/models-talk.md) found this: proxy.ts only
+  // ever *sets* one of the two CSP header names (whichever `getCspMode()`
+  // picks) — `.set()` on the *other* name is a no-op, so a request that
+  // already carried it (a stray header, or one injected by a misconfigured
+  // edge/proxy in front of this origin) would survive untouched. Next's own
+  // nonce extraction (app-render.js) prefers `content-security-policy` over
+  // `-report-only` when both are present, so an attacker-controlled
+  // `Content-Security-Policy` header would win and get stamped onto every
+  // framework-injected script. Reproduced against `next dev` with a plain
+  // `curl -H "Content-Security-Policy: script-src 'nonce-attacker'"` before
+  // the fix (proxy.ts now deletes both header names before setting the
+  // active one); this test pins that fix as a permanent regression guard.
+  const response = await request.get('/en/login', {
+    headers: { 'Content-Security-Policy': "script-src 'nonce-attacker'" },
+  })
+
+  const csp = response.headers()['content-security-policy-report-only']
+  const realNonce = csp!.match(/'nonce-([^']+)'/)?.[1]
+  expect(realNonce).toBeTruthy()
+  expect(realNonce).not.toBe('attacker')
+
+  const html = await response.text()
+  const scriptTags = html.match(/<script\b[^>]*>/gi) ?? []
+  expect(scriptTags.length).toBeGreaterThan(0)
+  expect(scriptTags.some((tag) => tag.includes('nonce="attacker"'))).toBe(false)
+  expect(scriptTags.every((tag) => tag.includes(`nonce="${realNonce}"`))).toBe(true)
+})
+
+test('a hostile inbound Content-Security-Policy-Report-Only request header cannot override the framework nonce', async ({
+  request,
+}) => {
+  // Same class of gap, the other header name — proves the fix clears both,
+  // not just whichever one an earlier draft happened to test.
+  const response = await request.get('/en/login', {
+    headers: { 'Content-Security-Policy-Report-Only': "script-src 'nonce-attacker2'" },
+  })
+
+  const csp = response.headers()['content-security-policy-report-only']
+  const realNonce = csp!.match(/'nonce-([^']+)'/)?.[1]
+  expect(realNonce).toBeTruthy()
+  expect(realNonce).not.toBe('attacker2')
+
+  const html = await response.text()
+  const scriptTags = html.match(/<script\b[^>]*>/gi) ?? []
+  expect(scriptTags.some((tag) => tag.includes('nonce="attacker2"'))).toBe(false)
+  expect(scriptTags.every((tag) => tag.includes(`nonce="${realNonce}"`))).toBe(true)
+})
+
 test('a bare, unnoned inline script IS reported as a CSP violation — proves the policy is not vacuous', async ({
   page,
 }) => {
