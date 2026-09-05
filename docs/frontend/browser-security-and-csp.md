@@ -3,10 +3,9 @@
 `apps/web` ships a real, non-decorative browser security-header baseline:
 static headers for every response, a nonce-based Content Security Policy
 (CSP) for HTML/navigation requests, and a minimal violation-reporting
-endpoint. Full design rationale, options considered, and the two-agent
-review that produced this: **ADR-074**
-(`ai/decisions/adr-074-web-nonce-based-csp-and-security-headers.md`, private
-maintainer repository).
+endpoint. This page is the public operating contract for downstream forks:
+what is enabled, where to change it, and what must be verified before
+weakening or extending the policy.
 
 ## What's enabled by default
 
@@ -44,10 +43,14 @@ report-uri /api/csp-report;
 report-to csp-endpoint;
 ```
 
+Under `next dev` only, AMCore appends `'unsafe-eval'` to `script-src`
+because React uses it for development diagnostics; production never gets
+that allowance.
+
 `script-src` has no `'unsafe-inline'` — App Router's RSC Flight payload is
 always an inline `<script>`, and Next's own `experimental.sri` cannot cover
 it (only external bootstrap/preinit files get `integrity`, per the
-installed source — see ADR-074). A per-request nonce, generated in
+installed framework source). A per-request nonce, generated in
 `src/proxy.ts` and threaded through `x-nonce` to the theme-init script and
 Base UI's `CSPProvider`, is the only mechanism that actually restricts
 script execution here.
@@ -125,13 +128,17 @@ entirely. Edit the directive list in
 by `build-csp.test.ts`. If the provider ships its own script that needs to
 run, it must either:
 
-- load from an allowlisted origin under `script-src` (still `'self'
-'nonce-...' 'strict-dynamic'` plus the provider's host — `'strict-dynamic'`
-  then trusts scripts that origin's nonced script itself loads, so a single
-  host entry is usually enough), or
-- be rendered via Next's `<Script>` component with the request nonce
-  (`(await headers()).get('x-nonce')`, the same pattern
-  `app/[locale]/layout.tsx` already uses for the theme-init script).
+- be rendered by this app with the request nonce, usually via Next's
+  `<Script nonce={nonce}>` after reading
+  `(await headers()).get('x-nonce')` in a Server Component; or
+- be loaded by another script that was already trusted by nonce.
+
+Do **not** assume that adding `https://provider.example` to `script-src`
+is enough. In CSP3 browsers, `'strict-dynamic'` makes host allowlists a
+legacy fallback for scripts: a parser-inserted external `<script>` still
+needs a nonce. Host entries may still be useful for older browsers or
+non-script directives, but the modern path is "nonce the provider's
+bootstrap script, then let that trusted script load what it needs."
 
 Verify with `WEB_CSP_MODE=enforce` locally and a real browser console free
 of `securitypolicyviolation` before shipping — not just the mocked
@@ -161,9 +168,8 @@ group today — but the supported pattern for a fork that does is:
 2. **Give the public route group its own, relaxed policy** via a
    `next.config.ts` `headers()` entry scoped to that route's `source`
    pattern (static hash-based or a documented `'unsafe-inline'` baseline,
-   labeled honestly as weaker — see ADR-074's options-considered table for
-   why that shape is measured-decorative, not a recommendation, just an
-   honest fallback for content that can't take the dynamic-rendering cost).
+   labeled honestly as weaker, not a recommendation — just an honest
+   fallback for content that can't take the dynamic-rendering cost).
 3. **For a high-cache public marketing surface, consider a separate Next
    [multi-zone](https://nextjs.org/docs/app/guides/multi-zones) or a
    separate domain entirely**, so it can be statically generated/CDN-cached
@@ -215,25 +221,27 @@ trip-wire: it fails the moment any of the four is introduced anywhere in
 the guard can be updated to allow it. Global wiring making something
 "should just work" is not the same as verifying it does.
 
-## Deployment requirement: forward the request-side CSP header
+## Deployment requirement: preserve the Proxy-added request CSP header
 
 Next reads the nonce from the **request's** `Content-Security-Policy` /
-`-Report-Only` header, not the response (see ADR-074's framework-constraint
-section). Any edge/CDN/WAF/reverse proxy in front of a real deployment
-**must forward that header through on the request path unmodified.** An
-edge that strips inbound security-looking headers by default — a real,
-documented pattern for several WAFs/CDNs — would silently degrade every
-framework-injected script to unnoned, breaking hydration the moment
-enforcement is on. Verify this explicitly for your own edge configuration
-before relying on `enforce` in production behind it; see
-`docs/operations/deployment.md` → "TLS & reverse proxy".
+`-Report-Only` header, not the response. AMCore's `src/proxy.ts` generates
+that header itself after first deleting any hostile or stray inbound CSP
+headers from the browser/upstream edge.
 
-`src/proxy.ts` separately defends against the _opposite_ problem — a
-hostile or stray inbound CSP header being trusted instead of overwritten —
-by deleting both possible header names before setting its own. That
-protects nonce integrity against a header arriving from upstream of your
-edge; it cannot make an edge that drops the header before it reaches
-`apps/web` forward one it never received.
+The operational requirement is therefore precise: if your hosting platform
+or custom adapter runs Proxy at one layer and renders the App Router page at
+another, the **Proxy-modified request headers** must survive that internal
+Proxy -> renderer hop. If that internal path strips security-looking
+headers, Next silently emits framework scripts with no nonce, and hydration
+breaks the moment enforcement is on. Verify this on the deployed artifact
+before relying on `enforce`; see `docs/operations/deployment.md` → "TLS &
+reverse proxy".
+
+Do not configure an outer CDN/WAF to trust or inject client-supplied CSP
+request headers as input to AMCore. AMCore owns the nonce and policy for
+its own HTML responses; the edge should preserve AMCore's generated
+response headers and must not interfere with Next's internal request-header
+propagation.
 
 ## See also
 
@@ -245,7 +253,5 @@ edge; it cannot make an edge that drops the header before it reaches
   behind AMCore's own dynamic-rendering trade-off, and
   `WEB_TRUSTED_CLIENT_IP_HEADER`, reused for the reporting endpoint's rate
   limit key.
-- `docs/operations/deployment.md` → "TLS & reverse proxy" — edge/CDN header
-  forwarding requirements.
-- ADR-074 (`ai/decisions/`, private) — full rationale, options considered,
-  and the security fix found during this track's own review.
+- `docs/operations/deployment.md` → "TLS & reverse proxy" — deployment
+  requirements for TLS, forwarded headers, and CSP nonce propagation.
