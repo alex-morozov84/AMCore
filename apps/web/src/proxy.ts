@@ -105,5 +105,12 @@ export const config = {
   // Next.js internals, the API proxy rewrite, and any path with a file
   // extension (static assets, `manifest.webmanifest`, `sw.js`, icons).
   // Rewriting those would break asset URLs and the service worker scope.
+  //
+  // Do NOT narrow this to exclude a route group that wants a relaxed CSP
+  // (docs/frontend/browser-security-and-csp.md § "Downstream forks") — this
+  // matcher also gates next-intl's own locale routing, not just the CSP
+  // logic above. Excluding a path here breaks its locale detection/redirects
+  // entirely; it does not give it a relaxed policy. Verified live while
+  // writing that doc section. Branch inside `proxy()` itself instead.
   matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
 }

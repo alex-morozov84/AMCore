@@ -160,20 +160,37 @@ need it.
 No code ships for this in the starter — AMCore itself has no such route
 group today — but the supported pattern for a fork that does is:
 
-1. **Scope the strict nonce policy to an authenticated/app-shell route
-   group.** Narrow `src/proxy.ts`'s `matcher` to the routes that actually
-   need per-request nonces (e.g. everything under `(dashboard)`), so
-   `next-intl`'s middleware — and therefore the nonce/CSP logic riding
-   inside it — never runs against the new public route group.
-2. **Give the public route group its own, relaxed policy** via a
-   `next.config.ts` `headers()` entry scoped to that route's `source`
-   pattern (static hash-based or a documented `'unsafe-inline'` baseline,
-   labeled honestly as weaker, not a recommendation — just an honest
-   fallback for content that can't take the dynamic-rendering cost).
-3. **For a high-cache public marketing surface, consider a separate Next
+1. **Do not narrow `src/proxy.ts`'s `matcher` to exclude the new public
+   route group.** This looks like the obvious fix and is wrong: the
+   matcher governs `next-intl`'s locale routing too, not just the CSP
+   logic riding alongside it — every route lives under a `[locale]`
+   segment (see [Locale routing](./architecture-and-conventions.md#locale-routing)),
+   so excluding a route from the matcher breaks its locale
+   detection/redirects entirely, not just its CSP. Verified live: narrowing
+   the matcher for a test path made that path 404/misroute, not "get a
+   relaxed policy."
+2. **Instead, branch inside `proxy()` itself.** Keep the matcher as-is (so
+   `next-intl` still runs for every route), but skip the
+   `response.headers.set(cspHeaderName, cspHeaderValue)` call — and the
+   nonce/`x-nonce` request-header logic — for the new public route group's
+   paths. `next-intl`'s own routing still applies to them; only AMCore's
+   CSP response header is conditionally skipped.
+3. **Only then does a separate `next.config.ts` `headers()` entry, scoped
+   to that route's `source` pattern, actually take effect** (static
+   hash-based or a documented `'unsafe-inline'` baseline, labeled honestly
+   as weaker, not a recommendation — just an honest fallback for content
+   that can't take the dynamic-rendering cost). This is not optional
+   ordering advice: verified live that if `proxy()` still sets the CSP
+   response header for a path, it silently **overwrites** whatever
+   `next.config.ts` set for that same header name and path — a
+   `next.config.ts` entry alone, without step 2, achieves nothing.
+4. **For a high-cache public marketing surface, consider a separate Next
    [multi-zone](https://nextjs.org/docs/app/guides/multi-zones) or a
-   separate domain entirely**, so it can be statically generated/CDN-cached
-   without inheriting the authenticated app's rendering model at all.
+   separate domain entirely instead of steps 1–3.** A genuinely separate
+   Next app shares neither `src/proxy.ts` nor `app/[locale]/layout.tsx`
+   with the authenticated app, so there's no CSP wiring to route around at
+   all — the least error-prone option once the surface is large enough to
+   justify it.
 
 ## CSP violation reports
 
