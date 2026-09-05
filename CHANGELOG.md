@@ -60,6 +60,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it requires dropping `api`/`web`'s published host ports first (it scales to
   two replicas, which can't share a fixed port mapping) and reaching them
   through a reverse proxy on the Compose network instead.
+- **A `restore-drill` compose profile that rehearses an actual restore, not
+  just takes a backup.** New
+  `docker compose --profile restore-drill run --rm restore-drill`: finds the
+  most recent `amcore-*.dump`, restores it into a throwaway Postgres instance
+  that lives only inside that one container, and runs an integrity smoke
+  check. Never reads `DATABASE_URL` and has no dependency on the real
+  `postgres` service, so it's safe to run against a live production host at
+  any time. Motivated by GitLab's public 2017 database incident postmortem,
+  where none of four backup/replication mechanisms turned out to be usable
+  when needed — a `pg_dump` version mismatch had been silently failing every
+  backup, and it was found only during the actual incident.
+  [`docs/operations/backup-restore.md`](docs/operations/backup-restore.md)
+  documents a suggested monthly cron/systemd-timer cadence.
 
 ### Fixed
 

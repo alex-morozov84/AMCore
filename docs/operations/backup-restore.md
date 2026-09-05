@@ -134,6 +134,82 @@ first), not an existing one with unrelated objects in it. Point
 `DATABASE_URL`/`COMPOSE_DATABASE_URL` at the intended target before running
 it, and never run it against a database you don't intend to overwrite.
 
+### Restore-drill (rehearsing a restore, not just taking one)
+
+**A backup nobody has restored is not a verified backup.** GitLab's own
+public postmortem of its January 2017 database incident is the canonical
+example of why: they had four separate backup/replication mechanisms in
+place (a daily `pg_dump` to S3, a daily LVM snapshot, disk snapshots for
+other servers, and Postgres replication), and none of them were usable when
+the incident hit. The `pg_dump`-based backups turned out not to exist at
+all — a Postgres major-version mismatch between the backup tooling (9.2) and
+production (9.6) had been silently making every dump fail — so recovery fell
+back to a manual snapshot taken about six hours before the outage, and
+copying that data back took roughly 18 hours. Every one of those failures
+was findable in advance by simply trying a restore.
+([GitLab's postmortem](https://about.gitlab.com/blog/postmortem-of-database-outage-of-january-31/))
+
+The `restore-drill` profile automates exactly that check for the logical-dump
+fallback above — it is **not** available for managed-provider PITR or
+self-hosted WAL archiving, which have their own vendor/tool-specific restore
+verification:
+
+```bash
+docker compose --profile restore-drill run --rm restore-drill
+```
+
+It mounts the shared backup volume **read-only**, finds the most recent
+`amcore-*.dump`, and restores it into a **throwaway Postgres instance that
+lives only inside that one container's own filesystem** (`initdb`/`pg_ctl`
+against a scratch data directory under `/tmp`), then checks that the
+restored database actually has tables in it — everything is gone whether the
+drill passes or fails. `postgres:16-alpine` declares
+`/var/lib/postgresql/data` as a Docker volume, which would otherwise leave an
+empty anonymous volume behind on every run regardless of `/tmp` being used
+for the actual scratch data; the compose service overrides that path with a
+`tmpfs` mount instead, so no Docker volume is ever created there — `run
+--rm` and `up` are equally clean, verified by volume-count before/after
+both. Unlike `restore` above, this script never reads
+`DATABASE_URL`/`COMPOSE_DATABASE_URL`, has no dependency on the real
+`postgres` service, and cannot write to the backup volume it reads from — it
+is structurally incapable of touching production data or corrupting the
+dumps it's verifying, so it is safe to run against a live production host at
+any time without coordinating a maintenance window for _that_ reason. It is
+**not** free of resource cost, though: it materializes a full copy of your
+database inside the container for the duration of the run, so budget disk
+headroom (roughly your database's size) and expect real CPU/IO load
+proportional to its size — schedule it for a low-traffic window if that
+matters for your host. A non-zero exit code means the drill failed; treat
+that the same as a failed backup, not a formality.
+
+This only proves the dump is a well-formed, restorable Postgres archive that
+produces a non-empty schema. Two things it deliberately does **not** check:
+row-level data correctness (it cannot, without knowing your current schema),
+and that restoring ownership/ACLs (`GRANT`/`REVOKE`) against a target
+cluster's roles would succeed — the drill's own scratch cluster has none of
+your database's roles, so it runs `pg_restore --no-owner --no-privileges` to
+skip both rather than fail on every one of them. If you adopt production DB
+role separation (a migrator role distinct from the app's runtime role — see
+this track's forthcoming DB-role-separation guide), that ownership/ACL
+restore path is a separate thing to verify in its own right; this drill
+proves the data restores, not that your grants would come back with it. It
+closes the exact gap GitLab's incident illustrates (a backup nobody had
+verified could actually restore), not every possible backup failure mode.
+
+**Run it on a schedule, not just once.** Like the `backup` service, this
+profile has no built-in wall-clock scheduler — wire it to your host's own
+cron or systemd timer. A monthly cadence is a reasonable starting point for
+most deployments; tighten it if your RPO tolerance is smaller:
+
+```cron
+# /etc/cron.d/amcore-restore-drill — 1st of the month, 04:00
+0 4 1 * * root cd /path/to/amcore && docker compose --profile restore-drill run --rm restore-drill || echo "amcore restore-drill FAILED" | mail -s "AMCore restore-drill failed" ops@example.com
+```
+
+Adapt the failure action to however you already page/alert — the important
+part is that a failed drill produces a signal an operator sees, not a line
+buried in `docker compose logs`.
+
 ### Operational notes
 
 - **Dumps contain full data, including PII.** Apply the same access
@@ -144,8 +220,10 @@ it, and never run it against a database you don't intend to overwrite.
   on a schedule.
 - **Encrypt dumps at rest** if they leave your infrastructure's trust
   boundary.
-- **Test restores periodically**, not just once — the same rule as the
-  managed-provider path above.
+- **Test restores periodically**, not just once — see "Restore-drill" above
+  for the logical-dump path's automated check; managed-provider PITR and
+  self-hosted WAL archiving need their own restore-drill equivalent using
+  their own tooling.
 
 ## Not covered here
 
