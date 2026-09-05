@@ -73,6 +73,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backup, and it was found only during the actual incident.
   [`docs/operations/backup-restore.md`](docs/operations/backup-restore.md)
   documents a suggested monthly cron/systemd-timer cadence.
+- **Production database role separation: a migrator/owner role distinct
+  from the app's runtime role** (ADR-076). New
+  [`docker/postgres/setup-roles.sql`](docker/postgres/setup-roles.sql) and
+  [`docs/operations/database-role-separation.md`](docs/operations/database-role-separation.md):
+  `amcore_migrator` owns the schema and is used only by
+  `prisma migrate deploy` (wired via `MIGRATION_DATABASE_URL`);
+  `amcore_runtime` gets DML only — no `CREATE`, no ownership — and is what
+  the running `api`/`worker` processes actually connect as (wired via
+  `DATABASE_URL`). `ALTER DEFAULT PRIVILEGES` makes every table/sequence a
+  future migration creates auto-grant to the runtime role, so ordinary
+  schema changes never need a manual `GRANT`. This is AMCore's own
+  prescription of standard Postgres least-privilege practice, not a
+  Prisma-endorsed pattern — Prisma's own docs and a maintainer's own
+  community answer on this exact question stop at "grant all privileges."
+  AMCore's Prisma schema actually uses `multiSchema` (`core`,
+  `notifications`, `ai` — never `public`, which no AMCore model uses), so
+  the script and guide are schema-list-aware rather than assuming a
+  single-schema layout, and sequenced in three steps since those schemas
+  don't exist until Prisma's own migrations create them: role creation →
+  `prisma migrate deploy` → runtime grants + `ALTER DEFAULT PRIVILEGES` per
+  schema. Verified against a **real `prisma migrate deploy` run of every
+  migration in this repo**, not a hand-written simulation: the migrator role
+  still needs `CREATE` on the `public` schema specifically, even though no
+  AMCore model lives there, because Prisma's own `_prisma_migrations`
+  bookkeeping table is created in whatever schema the migration connection
+  defaults to (`public`, per this repo's own `.env.example`) — without it,
+  the very first migration fails before applying anything. `ALTER DEFAULT
+PRIVILEGES FOR ROLE` also fails for a non-member admin connection
+  (including one with `CREATEROLE`/`CREATEDB`, the shape several managed
+  providers' admin user actually has); the script grants itself temporary
+  membership and `SET ROLE`s unconditionally for the duration of the grants,
+  then resets and revokes — one session, either a true superuser or a
+  `CREATEROLE`-holding admin, no reconnection needed.
 
 ### Fixed
 
@@ -81,6 +114,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   out-of-sync business logic) against an already-migrated schema after every
   release. `docs/operations/deployment.md`'s "Upgrades" section now
   recreates `api`, `worker`, and `web` together.
+- **`docs/operations/production-deploy-profile.md`'s "What this page
+  doesn't cover yet" list still named the `restore-drill` profile after it
+  shipped**, a stale claim left behind by the PR that added it. Removed now
+  that both `restore-drill` and DB role separation are real.
 
 ## [0.7.0] - 2026-09-05
 
