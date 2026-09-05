@@ -117,7 +117,16 @@ chore: unify github repository url
    in the PR description or handoff, or say explicitly why none applied. This
    is a review expectation, not a CI check — reviewers should expect to see
    this list for a Next.js-specific PR, not find it enforced automatically.
-7. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
+7. **CSP-affecting changes** (a new third-party script/style origin, a
+   `shared/ui` addition using `ScrollArea`/`Tabs.Indicator`/`Slider.Thumb`/
+   `Select` with `alignItemWithTrigger`, or anything touching
+   `apps/web/src/proxy.ts`/`shared/lib/csp/`): verify with
+   `WEB_CSP_MODE=enforce` against a real browser, console free of
+   `securitypolicyviolation` — not just the mocked Playwright lane, whose
+   `next dev` target can't prove "zero violations" (Turbopack's own HMR
+   tooling noise). See
+   [`docs/frontend/browser-security-and-csp.md`](docs/frontend/browser-security-and-csp.md).
+8. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
 
 CI runs the same checks on push; fixing any failures before opening a PR saves time.
 

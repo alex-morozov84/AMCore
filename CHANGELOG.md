@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`apps/web` now ships a real browser security-header baseline and an
+  enforced, nonce-based Content Security Policy by default** (ADR-074).
+  Previously, `apps/web` emitted no security headers beyond a `/sw.js`
+  block, and `apps/api`'s `helmet()` — which never touches `apps/web`'s
+  HTML — was documented as covering this, which it did not.
+  - Static headers on every response (`Referrer-Policy`,
+    `X-Content-Type-Options`, a deny-by-default `Permissions-Policy`,
+    `X-Frame-Options`, HSTS without `preload`).
+  - A per-request nonce CSP for HTML/navigation requests: `script-src`
+    with no `'unsafe-inline'` (a per-request nonce + `'strict-dynamic'`,
+    the only mechanism that actually restricts script execution for
+    Next.js App Router), Base UI's `CSPProvider` wired globally, and a
+    structural guardrail against future CSP-sensitive Base UI components.
+  - **Enforced by default in production**, `Report-Only` by default under
+    `next dev` (`WEB_CSP_MODE` env var overrides either direction).
+  - A minimal, same-origin CSP violation-reporting endpoint
+    (`/api/csp-report`), rate-limited and body-capped, logging a redacted
+    summary — observability only, not a protection mechanism.
+  - See [`docs/frontend/browser-security-and-csp.md`](docs/frontend/browser-security-and-csp.md)
+    for the full policy, how to add a third-party origin, and downstream
+    route-scoping guidance for public/marketing routes.
+
 ## [0.6.0] - 2026-09-04
 
 ### Security

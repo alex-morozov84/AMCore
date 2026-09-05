@@ -16,6 +16,7 @@ does not express.
 | Know which import/styling rules are enforced                             | [`frontend/fsd-boundaries-and-guardrails.md`](frontend/fsd-boundaries-and-guardrails.md)                                          |
 | Reuse or add a shared UI primitive (shadcn)                              | [`frontend/shared-ui-and-shadcn.md`](frontend/shared-ui-and-shadcn.md)                                                            |
 | Consume media/notifications/AI from the frontend                         | [`frontend/api-consumption.md`](frontend/api-consumption.md)                                                                      |
+| Add a third-party script/style origin, or run CSP in report-only         | [`frontend/browser-security-and-csp.md`](frontend/browser-security-and-csp.md)                                                    |
 | Add a frontend test / pick the right layer                               | [`frontend/testing.md`](frontend/testing.md)                                                                                      |
 | Write or review a Storybook story                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |
 | Initialize a downstream fork (rebrand, single-locale, disable Storybook) | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |
@@ -67,6 +68,10 @@ does not express.
   fetch-stream reader a direct (non-BFF) SSE consumer needs, the frontend
   `429`/`Retry-After` retry policy, and the opt-in client-IP relay that lets
   `apps/api`'s rate limiter tell BFF visitors apart.
+- **[Browser security headers and CSP](frontend/browser-security-and-csp.md)** —
+  the static header baseline, nonce-based CSP, enforcement mode, HSTS,
+  adding a third-party origin, downstream route-scoping, and the CSP
+  violation-reporting endpoint.
 - **[Frontend testing](frontend/testing.md)** — the test taxonomy
   (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/
   real-stack E2E, Storybook, and axe scans), the technical boundary the E2E

@@ -224,9 +224,14 @@ BullMQ workers consume one shared queue. Add worker replicas freely.
 
 AMCore's Node process speaks plain HTTP; TLS terminates at the **edge** — a
 reverse proxy, your cloud load balancer, or a Kubernetes Ingress — never inside
-the app. There is no in-app certificate management. `helmet()` already sends
-HSTS and the other secure-header defaults (`apps/api/src/main.ts`); once the
-edge speaks HTTPS, the app side needs no extra configuration for that part.
+the app. There is no in-app certificate management. `helmet()`
+(`apps/api/src/main.ts`) sends secure-header defaults for **`apps/api`'s
+JSON responses only** — it never touches the HTML `apps/web` serves, so it
+does not cover the browser-facing origin at all. `apps/web`'s own browser
+security-header baseline (static headers, HSTS, nonce-based CSP) is a
+separate mechanism — see
+[Browser security headers and CSP](../frontend/browser-security-and-csp.md)
+and the CSP nonce-propagation requirement below.
 
 The proxy is **bring-your-own** — nginx, Caddy, Traefik, an ALB/GCP HTTPS LB, or
 an Ingress controller all work. This guide documents **nginx** as the
@@ -292,6 +297,29 @@ IP and the invite-abuse limiter are not wired to this relay — only the
 global throttler is. Full contract and current status:
 [`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
 "Client-IP relay to `apps/api`".
+
+### CSP nonce propagation — your edge must forward the request-side header
+
+`apps/web`'s Content Security Policy (Track 3, ADR-074) nonces Next's own
+framework-injected scripts. Next extracts that nonce from the
+**request's** `Content-Security-Policy` / `-Report-Only` header, not the
+response — this is a Next.js implementation detail, verified against the
+installed framework source, not a configuration choice AMCore made.
+
+**Any edge/CDN/WAF/reverse proxy in front of `apps/web` must forward that
+header through on the request path unmodified.** Several WAFs and CDNs
+strip inbound headers that look like security headers by default — if
+yours does, Next silently emits framework scripts with no nonce at all,
+and the app fails to hydrate the moment `WEB_CSP_MODE` is `enforce`
+(AMCore's production default). This is not something `apps/web` can detect
+or work around from inside the app; verify it explicitly against your own
+edge configuration (a request through the full path should reach `apps/web`
+with the header intact — check via a temporary debug log or your edge's
+own request-inspection tooling) before relying on enforcement in
+production behind it.
+
+Full policy, enforcement mode, and how to add a third-party origin:
+[Browser security headers and CSP](../frontend/browser-security-and-csp.md).
 
 **The reference `docker-compose.yml` closes the topology gap this relies
 on.** `api`'s published port binds to `127.0.0.1` by default (not
