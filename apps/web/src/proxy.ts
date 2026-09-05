@@ -4,7 +4,9 @@ import createMiddleware from 'next-intl/middleware'
 import { buildCspDirectives } from '@/shared/lib/csp/build-csp'
 import {
   CSP_ENFORCE_HEADER,
+  CSP_REPORT_ENDPOINT_PATH,
   CSP_REPORT_ONLY_HEADER,
+  CSP_REPORTING_GROUP_NAME,
   NONCE_REQUEST_HEADER,
 } from '@/shared/lib/csp/constants'
 import { getCspMode } from '@/shared/lib/csp/csp-mode'
@@ -87,6 +89,13 @@ export default function proxy(request: NextRequest) {
   const response = handleI18nRouting(request)
 
   response.headers.set(cspHeaderName, cspHeaderValue)
+  // Maps the CSP's `report-to` group name to an actual URL (must be
+  // absolute per the Reporting API spec, unlike `report-uri`, which
+  // accepts the plain relative path already baked into the CSP directive).
+  response.headers.set(
+    'Reporting-Endpoints',
+    `${CSP_REPORTING_GROUP_NAME}="${request.nextUrl.origin}${CSP_REPORT_ENDPOINT_PATH}"`
+  )
 
   return response
 }

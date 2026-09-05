@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildCspDirectives } from './build-csp'
+import { CSP_REPORT_ENDPOINT_PATH, CSP_REPORTING_GROUP_NAME } from './constants'
 
 describe('buildCspDirectives', () => {
   it('includes the nonce in both script-src and style-src-elem', () => {
@@ -49,5 +50,11 @@ describe('buildCspDirectives', () => {
     const csp = buildCspDirectives({ nonce: 'n', isDev: false })
     expect(csp).not.toMatch(/\n/)
     expect(csp.endsWith(';')).toBe(true)
+  })
+
+  it('points both reporting mechanisms at the same csp-report endpoint', () => {
+    const csp = buildCspDirectives({ nonce: 'n', isDev: false })
+    expect(csp).toContain(`report-uri ${CSP_REPORT_ENDPOINT_PATH}`)
+    expect(csp).toContain(`report-to ${CSP_REPORTING_GROUP_NAME}`)
   })
 })

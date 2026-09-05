@@ -21,3 +21,21 @@ export const CSP_ENFORCE_HEADER = 'Content-Security-Policy'
  * modes.
  */
 export const CSP_REPORT_ONLY_HEADER = 'Content-Security-Policy-Report-Only'
+
+/**
+ * Track 3 PR3 (`ai/models-talk.md` FINAL PLAN §3) — minimal CSP violation
+ * reporting endpoint. Same-origin Route Handler (`app/api/csp-report/route.ts`),
+ * outside `src/proxy.ts`'s matcher (paths starting with `api`), so it needs
+ * no nonce and isn't subject to the policy it collects reports for.
+ */
+export const CSP_REPORT_ENDPOINT_PATH = '/api/csp-report'
+
+/**
+ * The `report-to` CSP directive references this group name; the
+ * `Reporting-Endpoints` response header (set in `src/proxy.ts`) maps it to
+ * {@link CSP_REPORT_ENDPOINT_PATH}. `report-uri` (also in the CSP) points
+ * directly at the path instead, for browsers that don't support the newer
+ * Reporting API — both directives are kept so either delivery mechanism
+ * reaches the same endpoint.
+ */
+export const CSP_REPORTING_GROUP_NAME = 'csp-endpoint'
