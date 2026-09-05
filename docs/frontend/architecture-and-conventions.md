@@ -307,7 +307,12 @@ been quietly 404ing through the stale rewrite.
 1. Add the route file under `src/app/[locale]/` (`page.tsx`, `layout.tsx`,
    etc.) — metadata and plumbing only. Server Component pages should call
    `setRequestLocale(await resolveLocaleParam(params))` first; see
-   [Locale routing](#locale-routing).
+   [Locale routing](#locale-routing). **If this route is genuinely public
+   content that should stay statically generated/CDN-cached** (a
+   marketing/landing page, not an authenticated app page), read
+   [Browser security headers and CSP § Downstream forks](./browser-security-and-csp.md#downstream-forks-publicmarketing-routes-and-route-scoping)
+   first — the CSP wiring every route inherits by default will otherwise
+   silently force it dynamic.
 2. Build the actual page composition under `src/_pages/<route>/`, importing
    whatever `widgets`/`features`/`entities` it needs through their public
    APIs.
