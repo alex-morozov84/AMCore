@@ -21,8 +21,9 @@ specific concern comes up.
   registry-based production deploy.
 - **[Backup & restore](backup-restore.md)** — which backup strategy fits your
   deployment (managed-provider PITR, self-hosted WAL archiving, or the
-  logical-dump fallback), and the optional compose `backup`/`restore`
-  profiles this repo ships.
+  logical-dump fallback), the optional compose `backup`/`restore` profiles
+  this repo ships, and the `restore-drill` profile that rehearses an actual
+  restore on a schedule instead of only taking backups.
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
   rules, structured logging and redaction, and operator interpretation of the
   key metrics.

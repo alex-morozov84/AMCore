@@ -318,6 +318,34 @@ services:
         required: false
     restart: 'no'
 
+  # ---------------------------------------------------------------------------
+  # Optional bundled restore-drill — one-shot, like `restore`; never runs on a
+  # normal `docker compose up`. Rehearses restoring the latest dump into a
+  # throwaway, in-container Postgres instance to prove it's actually
+  # restorable — never touches the real database (no DATABASE_URL, no network
+  # dependency on `postgres`). See docs/operations/backup-restore.md →
+  # "Restore-drill (rehearsing a restore, not just taking one)".
+  #   docker compose --profile restore-drill run --rm restore-drill
+  # ---------------------------------------------------------------------------
+  restore-drill:
+    image: postgres:16-alpine
+    profiles: ['restore-drill']
+    entrypoint: ['sh', '/scripts/restore-drill.sh']
+    # tmpfs, not a volume: postgres:16-alpine declares /var/lib/postgresql/data
+    # as a VOLUME, so Docker allocates an anonymous volume there for every
+    # container regardless of what the entrypoint actually uses. The script
+    # never writes there (its scratch instance lives under /tmp instead), but
+    # without this override `docker compose up restore-drill` (rather than the
+    # documented `run --rm`) would still leave that unused anonymous volume
+    # behind after `down` — tmpfs is RAM-backed and gone with the container,
+    # no Docker volume object ever created either way.
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./docker/postgres/restore-drill.sh:/scripts/restore-drill.sh:ro
+      - postgres_backups:/backups:ro
+    restart: 'no'
+
 volumes:
   postgres_data:
   redis_data:
