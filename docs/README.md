@@ -38,6 +38,7 @@ does not express.
 | Understand frontend retry behavior for `429`                               | [`frontend/api-consumption.md`](frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073)                             |
 | Set up a registry-based production deploy (digest promotion, environments) | [`operations/production-deploy-profile.md`](operations/production-deploy-profile.md)                                              |
 | Back up or restore the database                                            | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
+| Set up production database role separation                                 | [`operations/database-role-separation.md`](operations/database-role-separation.md)                                                |
 | Understand the CI / repo-security workflow                                 | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
 
 ## Documentation map
@@ -100,8 +101,8 @@ does not express.
   profile), the production deploy profile (build-once/promote-by-digest,
   GitHub Environments), the `docker-compose.prod.yml` image-pull production
   overlay (immutable digests, restart policies, log rotation), Postgres
-  backup/restore, observability, CI/repo security, audit log, webhooks, and
-  idempotency.
+  backup/restore, production database role separation, observability,
+  CI/repo security, audit log, webhooks, and idempotency.
 
 ## Common extension tasks
 

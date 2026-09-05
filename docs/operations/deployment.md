@@ -38,6 +38,11 @@ a backport is actually needed.
 - Migrations should use a **direct** DB connection, not a PgBouncer/pooled
   endpoint. Set `MIGRATION_DATABASE_URL` when app traffic is pooled; otherwise the
   step uses the same DB URL as the app.
+- In a production setup following [DB role
+  separation](database-role-separation.md), `MIGRATION_DATABASE_URL` carries
+  a second responsibility beyond bypassing a pooler: it's also how the
+  one-shot migration step authenticates as the schema-owning migrator role,
+  distinct from the runtime role `DATABASE_URL` uses.
 
 ## Requirements
 

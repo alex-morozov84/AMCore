@@ -188,11 +188,11 @@ row-level data correctness (it cannot, without knowing your current schema),
 and that restoring ownership/ACLs (`GRANT`/`REVOKE`) against a target
 cluster's roles would succeed — the drill's own scratch cluster has none of
 your database's roles, so it runs `pg_restore --no-owner --no-privileges` to
-skip both rather than fail on every one of them. If you adopt production DB
-role separation (a migrator role distinct from the app's runtime role — see
-this track's forthcoming DB-role-separation guide), that ownership/ACL
-restore path is a separate thing to verify in its own right; this drill
-proves the data restores, not that your grants would come back with it. It
+skip both rather than fail on every one of them. If you adopt [production DB
+role separation](database-role-separation.md) (a migrator role distinct from
+the app's runtime role), that ownership/ACL restore path is a separate thing
+to verify in its own right; this drill proves the data restores, not that
+your grants would come back with it. It
 closes the exact gap GitLab's incident illustrates (a backup nobody had
 verified could actually restore), not every possible backup failure mode.
 

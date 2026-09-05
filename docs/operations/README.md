@@ -24,6 +24,10 @@ specific concern comes up.
   logical-dump fallback), the optional compose `backup`/`restore` profiles
   this repo ships, and the `restore-drill` profile that rehearses an actual
   restore on a schedule instead of only taking backups.
+- **[Database role separation](database-role-separation.md)** — a
+  migrator/owner role for `prisma migrate deploy` versus a DML-only runtime
+  role for the running app, the setup script, and adopting it on an existing
+  database.
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
   rules, structured logging and redaction, and operator interpretation of the
   key metrics.
