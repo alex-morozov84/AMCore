@@ -1,3 +1,5 @@
+import { CSP_REPORT_ENDPOINT_PATH, CSP_REPORTING_GROUP_NAME } from './constants'
+
 export interface BuildCspDirectivesOptions {
   /** Per-request nonce from {@link import('./generate-nonce').generateNonce}. */
   nonce: string
@@ -56,6 +58,14 @@ export function buildCspDirectives({ nonce, isDev }: BuildCspDirectivesOptions):
     // relying on the legacy header.
     `frame-ancestors 'none'`,
     ...(isDev ? [] : [`upgrade-insecure-requests`]),
+    // Track 3 PR3: both delivery mechanisms point at the same endpoint.
+    // `report-uri` (CSP Level 2, deprecated but broadly supported) and
+    // `report-to` (current Reporting API, needs the `Reporting-Endpoints`
+    // response header — set alongside this header in src/proxy.ts) so a
+    // browser using either one still reaches
+    // `app/api/csp-report/route.ts`.
+    `report-uri ${CSP_REPORT_ENDPOINT_PATH}`,
+    `report-to ${CSP_REPORTING_GROUP_NAME}`,
   ]
   return directives.join('; ') + ';'
 }
