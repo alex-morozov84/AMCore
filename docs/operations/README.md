@@ -13,6 +13,10 @@ specific concern comes up.
   `TRUSTED_WEB_PEERS`), the Redis-backed GCRA rate limiter's production
   assumptions, the Redis queue profile, database pool sizing, and
   SSE-behind-a-proxy guidance.
+- **[Production deploy profile](production-deploy-profile.md)** — the
+  build-once/promote-by-digest contract, the `staging`/`production` GitHub
+  Environments setup, and the secrets/variables checklist that gates a
+  registry-based production deploy.
 - **[Backup & restore](backup-restore.md)** — which backup strategy fits your
   deployment (managed-provider PITR, self-hosted WAL archiving, or the
   logical-dump fallback), and the optional compose `backup`/`restore`
