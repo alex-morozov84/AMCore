@@ -8,6 +8,8 @@ import { PWAProvider } from '@/shared/pwa'
 import { ThemeProvider } from '@/shared/store'
 import { Toaster } from '@/shared/ui/toast'
 
+import '@/shared/lib/zod-jitless'
+
 interface ProvidersProps {
   children: ReactNode
 }
