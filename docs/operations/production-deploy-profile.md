@@ -132,14 +132,63 @@ reason not to.
 
 ## Deploy workflow template
 
-The mechanical implementation of this contract (a workflow that actually
-builds, tags, pushes, captures the digest, and gates staging/production
-deploys behind the environments above) is a separate, explicitly
-non-active-for-upstream template — tracked as the next increment in this same
-production-readiness work. It will not require real secrets to exist for
-CI to stay green on this repository, and it will not publish or deploy
-anything for AMCore upstream unless the maintainer separately decides to
-turn it on.
+[`.github/workflows/deploy-template.yml`](../../.github/workflows/deploy-template.yml)
+is the mechanical implementation of the contract above, and its two paths are
+structurally different, not just differently gated:
+
+- **Choosing `main` runs the build path**: it builds the `api`, `api`
+  migrator, and `web` images for `main`'s current commit, pushes them to GHCR
+  tagged `sha-<commit>`, and deploys that output to `staging`.
+- **Choosing a `v*` tag runs the promote path**: it does **not** build
+  anything. It resolves the digest already published for that tag's commit
+  (from a prior build-path run against that same commit) and deploys that
+  digest to `production`. If that commit was never published via the build
+  path, this step **fails loudly** instead of silently building one —
+  deploying an artifact staging never actually ran would defeat the entire
+  point of this contract.
+
+**It is `workflow_dispatch`-only on purpose** — it never runs on `push` or
+`pull_request`, so it needs no configured secret to keep this repository's
+required CI green, and it never fires for AMCore upstream on its own.
+Triggering it is a deliberate action, not something a fork inherits as live
+automation.
+
+- **The build job needs no secret you have to configure.** It authenticates
+  to GHCR with the workflow's own `GITHUB_TOKEN` (`packages: write` is
+  sufficient) — pushing a real image to your fork's own GHCR package space
+  works the moment you run it.
+- **The final deploy step on each path is an illustrative placeholder.** It
+  prints the digests to deploy and tells you where your real deploy command
+  goes (SSH + `docker compose pull && docker compose up -d` for the VPS path,
+  or your platform's deploy API). Replace that step once you have a real
+  target — the workflow's job is to prove the promotion mechanics, not to
+  guess your infrastructure.
+- **Create the `staging`/`production` GitHub Environments first.** Referencing
+  an environment that doesn't exist yet makes GitHub silently create it with
+  no protection rules at all — exactly the ungated behavior this whole
+  contract exists to prevent. Follow "Setting up the GitHub Environments"
+  above before running this workflow for the first time.
+- **Going live:** once you have a real target, replace the `workflow_dispatch`
+  trigger with real ones — `on: push: branches: [main]` for the build path,
+  `on: push: tags: ['v*']` for the promote path — so the pipeline runs
+  automatically instead of on manual dispatch.
+
+**To exercise the whole contract end to end**, from the Actions tab →
+**Deploy Template (Registry + Digest Promotion)** → **Run workflow**:
+
+1. Run it choosing `main`. This builds and publishes images for `main`'s
+   current commit and deploys them to `staging`.
+2. Tag that same commit with an **annotated** tag (matching this repo's own
+   release convention — see [Deployment &
+   migrations](deployment.md#branch-release--environments-model)) and push
+   it: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`. A lightweight
+   tag (plain `git tag vX.Y.Z`) works for the workflow's own ref-matching, but
+   don't use one here — it isn't what this repo's release process creates.
+3. Run the workflow again, choosing that tag. It resolves the digests step 1
+   already published — it does not build anything — and deploys them to
+   `production` once your configured reviewer approves. Choosing a tag whose
+   commit was never published via step 1 fails loudly instead of building one
+   for you; that failure is the point, not a bug.
 
 ## What this page doesn't cover yet
 

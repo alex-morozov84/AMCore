@@ -23,6 +23,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a self-hosted-runner isolation warning. This is a reference contract and
   setup checklist, not a live pipeline for AMCore upstream itself — see the
   doc's own "What this isn't" section.
+- **Deploy workflow template implementing the production deploy profile
+  contract.** New
+  [`.github/workflows/deploy-template.yml`](.github/workflows/deploy-template.yml)
+  with two structurally different paths, not just differently gated ones: a
+  **build path** (`main`) that builds the `api`, `api` migrator, and `web`
+  images once and pushes them to GHCR using only the workflow's own
+  `GITHUB_TOKEN` (no secret to configure), and a **promote path** (a `v*` tag)
+  that builds nothing — it resolves the digest the build path already
+  published for that commit and fails loudly if that commit was never
+  published, rather than silently building a fresh one. Each path deploys
+  behind the matching GitHub Environment the profile doc describes.
+  `workflow_dispatch`-only by design — it never runs on `push`/`pull_request`,
+  so it adds no new required check and needs no configured secret to keep
+  this repository's CI green. The final deploy step on each path is an
+  illustrative placeholder until a fork points it at a real target.
 
 ## [0.7.0] - 2026-09-05
 

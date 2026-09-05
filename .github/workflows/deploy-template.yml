@@ -1,0 +1,236 @@
+name: Deploy Template (Registry + Digest Promotion)
+
+# Reference implementation of the contract in
+# docs/operations/production-deploy-profile.md — build once, push by digest,
+# gate staging/production behind GitHub Environments. Read that doc first.
+#
+# workflow_dispatch-only on purpose: this workflow never runs on push/pull_request,
+# so it needs no configured secret to keep this repository's required CI green,
+# and it never fires for AMCore upstream on its own — running it is a deliberate
+# action, not something a fork inherits as live automation.
+#
+# Before running this for real: create the `staging` and `production` GitHub
+# Environments described in production-deploy-profile.md first. Referencing an
+# environment that does not exist yet makes GitHub silently create it with NO
+# protection rules — the opposite of the tag-gated/reviewer-gated behavior this
+# template exists to demonstrate.
+#
+# The two paths are structurally different, not just gated differently:
+# - Choosing `main` runs the BUILD path: it builds the api/api-migrator/web
+#   images for main's current commit and pushes them to GHCR tagged
+#   sha-<commit>, then deploys that fresh output to `staging`.
+# - Choosing a `v*` tag runs the PROMOTE path: it does NOT build anything. It
+#   resolves the digest already published for that tag's commit (from a prior
+#   run of the build path against that same commit) and deploys that digest to
+#   `production`. If that commit was never published via the build path, this
+#   fails loudly instead of silently building one — promoting an artifact that
+#   staging never actually ran would defeat the entire point of this pattern.
+#
+# The build job needs no secret beyond the workflow's own GITHUB_TOKEN
+# (`packages: write` to push, `packages: read` to resolve). The two deploy
+# jobs' final step is an intentionally illustrative placeholder — replace it
+# with your real deploy command (SSH + `docker compose pull && up -d`, or your
+# platform's deploy API) once you have a real target. A fork that goes live
+# should also replace the `workflow_dispatch` trigger below with real `push`
+# triggers (branches: [main] for the build path, tags: ['v*'] for the promote
+# path).
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & push (main only — never runs for a tag)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}
+      api_digest: ${{ steps.push-api.outputs.digest }}
+      api_migrator_digest: ${{ steps.push-api-migrator.outputs.digest }}
+      web_digest: ${{ steps.push-web.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve image tag
+        id: tag
+        run: echo "value=sha-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve lowercase image base (registry names must be lowercase)
+        id: image-base
+        env:
+          REPO: ${{ github.repository }}
+        run: echo "value=${REPO,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push api image
+        id: push-api
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: runner
+          push: true
+          tags: ghcr.io/${{ steps.image-base.outputs.value }}/api:${{ steps.tag.outputs.value }}
+
+      - name: Build & push api migrator image
+        id: push-api-migrator
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: migrator
+          push: true
+          tags: ghcr.io/${{ steps.image-base.outputs.value }}/api-migrator:${{ steps.tag.outputs.value }}
+
+      - name: Build & push web image
+        id: push-web
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: runner
+          push: true
+          tags: ghcr.io/${{ steps.image-base.outputs.value }}/web:${{ steps.tag.outputs.value }}
+
+  deploy-staging:
+    name: Deploy staging (from main)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Show the digests staging is about to run
+        run: |
+          echo "api:            ${{ needs.build.outputs.api_digest }}"
+          echo "api-migrator:   ${{ needs.build.outputs.api_migrator_digest }}"
+          echo "web:            ${{ needs.build.outputs.web_digest }}"
+
+      - name: Deploy (placeholder — replace with your real staging deploy)
+        run: |
+          echo "This step is a placeholder. Replace it with your real deploy command, e.g.:"
+          echo "  ssh deploy@staging-host 'API_IMAGE=ghcr.io/.../api@<digest> docker compose pull && docker compose up -d'"
+          echo "Never rebuild here — pull the exact digests captured by the build job above."
+
+  resolve-production-digests:
+    name: Resolve already-published digests (tag only — never builds)
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}
+      api_digest: ${{ steps.api.outputs.value }}
+      api_migrator_digest: ${{ steps.api-migrator.outputs.value }}
+      web_digest: ${{ steps.web.outputs.value }}
+    steps:
+      - name: Resolve lowercase image base (registry names must be lowercase)
+        id: image-base
+        env:
+          REPO: ${{ github.repository }}
+        run: echo "value=${REPO,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the commit-based tag this release points at
+        id: tag
+        run: echo "value=sha-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve api digest (fails if this commit was never published by the build job)
+        id: api
+        env:
+          IMAGE_REF: ghcr.io/${{ steps.image-base.outputs.value }}/api:${{ steps.tag.outputs.value }}
+        run: |
+          set -uo pipefail
+          if ! inspect_output=$(docker buildx imagetools inspect "$IMAGE_REF" 2>&1); then
+            echo "::error::No published image found at $IMAGE_REF — this commit was never built via the main path. Run this workflow on main first, then tag that same commit." >&2
+            echo "$inspect_output" >&2
+            exit 1
+          fi
+          digest=$(printf '%s\n' "$inspect_output" | awk '/^Digest:/ {print $2; exit}')
+          if [ -z "$digest" ]; then
+            echo "::error::Found $IMAGE_REF but could not parse a digest from its manifest." >&2
+            echo "$inspect_output" >&2
+            exit 1
+          fi
+          echo "value=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve api migrator digest (fails if this commit was never published by the build job)
+        id: api-migrator
+        env:
+          IMAGE_REF: ghcr.io/${{ steps.image-base.outputs.value }}/api-migrator:${{ steps.tag.outputs.value }}
+        run: |
+          set -uo pipefail
+          if ! inspect_output=$(docker buildx imagetools inspect "$IMAGE_REF" 2>&1); then
+            echo "::error::No published image found at $IMAGE_REF — this commit was never built via the main path. Run this workflow on main first, then tag that same commit." >&2
+            echo "$inspect_output" >&2
+            exit 1
+          fi
+          digest=$(printf '%s\n' "$inspect_output" | awk '/^Digest:/ {print $2; exit}')
+          if [ -z "$digest" ]; then
+            echo "::error::Found $IMAGE_REF but could not parse a digest from its manifest." >&2
+            echo "$inspect_output" >&2
+            exit 1
+          fi
+          echo "value=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve web digest (fails if this commit was never published by the build job)
+        id: web
+        env:
+          IMAGE_REF: ghcr.io/${{ steps.image-base.outputs.value }}/web:${{ steps.tag.outputs.value }}
+        run: |
+          set -uo pipefail
+          if ! inspect_output=$(docker buildx imagetools inspect "$IMAGE_REF" 2>&1); then
+            echo "::error::No published image found at $IMAGE_REF — this commit was never built via the main path. Run this workflow on main first, then tag that same commit." >&2
+            echo "$inspect_output" >&2
+            exit 1
+          fi
+          digest=$(printf '%s\n' "$inspect_output" | awk '/^Digest:/ {print $2; exit}')
+          if [ -z "$digest" ]; then
+            echo "::error::Found $IMAGE_REF but could not parse a digest from its manifest." >&2
+            echo "$inspect_output" >&2
+            exit 1
+          fi
+          echo "value=$digest" >> "$GITHUB_OUTPUT"
+
+  deploy-production:
+    name: Deploy production (from an approved tag — never rebuilds)
+    needs: resolve-production-digests
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Confirm the exact digests staging already validated
+        run: |
+          echo "This job only runs after production's required-reviewer approval."
+          echo "It deploys the same digests already published by a prior main run — nothing here was rebuilt."
+          echo "api:            ${{ needs.resolve-production-digests.outputs.api_digest }}"
+          echo "api-migrator:   ${{ needs.resolve-production-digests.outputs.api_migrator_digest }}"
+          echo "web:            ${{ needs.resolve-production-digests.outputs.web_digest }}"
+
+      - name: Deploy (placeholder — replace with your real production deploy)
+        run: |
+          echo "This step is a placeholder. Replace it with your real deploy command."
+          echo "Pull by digest, not by tag, on the production host."
