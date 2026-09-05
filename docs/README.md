@@ -9,35 +9,36 @@ does not express.
 
 ## Find the right guide
 
-| I want to…                                                               | Go to                                                                                                                             |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| Add a backend module the AMCore way                                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                              |
-| Add a route/page on the frontend the AMCore way                          | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                 |
-| Know which import/styling rules are enforced                             | [`frontend/fsd-boundaries-and-guardrails.md`](frontend/fsd-boundaries-and-guardrails.md)                                          |
-| Reuse or add a shared UI primitive (shadcn)                              | [`frontend/shared-ui-and-shadcn.md`](frontend/shared-ui-and-shadcn.md)                                                            |
-| Consume media/notifications/AI from the frontend                         | [`frontend/api-consumption.md`](frontend/api-consumption.md)                                                                      |
-| Add a third-party script/style origin, or run CSP in report-only         | [`frontend/browser-security-and-csp.md`](frontend/browser-security-and-csp.md)                                                    |
-| Add a frontend test / pick the right layer                               | [`frontend/testing.md`](frontend/testing.md)                                                                                      |
-| Write or review a Storybook story                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |
-| Initialize a downstream fork (rebrand, single-locale, disable Storybook) | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |
-| Check or update the frontend bundle baseline                             | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                          |
-| Add an environment variable                                              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
-| Add an external service / infra dependency                               | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
-| Add UI copy, a locale, or an error message                               | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
-| Configure auth, OAuth, sessions                                          | [`auth/`](auth/README.md)                                                                                                         |
-| Set up RBAC / authorization                                              | [`auth/rbac.md`](auth/rbac.md)                                                                                                    |
-| Issue scoped API keys                                                    | [`auth/api-keys.md`](auth/api-keys.md)                                                                                            |
-| Add or customize email                                                   | [`email/`](email/README.md)                                                                                                       |
-| Add a notification                                                       | [`notifications/`](notifications/README.md)                                                                                       |
-| Add an AI provider / tool / assistant / artifact                         | [`ai/`](ai/README.md)                                                                                                             |
-| Add a storage- or media-backed feature                                   | [`storage/`](storage/README.md), [`media/`](media/README.md)                                                                      |
-| Deploy, run, or operate the system                                       | [`operations/`](operations/README.md)                                                                                             |
-| Set up TLS / a reverse proxy                                             | [`operations/deployment.md`](operations/deployment.md#tls--reverse-proxy)                                                         |
-| Understand or override route rate limits                                 | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#cross-cutting-decision-points)                |
-| Let the global limiter tell BFF visitors apart                           | [`operations/deployment.md`](operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy) |
-| Understand frontend retry behavior for `429`                             | [`frontend/api-consumption.md`](frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073)                             |
-| Back up or restore the database                                          | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
-| Understand the CI / repo-security workflow                               | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
+| I want to…                                                                 | Go to                                                                                                                             |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Add a backend module the AMCore way                                        | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                              |
+| Add a route/page on the frontend the AMCore way                            | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                 |
+| Know which import/styling rules are enforced                               | [`frontend/fsd-boundaries-and-guardrails.md`](frontend/fsd-boundaries-and-guardrails.md)                                          |
+| Reuse or add a shared UI primitive (shadcn)                                | [`frontend/shared-ui-and-shadcn.md`](frontend/shared-ui-and-shadcn.md)                                                            |
+| Consume media/notifications/AI from the frontend                           | [`frontend/api-consumption.md`](frontend/api-consumption.md)                                                                      |
+| Add a third-party script/style origin, or run CSP in report-only           | [`frontend/browser-security-and-csp.md`](frontend/browser-security-and-csp.md)                                                    |
+| Add a frontend test / pick the right layer                                 | [`frontend/testing.md`](frontend/testing.md)                                                                                      |
+| Write or review a Storybook story                                          | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |
+| Initialize a downstream fork (rebrand, single-locale, disable Storybook)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |
+| Check or update the frontend bundle baseline                               | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                          |
+| Add an environment variable                                                | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
+| Add an external service / infra dependency                                 | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
+| Add UI copy, a locale, or an error message                                 | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
+| Configure auth, OAuth, sessions                                            | [`auth/`](auth/README.md)                                                                                                         |
+| Set up RBAC / authorization                                                | [`auth/rbac.md`](auth/rbac.md)                                                                                                    |
+| Issue scoped API keys                                                      | [`auth/api-keys.md`](auth/api-keys.md)                                                                                            |
+| Add or customize email                                                     | [`email/`](email/README.md)                                                                                                       |
+| Add a notification                                                         | [`notifications/`](notifications/README.md)                                                                                       |
+| Add an AI provider / tool / assistant / artifact                           | [`ai/`](ai/README.md)                                                                                                             |
+| Add a storage- or media-backed feature                                     | [`storage/`](storage/README.md), [`media/`](media/README.md)                                                                      |
+| Deploy, run, or operate the system                                         | [`operations/`](operations/README.md)                                                                                             |
+| Set up TLS / a reverse proxy                                               | [`operations/deployment.md`](operations/deployment.md#tls--reverse-proxy)                                                         |
+| Understand or override route rate limits                                   | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#cross-cutting-decision-points)                |
+| Let the global limiter tell BFF visitors apart                             | [`operations/deployment.md`](operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy) |
+| Understand frontend retry behavior for `429`                               | [`frontend/api-consumption.md`](frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073)                             |
+| Set up a registry-based production deploy (digest promotion, environments) | [`operations/production-deploy-profile.md`](operations/production-deploy-profile.md)                                              |
+| Back up or restore the database                                            | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
+| Understand the CI / repo-security workflow                                 | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
 
 ## Documentation map
 
@@ -96,8 +97,9 @@ does not express.
   cloud-agnostic file layer and the image-derivative layer on top of it.
 - **[Operations](operations/README.md)** — deployment, migrations, process
   roles, TLS/reverse-proxy setup (nginx or the optional bundled Caddy
-  profile), Postgres backup/restore, observability, CI/repo security, audit
-  log, webhooks, and idempotency.
+  profile), the production deploy profile (build-once/promote-by-digest,
+  GitHub Environments), Postgres backup/restore, observability, CI/repo
+  security, audit log, webhooks, and idempotency.
 
 ## Common extension tasks
 

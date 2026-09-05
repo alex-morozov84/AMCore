@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Production deploy profile: the build-once/promote-by-digest contract and
+  a GitHub Environments setup checklist** (ADR-075). New
+  [`docs/operations/production-deploy-profile.md`](docs/operations/production-deploy-profile.md)
+  makes concrete a model that was previously described only in prose in
+  [`docs/operations/deployment.md`](docs/operations/deployment.md): merge to `main` deploys
+  `staging`; a `vX.Y.Z` tag deploys `production` only after re-pulling the
+  exact digest `staging` already validated, gated by a required-reviewer
+  GitHub Environment approval — never a rebuild from the tag. Includes a
+  secrets/variables checklist (registry credentials, deploy keys, the
+  migrator-role database URL, application secrets) mapped to
+  environment-scoped vs. repo-scoped placement, an OIDC-preference note, and
+  a self-hosted-runner isolation warning. This is a reference contract and
+  setup checklist, not a live pipeline for AMCore upstream itself — see the
+  doc's own "What this isn't" section.
+
 ## [0.7.0] - 2026-09-05
 
 ### Security
