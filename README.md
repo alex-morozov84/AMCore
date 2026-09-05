@@ -135,11 +135,14 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | API surface                         | Swagger/OpenAPI at `/docs` in development, including JWT/API-key bearer schemes, multipart uploads, and CI-guarded success-response inventory                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
-Vitest for React Email template rendering and frontend unit/integration tests,
-Storybook for isolated component-state/interaction/a11y checks, Playwright for
-frontend browser flows, and `@axe-core/playwright` for automated accessibility
-scans. See [`docs/frontend/testing.md`](docs/frontend/testing.md) for the
-frontend test taxonomy and command choices.
+Vitest for `packages/shared`'s own schema/lib contract tests, React Email
+template rendering, and frontend unit/integration tests, Storybook for
+isolated component-state/interaction/a11y checks, Playwright for frontend
+browser flows, and `@axe-core/playwright` for automated accessibility scans.
+See [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md#2-contract-shared-zod)
+for where a shared schema's own test belongs, and
+[`docs/frontend/testing.md`](docs/frontend/testing.md) for the frontend test
+taxonomy and command choices.
 
 ## Quick Start
 

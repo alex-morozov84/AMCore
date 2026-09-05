@@ -1,4 +1,8 @@
-import { Action, assignPermissionSchema, Subject } from '@amcore/shared'
+import { describe, expect, it } from 'vitest'
+
+import { Action, Subject } from '../enums/permissions'
+
+import { assignPermissionSchema } from './organization'
 
 /**
  * OB-01: `assignPermissionSchema.action` and `.subject` are validated
@@ -7,10 +11,6 @@ import { Action, assignPermissionSchema, Subject } from '@amcore/shared'
  * editing the enum) are rejected at the schema boundary, not silently
  * accepted into the permission table where no policy would consult
  * them.
- *
- * Schema specs live in the API workspace — per project precedent
- * (see `api-keys-schema.spec.ts`), `packages/shared` does not have a
- * test runner of its own.
  */
 describe('assignPermissionSchema (OB-01)', () => {
   const baseInput = { action: Action.Read, subject: Subject.User }

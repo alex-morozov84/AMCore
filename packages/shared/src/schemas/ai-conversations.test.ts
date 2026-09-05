@@ -1,10 +1,13 @@
-import { aiTextOnlyMessageContentSchema, postOperatorMessageSchema } from '@amcore/shared'
+import { describe, expect, it } from 'vitest'
+
+import { aiTextOnlyMessageContentSchema, postOperatorMessageSchema } from './ai-conversations'
 
 /**
  * Contract tests for the AI conversation takeover/operator schemas (Track C — ADR-054, Arc F.3 /
  * Arc G). Focus: the Arc G tightening that the operator/owner human-turn content is **text only** —
  * an `artifact_ref` is refused at the contract boundary (the run-input path is the only artifact
- * surface this arc). The full takeover/reason contracts are otherwise exercised via the service specs.
+ * surface this arc). The full takeover/reason contracts are otherwise exercised via apps/api's
+ * service specs.
  */
 
 describe('aiTextOnlyMessageContentSchema (Arc G)', () => {
