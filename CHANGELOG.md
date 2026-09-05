@@ -106,6 +106,38 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
   membership and `SET ROLE`s unconditionally for the duration of the grants,
   then resets and revokes — one session, either a true superuser or a
   `CREATEROLE`-holding admin, no reconnection needed.
+- **Secret rotation runbook.** New
+  [`docs/operations/secret-rotation.md`](docs/operations/secret-rotation.md)
+  covers what actually happens, verified against this repo's own code and a
+  real Postgres, when you rotate `JWT_SECRET`, database credentials,
+  `REDIS_URL`, OAuth secrets, or third-party API keys. The headline finding:
+  rotating `JWT_SECRET` does not force a full re-login (refresh tokens are
+  opaque, DB-verified strings independent of the JWT secret — `token.service.ts`),
+  but it isn't a silent no-op either — tracing the real request path
+  (`ensure-fresh-session.ts`'s time-based freshness check, `authenticated-proxy.ts`'s
+  unretried single forward, `query-client.ts`'s no-retry-on-4xx policy) shows
+  it produces real, visible 401s for up to `JWT_ACCESS_EXPIRATION` (15 minutes
+  by default) per already-active session — but only if the secret is cut over
+  atomically (blue-green, or a simultaneous full restart); a rolling restart
+  specifically breaks this guarantee, since replicas verifying against the
+  old and new secret simultaneously reject each other's tokens for as long as
+  the rollout takes. The guide documents both the exposure-window options and
+  the atomic-cutover requirement. Database credential rotation is verified
+  safe under a rolling restart against a real Postgres 16 container
+  (`ALTER ROLE ... PASSWORD` never affects already-open connections) — the
+  opposite of JWT_SECRET's requirement, and the guide says so explicitly.
+  Redis's plain `requirepass` behaves the same way as Postgres (verified
+  against a real Redis 7 container: an already-authenticated connection
+  survives a password change), with the real risk being a client's own
+  automatic reconnect using a stale credential, not the rotation itself; ACL's
+  documented multi-password support removes that risk entirely. Google
+  OAuth's and AWS IAM's documented multi-credential rotation features are
+  used where the provider actually supports them, cited to source, rather
+  than assumed, and webhook signing secrets / the metrics scrape token are
+  covered separately as two-sided secrets shared with an external party. This
+  repo has no `kid`/key-ring support for JWTs — documented honestly as a
+  single-secret rotation, with the gap tracked as a separate, explicitly
+  deferred backlog item rather than glossed over.
 
 ### Fixed
 

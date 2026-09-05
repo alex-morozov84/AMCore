@@ -39,6 +39,7 @@ does not express.
 | Set up a registry-based production deploy (digest promotion, environments) | [`operations/production-deploy-profile.md`](operations/production-deploy-profile.md)                                              |
 | Back up or restore the database                                            | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
 | Set up production database role separation                                 | [`operations/database-role-separation.md`](operations/database-role-separation.md)                                                |
+| Rotate `JWT_SECRET`, DB/Redis credentials, OAuth secrets, or API keys      | [`operations/secret-rotation.md`](operations/secret-rotation.md)                                                                  |
 | Understand the CI / repo-security workflow                                 | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
 
 ## Documentation map

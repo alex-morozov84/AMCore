@@ -233,8 +233,9 @@ buried in `docker compose logs`.
   environment requirements" in [deployment.md](deployment.md)) — durability
   for that data is the object-storage provider's responsibility, not this
   guide's.
-- **Secret rotation** (JWT secret, OAuth credentials, storage keys) is a
-  separate operator runbook and is not covered by this starter guide yet.
+- **Secret rotation** (JWT secret, database/Redis credentials, OAuth
+  credentials, storage/AI provider keys) is a separate operator runbook — see
+  [Secret rotation](secret-rotation.md).
 - Redis is not covered — it holds queues/cache/rate-limit state, not durable
   application data; see "Redis production profile" in
   [deployment.md](deployment.md) for its persistence (AOF) requirements.
