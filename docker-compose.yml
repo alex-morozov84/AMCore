@@ -25,6 +25,12 @@
 # `service_completed_successfully`). Production hardening (sslmode, S3, real JWT
 # secret >= 32 chars) is documented in docs/operations/deployment.md.
 #
+# Production image-pull rollout: apply docker-compose.prod.yml on top of this
+# file (`-f docker-compose.yml -f docker-compose.prod.yml`) to pin api/worker/
+# web/migrate to immutable registry digests instead of building locally, add
+# restart policies, and bound/rotate container logs. See deployment.md →
+# "Production rollout via registry (image-pull path)".
+#
 # The `api` (web role) and `worker` (worker role) run the SAME image; PROCESS_ROLE
 # selects behavior (ADR-041). For a single-process setup, set the api's
 # PROCESS_ROLE=all and drop the worker service.

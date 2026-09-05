@@ -195,10 +195,6 @@ automation.
 Tracked as separate, focused pieces of the same production-readiness
 initiative — each gets its own doc rather than growing this one indefinitely:
 
-- The actual VPS/Compose production hardening (log rotation, restart
-  policies, health-gated rollout, immutable digest pinning in
-  `docker-compose.yml`) — extends
-  [Deployment & migrations](deployment.md).
 - An automated backup restore-drill procedure — extends
   [Backup & restore](backup-restore.md).
 - Production database role separation (a migrator/owner role distinct from
@@ -211,7 +207,9 @@ initiative — each gets its own doc rather than growing this one indefinitely:
 
 - [Deployment & migrations](deployment.md) — the branch/release/environment
   model this contract extends, the one-shot migration contract, process
-  roles, and TLS/reverse-proxy setup.
+  roles, TLS/reverse-proxy setup, and the `docker-compose.prod.yml`
+  image-pull rollout (immutable digest pinning, restart policies, log
+  rotation, and honest zero/low-downtime guidance).
 - [CI & repo security](ci-security.md) — what a fork inherits automatically
   versus what must be configured separately (including GitHub Environments),
   and the immutable `v*` tag ruleset this contract relies on.

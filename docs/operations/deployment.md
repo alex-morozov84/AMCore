@@ -103,8 +103,8 @@ that already exited successfully. Re-run it explicitly **before** recreating the
 ```bash
 git pull
 docker compose build
-docker compose run --rm migrate          # apply new migrations once
-docker compose up -d --no-deps api web   # recreate the app with the new image
+docker compose run --rm migrate                 # apply new migrations once
+docker compose up -d --no-deps api worker web   # recreate the app with the new image
 ```
 
 ### Validate the compose graph
@@ -115,6 +115,108 @@ Cheap sanity check for both modes (no containers started):
 COMPOSE_PROFILES=local-infra docker compose config --quiet   # local
 COMPOSE_PROFILES=          docker compose config --quiet     # remote
 ```
+
+## Production rollout via registry (image-pull path)
+
+`docker-compose.prod.yml` is a production overlay for the reference stack
+above: it replaces each service's local `build:` with an `image:` pinned to
+an immutable digest a registry + digest promotion pipeline already published
+(see [Production deploy profile](production-deploy-profile.md)), adds an
+explicit restart policy to every long-running service, and bounds/rotates
+container logs. It changes nothing else — ports, volumes, environment, and
+profiles all stay exactly as defined in the base file.
+
+```bash
+export COMPOSE_API_IMAGE="ghcr.io/<org>/<repo>/api@sha256:..."
+export COMPOSE_API_MIGRATOR_IMAGE="ghcr.io/<org>/<repo>/api-migrator@sha256:..."
+export COMPOSE_WEB_IMAGE="ghcr.io/<org>/<repo>/web@sha256:..."
+
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps api worker web
+```
+
+`pull` fails loudly if a digest is missing or unreachable — it never falls
+back to building locally, the same "never silently rebuild" rule
+`.github/workflows/deploy-template.yml`'s promote path already enforces.
+`run --rm migrate` re-runs the one-shot migration step against the new image
+before any app container restarts, same as the local-build "Upgrades" path
+above. `--no-deps` on the final `up` avoids bouncing `postgres`/`redis` just
+to recreate `api`/`worker`/`web`.
+
+Every `*_IMAGE` var is **required** by the overlay (no default) — leaving one
+unset fails `pull`/`up` immediately with a clear message rather than
+silently reusing a locally built dev image in production. Log driver/size
+(`COMPOSE_LOG_DRIVER`/`COMPOSE_LOG_MAX_SIZE`/`COMPOSE_LOG_MAX_FILE`,
+`.env.example`) default to `local`, 20 MB × 5 files per container — Docker's
+own docs recommend `local` over the unbounded-by-default `json-file` for its
+automatic rotation, and `json-file` stays Docker's own default only for
+backward compatibility and Kubernetes-runtime scenarios. `local`'s own
+caveat: its files are for the Docker daemon and `docker logs`/`docker
+compose logs` only, not for an external log-shipping tool to read directly
+— use `json-file` instead if you need that. `COMPOSE_LOG_DRIVER` only
+accepts `local` or `json-file`; another driver uses different log-opt names
+and fails at container **start**, not at `compose config` time. Requires a
+Compose CLI supporting the `!reset` merge tag — available since Compose CLI
+v2.17.3, below this repo's documented v2.20.2+ minimum, and already relied
+on by this repo's own CI (`.github/compose.boot-smoke.override.yml`).
+
+### Zero/low-downtime rollout — stated honestly
+
+Plain `docker compose up -d`, with or without the overlay above, is **not**
+zero-downtime: Compose stops the old container and starts the new one, so
+there is a real gap during which `api`/`web` refuse connections. Two
+escalation paths, in order of how much they cost to run:
+
+1. **Health-gated rolling restart (routine deploys).** Put `api`/`web`
+   behind a reverse proxy rather than relying on `api`'s published port
+   directly, then cut traffic over only after the new container's own
+   readiness healthcheck passes.
+
+   - **The two proxy options this repo documents are not interchangeable for
+     this specific pattern.** The shipped nginx config (above, `proxy_pass
+http://api:5002`) resolves that hostname once, at nginx startup/reload,
+     and caches the IP for the worker process's lifetime — recreating the
+     `api` container mid-rollout gives it a new IP nginx doesn't know about,
+     so nginx keeps sending traffic to the dead container until it's
+     reloaded (`nginx -s reload`, or the container is restarted). Add
+     `resolver 127.0.0.11 valid=10s;` and put the upstream in a variable
+     (`set $upstream_api http://api:5002; proxy_pass $upstream_api;`) if you
+     want nginx to actually resolve per this pattern. The optional Caddy
+     `edge` profile does not have this problem: Caddy uses Go's default
+     per-connection DNS resolution rather than resolving once at startup, so
+     a new connection after the old container is gone naturally re-resolves
+     to the new one via Docker's embedded DNS — no reload needed (documented
+     Caddy community consensus, not a guarantee in Caddy's own reference
+     docs; see [Caddy Community — proxy DNS resolver
+     mechanism](https://caddy.community/t/proxy-dns-resolver-mechanism/5934)).
+   - **The community tool [`docker-rollout`](https://github.com/wowu/docker-rollout)**
+     implements this pattern for plain Compose (scale to two replicas, wait
+     for the new one's healthcheck, remove the old one) — but it does **not**
+     work against this repo's services as shipped: `docker-rollout`'s own
+     README requires a service to have neither `ports:` nor `container_name:`,
+     since it scales to two replicas and a fixed host port mapping can't be
+     held by both at once. `api` (`127.0.0.1:5002:5002`) and `web`
+     (`3000:3000`) both publish one. Using it requires your own overlay that
+     resets those (`ports: !reset []`) and reaches the service only through
+     your reverse proxy on the Compose network (`api:5002`/`web:3000`) — the
+     network-name access the bundled Caddy `edge` profile already gives you
+     for free, and that the nginx config needs the resolver fix above to do
+     safely under this pattern. Not bundled or required by this starter;
+     evaluate it once you've made that change, not before.
+
+2. **Blue-green (releases that also carry a migration).** Run a second full
+   Compose project (`-p amcore-green` against the new images), apply the
+   migration against it, verify it, then flip your reverse proxy's upstream
+   from the "blue" project to "green." This is the escalation path
+   specifically because a same-stack rolling restart does not address
+   migration ordering for a schema-changing release the way a fully separate
+   stack does — "blue" stays untouched and is your instant rollback target.
+
+Neither path is bundled as a script in this starter; both are documented
+patterns to apply with your own reverse proxy, since the correct choice
+depends on infrastructure this repo does not own (see [Production deploy
+profile](production-deploy-profile.md) → "Who this is for").
 
 ## Production rollout (without compose)
 

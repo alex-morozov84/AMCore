@@ -38,6 +38,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so it adds no new required check and needs no configured secret to keep
   this repository's CI green. The final deploy step on each path is an
   illustrative placeholder until a fork points it at a real target.
+- **VPS/Compose production hardening: an image-pull overlay, restart
+  policies, bounded logs, and honest rollout guidance.** New
+  `docker-compose.prod.yml`, applied on top of the reference stack
+  (`docker compose -f docker-compose.yml -f docker-compose.prod.yml ...`):
+  pins `migrate`/`api`/`worker`/`web` to immutable registry digests instead
+  of building locally (`pull_policy: always`, fails loudly on a missing
+  digest rather than silently building a fresh one), adds an explicit
+  `restart: unless-stopped` to every long-running service, and bounds/rotates
+  container logs (`local` driver, 20 MB × 5 files per container by default —
+  Docker's unconfigured `json-file` default has **no** size cap at all). Base
+  `docker-compose.yml` is unchanged; this overlay is additive and optional.
+  [`docs/operations/deployment.md`](docs/operations/deployment.md) gained a
+  new "Production rollout via registry (image-pull path)" section plus an
+  explicit "Zero/low-downtime rollout" section stating plainly that a plain
+  `docker compose up -d` is **not** zero-downtime, documenting the
+  health-gated rolling-restart pattern as the routine path and blue-green as
+  the escalation path for migration-carrying releases. The community
+  [`docker-rollout`](https://github.com/wowu/docker-rollout) tool is named as
+  an option for automating the rolling-restart pattern, with the caveat that
+  it requires dropping `api`/`web`'s published host ports first (it scales to
+  two replicas, which can't share a fixed port mapping) and reaching them
+  through a reverse proxy on the Compose network instead.
+
+### Fixed
+
+- **The documented upgrade procedure didn't recreate the `worker`
+  container**, leaving it running the pre-upgrade image (and thus
+  out-of-sync business logic) against an already-migrated schema after every
+  release. `docs/operations/deployment.md`'s "Upgrades" section now
+  recreates `api`, `worker`, and `web` together.
 
 ## [0.7.0] - 2026-09-05
 
