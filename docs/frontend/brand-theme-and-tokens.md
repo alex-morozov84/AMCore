@@ -152,9 +152,12 @@ component, this one extra render is expected — don't try to "fix" it by
 reading the DOM directly in `useState`'s initializer, which reintroduces a
 real React hydration-mismatch warning instead.
 
-**Downstream products that add a CSP**: allow this inline script via a hash
-or Next's nonce middleware pattern — never `unsafe-inline`. AMCore doesn't
-set a CSP today, so this isn't wired up by default.
+**AMCore ships a real CSP by default** (Track 3, ADR-074) — this script
+already receives the per-request nonce `src/proxy.ts` generates
+(`app/[locale]/layout.tsx`'s `<script nonce={nonce}>`), never
+`unsafe-inline`. See
+[Browser security headers and CSP](./browser-security-and-csp.md) for the
+full policy, enforcement mode, and how to extend it.
 
 ## Cookie-backed SSR theme (advanced variant)
 

@@ -207,6 +207,50 @@ Complements, does not replace, the static token-contrast-pair suite in
 `shared/lib/theme.test.ts`; a manual pass is still worth doing before
 calling a surface WCAG-reviewed.
 
+## CSP and security headers
+
+Static headers (`Referrer-Policy`, `X-Content-Type-Options`,
+`Permissions-Policy`, `X-Frame-Options`, HSTS) and the CSP nonce mechanism
+are both environment-independent — deterministic regardless of dev vs.
+production — so the `mocked` lane can assert them directly against `next
+dev`'s real HTTP responses, fetched via Playwright's `request` fixture
+rather than `page.content()` (browsers deliberately zero out a rendered
+element's `nonce` attribute once it's in the document, a defense against
+reading it back via `innerHTML`/XSS — `page.content()` always reports
+`nonce=""` regardless of what the server actually sent).
+
+**"Zero CSP violations during normal navigation" is a real-stack-only
+assertion.** `next dev`'s own Turbopack HMR machinery injects dozens of
+inline `<style>` tags for its own tooling — a real, observed
+`style-src-elem` violation storm that is 100% dev-tooling noise, absent
+from the production build. Asserting "zero violations" against `next dev`
+is a false negative either way: noisy-red on a correct policy, or silently
+passing if loosened to tolerate it, hiding a real future regression.
+`e2e/real-stack/csp-nonce.spec.ts` runs this check against the actual
+standalone/Docker build instead — the artefact that ships.
+
+**Proving a CSP guard can fail, not just that it's present**, needs a real
+HTML-parsed injection, not `page.evaluate()`: Chrome's DevTools Protocol
+execution is exempt from CSP entirely (a real, documented Chromium
+behavior), so injecting a probe script via `page.evaluate()` +
+`appendChild` proves nothing either way. Use `page.route()` to modify the
+_served response body_ instead — real content the browser actually parses:
+
+```ts
+await page.route('**/en/login', async (route) => {
+  const response = await route.fetch()
+  const body = await response.text()
+  const injected = body.replace('</body>', '<script>window.__probe = true</script></body>')
+  await route.fulfill({ response, body: injected })
+})
+```
+
+See `e2e/mocked/csp-nonce.spec.ts` and `e2e/real-stack/csp-nonce.spec.ts`
+for the full pattern (nonce-matching assertions, hostile-inbound-header
+regression coverage, the injection proof above) and
+[Browser security headers and CSP](./browser-security-and-csp.md) for the
+policy itself.
+
 ## Dev workflow: verifying a change at runtime
 
 Two views, framework-neutral wording deliberately — this repo doesn't
@@ -279,6 +323,8 @@ dependency graph. The CI `web-e2e` job has this as an explicit step.
 - [Architecture & conventions](./architecture-and-conventions.md) — FSD
   layers, route thinness, and the BFF Route Handler layer these tests
   exercise.
+- [Browser security headers and CSP](./browser-security-and-csp.md) — the
+  policy the "CSP and security headers" section above tests.
 - [API consumption](./api-consumption.md) — the hooks the integration
   layer's contract tests target.
 - [Storybook](./storybook.md) — the fifth pyramid layer added in Track 8:

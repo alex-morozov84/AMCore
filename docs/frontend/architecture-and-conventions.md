@@ -84,6 +84,19 @@ src/app/[locale]/(dashboard)/page.tsx               → imports and renders a _p
 src/_pages/dashboard/DashboardPage/DashboardPage.tsx → owns the actual composition
 ```
 
+## Browser security headers and CSP
+
+`src/proxy.ts` (next-intl's locale-routing middleware) also generates a
+per-request Content Security Policy nonce and composes it with locale
+routing — the CSP/nonce logic itself lives in `shared/lib/csp/`, kept
+separate from proxy composition so it stays independently unit-testable.
+The nonce reaches Server/Client Components via a request header
+(`x-nonce`, read through `headers()`), not a prop — see
+`app/[locale]/layout.tsx` for how the theme-init script and Base UI's
+`CSPProvider` both consume it. Full policy, enforcement mode, and how to
+extend it for a third-party origin:
+[Browser security headers and CSP](./browser-security-and-csp.md).
+
 ## Locale routing
 
 Every route lives under a `[locale]` segment: `src/app/[locale]/(auth)/login/page.tsx`.
@@ -294,7 +307,12 @@ been quietly 404ing through the stale rewrite.
 1. Add the route file under `src/app/[locale]/` (`page.tsx`, `layout.tsx`,
    etc.) — metadata and plumbing only. Server Component pages should call
    `setRequestLocale(await resolveLocaleParam(params))` first; see
-   [Locale routing](#locale-routing).
+   [Locale routing](#locale-routing). **If this route is genuinely public
+   content that should stay statically generated/CDN-cached** (a
+   marketing/landing page, not an authenticated app page), read
+   [Browser security headers and CSP § Downstream forks](./browser-security-and-csp.md#downstream-forks-publicmarketing-routes-and-route-scoping)
+   first — the CSP wiring every route inherits by default will otherwise
+   silently force it dynamic.
 2. Build the actual page composition under `src/_pages/<route>/`, importing
    whatever `widgets`/`features`/`entities` it needs through their public
    APIs.
@@ -324,6 +342,9 @@ architectural structure.
 - [Brand, theme, and design tokens](./brand-theme-and-tokens.md) — token
   architecture, light/dark/system modes, the no-flash mechanism, and the
   downstream rebrand checklist.
+- [Browser security headers and CSP](./browser-security-and-csp.md) — the
+  static header baseline, nonce-based CSP, enforcement mode, and
+  downstream route-scoping for public/marketing routes.
 - [Shared UI & shadcn](./shared-ui-and-shadcn.md) — the `shared/ui` reuse
   rule, the safe shadcn CLI procedure, and the current primitive inventory.
 - [API consumption](./api-consumption.md) — the hooks that consume media,

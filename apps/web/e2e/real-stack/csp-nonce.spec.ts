@@ -3,20 +3,26 @@ import { expect, test } from '@playwright/test'
 import { registerViaUi, uniqueEmail } from './helpers'
 
 /**
- * Track 3 PR2 (`ai/models-talk.md` FINAL PLAN §3) — nonce-based CSP against
- * the real production-mode standalone server (`docker-compose.yml`'s
- * `local-infra` profile), not `next dev`.
+ * Track 3 (`ai/models-talk.md` FINAL PLAN §3) — nonce-based CSP against the
+ * real production-mode standalone server (`docker-compose.yml`'s
+ * `local-infra` profile), not `next dev`. Since PR4, this build runs
+ * **enforcing** CSP by default (`getCspMode()`'s environment-aware
+ * default) — a violation here means the browser actually blocked
+ * something, not merely reported it, so "zero violations" is a
+ * meaningfully stronger guarantee than it was under PR2/PR3's Report-Only
+ * default.
  *
  * This lane exists specifically because `next dev`/Turbopack's own HMR
  * machinery injects ~130 inline `<style>` tags for CSS hot-reload — a real,
- * observed `style-src-elem` "violation" storm that is 100% dev-tooling
+ * observed `style-src-elem` violation storm that is 100% dev-tooling
  * noise, absent from the production build (confirmed by running the same
- * check against both during PR2's implementation: 132 vs 0). Asserting
- * "zero CSP violations" against `next dev` would be a false negative
- * either way — noisy-red on a correct policy, or silently passing if the
- * assertion were loosened to tolerate it, hiding a real future regression.
- * `ai/STATUS.md` working rule 1 ("verify against the artefact that
- * ships") is exactly why this check lives here instead.
+ * check against both during PR2's implementation: 132 vs 0; also why `next
+ * dev` keeps defaulting to Report-Only even after PR4's flip — see
+ * `csp-mode.ts`). Asserting "zero CSP violations" against `next dev` would
+ * be a false negative either way — noisy-red on a correct policy, or
+ * silently passing if the assertion were loosened to tolerate it, hiding a
+ * real future regression. `ai/STATUS.md` working rule 1 ("verify against
+ * the artefact that ships") is exactly why this check lives here instead.
  */
 
 test('production build: no CSP violations during normal navigation', async ({ page }) => {
