@@ -33,6 +33,11 @@ specific concern comes up.
   `JWT_SECRET`, database credentials, `REDIS_URL`, OAuth secrets, or
   third-party API keys: what breaks, what doesn't, and how to bound or avoid a
   maintenance window for each.
+- **[Deployment platforms](deployment-platforms.md)** — a decision matrix, not
+  a recipe collection: how AMCore's `api`/`worker`/Redis/Postgres/SSE actually
+  map onto Kubernetes, Cloud Run, Fly, Render, Railway, and (with a hard
+  web-only caveat) Vercel, sourced and dated against each platform's own docs.
+  VPS/Compose remains the one platform with a full owned recipe.
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
   rules, structured logging and redaction, and operator interpretation of the
   key metrics.

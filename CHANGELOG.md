@@ -138,6 +138,26 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
   repo has no `kid`/key-ring support for JWTs — documented honestly as a
   single-secret rotation, with the gap tracked as a separate, explicitly
   deferred backlog item rather than glossed over.
+- **Deployment platforms decision matrix.** New
+  [`docs/operations/deployment-platforms.md`](docs/operations/deployment-platforms.md):
+  VPS/Compose stays the only platform with a full owned recipe; Kubernetes,
+  Cloud Run, Fly, Render, and Railway get durable, officially-sourced, dated
+  mappings of how AMCore's `api`/`worker`/Redis/Postgres/SSE pieces land on
+  each platform's own primitives, not maintained deploy scripts. No
+  maintained Helm chart ships from this repo — deliberately, to avoid a
+  second deployment artifact drifting from `docker-compose.yml` — with
+  pointers to Katenary and the official `kubernetes/kompose` project for
+  generating a starting chart. Vercel gets the most prominent caveat: `api`
+  and `worker` cannot run there at all (Vercel Functions are
+  invocation-scoped with a duration ceiling, never an unbounded persistent
+  process), and Vercel has no first-party Redis since Vercel KV's December
+  2024 discontinuation. Fly's documented autostop/autostart gotcha turns out
+  to favor AMCore's shape rather than working against it: the gotcha is
+  specifically about background work spawned from inside an HTTP handler,
+  and Fly's own recommended fix — a separate process group with no service
+  block — is exactly what AMCore's already-separate `worker` role already
+  is. Closes out the production deploy reference profile track (P1 item 5,
+  7 of 7 PRs).
 
 ### Fixed
 
