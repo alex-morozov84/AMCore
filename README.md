@@ -29,16 +29,16 @@ Feature-specific admin surfaces remain intentionally product-owned.
 
 ### Backend Starter Capabilities
 
-| Capability        | Status          | Description                                                                                                                                                                                                                                                          |
-| ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Auth & RBAC**   | ✅ Shipped      | Email auth, OAuth/OIDC, sessions, organizations, CASL permissions, admin flows                                                                                                                                                                                       |
-| **API Keys**      | ✅ Shipped      | Long-lived scoped server-to-server tokens with hashed secrets and org permission checks                                                                                                                                                                              |
-| **Storage**       | ✅ Shipped      | S3-compatible, local, and memory drivers with private-by-default uploads and download seams                                                                                                                                                                          |
-| **Media**         | ✅ Foundational | Safe image derivatives via `sharp`/libvips; avatar upload/delete is the shipped consumer                                                                                                                                                                             |
-| **Notifications** | ✅ Shipped      | In-app feed, preferences, durable email + Telegram dispatch, realtime SSE fan-out                                                                                                                                                                                    |
-| **AI Capability** | ✅ Foundational | Provider-agnostic assistants, runs, tools/approvals, takeover, multimodal inputs                                                                                                                                                                                     |
-| **i18n**          | ✅ Shipped      | English + Russian end to end: locale-routed UI, per-user locale, ICU-pluralized email, API errors and form validation localized by machine-readable code                                                                                                             |
-| **Operations**    | ✅ Shipped      | Health, observability, audit log, idempotency, webhooks, TLS/reverse-proxy (incl. an optional bundled Caddy edge profile), Redis-backed GCRA rate limiting with burst tolerance, verified BFF client-identity relay, Postgres backup/restore, CI/security automation |
+| Capability        | Status          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Auth & RBAC**   | ✅ Shipped      | Email auth, OAuth/OIDC, sessions, organizations, CASL permissions, admin flows                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **API Keys**      | ✅ Shipped      | Long-lived scoped server-to-server tokens with hashed secrets and org permission checks                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Storage**       | ✅ Shipped      | S3-compatible, local, and memory drivers with private-by-default uploads and download seams                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Media**         | ✅ Foundational | Safe image derivatives via `sharp`/libvips; avatar upload/delete is the shipped consumer                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Notifications** | ✅ Shipped      | In-app feed, preferences, durable email + Telegram dispatch, realtime SSE fan-out                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **AI Capability** | ✅ Foundational | Provider-agnostic assistants, runs, tools/approvals, takeover, multimodal inputs                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **i18n**          | ✅ Shipped      | English + Russian end to end: locale-routed UI, per-user locale, ICU-pluralized email, API errors and form validation localized by machine-readable code                                                                                                                                                                                                                                                                                                                                                 |
+| **Operations**    | ✅ Shipped      | Health, observability, audit log, idempotency, webhooks, TLS/reverse-proxy (incl. an optional bundled Caddy edge profile), Redis-backed GCRA rate limiting with burst tolerance, verified BFF client-identity relay, Postgres backup/restore + restore-drill rehearsal, production database role separation, secret rotation runbook, a build-once/promote-by-digest production deploy profile, a platform decision matrix (Kubernetes, Cloud Run, Fly, Render, Railway, Vercel), CI/security automation |
 
 ### Frontend Starter Capabilities
 
@@ -98,10 +98,14 @@ amcore/
 │   ├── media/          # Image derivative/media processing documentation
 │   ├── operations/     # Deployment, observability, security, and production runbooks
 │   └── storage/        # File storage documentation
-├── docker/         # Caddy edge profile, Postgres backup/restore scripts
+├── docker/         # Caddy edge profile; Postgres backup/restore/restore-drill scripts and the DB role-separation SQL
 ├── scripts/        # Fork init (init:brand/init:project), repo-security setup, dependency-freshness
-└── .github/        # CI, Dependabot, issue/PR templates
+└── .github/        # CI, Dependabot, issue/PR templates, and a non-active deploy workflow template
 ```
+
+Root also carries `docker-compose.yml` (the reference full stack) and
+`docker-compose.prod.yml` (the production image-pull overlay applied on top of
+it) — see [Going to production](#going-to-production).
 
 ## What's Built
 
@@ -139,6 +143,7 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | Backup & restore                    | [`docs/operations/backup-restore.md`](docs/operations/backup-restore.md) — managed-provider PITR, self-hosted WAL archiving, the bundled compose `backup`/`restore` profiles, and the `restore-drill` profile that rehearses an actual restore                                                                                                                                                                                                                                                                                                                   |
 | Database role separation            | [`docs/operations/database-role-separation.md`](docs/operations/database-role-separation.md) — a migrator/owner role for `prisma migrate deploy` vs. a DML-only runtime role for the running app                                                                                                                                                                                                                                                                                                                                                                 |
 | Secret rotation                     | [`docs/operations/secret-rotation.md`](docs/operations/secret-rotation.md) — `JWT_SECRET`, database/Redis credentials, OAuth secrets, and third-party API keys: what breaks, what doesn't, and how to bound or avoid a maintenance window for each                                                                                                                                                                                                                                                                                                               |
+| Deployment platforms                | [`docs/operations/deployment-platforms.md`](docs/operations/deployment-platforms.md) — decision matrix (not recipes): how AMCore's api/worker/Redis/Postgres/SSE map onto Kubernetes, Cloud Run, Fly, Render, Railway, and (web-only) Vercel                                                                                                                                                                                                                                                                                                                     |
 | API surface                         | Swagger/OpenAPI at `/docs` in development, including JWT/API-key bearer schemes, multipart uploads, and CI-guarded success-response inventory                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
@@ -206,6 +211,41 @@ pnpm dev
 > [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
+
+## Going to production
+
+The Quick Start above is a development stack. Production is a documented path,
+not a single command — work through it in this order. Each step is a runbook,
+and each states plainly what it does **not** give you.
+
+1. **[Production deploy profile](docs/operations/production-deploy-profile.md)** —
+   the contract everything else assumes: build the image once, promote the same
+   digest, `staging` from `main`, `production` from a `v*` tag behind a required
+   reviewer. Includes the GitHub Environments and secrets/variables checklist.
+   A non-active workflow template implementing it ships at
+   [`.github/workflows/deploy-template.yml`](.github/workflows/deploy-template.yml).
+2. **[VPS/Compose rollout](docs/operations/deployment.md#production-rollout-via-registry-image-pull-path)** —
+   apply `docker-compose.prod.yml` over the base file to pin every service to an
+   immutable digest, add restart policies, and bound container logs. The same
+   page covers TLS/reverse proxy, process roles, the one-shot migration
+   contract, and [what "zero-downtime" honestly
+   costs](docs/operations/deployment.md#zerolow-downtime-rollout--stated-honestly).
+3. **[Database role separation](docs/operations/database-role-separation.md)** —
+   a migrator/owner role used only by `prisma migrate deploy`, and a DML-only
+   runtime role for the running app. Works against a managed provider's
+   non-superuser admin, not just a real superuser.
+4. **[Backup & restore](docs/operations/backup-restore.md)** — pick a strategy,
+   then schedule the `restore-drill` profile so you find out a backup is
+   unrestorable before an incident does.
+5. **[Secret rotation](docs/operations/secret-rotation.md)** — per secret class,
+   what breaks and what doesn't, and how to bound or avoid a maintenance window.
+6. **[Deployment platforms](docs/operations/deployment-platforms.md)** — if you
+   are _not_ on a VPS: how AMCore's api/worker/Redis/Postgres/SSE map onto
+   Kubernetes, Cloud Run, Fly, Render, Railway, and why Vercel can host only the
+   web app. A decision matrix, not recipes — VPS/Compose is the one path this
+   repo owns end to end.
+
+Full operations index: [`docs/operations/`](docs/operations/README.md).
 
 ## Author
 

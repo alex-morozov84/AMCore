@@ -7,40 +7,58 @@ here — the Swagger/OpenAPI document at `/docs` in development is their source 
 truth. These guides cover the model, extension points, and invariants OpenAPI
 does not express.
 
+Going to production for the first time? The root README's [Going to
+production](../README.md#going-to-production) walks the six operations runbooks
+in the order you actually need them, rather than leaving you to pick from the
+list below.
+
+**On `ADR-NNN` citations — a known gap.** Code comments and guides cite
+decisions as `ADR-041`, `ADR-072`, and so on. Those records currently live in
+the maintainer's own repository and are **not** part of a fork, so today a
+citation is a dead reference for anyone but the maintainer. That is a
+documentation defect, not a design choice, and publishing them is tracked
+work. Until then: every rule you must actually follow is stated here in
+`docs/` or in the comment doing the citing — a citation only points at the
+recorded rationale behind it. If a citation is the only explanation you can
+find for something, that page is under-documented; please open an issue.
+
 ## Find the right guide
 
-| I want to…                                                                 | Go to                                                                                                                             |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Add a backend module the AMCore way                                        | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                              |
-| Add a route/page on the frontend the AMCore way                            | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                 |
-| Know which import/styling rules are enforced                               | [`frontend/fsd-boundaries-and-guardrails.md`](frontend/fsd-boundaries-and-guardrails.md)                                          |
-| Reuse or add a shared UI primitive (shadcn)                                | [`frontend/shared-ui-and-shadcn.md`](frontend/shared-ui-and-shadcn.md)                                                            |
-| Consume media/notifications/AI from the frontend                           | [`frontend/api-consumption.md`](frontend/api-consumption.md)                                                                      |
-| Add a third-party script/style origin, or run CSP in report-only           | [`frontend/browser-security-and-csp.md`](frontend/browser-security-and-csp.md)                                                    |
-| Add a frontend test / pick the right layer                                 | [`frontend/testing.md`](frontend/testing.md)                                                                                      |
-| Write or review a Storybook story                                          | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |
-| Initialize a downstream fork (rebrand, single-locale, disable Storybook)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |
-| Check or update the frontend bundle baseline                               | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                          |
-| Add an environment variable                                                | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
-| Add an external service / infra dependency                                 | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
-| Add UI copy, a locale, or an error message                                 | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
-| Configure auth, OAuth, sessions                                            | [`auth/`](auth/README.md)                                                                                                         |
-| Set up RBAC / authorization                                                | [`auth/rbac.md`](auth/rbac.md)                                                                                                    |
-| Issue scoped API keys                                                      | [`auth/api-keys.md`](auth/api-keys.md)                                                                                            |
-| Add or customize email                                                     | [`email/`](email/README.md)                                                                                                       |
-| Add a notification                                                         | [`notifications/`](notifications/README.md)                                                                                       |
-| Add an AI provider / tool / assistant / artifact                           | [`ai/`](ai/README.md)                                                                                                             |
-| Add a storage- or media-backed feature                                     | [`storage/`](storage/README.md), [`media/`](media/README.md)                                                                      |
-| Deploy, run, or operate the system                                         | [`operations/`](operations/README.md)                                                                                             |
-| Set up TLS / a reverse proxy                                               | [`operations/deployment.md`](operations/deployment.md#tls--reverse-proxy)                                                         |
-| Understand or override route rate limits                                   | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#cross-cutting-decision-points)                |
-| Let the global limiter tell BFF visitors apart                             | [`operations/deployment.md`](operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy) |
-| Understand frontend retry behavior for `429`                               | [`frontend/api-consumption.md`](frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073)                             |
-| Set up a registry-based production deploy (digest promotion, environments) | [`operations/production-deploy-profile.md`](operations/production-deploy-profile.md)                                              |
-| Back up or restore the database                                            | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
-| Set up production database role separation                                 | [`operations/database-role-separation.md`](operations/database-role-separation.md)                                                |
-| Rotate `JWT_SECRET`, DB/Redis credentials, OAuth secrets, or API keys      | [`operations/secret-rotation.md`](operations/secret-rotation.md)                                                                  |
-| Understand the CI / repo-security workflow                                 | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
+| I want to…                                                                               | Go to                                                                                                                             |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Add a backend module the AMCore way                                                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                              |
+| Add a route/page on the frontend the AMCore way                                          | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                 |
+| Know which import/styling rules are enforced                                             | [`frontend/fsd-boundaries-and-guardrails.md`](frontend/fsd-boundaries-and-guardrails.md)                                          |
+| Reuse or add a shared UI primitive (shadcn)                                              | [`frontend/shared-ui-and-shadcn.md`](frontend/shared-ui-and-shadcn.md)                                                            |
+| Consume media/notifications/AI from the frontend                                         | [`frontend/api-consumption.md`](frontend/api-consumption.md)                                                                      |
+| Add a third-party script/style origin, or run CSP in report-only                         | [`frontend/browser-security-and-csp.md`](frontend/browser-security-and-csp.md)                                                    |
+| Add a frontend test / pick the right layer                                               | [`frontend/testing.md`](frontend/testing.md)                                                                                      |
+| Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |
+| Initialize a downstream fork (rebrand, single-locale, disable Storybook)                 | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |
+| Check or update the frontend bundle baseline                                             | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                          |
+| Add an environment variable                                                              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
+| Add an external service / infra dependency                                               | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
+| Add UI copy, a locale, or an error message                                               | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
+| Configure auth, OAuth, sessions                                                          | [`auth/`](auth/README.md)                                                                                                         |
+| Set up RBAC / authorization                                                              | [`auth/rbac.md`](auth/rbac.md)                                                                                                    |
+| Issue scoped API keys                                                                    | [`auth/api-keys.md`](auth/api-keys.md)                                                                                            |
+| Add or customize email                                                                   | [`email/`](email/README.md)                                                                                                       |
+| Add a notification                                                                       | [`notifications/`](notifications/README.md)                                                                                       |
+| Add an AI provider / tool / assistant / artifact                                         | [`ai/`](ai/README.md)                                                                                                             |
+| Add a storage- or media-backed feature                                                   | [`storage/`](storage/README.md), [`media/`](media/README.md)                                                                      |
+| Deploy, run, or operate the system                                                       | [`operations/`](operations/README.md)                                                                                             |
+| Set up TLS / a reverse proxy                                                             | [`operations/deployment.md`](operations/deployment.md#tls--reverse-proxy)                                                         |
+| Understand or override route rate limits                                                 | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#cross-cutting-decision-points)                |
+| Let the global limiter tell BFF visitors apart                                           | [`operations/deployment.md`](operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy) |
+| Understand frontend retry behavior for `429`                                             | [`frontend/api-consumption.md`](frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073)                             |
+| Set up a registry-based production deploy (digest promotion, environments)               | [`operations/production-deploy-profile.md`](operations/production-deploy-profile.md)                                              |
+| Roll out a new version by digest, with restart policies and bounded logs                 | [`operations/deployment.md`](operations/deployment.md#production-rollout-via-registry-image-pull-path)                            |
+| Roll out with minimal downtime (health-gated restart, blue-green)                        | [`operations/deployment.md`](operations/deployment.md#zerolow-downtime-rollout--stated-honestly)                                  |
+| Back up or restore the database                                                          | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
+| Set up production database role separation                                               | [`operations/database-role-separation.md`](operations/database-role-separation.md)                                                |
+| Rotate `JWT_SECRET`, DB/Redis credentials, OAuth secrets, or API keys                    | [`operations/secret-rotation.md`](operations/secret-rotation.md)                                                                  |
+| Decide which platform to deploy AMCore on (K8s, Cloud Run, Fly, Render, Railway, Vercel) | [`operations/deployment-platforms.md`](operations/deployment-platforms.md)                                                        |
+| Understand the CI / repo-security workflow                                               | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
 
 ## Documentation map
 
@@ -102,8 +120,10 @@ does not express.
   profile), the production deploy profile (build-once/promote-by-digest,
   GitHub Environments), the `docker-compose.prod.yml` image-pull production
   overlay (immutable digests, restart policies, log rotation), Postgres
-  backup/restore, production database role separation, observability,
-  CI/repo security, audit log, webhooks, and idempotency.
+  backup/restore, production database role separation, secret rotation,
+  the deployment platforms decision matrix (Kubernetes, Cloud Run, Fly,
+  Render, Railway, Vercel), observability, CI/repo security, audit log,
+  webhooks, and idempotency.
 
 ## Common extension tasks
 

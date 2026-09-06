@@ -190,15 +190,6 @@ automation.
    commit was never published via step 1 fails loudly instead of building one
    for you; that failure is the point, not a bug.
 
-## What this page doesn't cover yet
-
-Tracked as separate, focused pieces of the same production-readiness
-initiative — each gets its own doc rather than growing this one indefinitely:
-
-- A secret-rotation runbook (JWT signing material, database credentials,
-  third-party API keys).
-- The platform decision matrix for managed hosting targets.
-
 ## See also
 
 - [Deployment & migrations](deployment.md) — the branch/release/environment
@@ -206,6 +197,16 @@ initiative — each gets its own doc rather than growing this one indefinitely:
   roles, TLS/reverse-proxy setup, and the `docker-compose.prod.yml`
   image-pull rollout (immutable digest pinning, restart policies, log
   rotation, and honest zero/low-downtime guidance).
+- [Database role separation](database-role-separation.md) — the
+  migrator/runtime role split behind the migrator-role secret this page's
+  checklist places in the `production` environment only.
+- [Secret rotation](secret-rotation.md) — rotating `JWT_SECRET`, database
+  credentials, and third-party API keys once they're already in place; this
+  page covers where they're placed, not how to change their value later.
+- [Deployment platforms](deployment-platforms.md) — the decision matrix for
+  managed hosting targets; this page's build-once/promote-by-digest contract
+  is demonstrated against the registry + GitHub Environments path, not tied
+  to one platform.
 - [CI & repo security](ci-security.md) — what a fork inherits automatically
   versus what must be configured separately (including GitHub Environments),
   and the immutable `v*` tag ruleset this contract relies on.

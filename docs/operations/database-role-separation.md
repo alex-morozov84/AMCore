@@ -193,3 +193,9 @@ resolve` never touch it. The production migrator role needs no shadow-DB
   environment only.
 - [Backup & restore](backup-restore.md) — what the `restore-drill` profile
   does and does not verify about roles, per above.
+- [Secret rotation](secret-rotation.md) — rotating `amcore_migrator`'s and
+  `amcore_runtime`'s passwords once they're already set up here.
+- [Deployment platforms](deployment-platforms.md) — this guide's own testing
+  against both a true superuser and a `CREATEROLE`-holding non-superuser
+  admin connection is why "our managed provider doesn't give us a
+  superuser" isn't a reason to skip role separation on any platform there.

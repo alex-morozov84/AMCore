@@ -233,7 +233,7 @@ services:
       # overwrites (never appends to) the named header; see .env.example and
       # docs/frontend/api-consumption.md.
       WEB_TRUSTED_CLIENT_IP_HEADER: ${WEB_TRUSTED_CLIENT_IP_HEADER:-}
-      # CSP mode (Track 3, ai/models-talk.md FINAL PLAN §3). This service
+      # CSP mode. This service
       # runs the standalone production build, so unset defaults to
       # "enforce" (the module's own environment-aware default); see
       # .env.example for the full contract.

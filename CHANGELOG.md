@@ -138,6 +138,32 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
   repo has no `kid`/key-ring support for JWTs — documented honestly as a
   single-secret rotation, with the gap tracked as a separate, explicitly
   deferred backlog item rather than glossed over.
+- **Deployment platforms decision matrix.** New
+  [`docs/operations/deployment-platforms.md`](docs/operations/deployment-platforms.md):
+  VPS/Compose stays the only platform with a full owned recipe; Kubernetes,
+  Cloud Run, Fly, Render, and Railway get durable, officially-sourced, dated
+  mappings of how AMCore's `api`/`worker`/Redis/Postgres/SSE pieces land on
+  each platform's own primitives, not maintained deploy scripts. No
+  maintained Helm chart ships from this repo — deliberately, to avoid a
+  second deployment artifact drifting from `docker-compose.yml` — with
+  pointers to Katenary and the official `kubernetes/kompose` project for
+  generating a starting chart. Vercel gets the most prominent caveat: `api`
+  and `worker` cannot run there at all (Vercel Functions are
+  invocation-scoped with a duration ceiling, never an unbounded persistent
+  process), and Vercel has no first-party Redis since Vercel KV's December
+  2024 discontinuation. Fly's documented autostop/autostart gotcha turns out
+  to favor AMCore's shape rather than working against it: the gotcha is
+  specifically about background work spawned from inside an HTTP handler,
+  and Fly's own recommended fix — a separate process group with no service
+  block — is exactly what AMCore's already-separate `worker` role already
+  is. Closes out the production deploy reference profile track (P1 item 5,
+  7 of 7 PRs).
+- **"Going to production" onboarding path.** Root `README.md` and
+  `docs/operations/README.md` now walk the six operations runbooks this
+  track shipped (production deploy profile, VPS/Compose rollout, database
+  role separation, backup & restore, secret rotation, deployment platforms)
+  in the order a first-time production setup actually needs them, instead of
+  leaving a reader to find each one separately from a flat doc index.
 
 ### Fixed
 
@@ -150,6 +176,21 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
   doesn't cover yet" list still named the `restore-drill` profile after it
   shipped**, a stale claim left behind by the PR that added it. Removed now
   that both `restore-drill` and DB role separation are real.
+- **`docs/operations/deployment.md` had no links to any of its five sibling
+  operations docs**, and `production-deploy-profile.md`'s own "doesn't cover
+  yet" list still named the secret-rotation runbook and platform decision
+  matrix as unwritten after both shipped — the same stale-forward-reference
+  class already fixed once for `restore-drill`. Both corrected, plus a
+  missing back-link from `database-role-separation.md` to `secret-rotation.md`.
+- **Private `ai/` repository paths leaked into five shipped, forkable
+  files** (`docker-compose.yml`, `.env.example`, `.github/dependabot.yml`,
+  `.github/workflows/ci.yml`) as comment citations a fork cannot open.
+  Removed; `docs/README.md` now names the same class of gap for `ADR-NNN`
+  source citations explicitly, since the ADR record itself remains private
+  pending an owner decision on publishing it.
+- **ADR-029 was stale**: it documented a hardcoded
+  `application_name: 'amcore-api'`, but `PrismaService` has set the
+  role-specific `amcore-${PROCESS_ROLE}` since ADR-041. Updated to match.
 
 ## [0.7.0] - 2026-09-05
 
