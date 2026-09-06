@@ -632,3 +632,24 @@ DB-heavy. Each role sets a distinct pg `application_name` (`amcore-web` /
 
 Redis Sentinel/Cluster, autoscaling policy, and sandboxed (CPU-isolated)
 processors are out of scope for this starter — extend per your platform.
+
+## See also
+
+This page is the VPS/Compose entry point; the rest of the production
+readiness surface lives in sibling docs rather than growing this one
+indefinitely:
+
+- [Production deploy profile](production-deploy-profile.md) — the
+  build-once/promote-by-digest contract and GitHub Environments/secrets
+  checklist this page's registry rollout follows.
+- [Database role separation](database-role-separation.md) — a
+  migrator/owner role distinct from the app's DML-only runtime role.
+- [Backup & restore](backup-restore.md) — which backup strategy fits your
+  deployment, and the `restore-drill` profile that rehearses an actual
+  restore.
+- [Secret rotation](secret-rotation.md) — rotating `JWT_SECRET`, database
+  credentials, `REDIS_URL`, OAuth secrets, and third-party API keys once
+  they're already running in production.
+- [Deployment platforms](deployment-platforms.md) — a decision matrix for
+  Kubernetes, Cloud Run, Fly, Render, Railway, and (with a hard caveat)
+  Vercel, if VPS/Compose isn't your target.

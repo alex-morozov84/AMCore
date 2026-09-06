@@ -103,8 +103,10 @@ does not express.
   profile), the production deploy profile (build-once/promote-by-digest,
   GitHub Environments), the `docker-compose.prod.yml` image-pull production
   overlay (immutable digests, restart policies, log rotation), Postgres
-  backup/restore, production database role separation, observability,
-  CI/repo security, audit log, webhooks, and idempotency.
+  backup/restore, production database role separation, secret rotation,
+  the deployment platforms decision matrix (Kubernetes, Cloud Run, Fly,
+  Render, Railway, Vercel), observability, CI/repo security, audit log,
+  webhooks, and idempotency.
 
 ## Common extension tasks
 
