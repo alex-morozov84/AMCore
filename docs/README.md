@@ -7,6 +7,21 @@ here — the Swagger/OpenAPI document at `/docs` in development is their source 
 truth. These guides cover the model, extension points, and invariants OpenAPI
 does not express.
 
+Going to production for the first time? The root README's [Going to
+production](../README.md#going-to-production) walks the six operations runbooks
+in the order you actually need them, rather than leaving you to pick from the
+list below.
+
+**On `ADR-NNN` citations — a known gap.** Code comments and guides cite
+decisions as `ADR-041`, `ADR-072`, and so on. Those records currently live in
+the maintainer's own repository and are **not** part of a fork, so today a
+citation is a dead reference for anyone but the maintainer. That is a
+documentation defect, not a design choice, and publishing them is tracked
+work. Until then: every rule you must actually follow is stated here in
+`docs/` or in the comment doing the citing — a citation only points at the
+recorded rationale behind it. If a citation is the only explanation you can
+find for something, that page is under-documented; please open an issue.
+
 ## Find the right guide
 
 | I want to…                                                                               | Go to                                                                                                                             |
@@ -37,6 +52,8 @@ does not express.
 | Let the global limiter tell BFF visitors apart                                           | [`operations/deployment.md`](operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy) |
 | Understand frontend retry behavior for `429`                                             | [`frontend/api-consumption.md`](frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073)                             |
 | Set up a registry-based production deploy (digest promotion, environments)               | [`operations/production-deploy-profile.md`](operations/production-deploy-profile.md)                                              |
+| Roll out a new version by digest, with restart policies and bounded logs                 | [`operations/deployment.md`](operations/deployment.md#production-rollout-via-registry-image-pull-path)                            |
+| Roll out with minimal downtime (health-gated restart, blue-green)                        | [`operations/deployment.md`](operations/deployment.md#zerolow-downtime-rollout--stated-honestly)                                  |
 | Back up or restore the database                                                          | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
 | Set up production database role separation                                               | [`operations/database-role-separation.md`](operations/database-role-separation.md)                                                |
 | Rotate `JWT_SECRET`, DB/Redis credentials, OAuth secrets, or API keys                    | [`operations/secret-rotation.md`](operations/secret-rotation.md)                                                                  |

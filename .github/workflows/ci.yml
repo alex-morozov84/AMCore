@@ -392,8 +392,7 @@ jobs:
           NEEDRESTART_MODE: a
         run: npx playwright install --with-deps chromium
 
-      # Mocked + server-mocked lanes (Track 7 FINAL PLAN §1/§4,
-      # ai/models-talk.md): infra-free, Playwright manages its own `next dev`
+      # Mocked + server-mocked lanes: infra-free, Playwright manages its own `next dev`
       # via playwright.config.ts's webServer. No env file needed — verified
       # empirically that both lanes boot and pass with none present.
       - name: Run mocked + server-mocked E2E lanes
@@ -461,7 +460,7 @@ jobs:
     # until GitHub's default 6-hour job timeout killed it instead of failing
     # fast. `web-e2e` runs the identical install command and shared this
     # exposure until it got the same fix (timeout-minutes + env vars on its
-    # own install step) per the ai/BACKLOG.md follow-up.
+    # own install step).
     timeout-minutes: 20
     steps:
       - name: Checkout

@@ -1,8 +1,26 @@
 # Operations
 
 Runbooks and contracts for deploying, running, and operating AMCore in
-production. Start with [deployment](deployment.md); reach for the others when a
-specific concern comes up.
+production.
+
+**Setting up production for the first time?** Work through these six in order —
+each one assumes the previous is done:
+
+1. [Production deploy profile](production-deploy-profile.md) — the
+   build-once/promote-by-digest contract and the GitHub Environments/secrets
+   checklist everything else assumes.
+2. [Deployment & migrations](deployment.md#production-rollout-via-registry-image-pull-path) —
+   the `docker-compose.prod.yml` overlay, TLS/reverse proxy, process roles, and
+   the migration contract.
+3. [Database role separation](database-role-separation.md) — a migrator role
+   distinct from the app's runtime role.
+4. [Backup & restore](backup-restore.md) — a strategy, plus the `restore-drill`
+   that proves it actually restores.
+5. [Secret rotation](secret-rotation.md) — before you need it, not during.
+6. [Deployment platforms](deployment-platforms.md) — only if you are not on a
+   VPS.
+
+Already running? Reach for whichever concern below applies.
 
 - **[Deployment & migrations](deployment.md)** — clone → migrate → run, locally
   and in production. One-shot `prisma migrate deploy`, production env

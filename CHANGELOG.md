@@ -158,6 +158,12 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
   block — is exactly what AMCore's already-separate `worker` role already
   is. Closes out the production deploy reference profile track (P1 item 5,
   7 of 7 PRs).
+- **"Going to production" onboarding path.** Root `README.md` and
+  `docs/operations/README.md` now walk the six operations runbooks this
+  track shipped (production deploy profile, VPS/Compose rollout, database
+  role separation, backup & restore, secret rotation, deployment platforms)
+  in the order a first-time production setup actually needs them, instead of
+  leaving a reader to find each one separately from a flat doc index.
 
 ### Fixed
 
@@ -170,6 +176,21 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
   doesn't cover yet" list still named the `restore-drill` profile after it
   shipped**, a stale claim left behind by the PR that added it. Removed now
   that both `restore-drill` and DB role separation are real.
+- **`docs/operations/deployment.md` had no links to any of its five sibling
+  operations docs**, and `production-deploy-profile.md`'s own "doesn't cover
+  yet" list still named the secret-rotation runbook and platform decision
+  matrix as unwritten after both shipped — the same stale-forward-reference
+  class already fixed once for `restore-drill`. Both corrected, plus a
+  missing back-link from `database-role-separation.md` to `secret-rotation.md`.
+- **Private `ai/` repository paths leaked into five shipped, forkable
+  files** (`docker-compose.yml`, `.env.example`, `.github/dependabot.yml`,
+  `.github/workflows/ci.yml`) as comment citations a fork cannot open.
+  Removed; `docs/README.md` now names the same class of gap for `ADR-NNN`
+  source citations explicitly, since the ADR record itself remains private
+  pending an owner decision on publishing it.
+- **ADR-029 was stale**: it documented a hardcoded
+  `application_name: 'amcore-api'`, but `PrismaService` has set the
+  role-specific `amcore-${PROCESS_ROLE}` since ADR-041. Updated to match.
 
 ## [0.7.0] - 2026-09-05
 
