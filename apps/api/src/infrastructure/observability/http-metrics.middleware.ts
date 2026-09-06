@@ -17,7 +17,7 @@ export class HttpMetricsMiddleware implements NestMiddleware {
 
     const method = req.method.toUpperCase()
     const startedAt = process.hrtime.bigint()
-    const inFlightLabels = this.metrics.inFlightLabels(method, 'pending')
+    const inFlightLabels = this.metrics.inFlightLabels(method)
     this.metrics.incHttpInFlight(inFlightLabels)
 
     // Record once on whichever fires first: `finish` (response fully sent) or

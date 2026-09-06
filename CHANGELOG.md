@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Observability metric gaps closed ahead of the upcoming runbooks/dashboards
+  track.** New `amcore_build_info`
+  info-metric (`version`/`commit` from new `APP_VERSION`/`APP_COMMIT` env
+  vars, `unknown` if unset); new `amcore_redis_ping_seconds` gauge (a cheap
+  interim Redis-latency signal); new `amcore_notification_delivery_backlog`/
+  `_due` and `amcore_ai_run_backlog`/`_due` gauges — the `notifications`/
+  `ai-runs` BullMQ queues carry only one-attempt wake jobs, so their real
+  backlog (in `notification_deliveries`/`ai_runs`) was previously invisible
+  to `amcore_queue_jobs`.
+
+### Changed
+
+- **`amcore_http_requests_in_flight` dropped its `route` label** — the label
+  could only ever hold the literal placeholder `"pending"` (routing hasn't
+  resolved at middleware entry), which is worse than no label at all. Now
+  `{method,role}` only.
+- **Raw email addresses removed from application logs.** Queued/processed/
+  sent/dead-lettered email job logs now redact the recipient address
+  (`a***@example.com`, domain kept) instead of logging it raw, and carry a
+  stable `userId` alongside it (new optional field on the internal
+  `SendEmailJobData` job schema) so a missed email stays traceable to an
+  account after the job's own retention window. The registration/login
+  success logs, which already carried `userId`, drop the raw `email` field
+  entirely. See `docs/operations/observability.md`.
+
 ## [0.8.0] - 2026-09-06
 
 ### Added

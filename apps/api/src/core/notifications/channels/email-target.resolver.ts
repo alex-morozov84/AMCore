@@ -7,18 +7,10 @@ import type {
   TargetResolutionContext,
 } from './channel-target-resolver.types'
 
+import { redactEmail } from '@/common/utils'
+
 /** Bounded terminal reason: the account email is not a usable notification target. */
 export const EMAIL_SKIP_UNVERIFIED = NotificationTerminalReason.DESTINATION_UNVERIFIED
-
-/**
- * Redact an address for the durable `destinationSnapshot` (no full address at rest):
- * keep the first local char and the domain — `a***@example.com`.
- */
-function redactEmail(email: string): string {
-  const at = email.lastIndexOf('@')
-  if (at <= 0) return '***'
-  return `${email.slice(0, 1)}***${email.slice(at)}`
-}
 
 /**
  * Email target resolver (ADR-052 / Arc B). One target per recipient — the account

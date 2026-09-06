@@ -8,6 +8,7 @@ import { EmailChannelDeliverer } from './channels/email-channel.deliverer'
 import { TelegramBotApiClient } from './channels/telegram/telegram-bot-api.client'
 import { TelegramChannelDeliverer } from './channels/telegram/telegram-channel.deliverer'
 import { NotificationDeliveryRepository } from './dispatch/notification-delivery.repository'
+import { NotificationDeliveryBacklogCollector } from './dispatch/notification-delivery-backlog.collector'
 import { NotificationDispatchProcessor } from './dispatch/notification-dispatch.processor'
 import { NotificationDispatchService } from './dispatch/notification-dispatch.service'
 import { NotificationRecoveryService } from './dispatch/notification-recovery.service'
@@ -36,6 +37,7 @@ import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.ru
   imports: [PrismaModule, NotificationsCoreModule, EmailModule],
   providers: [
     NotificationDeliveryRepository,
+    NotificationDeliveryBacklogCollector,
     EmailChannelDeliverer,
     TelegramBotApiClient,
     TelegramChannelDeliverer,

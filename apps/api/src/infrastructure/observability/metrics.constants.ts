@@ -3,6 +3,7 @@ export const METRICS_HTTP_PATH = '/api/v1/metrics'
 export const METRICS_COLLECTOR_TIMEOUT_MS = 100
 
 export const METRIC_NAMES = {
+  buildInfo: 'amcore_build_info',
   httpRequestsTotal: 'amcore_http_requests_total',
   httpRequestDurationSeconds: 'amcore_http_request_duration_seconds',
   httpRequestsInFlight: 'amcore_http_requests_in_flight',
@@ -10,9 +11,14 @@ export const METRIC_NAMES = {
   dbPoolConnections: 'amcore_db_pool_connections',
   dbSlowQueriesTotal: 'amcore_db_slow_queries_total',
   redisClientEventsTotal: 'amcore_redis_client_events_total',
+  redisPingSeconds: 'amcore_redis_ping_seconds',
   queueJobs: 'amcore_queue_jobs',
   queuePaused: 'amcore_queue_paused',
   queueEventsTotal: 'amcore_queue_events_total',
+  notificationDeliveryBacklog: 'amcore_notification_delivery_backlog',
+  notificationDeliveryDue: 'amcore_notification_delivery_due',
+  aiRunBacklog: 'amcore_ai_run_backlog',
+  aiRunDue: 'amcore_ai_run_due',
   cacheOperationsTotal: 'amcore_cache_operations_total',
   storageOperationsTotal: 'amcore_storage_operations_total',
   storageOperationDurationSeconds: 'amcore_storage_operation_duration_seconds',

@@ -148,11 +148,14 @@ export class AuthService {
 
     // Queue welcome + verification emails (non-blocking, silent fail)
     void this.emailService
-      .sendWelcomeEmail({
-        name: user.name ?? user.email,
-        email: user.email,
-        locale: userLocale,
-      })
+      .sendWelcomeEmail(
+        {
+          name: user.name ?? user.email,
+          email: user.email,
+          locale: userLocale,
+        },
+        user.id
+      )
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send welcome email'))
     void this.emailService
       .sendEmailVerificationEmail(user.email, {
@@ -163,7 +166,7 @@ export class AuthService {
       })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send verification email'))
 
-    this.logger.info({ userId: user.id, email: user.email }, 'User registered successfully')
+    this.logger.info({ userId: user.id }, 'User registered successfully')
 
     return {
       user: this.mapUserToResponse(user),
@@ -229,7 +232,7 @@ export class AuthService {
       sid: session.id,
     })
 
-    this.logger.info({ userId: user.id, email: user.email }, 'User logged in successfully')
+    this.logger.info({ userId: user.id }, 'User logged in successfully')
 
     return {
       user: this.mapUserToResponse(user),

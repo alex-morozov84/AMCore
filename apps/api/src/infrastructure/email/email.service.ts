@@ -27,6 +27,7 @@ import { getOrgInviteSubject, OrgInviteEmail } from './templates/org-invite'
 import { getPasswordResetSubject, PasswordResetEmail } from './templates/password-reset'
 import { getWelcomeSubject, WelcomeEmail } from './templates/welcome'
 
+import { redactEmail } from '@/common/utils'
 import { EnvService } from '@/env/env.service'
 import {
   type EmailMetricsMode,
@@ -121,7 +122,10 @@ export class EmailService {
 
       await this.queueService.add(QueueName.EMAIL, JobName.SEND_EMAIL, jobData, EMAIL_JOB_OPTIONS)
       this.observe(jobData.template, 'dispatch', 'queued', 'success', undefined, startedAt)
-      this.logger.info({ template: jobData.template, to: jobData.to }, 'Email queued')
+      this.logger.info(
+        { template: jobData.template, to: redactEmail(jobData.to), userId: jobData.userId },
+        'Email queued'
+      )
     } catch (error) {
       this.observe(jobData.template, 'dispatch', 'queued', 'error', undefined, startedAt)
       throw error
@@ -149,16 +153,19 @@ export class EmailService {
       throw new Error(result.error || 'Email sending failed')
     }
 
-    this.logger.info({ template, to }, 'Email sent (direct, not queued)')
+    this.logger.info({ template, to: redactEmail(to) }, 'Email sent (direct, not queued)')
   }
 
   /**
-   * Send welcome email after registration
+   * Send welcome email after registration. `userId` (N10) is a stable
+   * pseudonym logged alongside the redacted address so a missed welcome
+   * email stays traceable to an account without a raw address in logs.
    */
-  async sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
+  async sendWelcomeEmail(data: WelcomeEmailData, userId?: string): Promise<void> {
     await this.queue({
       template: EmailTemplate.WELCOME,
       to: data.email,
+      userId,
       data,
     })
   }
