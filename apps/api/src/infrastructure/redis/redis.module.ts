@@ -6,6 +6,7 @@ import { REDIS_CLIENT } from './redis.constants'
 import { RedisConnectionService } from './redis-connection.service'
 import { RedisLockService } from './redis-lock.service'
 import { RedisMutexService } from './redis-mutex.service'
+import { RedisPingMetricsCollector } from './redis-ping-metrics.collector'
 
 @Global()
 @Module({
@@ -14,6 +15,7 @@ import { RedisMutexService } from './redis-mutex.service'
     RedisConnectionService,
     RedisLockService,
     RedisMutexService,
+    RedisPingMetricsCollector,
     {
       provide: REDIS_CLIENT,
       inject: [RedisConnectionService],

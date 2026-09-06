@@ -69,6 +69,11 @@ export class NotificationDeliveryRepository {
    * transaction with no external I/O. Due = `PENDING`/`RETRY_SCHEDULED` whose
    * `availableAt`/`nextAttemptAt` have arrived. `SKIP LOCKED` lets every worker/replica
    * drain disjoint rows without blocking.
+   *
+   * `NotificationDeliveryBacklogCollector.collectDue()` mirrors this exact
+   * predicate for the `amcore_notification_delivery_due` gauge — change one,
+   * change the other, or the alertable count silently stops matching what
+   * this claims.
    */
   async claimDueBatch(limit: number = NOTIFICATION_CLAIM_BATCH_LIMIT): Promise<ClaimedDelivery[]> {
     const leaseToken = randomUUID()

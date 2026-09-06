@@ -13,6 +13,8 @@ describe('MetricsService', () => {
           PROCESS_ROLE: 'web',
           NODE_ENV: 'test',
           METRICS_ENABLED: true,
+          APP_VERSION: '0.0.0-test',
+          APP_COMMIT: 'deadbeef',
         }
         return values[key]
       }),
@@ -41,6 +43,32 @@ describe('MetricsService', () => {
     expect(firstMetrics).toContain(METRIC_NAMES.httpRequestsTotal)
     expect(firstMetrics).toContain('route="/api/v1/health"')
     expect(secondMetrics).not.toContain('route="/api/v1/health"')
+  })
+
+  it('exposes a static build_info gauge set once at construction (N6)', async () => {
+    const service = makeService()
+
+    const output = await service.metrics()
+    const line = output.split('\n').find((l) => l.startsWith(`${METRIC_NAMES.buildInfo}{`))
+    expect(line).toContain('version="0.0.0-test"')
+    expect(line).toContain('commit="deadbeef"')
+    expect(line).toContain(`node_version="${process.version}"`)
+    expect(line).toContain('role="web"')
+    expect(line?.endsWith(' 1')).toBe(true)
+  })
+
+  it('does not label the in-flight gauge by route (N1 — the route has not resolved yet)', async () => {
+    const service = makeService()
+
+    service.incHttpInFlight(service.inFlightLabels('GET'))
+
+    const output = await service.metrics()
+    const line = output
+      .split('\n')
+      .find((l) => l.startsWith(`${METRIC_NAMES.httpRequestsInFlight}{`))
+    expect(line).toContain('method="GET"')
+    expect(line).toContain('role="web"')
+    expect(line).not.toContain('route=')
   })
 
   it('can construct two instances in one process without duplicate registration', () => {

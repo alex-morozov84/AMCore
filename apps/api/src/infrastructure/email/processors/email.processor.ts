@@ -9,6 +9,7 @@ import { EmailService } from '../email.service'
 import type { SendEmailJobData } from '../email.types'
 import { EmailTemplate, SECRET_EMAIL_TEMPLATES } from '../email.types'
 
+import { redactEmail } from '@/common/utils'
 import type { EmailMetricsTemplate } from '@/infrastructure/observability'
 import { MetricsService } from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
@@ -74,6 +75,10 @@ export class EmailProcessor extends WorkerHost {
       typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
     const template = typeof rawRecord.template === 'string' ? rawRecord.template : undefined
     const to = typeof rawRecord.to === 'string' ? rawRecord.to : undefined
+    // Stable pseudonym (N10) logged alongside the redacted `to` below — never
+    // the raw address, in the routine `info`/`warn` lines or the terminal
+    // `error` dead-letter one.
+    const userId = typeof rawRecord.userId === 'string' ? rawRecord.userId : undefined
 
     // EQS-02 boundary guard — MUST stay first, and fire ONLY for a KNOWN
     // secret-bearing template. Discard WITHOUT rendering/sending and WITHOUT
@@ -84,7 +89,7 @@ export class EmailProcessor extends WorkerHost {
     // observably dead-lettered, not silently completed. Never log `data`.
     if (template !== undefined && SECRET_EMAIL_TEMPLATES.has(template as EmailTemplate)) {
       this.logger.warn(
-        { jobId: job.id, template, to },
+        { jobId: job.id, template, to: redactEmail(to), userId },
         'Discarded secret-bearing email job (must not be queued — EQS-02)'
       )
       this.observeProcess(metricTemplate, 'discarded', false, startedAt)
@@ -99,7 +104,13 @@ export class EmailProcessor extends WorkerHost {
     const parsed = sendEmailJobDataSchema.safeParse(raw)
     if (!parsed.success) {
       this.logger.warn(
-        { jobId: job.id, template, to, issues: parsed.error.issues.map((i) => i.path.join('.')) },
+        {
+          jobId: job.id,
+          template,
+          to: redactEmail(to),
+          userId,
+          issues: parsed.error.issues.map((i) => i.path.join('.')),
+        },
         'Invalid email job payload — discarding without retry'
       )
       throw new UnrecoverableError('Invalid email job payload')
@@ -109,7 +120,8 @@ export class EmailProcessor extends WorkerHost {
       {
         jobId: job.id,
         template: parsed.data.template,
-        to: parsed.data.to,
+        to: redactEmail(parsed.data.to),
+        userId: parsed.data.userId,
         attempt: job.attemptsMade + 1,
       },
       `Processing email job ${job.id}`
@@ -127,7 +139,7 @@ export class EmailProcessor extends WorkerHost {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       this.logger.warn(
-        { jobId: job.id, template, to, error: message },
+        { jobId: job.id, template, to: redactEmail(to), userId, error: message },
         'Email render failed (deterministic) — discarding without retry'
       )
       throw new UnrecoverableError(`Email render failed: ${message}`)
@@ -151,20 +163,30 @@ export class EmailProcessor extends WorkerHost {
 
       if (result.retryable === false) {
         this.logger.warn(
-          { jobId: job.id, template, to, error: message },
+          { jobId: job.id, template, to: redactEmail(to), userId, error: message },
           'Email send failed (deterministic) — discarding without retry'
         )
         throw new UnrecoverableError(message)
       }
 
       this.logger.warn(
-        { jobId: job.id, template, to, error: message, attempt: job.attemptsMade + 1 },
+        {
+          jobId: job.id,
+          template,
+          to: redactEmail(to),
+          userId,
+          error: message,
+          attempt: job.attemptsMade + 1,
+        },
         'Email send failed (transient) — will retry'
       )
       throw new Error(message)
     }
 
-    this.logger.info({ id: result.id, template, to }, 'Email sent successfully')
+    this.logger.info(
+      { id: result.id, template, to: redactEmail(to), userId },
+      'Email sent successfully'
+    )
     this.observeProcess(metricTemplate, 'success', undefined, startedAt)
   }
 
@@ -188,7 +210,8 @@ export class EmailProcessor extends WorkerHost {
         event: 'email.job.dead_letter',
         jobId: job.id,
         template: job.data?.template,
-        to: job.data?.to,
+        to: redactEmail(job.data?.to),
+        userId: job.data?.userId,
         attemptsMade: job.attemptsMade,
         unrecoverable,
         error: error?.message,
