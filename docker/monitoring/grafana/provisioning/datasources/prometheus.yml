@@ -1,0 +1,14 @@
+# AMCore — Grafana datasource provisioning for the `monitoring` dev compose
+# profile. Auto-registers Prometheus so a fresh
+# `docker compose --profile monitoring up` needs no manual datasource
+# click-through before dashboards resolve their queries.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

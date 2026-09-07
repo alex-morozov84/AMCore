@@ -21,9 +21,21 @@
 # one-shot restore). Logical-dump fallback only, NOT point-in-time recovery —
 # see docs/operations/backup-restore.md.
 #
+# Optional bundled monitoring (COMPOSE_PROFILES=...,monitoring): a dev-only
+# Prometheus + Grafana + Alertmanager harness that scrapes THIS stack's real
+# api/worker metrics — never part of docker-compose.prod.yml, never a
+# production monitoring stack. Requires METRICS_AUTH_TOKEN and
+# GF_SECURITY_ADMIN_PASSWORD set in .env (compose refuses to start `prometheus`/
+# `grafana` otherwise — no insecure default). See
+# docs/operations/observability.md → "Local Verification Harness".
+#
 # Requires Docker Compose v2.20.2+ (depends_on `required:false`,
-# `service_completed_successfully`). Production hardening (sslmode, S3, real JWT
-# secret >= 32 chars) is documented in docs/operations/deployment.md.
+# `service_completed_successfully`; this floor already comfortably covers
+# top-level `secrets: <name>: environment:` too, which the `monitoring`
+# profile's `prometheus` service uses to source its scrape bearer token from
+# the host env without ever writing it to a tracked file — that feature
+# shipped in Compose v2.6.0, 2022-05-30). Production hardening (sslmode, S3,
+# real JWT secret >= 32 chars) is documented in docs/operations/deployment.md.
 #
 # Production image-pull rollout: apply docker-compose.prod.yml on top of this
 # file (`-f docker-compose.yml -f docker-compose.prod.yml`) to pin api/worker/
@@ -79,6 +91,13 @@ x-app-env: &app-env
   NOTIFICATIONS_REALTIME_MAX_STREAM_LIFETIME_MS: ${NOTIFICATIONS_REALTIME_MAX_STREAM_LIFETIME_MS:-3600000}
   NOTIFICATIONS_REALTIME_PUBLISH_TIMEOUT_MS: ${NOTIFICATIONS_REALTIME_PUBLISH_TIMEOUT_MS:-1000}
   NOTIFICATIONS_REALTIME_MAX_INFLIGHT_PUBLISH: ${NOTIFICATIONS_REALTIME_MAX_INFLIGHT_PUBLISH:-1000}
+  # Prometheus metrics-endpoint bearer token (ADR-042). Empty by default —
+  # `optionalEnvString()` treats "" as unset, so the metrics route stays open
+  # (matching the app's own env-schema default) unless a real token is set.
+  # The `monitoring` profile's `prometheus` service requires this var to be
+  # set (its Compose secret refuses to start otherwise) so the harness always
+  # exercises the authenticated scrape path, never the open default.
+  METRICS_AUTH_TOKEN: ${METRICS_AUTH_TOKEN:-}
 
 # Health-only Node fetch check (node:24-slim has no wget/curl). Readiness, so
 # web waits for DB/Redis to be usable; the worker uses it for liveness too.
@@ -346,9 +365,110 @@ services:
       - postgres_backups:/backups:ro
     restart: 'no'
 
+  # ---------------------------------------------------------------------------
+  # Optional bundled monitoring — OPTIONAL, only with
+  # COMPOSE_PROFILES=...,monitoring. Dev-only verification harness: proves the
+  # metric surface, alert rules, and dashboards this repo ships actually work
+  # against THIS stack's real api/worker, before a fork wires its own
+  # production Prometheus/Grafana/Alertmanager (this profile is never applied
+  # by docker-compose.prod.yml, never a production stack of its own). All
+  # three ports are loopback-only, unlike postgres/redis above — ADR-072
+  # precedent extended here because Grafana is a web UI, not a bare data
+  # port. See docs/operations/observability.md → "Local Verification
+  # Harness".
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    profiles: ['monitoring']
+    ports:
+      - '127.0.0.1:9090:9090'
+    secrets:
+      - metrics_auth_token
+    volumes:
+      - ./docker/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docs/operations/prometheus:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.0@sha256:690c7b525f4367aa91f73e2f91c632206d32e97c6384bdbf2fb7a861b420340d
+    profiles: ['monitoring']
+    ports:
+      - '127.0.0.1:9093:9093'
+    volumes:
+      - ./docker/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+
+  grafana:
+    image: grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    profiles: ['monitoring']
+    # Official image's entrypoint is /run.sh. Wrapped here (rather than a
+    # custom Dockerfile) so an empty/unset GF_SECURITY_ADMIN_PASSWORD fails
+    # this container loudly at startup instead of silently falling back to
+    # Grafana's own built-in "admin" default — mirrors the `caddy` service's
+    # existing "fails inside the container at startup, only when this profile
+    # is active" pattern (see the top-of-file comment on `:?` vs. profile
+    # gating; the same reasoning blocks using `:?` directly here).
+    entrypoint:
+      - sh
+      - -c
+      - |
+        if [ -z "$$GF_SECURITY_ADMIN_PASSWORD" ]; then
+          echo 'GF_SECURITY_ADMIN_PASSWORD must be set in .env to use the monitoring profile (no shipped default admin password).' >&2
+          exit 1
+        fi
+        exec /run.sh
+    ports:
+      - '127.0.0.1:3001:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-}
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      # The pinned digest fixes Grafana's OWN code but not its default
+      # runtime behavior: Grafana 12+ preinstalls a fixed set of plugins
+      # (metricsdrilldown, exploretraces, lokiexplore, pyroscope-app) from
+      # the network on every boot with an empty `grafana_data` volume,
+      # selecting their latest version at install time — verified live,
+      # confirmed unrelated to the datasource/dashboards this profile ships.
+      # Disabled so a clean boot installs nothing beyond the pinned image and
+      # two clean boots on different dates produce the same result.
+      GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+      # Same offline/deterministic reasoning: don't let a clean boot phone
+      # home to grafana.com for update/version checks.
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+    volumes:
+      - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+secrets:
+  # Sourced from the host env var of the same name, never written to a file
+  # this repo tracks — Compose materializes /run/secrets/metrics_auth_token
+  # inside `prometheus` only, and only while the `monitoring` profile is
+  # active. Compose refuses to start `prometheus` if METRICS_AUTH_TOKEN is
+  # entirely unset (verified: "environment variable ... is not set"); a set-
+  # but-empty value creates no file at all, which `prometheus.yml`'s
+  # `credentials_file` would then fail to read — so an operator activating
+  # this profile must set a real, non-empty token, not leave the var present
+  # but blank.
+  metrics_auth_token:
+    environment: METRICS_AUTH_TOKEN
+
 volumes:
   postgres_data:
   redis_data:
   caddy_data:
   caddy_config:
   postgres_backups:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:

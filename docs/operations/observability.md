@@ -283,3 +283,53 @@ specs.
 `PROCESS_ROLE=web`, `worker`, and `all` all expose metrics. The worker has no
 business API routes and no Bull Board, but does expose health and metrics so
 Kubernetes can probe it and Prometheus can scrape it.
+
+## Local Verification Harness
+
+An optional `monitoring` Docker Compose profile ships a dev-only
+Prometheus + Grafana + Alertmanager stack that scrapes **this repo's own**
+`api`/`worker` containers over the real, authenticated `/api/v1/metrics`
+path above — it exists to prove the metric surface, alert rules, and
+dashboards this repo ships actually work, before a fork wires its own
+production monitoring stack. It is never part of `docker-compose.prod.yml`
+and is not itself a production monitoring stack.
+
+```bash
+# .env: set METRICS_AUTH_TOKEN and GF_SECURITY_ADMIN_PASSWORD first — both
+# are required; Compose refuses to start prometheus/grafana otherwise.
+docker compose --profile local-infra --profile monitoring up -d
+```
+
+- **Prometheus** — `http://localhost:9090`, scrapes `api`/`worker` with a
+  bearer token sourced from a Compose secret (never written to a tracked
+  file), so the harness always exercises the same authenticated path a real
+  deployment must use, never the open default.
+- **Grafana** — `http://localhost:3001`, Prometheus datasource
+  auto-provisioned; sign in as `admin` with the password you set. No default
+  admin password ships — an unset `GF_SECURITY_ADMIN_PASSWORD` fails the
+  container at startup rather than falling back to one.
+- **Alertmanager** — `http://localhost:9093`.
+- All three ports are loopback-only (`127.0.0.1`).
+
+**`GF_SECURITY_ADMIN_PASSWORD` only sets the _initial_ password for a fresh
+`grafana_data` volume** — it does not rotate an existing one on a later
+`up`/restart, since Grafana persists its own user database there. Changing
+the `.env` value alone after the volume already exists has no effect (the
+old password keeps working, the new one doesn't). To actually change it: set
+the new value in `.env`, recreate only `grafana` so it picks the new value
+up, then reset from that same container-local env var — never typing the
+password itself into a command, which would otherwise leak it into shell
+history and process listings:
+
+```bash
+docker compose --profile monitoring up -d --no-deps --force-recreate grafana
+docker compose --profile monitoring exec grafana sh -c \
+  'printf "%s" "$GF_SECURITY_ADMIN_PASSWORD" | grafana cli admin reset-admin-password --password-from-stdin'
+```
+
+Alert rules (`docs/operations/prometheus/`) and dashboards
+(`docker/monitoring/grafana/dashboards/`) are empty today — this harness is
+the verification scaffold they land in and are proven against next, not a
+demo. Alertmanager's own config
+(`docker/monitoring/alertmanager/alertmanager.yml`) is a placeholder for the
+same reason.
