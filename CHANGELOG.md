@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multi-burn-rate SLO alerting layer
   (`docs/operations/prometheus/optional/amcore-slo-burn-rate.yml`) ships
   alongside it. See `docs/operations/observability.md` → "Alerting".
+- **Shipped Grafana dashboard** (`docker/monitoring/grafana/dashboards/amcore-overview.json`)
+  covering every metric-family category, auto-provisioned by the
+  `monitoring` profile. Every panel's query was checked against this
+  stack's own real scraped data before shipping. The Prometheus datasource
+  now has a fixed `uid` so dashboard JSON can reference it reliably; a
+  `grafana_data` volume created before this change migrates automatically
+  on the next restart (verified against a real pre-existing volume, not
+  only a clean one).
 
 ### Changed
 

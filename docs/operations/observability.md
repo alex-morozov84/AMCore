@@ -327,9 +327,12 @@ docker compose --profile monitoring exec grafana sh -c \
   'printf "%s" "$GF_SECURITY_ADMIN_PASSWORD" | grafana cli admin reset-admin-password --password-from-stdin'
 ```
 
-Dashboards (`docker/monitoring/grafana/dashboards/`) are empty today — a
-later pass populates and proves them against this same harness. Alert rules
-and Alertmanager routing already ship — see "Alerting" below.
+`docker/monitoring/grafana/dashboards/amcore-overview.json` ships one
+dashboard — Grafana's own dashboard provisioning loads it automatically
+from the bind-mounted directory, no click-through needed — covering every
+metric-family category below, one row per category, verified against real
+scraped data from this same harness. Alert rules and Alertmanager routing
+also ship — see "Alerting" below.
 
 ## Alerting
 

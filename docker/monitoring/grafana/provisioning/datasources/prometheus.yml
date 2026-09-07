@@ -5,8 +5,29 @@
 
 apiVersion: 1
 
+# Deletes any existing "Prometheus" datasource (matched by name) before the
+# entry below re-creates it with an explicit uid. Required, not defensive
+# boilerplate: an earlier version of this file shipped with no explicit
+# `uid` (Grafana auto-generated one), so any `grafana_data` volume created
+# before dashboard JSON started referencing a fixed uid has a "Prometheus"
+# datasource under a DIFFERENT, auto-generated uid. Reproduced directly:
+# restarting `grafana` on such a volume with only the `uid:` line added
+# below (no `deleteDatasources`) makes the whole container fail to start —
+# "Datasource provisioning error: data source not found" — not just a
+# broken panel. `deleteDatasources` + re-declaring under the new uid in the
+# same file is Grafana's own documented fix for exactly this migration;
+# verified it boots clean both on a volume carrying the old auto-generated
+# uid and on a brand new one.
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
 datasources:
   - name: Prometheus
+    # Fixed, explicit uid (rather than Grafana's own auto-generated hash) so
+    # dashboard JSON provisioned alongside this file can reference this
+    # datasource by a stable id that never changes across a re-provision.
+    uid: amcore-prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
