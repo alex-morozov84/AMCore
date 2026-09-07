@@ -1,0 +1,132 @@
+# AMCore — optional multiwindow multi-burn-rate SLO alerting (Google SRE
+# Workbook, "Alerting on SLOs"), covering the same HTTP error-ratio SLI as
+# amcore-alerts.yml's symptom-based thresholds, but tied to a chosen
+# availability target instead of fixed percentages.
+#
+# OFF BY DEFAULT: this directory (docs/operations/prometheus/optional/) is
+# NOT included in docker/monitoring/prometheus/prometheus.yml's default
+# `rule_files` glob (a single `*.yml` there only reaches the parent
+# directory, not this subdirectory — Prometheus glob patterns are not
+# recursive). To enable, add one line to that file's `rule_files`:
+#   - /etc/prometheus/rules/optional/*.yml
+# (the directory is already bind-mounted into the container by the
+# existing `- ./docs/operations/prometheus:/etc/prometheus/rules:ro`
+# volume in docker-compose.yml — no compose change needed, only the
+# prometheus.yml line above.)
+#
+# `amcore:slo_target` below is the one number a fork edits to choose a
+# different target than the shipped 0.999 (99.9% availability, "three
+# nines"). No real AMCore production traffic exists to derive a target
+# from — 0.999 is a commonly-cited web-service starting point, not a
+# measured fact about this starter.
+#
+# Burn-rate math (verified against the Google SRE Workbook's own worked
+# table, https://sre.google/workbook/alerting-on-slos/, on a 30-day
+# window):
+#   | Severity | Long window | Short window | Burn rate | Budget consumed |
+#   |----------|-------------|---------------|-----------|-----------------|
+#   | page     | 1h          | 5m            | 14.4x     | 2%              |
+#   | page     | 6h          | 30m           | 6x        | 5%              |
+#   | ticket   | 3d          | 6h            | 1x        | 10%             |
+# A multiwindow condition (both the long AND short window burning fast)
+# avoids paging on a brief spike that the long window hasn't caught up to
+# yet, and avoids missing a real outage that started recently enough that
+# the long window alone still looks fine.
+#
+# No `for:` clause on either alert below — this is deliberate, not an
+# oversight. The Workbook's own method is that the multiwindow condition
+# itself IS the debounce: the short window already requires the burn to be
+# real and current, and the long window already requires it to be
+# sustained, so an additional `for:` only adds pure, undocumented extra
+# delay on top of the specific budget-consumption percentages in the table
+# above (a `for: 5m` on an already-multiwindow fast-burn condition would
+# mean "page only after 2% of the monthly budget is gone AND 5 more
+# minutes," not "page at 2%").
+#
+# The fast (1h/5m) and slow (6h/30m) page-severity conditions are combined
+# with `or` into ONE alert rule, not two independent ones — this is the
+# Workbook's own explicit recipe, not a simplification. Its own words:
+# "To avoid multiple alerts from firing if all conditions are true, you
+# need to implement alert suppression... This scenario will trigger three
+# notifications unless the monitoring system is smart enough to prevent it
+# from doing so" — and its worked example combines exactly this way, one
+# `or` per severity. Two independent alert rules sharing `severity: page`
+# would both go `firing` during a severe, sustained outage (a high enough
+# error rate satisfies every window's threshold at once) and
+# `group_by: ['alertname']` in `docker/monitoring/alertmanager/alertmanager.yml`
+# would then send two separate notifications for the one incident — a real
+# duplicate-paging defect, not a hypothetical one. The ticket-severity
+# condition (3d/6h) stays a separate alert: it is a different severity
+# tier from page, so it is not a duplicate of either page condition and
+# does not need combining with them.
+
+groups:
+  - name: amcore-slo-target
+    rules:
+      - record: amcore:slo_target
+        expr: vector(0.999)
+
+  - name: amcore-slo-error-ratio
+    rules:
+      - record: amcore:http_requests:error_ratio5m
+        expr: |
+          sum(rate(amcore_http_requests_total{status_code=~"5..",route!~"/api/v1/health.*"}[5m]))
+          /
+          sum(rate(amcore_http_requests_total{route!~"/api/v1/health.*"}[5m]))
+      - record: amcore:http_requests:error_ratio30m
+        expr: |
+          sum(rate(amcore_http_requests_total{status_code=~"5..",route!~"/api/v1/health.*"}[30m]))
+          /
+          sum(rate(amcore_http_requests_total{route!~"/api/v1/health.*"}[30m]))
+      - record: amcore:http_requests:error_ratio1h
+        expr: |
+          sum(rate(amcore_http_requests_total{status_code=~"5..",route!~"/api/v1/health.*"}[1h]))
+          /
+          sum(rate(amcore_http_requests_total{route!~"/api/v1/health.*"}[1h]))
+      - record: amcore:http_requests:error_ratio6h
+        expr: |
+          sum(rate(amcore_http_requests_total{status_code=~"5..",route!~"/api/v1/health.*"}[6h]))
+          /
+          sum(rate(amcore_http_requests_total{route!~"/api/v1/health.*"}[6h]))
+      - record: amcore:http_requests:error_ratio3d
+        expr: |
+          sum(rate(amcore_http_requests_total{status_code=~"5..",route!~"/api/v1/health.*"}[3d]))
+          /
+          sum(rate(amcore_http_requests_total{route!~"/api/v1/health.*"}[3d]))
+
+  - name: amcore-slo-burn-rate
+    rules:
+      # Fast (1h/5m, 14.4x, 2% budget) OR slow (6h/30m, 6x, 5% budget) —
+      # combined into one alert so a severe outage satisfying both never
+      # sends two separate page notifications for the same incident
+      # (Google SRE Workbook's own explicit recipe for this exact problem).
+      - alert: AMCoreErrorBudgetPageBurn
+        expr: |
+          (
+            (amcore:http_requests:error_ratio1h / (1 - amcore:slo_target)) > 14.4
+            and
+            (amcore:http_requests:error_ratio5m / (1 - amcore:slo_target)) > 14.4
+          )
+          or
+          (
+            (amcore:http_requests:error_ratio6h / (1 - amcore:slo_target)) > 6
+            and
+            (amcore:http_requests:error_ratio30m / (1 - amcore:slo_target)) > 6
+          )
+        labels:
+          severity: page
+        annotations:
+          summary: 'AMCore error budget burning fast enough to page'
+          description: 'Either the 1h+5m windows exceed 14.4x the burn rate implied by amcore:slo_target (2% of the 30-day budget in ~1h) or the 6h+30m windows exceed 6x (5% of the budget in ~6h) — both are real, ongoing outages at different speeds, reported as one alert so they never double-page for the same incident.'
+          runbook_path: docs/operations/runbooks/http.md#slo-burn-rate
+      - alert: AMCoreErrorBudgetTicketBurn
+        expr: |
+          (amcore:http_requests:error_ratio3d / (1 - amcore:slo_target)) > 1
+          and
+          (amcore:http_requests:error_ratio6h / (1 - amcore:slo_target)) > 1
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'AMCore error budget consumption worth a ticket (10% over 3d at this rate)'
+          description: 'Both the 3d and 6h error-ratio windows exceed 1x the burn rate implied by amcore:slo_target — not urgent, but the monthly budget is being spent faster than the target allows.'
+          runbook_path: docs/operations/runbooks/http.md#slo-burn-rate

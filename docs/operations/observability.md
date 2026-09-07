@@ -327,9 +327,97 @@ docker compose --profile monitoring exec grafana sh -c \
   'printf "%s" "$GF_SECURITY_ADMIN_PASSWORD" | grafana cli admin reset-admin-password --password-from-stdin'
 ```
 
-Alert rules (`docs/operations/prometheus/`) and dashboards
-(`docker/monitoring/grafana/dashboards/`) are empty today — this harness is
-the verification scaffold they land in and are proven against next, not a
-demo. Alertmanager's own config
-(`docker/monitoring/alertmanager/alertmanager.yml`) is a placeholder for the
-same reason.
+Dashboards (`docker/monitoring/grafana/dashboards/`) are empty today — a
+later pass populates and proves them against this same harness. Alert rules
+and Alertmanager routing already ship — see "Alerting" below.
+
+## Alerting
+
+`docs/operations/prometheus/amcore-alerts.yml` ships one Prometheus rule
+group per metric category above (HTTP errors, Node runtime, metrics
+collector health, DB, Redis, queues, email, realtime). Every rule carries
+`severity: ticket` (an operator follow-up, not urgent) or `severity: page`
+(meant to wake someone) and a `runbook_path` — a **repo-relative path, not
+a URL** (named honestly rather than as `runbook_url`, since Alertmanager
+cannot resolve a bare relative path against a Git checkout the way a real
+hyperlink would need) — a fork's own checkout has the linked file at the
+same relative location regardless of its Git remote. The runbooks themselves
+(`docs/operations/runbooks/`) land in a later pass; the links are correct,
+forward references until then.
+
+Every alert is proven, not just written: every one of the 32 rules in
+`docs/operations/prometheus/tests/amcore-alerts_test.yml` has both a
+firing-case test (fires on a constructed bad case) and a genuine
+healthy-case test (`exp_alerts: []`, stays silent when nothing is wrong).
+Every alert that joins two metric families with a boolean `or`/`and` — the
+paused-queue gate, the outbox backlog, all eight `or`-combined realtime
+alerts — additionally has an asymmetric-health firing test (one side
+explicitly healthy, the other firing): a _positive_ assertion that the
+alert still fires correctly, proving neither side can mask or leak into
+the other. An earlier draft of the outbox alerts had exactly that masking
+bug (a bare `(amcore_notification_delivery_due or amcore_ai_run_due) > N`
+silently returns only whichever side PromQL's `or` happens to keep once
+the two series' label sets match, hiding the other's real value
+completely) — caught by review before it ever shipped, which is why this
+test class is mandatory here, not just encouraged.
+`docker/monitoring/prometheus/prometheus.yml`'s `rule_files` already
+globs this directory, so the alerts load automatically once the
+`monitoring` profile is up; CI's `promtool` job runs `promtool check
+config`/`check rules`/`test rules` against the exact shipped files on every
+PR.
+
+**Deliberately not alerted** (no invented number where the underlying table
+in this guide's own design notes gives none, or an explicit "never"): HTTP
+saturation (`amcore_http_requests_in_flight`'s "sustained near historical
+max" needs a per-fork traffic baseline this starter cannot ship), HTTP
+latency's page tier (needs an app-level request timeout budget this starter
+does not itself define), realtime `no_local_target` (expected and high in
+multi-replica fan-out), realtime connection-count gauges (a bare drop to
+zero is normal overnight), realtime slow-close's relative "baseline
+rate"/"sharp spike", AI provider/tool-failure rows (provider bursts are
+often transient — paging on them trains operators to ignore the channel),
+AI approval expiry (a process signal, never a page), and rate-limit burst
+calibration (a periodic review input, not an alert). Each is called out
+again, in place, as a comment in `amcore-alerts.yml` itself.
+
+**Alertmanager** (`docker/monitoring/alertmanager/alertmanager.yml`) routes
+by the `severity` label to a `page` or `ticket` receiver, neither with an
+active integration by default — every alert routes successfully today but
+reaches no one, since this repo never bakes real credentials into a public
+config file. `docker/monitoring/alertmanager/tests/alertmanager.example-full.yml`
+is the CI-checked (`amtool check-config`, every PR) example for both
+native receiver types this repo expects a fork to actually want, email and
+Telegram (no bridge/exporter process needed for either) — copy its
+`email_configs`/`telegram_configs` blocks into the real file's receivers
+and drop the matching secret file(s) into
+`docker/monitoring/alertmanager/secrets/` (gitignored, always mounted into
+the container — see its README) to actually receive alerts. One worked
+`inhibit_rule` example ships too: a queue-critical Redis client
+reconnecting for 5m straight suppresses the queue/outbox backlog alerts
+that would otherwise also fire during the same outage — a derived symptom
+of the same root cause, not independent new information.
+
+**Binding architectural rule:** AMCore's own notification subsystem
+(`in_app`/`email`/`telegram` via `NotificationChannel`) must never carry
+infrastructure alerts — both its delivery paths run over the same
+Redis/Postgres this alerting exists to monitor, so an alert about (for
+example) a Redis outage routed through either path would sit inside the
+very queue that is broken. Alertmanager runs beside the app, not inside it;
+the email/Telegram receivers above are configured entirely independently of
+`NotificationChannel`.
+
+### Optional: SLO burn-rate alerting
+
+`docs/operations/prometheus/optional/amcore-slo-burn-rate.yml` ships a
+second, independent alerting layer: Google SRE Workbook-style multiwindow
+multi-burn-rate alerting tied to a chosen availability target
+(`amcore:slo_target`, shipped at `0.999` — no real AMCore production
+traffic exists to derive a target from, so this is a reasoned starting
+point, not a measured fact) rather than the fixed percentages
+`amcore-alerts.yml` uses. **Off by default**: this `optional/` subdirectory
+is not reached by `prometheus.yml`'s `rule_files: - /etc/prometheus/rules/*.yml`
+glob (Prometheus globs are not recursive) — enable it by adding
+`- /etc/prometheus/rules/optional/*.yml` to that file. Proven the same way,
+in `optional/tests/amcore-slo-burn-rate_test.yml`, including a test that the
+multiwindow condition is real (a short-lived spike diluted by a healthy
+long window must not page).

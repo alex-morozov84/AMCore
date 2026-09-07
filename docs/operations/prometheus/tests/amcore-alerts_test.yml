@@ -1,0 +1,1074 @@
+# AMCore — promtool unit tests for amcore-alerts.yml. Every alert in that
+# file has at least one test proving it actually fires on the bad case —
+# a wrong label value or selector that would silently never fire is exactly
+# the defect class a test suite like this exists to catch. A smaller set of
+# targeted negative-case tests cover the highest-risk selectors: the
+# paused-gate join, the outbox `or` across two metric families, the
+# collector-errors label match, and the DB pool threshold boundary.
+#
+# Route labels below use the real global prefix (`/api/v1/...`), matching
+# production — the e2e test app's unprefixed `/health/ready` would silently
+# defeat the `route!~"/api/v1/health.*"` selector every real alert here
+# depends on.
+#
+# Every `exp_labels`/`exp_annotations` block below is the FULL, exact set
+# `promtool test rules` computes — not a partial/best-effort guess. Omitting
+# `exp_annotations` does not mean "don't care": promtool compares it against
+# an empty map and fails on any real annotation text, found empirically while
+# writing this file. Matching the rendered annotation text exactly also
+# proves each `{{ $labels.* }}` template substitutes correctly, not just
+# that some alert fired.
+#
+# All test blocks use `interval: 1m`. `rate()`/`increase()` need at least
+# two samples in-window before they produce a value at all, so the first
+# evaluation where a rate-based condition can even be seen as "true" is one
+# step after the series' first sample — a `for: Nm` rule with `rate()` in
+# its expression therefore fires at `1m + Nm`, not `Nm`, when the series
+# starts at t=0. Every eval_time below already accounts for this.
+
+rule_files:
+  - ../amcore-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ---------------------------------------------------------------------
+  # amcore-http-errors
+  # `sum(...)` with no `by()` strips every label from its input, so these
+  # three alerts carry only {alertname, severity} — proven, not assumed.
+  # ---------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'amcore_http_requests_total{status_code="500",route="/organizations/:id",method="GET",role="web"}'
+        values: '0+1x400'
+      - series: 'amcore_http_requests_total{status_code="200",route="/organizations/:id",method="GET",role="web"}'
+        values: '0+199x400'
+    alert_rule_test:
+      - eval_time: 6h5m
+        alertname: AMCoreHttp5xxRatioTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore 5xx error ratio elevated'
+              description: '5xx ratio has been above 0.1% for 6h. Not yet page-worthy; worth investigating before it grows.'
+              runbook_path: docs/operations/runbooks/http.md#5xx-error-ratio
+      - eval_time: 30m
+        alertname: AMCoreHttp5xxRatioTicket
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_http_requests_total{status_code="500",route="/organizations/:id",method="GET",role="web"}'
+        values: '0+10x30'
+      - series: 'amcore_http_requests_total{status_code="200",route="/organizations/:id",method="GET",role="web"}'
+        values: '0+90x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AMCoreHttp5xxRatioPageFast
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'AMCore 5xx error ratio critical (fast burn)'
+              description: '5xx ratio above 5% for 5m — a sharp, ongoing outage.'
+              runbook_path: docs/operations/runbooks/http.md#5xx-error-ratio
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_http_requests_total{status_code="500",route="/organizations/:id",method="GET",role="web"}'
+        values: '0+2x90'
+      - series: 'amcore_http_requests_total{status_code="200",route="/organizations/:id",method="GET",role="web"}'
+        values: '0+98x90'
+    alert_rule_test:
+      - eval_time: 1h5m
+        alertname: AMCoreHttp5xxRatioPageSustained
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'AMCore 5xx error ratio critical (sustained)'
+              description: '5xx ratio above 1% for a full hour — a persistent, lower-grade outage the fast-burn rule alone would miss.'
+              runbook_path: docs/operations/runbooks/http.md#5xx-error-ratio
+
+  # Health-route traffic must never dilute or trigger the ratio, even at
+  # 100% "5xx" on the health route itself (proves the route!~ exclusion is
+  # doing real work, not just present in the text). Sustained past the
+  # 1h `for:` too, for the sustained-page variant.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_http_requests_total{status_code="503",route="/api/v1/health/ready",method="GET",role="web"}'
+        values: '0+50x70'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AMCoreHttp5xxRatioPageFast
+        exp_alerts: []
+      - eval_time: 1h5m
+        alertname: AMCoreHttp5xxRatioPageSustained
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: AMCoreHttp5xxRatioTicket
+        exp_alerts: []
+
+  # ---------------------------------------------------------------------
+  # amcore-node-runtime
+  # ---------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'nodejs_eventloop_lag_p99_seconds'
+        values: '0.06x35'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: AMCoreEventLoopLagElevated
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore event loop p99 lag elevated'
+              description: 'p99 event loop lag above 50ms for 30m — a rising trend worth investigating (CPU-bound work on the event loop, GC pressure).'
+              runbook_path: docs/operations/runbooks/node-runtime.md#event-loop-lag
+
+  - interval: 1m
+    input_series:
+      - series: 'nodejs_eventloop_lag_p99_seconds'
+        values: '0.15x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AMCoreEventLoopLagCritical
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'AMCore event loop p99 lag critical'
+              description: 'p99 event loop lag above 100ms for 5m — requests are visibly queuing behind blocked JS execution.'
+              runbook_path: docs/operations/runbooks/node-runtime.md#event-loop-lag
+
+  - interval: 1m
+    input_series:
+      - series: 'nodejs_heap_size_used_bytes'
+        values: '1500000000x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AMCoreHeapApproachingLivenessCeiling
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'AMCore heap usage approaching the liveness ceiling'
+              description: 'Heap used is above 90% of the 1.5GiB liveness threshold (health.controller.ts) for 5m — the next liveness check may restart this process. Keep this threshold in sync with HEALTH_MEMORY_HEAP_BYTES if a fork overrides the default.'
+              runbook_path: docs/operations/runbooks/node-runtime.md#heap-usage
+      - eval_time: 0m
+        alertname: AMCoreHeapApproachingLivenessCeiling
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'process_open_fds'
+        values: '950x10'
+      - series: 'process_max_fds'
+        values: '1000x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AMCoreFileDescriptorsApproachingLimit
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'AMCore open file descriptors approaching the process limit'
+              description: 'Open FDs above 90% of the process ulimit for 5m — realtime SSE connections and DB/Redis sockets all consume one each.'
+              runbook_path: docs/operations/runbooks/node-runtime.md#file-descriptors
+
+  # ---------------------------------------------------------------------
+  # amcore-metrics-collector-health
+  # ---------------------------------------------------------------------
+  - interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: AMCoreQueueMetricsAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'AMCore queue depth metric missing'
+              description: 'amcore_queue_jobs has been absent for 15m — either every worker is down or the BullMQ collector is stuck, not "zero jobs everywhere."'
+              runbook_path: docs/operations/runbooks/metrics-collector-health.md#absent-queue-metrics
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_queue_jobs{queue="email",state="waiting"}'
+        values: '5x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: AMCoreQueueMetricsAbsent
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_metrics_collector_errors_total{collector="redis_ping"}'
+        values: '0+1x15'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AMCoreMetricsCollectorErrors
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              collector: redis_ping
+            exp_annotations:
+              summary: 'AMCore metrics collector repeatedly failing'
+              description: 'The redis_ping collector has been erroring for 10m. Treat any co-reported amcore_notification_delivery_due/amcore_ai_run_due/amcore_redis_ping_seconds value of exactly 0 as unknown, not healthy, while this fires.'
+              runbook_path: docs/operations/runbooks/metrics-collector-health.md#collector-errors
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_metrics_collector_errors_total{collector="ai_run_due"}'
+        values: '0+1x15'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AMCoreMetricsCollectorErrors
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              collector: ai_run_due
+            exp_annotations:
+              summary: 'AMCore metrics collector repeatedly failing'
+              description: 'The ai_run_due collector has been erroring for 10m. Treat any co-reported amcore_notification_delivery_due/amcore_ai_run_due/amcore_redis_ping_seconds value of exactly 0 as unknown, not healthy, while this fires.'
+              runbook_path: docs/operations/runbooks/metrics-collector-health.md#collector-errors
+
+  # ---------------------------------------------------------------------
+  # amcore-db
+  # ---------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'amcore_db_pool_connections{state="waiting"}'
+        values: '6x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AMCoreDbPoolWaitingElevated
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              state: waiting
+            exp_annotations:
+              summary: 'AMCore DB pool has connections waiting'
+              description: 'More than DATABASE_POOL_WAITING_THRESHOLD (default 5) connections have been waiting on the pool for 5m. The readiness check already restarts the process if this gets bad enough to fail outright — this alert is the earlier, non-restart signal.'
+              runbook_path: docs/operations/runbooks/db.md#pool-waiting
+
+  # Boundary: exactly the threshold must NOT fire (strictly greater-than).
+  - interval: 1m
+    input_series:
+      - series: 'amcore_db_pool_connections{state="waiting"}'
+        values: '5x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AMCoreDbPoolWaitingElevated
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_db_slow_queries_total'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: AMCoreDbSlowQueriesRising
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore slow queries occurring'
+              description: 'Queries slower than SLOW_QUERY_THRESHOLD_MS have been recorded over the last 15m. Use pg_stat_statements (docs/operations/prometheus-statements.md) to find which query; never page on this alone.'
+              runbook_path: docs/operations/runbooks/db.md#slow-queries
+
+  # ---------------------------------------------------------------------
+  # amcore-redis
+  # ---------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'amcore_redis_client_events_total{client="queue_worker",event="reconnecting"}'
+        values: '0+1x15'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AMCoreRedisReconnectingTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              client: queue_worker
+              event: reconnecting
+            exp_annotations:
+              summary: 'AMCore queue-critical Redis client reconnecting'
+              description: 'A queue-critical Redis client (queue_worker) has reconnected at least once in the last 5m.'
+              runbook_path: docs/operations/runbooks/redis.md#reconnecting
+      - eval_time: 6m
+        alertname: AMCoreRedisReconnectingPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              client: queue_worker
+              event: reconnecting
+            exp_annotations:
+              summary: 'AMCore queue-critical Redis client reconnecting, no fallback'
+              description: 'A queue-critical Redis client (queue_worker) has been reconnecting for 5m straight with no in-memory fallback available for queues — jobs stop flowing.'
+              runbook_path: docs/operations/runbooks/redis.md#reconnecting
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_redis_client_events_total{client="throttler",event="degraded"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AMCoreRedisThrottlerDegradedTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              client: throttler
+              event: degraded
+            exp_annotations:
+              summary: 'AMCore rate limiter fell back to in-memory'
+              description: 'The rate limiter degraded to per-process in-memory state at least once in the last 5m — under N replicas the effective global rate limit silently becomes N times the configured value.'
+              runbook_path: docs/operations/runbooks/redis.md#throttler-degraded
+      - eval_time: 16m
+        alertname: AMCoreRedisThrottlerDegradedPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              client: throttler
+              event: degraded
+            exp_annotations:
+              summary: 'AMCore rate limiter sustained in-memory fallback'
+              description: 'The rate limiter has stayed degraded to per-process in-memory state for 15m — an ongoing abuse-control regression, not graceful degradation.'
+              runbook_path: docs/operations/runbooks/redis.md#throttler-degraded
+
+  # A `shared` client reconnecting must NOT trip the queue-critical alerts
+  # (client=~"queue_.*" is a real filter, not accidentally unanchored).
+  - interval: 1m
+    input_series:
+      - series: 'amcore_redis_client_events_total{client="shared",event="reconnecting"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreRedisReconnectingPage
+        exp_alerts: []
+
+  # ---------------------------------------------------------------------
+  # amcore-queues
+  # ---------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'amcore_queue_jobs{queue="email",state="waiting"}'
+        values: '150x35'
+      - series: 'amcore_queue_paused{queue="email"}'
+        values: '0x35'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: AMCoreQueueBacklogTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              queue: email
+              state: waiting
+            exp_annotations:
+              summary: 'AMCore email queue backlog building'
+              description: 'More than 100 jobs waiting in email for 30m.'
+              runbook_path: docs/operations/runbooks/queues.md#backlog
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_queue_jobs{queue="email",state="waiting"}'
+        values: '1500x20'
+      - series: 'amcore_queue_paused{queue="email"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AMCoreQueueBacklogPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              queue: email
+              state: waiting
+            exp_annotations:
+              summary: 'AMCore email queue backlog critical'
+              description: 'More than 1000 jobs waiting in email for 15m.'
+              runbook_path: docs/operations/runbooks/queues.md#backlog
+
+  # The SAME backlog, but the queue is paused — must NOT alert either
+  # tier (proves the on(queue) join gate, not just the presence of a
+  # paused==0 clause in the text).
+  - interval: 1m
+    input_series:
+      - series: 'amcore_queue_jobs{queue="email",state="waiting"}'
+        values: '1500x20'
+      - series: 'amcore_queue_paused{queue="email"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AMCoreQueueBacklogPage
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AMCoreQueueBacklogTicket
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_queue_paused{queue="default"}'
+        values: '1x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreQueuePausedUnexpected
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              queue: default
+            exp_annotations:
+              summary: 'AMCore default queue is paused'
+              description: 'The default queue has been paused for at least a minute — a silent, user-facing delivery stop if this was not deliberate.'
+              runbook_path: docs/operations/runbooks/queues.md#paused
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_delivery_due'
+        values: '60x35'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: AMCoreOutboxBacklogTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              source: notifications
+            exp_annotations:
+              summary: 'AMCore outbox backlog building'
+              description: 'The notifications due-now outbox gauge has been above 50 for 30m. Check amcore_metrics_collector_errors_total first — a stalled collector reads back as this same gauge holding at 0, never as this alert, but a real backlog and a timed-out collector both mean "the dispatcher may not be keeping up."'
+              runbook_path: docs/operations/runbooks/queues.md#outbox-backlog
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_ai_run_due'
+        values: '600x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AMCoreOutboxBacklogPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              source: ai-runs
+            exp_annotations:
+              summary: 'AMCore outbox backlog critical'
+              description: 'The ai-runs due-now outbox gauge has been above 500 for 15m — the dispatcher is very likely not keeping up.'
+              runbook_path: docs/operations/runbooks/queues.md#outbox-backlog
+
+  # Masking proof: notifications is genuinely healthy (0, well under the
+  # threshold) while ai_run_due is critically high. A naive
+  # `(amcore_notification_delivery_due or amcore_ai_run_due) > 500`
+  # silently returns only the notifications side here (both series share
+  # the same label set once `__name__` is dropped, which is how PromQL's
+  # `or` matches) — the real expression, which tags each side with a
+  # distinct `source` label before combining, must still catch the ai-runs
+  # backlog.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_delivery_due'
+        values: '0x20'
+      - series: 'amcore_ai_run_due'
+        values: '600x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AMCoreOutboxBacklogPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              source: ai-runs
+            exp_annotations:
+              summary: 'AMCore outbox backlog critical'
+              description: 'The ai-runs due-now outbox gauge has been above 500 for 15m — the dispatcher is very likely not keeping up.'
+              runbook_path: docs/operations/runbooks/queues.md#outbox-backlog
+
+  # And the reverse direction: ai_run_due healthy, notifications critical.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_delivery_due'
+        values: '600x20'
+      - series: 'amcore_ai_run_due'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AMCoreOutboxBacklogPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              source: notifications
+            exp_annotations:
+              summary: 'AMCore outbox backlog critical'
+              description: 'The notifications due-now outbox gauge has been above 500 for 15m — the dispatcher is very likely not keeping up.'
+              runbook_path: docs/operations/runbooks/queues.md#outbox-backlog
+
+  # Same masking proof, ticket tier: ai_run_due healthy (0), notifications
+  # above the ticket threshold (50) but still under the page threshold
+  # (500) — must fire the ticket alert with the correct source, not go
+  # silent, and must not fire the page alert either.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_delivery_due'
+        values: '60x35'
+      - series: 'amcore_ai_run_due'
+        values: '0x35'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: AMCoreOutboxBacklogTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              source: notifications
+            exp_annotations:
+              summary: 'AMCore outbox backlog building'
+              description: 'The notifications due-now outbox gauge has been above 50 for 30m. Check amcore_metrics_collector_errors_total first — a stalled collector reads back as this same gauge holding at 0, never as this alert, but a real backlog and a timed-out collector both mean "the dispatcher may not be keeping up."'
+              runbook_path: docs/operations/runbooks/queues.md#outbox-backlog
+      - eval_time: 30m
+        alertname: AMCoreOutboxBacklogPage
+        exp_alerts: []
+
+  # Genuine healthy case, both tiers: both due-now gauges present and well
+  # under even the ticket threshold.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_delivery_due'
+        values: '5x35'
+      - series: 'amcore_ai_run_due'
+        values: '5x35'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: AMCoreOutboxBacklogTicket
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: AMCoreOutboxBacklogPage
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_queue_events_total{queue="default",event="dead_letter"}'
+        values: '0+1x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreQueueDeadLetterTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              queue: default
+              event: dead_letter
+            exp_annotations:
+              summary: 'AMCore default queue has a dead-lettered job'
+              description: "At least one job in default was dead-lettered. Bull Board's failed-jobs view retains it for 24h or 1000 jobs, whichever is first — retrieve it before then."
+              runbook_path: docs/operations/runbooks/queues.md#dead-letter
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_queue_events_total{queue="default",event="dead_letter"}'
+        values: '0+3x5'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: AMCoreQueueDeadLetterBurstPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              queue: default
+              event: dead_letter
+            exp_annotations:
+              summary: 'AMCore default queue dead-letter burst'
+              description: "More than 10 jobs in default were dead-lettered in 5m — Bull Board's retention (24h or 1000 jobs) can evict a burst like this in minutes."
+              runbook_path: docs/operations/runbooks/queues.md#dead-letter
+
+  # ---------------------------------------------------------------------
+  # amcore-email
+  # ---------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'amcore_email_dead_letters_total{template="welcome",unrecoverable="true"}'
+        values: '0+1x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreEmailDeadLetterTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              template: welcome
+              unrecoverable: 'true'
+            exp_annotations:
+              summary: 'AMCore email dead-lettered'
+              description: 'At least one email (welcome) was dead-lettered. The exact recipient is not in the metric (redacted by design) — check the structured log site or the BullMQ job record within its 24h/1000-job retention window.'
+              runbook_path: docs/operations/runbooks/email.md#dead-letter
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_email_dead_letters_total{template="notification",unrecoverable="true"}'
+        values: '0+2x10'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AMCoreEmailDeadLetterBurstPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              template: notification
+              unrecoverable: 'true'
+            exp_annotations:
+              summary: 'AMCore email dead-letter burst'
+              description: 'More than 5 emails were dead-lettered in 15m — likely a provider-wide or template-wide failure, not isolated bad addresses.'
+              runbook_path: docs/operations/runbooks/email.md#dead-letter
+
+  # ---------------------------------------------------------------------
+  # amcore-realtime
+  # ---------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="rejected_user"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: AMCoreRealtimeRejectedUserTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              event: rejected_user
+            exp_annotations:
+              summary: 'AMCore realtime per-user connection cap hit repeatedly'
+              description: 'Per-user realtime connection admission has been refusing for 15m straight — check whether NOTIFICATIONS_REALTIME_MAX_PER_USER/AI_REALTIME_MAX_PER_USER is too low for real client behavior (reconnect storms, many tabs) before assuming abuse.'
+              runbook_path: docs/operations/runbooks/realtime.md#rejected
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_ai_run_realtime_events_total{event="rejected_global"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreRealtimeRejectedGlobalPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              event: rejected_global
+            exp_annotations:
+              summary: 'AMCore realtime connection cap hit globally'
+              description: 'The global realtime connection cap has been refusing new admissions for 5m — every rejected client sees no live updates at all.'
+              runbook_path: docs/operations/runbooks/realtime.md#rejected
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_publish_total{outcome="dropped"}'
+        values: '0+1x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreRealtimeDroppedTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              outcome: dropped
+            exp_annotations:
+              summary: 'AMCore realtime event dropped'
+              description: 'At least one realtime publish was dropped in the last 15m — a connected client silently missed an update. Check *_MAX_INFLIGHT_PUBLISH.'
+              runbook_path: docs/operations/runbooks/realtime.md#dropped
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_ai_run_realtime_publish_total{outcome="dropped"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreRealtimeDroppedPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              outcome: dropped
+            exp_annotations:
+              summary: 'AMCore realtime events dropping repeatedly'
+              description: 'Realtime publishes have been dropping for 5m straight — this is silent non-delivery to a connected client, arguably the highest-severity realtime signal.'
+              runbook_path: docs/operations/runbooks/realtime.md#dropped
+
+  # `outcome="published"` must never trip the dropped alert (proves the
+  # label match is exact, not e.g. an unanchored regex matching anything).
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_publish_total{outcome="published"}'
+        values: '0+50x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreRealtimeDroppedPage
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="invalid_envelope"}'
+        values: '0+1x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreRealtimeInvalidEnvelopeTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              event: invalid_envelope
+            exp_annotations:
+              summary: 'AMCore realtime invalid envelope received'
+              description: 'A realtime subscriber received an envelope it could not parse. Expected during a rolling deploy across a namespace/version skew; check *_REALTIME_NAMESPACE otherwise.'
+              runbook_path: docs/operations/runbooks/realtime.md#invalid-envelope
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_ai_run_realtime_events_total{event="invalid_envelope"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: AMCoreRealtimeInvalidEnvelopePage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              event: invalid_envelope
+            exp_annotations:
+              summary: 'AMCore realtime invalid envelopes sustained'
+              description: 'Invalid realtime envelopes have kept arriving for 15m — longer than a rolling deploy should take; check for a genuine namespace/version mismatch.'
+              runbook_path: docs/operations/runbooks/realtime.md#invalid-envelope
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="startup_failure"}'
+        values: '0+1x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreRealtimeStartupFailureTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              event: startup_failure
+            exp_annotations:
+              summary: 'AMCore realtime stream startup failure'
+              description: 'A realtime stream was admitted but died before opening at least once in the last 15m.'
+              runbook_path: docs/operations/runbooks/realtime.md#startup-failure
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_ai_run_realtime_events_total{event="startup_failure"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreRealtimeStartupFailurePage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              event: startup_failure
+            exp_annotations:
+              summary: 'AMCore realtime streams repeatedly failing to start'
+              description: 'Realtime streams have been failing to start for 5m straight.'
+              runbook_path: docs/operations/runbooks/realtime.md#startup-failure
+
+  # Masking proof, all eight `or`-combining realtime alerts: the
+  # notification-side series is explicitly present and healthy (flat 0,
+  # not merely absent) while the ai_run-side series is the one actually
+  # firing. Each alert's expression applies its threshold to each side
+  # BEFORE the `or` (`rate(A{...}) > 0 or rate(B{...}) > 0`, never
+  # `(A or B) > 0`), so an explicit-zero healthy side can never hide a
+  # firing one the way the outbox backlog alerts did before their fix
+  # above — this locks that in per alert, not just for the pattern once.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="rejected_user"}'
+        values: '0x20'
+      - series: 'amcore_ai_run_realtime_events_total{event="rejected_user"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: AMCoreRealtimeRejectedUserTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              event: rejected_user
+            exp_annotations:
+              summary: 'AMCore realtime per-user connection cap hit repeatedly'
+              description: 'Per-user realtime connection admission has been refusing for 15m straight — check whether NOTIFICATIONS_REALTIME_MAX_PER_USER/AI_REALTIME_MAX_PER_USER is too low for real client behavior (reconnect storms, many tabs) before assuming abuse.'
+              runbook_path: docs/operations/runbooks/realtime.md#rejected
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="rejected_global"}'
+        values: '0x10'
+      - series: 'amcore_ai_run_realtime_events_total{event="rejected_global"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreRealtimeRejectedGlobalPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              event: rejected_global
+            exp_annotations:
+              summary: 'AMCore realtime connection cap hit globally'
+              description: 'The global realtime connection cap has been refusing new admissions for 5m — every rejected client sees no live updates at all.'
+              runbook_path: docs/operations/runbooks/realtime.md#rejected
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_publish_total{outcome="dropped"}'
+        values: '0x2'
+      - series: 'amcore_ai_run_realtime_publish_total{outcome="dropped"}'
+        values: '0+1x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreRealtimeDroppedTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              outcome: dropped
+            exp_annotations:
+              summary: 'AMCore realtime event dropped'
+              description: 'At least one realtime publish was dropped in the last 15m — a connected client silently missed an update. Check *_MAX_INFLIGHT_PUBLISH.'
+              runbook_path: docs/operations/runbooks/realtime.md#dropped
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_publish_total{outcome="dropped"}'
+        values: '0x10'
+      - series: 'amcore_ai_run_realtime_publish_total{outcome="dropped"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreRealtimeDroppedPage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              outcome: dropped
+            exp_annotations:
+              summary: 'AMCore realtime events dropping repeatedly'
+              description: 'Realtime publishes have been dropping for 5m straight — this is silent non-delivery to a connected client, arguably the highest-severity realtime signal.'
+              runbook_path: docs/operations/runbooks/realtime.md#dropped
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="invalid_envelope"}'
+        values: '0x2'
+      - series: 'amcore_ai_run_realtime_events_total{event="invalid_envelope"}'
+        values: '0+1x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreRealtimeInvalidEnvelopeTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              event: invalid_envelope
+            exp_annotations:
+              summary: 'AMCore realtime invalid envelope received'
+              description: 'A realtime subscriber received an envelope it could not parse. Expected during a rolling deploy across a namespace/version skew; check *_REALTIME_NAMESPACE otherwise.'
+              runbook_path: docs/operations/runbooks/realtime.md#invalid-envelope
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="invalid_envelope"}'
+        values: '0x20'
+      - series: 'amcore_ai_run_realtime_events_total{event="invalid_envelope"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: AMCoreRealtimeInvalidEnvelopePage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              event: invalid_envelope
+            exp_annotations:
+              summary: 'AMCore realtime invalid envelopes sustained'
+              description: 'Invalid realtime envelopes have kept arriving for 15m — longer than a rolling deploy should take; check for a genuine namespace/version mismatch.'
+              runbook_path: docs/operations/runbooks/realtime.md#invalid-envelope
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="startup_failure"}'
+        values: '0x2'
+      - series: 'amcore_ai_run_realtime_events_total{event="startup_failure"}'
+        values: '0+1x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreRealtimeStartupFailureTicket
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              event: startup_failure
+            exp_annotations:
+              summary: 'AMCore realtime stream startup failure'
+              description: 'A realtime stream was admitted but died before opening at least once in the last 15m.'
+              runbook_path: docs/operations/runbooks/realtime.md#startup-failure
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="startup_failure"}'
+        values: '0x10'
+      - series: 'amcore_ai_run_realtime_events_total{event="startup_failure"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreRealtimeStartupFailurePage
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              event: startup_failure
+            exp_annotations:
+              summary: 'AMCore realtime streams repeatedly failing to start'
+              description: 'Realtime streams have been failing to start for 5m straight.'
+              runbook_path: docs/operations/runbooks/realtime.md#startup-failure
+
+  # no_local_target must never appear as any alert name in this file at all
+  # — proven by asserting the rule group's alert list, not just "some
+  # alert didn't fire" (a typo'd alertname in exp_alerts would pass
+  # vacuously otherwise).
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="no_local_target"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: AMCoreRealtimeRejectedUserTicket
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: AMCoreRealtimeDroppedPage
+        exp_alerts: []
+
+  # ---------------------------------------------------------------------
+  # Genuine healthy-case coverage for every remaining alert not already
+  # covered above (flat/absent metric, or a value below its threshold) —
+  # every alert in this file has both a firing-case test and a healthy
+  # no-fire test.
+  # ---------------------------------------------------------------------
+  - interval: 1m
+    input_series:
+      - series: 'nodejs_eventloop_lag_p99_seconds'
+        values: '0.01x35'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: AMCoreEventLoopLagElevated
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: AMCoreEventLoopLagCritical
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'process_open_fds'
+        values: '100x10'
+      - series: 'process_max_fds'
+        values: '1000x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AMCoreFileDescriptorsApproachingLimit
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_metrics_collector_errors_total{collector="queue_depth"}'
+        values: '3x15'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AMCoreMetricsCollectorErrors
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_db_slow_queries_total'
+        values: '7x20'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: AMCoreDbSlowQueriesRising
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_redis_client_events_total{client="queue_worker",event="reconnecting"}'
+        values: '2x15'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AMCoreRedisReconnectingTicket
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_redis_client_events_total{client="throttler",event="degraded"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AMCoreRedisThrottlerDegradedTicket
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: AMCoreRedisThrottlerDegradedPage
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_queue_paused{queue="default"}'
+        values: '0x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreQueuePausedUnexpected
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_queue_events_total{queue="default",event="dead_letter"}'
+        values: '3x5'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreQueueDeadLetterTicket
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: AMCoreQueueDeadLetterBurstPage
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_email_dead_letters_total{template="welcome",unrecoverable="true"}'
+        values: '2x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreEmailDeadLetterTicket
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AMCoreEmailDeadLetterBurstPage
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="rejected_global"}'
+        values: '5x10'
+      - series: 'amcore_ai_run_realtime_events_total{event="rejected_global"}'
+        values: '5x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreRealtimeRejectedGlobalPage
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_publish_total{outcome="dropped"}'
+        values: '3x2'
+      - series: 'amcore_ai_run_realtime_publish_total{outcome="dropped"}'
+        values: '3x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreRealtimeDroppedTicket
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="invalid_envelope"}'
+        values: '3x2'
+      - series: 'amcore_ai_run_realtime_events_total{event="invalid_envelope"}'
+        values: '3x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreRealtimeInvalidEnvelopeTicket
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: AMCoreRealtimeInvalidEnvelopePage
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_notification_realtime_events_total{event="startup_failure"}'
+        values: '3x2'
+      - series: 'amcore_ai_run_realtime_events_total{event="startup_failure"}'
+        values: '3x2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AMCoreRealtimeStartupFailureTicket
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: AMCoreRealtimeStartupFailurePage
+        exp_alerts: []

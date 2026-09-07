@@ -1,23 +1,69 @@
 # AMCore — Alertmanager config for the optional `monitoring` dev compose
-# profile.
+# profile. Routes alerts from docs/operations/prometheus/amcore-alerts.yml
+# by their `severity` label (`page` vs `ticket`) to two receivers, each
+# with no active integration — every alert routes successfully today, but
+# reaches no one, since this repo never bakes real credentials into a
+# public config file.
 #
-# PLACEHOLDER: this file exists only so the `alertmanager` container has a
-# valid config to boot with -- it routes every alert to a no-op receiver and
-# sends nothing anywhere. A later change replaces `route`/`receivers` below
-# with working, commented email and Telegram receiver examples plus one
-# worked `inhibit_rule`, once the alert rules these receivers would actually
-# fire for also ship.
+# To actually receive alerts, copy an email_configs/telegram_configs block
+# from `tests/alertmanager.example-full.yml` into the `page`/`ticket`
+# receivers below (both native Alertmanager receiver types — no
+# bridge/exporter process needed for either) and drop the matching secret
+# file(s) into `secrets/` (gitignored, see its README). That example file
+# is the single copy of these field names in this repo — not duplicated
+# here as an inline comment — specifically so it can be `amtool
+# check-config`-checked by CI on every PR (a comment can drift silently
+# across an Alertmanager version bump; a file CI actually parses cannot).
+# Both its blocks use Alertmanager's `_file` secret variants
+# (`auth_password_file`, `bot_token_file`), never an inline
+# `auth_password`/`bot_token` value, so copying them never teaches writing
+# a real secret into a tracked YAML file.
 #
 # Architectural rule: AMCore's own notification subsystem (in_app/email/
-# telegram via NotificationChannel) must never carry infrastructure alerts --
-# both its delivery paths run over the same Redis/Postgres this alerting
-# exists to monitor, so an alert about (for example) a Redis outage routed
-# through either path would sit inside the very queue that is broken.
-# Alertmanager's receivers below are configured independently of
-# NotificationChannel, not routed through it.
+# telegram via NotificationChannel) must never carry infrastructure
+# alerts -- both its delivery paths run over the same Redis/Postgres this
+# alerting exists to monitor, so an alert about (for example) a Redis
+# outage routed through either path would sit inside the very queue that
+# is broken. This file's email/Telegram receivers are configured entirely
+# independently of NotificationChannel, never routed through it.
 
 route:
-  receiver: 'null'
+  receiver: 'default'
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "page"
+      receiver: 'page'
+    - matchers:
+        - severity = "ticket"
+      receiver: 'ticket'
 
 receivers:
-  - name: 'null'
+  # Catches anything without a recognized severity label — should never
+  # actually receive an alert from amcore-alerts.yml, which sets severity
+  # on every rule.
+  - name: 'default'
+
+  - name: 'page'
+    # See tests/alertmanager.example-full.yml for the exact,
+    # CI-verified email_configs/telegram_configs fields to copy here.
+
+  - name: 'ticket'
+    # See tests/alertmanager.example-full.yml for the exact,
+    # CI-verified email_configs/telegram_configs fields to copy here.
+
+# Worked inhibit_rule example: a queue-critical Redis client reconnecting
+# for 5m straight (AMCoreRedisReconnectingPage) means BullMQ jobs cannot be
+# processed at all — the queue/outbox backlog alerts that would otherwise
+# also fire during the same outage are a derived symptom of this same root
+# cause, not independent new information, so suppress them while the Redis
+# alert is active.
+inhibit_rules:
+  - source_matchers:
+      - alertname = "AMCoreRedisReconnectingPage"
+    target_matchers:
+      - alertname =~ "AMCoreQueueBacklog.*|AMCoreOutboxBacklog.*"
+    equal: []

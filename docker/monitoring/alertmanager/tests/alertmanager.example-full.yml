@@ -1,0 +1,71 @@
+# AMCore — the canonical, CI-checked example for the `page`/`ticket`
+# receivers in `docker/monitoring/alertmanager/alertmanager.yml`. This is
+# the ONLY copy of these field names in the repo (the real
+# `alertmanager.yml` points here rather than duplicating the block as an
+# inline comment) — copy the `email_configs`/`telegram_configs` blocks
+# below into that file's `page`/`ticket` receivers to actually use them.
+# This file is never mounted into the running `alertmanager` container;
+# `amtool check-config` in the `promtool` CI job validates it directly on
+# every PR, so a future Alertmanager version bump that renames/removes a
+# field fails CI here instead of silently going stale in an unchecked
+# comment.
+#
+# Uses `_file` secret variants throughout (`auth_password_file`,
+# `bot_token_file`) rather than inline `auth_password`/`bot_token` — the
+# paths below don't need to exist for `amtool check-config` to validate
+# the schema, but the shipped example should never teach writing a real
+# secret value directly into a tracked YAML file. The paths match
+# `docker-compose.yml`'s `alertmanager` service, which always mounts
+# `../secrets` (gitignored) at `/run/secrets/alertmanager` — drop real
+# `smtp_password`/`telegram_bot_token` files there and these paths resolve
+# for real, no compose change needed.
+
+route:
+  receiver: 'default'
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "page"
+      receiver: 'page'
+    - matchers:
+        - severity = "ticket"
+      receiver: 'ticket'
+
+receivers:
+  - name: 'default'
+
+  - name: 'page'
+    email_configs:
+      - to: 'oncall@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.example.com:587'
+        auth_username: 'alertmanager@example.com'
+        auth_password_file: '/run/secrets/alertmanager/smtp_password'
+        require_tls: true
+    telegram_configs:
+      - bot_token_file: '/run/secrets/alertmanager/telegram_bot_token'
+        chat_id: -1001234567890
+        parse_mode: 'HTML'
+
+  - name: 'ticket'
+    email_configs:
+      - to: 'ops-tickets@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.example.com:587'
+        auth_username: 'alertmanager@example.com'
+        auth_password_file: '/run/secrets/alertmanager/smtp_password'
+        require_tls: true
+    telegram_configs:
+      - bot_token_file: '/run/secrets/alertmanager/telegram_bot_token'
+        chat_id: -1001234567890
+        parse_mode: 'HTML'
+
+inhibit_rules:
+  - source_matchers:
+      - alertname = "AMCoreRedisReconnectingPage"
+    target_matchers:
+      - alertname =~ "AMCoreQueueBacklog.*|AMCoreOutboxBacklog.*"
+    equal: []
