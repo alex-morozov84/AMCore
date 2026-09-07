@@ -73,6 +73,10 @@ export class AiRunRepository {
    * `nextAttemptAt` have arrived and whose `deadlineAt` (if any) is still in the future (overdue
    * runs are swept to `EXPIRED` by `expireDeadlinedRuns`). `SKIP LOCKED` lets every worker drain
    * disjoint runs without blocking.
+   *
+   * `AiRunBacklogCollector.collectDue()` mirrors this exact predicate for the
+   * `amcore_ai_run_due` gauge, including the `deadlineAt` clause — change
+   * one, change the other.
    */
   async claimDueBatch(limit: number = AI_RUN_CLAIM_BATCH_LIMIT): Promise<ClaimedRun[]> {
     const leaseToken = randomUUID()

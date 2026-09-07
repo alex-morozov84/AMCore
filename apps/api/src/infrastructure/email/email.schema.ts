@@ -45,6 +45,12 @@ export const sendEmailJobDataSchema = z.discriminatedUnion('template', [
   z.object({
     template: z.literal(EmailTemplate.WELCOME),
     to: z.email(),
+    // Stable pseudonymous identifier: logged alongside the redacted `to` so
+    // "who missed their email" stays answerable after the job's own retention
+    // window, without a raw address in rotated logs. Optional — deserialized
+    // Redis JSON may predate this field or a future queueable template may
+    // omit it.
+    userId: z.string().optional(),
     data: welcomeEmailDataSchema,
   }),
 ])

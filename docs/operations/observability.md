@@ -25,6 +25,18 @@ secret-bearing fields. **New code must not log** raw request bodies, rendered
 email bodies, object keys, prompt/provider payloads, or free-form user content
 unless a feature-specific public doc explicitly allows that field.
 
+Email addresses in log lines (queued/processed/sent/dead-lettered email jobs)
+are redacted via `redactEmail()` (`a***@example.com` — domain kept, since
+delivery/bounce triage is overwhelmingly domain-level) rather than the
+`logging.config.ts` redact list: Pino's own redaction fully replaces a value
+with `[Redacted]`, which would destroy the domain. A stable `userId` pseudonym
+travels alongside the redacted address on the queued-email job payload so
+"which account's email failed" stays answerable after the job's own retention
+window, without a raw address ever reaching a rotated log file. Auth's own
+`User registered`/`User logged in` log lines already carry `userId` and drop
+the raw `email` field entirely — no pseudonym gap to fill there, so no
+redaction is needed, only the surplus field's removal.
+
 ## Metrics Endpoint
 
 The scrape path is `GET /api/v1/metrics` (the e2e test app has no global prefix,
@@ -59,10 +71,18 @@ are the hard contract every label must satisfy.
 **HTTP & runtime**
 
 - `http_requests_total{method,route,status_code,role}`,
-  `http_request_duration_seconds{…}`, `http_requests_in_flight{method,route,role}`
-  — captured on `res.on('finish')`, so guard rejections and unmatched routes are
-  counted. `/api/v1/metrics` is excluded from its own HTTP metrics.
+  `http_request_duration_seconds{…}` — captured on `res.on('finish')` **or**
+  `res.on('close')`, whichever fires first, so guard rejections, unmatched
+  routes, and client aborts are all counted. `/api/v1/metrics` is excluded
+  from its own HTTP metrics.
+- `http_requests_in_flight{method,role}` — **not** labeled by route: the route
+  hasn't resolved yet when a request enters/leaves flight (before Express
+  matches it), so a `route` label here could only ever hold one placeholder
+  value.
 - `metrics_collector_errors_total{collector}`.
+- `build_info{version,commit,node_version,role}` — a static info-metric, value
+  always `1`; `version`/`commit` come from the deployer (`APP_VERSION`/
+  `APP_COMMIT`), `unknown` if unset (e.g. local dev).
 - `db_pool_connections{state,role}` (`state=total|idle|waiting`),
   `db_slow_queries_total{role}` — collected from the process-local pool; no query
   text or model names.
@@ -71,6 +91,9 @@ are the hard contract every label must satisfy.
   ADR-073 — it describes the Redis-client role, not the specific storage
   implementation behind it), `notif_subscriber`, or `ai_run_subscriber`;
   `event=error|reconnecting|degraded`.
+- `redis_ping_seconds` — round-trip latency of a `PING` against the shared
+  Redis client, sampled at scrape time. A cheap interim signal; a real
+  per-command latency histogram is a separate, larger follow-up.
 - `rate_limit_decisions_total{policy,outcome,role}` (ADR-073) — every global
   rate-limit admission decision. `policy` is bounded to `default`,
   `privileged_mutation`, `expensive_action`, or `custom` (object-identity
@@ -90,11 +113,23 @@ are the hard contract every label must satisfy.
 - `queue_events_total{queue,event,role}` —
   `event=job_added|redis_error|redis_reconnecting|worker_error|dead_letter`. Job
   IDs and job names are never labels.
+- `notification_delivery_backlog{status}` (`status=pending|processing|
+retry_scheduled`) and `notification_delivery_due` (no labels) — the
+  `notifications` queue carries only one-attempt wake jobs (ADR-052); the real
+  backlog is these `notification_deliveries` rows, which `queue_jobs` never
+  reflects. `_due` counts only rows actionable right now (`pending` past
+  `availableAt`, or `retry_scheduled` past `nextAttemptAt`) — the alertable
+  quantity; the per-status backlog also includes healthy future-scheduled work.
+- `ai_run_backlog{status}` (`status=queued|running|waiting_approval|
+waiting_human`) and `ai_run_due` (no labels) — the same pattern for the
+  `ai-runs` wake-job queue (ADR-054) over `ai_runs` rows. `_due` excludes
+  `waiting_approval`/`waiting_human` (intentionally parked for a human, not
+  stuck).
 
 **Cache**
 
-- `cache_operations_total{cache,result,role}` — `cache=user|permissions`,
-  `result=hit|negative_hit|miss|db_fallback|corrupt`.
+- `cache_operations_total{cache,result,role}` — `cache=user|permissions|
+ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
 
 **Storage & media**
 
@@ -192,6 +227,13 @@ payloads.
 
 If a safe route template cannot be derived, AMCore uses a bounded fallback such as
 `unknown` instead of the raw path.
+
+**One deliberate exception: `build_info`'s `version`/`commit` labels are
+free-form strings, not a closed union.** This is the standard Prometheus
+info-metric pattern — cardinality is bounded by the number of versions ever
+deployed (not request input), and the label set is constant for the
+process's whole lifetime. Not a precedent for a free-form label anywhere
+else; every other metric in this file follows the closed-union rule above.
 
 ## Add a metric
 

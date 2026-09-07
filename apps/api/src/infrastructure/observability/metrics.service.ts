@@ -12,7 +12,12 @@ type HttpLabels = {
   role: string
 }
 
-type InFlightLabels = Omit<HttpLabels, 'status_code'>
+// Not `Omit<HttpLabels, 'status_code'>`: the route hasn't resolved yet when a
+// request enters/leaves flight (before Express matches it), so the middleware's
+// only call site always passed the literal `'pending'` for `route` — a label
+// that can only ever hold one value, which is worse than no label at all.
+// Dropped rather than fixed.
+type InFlightLabels = Omit<HttpLabels, 'status_code' | 'route'>
 
 type GaugeHandle<T extends string> = Pick<Gauge<T>, 'reset' | 'set'>
 
@@ -198,8 +203,8 @@ export class MetricsService implements OnModuleDestroy {
       }
     )
     this.httpRequestsInFlight = this.getOrCreateGauge(METRIC_NAMES.httpRequestsInFlight, {
-      help: 'In-flight HTTP requests by method, normalized route, and process role.',
-      labelNames: ['method', 'route', 'role'],
+      help: 'In-flight HTTP requests by method and process role.',
+      labelNames: ['method', 'role'],
     })
     this.metricsCollectorErrorsTotal = this.getOrCreateCounter(
       METRIC_NAMES.metricsCollectorErrorsTotal,
@@ -351,6 +356,30 @@ export class MetricsService implements OnModuleDestroy {
       help: 'Total rate-limit admission decisions by bounded policy classification and outcome (+ process role). policy classifies by object identity against RATE_LIMIT_POLICIES, never a route/tracker.',
       labelNames: ['policy', 'outcome', 'role'],
     })
+
+    // Static build/version info-metric — the standard Prometheus "info"
+    // pattern: the value is always 1, the identity is the label set. Set
+    // once; never re-set. `version`/`commit` come from the deployer (unset
+    // locally, where 'unknown' is honest). Deliberate exception to this
+    // file's own closed-string-union label discipline: cardinality here is
+    // bounded by the number of deployed versions, not request input, and the
+    // labels are constant for the process's lifetime — the standard
+    // Prometheus info-metric shape, not a precedent for a free-form label
+    // elsewhere. Deliberately not gated by `this.enabled` like every other
+    // emit method below: it is set once at construction, not per request, and
+    // the endpoint itself still 404s when metrics are disabled.
+    this.getOrCreateGauge(METRIC_NAMES.buildInfo, {
+      help: 'Static build/version info (value is always 1; the identity is the label set).',
+      labelNames: ['version', 'commit', 'node_version', 'role'],
+    }).set(
+      {
+        version: env.get('APP_VERSION'),
+        commit: env.get('APP_COMMIT'),
+        node_version: process.version,
+        role: this.role,
+      },
+      1
+    )
   }
 
   get enabled(): boolean {
@@ -382,8 +411,8 @@ export class MetricsService implements OnModuleDestroy {
     this.httpRequestDurationSeconds.observe(allLabels, durationSeconds)
   }
 
-  inFlightLabels(method: string, route: string): InFlightLabels {
-    return { method, route, role: this.role }
+  inFlightLabels(method: string): InFlightLabels {
+    return { method, role: this.role }
   }
 
   incCollectorError(collector: string): void {
