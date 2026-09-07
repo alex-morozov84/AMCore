@@ -57,8 +57,10 @@ Already running? Reach for whichever concern below applies.
   web-only caveat) Vercel, sourced and dated against each platform's own docs.
   VPS/Compose remains the one platform with a full owned recipe.
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
-  rules, structured logging and redaction, and operator interpretation of the
-  key metrics.
+  rules, structured logging and redaction, operator interpretation of the key
+  metrics, and the optional dev-only `monitoring` compose profile
+  (Prometheus + Grafana + Alertmanager) that verifies them against this
+  repo's own running stack.
 - **[CI & repo security](ci-security.md)** — the CI security gates, what a fork
   inherits (and what it doesn't), the `strict`-mode `setup-repo-security.sh` step,
   and the action-pin rules.

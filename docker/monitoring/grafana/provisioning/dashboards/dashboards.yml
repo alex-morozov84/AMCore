@@ -1,0 +1,16 @@
+# AMCore — Grafana dashboard provisioning for the `monitoring` dev compose
+# profile. Loads any dashboard JSON dropped into
+# docker/monitoring/grafana/dashboards/ (bind-mounted read-only below) with no
+# further compose or provisioning change. Empty today.
+
+apiVersion: 1
+
+providers:
+  - name: AMCore
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

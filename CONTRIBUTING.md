@@ -12,17 +12,18 @@ Thanks for your interest in contributing. This document explains how to set up t
 
 ## Development Commands
 
-| Command             | Description                                                                           |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| `pnpm dev`          | Start all apps in dev mode                                                            |
-| `pnpm build`        | Build all apps                                                                        |
-| `pnpm lint`         | Run ESLint                                                                            |
-| `pnpm typecheck`    | Run TypeScript check                                                                  |
-| `pnpm test`         | Run all unit tests                                                                    |
-| `pnpm format:check` | Check Prettier formatting                                                             |
-| `pnpm format`       | Format code with Prettier                                                             |
-| `pnpm init:brand`   | Initialize a downstream fork's identity, brand, assets, and theme choices             |
-| `pnpm init:project` | Apply downstream structural choices such as single-locale mode or disabling Storybook |
+| Command                                                           | Description                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                                                        | Start all apps in dev mode                                                                                                                                                                                                                           |
+| `pnpm build`                                                      | Build all apps                                                                                                                                                                                                                                       |
+| `pnpm lint`                                                       | Run ESLint                                                                                                                                                                                                                                           |
+| `pnpm typecheck`                                                  | Run TypeScript check                                                                                                                                                                                                                                 |
+| `pnpm test`                                                       | Run all unit tests                                                                                                                                                                                                                                   |
+| `pnpm format:check`                                               | Check Prettier formatting                                                                                                                                                                                                                            |
+| `pnpm format`                                                     | Format code with Prettier                                                                                                                                                                                                                            |
+| `pnpm init:brand`                                                 | Initialize a downstream fork's identity, brand, assets, and theme choices                                                                                                                                                                            |
+| `pnpm init:project`                                               | Apply downstream structural choices such as single-locale mode or disabling Storybook                                                                                                                                                                |
+| `docker compose --profile local-infra --profile monitoring up -d` | Optional dev-only Prometheus + Grafana + Alertmanager harness scraping this stack's real metrics — needs `METRICS_AUTH_TOKEN`/`GF_SECURITY_ADMIN_PASSWORD` set in `.env`; see [`docs/operations/observability.md`](docs/operations/observability.md) |
 
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 

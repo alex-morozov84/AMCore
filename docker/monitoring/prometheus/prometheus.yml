@@ -1,0 +1,42 @@
+# AMCore — Prometheus scrape config for the optional `monitoring` dev compose
+# profile. Scrapes the real `api` (web role) and `worker` processes over the
+# Docker network at the same path a production Prometheus would use
+# (docs/operations/observability.md -> "Metrics Endpoint"), through the SAME
+# authenticated path a real deployment must use: METRICS_AUTH_TOKEN, supplied
+# here from a Compose secret sourced from the host environment variable of
+# the same name (never written to this file, never baked into the image) --
+# see docker-compose.yml's `prometheus` service and its `secrets:` block.
+# `rule_files` already globs `docs/operations/prometheus/` (bind-mounted
+# read-only below), so alert rule files added there later need no change to
+# this file to load.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: amcore-api
+    metrics_path: /api/v1/metrics
+    authorization:
+      credentials_file: /run/secrets/metrics_auth_token
+    static_configs:
+      - targets: ['api:5002']
+
+  - job_name: amcore-worker
+    metrics_path: /api/v1/metrics
+    authorization:
+      credentials_file: /run/secrets/metrics_auth_token
+    static_configs:
+      - targets: ['worker:5002']

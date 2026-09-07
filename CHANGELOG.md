@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backlog (in `notification_deliveries`/`ai_runs`) was previously invisible
   to `amcore_queue_jobs`.
 
+- **Optional dev-only `monitoring` Docker Compose profile** — Prometheus +
+  Grafana + Alertmanager, scraping this stack's own `api`/`worker` metrics
+  over the authenticated `METRICS_AUTH_TOKEN` path via a Compose secret (never
+  written to a tracked file). Loopback-only ports, no default Grafana admin
+  password (the container refuses to start without one), never part of
+  `docker-compose.prod.yml`. The verification harness alert rules (next) and
+  dashboards land in and are proven against — see
+  `docs/operations/observability.md` → "Local Verification Harness".
+
 ### Changed
 
 - **`amcore_http_requests_in_flight` dropped its `route` label** — the label

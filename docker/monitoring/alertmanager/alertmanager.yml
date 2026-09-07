@@ -1,0 +1,23 @@
+# AMCore — Alertmanager config for the optional `monitoring` dev compose
+# profile.
+#
+# PLACEHOLDER: this file exists only so the `alertmanager` container has a
+# valid config to boot with -- it routes every alert to a no-op receiver and
+# sends nothing anywhere. A later change replaces `route`/`receivers` below
+# with working, commented email and Telegram receiver examples plus one
+# worked `inhibit_rule`, once the alert rules these receivers would actually
+# fire for also ship.
+#
+# Architectural rule: AMCore's own notification subsystem (in_app/email/
+# telegram via NotificationChannel) must never carry infrastructure alerts --
+# both its delivery paths run over the same Redis/Postgres this alerting
+# exists to monitor, so an alert about (for example) a Redis outage routed
+# through either path would sit inside the very queue that is broken.
+# Alertmanager's receivers below are configured independently of
+# NotificationChannel, not routed through it.
+
+route:
+  receiver: 'null'
+
+receivers:
+  - name: 'null'
