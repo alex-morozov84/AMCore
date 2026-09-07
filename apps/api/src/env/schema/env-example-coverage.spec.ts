@@ -72,6 +72,9 @@ const COMPOSE_ONLY_ALLOW = new Set([
   'COMPOSE_LOG_DRIVER',
   'COMPOSE_LOG_MAX_SIZE',
   'COMPOSE_LOG_MAX_FILE',
+  // Optional bundled `monitoring` profile — consumed by the `grafana`
+  // compose service's own environment, not the app's env schema at all.
+  'GF_SECURITY_ADMIN_PASSWORD',
 ])
 const WEBHOOK_SECRET_PATTERN = /^WEBHOOK_[A-Z0-9_]+_SECRET$/
 
