@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docker-compose.prod.yml`. The verification harness alert rules (next) and
   dashboards land in and are proven against — see
   `docs/operations/observability.md` → "Local Verification Harness".
+- **Shipped Prometheus alert rules** (`docs/operations/prometheus/amcore-alerts.yml`)
+  covering HTTP errors, Node runtime, metrics-collector health, DB, Redis,
+  queues, email, and realtime — every rule proven with a `promtool` test
+  fixture and a new `promtool` CI job. Alertmanager
+  (`docker/monitoring/alertmanager/alertmanager.yml`) routes by severity to
+  a `page`/`ticket` receiver, with a CI-checked email/Telegram example to
+  copy from and one worked `inhibit_rule`. An optional, off-by-default multiwindow
+  multi-burn-rate SLO alerting layer
+  (`docs/operations/prometheus/optional/amcore-slo-burn-rate.yml`) ships
+  alongside it. See `docs/operations/observability.md` → "Alerting".
 
 ### Changed
 

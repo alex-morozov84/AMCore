@@ -1,0 +1,111 @@
+# AMCore — promtool unit tests for the optional SLO burn-rate rules.
+# Confirms the shipped default (amcore:slo_target = 0.999) actually
+# produces the Google SRE Workbook's documented burn-rate thresholds, that
+# the multiwindow (long AND short) condition is real (a short-window spike
+# alone must not page if the long window hasn't caught up), and that the
+# fast/slow page conditions being combined into one alert (rather than two)
+# is real dedup, not just a comment — a scenario that satisfies both still
+# produces exactly one alert instance.
+
+rule_files:
+  - ../amcore-slo-burn-rate.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Fast-only burn: ~5% error ratio sustained through the 5m and 1h windows,
+  # but only 70 minutes of history — nowhere near the 6h the slow-burn
+  # clause needs, so only the fast branch of the `or` can be responsible.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_http_requests_total{status_code="500",route="/organizations/:id"}'
+        values: '0+5x70'
+      - series: 'amcore_http_requests_total{status_code="200",route="/organizations/:id"}'
+        values: '0+95x70'
+    alert_rule_test:
+      - eval_time: 1h6m
+        alertname: AMCoreErrorBudgetPageBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'AMCore error budget burning fast enough to page'
+              description: 'Either the 1h+5m windows exceed 14.4x the burn rate implied by amcore:slo_target (2% of the 30-day budget in ~1h) or the 6h+30m windows exceed 6x (5% of the budget in ~6h) — both are real, ongoing outages at different speeds, reported as one alert so they never double-page for the same incident.'
+              runbook_path: docs/operations/runbooks/http.md#slo-burn-rate
+
+  # Multiwindow proof: a SHORT-lived error spike against HIGH steady
+  # background traffic. In the last 5m alone, errors make up ~1.57% of
+  # requests — above the 1.44% (14.4x at a 0.999 target) threshold on its
+  # own. But summed over the full 1h, those same errors are only ~0.13% of
+  # an hour's worth of high-volume background traffic — nowhere near 1.44%.
+  # A single-window (5m-only) version of this alert WOULD fire here; the
+  # real one must not, proving the 1h clause is doing real work, not
+  # decorative.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_http_requests_total{status_code="500",route="/organizations/:id"}'
+        values: '0+0x55 0+100x5'
+      - series: 'amcore_http_requests_total{status_code="200",route="/organizations/:id"}'
+        values: '0+5000x60'
+    alert_rule_test:
+      - eval_time: 1h
+        alertname: AMCoreErrorBudgetPageBurn
+        exp_alerts: []
+
+  # Dedup proof: a 2% error ratio sustained from t=0 satisfies BOTH the
+  # fast-burn window pair (1h/5m at 14.4x = 1.44%) AND the slow-burn window
+  # pair (6h/30m at 6x = 0.6%) at the same time — this is exactly the
+  # "which one fired" ambiguity the Workbook's own recipe combines into one
+  # alert to avoid. Asserting exactly one entry in `exp_alerts` (not two,
+  # and not one-per-old-alertname, since AMCoreErrorBudgetFastBurn/
+  # AMCoreErrorBudgetSlowBurn no longer exist as separate rules at all) is
+  # the actual dedup proof.
+  - interval: 5m
+    input_series:
+      - series: 'amcore_http_requests_total{status_code="500",route="/organizations/:id"}'
+        values: '0+2x100'
+      - series: 'amcore_http_requests_total{status_code="200",route="/organizations/:id"}'
+        values: '0+98x100'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: AMCoreErrorBudgetPageBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'AMCore error budget burning fast enough to page'
+              description: 'Either the 1h+5m windows exceed 14.4x the burn rate implied by amcore:slo_target (2% of the 30-day budget in ~1h) or the 6h+30m windows exceed 6x (5% of the budget in ~6h) — both are real, ongoing outages at different speeds, reported as one alert so they never double-page for the same incident.'
+              runbook_path: docs/operations/runbooks/http.md#slo-burn-rate
+
+  - interval: 30m
+    input_series:
+      - series: 'amcore_http_requests_total{status_code="500",route="/organizations/:id"}'
+        values: '0+1x160'
+      - series: 'amcore_http_requests_total{status_code="200",route="/organizations/:id"}'
+        values: '0+499x160'
+    alert_rule_test:
+      - eval_time: 3d7h
+        alertname: AMCoreErrorBudgetTicketBurn
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore error budget consumption worth a ticket (10% over 3d at this rate)'
+              description: 'Both the 3d and 6h error-ratio windows exceed 1x the burn rate implied by amcore:slo_target — not urgent, but the monthly budget is being spent faster than the target allows.'
+              runbook_path: docs/operations/runbooks/http.md#slo-burn-rate
+
+  # Healthy traffic (well under budget at every window) must never fire
+  # either burn-rate alert.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_http_requests_total{status_code="500",route="/organizations/:id"}'
+        values: '0+1x70'
+      - series: 'amcore_http_requests_total{status_code="200",route="/organizations/:id"}'
+        values: '0+9999x70'
+    alert_rule_test:
+      - eval_time: 1h6m
+        alertname: AMCoreErrorBudgetPageBurn
+        exp_alerts: []
+      - eval_time: 1h6m
+        alertname: AMCoreErrorBudgetTicketBurn
+        exp_alerts: []

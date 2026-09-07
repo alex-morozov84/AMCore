@@ -401,6 +401,12 @@ services:
       - '127.0.0.1:9093:9093'
     volumes:
       - ./docker/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # Always mounted (fine if empty) so copying an email/Telegram
+      # receiver example from tests/alertmanager.example-full.yml into
+      # alertmanager.yml and dropping a real secret file in
+      # docker/monitoring/alertmanager/secrets/ (gitignored, see its
+      # README) actually works — no further compose change needed.
+      - ./docker/monitoring/alertmanager/secrets:/run/secrets/alertmanager:ro
       - alertmanager_data:/alertmanager
 
   grafana:
