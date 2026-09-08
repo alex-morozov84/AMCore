@@ -124,6 +124,23 @@ services:
   postgres:
     image: postgres:16-alpine
     profiles: ['local-infra']
+    # Loads pg_stat_statements at server start (verified: this module cannot be
+    # added without a restart — see docs/operations/pg-stat-statements-setup.md)
+    # so a fork can exercise docs/operations/slow-query-investigation.md's
+    # queries directly against this bundled instance. Collection begins the
+    # moment the module loads here, at container start — verified live, not
+    # gated on `CREATE EXTENSION`, which (superuser-only, `amcore` already is
+    # one here) is still a separate, deliberate step the setup guide walks
+    # through; it registers the extension and builds its query interface
+    # (the pg_stat_statements/pg_stat_statements_info views and the
+    # pg_stat_statements_reset() function) onto data that's already
+    # accumulating, not merely "a view."
+    # track_utility=off is NOT PostgreSQL's own default (which is `on`) —
+    # verified live that the default lets every pg_monitor-holding role read
+    # back the literal text of CREATE ROLE/ALTER ROLE ... PASSWORD statements,
+    # including the password itself. Off here for the same reason production
+    # must set it off too (see the guide).
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=top -c pg_stat_statements.track_utility=off
     environment:
       POSTGRES_USER: amcore
       POSTGRES_PASSWORD: amcore

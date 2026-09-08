@@ -208,7 +208,7 @@ groups:
           severity: ticket
         annotations:
           summary: 'AMCore slow queries occurring'
-          description: 'Queries slower than SLOW_QUERY_THRESHOLD_MS have been recorded over the last 15m. Use pg_stat_statements (docs/operations/prometheus-statements.md) to find which query; never page on this alone.'
+          description: 'Queries slower than SLOW_QUERY_THRESHOLD_MS have been recorded over the last 15m. Use pg_stat_statements (docs/operations/slow-query-investigation.md) to find which query; never page on this alone.'
           runbook_path: docs/operations/runbooks/db.md#slow-queries
 
   - name: amcore-redis

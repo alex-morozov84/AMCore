@@ -114,7 +114,10 @@ are the hard contract every label must satisfy.
   `APP_COMMIT`), `unknown` if unset (e.g. local dev).
 - `db_pool_connections{state,role}` (`state=total|idle|waiting`),
   `db_slow_queries_total{role}` — collected from the process-local pool; no query
-  text or model names.
+  text or model names. Deliberately: this metric answers "are slow queries
+  occurring," not "which one" — see
+  [Slow query investigation](slow-query-investigation.md) for that (Postgres's
+  own `pg_stat_statements`, queried directly, not scraped into Prometheus).
 - `redis_client_events_total{client,event,role}` — `client` is one of
   `shared`, `queue_producer`, `queue_worker`, `throttler` (unchanged since
   ADR-073 — it describes the Redis-client role, not the specific storage
