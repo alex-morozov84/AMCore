@@ -32,8 +32,8 @@ queue-critical client (`{{ $labels.client }}` — `queue_producer` or
 
 2. Open the **"Client event rate"** dashboard panel (Redis row) and filter for
    `client=~"queue_.*"` to confirm the trend, and the **"Ping latency"** panel
-   for the same window — rising ping latency alongside reconnects points at
-   an overloaded-but-reachable Redis rather than a hard outage.
+   (Redis row) for the same window — rising ping latency alongside reconnects
+   points at an overloaded-but-reachable Redis rather than a hard outage.
 3. Check Redis's own health directly (`redis-cli PING`, or your managed
    provider's status/metrics) — this alert only observes the effect from the
    application side, not Redis's own state.

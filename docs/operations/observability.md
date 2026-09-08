@@ -459,3 +459,61 @@ glob (Prometheus globs are not recursive) — enable it by adding
 in `optional/tests/amcore-slo-burn-rate_test.yml`, including a test that the
 multiwindow condition is real (a short-lived spike diluted by a healthy
 long window must not page).
+
+## Observability Contract Verification
+
+Everything above (metrics, alerts, dashboard, runbooks) is machine-checked as
+one maintained contract, not just documented — `scripts/observability-contract/`,
+run in two CI tiers on every PR.
+
+**Static tier** (`pnpm test:observability-contract`, part of the `Observability
+contract (static)` CI job — no containers): every alert/recording-rule and
+dashboard-panel expression structurally extracted; every runbook's fenced
+`promql` blocks inventoried (a future untagged fence referencing an
+`amcore_*` metric fails); every `runbook_path` and relative Markdown link
+resolves to a real file/heading; every dashboard panel/target's datasource
+matches the provisioned uid (`docker/monitoring/grafana/provisioning/datasources/prometheus.yml`);
+every runbook's `**"Title"** ... panel (X row)` citation names a real
+`(row, panel)` pair on the shipped dashboard; the Prometheus/Alertmanager
+image digests pinned in `docker-compose.yml` and `.github/workflows/ci.yml`
+match; and the public/private-boundary ratchet (below) holds.
+
+**Live tier** (`pnpm test:observability-contract:live`, the `Observability
+contract (live)` CI job, `needs: [promtool]` — boots the real `local-infra` +
+`monitoring` Compose profiles under an isolated project): the metric-reference
+guard queries `GET /api/v1/targets/metadata` scoped to `job=~"amcore-(api|worker)"`
+(never Prometheus's own self-scrape families) to build the real exposed-metric
+set live, expanding histogram families into `_bucket`/`_sum`/`_count`, and
+parses every shipped expression through `POST /api/v1/parse_query` to assert
+every referenced name is real; every expression is also evaluated via
+`POST /api/v1/query`, distinguishing a genuine query error from a valid empty
+result; `GET /api/v1/targets` asserts `amcore-api`/`amcore-worker` are exactly
+`up`; `GET /api/v1/rules` asserts exactly the 8 default groups are loaded
+and the optional SLO groups are genuinely absent (proving the off-by-default
+glob above holds live, not only on paper); `GET /api/v1/alertmanagers` asserts
+Alertmanager discovery resolved; and Grafana is checked three ways — the
+modern `/apis/dashboard.grafana.app` API (discovers `preferredVersion`, `v2`
+on the pinned `13.2.1` image today, and asserts the DTO's `apiVersion` matches
+it), the classic `v1` DTO diffed against the committed dashboard JSON
+(rows/panels/targets/expr/datasource refs), and a real `POST /api/ds/query`
+round trip through Grafana to Prometheus for the `amcore_build_info` target
+(catching a query-level error Grafana can return inside an HTTP 200). A
+second, fully isolated boot proves the old-volume migration path
+`provisioning/datasources/prometheus.yml`'s own header comment describes: a
+`grafana_data` volume seeded under the legacy no-uid provisioning
+(`docker/monitoring/grafana/provisioning-legacy-fixture/`) is handed the real
+provisioning and ends up with the legacy datasource gone and `amcore-prometheus`
+healthy. Both tiers tear their Compose stacks down unconditionally (a shell
+`trap` plus an `if: always()` CI step).
+
+**Public/private-boundary ratchet:** `scripts/observability-contract/private-path-baseline.json`
+is an exact, reviewed `(file, target citation, occurrence count)` snapshot of
+every private root `ai/*` citation this repository carried at the time PR7
+shipped (7 legitimate — `AGENTS.md`/`CONTRIBUTING.md`/`PROJECT_CONTEXT.md`,
+which exist specifically to describe the optional private maintainer overlay
+— plus 87 pre-existing citations across 65 files, tracked as their own
+maintainer cleanup item rather than rewritten by this PR). The check
+fails on any citation not in that exact baseline; a baseline entry may only
+shrink. Regenerate it with `node scripts/observability-contract/generate-private-path-baseline.mjs`
+only when deliberately fixing a listed `debt` entry — never to silently admit
+a new one.

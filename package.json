@@ -22,6 +22,8 @@
     "lint:fix": "turbo run lint -- --fix",
     "test": "turbo test",
     "test:scripts": "node --test --test-concurrency=1 scripts/lib/*.test.mjs scripts/*.test.mjs",
+    "test:observability-contract": "node --test --test-concurrency=1 scripts/observability-contract/*.test.mjs scripts/observability-contract/live/*.test.mjs",
+    "test:observability-contract:live": "bash scripts/observability-contract/run-live.sh",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
@@ -41,7 +43,8 @@
     "lint-staged": "^17.4.1",
     "prettier": "^3.9.6",
     "turbo": "^2.10.12",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "yaml": "^2.8.3"
   },
   "lint-staged": {
     "apps/api/**/*.{ts,tsx,js,jsx}": [

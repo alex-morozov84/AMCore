@@ -133,8 +133,9 @@ be a non-event.
    likely-causes note above — a `0` reading during a collector outage is not
    evidence of health.
 3. Open the **"Outbox due-now"** dashboard panel (Queues & outbox row) for the
-   trend. Use **"Queue jobs by state"** for `notifications` or `ai-runs` only
-   as evidence about the wake path; unlike the durable due-now gauge, those
+   trend. Use the **"Queue jobs by state"** panel (Queues & outbox row) for
+   `notifications` or `ai-runs` only as evidence about the wake path; unlike
+   the durable due-now gauge, those
    one-attempt jobs do not represent the complete backlog.
 
 **Mitigation:**

@@ -24,6 +24,8 @@ Thanks for your interest in contributing. This document explains how to set up t
 | `pnpm init:brand`                                                 | Initialize a downstream fork's identity, brand, assets, and theme choices                                                                                                                                                                            |
 | `pnpm init:project`                                               | Apply downstream structural choices such as single-locale mode or disabling Storybook                                                                                                                                                                |
 | `docker compose --profile local-infra --profile monitoring up -d` | Optional dev-only Prometheus + Grafana + Alertmanager harness scraping this stack's real metrics — needs `METRICS_AUTH_TOKEN`/`GF_SECURITY_ADMIN_PASSWORD` set in `.env`; see [`docs/operations/observability.md`](docs/operations/observability.md) |
+| `pnpm test:observability-contract`                                | Static observability-contract checks (metric references, runbook links/anchors/panel citations, private-path ratchet, image-pin consistency) — no Docker needed                                                                                      |
+| `pnpm test:observability-contract:live`                           | Live observability-contract checks — boots the monitoring harness above and Grafana's old-volume migration smoke, then tears both down; needs Docker                                                                                                 |
 
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 

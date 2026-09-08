@@ -37,7 +37,9 @@
           { "context": "Gitleaks" },
           { "context": "Dependency review" },
           { "context": "Lint workflows" },
-          { "context": "PR title" }
+          { "context": "PR title" },
+          { "context": "Observability contract (static)" },
+          { "context": "Observability contract (live)" }
         ]
       }
     },

@@ -1,0 +1,473 @@
+{
+  "description": "Exact occurrence-level baseline for the public/private-boundary ratchet (ai/models-talk.md FINAL PLAN, Tier 1 item 7). \"legitimate\" describes the optional private ai/ overlay itself (AGENTS.md, CONTRIBUTING.md, PROJECT_CONTEXT.md). \"debt\" is a pre-existing citation carried forward per the 2026-09-08 owner decision — tracked in ai/BACKLOG.md for a separate cleanup, not fixed by this PR. The check fails on anything not listed here at its exact file+target+count; a listed entry disappearing is fine (the baseline may only shrink), but count going up or a new (file, target) pair appearing fails.",
+  "entries": [
+    {
+      "file": "AGENTS.md",
+      "target": "ai/BACKLOG.md",
+      "count": 1,
+      "kind": "legitimate"
+    },
+    {
+      "file": "AGENTS.md",
+      "target": "ai/DECISIONS.md",
+      "count": 1,
+      "kind": "legitimate"
+    },
+    {
+      "file": "AGENTS.md",
+      "target": "ai/README.md",
+      "count": 1,
+      "kind": "legitimate"
+    },
+    {
+      "file": "AGENTS.md",
+      "target": "ai/STATUS.md",
+      "count": 1,
+      "kind": "legitimate"
+    },
+    {
+      "file": "AGENTS.md",
+      "target": "ai/WORKFLOW.md",
+      "count": 1,
+      "kind": "legitimate"
+    },
+    {
+      "file": "apps/api/Dockerfile",
+      "target": "ai/decisions/adr-038-pnpm-docker-deploy-packaging.md.",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/admin/admin.controller.ts",
+      "target": "ai/ORGANIZATIONS_ADMIN_REVIEW.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/api-keys/api-keys.controller.ts",
+      "target": "ai/API_KEYS_REVIEW.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/auth/auth.controller.ts",
+      "target": "ai/API_KEYS_REVIEW.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/auth/decorators/auth-decorator-coverage.spec.ts",
+      "target": "ai/DECISIONS.md",
+      "count": 2,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/auth/decorators/auth-decorator-coverage.spec.ts",
+      "target": "ai/ORGANIZATIONS_ADMIN_REVIEW.md",
+      "count": 2,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/auth/decorators/auth.decorator.ts",
+      "target": "ai/ORGANIZATIONS_ADMIN_REVIEW.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/auth/guards/authentication.guard.ts",
+      "target": "ai/DECISIONS.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/organizations/invite.service.ts",
+      "target": "ai/SECURITY_AUDIT.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/organizations/invites.controller.ts",
+      "target": "ai/ORGANIZATIONS_ADMIN_REVIEW.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/organizations/members.controller.ts",
+      "target": "ai/ORGANIZATIONS_ADMIN_REVIEW.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/organizations/organizations.controller.ts",
+      "target": "ai/ORGANIZATIONS_ADMIN_REVIEW.md",
+      "count": 2,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/core/organizations/roles.controller.ts",
+      "target": "ai/ORGANIZATIONS_ADMIN_REVIEW.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/env/schema/env-example-coverage.spec.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/env/schema/media.env.ts",
+      "target": "ai/MEDIA_PROCESSING_PLAN.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/env/schema/storage.env.ts",
+      "target": "ai/STORAGE_PLAN.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/infrastructure/email/templates/notification.integration.spec.ts",
+      "target": "ai/TESTING.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/infrastructure/media/media.types.ts",
+      "target": "ai/MEDIA_PROCESSING_PLAN.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/infrastructure/media/presets/avatar.preset.ts",
+      "target": "ai/MEDIA_PROCESSING_PLAN.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/infrastructure/media/processors/sharp-image.processor.ts",
+      "target": "ai/MEDIA_PROCESSING_PLAN.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/infrastructure/schedule/cleanup.service.ts",
+      "target": "ai/SECURITY_AUDIT.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/src/swagger.config.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/test/helpers.ts",
+      "target": "ai/TESTING.md",
+      "count": 2,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/api/test/organizations.e2e-spec.ts",
+      "target": "ai/ORGANIZATIONS_ADMIN_REVIEW.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/e2e/mocked/csp-nonce.spec.ts",
+      "target": "ai/models-talk.md",
+      "count": 2,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/e2e/mocked/csp-nonce.spec.ts",
+      "target": "ai/STATUS.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/e2e/mocked/csp-report-endpoint.spec.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/e2e/mocked/security-headers.spec.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/e2e/real-stack/csp-nonce.spec.ts",
+      "target": "ai/models-talk.md",
+      "count": 2,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/e2e/real-stack/csp-nonce.spec.ts",
+      "target": "ai/STATUS.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/e2e/real-stack/register-and-logout.spec.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/e2e/server-mocked/oauth-visibility.spec.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/e2e/shared/axe.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/next.config.ts",
+      "target": "ai/models-talk.md",
+      "count": 3,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/playwright.config.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/playwright.real-stack.config.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/app/[locale]/layout.tsx",
+      "target": "ai/models-talk.md",
+      "count": 2,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/entities/user/api/user-queries.msw-integration.test.tsx",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/features/auth-login/model/use-login.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/features/auth-register/model/use-register.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/proxy.ts",
+      "target": "ai/models-talk.md",
+      "count": 3,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/api/bff/ensure-fresh-session.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/api/bff/oauth-cookie-relay.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/api/bff/oauth-provider-proxy.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/api/bff/origin-guard.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/api/sse/use-event-source.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/lib/csp/build-csp.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/lib/csp/constants.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/lib/csp/csp-mode.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/lib/csp/csp-mode.ts",
+      "target": "ai/STATUS.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/lib/csp/csp-report-handler.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/lib/csp/csp-report-rate-limit.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/lib/theme.test.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/lib/zod-jitless.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/ui/button.tsx",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/ui/csp-inline-tag-components-guard.test.ts",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/shared/ui/sidebar.stories.tsx",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "apps/web/src/test/eslint-guards.test.ts",
+      "target": "ai/TESTING.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "target": "ai/PROCESS.md",
+      "count": 1,
+      "kind": "legitimate"
+    },
+    {
+      "file": "PROJECT_CONTEXT.md",
+      "target": "ai/STATUS.md",
+      "count": 1,
+      "kind": "legitimate"
+    },
+    {
+      "file": "scripts/init-brand.mjs",
+      "target": "ai/decisions/adr-071-",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/init-brand.mjs",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/init-project.mjs",
+      "target": "ai/decisions/adr-071-",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/init-project.mjs",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/lib/brand-plan-files.mjs",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/lib/project-config.mjs",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/lib/project-plan-api-notification-integration-test.mjs",
+      "target": "ai/TESTING.md",
+      "count": 2,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/lib/project-plan-storybook-ci.mjs",
+      "target": "ai/BACKLOG.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/lib/project-plan-storybook-docs-testing.mjs",
+      "target": "ai/decisions/",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/lib/project-plan-storybook-docs.test.mjs",
+      "target": "ai/decisions/",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/lib/project-plan-web-nav-hooks.mjs",
+      "target": "ai/models-talk.md",
+      "count": 4,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/lib/project-plan-web-nav-links.mjs",
+      "target": "ai/models-talk.md",
+      "count": 1,
+      "kind": "debt"
+    },
+    {
+      "file": "scripts/lib/safety.mjs",
+      "target": "ai/PROCESS.md",
+      "count": 2,
+      "kind": "debt"
+    }
+  ]
+}

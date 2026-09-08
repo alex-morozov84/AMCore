@@ -12,7 +12,14 @@ export default [
     // its runtime globals declared directly instead.
     files: ['scripts/**/*.mjs'],
     languageOptions: {
-      globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly' },
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        setTimeout: 'readonly',
+      },
     },
   },
 ]

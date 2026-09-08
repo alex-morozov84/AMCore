@@ -23,7 +23,7 @@ for 5m).
    `total`/`idle`/`waiting` split over time — `waiting` climbing while `idle`
    stays near zero and `total` is already at its configured max confirms
    genuine saturation rather than a transient blip.
-2. Check the **"Slow query rate"** panel for the same window — a correlated
+2. Check the **"Slow query rate"** panel (Database row) for the same window — a correlated
    rise means slow queries are the root cause, not pool sizing.
 3. Query directly to see whether `waiting` recovers on its own or keeps
    climbing:

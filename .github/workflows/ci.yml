@@ -448,7 +448,7 @@ jobs:
         run: docker compose down -v
 
   promtool:
-    name: Prometheus alert rules
+    name: Observability contract (static)
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
     env:
@@ -459,6 +459,27 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Static observability-contract checks: metric-reference extraction,
+      # runbook links/anchors/panel citations, the public/private-boundary
+      # ratchet, and compose-vs-CI image consistency. Pure Node checks
+      # against the real repository — no containers. See
+      # docs/operations/observability.md -> "Observability Contract
+      # Verification".
+      - name: Observability contract (static checks)
+        run: pnpm test:observability-contract
 
       # A fake, non-secret value standing in for the real METRICS_AUTH_TOKEN
       # docker-compose.yml sources from a Compose secret at runtime (never
@@ -507,6 +528,47 @@ jobs:
             -v "$PWD/docker/monitoring/alertmanager:/cfg" \
             "$ALERTMANAGER_IMAGE" \
             check-config /cfg/tests/alertmanager.example-full.yml
+
+  observability-contract-live:
+    name: Observability contract (live)
+    runs-on: ubuntu-latest
+    needs: [promtool]
+    # Builds 3 app images from scratch, boots the full local-infra +
+    # monitoring Compose profiles, runs every live check, then a second
+    # isolated old-volume Grafana migration smoke — a reasoned bound, not a
+    # measured one (no cached layers on a fresh runner).
+    timeout-minutes: 25
+    env:
+      METRICS_AUTH_TOKEN: ci-fake-token-never-a-real-secret
+      GF_SECURITY_ADMIN_PASSWORD: ci-fake-password-never-a-real-secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Owns its own Compose lifecycle end to end: boots local-infra +
+      # monitoring under an isolated COMPOSE_PROJECT_NAME, waits for real
+      # scrape targets, runs every live check (targets/rules/alertmanager/
+      # metric-reference/query-evaluability/Grafana), then the isolated
+      # old-volume migration smoke — and tears both stacks down
+      # unconditionally via its own shell trap. A job-level timeout above is
+      # the second, independent cleanup guarantee if the trap itself never
+      # runs.
+      - name: Observability contract (live checks + old-volume smoke)
+        run: pnpm test:observability-contract:live
 
   # amcore:sentinel-block start=storybook-job
   storybook:
