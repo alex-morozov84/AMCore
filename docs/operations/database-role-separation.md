@@ -63,14 +63,14 @@ silently until the running app actually queries that schema.
 [`docker/postgres/setup-roles.sql`](../../docker/postgres/setup-roles.sql)
 is the reference script — a template to review and run against whatever
 Postgres you're actually using (which may not even be the compose stack's
-bundled instance), not an automated compose service. Replace the password
-placeholders with real, unique secrets before running it. It has three
-steps, because AMCore's schemas don't exist until Prisma creates them:
+bundled instance), not an automated compose service. It has three steps,
+because AMCore's schemas don't exist until Prisma creates them:
 
 1. **Before the first `prisma migrate deploy` ever runs against this
-   database:** create both roles and grant `amcore_migrator`
-   `CREATE`/`CONNECT` on the database, **plus** `CREATE` on the `public`
-   schema specifically — even though no AMCore model lives there. Prisma's
+   database:** create both roles **as `NOLOGIN`** (not merely "without a
+   password" — see below) and grant `amcore_migrator` `CREATE`/`CONNECT` on
+   the database, **plus** `CREATE` on the `public` schema specifically —
+   even though no AMCore model lives there. Prisma's
    own bookkeeping table, `_prisma_migrations`, is created in whatever
    schema `MIGRATION_DATABASE_URL`'s connection defaults to, which is
    `public` per this repo's own `.env.example`. Verified against a real
@@ -84,6 +84,52 @@ denied for schema public`, before applying anything — Postgres 15+ no
    pseudo-role ACL entry, verified not to affect this role-specific one.
    `core`/`notifications`/`ai` themselves don't exist yet on a brand-new
    database, so nothing else schema-specific belongs in this step.
+
+   **`NOLOGIN`, not "`LOGIN` with no password" — verified these are
+   meaningfully different.** A `LOGIN` role with no password is still
+   admitted by any _non-password_ auth method your `pg_hba.conf` allows —
+   reproduced live against the bundled Postgres image's own default config,
+   where local `trust` connections let a passwordless `LOGIN` role straight
+   in, no password prompt at all. `NOLOGIN` is checked as a role attribute
+   **before** any `pg_hba.conf` method is even consulted — verified
+   rejected identically under both `trust` and `scram-sha-256`, with
+   `FATAL: role "..." is not permitted to log in`, not an
+   auth-method-specific error. That's genuinely fail-closed.
+
+   Immediately after this step, before step 2, set each role's password
+   interactively **while it's still `NOLOGIN`** (verified `\password` works
+   on a `NOLOGIN` role — setting a password doesn't itself grant the
+   ability to log in). Generate a strong, unique, random value from a
+   password manager's own generator for each — never a memorized or reused
+   one — and enter it directly at the prompt:
+
+   ```
+   \password amcore_migrator
+   \password amcore_runtime
+   ```
+
+   Never as inline SQL (`ALTER ROLE ... PASSWORD '...'` or a `PASSWORD`
+   clause on `CREATE ROLE`) — verified live that PostgreSQL's own
+   `pg_stat_statements` extension, when its default `track_utility` setting
+   is left on, captures that literal text (password included) for any
+   `pg_monitor`-holding role to read; `\password` hashes client-side and
+   never sends the cleartext to the server at all. See [`pg_stat_statements`
+   security settings](pg-stat-statements-security.md) for the full rationale and
+   [Secret rotation](secret-rotation.md) for using the same command to
+   rotate these passwords later.
+
+   **Only now, with a real password already set, lift `NOLOGIN`:**
+
+   ```sql
+   ALTER ROLE amcore_migrator LOGIN;
+   ALTER ROLE amcore_runtime LOGIN;
+   ```
+
+   Verified end to end: both roles reject every connection attempt (a real
+   network connection, any password or none, and the bundled image's own
+   local `trust` auth) right up until this `ALTER ROLE` runs — never a
+   passwordless-but-reachable window at any point.
+
 2. **Run `prisma migrate deploy`**, with `MIGRATION_DATABASE_URL` wired to
    `amcore_migrator`'s credentials. This is what actually creates the three
    schemas and every table in them; `amcore_migrator` becomes their owner
@@ -129,7 +175,9 @@ role (e.g. change its password or drop it). This script neither adds to
 nor removes that separate, Postgres-native grant; it's an unavoidable
 property of `CREATEROLE`, not a gap here.
 
-Wire the resulting connection strings:
+Wire the resulting connection strings, using the passwords you set via
+`\password` above (never the literal text you'd have typed into `CREATE
+ROLE`/`ALTER ROLE` — there isn't any):
 
 ```bash
 MIGRATION_DATABASE_URL="postgresql://amcore_migrator:<migrator-password>@<host>:5432/amcore?sslmode=require"
@@ -183,6 +231,22 @@ resolve` never touch it. The production migrator role needs no shadow-DB
   `REVOKE UPDATE, DELETE ON core.audit_log FROM amcore_runtime;` as defense
   in depth (a second, independent layer alongside the trigger), but it is
   optional hardening, not something this guide requires.
+
+## A third role for query investigation
+
+`setup-roles.sql` also provisions `amcore_observer` — a read-only role for
+querying Postgres's own `pg_stat_statements` slow-query statistics, distinct
+from both roles above. It needs no schema/table access at all; its one grant
+(`pg_monitor`) is deliberately made through a self-hosted superuser or
+provider-authorized equivalent, in a separate step, not by this script's own
+`CREATEROLE`-level admin connection — see the full guide for why.
+`amcore_runtime` is not the right credential for this
+role's purpose: it only shows the queries it itself ran (every AMCore
+process connects as that one role, so this happens to include everything
+the app runs), and granting it broader stats access would widen the exact
+role this guide's own separation narrowed. See [the `amcore_observer`
+role](pg-stat-statements-observer-role.md) for the full guide, including
+what it can and cannot do, verified empirically.
 
 ## See also
 

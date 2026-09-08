@@ -65,9 +65,13 @@ File a ticket and investigate before pool exhaustion needs manual remediation.
 1. Open the **"Slow query rate"** dashboard panel (Database row) to confirm
    the trend and its magnitude.
 2. This alert's own count says _that_ slow queries are occurring, not _which_
-   query. Use your deployment's approved `pg_stat_statements` setup and query
-   it directly to identify the offending query fingerprint; the extension
-   requires database/server setup and an appropriately privileged observer.
+   query. If `pg_stat_statements` isn't enabled yet, follow
+   [Bootstrap](../pg-stat-statements-setup.md) (a one-time privileged step,
+   not a migration), review the [security
+   settings](../pg-stat-statements-security.md), and provision [the `amcore_observer`
+   role](../pg-stat-statements-observer-role.md) first; then use [Slow query
+   investigation](../slow-query-investigation.md)'s triage queries to
+   identify the offending query directly.
 3. Cross-check the **"5xx error ratio"** and **"p99 latency by route"** panels
    (HTTP row, see [`http.md`](http.md)) for the same window — never treat a
    slow-query alert alone as proof of user-facing impact; correlate first.

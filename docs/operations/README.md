@@ -65,8 +65,16 @@ Already running? Reach for whichever concern below applies.
   `metrics-collector-health.md`, `db.md`, `redis.md`, `queues.md`, `email.md`,
   `realtime.md`) give each alert a symptom, ranked likely causes, diagnostic
   steps with executable diagnostic PromQL and the matching dashboard panel,
-  mitigation, and
-  escalation guidance.
+  mitigation, and escalation guidance.
+- **`pg_stat_statements`** — [Bootstrap](pg-stat-statements-setup.md) (a
+  one-time privileged step, never a migration), [security
+  settings](pg-stat-statements-security.md), [the `amcore_observer`
+  role](pg-stat-statements-observer-role.md) (fail-closed `NOLOGIN` →
+  `\password` → `LOGIN`), and [Recovery](pg-stat-statements-recovery.md) if
+  a password may have leaked through it.
+- **[Slow query investigation](slow-query-investigation.md)** — triage
+  queries once the above is set up — the tool the DB runbook's Slow queries
+  entry points to for "which query," not just "that queries are slow."
 - **[CI & repo security](ci-security.md)** — the CI security gates, what a fork
   inherits (and what it doesn't), the `strict`-mode `setup-repo-security.sh` step,
   and the action-pin rules.

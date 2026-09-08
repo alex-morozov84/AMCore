@@ -55,6 +55,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rotated by Docker's `local` driver — no bundled shipper or searchable log
   store, and no way to correlate a `correlationId` across `api`/`worker`
   once either has rotated past it.
+- **`pg_stat_statements` operations guides** — bootstrap, security settings,
+  the dedicated `amcore_observer` role, credential-exposure recovery, and
+  slow-query triage now have focused guides under `docs/operations/`. The
+  bootstrap provides executable `postgresql.conf`, server-flag, and live-SQL
+  paths, preserves existing preload modules, and treats extension installation
+  and `pg_monitor` delegation as provider capabilities rather than assuming a
+  managed service exposes a PostgreSQL superuser.
+- **Hardened database-role provisioning and recovery** —
+  `docker/postgres/setup-roles.sql` creates `amcore_migrator`,
+  `amcore_runtime`, and `amcore_observer` as `NOLOGIN`; operators set strong,
+  unique random passwords through psql's `\password` before enabling `LOGIN`.
+  The bundled development PostgreSQL disables utility-statement tracking so
+  inline role-management SQL cannot place cleartext passwords in
+  `pg_stat_statements`. Recovery identifies affected credentials from change
+  records, never mistakes the statement executor for the target role, never
+  returns captured query text, and resets only exact `(userid, dbid, queryid)`
+  entries. ADR-076 amended.
 
 ### Changed
 

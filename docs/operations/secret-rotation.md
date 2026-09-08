@@ -149,18 +149,36 @@ no rotation story better than "change the password and restart everything at
 once."
 
 **Verified against a real Postgres 16 container:** an `ALTER ROLE ... PASSWORD`
-statement does **not** affect connections that are already established and
-authenticated — a session opened with the old password keeps running new
-queries successfully for its entire lifetime. Only a _new_ connection attempt
-is checked against the current password. This is the mechanic that makes a
-rolling restart the actual rotation primitive here, not a special feature of
-this starter:
+statement (the one `\password` below sends, internally, with an already-hashed
+value — see the note after step 2) does **not** affect connections that are
+already established and authenticated — a session opened with the old
+password keeps running new queries successfully for its entire lifetime.
+Only a _new_ connection attempt is checked against the current password.
+This is the mechanic that makes a rolling restart the actual rotation
+primitive here, not a special feature of this starter:
 
-1. Generate new passwords for `amcore_migrator` and `amcore_runtime`.
-2. `ALTER ROLE amcore_runtime PASSWORD '<new>';` and the same for
-   `amcore_migrator`. Every pooled connection any currently-running `api`/
-   `worker` replica already holds keeps working, unaffected, verified above —
-   this step alone causes no errors anywhere.
+1. Generate a strong, unique, random password for `amcore_migrator` and
+   another for `amcore_runtime` — a password manager's or secrets manager's
+   own generator, never a memorized or reused value. Enter each one directly
+   into the `\password` prompt in step 2, from the manager's own reveal/copy
+   UI; don't stage it in a file, shell variable, or somewhere else you'd have
+   to separately remember to clear.
+2. `\password amcore_runtime` and `\password amcore_migrator`, run
+   interactively in `psql` — **never** `ALTER ROLE ... PASSWORD '<new>'` as
+   literal SQL. Verified live: PostgreSQL's own `pg_stat_statements`
+   extension, when its default `track_utility` setting is left on, captures
+   the full literal text of an `ALTER ROLE ... PASSWORD` statement —
+   password included — readable by any `pg_monitor`-holding role (including
+   `amcore_observer`, provisioned specifically to hold that role). `\password`
+   hashes the new password client-side and sends only the hash; PostgreSQL's
+   own docs confirm it isn't echoed by `psql` and isn't written to
+   `.psql_history` either. See [`pg_stat_statements` security
+   settings](pg-stat-statements-security.md) for the primary control and
+   [recovery](pg-stat-statements-recovery.md) for the procedure if a
+   password was ever rotated the old way
+   while `track_utility` was on. Every pooled connection any currently-running
+   `api`/`worker` replica already holds keeps working, unaffected, verified
+   above — this step alone causes no errors anywhere.
 3. Update `DATABASE_URL` (runtime role) and `MIGRATION_DATABASE_URL` (migrator
    role) in your secret store.
 4. Roll the `api`/`worker` processes (see [Zero/low-downtime
@@ -180,6 +198,31 @@ at once" — a role has exactly one password. The rolling-restart property above
 is what stands in for that here: it isn't a true grace period, but the
 practical effect (no request-serving replica ever has zero valid connections)
 is the same as long as your restart is actually rolling, not a stop-then-start.
+
+### `amcore_observer` (`pg_stat_statements` investigation role)
+
+Simpler than the two above: nothing in `apps/api`/`apps/web` connects as
+`amcore_observer` (see [the `amcore_observer`
+role](pg-stat-statements-observer-role.md)) — it's an operator/DBA credential
+for ad hoc `psql` use, not wired into any env var or connection pool. No
+rolling restart is needed:
+
+1. Generate a strong, unique, random password from a password manager's own
+   generator, then `\password amcore_observer`, run interactively, entering
+   it directly from the manager's reveal/copy UI — same reasoning as above:
+   this avoids ever sending the cleartext password to the server, so it
+   can't show up in `pg_stat_statements` (readable by `amcore_observer`
+   itself, given what this role's own credential grants it) even if
+   `track_utility` is on.
+2. Update wherever you personally store the credential (password manager,
+   local `psql` config). There is no further step — no running process holds
+   an open connection as this role to invalidate, and no `DATABASE_URL`-style
+   env var references it anywhere in this repo.
+
+Rotate it on the same cadence as any other credential with cluster-wide read
+access to query text (see that guide's sensitivity note) — sooner if an
+operator with access leaves, later otherwise; no fixed schedule is
+prescribed here.
 
 ## Redis (`REDIS_URL`)
 
