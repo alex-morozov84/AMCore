@@ -60,9 +60,17 @@ export function findPrivatePathCitations(filePath) {
   return hits
 }
 
-/** Scans every git-tracked file (excluding the private `ai/` repo itself). */
+/**
+ * Scans every git-tracked file, excluding the private `ai/` repo itself and
+ * this tool's own `scripts/observability-contract/` tree — the latter's
+ * source legitimately contains `ai/*`-shaped strings as regex patterns, test
+ * fixtures, and the baseline's own tracked data, none of which are a leaked
+ * citation of private rationale.
+ */
 export function scanRepoForPrivatePathCitations() {
-  const files = listTrackedFiles().filter((f) => !f.startsWith('ai/'))
+  const files = listTrackedFiles().filter(
+    (f) => !f.startsWith('ai/') && !f.startsWith('scripts/observability-contract/')
+  )
   const all = []
   for (const file of files) all.push(...findPrivatePathCitations(file))
   return all
