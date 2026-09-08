@@ -15,35 +15,30 @@ export async function areTargetsUp() {
   )
 }
 
-/** @returns {string[]} violations against the exact expected target set. */
-export async function checkTargets() {
-  const { body } = await getJson(`${PROMETHEUS_URL}/api/v1/targets`)
-  const active = body?.data?.activeTargets ?? []
-  const violations = []
-
-  for (const job of EXPECTED_JOBS) {
-    const matches = active.filter((t) => t.labels?.job === job)
-    if (matches.length === 0) {
-      violations.push(`no active target for job "${job}"`)
-      continue
-    }
-    if (matches.length > 1) {
-      violations.push(`job "${job}": expected exactly 1 active target, found ${matches.length}`)
-    }
-    const target = matches[0]
-    if (!target.scrapeUrl?.endsWith('/api/v1/metrics')) {
-      violations.push(
-        `job "${job}": scrapeUrl "${target.scrapeUrl}" does not end with /api/v1/metrics`
-      )
-    }
-    if (target.health !== 'up') {
-      violations.push(`job "${job}": health is "${target.health}", expected "up"`)
-    }
-    if (target.lastError) {
-      violations.push(`job "${job}": lastError is "${target.lastError}", expected empty`)
-    }
+function checkExpectedJobTarget(job, active, violations) {
+  const matches = active.filter((t) => t.labels?.job === job)
+  if (matches.length === 0) {
+    violations.push(`no active target for job "${job}"`)
+    return
   }
+  if (matches.length > 1) {
+    violations.push(`job "${job}": expected exactly 1 active target, found ${matches.length}`)
+  }
+  const target = matches[0]
+  if (!target.scrapeUrl?.endsWith('/api/v1/metrics')) {
+    violations.push(
+      `job "${job}": scrapeUrl "${target.scrapeUrl}" does not end with /api/v1/metrics`
+    )
+  }
+  if (target.health !== 'up') {
+    violations.push(`job "${job}": health is "${target.health}", expected "up"`)
+  }
+  if (target.lastError) {
+    violations.push(`job "${job}": lastError is "${target.lastError}", expected empty`)
+  }
+}
 
+function checkForUnexpectedTargets(active, violations) {
   for (const target of active) {
     const job = target.labels?.job
     if (!EXPECTED_JOBS.includes(job) && !ALLOWED_EXTRA_JOBS.has(job)) {
@@ -52,5 +47,14 @@ export async function checkTargets() {
       )
     }
   }
+}
+
+/** @returns {string[]} violations against the exact expected target set. */
+export async function checkTargets() {
+  const { body } = await getJson(`${PROMETHEUS_URL}/api/v1/targets`)
+  const active = body?.data?.activeTargets ?? []
+  const violations = []
+  for (const job of EXPECTED_JOBS) checkExpectedJobTarget(job, active, violations)
+  checkForUnexpectedTargets(active, violations)
   return violations
 }

@@ -45,36 +45,38 @@ export function collectVectorSelectorNames(node, out = []) {
   return out
 }
 
+/**
+ * Checks one expression's metric references. A parse failure (bad HTTP
+ * status, missing/non-JSON body, or the API's own status:"error") is itself
+ * a violation — silently treating it as "no selectors found" would disable
+ * this guard for that expression rather than flag it (verified: this is
+ * exactly what happened before this check existed, confirmed by mocking an
+ * error response).
+ */
+async function checkExpressionMetricReferences({ expr, file, line, label }, names) {
+  const { status, body } = await postJson(
+    `${PROMETHEUS_URL}/api/v1/parse_query`,
+    `query=${encodeURIComponent(expr)}`
+  )
+  if (status < 200 || status >= 300 || body?.status !== 'success' || !body?.data) {
+    return [
+      `${file}:${line}: ${label} — parse_query failed (HTTP ${status}, ` +
+        `status "${body?.status}"${body?.error ? `: ${body.error}` : ''}) — cannot verify its metric references`,
+    ]
+  }
+  return collectVectorSelectorNames(body.data)
+    .filter((name) => !names.has(name))
+    .map((name) => `${file}:${line}: ${label} references unknown metric "${name}"`)
+}
+
 export async function checkMetricReferences() {
   const { names, jobsSeen } = await buildAllowedMetricNames()
   const violations = []
   for (const job of ['amcore-api', 'amcore-worker']) {
     if (!jobsSeen.has(job)) violations.push(`no metadata returned for target job "${job}"`)
   }
-
-  for (const { expr, file, line, label } of getAllExpressions()) {
-    const { status, body } = await postJson(
-      `${PROMETHEUS_URL}/api/v1/parse_query`,
-      `query=${encodeURIComponent(expr)}`
-    )
-    // A parse failure (bad HTTP status, missing/non-JSON body, or the API's
-    // own status:"error") must itself be a violation — silently treating it
-    // as "no selectors found" would disable this guard for that expression
-    // rather than flag it (verified: this is exactly what happened before
-    // this check existed, confirmed by mocking an error response).
-    if (status < 200 || status >= 300 || body?.status !== 'success' || !body?.data) {
-      violations.push(
-        `${file}:${line}: ${label} — parse_query failed (HTTP ${status}, ` +
-          `status "${body?.status}"${body?.error ? `: ${body.error}` : ''}) — cannot verify its metric references`
-      )
-      continue
-    }
-    const referenced = collectVectorSelectorNames(body.data)
-    for (const name of referenced) {
-      if (!names.has(name)) {
-        violations.push(`${file}:${line}: ${label} references unknown metric "${name}"`)
-      }
-    }
+  for (const expression of getAllExpressions()) {
+    violations.push(...(await checkExpressionMetricReferences(expression, names)))
   }
   return violations
 }
