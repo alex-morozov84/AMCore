@@ -139,7 +139,7 @@ groups:
       # nothing off-Linux, e.g. a macOS dev host) — this alert is legitimately
       # never evaluable there and only becomes live in Docker/Linux.
       - alert: AMCoreFileDescriptorsApproachingLimit
-        expr: (process_open_fds / process_max_fds) > 0.9
+        expr: (process_open_fds{job=~"amcore-.*"} / process_max_fds{job=~"amcore-.*"}) > 0.9
         for: 5m
         labels:
           severity: page
@@ -197,7 +197,7 @@ groups:
           severity: ticket
         annotations:
           summary: 'AMCore DB pool has connections waiting'
-          description: 'More than DATABASE_POOL_WAITING_THRESHOLD (default 5) connections have been waiting on the pool for 5m. The readiness check already restarts the process if this gets bad enough to fail outright — this alert is the earlier, non-restart signal.'
+          description: 'More than DATABASE_POOL_WAITING_THRESHOLD (default 5) connections have been waiting on the pool for 5m. Readiness can remove a replica from service but does not inherently restart it — investigate before pool exhaustion needs manual remediation.'
           runbook_path: docs/operations/runbooks/db.md#pool-waiting
       # Never auto-page on slow-query count alone (cause, not symptom) —
       # ticket-only, correlate with HTTP latency/error alerts before acting.
@@ -336,8 +336,8 @@ groups:
         labels:
           severity: ticket
         annotations:
-          summary: 'AMCore {{ $labels.queue }} queue has a dead-lettered job'
-          description: "At least one job in {{ $labels.queue }} was dead-lettered. Bull Board's failed-jobs view retains it for 24h or 1000 jobs, whichever is first — retrieve it before then."
+          summary: 'AMCore {{ $labels.queue }} emitted a dead-letter signal'
+          description: 'At least one dead-letter signal was emitted for {{ $labels.queue }}. Inspect the queue-specific structured event; not every signal maps to a retained BullMQ job.'
           runbook_path: docs/operations/runbooks/queues.md#dead-letter
       - alert: AMCoreQueueDeadLetterBurstPage
         expr: increase(amcore_queue_events_total{event="dead_letter"}[5m]) > 10
@@ -345,8 +345,8 @@ groups:
         labels:
           severity: page
         annotations:
-          summary: 'AMCore {{ $labels.queue }} queue dead-letter burst'
-          description: "More than 10 jobs in {{ $labels.queue }} were dead-lettered in 5m — Bull Board's retention (24h or 1000 jobs) can evict a burst like this in minutes."
+          summary: 'AMCore {{ $labels.queue }} dead-letter signal burst'
+          description: 'More than 10 dead-letter signals were emitted for {{ $labels.queue }} in 5m. Inspect the queue-specific structured events for the durable record or wake-job failure involved.'
           runbook_path: docs/operations/runbooks/queues.md#dead-letter
 
   - name: amcore-email

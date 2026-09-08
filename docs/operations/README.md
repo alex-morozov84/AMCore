@@ -58,9 +58,15 @@ Already running? Reach for whichever concern below applies.
   VPS/Compose remains the one platform with a full owned recipe.
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
   rules, structured logging and redaction, operator interpretation of the key
-  metrics, and the optional dev-only `monitoring` compose profile
+  metrics, the optional dev-only `monitoring` compose profile
   (Prometheus + Grafana + Alertmanager) that verifies them against this
-  repo's own running stack.
+  repo's own running stack, and shipped alert rules with dashboard panels.
+  **Runbooks** (`runbooks/http.md`, `node-runtime.md`,
+  `metrics-collector-health.md`, `db.md`, `redis.md`, `queues.md`, `email.md`,
+  `realtime.md`) give each alert a symptom, ranked likely causes, diagnostic
+  steps with executable diagnostic PromQL and the matching dashboard panel,
+  mitigation, and
+  escalation guidance.
 - **[CI & repo security](ci-security.md)** — the CI security gates, what a fork
   inherits (and what it doesn't), the `strict`-mode `setup-repo-security.sh` step,
   and the action-pin rules.
