@@ -541,6 +541,11 @@ jobs:
     env:
       METRICS_AUTH_TOKEN: ci-fake-token-never-a-real-secret
       GF_SECURITY_ADMIN_PASSWORD: ci-fake-password-never-a-real-secret
+      # Fixed, job-scoped project names (not the scripts' own PID-based
+      # defaults) so the always()-cleanup step below can name the exact
+      # projects to tear down, independent of the shell traps.
+      COMPOSE_PROJECT_NAME: obs-contract-live-${{ github.run_id }}
+      OLD_VOLUME_PROJECT_NAME: obs-contract-oldvol-${{ github.run_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -560,15 +565,26 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Owns its own Compose lifecycle end to end: boots local-infra +
-      # monitoring under an isolated COMPOSE_PROJECT_NAME, waits for real
-      # scrape targets, runs every live check (targets/rules/alertmanager/
-      # metric-reference/query-evaluability/Grafana), then the isolated
-      # old-volume migration smoke — and tears both stacks down
-      # unconditionally via its own shell trap. A job-level timeout above is
-      # the second, independent cleanup guarantee if the trap itself never
-      # runs.
+      # monitoring under COMPOSE_PROJECT_NAME above, waits for real scrape
+      # targets AND at least one rule evaluation, runs every live check
+      # (targets/rules/alertmanager/metric-reference/query-evaluability/
+      # Grafana), then the isolated old-volume migration smoke under
+      # OLD_VOLUME_PROJECT_NAME — and tears both stacks down via their own
+      # shell traps.
       - name: Observability contract (live checks + old-volume smoke)
         run: pnpm test:observability-contract:live
+
+      # Second, independent cleanup layer: the shell traps above already
+      # tear down on every path (including this job's own failure), but a
+      # runner-level kill or an unforeseen trap bug must not leave either
+      # stack running — an `if: always()` step naming both fixed project
+      # names, not only a job timeout (which stops the job but does not run
+      # `docker compose down` itself).
+      - name: Ensure both Compose stacks are torn down
+        if: always()
+        run: |
+          docker compose -p "$COMPOSE_PROJECT_NAME" down -v --remove-orphans || true
+          docker compose -p "$OLD_VOLUME_PROJECT_NAME" down -v --remove-orphans || true
 
   # amcore:sentinel-block start=storybook-job
   storybook:

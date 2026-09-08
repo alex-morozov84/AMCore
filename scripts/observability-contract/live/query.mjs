@@ -53,11 +53,23 @@ export async function checkMetricReferences() {
   }
 
   for (const { expr, file, line, label } of getAllExpressions()) {
-    const { body } = await postJson(
+    const { status, body } = await postJson(
       `${PROMETHEUS_URL}/api/v1/parse_query`,
       `query=${encodeURIComponent(expr)}`
     )
-    const referenced = collectVectorSelectorNames(body?.data)
+    // A parse failure (bad HTTP status, missing/non-JSON body, or the API's
+    // own status:"error") must itself be a violation — silently treating it
+    // as "no selectors found" would disable this guard for that expression
+    // rather than flag it (verified: this is exactly what happened before
+    // this check existed, confirmed by mocking an error response).
+    if (status < 200 || status >= 300 || body?.status !== 'success' || !body?.data) {
+      violations.push(
+        `${file}:${line}: ${label} — parse_query failed (HTTP ${status}, ` +
+          `status "${body?.status}"${body?.error ? `: ${body.error}` : ''}) — cannot verify its metric references`
+      )
+      continue
+    }
+    const referenced = collectVectorSelectorNames(body.data)
     for (const name of referenced) {
       if (!names.has(name)) {
         violations.push(`${file}:${line}: ${label} references unknown metric "${name}"`)

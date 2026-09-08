@@ -1,8 +1,8 @@
-// AMCore observability contract — finds citations of the private root `ai/`
-// overlay (ai/STATUS.md, ai/models-talk.md, ai/decisions/..., etc.) across
-// every git-tracked file, while correctly excluding the unrelated public
-// `docs/ai/` capability-layer tree. See ai/models-talk.md's FINAL PLAN §1
-// Tier 1 item 7 for the exact exclusion rules this implements.
+// AMCore observability contract — finds citations of the private root
+// maintainer-overlay directory (any markdown-shaped file directly under it,
+// plus its archive/backlog/decisions subtrees) across every git-tracked
+// file, while correctly excluding the unrelated public capability-layer
+// docs tree that happens to share the same directory name one level down.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -60,17 +60,29 @@ export function findPrivatePathCitations(filePath) {
   return hits
 }
 
+const UNAVOIDABLE_DATA_FILES = new Set([
+  'scripts/observability-contract/private-path-baseline.json',
+])
+
+/** True for a path this tool cannot avoid filling with real citation strings as data. */
+function isUnavoidableDataFile(file) {
+  return (
+    UNAVOIDABLE_DATA_FILES.has(file) ||
+    (file.startsWith('scripts/observability-contract/') && file.endsWith('.test.mjs'))
+  )
+}
+
 /**
  * Scans every git-tracked file, excluding the private `ai/` repo itself and
- * this tool's own `scripts/observability-contract/` tree — the latter's
- * source legitimately contains `ai/*`-shaped strings as regex patterns, test
- * fixtures, and the baseline's own tracked data, none of which are a leaked
- * citation of private rationale.
+ * only the specific files this tool cannot avoid filling with real citation
+ * strings as data (the baseline JSON's own tracked entries; `.test.mjs`
+ * fixtures across the whole repo, not only this tool's own). Every other
+ * file — including this tool's own non-test source — is scanned normally;
+ * a real citation slipping into a source comment here is exactly the kind
+ * of regression this guard exists to catch, including in itself.
  */
 export function scanRepoForPrivatePathCitations() {
-  const files = listTrackedFiles().filter(
-    (f) => !f.startsWith('ai/') && !f.startsWith('scripts/observability-contract/')
-  )
+  const files = listTrackedFiles().filter((f) => !f.startsWith('ai/') && !isUnavoidableDataFile(f))
   const all = []
   for (const file of files) all.push(...findPrivatePathCitations(file))
   return all

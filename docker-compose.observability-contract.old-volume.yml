@@ -2,19 +2,23 @@
 # tier). Boots `grafana` against the LEGACY pre-fix datasource provisioning
 # (docker/monitoring/grafana/provisioning-legacy-fixture/ — no explicit uid,
 # no deleteDatasources), reproducing a `grafana_data` volume created before
-# the real provisioning's fixed uid existed. Always run under its own
-# COMPOSE_PROJECT_NAME and a non-default host port — never the same project
-# as the main live-tier stack. See docker-compose.observability-contract.old-volume.migrated.yml
-# for phase B (same project/volume, real shipped provisioning).
+# the real provisioning's fixed uid existed. Runs under its own
+# COMPOSE_PROJECT_NAME, after the main live-tier stack has already been torn
+# down (run-live.sh's ordering) — so the extra `3099` port below never has to
+# coexist with the main stack's `3001`. Plain YAML only, no Compose merge
+# tags: Compose merges `volumes:` by target path by default (this file's
+# entry replaces the base's), and `ports:` merges by the full
+# `{ip, target, published, protocol}` tuple, so a differently-published entry
+# is additive, not replacing — both are documented default behavior, keeping
+# this compatible with the README's stated Compose v2.20.2+ floor rather than
+# the v2.24.4+ the `!override` tag requires. `--no-deps` on the `up` command
+# (not a compose-file field) is what skips the base file's
+# `depends_on: [prometheus]`, so only this one container starts. See
+# docker-compose.observability-contract.old-volume.migrated.yml for phase B
+# (same project/volume, real shipped provisioning).
 services:
   grafana:
-    # This smoke only exercises Grafana's own datasource-provisioning
-    # identity — it never queries real data — so it does not need a working
-    # Prometheus behind it. Clears the base file's `depends_on: [prometheus]`
-    # (which would otherwise transitively pull in the whole app stack) so
-    # `up -d grafana` starts only this one container.
-    depends_on: !override []
-    ports: !override
+    ports:
       - '127.0.0.1:3099:3000'
     volumes:
       - ./docker/monitoring/grafana/provisioning-legacy-fixture:/etc/grafana/provisioning:ro

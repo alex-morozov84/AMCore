@@ -71,18 +71,31 @@ function diffPanel(rowTitle, panel, livePanel, violations) {
     violations.push(`row "${rowTitle}": panel title "${panel.title}" != live "${livePanel.title}"`)
     return
   }
+  if (panel.id !== livePanel.id) {
+    violations.push(`panel "${panel.title}": id ${panel.id} != live id ${livePanel.id}`)
+  }
+  // R4 fix: an extra live-provisioned target was previously invisible —
+  // forEach over the committed side alone never notices livePanel.targets
+  // being longer. Check both directions.
+  if (panel.targets.length !== livePanel.targets.length) {
+    violations.push(
+      `panel "${panel.title}": target count differs (committed ${panel.targets.length}, live ${livePanel.targets.length})`
+    )
+    return
+  }
   panel.targets.forEach((target, k) => {
     const liveTarget = livePanel.targets[k]
-    if (!liveTarget) {
-      violations.push(`panel "${panel.title}": missing live target ${k}`)
-      return
-    }
     if (target.expr !== liveTarget.expr) {
       violations.push(`panel "${panel.title}" target ${k}: expr differs from provisioned dashboard`)
     }
     if (target.datasource?.uid !== liveTarget.datasource?.uid) {
       violations.push(
         `panel "${panel.title}" target ${k}: datasource uid differs from provisioned dashboard`
+      )
+    }
+    if (target.datasource?.type !== liveTarget.datasource?.type) {
+      violations.push(
+        `panel "${panel.title}" target ${k}: datasource type "${target.datasource?.type}" != live "${liveTarget.datasource?.type}"`
       )
     }
   })

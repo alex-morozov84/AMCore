@@ -1,5 +1,5 @@
 {
-  "description": "Exact occurrence-level baseline for the public/private-boundary ratchet (ai/models-talk.md FINAL PLAN, Tier 1 item 7). \"legitimate\" describes the optional private ai/ overlay itself (AGENTS.md, CONTRIBUTING.md, PROJECT_CONTEXT.md). \"debt\" is a pre-existing citation carried forward per the 2026-09-08 owner decision — tracked in ai/BACKLOG.md for a separate cleanup, not fixed by this PR. The check fails on anything not listed here at its exact file+target+count; a listed entry disappearing is fine (the baseline may only shrink), but count going up or a new (file, target) pair appearing fails.",
+  "description": "Exact occurrence-level baseline for the public/private-boundary ratchet over citations of the private root maintainer-overlay directory. \"legitimate\" describes files whose contract is specifically to explain that optional overlay to a maintainer. \"debt\" is a pre-existing citation carried forward per a deliberate owner decision, tracked as a separate maintainer cleanup item rather than fixed by the PR that introduced this ratchet. The check fails on anything not listed here at its exact file+target+count; a listed entry disappearing is fine (the baseline may only shrink), but count going up or a new (file, target) pair appearing fails.",
   "entries": [
     {
       "file": "AGENTS.md",

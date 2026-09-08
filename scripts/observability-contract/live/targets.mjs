@@ -2,6 +2,10 @@
 import { getJson, PROMETHEUS_URL } from './http.mjs'
 
 const EXPECTED_JOBS = ['amcore-api', 'amcore-worker']
+// Prometheus's own self-scrape job is a legitimate, expected extra target —
+// shipped in docker/monitoring/prometheus/prometheus.yml's own `prometheus`
+// scrape_config. Any OTHER job name is unexpected and must fail (R3).
+const ALLOWED_EXTRA_JOBS = new Set(['prometheus'])
 
 export async function areTargetsUp() {
   const { body } = await getJson(`${PROMETHEUS_URL}/api/v1/targets`)
@@ -18,11 +22,15 @@ export async function checkTargets() {
   const violations = []
 
   for (const job of EXPECTED_JOBS) {
-    const target = active.find((t) => t.labels?.job === job)
-    if (!target) {
+    const matches = active.filter((t) => t.labels?.job === job)
+    if (matches.length === 0) {
       violations.push(`no active target for job "${job}"`)
       continue
     }
+    if (matches.length > 1) {
+      violations.push(`job "${job}": expected exactly 1 active target, found ${matches.length}`)
+    }
+    const target = matches[0]
     if (!target.scrapeUrl?.endsWith('/api/v1/metrics')) {
       violations.push(
         `job "${job}": scrapeUrl "${target.scrapeUrl}" does not end with /api/v1/metrics`
@@ -33,6 +41,15 @@ export async function checkTargets() {
     }
     if (target.lastError) {
       violations.push(`job "${job}": lastError is "${target.lastError}", expected empty`)
+    }
+  }
+
+  for (const target of active) {
+    const job = target.labels?.job
+    if (!EXPECTED_JOBS.includes(job) && !ALLOWED_EXTRA_JOBS.has(job)) {
+      violations.push(
+        `unexpected active target for job "${job}" (instance "${target.labels?.instance}")`
+      )
     }
   }
   return violations

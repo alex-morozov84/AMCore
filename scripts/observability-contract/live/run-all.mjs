@@ -5,7 +5,7 @@
 // and calls this once the stack is up.
 import { waitUntilReady } from './lifecycle.mjs'
 import { areTargetsUp, checkTargets } from './targets.mjs'
-import { checkRuleGroups } from './rules.mjs'
+import { areRulesEvaluated, checkRuleGroups } from './rules.mjs'
 import { checkAlertmanagerDiscovery } from './alertmanager.mjs'
 import { checkMetricReferences, checkQueryEvaluability } from './query.mjs'
 import {
@@ -29,6 +29,12 @@ const CHECKS = [
 
 async function main() {
   await waitUntilReady('amcore-api/amcore-worker scrape targets', areTargetsUp)
+  // R1 fix: also wait for the default rule groups' first evaluation — a
+  // scrape target can be "up" before Prometheus's own (independent)
+  // evaluation_interval has completed even once, and checkRuleGroups()
+  // asserting health:"ok" immediately after targets-up is a real race,
+  // reproduced independently against a clean boot.
+  await waitUntilReady('default rule groups evaluated at least once', areRulesEvaluated)
 
   let anyViolation = false
   for (const [label, check] of CHECKS) {

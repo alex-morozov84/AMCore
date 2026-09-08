@@ -9,6 +9,7 @@ const baseModel = () => ({
       title: 'HTTP',
       panels: [
         {
+          id: 4,
           title: 'Request rate',
           targets: [
             {
@@ -47,4 +48,32 @@ test('a missing row is caught', () => {
   const violations = diffDashboardModels(baseModel(), live)
   assert.equal(violations.length, 1)
   assert.match(violations[0], /row count differs/)
+})
+
+// R4 regressions: previously invisible drift.
+test('an extra live-provisioned target is caught (not just fewer)', () => {
+  const live = baseModel()
+  live.rows[0].panels[0].targets.push({
+    expr: 'sum(rate(z[5m]))',
+    datasource: { type: 'prometheus', uid: 'amcore-prometheus' },
+  })
+  const violations = diffDashboardModels(baseModel(), live)
+  assert.equal(violations.length, 1)
+  assert.match(violations[0], /target count differs/)
+})
+
+test('a drifted panel id is caught', () => {
+  const live = baseModel()
+  live.rows[0].panels[0].id = 999
+  const violations = diffDashboardModels(baseModel(), live)
+  assert.equal(violations.length, 1)
+  assert.match(violations[0], /id 4 != live id 999/)
+})
+
+test('a drifted datasource type is caught', () => {
+  const live = baseModel()
+  live.rows[0].panels[0].targets[0].datasource.type = 'loki'
+  const violations = diffDashboardModels(baseModel(), live)
+  assert.equal(violations.length, 1)
+  assert.match(violations[0], /datasource type "prometheus" != live "loki"/)
 })

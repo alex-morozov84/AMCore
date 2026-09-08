@@ -11,18 +11,22 @@ import { scanRepoForPrivatePathCitations } from './extract/private-paths.mjs'
  * @returns {string[]} violation messages; empty means clean
  */
 export function validatePrivatePathBoundary(hits, baseline) {
+  // JSON.stringify of the [file, target] pair is an unambiguous map key — a
+  // plain string-join delimiter risks colliding with a stray byte that could
+  // appear in either value (a real NUL-byte-delimiter bug shipped here once).
+  const keyOf = (file, target) => JSON.stringify([file, target])
   const liveCounts = new Map()
   for (const h of hits) {
-    const key = `${h.file} ${h.target}`
+    const key = keyOf(h.file, h.target)
     liveCounts.set(key, (liveCounts.get(key) ?? 0) + 1)
   }
-  const baselineCounts = new Map(baseline.entries.map((e) => [`${e.file} ${e.target}`, e.count]))
+  const baselineCounts = new Map(baseline.entries.map((e) => [keyOf(e.file, e.target), e.count]))
 
   const violations = []
   for (const [key, liveCount] of liveCounts) {
     const allowed = baselineCounts.get(key) ?? 0
     if (liveCount > allowed) {
-      const [file, target] = key.split(' ')
+      const [file, target] = JSON.parse(key)
       violations.push(
         `${file}: ${liveCount} occurrence(s) of "${target}" exceed the baseline's ${allowed} — ` +
           `a new or increased private-path citation must be removed, not added to the baseline`
