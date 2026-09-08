@@ -37,6 +37,35 @@ window, without a raw address ever reaching a rotated log file. Auth's own
 the raw `email` field entirely — no pseudonym gap to fill there, so no
 redaction is needed, only the surplus field's removal.
 
+## Log Shipping (Non-Goal)
+
+AMCore deliberately does not ship a log-shipping/aggregation layer. Structured
+Pino JSON goes to each container's stdout only; `docker-compose.prod.yml`'s
+shared `x-logging` block rotates it via Docker's own `local` driver
+(`COMPOSE_LOG_DRIVER`, default `local` — the only other accepted value is
+`json-file`; anything else, e.g. `syslog`/`journald`, uses different option
+names entirely and fails at container **start**, not at `compose config`
+time) at `COMPOSE_LOG_MAX_SIZE`/`COMPOSE_LOG_MAX_FILE` (default `20m` × `5`
+files per container — see `.env.example`). This bounds disk usage
+automatically; it does not make history searchable.
+
+The direct consequence under the shipped default (`local` driver): once a log
+line rolls past that 20MB×5 window, it is gone. There is no documented way to
+search historical logs, and no way to correlate a `correlationId` across the
+`api` and `worker` processes once either has rotated past the point where a
+given request's lines lived — `local`'s own files are for the Docker daemon
+and `docker logs`/`docker compose logs` only, not for an external shipper to
+read directly (see `.env.example`'s own comment and the file's `x-logging`
+comment). Switching `COMPOSE_LOG_DRIVER` to `json-file` is the documented
+escape hatch when an external tool needs the raw files directly, but AMCore
+does not itself ship or configure that tool, a shipping pipeline, or a
+searchable log store — a fork needing durable, searchable, cross-process log
+history is expected to add a real shipper (Vector, Fluent Bit, a platform's
+own log-shipping sidecar) reading from `json-file` on top of this, the same
+way this repo ships an exemplary metrics/alerting/dashboard surface but
+expects a fork to wire its own paging integration (see
+[Alerting](#alerting) below).
+
 ## Metrics Endpoint
 
 The scrape path is `GET /api/v1/metrics` (the e2e test app has no global prefix,
@@ -344,9 +373,12 @@ collector health, DB, Redis, queues, email, realtime). Every rule carries
 a URL** (named honestly rather than as `runbook_url`, since Alertmanager
 cannot resolve a bare relative path against a Git checkout the way a real
 hyperlink would need) — a fork's own checkout has the linked file at the
-same relative location regardless of its Git remote. The runbooks themselves
-(`docs/operations/runbooks/`) land in a later pass; the links are correct,
-forward references until then.
+same relative location regardless of its Git remote. `docs/operations/runbooks/`
+ships one file per category (`http`, `node-runtime`,
+`metrics-collector-health`, `db`, `redis`, `queues`, `email`, `realtime`),
+each anchor matching a `runbook_path` above exactly: symptom, ranked likely
+causes, diagnostic steps with executable PromQL derived from the rule and the matching
+dashboard panel, mitigation, and escalation guidance.
 
 Every alert is proven, not just written: every one of the 32 rules in
 `docs/operations/prometheus/tests/amcore-alerts_test.yml` has both a

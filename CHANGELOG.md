@@ -45,6 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `grafana_data` volume created before this change migrates automatically
   on the next restart (verified against a real pre-existing volume, not
   only a clean one).
+- **Runbooks** (`docs/operations/runbooks/`) — one file per alert category
+  (`http`, `node-runtime`, `metrics-collector-health`, `db`, `redis`,
+  `queues`, `email`, `realtime`), every anchor matching a shipped alert's
+  `runbook_path` exactly: symptom, ranked likely causes, executable diagnostic
+  PromQL and the matching dashboard panel, mitigation,
+  and escalation guidance. `docs/operations/observability.md` also documents
+  log shipping as an explicit non-goal: structured Pino JSON on stdout,
+  rotated by Docker's `local` driver — no bundled shipper or searchable log
+  store, and no way to correlate a `correlationId` across `api`/`worker`
+  once either has rotated past it.
 
 ### Changed
 

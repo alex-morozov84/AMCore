@@ -163,15 +163,16 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: 'process_open_fds'
+      - series: 'process_open_fds{job="amcore-api"}'
         values: '950x10'
-      - series: 'process_max_fds'
+      - series: 'process_max_fds{job="amcore-api"}'
         values: '1000x10'
     alert_rule_test:
       - eval_time: 5m
         alertname: AMCoreFileDescriptorsApproachingLimit
         exp_alerts:
           - exp_labels:
+              job: amcore-api
               severity: page
             exp_annotations:
               summary: 'AMCore open file descriptors approaching the process limit'
@@ -251,7 +252,7 @@ tests:
               state: waiting
             exp_annotations:
               summary: 'AMCore DB pool has connections waiting'
-              description: 'More than DATABASE_POOL_WAITING_THRESHOLD (default 5) connections have been waiting on the pool for 5m. The readiness check already restarts the process if this gets bad enough to fail outright — this alert is the earlier, non-restart signal.'
+              description: 'More than DATABASE_POOL_WAITING_THRESHOLD (default 5) connections have been waiting on the pool for 5m. Readiness can remove a replica from service but does not inherently restart it — investigate before pool exhaustion needs manual remediation.'
               runbook_path: docs/operations/runbooks/db.md#pool-waiting
 
   # Boundary: exactly the threshold must NOT fire (strictly greater-than).
@@ -554,8 +555,8 @@ tests:
               queue: default
               event: dead_letter
             exp_annotations:
-              summary: 'AMCore default queue has a dead-lettered job'
-              description: "At least one job in default was dead-lettered. Bull Board's failed-jobs view retains it for 24h or 1000 jobs, whichever is first — retrieve it before then."
+              summary: 'AMCore default emitted a dead-letter signal'
+              description: 'At least one dead-letter signal was emitted for default. Inspect the queue-specific structured event; not every signal maps to a retained BullMQ job.'
               runbook_path: docs/operations/runbooks/queues.md#dead-letter
 
   - interval: 1m
@@ -571,8 +572,8 @@ tests:
               queue: default
               event: dead_letter
             exp_annotations:
-              summary: 'AMCore default queue dead-letter burst'
-              description: "More than 10 jobs in default were dead-lettered in 5m — Bull Board's retention (24h or 1000 jobs) can evict a burst like this in minutes."
+              summary: 'AMCore default dead-letter signal burst'
+              description: 'More than 10 dead-letter signals were emitted for default in 5m. Inspect the queue-specific structured events for the durable record or wake-job failure involved.'
               runbook_path: docs/operations/runbooks/queues.md#dead-letter
 
   # ---------------------------------------------------------------------
@@ -942,9 +943,22 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: 'process_open_fds'
+      - series: 'process_open_fds{job="amcore-worker"}'
         values: '100x10'
-      - series: 'process_max_fds'
+      - series: 'process_max_fds{job="amcore-worker"}'
+        values: '1000x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AMCoreFileDescriptorsApproachingLimit
+        exp_alerts: []
+
+  # Prometheus exports the same process metrics; its own FD pressure must not
+  # produce an AMCore process alert.
+  - interval: 1m
+    input_series:
+      - series: 'process_open_fds{job="prometheus"}'
+        values: '950x10'
+      - series: 'process_max_fds{job="prometheus"}'
         values: '1000x10'
     alert_rule_test:
       - eval_time: 5m
