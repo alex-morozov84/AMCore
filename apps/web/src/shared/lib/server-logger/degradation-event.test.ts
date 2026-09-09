@@ -16,8 +16,8 @@ beforeEach(() => {
 })
 
 describe('logDegradation', () => {
-  it('logs a warn-level structured record with the given fields', () => {
-    logDegradation({ event: 'secondary_data_degraded', source: 'queue-panel', reason: 'upstream' })
+  it('logs a warn-level structured record owning its own event name', () => {
+    logDegradation({ source: 'queue-panel', reason: 'upstream' })
 
     expect(warn).toHaveBeenCalledWith(
       { event: 'secondary_data_degraded', source: 'queue-panel', reason: 'upstream' },
@@ -25,17 +25,35 @@ describe('logDegradation', () => {
     )
   })
 
-  it('suppresses repeats of the same event+source within the volume window', () => {
-    logDegradation({ event: 'secondary_data_degraded', source: 'queue-panel', reason: 'upstream' })
-    logDegradation({ event: 'secondary_data_degraded', source: 'queue-panel', reason: 'upstream' })
-    logDegradation({ event: 'secondary_data_degraded', source: 'queue-panel', reason: 'upstream' })
+  it('normalizes an invalid source instead of logging it verbatim', () => {
+    logDegradation({ source: 'Not A Valid Source!!', reason: 'timeout' })
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'invalid-source' }),
+      'degraded_data'
+    )
+  })
+
+  it('never lets a surplus field on the input object reach the logger', () => {
+    const withExtra = { source: 'queue-panel', reason: 'timeout', password: 'leak-me' } as never
+
+    logDegradation(withExtra)
+
+    const [record] = warn.mock.calls[0] as [Record<string, unknown>]
+    expect(record).not.toHaveProperty('password')
+  })
+
+  it('suppresses repeats of the same source within the volume window', () => {
+    logDegradation({ source: 'queue-panel', reason: 'upstream' })
+    logDegradation({ source: 'queue-panel', reason: 'upstream' })
+    logDegradation({ source: 'queue-panel', reason: 'upstream' })
 
     expect(warn).toHaveBeenCalledTimes(1)
   })
 
   it('logs distinct sources independently, not suppressed by each other', () => {
-    logDegradation({ event: 'secondary_data_degraded', source: 'queue-panel', reason: 'upstream' })
-    logDegradation({ event: 'secondary_data_degraded', source: 'audit-panel', reason: 'timeout' })
+    logDegradation({ source: 'queue-panel', reason: 'upstream' })
+    logDegradation({ source: 'audit-panel', reason: 'timeout' })
 
     expect(warn).toHaveBeenCalledTimes(2)
   })

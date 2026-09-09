@@ -1,4 +1,5 @@
 import { getServerLogger } from './logger'
+import { normalizeSource } from './source'
 import { checkSuppression } from './suppression'
 
 import 'server-only'
@@ -6,16 +7,16 @@ import 'server-only'
 const SUPPRESSION_WINDOW_MS = 60_000
 
 /**
- * The bounded field set a degradation log line may ever carry. Deliberately
- * closed — no `headers`/`query`/`body`/raw-error fields, matching
- * `ai/LOGGING.md`'s existing "bounded" discipline. The type itself is the
- * allowlist: a caller cannot pass an unbounded field even by mistake.
+ * The bounded field set a secondary-data degradation log line may ever
+ * carry. Deliberately no `headers`/`query`/`body`/raw-error fields, and no
+ * caller-supplied `event` name - the event string itself is owned by
+ * `logDegradation()` below, not accepted as input, so a caller can never
+ * widen what gets logged just by passing a different value.
  */
-export interface DegradationEvent {
-  /** e.g. `'secondary_data_degraded'` — stable, not interpolated. */
-  event: string
-  /** A bounded identifier for what degraded, e.g. `'queue-backlog-panel'` —
-   *  never a raw path/query string. */
+export interface LogDegradationInput {
+  /** A short identifier for the widget, e.g. `'queue-backlog-panel'` -
+   *  normalized and length-capped before it ever reaches the logger; never
+   *  a raw path/query string. */
   source: string
   reason: 'rate-limited' | 'timeout' | 'network' | 'upstream'
   retryAfterMs?: number
@@ -23,15 +24,30 @@ export interface DegradationEvent {
 }
 
 /**
- * Logs exactly once per `event:source` per `SUPPRESSION_WINDOW_MS` — a
- * dependency that's down for the whole window must not turn into one log
- * line per page view (`ai/models-talk.md` §7).
+ * Logs exactly once per `source` per `SUPPRESSION_WINDOW_MS`, and is itself
+ * subject to a global per-window line cap shared with every other bounded
+ * logger in this directory (`checkSuppression`'s `globalOverflowSuppressedSinceLastLog`)
+ * - a dependency that's down for the whole window, or one producing many
+ * distinct `source` values, cannot turn into unbounded log volume either
+ * way.
  */
-export function logDegradation(fields: DegradationEvent): void {
-  const key = `${fields.event}:${fields.source}`
-  const { shouldLog, suppressedSinceLastLog } = checkSuppression(key, SUPPRESSION_WINDOW_MS)
+export function logDegradation(input: LogDegradationInput): void {
+  const source = normalizeSource(input.source)
+  const key = `secondary_data_degraded:${source}`
+  const { shouldLog, suppressedSinceLastLog, globalOverflowSuppressedSinceLastLog } =
+    checkSuppression(key, SUPPRESSION_WINDOW_MS)
   if (!shouldLog) return
 
-  const record = suppressedSinceLastLog > 0 ? { ...fields, suppressedSinceLastLog } : fields
-  getServerLogger().warn(record, 'degraded_data')
+  getServerLogger().warn(
+    {
+      event: 'secondary_data_degraded',
+      source,
+      reason: input.reason,
+      retryAfterMs: input.retryAfterMs,
+      correlationId: input.correlationId?.slice(0, 64),
+      ...(suppressedSinceLastLog > 0 ? { suppressedSinceLastLog } : {}),
+      ...(globalOverflowSuppressedSinceLastLog > 0 ? { globalOverflowSuppressedSinceLastLog } : {}),
+    },
+    'degraded_data'
+  )
 }

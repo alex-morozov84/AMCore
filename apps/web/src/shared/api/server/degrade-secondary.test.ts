@@ -13,14 +13,17 @@ beforeEach(() => {
 })
 
 describe('degradeSecondary', () => {
-  it('returns the data on success without logging', () => {
+  it('returns an available outcome with the data on success, without logging', () => {
     const outcome: DataOutcome<{ id: string }> = { status: 'success', data: { id: 'p1' } }
 
-    expect(degradeSecondary(outcome, { source: 'facets' })).toEqual({ id: 'p1' })
+    expect(degradeSecondary(outcome, { source: 'facets' })).toEqual({
+      status: 'available',
+      data: { id: 'p1' },
+    })
     expect(logDegradation).not.toHaveBeenCalled()
   })
 
-  it('returns undefined and logs once for a known unavailable outcome', () => {
+  it('returns a degraded outcome carrying the reason, and logs once, for a known unavailable outcome', () => {
     const outcome: DataOutcome<never> = {
       status: 'unavailable',
       reason: 'timeout',
@@ -28,14 +31,28 @@ describe('degradeSecondary', () => {
       correlationId: 'corr-1',
     }
 
-    expect(degradeSecondary(outcome, { source: 'facets' })).toBeUndefined()
+    expect(degradeSecondary(outcome, { source: 'facets' })).toEqual({
+      status: 'degraded',
+      reason: 'timeout',
+    })
     expect(logDegradation).toHaveBeenCalledWith({
-      event: 'secondary_data_degraded',
       source: 'facets',
       reason: 'timeout',
       retryAfterMs: undefined,
       correlationId: 'corr-1',
     })
+  })
+
+  it('lets a caller build a hidden, disabled, or inline-note UI from the same degraded outcome', () => {
+    const outcome: DataOutcome<never> = { status: 'unavailable', reason: 'rate-limited' }
+    const result = degradeSecondary(outcome, { source: 'facets' })
+
+    expect(result.status).toBe('degraded')
+    if (result.status === 'degraded') {
+      // The reason survives the primitive, unlike a plain `T | undefined`
+      // return - a caller can pick copy/behavior per failure class.
+      expect(result.reason).toBe('rate-limited')
+    }
   })
 
   it('throws (does not silently degrade) for a not-found outcome from a secondary source', () => {

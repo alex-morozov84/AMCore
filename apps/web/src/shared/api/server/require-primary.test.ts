@@ -1,15 +1,30 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { PrimaryUnavailableError, requirePrimary } from './require-primary'
+import { logPrimaryUnavailable } from '@/shared/lib/server-logger'
+
+import {
+  isPrimaryUnavailableError,
+  PrimaryUnavailableError,
+  requirePrimary,
+} from './require-primary'
 import type { DataOutcome } from './types'
 
+vi.mock('server-only', () => ({}))
+vi.mock('@/shared/lib/server-logger', () => ({ logPrimaryUnavailable: vi.fn() }))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
 describe('requirePrimary', () => {
-  it('returns the data on success', () => {
+  it('returns the data on success without logging', () => {
     const outcome: DataOutcome<{ id: string }> = { status: 'success', data: { id: 'p1' } }
-    expect(requirePrimary(outcome)).toEqual({ id: 'p1' })
+
+    expect(requirePrimary(outcome, { source: 'product-detail' })).toEqual({ id: 'p1' })
+    expect(logPrimaryUnavailable).not.toHaveBeenCalled()
   })
 
-  it('throws PrimaryUnavailableError carrying the reason for an unavailable outcome', () => {
+  it('logs exactly once, then throws PrimaryUnavailableError carrying the reason', () => {
     const outcome: DataOutcome<never> = {
       status: 'unavailable',
       reason: 'upstream',
@@ -17,9 +32,19 @@ describe('requirePrimary', () => {
       correlationId: 'corr-1',
     }
 
-    expect(() => requirePrimary(outcome)).toThrow(PrimaryUnavailableError)
+    expect(() => requirePrimary(outcome, { source: 'product-detail' })).toThrow(
+      PrimaryUnavailableError
+    )
+    expect(logPrimaryUnavailable).toHaveBeenCalledTimes(1)
+    expect(logPrimaryUnavailable).toHaveBeenCalledWith({
+      source: 'product-detail',
+      reason: 'upstream',
+      retryAfterMs: 500,
+      correlationId: 'corr-1',
+    })
+
     try {
-      requirePrimary(outcome)
+      requirePrimary(outcome, { source: 'product-detail' })
       expect.fail('should have thrown')
     } catch (error) {
       expect(error).toBeInstanceOf(PrimaryUnavailableError)
@@ -29,10 +54,28 @@ describe('requirePrimary', () => {
     }
   })
 
-  it('throws a plain error (not PrimaryUnavailableError) for a not-found outcome — caller must handle it', () => {
+  it('throws a plain error (not PrimaryUnavailableError) for a not-found outcome - caller must handle it', () => {
     const outcome: DataOutcome<never> = { status: 'not-found' }
 
-    expect(() => requirePrimary(outcome)).toThrow(/notFound\(\)/)
-    expect(() => requirePrimary(outcome)).not.toThrow(PrimaryUnavailableError)
+    expect(() => requirePrimary(outcome, { source: 'product-detail' })).toThrow(/notFound\(\)/)
+    expect(() => requirePrimary(outcome, { source: 'product-detail' })).not.toThrow(
+      PrimaryUnavailableError
+    )
+    expect(logPrimaryUnavailable).not.toHaveBeenCalled()
+  })
+})
+
+describe('isPrimaryUnavailableError', () => {
+  it('recognizes a real instance', () => {
+    expect(isPrimaryUnavailableError(new PrimaryUnavailableError('timeout'))).toBe(true)
+  })
+
+  it('recognizes a duck-typed marker for a value that lost its prototype chain', () => {
+    expect(isPrimaryUnavailableError({ isPrimaryUnavailableError: true })).toBe(true)
+  })
+
+  it('rejects an unrelated error', () => {
+    expect(isPrimaryUnavailableError(new Error('something else'))).toBe(false)
+    expect(isPrimaryUnavailableError(undefined)).toBe(false)
   })
 })
