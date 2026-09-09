@@ -6,14 +6,16 @@ of workflow self-hardening to keep the example forkable.
 
 ## Current Gates
 
-| Workflow                | Trigger                                 | Tooling                                              | CI behavior                          |
-| ----------------------- | --------------------------------------- | ---------------------------------------------------- | ------------------------------------ |
-| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`) | report-only, uploads SARIF           |
-| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                             | blocking on `high+`                  |
-| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                        | gitleaks blocks; OSV is report-only  |
-| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                               | Trivy report-only; boot-smoke blocks |
-| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier              | blocking                             |
-| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                   | blocking (squash title = commit msg) |
+| Workflow                | Trigger                                 | Tooling                                                                                             | CI behavior                          |
+| ----------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                | report-only, uploads SARIF           |
+| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                                                                            | blocking on `high+`                  |
+| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                       | gitleaks blocks; OSV is report-only  |
+| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                              | Trivy report-only; boot-smoke blocks |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job) | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                           | blocking                             |
+| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                             | blocking                             |
+| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                  | blocking (squash title = commit msg) |
 
 ## What Each Gate Proves
 
@@ -36,6 +38,29 @@ of workflow self-hardening to keep the example forkable.
   - keep the worker healthy.
 - **workflow-lint** checks workflow syntax and hardening rules, and verifies
   that every `uses:` pin matches the real tag commit (including annotated tags).
+- **Observability contract (static)** — job id `promtool`, display name
+  "Observability contract (static)" — cross-checks every alert/recording-rule
+  and dashboard-panel PromQL expression, runbook links/anchors/panel
+  citations, the Prometheus/Alertmanager image-pin consistency between
+  `docker-compose.yml` and this workflow, and the public/private-boundary
+  ratchet. No containers; pure static analysis of the repository. See
+  `docs/operations/observability.md` → "Observability Contract Verification".
+- **Observability contract (live)** — job id `observability-contract-live`,
+  `needs: [promtool]` — boots the real `local-infra`/`monitoring` Compose
+  profiles to prove the static layer's claims hold against a running stack:
+  metric references and query evaluability against a live Prometheus, exact
+  scrape-target/rule-group/Alertmanager-discovery state, Grafana's dashboard
+  APIs against the committed dashboard JSON, a real Grafana→Prometheus query
+  round trip, and a from-scratch Grafana old-volume migration smoke.
+
+**Both new observability-contract job contexts are listed in the tracked
+`.github/rulesets/main.json`'s `required_status_checks`** — as with every
+ruleset entry in this file, that is the _declared intent_ checked into
+version control, not live GitHub state. Applying it (making the check
+actually required to merge) is the separate owner action described in
+[Strict security setup after forking](#strict-security-setup-after-forking)
+below — required-check contexts only become selectable in that flow after
+they have run at least once on the repository.
 
 ## Handling CodeQL alerts (false positives)
 

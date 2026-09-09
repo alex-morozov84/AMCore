@@ -24,12 +24,12 @@ group.
 1. Open the **"Event loop p99 lag"** dashboard panel (Node runtime row) to see
    whether the lag is a steady climb (leak-shaped) or a step change (deploy or
    traffic-shaped).
-2. Cross-check the **"Heap used"** panel for the same time window — a
-   simultaneous heap climb points at GC pressure as the cause; a flat heap
-   with lag climbing alone points at synchronous CPU-bound work.
-3. Check the **"Request rate by route"** panel for a traffic-shape change,
-   and correlate against the **"Build info"** panel's `version`/`commit` for
-   a recent deploy.
+2. Cross-check the **"Heap used"** panel (Node runtime row) for the same time
+   window — a simultaneous heap climb points at GC pressure as the cause; a
+   flat heap with lag climbing alone points at synchronous CPU-bound work.
+3. Check the **"Request rate by route"** panel (HTTP row) for a traffic-shape
+   change, and correlate against the **"Build info"** panel (Build info row)
+   for the `version`/`commit` of a recent deploy.
 
 **Mitigation:**
 
@@ -64,7 +64,7 @@ blocked JS execution — escalate per your organization's on-call process.
 1. Open the **"Heap used"** dashboard panel (Node runtime row) and look at the
    shape: a leak raises the post-GC baseline across process lifetime and
    resets on restart; load-driven usage tracks the **"Request rate by route"**
-   panel and falls back down when traffic does.
+   panel (HTTP row) and falls back down when traffic does.
 2. If the pattern looks like a leak, the next diagnostic step is a heap
    snapshot / profiler session against the running process — outside the
    scope of this metrics-only guide.

@@ -29,11 +29,11 @@ Every query below excludes health-check probe traffic
    sum(rate(amcore_http_requests_total{route!~"/api/v1/health.*"}[5m])) by (route)
    ```
 
-2. Open the **"5xx error ratio"** dashboard panel (Grafana, HTTP row) to see
+2. Open the **"5xx error ratio"** dashboard panel (HTTP row) to see
    whether the rise is sudden (deploy-shaped) or a slow climb, and the
-   **"Build info"** panel to read the currently deployed `version`/`commit`
-   and correlate against the deploy timeline.
-3. Check the **"p99 latency by route"** panel for the same route(s) — a
+   **"Build info"** panel (Build info row) to read the currently deployed
+   `version`/`commit` and correlate against the deploy timeline.
+3. Check the **"p99 latency by route"** panel (HTTP row) for the same route(s) — a
    failing downstream dependency usually shows as elevated latency _and_
    elevated 5xx together, not 5xx alone.
 4. If a dependency is suspected, follow [`db.md`](db.md) or [`redis.md`](redis.md)

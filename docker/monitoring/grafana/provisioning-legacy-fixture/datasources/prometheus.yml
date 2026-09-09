@@ -1,0 +1,22 @@
+# AMCore — fixture reproducing the PRE-fix Grafana datasource provisioning
+# state (before a fixed `uid:` and `deleteDatasources` existed — see the real
+# `docker/monitoring/grafana/provisioning/datasources/prometheus.yml`'s own
+# header comment for the incident this fixed). Used only by the
+# observability-contract live tier's old-volume migration smoke
+# (docker-compose.observability-contract.old-volume.yml, phase A) to prove a
+# `grafana_data` volume created under this old provisioning migrates cleanly
+# once the real, fixed provisioning replaces it. Never mounted by the normal
+# `monitoring` compose profile.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    # No explicit `uid:` — Grafana auto-generates one. This is exactly the
+    # state a `grafana_data` volume created before the fixed uid existed
+    # would have.
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Observability contract verification** — the metrics/alerts/dashboard/
+  runbooks shipped by the previous entries in this section are now a
+  maintained, CI-checked contract rather than only documented. A new static
+  CI tier (`pnpm test:observability-contract`, folded into the existing
+  `promtool` job) extracts and cross-checks every alert/recording-rule and
+  dashboard-panel PromQL expression, every runbook link/anchor/dashboard-panel
+  citation, the Prometheus/Alertmanager image-pin consistency between
+  `docker-compose.yml` and CI, and a public/private-boundary ratchet against
+  a reviewed baseline of pre-existing private-path citations (new
+  `scripts/observability-contract/`). A new live CI tier
+  (`pnpm test:observability-contract:live`, new `Observability contract
+(live)` job) boots the real `local-infra`/`monitoring` Compose profiles to
+  verify metric references and query evaluability against a live Prometheus,
+  exact scrape-target/rule-group/Alertmanager-discovery state, Grafana's
+  modern (`/apis/dashboard.grafana.app`) and classic dashboard APIs agree
+  with the committed dashboard JSON, a real Grafana→Prometheus query round
+  trip, and a from-scratch Grafana old-volume migration smoke. Both new CI
+  contexts (`Observability contract (static)`, `Observability contract
+(live)`) are added to the tracked `strict` ruleset's required status
+  checks — applying that on GitHub remains a separate owner action. See
+  `docs/operations/observability.md` → "Observability Contract Verification".
 - **Observability metric gaps closed ahead of the upcoming runbooks/dashboards
   track.** New `amcore_build_info`
   info-metric (`version`/`commit` from new `APP_VERSION`/`APP_COMMIT` env

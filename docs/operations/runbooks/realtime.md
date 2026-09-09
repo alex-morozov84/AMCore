@@ -30,6 +30,9 @@ firing.
 
    ```promql
    label_replace(rate(amcore_notification_realtime_events_total{event="rejected_user"}[5m]), "stream", "notifications", "", "") or label_replace(rate(amcore_ai_run_realtime_events_total{event="rejected_user"}[5m]), "stream", "ai-runs", "", "")
+   ```
+
+   ```promql
    label_replace(rate(amcore_notification_realtime_events_total{event="rejected_global"}[5m]), "stream", "notifications", "", "") or label_replace(rate(amcore_ai_run_realtime_events_total{event="rejected_global"}[5m]), "stream", "ai-runs", "", "")
    ```
 
@@ -86,8 +89,9 @@ connected silently missed an update.
 
 2. Open the **"Dropped publishes"** dashboard panel (Realtime row) to see the
    trend and scale.
-3. Check `publish_total{outcome="failed"}`, the Redis **"Client event rate"**
-   panel, and Redis **"Ping latency"** in the same window. `slow_close` is a
+3. Check `publish_total{outcome="failed"}`, the **"Client event rate"** panel
+   (Redis row), and the **"Ping latency"** panel (Redis row) in the same
+   window. `slow_close` is a
    separate per-connection queue-overflow signal; it does not explain or
    confirm a process-wide publish drop.
 

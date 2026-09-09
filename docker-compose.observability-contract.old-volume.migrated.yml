@@ -1,0 +1,15 @@
+# AMCore — old-volume migration smoke, PHASE B (observability-contract live
+# tier). Same COMPOSE_PROJECT_NAME and the same `grafana_data` volume as
+# phase A (docker-compose.observability-contract.old-volume.yml), but this
+# file overrides nothing about provisioning — it lets docker-compose.yml's
+# own real, shipped `docker/monitoring/grafana/provisioning/` (fixed uid +
+# deleteDatasources) apply, proving a volume seeded under the legacy
+# provisioning migrates cleanly once the real provisioning takes over. Only
+# the host port stays overridden (plain YAML, additive per Compose's default
+# ports-merge semantics — see phase A's file for why no merge tag is used);
+# `--no-deps` on the `up` command skips the base file's Prometheus
+# dependency, same as phase A.
+services:
+  grafana:
+    ports:
+      - '127.0.0.1:3099:3000'

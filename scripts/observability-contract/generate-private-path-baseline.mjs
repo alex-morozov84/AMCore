@@ -1,0 +1,52 @@
+#!/usr/bin/env node
+// Regenerates private-path-baseline.json from the real repository state.
+// Run manually and review the diff whenever a `debt` entry gets fixed (the
+// baseline must only shrink) — never to silently absorb a new leak.
+import { writeFileSync } from 'node:fs'
+
+import { scanRepoForPrivatePathCitations } from './extract/private-paths.mjs'
+
+const LEGITIMATE_FILES = new Set(['AGENTS.md', 'CONTRIBUTING.md', 'PROJECT_CONTEXT.md'])
+
+function buildBaseline() {
+  const hits = scanRepoForPrivatePathCitations()
+  const counts = new Map()
+  for (const h of hits) {
+    // JSON.stringify of the [file, target] pair is an unambiguous map key —
+    // a plain string-join delimiter risks colliding with a space (or any
+    // other stray byte) that could legitimately appear in either value.
+    const key = JSON.stringify([h.file, h.target])
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const entries = [...counts.entries()]
+    .map(([key, count]) => {
+      const [file, target] = JSON.parse(key)
+      return { file, target, count, kind: LEGITIMATE_FILES.has(file) ? 'legitimate' : 'debt' }
+    })
+    .sort((a, b) => a.file.localeCompare(b.file) || a.target.localeCompare(b.target))
+  return entries
+}
+
+const entries = buildBaseline()
+const baseline = {
+  description:
+    'Exact occurrence-level baseline for the public/private-boundary ratchet ' +
+    'over citations of the private root maintainer-overlay directory. ' +
+    '"legitimate" describes files whose contract is specifically to explain ' +
+    'that optional overlay to a maintainer. "debt" is a pre-existing citation ' +
+    'carried forward per a deliberate owner decision, tracked as a separate ' +
+    'maintainer cleanup item rather than fixed by the PR that introduced this ' +
+    'ratchet. The check fails on anything not listed here at its exact ' +
+    'file+target+count; a listed entry disappearing is fine (the baseline may ' +
+    'only shrink), but count going up or a new (file, target) pair appearing ' +
+    'fails.',
+  entries,
+}
+
+writeFileSync(
+  new URL('./private-path-baseline.json', import.meta.url),
+  JSON.stringify(baseline, null, 2) + '\n'
+)
+console.log(
+  `Wrote ${entries.length} baseline entries (${entries.reduce((a, e) => a + e.count, 0)} occurrences).`
+)
