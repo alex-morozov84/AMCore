@@ -21,8 +21,9 @@ export type SecondaryRenderOutcome<T> =
   { status: 'available'; data: T } | { status: 'degraded'; reason: UnavailableReason }
 
 /**
- * Converts a `DataOutcome` into what a secondary section renders. Logs
- * exactly once per degrade (never a silent, unlogged disappearance).
+ * Converts a `DataOutcome` into what a secondary section renders. Records
+ * the degradation at this decision point, subject to the logger's documented
+ * per-key and global volume suppression (never an entirely silent path).
  * Anything else - `'not-found'` from a source that has no such semantics,
  * or a caller passing something outside the closed `DataOutcome` union - is
  * a programming error and throws rather than degrading, matching the

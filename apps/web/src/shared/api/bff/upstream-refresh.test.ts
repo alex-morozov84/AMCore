@@ -67,6 +67,28 @@ describe('upstreamRefresh', () => {
     })
   })
 
+  it('maps a fetch rejection to code "network" without exposing its message', async () => {
+    const cause = new TypeError('connect ECONNREFUSED secret-host')
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(cause))
+
+    const rejection = upstreamRefresh('rt-old', new AbortController().signal)
+    await expect(rejection).rejects.toMatchObject({
+      message: 'Upstream refresh request failed',
+      code: 'network',
+      cause,
+    })
+  })
+
+  it('maps an aborted refresh request to code "timeout"', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(controller.signal.reason))
+
+    await expect(upstreamRefresh('rt-old', controller.signal)).rejects.toMatchObject({
+      code: 'timeout',
+    })
+  })
+
   it('treats a missing rotated refresh_token cookie as code "invalid"', async () => {
     vi.stubGlobal(
       'fetch',

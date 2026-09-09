@@ -23,7 +23,7 @@ const context = {
 } as const
 
 describe('onRequestError', () => {
-  it('logs the error message and digest for a real Error instance', async () => {
+  it('logs the bounded error name and digest for a real Error instance', async () => {
     const error = Object.assign(new Error('boom'), { digest: 'abc123' })
 
     await onRequestError(error, { path: '/x', method: 'GET', headers: {} }, context as never)
@@ -32,11 +32,11 @@ describe('onRequestError', () => {
       routePath: '/[locale]/dashboard',
       routeType: 'render',
       digest: 'abc123',
-      message: 'boom',
+      errorName: 'Error',
     })
   })
 
-  it('stringifies a non-Error thrown value and omits digest when absent', async () => {
+  it('logs only the type of a non-Error thrown value and omits digest when absent', async () => {
     await onRequestError(
       'a raw string was thrown',
       { path: '/x', method: 'GET', headers: {} },
@@ -47,7 +47,7 @@ describe('onRequestError', () => {
       routePath: '/[locale]/dashboard',
       routeType: 'render',
       digest: undefined,
-      message: 'a raw string was thrown',
+      errorName: 'string',
     })
   })
 

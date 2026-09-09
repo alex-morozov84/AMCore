@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
+import { SessionVaultUnavailableError } from '../bff/errors'
 import { resolveTrustedClientIp } from '../bff/trusted-client-ip'
 
 import { getBackendAccessToken } from './access-token'
@@ -152,13 +153,25 @@ describe('fetchBackend - orchestration', () => {
     })
 
     it("'optional' returns unavailable (never anonymous) when the vault is down, and never calls fetch", async () => {
-      vi.mocked(getBackendAccessToken).mockRejectedValue(new Error('Redis unreachable'))
+      vi.mocked(getBackendAccessToken).mockRejectedValue(
+        new SessionVaultUnavailableError(new Error('Redis unreachable'))
+      )
       const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
 
       expect(await fetchBackend('/things/p1', schema, { auth: 'optional' })).toMatchObject({
         status: 'unavailable',
         reason: 'upstream',
       })
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it("'optional' rethrows an unknown auth-resolution error and never calls fetch", async () => {
+      vi.mocked(getBackendAccessToken).mockRejectedValue(new Error('programming defect'))
+      const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
+
+      await expect(fetchBackend('/things/p1', schema, { auth: 'optional' })).rejects.toThrow(
+        'programming defect'
+      )
       expect(fetchMock).not.toHaveBeenCalled()
     })
 
@@ -214,6 +227,17 @@ describe('fetchBackend - orchestration', () => {
       callerController.abort('user navigated away')
 
       await expect(resultPromise).rejects.toBe('user navigated away')
+    })
+
+    it('rethrows a caller signal that was already aborted before the call', async () => {
+      const callerController = new AbortController()
+      callerController.abort('navigation already cancelled')
+      const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
+
+      await expect(
+        fetchBackend('/things', schema, { auth: 'none', signal: callerController.signal })
+      ).rejects.toBe('navigation already cancelled')
+      expect(fetchMock).not.toHaveBeenCalled()
     })
   })
 })

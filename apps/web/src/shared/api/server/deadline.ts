@@ -20,17 +20,23 @@ export function createDeadlineController(
   callerSignal?: AbortSignal
 ): DeadlineController {
   const controller = new AbortController()
-  const deadline = setTimeout(
-    () => controller.abort(new DOMException('deadline exceeded', 'TimeoutError')),
-    timeoutMs
-  )
+  const deadline = setTimeout(() => {
+    if (!controller.signal.aborted) {
+      controller.abort(new DOMException('deadline exceeded', 'TimeoutError'))
+    }
+  }, timeoutMs)
 
-  let callerCancelled = false
+  let callerCancelled = callerSignal?.aborted ?? false
   const onCallerAbort = () => {
+    if (controller.signal.aborted) return
     callerCancelled = true
     controller.abort(callerSignal?.reason)
   }
-  callerSignal?.addEventListener('abort', onCallerAbort, { once: true })
+  if (callerCancelled) {
+    controller.abort(callerSignal?.reason)
+  } else {
+    callerSignal?.addEventListener('abort', onCallerAbort, { once: true })
+  }
 
   return {
     signal: controller.signal,

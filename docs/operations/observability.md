@@ -95,8 +95,9 @@ application logging:
 
 Every event accepts only a small, closed field set (event name, a bounded
 `source`/`routePath` identifier, a known `reason`, `retryAfterMs`,
-`correlationId`) — the TypeScript interface _is_ the allowlist, there is no
-code path that spreads an arbitrary caller object into a log record.
+`correlationId`). Each logging function constructs an explicit allowlisted
+record; there is no code path that spreads an arbitrary caller object into it,
+and the raw Pino instance is not part of the module's public API.
 Sensitive-field names (`password`, `token`, `authorization`, `cookie`, and
 nested equivalents) are additionally Pino-`redact`ed as defense in depth.
 

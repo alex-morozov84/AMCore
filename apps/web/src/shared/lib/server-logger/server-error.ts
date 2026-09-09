@@ -4,7 +4,6 @@ import { checkSuppression } from './suppression'
 import 'server-only'
 
 const SUPPRESSION_WINDOW_MS = 60_000
-const MAX_MESSAGE_LENGTH = 500
 const MAX_FIELD_LENGTH = 200
 
 function cap(value: string | undefined, maxLength: number): string | undefined {
@@ -17,15 +16,15 @@ function cap(value: string | undefined, maxLength: number): string | undefined {
  * (`apps/web/src/instrumentation.ts`'s `onRequestError`) - the loud-logging
  * half for failures a user does see (a real error boundary rendered),
  * complementing `degradation-event.ts`'s silent-degrade half for secondary
- * data. `message`/`digest` may already be reduced by Next before this runs
- * (production replaces the original message with a generic one) - logged
- * as whatever arrives, capped, never assumed complete or original.
+ * data. `digest` may already be reduced by Next before this runs. Free-form
+ * exception messages are deliberately excluded; the stable error name and
+ * framework digest retain bounded diagnostic context.
  */
 export interface LogServerErrorInput {
   routePath: string
   routeType: string
   digest?: string
-  message?: string
+  errorName: string
 }
 
 export function logServerError(input: LogServerErrorInput): void {
@@ -42,7 +41,7 @@ export function logServerError(input: LogServerErrorInput): void {
       routePath,
       routeType: cap(input.routeType, 32),
       digest,
-      message: cap(input.message, MAX_MESSAGE_LENGTH),
+      errorName: cap(input.errorName, 64),
       ...(suppressedSinceLastLog > 0 ? { suppressedSinceLastLog } : {}),
       ...(globalOverflowSuppressedSinceLastLog > 0 ? { globalOverflowSuppressedSinceLastLog } : {}),
     },

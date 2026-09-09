@@ -17,15 +17,23 @@ const REFRESH_COOKIE_NAME = 'refresh_token'
  * same `401 TOKEN_INVALID` — no separate signal to distinguish reuse from a
  * plain invalid/expired token, so both map to `code: 'invalid'` here, which
  * is exactly the class `ensureFreshSession` treats as "delete the vault."
- * Anything else (network failure, 5xx, unexpected shape) is left uncoded,
- * so it's treated as transient per that same classification.
+ * Network failures and non-401 responses carry `code: 'network'`, so callers
+ * can distinguish known authentication-infrastructure unavailability from an
+ * unrelated implementation defect. Unexpected response shapes stay uncoded.
  */
 export const upstreamRefresh: UpstreamRefreshFn = async (refreshToken, signal) => {
-  const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
-    method: 'POST',
-    headers: { Cookie: `${REFRESH_COOKIE_NAME}=${refreshToken}` },
-    signal,
-  })
+  let response: Response
+  try {
+    response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { Cookie: `${REFRESH_COOKIE_NAME}=${refreshToken}` },
+      signal,
+    })
+  } catch (cause) {
+    throw Object.assign(new Error('Upstream refresh request failed', { cause }), {
+      code: signal.aborted ? ('timeout' as const) : ('network' as const),
+    })
+  }
 
   if (!response.ok) {
     const code = response.status === 401 ? 'invalid' : 'network'

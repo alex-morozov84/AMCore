@@ -1,3 +1,5 @@
+import { SessionLockTimeoutError, SessionVaultUnavailableError } from '../bff/errors'
+
 import { getBackendAccessToken } from './access-token'
 import { BackendAuthRequiredError } from './errors'
 
@@ -19,13 +21,23 @@ export type BackendAuthMode = 'none' | 'optional' | 'required'
 
 export type AuthHeaderResult = { header?: string } | { unavailable: true }
 
+function isAuthInfrastructureFailure(error: unknown): boolean {
+  if (error instanceof SessionVaultUnavailableError || error instanceof SessionLockTimeoutError) {
+    return true
+  }
+
+  const code = (error as { code?: unknown } | null)?.code
+  return code === 'network' || code === 'timeout'
+}
+
 export async function resolveAuthHeader(mode: BackendAuthMode): Promise<AuthHeaderResult> {
   if (mode === 'none') return {}
 
   let token: string | null
   try {
     token = await getBackendAccessToken()
-  } catch {
+  } catch (error) {
+    if (!isAuthInfrastructureFailure(error)) throw error
     return { unavailable: true }
   }
   if (token) return { header: `Bearer ${token}` }

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { SessionVaultUnavailableError } from '../bff/errors'
+
 import { getBackendAccessToken } from './access-token'
 import { resolveAuthHeader } from './auth-header'
 import { BackendAuthRequiredError } from './errors'
@@ -32,9 +34,17 @@ describe('resolveAuthHeader', () => {
   })
 
   it("'optional' reports unavailable (never silently anonymous) when the vault throws", async () => {
-    vi.mocked(getBackendAccessToken).mockRejectedValue(new Error('Redis unreachable'))
+    vi.mocked(getBackendAccessToken).mockRejectedValue(
+      new SessionVaultUnavailableError(new Error('Redis unreachable'))
+    )
 
     expect(await resolveAuthHeader('optional')).toEqual({ unavailable: true })
+  })
+
+  it("'optional' rethrows an unknown token-resolution bug", async () => {
+    vi.mocked(getBackendAccessToken).mockRejectedValue(new Error('programming defect'))
+
+    await expect(resolveAuthHeader('optional')).rejects.toThrow('programming defect')
   })
 
   it("'required' attaches a Bearer header when a session exists", async () => {
@@ -50,8 +60,16 @@ describe('resolveAuthHeader', () => {
   })
 
   it("'required' reports unavailable (not BackendAuthRequiredError) when the vault throws", async () => {
-    vi.mocked(getBackendAccessToken).mockRejectedValue(new Error('Redis unreachable'))
+    vi.mocked(getBackendAccessToken).mockRejectedValue(
+      new SessionVaultUnavailableError(new Error('Redis unreachable'))
+    )
 
     expect(await resolveAuthHeader('required')).toEqual({ unavailable: true })
+  })
+
+  it("'required' rethrows an unknown token-resolution bug", async () => {
+    vi.mocked(getBackendAccessToken).mockRejectedValue(new Error('programming defect'))
+
+    await expect(resolveAuthHeader('required')).rejects.toThrow('programming defect')
   })
 })

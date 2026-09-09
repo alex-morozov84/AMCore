@@ -19,15 +19,14 @@ import { logServerError } from '@/shared/lib/server-logger'
  * unchanged) - not yet verified against a real running boundary, since none
  * exists until PR2 ships `shared/ui/section-error-boundary.tsx`.
  *
- * `error`'s own fields may already be reduced by Next before this runs
- * (production replaces the original message with a generic one, keeping
- * only `digest`) - logged as whatever arrives, capped, never assumed
- * complete or original.
+ * `error`'s own fields may already be reduced by Next before this runs.
+ * Only its bounded name/digest are retained; arbitrary thrown values and
+ * free-form messages are never stringified into the structured log.
  */
 export const onRequestError: Instrumentation.onRequestError = async (error, _request, context) => {
   if (isPrimaryUnavailableError(error)) return
 
-  const message = error instanceof Error ? error.message : String(error)
+  const errorName = error instanceof Error ? error.name : typeof error
   const digest =
     typeof error === 'object' && error !== null && 'digest' in error
       ? String((error as { digest?: unknown }).digest)
@@ -37,6 +36,6 @@ export const onRequestError: Instrumentation.onRequestError = async (error, _req
     routePath: context.routePath,
     routeType: context.routeType,
     digest,
-    message,
+    errorName,
   })
 }

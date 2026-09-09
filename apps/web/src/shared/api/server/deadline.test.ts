@@ -38,6 +38,36 @@ describe('createDeadlineController', () => {
     cleanup()
   })
 
+  it('preserves a caller signal that was already aborted before composition', () => {
+    const callerController = new AbortController()
+    callerController.abort('already gone')
+
+    const { signal, isCallerCancelled, cleanup } = createDeadlineController(
+      60_000,
+      callerController.signal
+    )
+
+    expect(signal.aborted).toBe(true)
+    expect(signal.reason).toBe('already gone')
+    expect(isCallerCancelled()).toBe(true)
+    cleanup()
+  })
+
+  it('does not relabel an elapsed deadline when the caller aborts afterward', () => {
+    const callerController = new AbortController()
+    const { signal, isCallerCancelled, cleanup } = createDeadlineController(
+      1_000,
+      callerController.signal
+    )
+
+    vi.advanceTimersByTime(1_000)
+    callerController.abort('too late')
+
+    expect(signal.reason).toMatchObject({ name: 'TimeoutError' })
+    expect(isCallerCancelled()).toBe(false)
+    cleanup()
+  })
+
   it('cleanup() prevents the deadline timer from firing later', () => {
     const { signal, cleanup } = createDeadlineController(1_000)
     cleanup()
