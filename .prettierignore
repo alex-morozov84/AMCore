@@ -13,6 +13,8 @@ out/
 coverage/
 *.tsbuildinfo
 pnpm-lock.yaml
+apps/web/next-env.d.ts
+apps/web/test-results/
 
 # IDE
 .idea/
