@@ -58,13 +58,16 @@ a _known_ availability failure (`429`/`5xx`/timeout/network) or a real `404`
 is required on every call (`'none'` never touches the session vault — safe
 for a public read even when Redis is down; `'optional'`/`'required'` differ
 only in whether a genuinely logged-out caller proceeds anonymously or gets a
-`BackendAuthRequiredError`). `degradeSecondary()`/`requirePrimary()` turn a
-`DataOutcome` into what a page actually renders — a secondary section
-degrades silently (logged once, server-side); primary content never
-silently degrades, logging its own failure before throwing for a section
-error boundary to catch. The full pattern this composes into — primary vs.
-secondary sections, the boundary component, localized fallback copy — is
-`docs/frontend/server-rendered-resilience.md` (once it ships).
+`BackendAuthRequiredError`). `degradeSecondary()`/`resolvePrimary()` turn a
+`DataOutcome` into what a page actually renders — both are ordinary render
+branches, never a throw: a secondary section degrades silently (logged
+once, server-side), and primary content renders an explicit unavailable
+outcome for the caller to show as a localized fallback + retry, also logged
+once, also without ever crossing an error boundary. `catchError`/
+`instrumentation.ts`'s `onRequestError` are reserved for genuinely
+unexpected exceptions, not this known-failure path. The full pattern this
+composes into — primary vs. secondary sections, the fallback UI, localized
+copy — is `docs/frontend/server-rendered-resilience.md` (once it ships).
 
 ## Retry policy: 429 and `Retry-After` (ADR-073)
 

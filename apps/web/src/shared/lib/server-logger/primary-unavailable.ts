@@ -8,12 +8,11 @@ const SUPPRESSION_WINDOW_MS = 60_000
 
 /**
  * The bounded field set for a *known* primary-content availability failure
- * - logged by `shared/api/server/require-primary.ts` at the exact moment it
- * throws, server-side, before any RSC/error-boundary processing. This is
- * the reliable "loud to the team" guarantee for primary content: it does
- * not depend on `PrimaryUnavailableError`'s fields surviving to a client
- * fallback or to `instrumentation.ts`'s `onRequestError` (neither is
- * guaranteed to see the original error unchanged).
+ * - logged by `shared/api/server/resolve-primary.ts` at the point it
+ * resolves the failure, server-side. Primary unavailability is an ordinary
+ * render-time outcome, never thrown, so this is a plain log-then-return -
+ * no error boundary, no RSC serialization, and no dependency on any field
+ * surviving a transport it never crosses.
  */
 export interface LogPrimaryUnavailableInput {
   source: string

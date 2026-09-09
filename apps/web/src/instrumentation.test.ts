@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { isPrimaryUnavailableError } from '@/shared/api/server/require-primary'
 import { logServerError } from '@/shared/lib/server-logger'
 
 import { onRequestError } from './instrumentation'
 
 vi.mock('@/shared/lib/server-logger', () => ({ logServerError: vi.fn() }))
-vi.mock('@/shared/api/server/require-primary', () => ({ isPrimaryUnavailableError: vi.fn() }))
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(isPrimaryUnavailableError).mockReturnValue(false)
 })
 
 const context = {
@@ -49,16 +46,5 @@ describe('onRequestError', () => {
       digest: undefined,
       errorName: 'string',
     })
-  })
-
-  it('skips logging a PrimaryUnavailableError - it already logged itself at throw time', async () => {
-    vi.mocked(isPrimaryUnavailableError).mockReturnValue(true)
-    const error = Object.assign(new Error('primary content unavailable (upstream)'), {
-      digest: 'abc123',
-    })
-
-    await onRequestError(error, { path: '/x', method: 'GET', headers: {} }, context as never)
-
-    expect(logServerError).not.toHaveBeenCalled()
   })
 })

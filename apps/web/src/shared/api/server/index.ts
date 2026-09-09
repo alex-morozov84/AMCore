@@ -10,8 +10,8 @@ export {
 } from './degrade-secondary'
 export { BackendAuthRequiredError, BackendRequestError } from './errors'
 export {
-  PrimaryUnavailableError,
-  requirePrimary,
-  type RequirePrimaryContext,
-} from './require-primary'
+  type PrimaryRenderOutcome,
+  resolvePrimary,
+  type ResolvePrimaryContext,
+} from './resolve-primary'
 export type { DataOutcome, UnavailableReason } from './types'

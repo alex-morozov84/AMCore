@@ -16,9 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwing for a known `429`/`5xx`/timeout/network failure, reusing the
   BFF's session-vault token, trusted-client-IP relay, and header-allowlist
   discipline rather than duplicating it. `degradeSecondary()`/
-  `requirePrimary()` convert that outcome into what a page renders — a
-  secondary section degrades silently (logged once), primary content never
-  fakes an empty state. A new minimal `shared/lib/server-logger/` (Pino,
+  `resolvePrimary()` convert that outcome into what a page renders — both
+  are ordinary render branches, never a throw: a secondary section degrades
+  silently (logged once), primary content renders an explicit unavailable
+  state (also logged once) instead of ever faking an empty one.
+  `catchError`/`onRequestError` are reserved for genuinely unexpected
+  exceptions. A new minimal `shared/lib/server-logger/` (Pino,
   bounded/redacted fields, volume-suppressed) gives `apps/web` its own
   structured logging for the first time, closing a real gap between
   `docs/operations/observability.md`'s prior claim and reality. No UI
