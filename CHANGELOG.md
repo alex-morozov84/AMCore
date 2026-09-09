@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-09
+
 ### Added
 
 - **Server-rendered graceful degradation** (ADR-079, P1 item 7).
@@ -30,10 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/operations/observability.md`'s prior claim and reality. See
   [Server-rendered graceful degradation](docs/frontend/server-rendered-resilience.md)
   for the full pattern.
-
-## [0.9.0] - 2026-09-09
-
-### Added
 
 - **Observability documentation discoverability pass** (P1 item 6 closeout).
   Root `README.md` gains a dedicated "Observability / metrics & alerting"
