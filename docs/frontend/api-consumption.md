@@ -67,7 +67,7 @@ once, also without ever crossing an error boundary. `catchError`/
 `instrumentation.ts`'s `onRequestError` are reserved for genuinely
 unexpected exceptions, not this known-failure path. The full pattern this
 composes into — primary vs. secondary sections, the fallback UI, localized
-copy — is `docs/frontend/server-rendered-resilience.md` (once it ships).
+copy — is [Server-rendered graceful degradation](./server-rendered-resilience.md).
 
 ## Retry policy: 429 and `Retry-After` (ADR-073)
 

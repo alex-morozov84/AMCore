@@ -46,6 +46,7 @@
   "common": {
     "loading": "Loading…",
     "error": "Something went wrong",
+    "temporarilyUnavailable": "This is temporarily unavailable. Please try again.",
     "retry": "Retry",
     "save": "Save",
     "cancel": "Cancel",
