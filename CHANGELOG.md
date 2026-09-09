@@ -118,6 +118,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   success logs, which already carried `userId`, drop the raw `email` field
   entirely. See `docs/operations/observability.md`.
 
+### Fixed
+
+- **Deterministic formatting check after running Next.js or Playwright.**
+  Prettier now ignores Next.js-managed `apps/web/next-env.d.ts` and
+  Playwright's ephemeral `apps/web/test-results/`; generating either artifact
+  no longer makes `pnpm format:check` fail on files that must not be maintained
+  by hand.
+
 ## [0.8.0] - 2026-09-06
 
 ### Added
