@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs'
 
 import { extractDashboardModel, flattenPanels } from './extract/dashboard.mjs'
-import { extractPanelCitations } from './extract/runbook.mjs'
+import { extractPanelCitations } from './extract/panel-citations.mjs'
 
 /** @returns {string[]} violation messages for panels/targets whose datasource doesn't match `expectedUid`. */
 export function validateDatasourceConsistency(model, expectedUid) {
