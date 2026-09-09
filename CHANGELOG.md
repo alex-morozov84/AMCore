@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Observability documentation discoverability pass** (P1 item 6 closeout).
+  Root `README.md` gains a dedicated "Observability / metrics & alerting"
+  row (previously folded into a generic "Operations" line) and a
+  Prometheus/Grafana/Alertmanager row in the Tech Stack table;
+  `docs/README.md` gains a "run the monitoring harness / respond to an
+  alert" routing entry. No behavior change.
 - **Observability contract verification** — the metrics/alerts/dashboard/
   runbooks shipped by the previous entries in this section are now a
   maintained, CI-checked contract rather than only documented. A new static
