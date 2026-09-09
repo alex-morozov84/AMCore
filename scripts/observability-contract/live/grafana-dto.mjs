@@ -4,6 +4,19 @@ import { getJson, GRAFANA_URL, GRAFANA_AUTH } from './http.mjs'
 
 export const DASHBOARD_UID = 'amcore-overview'
 
+/**
+ * Grafana's container reaching "Started" doesn't mean its HTTP server is
+ * accepting connections yet — it can still be running its own DB migrations,
+ * during which a request gets `ECONNRESET` rather than a clean HTTP error.
+ * `/api/health` is unauthenticated and only reports `database: "ok"` once
+ * that's done, mirroring the Prometheus `waitUntilReady` gate this repo
+ * already uses for scrape targets and rule evaluation.
+ */
+export async function isGrafanaReady() {
+  const { status, body } = await getJson(`${GRAFANA_URL}/api/health`)
+  return status === 200 && body?.database === 'ok'
+}
+
 /** Discovers the dashboard API group's preferred version (e.g. "v2" today). */
 export async function discoverPreferredDashboardVersion() {
   const { body } = await getJson(`${GRAFANA_URL}/apis/dashboard.grafana.app`, GRAFANA_AUTH)
