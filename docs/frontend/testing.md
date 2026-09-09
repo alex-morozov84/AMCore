@@ -37,6 +37,19 @@ Both are fast and fine for logic/branch coverage — but neither ever looks
 at the actual outgoing request, which is exactly the gap the next layer
 closes.
 
+A `catchError` (`next/error`) boundary's actual catch-and-fallback behavior
+is a third gap this layer can't close: its real implementation reaches
+into Next's app-router client runtime (confirmed by a real `TypeError`
+reading an internal pending-navigation field when tried directly), which
+plain Vitest + Testing Library never initializes. Test that nothing throws
+in the healthy case here; prove the thrown-child → fallback → `retry()`
+path in Storybook instead (`@storybook/nextjs-vite`'s
+`parameters.nextjs.appDirectory` mock supplies the context) — see
+`shared/ui/section-error-boundary.test.tsx` /
+`.stories.tsx` for the split in practice, and
+[Server-rendered graceful degradation](./server-rendered-resilience.md) for
+the pattern this boundary is part of.
+
 ## Integration tests — the real `/api/*` wire contract
 
 `msw/node`'s `setupServer()`, not `msw/browser`'s `setupWorker()`:
