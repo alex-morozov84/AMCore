@@ -12,8 +12,8 @@ import 'server-only'
  * Only an explicit "this credential is dead" signal (`SessionNotFoundError`,
  * `SessionRefreshUnsafeError`, or `isInvalidRefreshError` — backend
  * `401 TOKEN_INVALID`) maps to 401. Everything else — Redis/lock trouble,
- * or a transient `upstreamRefresh` failure (`code: 'network'`, an uncoded
- * fetch exception, a backend 5xx) — fails closed as 503 rather than either
+ * or a transient `upstreamRefresh` failure (`code: 'network'`, a backend
+ * 5xx) — fails closed as 503 rather than either
  * logging the user out or crashing into an unhandled 500.
  */
 export function authFailureResponse(request: Request, error: unknown): Response {

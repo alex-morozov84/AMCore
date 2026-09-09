@@ -126,6 +126,18 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   success inventory and extend/adjust OpenAPI guardrails when changing security
   schemes or upload request bodies. Do not treat Markdown docs as a substitute
   for `/docs`.
+- **Never cite a private `ai/<name>.md`-shaped path from public code or docs.**
+  A comment pointing at the maintainer's internal planning thread or logging
+  notes inside `apps/*`, `packages/*`, or public `docs/` ships to every fork
+  and contributor checkout, which has no `ai/` directory — the citation is
+  dead on arrival for everyone but the maintainer. `pnpm test:observability-contract`'s
+  private-path ratchet (ADR-078) mechanically fails a PR that adds one — it
+  scans every git-tracked file, not just Markdown, and its baseline may only
+  shrink, never grow. Put the rationale inline (self-contained — explain the
+  _why_, don't point at it) or link the ADR once one exists; never a private
+  planning-thread section. Run `pnpm test:observability-contract` before
+  pushing any change that touches `apps/*`/`packages/*`/public `docs/` code
+  comments.
 - First-time setup of `strict` repo protections (they do not travel with a
   fork): `bash scripts/setup-repo-security.sh` — see
   `docs/operations/ci-security.md` → _Strict security setup after forking_. The

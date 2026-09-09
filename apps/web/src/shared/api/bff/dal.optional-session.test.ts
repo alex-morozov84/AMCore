@@ -2,7 +2,7 @@
 import type * as ReactModule from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getOptionalSession } from './dal'
+import { getOptionalSession, getOptionalSessionEntry } from './dal'
 import { fakeUser, fakeVaultEntry, mockSessionCookie } from './dal.test-helpers'
 import { ensureFreshSession } from './ensure-fresh-session'
 import {
@@ -80,5 +80,42 @@ describe('getOptionalSession', () => {
     vi.mocked(ensureFreshSession).mockRejectedValue(new Error('network blip'))
 
     await expect(getOptionalSession()).rejects.toThrow('network blip')
+  })
+})
+
+describe('getOptionalSessionEntry', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns null without calling ensureFreshSession when there is no cookie', async () => {
+    mockSessionCookie(undefined)
+
+    expect(await getOptionalSessionEntry()).toBeNull()
+    expect(ensureFreshSession).not.toHaveBeenCalled()
+  })
+
+  it('returns the full vault entry (including accessToken) on a valid session', async () => {
+    mockSessionCookie('sess-1')
+    const entry = fakeVaultEntry()
+    vi.mocked(ensureFreshSession).mockResolvedValue(entry)
+
+    expect(await getOptionalSessionEntry()).toEqual(entry)
+  })
+
+  it('treats SessionNotFoundError as logged out (returns null)', async () => {
+    mockSessionCookie('sess-1')
+    vi.mocked(ensureFreshSession).mockRejectedValue(new SessionNotFoundError('sess-1'))
+
+    expect(await getOptionalSessionEntry()).toBeNull()
+  })
+
+  it('rethrows SessionVaultUnavailableError instead of treating it as logged out', async () => {
+    mockSessionCookie('sess-1')
+    vi.mocked(ensureFreshSession).mockRejectedValue(
+      new SessionVaultUnavailableError(new Error('ECONNREFUSED'))
+    )
+
+    await expect(getOptionalSessionEntry()).rejects.toBeInstanceOf(SessionVaultUnavailableError)
   })
 })

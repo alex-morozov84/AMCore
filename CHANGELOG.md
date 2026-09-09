@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Server-rendered graceful degradation foundation** (ADR-079, P1 item 7,
+  PR1). `shared/api/server/` — Server Components fetch `apps/api` directly
+  (never looping back through this app's own `/api/*` routes), returning a
+  closed `DataOutcome<T>` (`success`/`not-found`/`unavailable`) instead of
+  throwing for a known `429`/`5xx`/timeout/network failure, reusing the
+  BFF's session-vault token, trusted-client-IP relay, and header-allowlist
+  discipline rather than duplicating it. `degradeSecondary()`/
+  `resolvePrimary()` convert that outcome into what a page renders — both
+  are ordinary render branches, never a throw: a secondary section degrades
+  silently (logged once), primary content renders an explicit unavailable
+  state (also logged once) instead of ever faking an empty one.
+  `catchError`/`onRequestError` are reserved for genuinely unexpected
+  exceptions. A new minimal `shared/lib/server-logger/` (Pino,
+  bounded/redacted fields, volume-suppressed) gives `apps/web` its own
+  structured logging for the first time, closing a real gap between
+  `docs/operations/observability.md`'s prior claim and reality. No UI
+  consumer yet — see `docs/frontend/api-consumption.md`'s new "Server
+  Components: direct backend transport" section for the contract; the
+  section error boundary and localized presentation ship in a follow-up PR.
+
 ## [0.9.0] - 2026-09-09
 
 ### Added

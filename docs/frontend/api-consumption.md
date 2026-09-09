@@ -37,6 +37,38 @@ A dedicated route is worth adding for two distinct reasons, not one:
   `public-auth-action.ts` covers the latter four (forwards the backend's
   response verbatim, mints nothing — none of them authenticate anyone).
 
+## Server Components: direct backend transport (ADR-079)
+
+The rule above is about the **browser**. A Server Component runs on the Next
+server itself, so looping it back through this app's own `/api/*` routes
+would mean the same process calling itself over HTTP for no benefit — the
+installed Next docs are explicit that Server Components should fetch from
+the source directly instead (`node_modules/next/dist/docs/01-app/02-guides/
+backend-for-frontend.md` → "Caveats" → "Server Components"). `shared/api/
+server/fetchBackend()` is that direct path: it calls `apps/api` via
+`process.env.API_URL` (the same variable `authenticated-proxy.ts` already
+uses for its own outbound call), reusing rather than duplicating the BFF's
+session-vault token resolution, trusted-client-IP relay (ADR-072), and
+outbound header allowlist.
+
+`fetchBackend(path, schema, { auth, timeoutMs?, signal? })` never throws for
+a _known_ availability failure (`429`/`5xx`/timeout/network) or a real `404`
+— it returns a closed `DataOutcome<T>` (`'success' | 'not-found' |
+'unavailable'`) instead, validated against the caller's Zod `schema`. `auth`
+is required on every call (`'none'` never touches the session vault — safe
+for a public read even when Redis is down; `'optional'`/`'required'` differ
+only in whether a genuinely logged-out caller proceeds anonymously or gets a
+`BackendAuthRequiredError`). `degradeSecondary()`/`resolvePrimary()` turn a
+`DataOutcome` into what a page actually renders — both are ordinary render
+branches, never a throw: a secondary section degrades silently (logged
+once, server-side), and primary content renders an explicit unavailable
+outcome for the caller to show as a localized fallback + retry, also logged
+once, also without ever crossing an error boundary. `catchError`/
+`instrumentation.ts`'s `onRequestError` are reserved for genuinely
+unexpected exceptions, not this known-failure path. The full pattern this
+composes into — primary vs. secondary sections, the fallback UI, localized
+copy — is `docs/frontend/server-rendered-resilience.md` (once it ships).
+
 ## Retry policy: 429 and `Retry-After` (ADR-073)
 
 `getQueryClient()`'s `defaultOptions.queries` (`shared/api/query-client.ts`)

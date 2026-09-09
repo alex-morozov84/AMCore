@@ -1,14 +1,18 @@
 # Observability
 
-AMCore exposes Prometheus metrics from the API process. Logs are structured Pino
-JSON with a `correlationId`; metrics are the low-cardinality time-series surface
-for latency, error rate, and runtime health.
+AMCore exposes Prometheus metrics from the API process. `apps/api`'s logs are
+structured Pino JSON with a `correlationId`; metrics are the low-cardinality
+time-series surface for latency, error rate, and runtime health. `apps/web`
+has its own, deliberately minimal Pino logging surface for a small set of
+server-only events — see [Web Server Logs](#web-server-logs) below; the rest
+of this page describes `apps/api`.
 
 ## Structured Logs
 
-Application logs are structured Pino JSON in production and carry a
-`correlationId` on every record. The value is read from `X-Request-ID` /
-`X-Correlation-ID` when present, otherwise AMCore generates one per request.
+`apps/api`'s application logs are structured Pino JSON in production and
+carry a `correlationId` on every record. The value is read from
+`X-Request-ID` / `X-Correlation-ID` when present, otherwise AMCore generates
+one per request.
 
 HTTP request logs include bounded request metadata — method, route, status, user
 id when authenticated, user agent, and an **anonymized client IP** (IPv4 host
@@ -65,6 +69,45 @@ own log-shipping sidecar) reading from `json-file` on top of this, the same
 way this repo ships an exemplary metrics/alerting/dashboard surface but
 expects a fork to wire its own paging integration (see
 [Alerting](#alerting) below).
+
+## Web Server Logs
+
+`apps/web` (`shared/lib/server-logger/`) has its own minimal, server-only
+Pino instance — JSON in production, `pino-pretty` in local dev, matching
+`apps/api`'s dev/prod split, stdout only (no shipping, same non-goal as
+above). It is **not** a copy of `apps/api`'s `nestjs-pino`/`nestjs-cls`
+stack: no per-request dependency injection, no automatic HTTP request
+logging. It exists for a small, closed set of bounded events emitted by
+Server Components and Next's own server-error hook, not general-purpose
+application logging:
+
+- **Secondary-data degradation** — a section of a page silently degraded
+  (hidden/disabled) after a known availability failure (`429`/`5xx`/
+  timeout/network) from a direct `apps/api` call. Logged once per source per
+  60-second window (see below), `warn` level.
+- **Primary-data unavailability** — a page's primary content failed for the
+  same reason class and is showing a retry UI. Logged once per source per
+  window, `error` level, at the moment the failure is thrown — not relying
+  on it being caught correctly downstream.
+- **Uncaught server errors** — `apps/web/src/instrumentation.ts`'s
+  `onRequestError` hook, Next's own mechanism for errors that reach an error
+  boundary. `error` level.
+
+Every event accepts only a small, closed field set (event name, a bounded
+`source`/`routePath` identifier, a known `reason`, `retryAfterMs`,
+`correlationId`). Each logging function constructs an explicit allowlisted
+record; there is no code path that spreads an arbitrary caller object into it,
+and the raw Pino instance is not part of the module's public API.
+Sensitive-field names (`password`, `token`, `authorization`, `cookie`, and
+nested equivalents) are additionally Pino-`redact`ed as defense in depth.
+
+Volume is bounded two ways: a repeat of the same `source`/error within a
+60-second window is suppressed and counted (reported on the next line for
+that key); independently, a hard cap on total log lines per window across
+every key combined stops a flood of many _distinct_ sources or errors from
+becoming unbounded log volume on its own. Both caps are per-process,
+in-memory state — a multi-replica/serverless deployment suppresses
+independently per instance.
 
 ## Metrics Endpoint
 
