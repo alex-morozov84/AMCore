@@ -68,7 +68,9 @@ Already running? Reach for whichever concern below applies.
   mitigation, and escalation guidance. A static + live CI contract
   (`scripts/observability-contract/`, see the "Observability Contract
   Verification" section within this guide) keeps the metric↔alert↔
-  dashboard↔runbook chain from silently drifting.
+  dashboard↔runbook chain from silently drifting; the guide's "Change or
+  extend observability" recipe shows how to update every linked artifact
+  without weakening that contract.
 - **`pg_stat_statements`** — [Bootstrap](pg-stat-statements-setup.md) (a
   one-time privileged step, never a migration), [security
   settings](pg-stat-statements-security.md), [the `amcore_observer`

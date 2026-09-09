@@ -13,8 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Root `README.md` gains a dedicated "Observability / metrics & alerting"
   row (previously folded into a generic "Operations" line) and a
   Prometheus/Grafana/Alertmanager row in the Tech Stack table;
-  `docs/README.md` gains a "run the monitoring harness / respond to an
-  alert" routing entry. No behavior change.
+  `docs/README.md` gains routing entries for running and safely extending
+  the monitoring stack, and the observability guide gains an end-to-end
+  alert/dashboard/runbook/receiver extension recipe. No behavior change.
 - **Observability contract verification** — the metrics/alerts/dashboard/
   runbooks shipped by the previous entries in this section are now a
   maintained, CI-checked contract rather than only documented. A new static
@@ -25,15 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docker-compose.yml` and CI, and a public/private-boundary ratchet against
   a reviewed baseline of pre-existing private-path citations (new
   `scripts/observability-contract/`). A new live CI tier
-  (`pnpm test:observability-contract:live`, new `Observability contract
-(live)` job) boots the real `local-infra`/`monitoring` Compose profiles to
+  (`pnpm test:observability-contract:live`, new
+  `Observability contract (live)` job) boots the real
+  `local-infra`/`monitoring` Compose profiles to
   verify metric references and query evaluability against a live Prometheus,
   exact scrape-target/rule-group/Alertmanager-discovery state, Grafana's
   modern (`/apis/dashboard.grafana.app`) and classic dashboard APIs agree
   with the committed dashboard JSON, a real Grafana→Prometheus query round
   trip, and a from-scratch Grafana old-volume migration smoke. Both new CI
-  contexts (`Observability contract (static)`, `Observability contract
-(live)`) are added to the tracked `strict` ruleset's required status
+  contexts (`Observability contract (static)`,
+  `Observability contract (live)`) are added to the tracked `strict`
+  ruleset's required status
   checks — applying that on GitHub remains a separate owner action. See
   `docs/operations/observability.md` → "Observability Contract Verification".
 - **Observability metric gaps closed ahead of the upcoming runbooks/dashboards

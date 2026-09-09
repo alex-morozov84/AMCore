@@ -49,6 +49,7 @@ find for something, that page is under-documented; please open an issue.
 | Deploy, run, or operate the system                                                       | [`operations/`](operations/README.md)                                                                                             |
 | Set up TLS / a reverse proxy                                                             | [`operations/deployment.md`](operations/deployment.md#tls--reverse-proxy)                                                         |
 | Run the Prometheus/Grafana/Alertmanager monitoring harness, or respond to an alert       | [`operations/observability.md`](operations/observability.md), [`operations/runbooks/`](operations/runbooks/)                      |
+| Add or change an alert, dashboard panel, runbook, or Alertmanager receiver               | [`operations/observability.md`](operations/observability.md#change-or-extend-observability)                                       |
 | Understand or override route rate limits                                                 | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#cross-cutting-decision-points)                |
 | Let the global limiter tell BFF visitors apart                                           | [`operations/deployment.md`](operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy) |
 | Understand frontend retry behavior for `429`                                             | [`frontend/api-consumption.md`](frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073)                             |
@@ -147,3 +148,4 @@ there, not here.
 - Add a locale → [i18n · Add a third locale](frontend/i18n-and-errors.md#recipe-add-a-third-locale)
 - Add an audited action → [Operations · Add an audited action](operations/audit-log.md#add-an-audited-action)
 - Add a metric → [Operations · Add a metric](operations/observability.md#add-a-metric)
+- Add or change an alert, dashboard panel, runbook, or receiver → [Operations · Change or extend observability](operations/observability.md#change-or-extend-observability)

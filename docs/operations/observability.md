@@ -460,6 +460,57 @@ in `optional/tests/amcore-slo-burn-rate_test.yml`, including a test that the
 multiwindow condition is real (a short-lived spike diluted by a healthy
 long window must not page).
 
+## Change or Extend Observability
+
+Treat a metric, its alert, dashboard panel, and runbook as one versioned
+contract. Do not change only the artifact that first exposed the need:
+
+1. **Metric:** follow [Add a metric](#add-a-metric). Keep names stable and
+   labels bounded and non-sensitive; update the metric-family reference and
+   unit tests.
+2. **Alert or threshold:** edit
+   `docs/operations/prometheus/amcore-alerts.yml`. Keep `severity` limited to
+   `page`/`ticket` and make `runbook_path` a repo-relative path plus heading.
+   State why a new threshold is a safe starter default. Add both firing and
+   healthy cases to `tests/amcore-alerts_test.yml`; a boolean join also needs
+   an asymmetric-health firing case. Thresholds live in git with tests — they
+   are not runtime/UI-editable state.
+3. **Dashboard:** edit the provisioned dashboard in Grafana or its source JSON,
+   then commit the exported classic dashboard JSON to
+   `docker/monitoring/grafana/dashboards/amcore-overview.json`. Preserve its
+   uid, the `amcore-prometheus` datasource uid/type, stable row/panel identity,
+   and every target expression. An edit saved only in Grafana's data volume is
+   not part of the starter.
+4. **Runbook:** add or update the matching file under
+   `docs/operations/runbooks/`. Its heading must match `runbook_path`; include
+   symptom, ranked likely causes, mitigation, escalation, and the exact
+   dashboard citation. Put exactly one executable query in each `promql`
+   fence and use relative Markdown links.
+5. **Receiver or inhibition:** edit
+   `docker/monitoring/alertmanager/alertmanager.yml`. Copy the tested
+   email/Telegram blocks from
+   `tests/alertmanager.example-full.yml`, store credentials only under the
+   gitignored `secrets/` directory, and keep infrastructure alerts outside
+   AMCore's `NotificationChannel`. An inhibition must suppress only a derived
+   symptom of the same root cause, not an independent failure.
+
+Run the static contract after every change and the live contract whenever a
+query, provisioned artifact, scrape/routing config, or image changes:
+
+```bash
+pnpm test:observability-contract
+pnpm test:observability-contract:live
+```
+
+The static CI job additionally runs `promtool check config`, `promtool check
+rules`, `promtool test rules`, and `amtool check-config` against both the real
+Alertmanager file and its receiver example. Do not merge an alert/config change
+until that job passes; the live tier catches valid syntax that still fails
+against the provisioned stack or real exposed metrics. The optional SLO file
+remains off by default unless `prometheus.yml` deliberately adds its separate,
+non-recursive glob; changing that default is an operational behavior change,
+not a documentation edit.
+
 ## Observability Contract Verification
 
 Everything above (metrics, alerts, dashboard, runbooks) is machine-checked as
