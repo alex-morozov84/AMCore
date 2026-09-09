@@ -5,16 +5,13 @@ import type { DataOutcome, UnavailableReason } from './types'
 import 'server-only'
 
 /**
- * A primary section's render state. Unlike the earlier throw-based design
- * (see `ai/models-talk.md`'s PR1 second review round), a *known*
- * availability failure is never thrown - it is an ordinary, expected
- * outcome the Server Component branches on directly, the same way
- * `degrade-secondary.ts`'s `SecondaryRenderOutcome` already works. This
- * sidesteps the "does a thrown error's fields survive to a client
- * fallback" problem entirely: nothing crosses an error boundary for the
- * known case, so there is nothing that can be lost in transit, and no
- * double-logging risk to guard against. `catchError`/`instrumentation.ts`'s
- * `onRequestError` are reserved for genuinely unexpected exceptions only.
+ * A primary section's render state. A *known* availability failure is never
+ * thrown: it is an ordinary, expected outcome the Server Component branches
+ * on directly, just like `degrade-secondary.ts`'s `SecondaryRenderOutcome`.
+ * Nothing crosses an error boundary for the known case, so RSC error
+ * serialization cannot discard classification fields or cause a second log.
+ * `catchError`/`instrumentation.ts`'s `onRequestError` remain reserved for
+ * genuinely unexpected exceptions.
  */
 export type PrimaryRenderOutcome<T> =
   | { status: 'available'; data: T }
