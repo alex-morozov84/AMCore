@@ -10,6 +10,7 @@ import { ensureFreshSession } from './ensure-fresh-session'
 import { isInvalidRefreshError, SessionNotFoundError, SessionRefreshUnsafeError } from './errors'
 import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultLock } from './session-lock'
+import type { VaultEntry } from './session-vault.types'
 import { redisVaultStore } from './session-vault-store'
 import { upstreamRefresh } from './upstream-refresh'
 
@@ -34,18 +35,22 @@ export interface DalSession {
  * transient upstream refresh failure) **rethrows**: auth could not be
  * *proven* one way or the other, which callers must not silently treat as
  * "logged out" (see `requireSession` and `(dashboard)/error.tsx`).
+ *
+ * Split from `getOptionalSession` (below) so `shared/api/server/access-token.ts`
+ * can read the raw `accessToken` without a second Redis round-trip on a page
+ * that also calls `getOptionalSession`/`requireSession` — `cache()` dedupes
+ * both to this one call per request.
  */
-export const getOptionalSession = cache(async (): Promise<DalSession | null> => {
+export const getOptionalSessionEntry = cache(async (): Promise<VaultEntry | null> => {
   const sessionId = (await cookies()).get(SESSION_COOKIE_NAME)?.value
   if (!sessionId) return null
 
   try {
-    const entry = await ensureFreshSession(sessionId, {
+    return await ensureFreshSession(sessionId, {
       store: redisVaultStore,
       lock: redisVaultLock,
       upstreamRefresh,
     })
-    return { user: entry.userSnapshot }
   } catch (error) {
     if (
       error instanceof SessionNotFoundError ||
@@ -56,6 +61,11 @@ export const getOptionalSession = cache(async (): Promise<DalSession | null> => 
     }
     throw error
   }
+})
+
+export const getOptionalSession = cache(async (): Promise<DalSession | null> => {
+  const entry = await getOptionalSessionEntry()
+  return entry ? { user: entry.userSnapshot } : null
 })
 
 /**
