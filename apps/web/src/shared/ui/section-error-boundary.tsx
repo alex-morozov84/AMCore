@@ -1,39 +1,26 @@
 'use client'
 
-import { useEffect } from 'react'
 import { catchError, type ErrorInfo } from 'next/error'
 import { useTranslations } from 'next-intl'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 
+import { Alert, AlertDescription } from './alert'
 import { Button } from './button'
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from './empty'
 
-function UnexpectedSectionErrorFallback(_props: object, { error, retry }: ErrorInfo) {
+function UnexpectedSectionErrorFallback(_props: object, { retry }: ErrorInfo) {
   const t = useTranslations('common')
 
-  // Dev-console visibility only, matching `(dashboard)/error.tsx`'s existing
-  // convention - never read for UI branching. `onRequestError`
-  // (`apps/web/src/instrumentation.ts`) already gives the team the
-  // server-side, structured record of this same failure.
-  useEffect(() => {
-    console.error(error)
-  }, [error])
-
   return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <AlertTriangle />
-        </EmptyMedia>
-        <EmptyTitle>{t('error')}</EmptyTitle>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button onClick={() => retry()}>
+    <Alert variant="destructive">
+      <AlertTriangle aria-hidden="true" />
+      <AlertDescription className="gap-3">
+        <span>{t('error')}</span>
+        <Button size="sm" onClick={() => retry()}>
           <RefreshCw className="size-4" />
           {t('retry')}
         </Button>
-      </EmptyContent>
-    </Empty>
+      </AlertDescription>
+    </Alert>
   )
 }
 

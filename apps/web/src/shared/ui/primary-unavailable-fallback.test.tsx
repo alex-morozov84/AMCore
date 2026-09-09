@@ -48,22 +48,17 @@ describe('PrimaryUnavailableFallback', () => {
     expect(screen.getByRole('button', { name: 'Повторить' })).toBeInTheDocument()
   })
 
-  it('renders identical copy regardless of reason - a deliberate design choice, not a gap', () => {
-    renderFallback('rate-limited')
-    const rateLimited = screen.getByText('This is temporarily unavailable. Please try again.')
+  it.each(['rate-limited', 'timeout', 'network', 'upstream'] as const)(
+    'maps %s to approved generic copy without exposing the raw reason',
+    (reason) => {
+      const { container } = renderFallback(reason)
 
-    renderFallback('network')
-    const network = screen.getAllByText('This is temporarily unavailable. Please try again.')
-
-    expect(rateLimited).toBeInTheDocument()
-    expect(network).toHaveLength(2)
-  })
-
-  it('never renders the raw reason string to the user', () => {
-    renderFallback('rate-limited')
-
-    expect(screen.queryByText(/rate-limited/)).not.toBeInTheDocument()
-  })
+      expect(
+        screen.getByText('This is temporarily unavailable. Please try again.')
+      ).toBeInTheDocument()
+      expect(container.innerHTML).not.toContain(reason)
+    }
+  )
 
   it('calls router.refresh() when retry is clicked, not any other recovery mechanism', async () => {
     const user = userEvent.setup()

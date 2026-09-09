@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { expect, within } from 'storybook/test'
+import { expect, userEvent, within } from 'storybook/test'
 
 import { SectionErrorBoundary } from './section-error-boundary'
 
@@ -11,8 +11,17 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-function ThrowingChild(): never {
-  throw new Error('a genuine bug in this section - never shown to the user')
+let shouldThrow = true
+
+class ClassifiedStoryError extends Error {
+  override name = 'raw-name-token'
+  digest = 'raw-digest-token'
+  classification = 'raw-classification-token'
+}
+
+function RecoverableChild() {
+  if (shouldThrow) throw new ClassifiedStoryError('raw-message-token')
+  return <div>Recovered section content</div>
 }
 
 // `.storybook/preview.tsx`'s global `parameters.nextjs.appDirectory` mock
@@ -30,12 +39,26 @@ export const Healthy: Story = {
 }
 
 export const UnexpectedException: Story = {
-  args: { children: <ThrowingChild /> },
+  args: { children: <RecoverableChild /> },
+  beforeEach: () => {
+    shouldThrow = true
+  },
+  render: ({ children }) => (
+    <div>
+      <div>Sibling section</div>
+      <SectionErrorBoundary>{children}</SectionErrorBoundary>
+    </div>
+  ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await expect(canvas.getByText('Something went wrong')).toBeInTheDocument()
-    await expect(canvas.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
-    // The generic starter never shows the real thrown message to the user.
-    expect(canvas.queryByText(/a genuine bug in this section/)).not.toBeInTheDocument()
+    await expect(canvas.getByText('Sibling section')).toBeInTheDocument()
+    expect(canvasElement.innerHTML).not.toMatch(/raw-(?:message|name|digest|classification)-token/)
+
+    shouldThrow = false
+    await userEvent.click(canvas.getByRole('button', { name: 'Retry' }))
+
+    await expect(await canvas.findByText('Recovered section content')).toBeInTheDocument()
+    await expect(canvas.getByText('Sibling section')).toBeInTheDocument()
   },
 }

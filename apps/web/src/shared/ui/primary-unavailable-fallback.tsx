@@ -6,8 +6,15 @@ import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { useRouter } from '@/i18n/navigation'
 import type { UnavailableReason } from '@/shared/api/server'
 
+import { Alert, AlertDescription } from './alert'
 import { Button } from './button'
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from './empty'
+
+const MESSAGE_KEYS = {
+  'rate-limited': 'temporarilyUnavailable',
+  timeout: 'temporarilyUnavailable',
+  network: 'temporarilyUnavailable',
+  upstream: 'temporarilyUnavailable',
+} as const satisfies Record<UnavailableReason, 'temporarilyUnavailable'>
 
 export interface PrimaryUnavailableFallbackProps {
   /** Accepted for a stable call-site contract and possible future per-reason
@@ -39,19 +46,15 @@ export function PrimaryUnavailableFallback({ reason }: PrimaryUnavailableFallbac
   const router = useRouter()
 
   return (
-    <Empty data-reason={reason}>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <AlertTriangle />
-        </EmptyMedia>
-        <EmptyTitle>{t('temporarilyUnavailable')}</EmptyTitle>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button onClick={() => router.refresh()}>
+    <Alert variant="destructive">
+      <AlertTriangle aria-hidden="true" />
+      <AlertDescription className="gap-3">
+        <span>{t(MESSAGE_KEYS[reason])}</span>
+        <Button size="sm" onClick={() => router.refresh()}>
           <RefreshCw className="size-4" />
           {t('retry')}
         </Button>
-      </EmptyContent>
-    </Empty>
+      </AlertDescription>
+    </Alert>
   )
 }
