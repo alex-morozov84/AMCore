@@ -13,6 +13,7 @@ import {
   checkDatasourceHealth,
   checkGrafanaDsQuery,
   checkModernApiVersion,
+  isGrafanaReady,
 } from './grafana.mjs'
 
 const CHECKS = [
@@ -35,6 +36,12 @@ async function main() {
   // asserting health:"ok" immediately after targets-up is a real race,
   // reproduced independently against a clean boot.
   await waitUntilReady('default rule groups evaluated at least once', areRulesEvaluated)
+  // Grafana's container reaching "Started" doesn't mean its HTTP server is
+  // ready — it can still be mid-migration, which resets in-flight
+  // connections instead of returning a clean HTTP error (observed live,
+  // PR #394: an unhandled `ECONNRESET` failed the whole run instead of a
+  // reported violation).
+  await waitUntilReady('grafana ready', isGrafanaReady)
 
   let anyViolation = false
   for (const [label, check] of CHECKS) {
