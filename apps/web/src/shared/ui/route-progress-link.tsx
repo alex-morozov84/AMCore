@@ -30,19 +30,23 @@ export interface RouteProgressLinkOwnProps {
  * unprefixed (next-intl's own convention), so this never touches
  * `window.location` or its locale-*prefixed* format at all.
  */
-function hrefToKey(href: LinkProps['href']): string {
+function hrefToKey(href: LinkProps['href'], currentKey: string): string {
+  const currentUrl = new URL(currentKey, 'http://x')
   if (typeof href === 'string') {
-    // A dummy base makes a relative path parse correctly and, critically,
-    // separates a `#hash` from `pathname`/`search` -- a plain `.split('?')`
-    // would leave a hash-only link's fragment glued onto `pathname`,
-    // making it look different from the current page it's actually on.
-    const url = new URL(href, 'http://x')
+    // Resolve against the current route, not the origin: `#section` and
+    // `?tab=details` are relative references to the page already showing.
+    const url = new URL(href, currentUrl)
     return url.search ? `${url.pathname}${url.search}` : url.pathname
   }
-  const pathname = href.pathname ?? ''
-  const search = href.query
-    ? new URLSearchParams(href.query as Record<string, string>).toString()
-    : ''
+  const pathname = href.pathname ?? currentUrl.pathname
+  const search =
+    href.search != null
+      ? href.search.replace(/^\?/, '')
+      : href.query
+        ? new URLSearchParams(href.query as Record<string, string>).toString()
+        : href.pathname == null
+          ? currentUrl.searchParams.toString()
+          : ''
   return search ? `${pathname}?${search}` : pathname
 }
 
@@ -92,7 +96,7 @@ export const RouteProgressLink = forwardRef<
 
     const currentSearch = searchParams.toString()
     const currentKey = currentSearch ? `${pathname}?${currentSearch}` : pathname
-    if (hrefToKey(href) === currentKey) return
+    if (hrefToKey(href, currentKey) === currentKey) return
 
     controller.start()
   }

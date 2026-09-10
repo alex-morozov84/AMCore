@@ -9,7 +9,7 @@ import {
 
 import { RouteProgressLink } from './route-progress-link'
 
-const pathname = vi.fn(() => '/en')
+const pathname = vi.fn(() => '/login')
 let capturedOnNavigate: ((event: { preventDefault: () => void }) => void) | undefined
 
 vi.mock('@/i18n/navigation', () => ({
@@ -52,7 +52,7 @@ function fireNavigate() {
 afterEach(() => {
   routeProgressController.dispose()
   routeProgressFlag.enabled = true
-  pathname.mockReturnValue('/en')
+  pathname.mockReturnValue('/login')
   searchParams.mockReturnValue(new URLSearchParams())
   capturedOnNavigate = undefined
 })
@@ -100,27 +100,27 @@ describe('RouteProgressLink', () => {
   })
 
   it('does not start for a link to the current page', () => {
-    render(<RouteProgressLink href="/en">Here</RouteProgressLink>)
+    render(<RouteProgressLink href="/login">Here</RouteProgressLink>)
     fireNavigate()
     expect(routeProgressController.getPhase()).toBe('idle')
   })
 
   it('does not start for a hash-only link on the current page', () => {
-    render(<RouteProgressLink href="/en#section">Here</RouteProgressLink>)
+    render(<RouteProgressLink href="#section">Here</RouteProgressLink>)
     fireNavigate()
     expect(routeProgressController.getPhase()).toBe('idle')
   })
 
   it('does not start for the current page plus its current query', () => {
     searchParams.mockReturnValue(new URLSearchParams('tab=details'))
-    render(<RouteProgressLink href="/en?tab=details">Here</RouteProgressLink>)
+    render(<RouteProgressLink href="?tab=details">Here</RouteProgressLink>)
     fireNavigate()
     expect(routeProgressController.getPhase()).toBe('idle')
   })
 
   it('starts for the current page with a different query', () => {
     searchParams.mockReturnValue(new URLSearchParams('tab=details'))
-    render(<RouteProgressLink href="/en?tab=other">Here</RouteProgressLink>)
+    render(<RouteProgressLink href="?tab=other">Here</RouteProgressLink>)
     fireNavigate()
     expect(routeProgressController.getPhase()).not.toBe('idle')
   })
