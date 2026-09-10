@@ -11,9 +11,10 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    (`strict`, `flexible`, or `custom`). Do not guess from git remotes or names.
    If the file is missing or still says `upstream-starter` in a product fork, stop
    and ask the owner to initialize it. The supported fork-initialization path is
-   `pnpm init:brand` first, then `pnpm init:project --mode=single --locale=<code>`
-   and/or `pnpm init:project --storybook=disabled` only if the fork wants those
-   one-time structural choices; see
+   `pnpm init:brand` first, then `pnpm init:project --mode=single --locale=<code>`,
+   `pnpm init:project --storybook=disabled`, and/or
+   `pnpm init:project --route-progress=disabled`, in any combination, only for the
+   structural choices the fork actually wants; see
    `docs/frontend/brand-theme-and-tokens.md#project-scaffolding`.
 2. Detect the working-context overlay:
    - **`ai/` directory present** → maintainer copy of the product named in
@@ -60,8 +61,10 @@ docker compose up                     # full stack (Postgres+Redis+migrate+api+w
 ```
 
 `pnpm init:project` is intentionally flag-driven: use
-`--mode=single --locale=<code>` to remove locale routing, and/or
-`--storybook=disabled` to remove Storybook from a fork.
+`--mode=single --locale=<code>` to remove locale routing,
+`--storybook=disabled` to remove Storybook from a fork, and/or
+`--route-progress=disabled` to turn off the top route-progress bar's
+default (non-destructive — see `PROJECT_CONTEXT.md`).
 
 Production migrates with `db:migrate:prod` (`prisma migrate deploy`) as a one-shot
 step, never `db:migrate`. See `docs/operations/deployment.md`.
