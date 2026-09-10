@@ -6,18 +6,18 @@ of workflow self-hardening to keep the example forkable.
 
 ## Current Gates
 
-| Workflow                | Trigger                                 | Tooling                                                                                             | CI behavior                          |
-| ----------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                | report-only, uploads SARIF           |
-| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                                                                            | blocking on `high+`                  |
-| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                       | gitleaks blocks; OSV is report-only  |
-| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                              | Trivy report-only; boot-smoke blocks |
-| `ci.yml`                | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job) | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                           | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Scaffolding contract — fast (`scripts/lib/*.test.mjs`, structural/fixture checks, no install)       | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Scaffolding contract — full (`pnpm test:scripts`, real install/typecheck/lint/build/test)           | blocking                             |
-| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                             | blocking                             |
-| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                  | blocking (squash title = commit msg) |
+| Workflow                | Trigger                                 | Tooling                                                                                              | CI behavior                          |
+| ----------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                 | report-only, uploads SARIF           |
+| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                                                                             | blocking on `high+`                  |
+| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                        | gitleaks blocks; OSV is report-only  |
+| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                               | Trivy report-only; boot-smoke blocks |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job)  | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                            | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Scaffolding contract — fast (`scripts/lib/*.test.mjs`, structural/fixture checks, no nested install) | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Scaffolding contract — full (`pnpm test:scripts`, real install/typecheck/lint/build/test)            | blocking                             |
+| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                              | blocking                             |
+| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                   | blocking (squash title = commit msg) |
 
 ## What Each Gate Proves
 
@@ -59,7 +59,9 @@ of workflow self-hardening to keep the example forkable.
   still matches the real file it targets, and the fixture-composition
   invariants (no two edit steps target the same file, every scaffold
   dimension composes safely with every other). Read-only against the real
-  repo, no install, no Docker, ~6 seconds. Does **not** cover the
+  repo, no nested/disposable-copy install (the job's own top-level
+  `pnpm install --frozen-lockfile` still runs), no Docker, ~6 seconds. Does
+  **not** cover the
   public/private-path ratchet — that is the separate "Observability contract
   (static)" job above. No path filter: a change anywhere in the repo can
   drift a scaffolding fixture (this job exists because exactly that
