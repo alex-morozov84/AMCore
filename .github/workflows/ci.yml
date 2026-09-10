@@ -141,9 +141,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Structural/read-only checks against the real repo (no install, no
-      # Docker, ~6s): every pnpm init:project before/after fixture still
-      # matches the real file it targets, plus the private-path ratchet's
-      # own unit tests. NOT the full pnpm test:scripts (see the parallel
+      # Docker, ~6s): every pnpm init:project before/after fixture in
+      # scripts/lib/ still matches the real file it targets, plus the
+      # fixture-composition invariants (no two edit steps target the same
+      # file, locale/Storybook dimensions compose safely). Does NOT cover
+      # the private-path ratchet -- that is the separate "promtool" job,
+      # display name "Observability contract (static)", already required.
+      # NOT the full pnpm test:scripts either (see the parallel
       # "Scaffolding contract (full)" job below for that) — this is the
       # cheap layer meant to fail fast on every PR, not gated by which paths
       # changed: a change anywhere in the repo can drift a scaffolding
