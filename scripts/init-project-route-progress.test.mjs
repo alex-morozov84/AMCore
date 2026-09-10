@@ -108,8 +108,10 @@ describe('init-project --route-progress=disabled (end-to-end against a real-repo
     // The route-progress flag file itself is never a shared target, so it
     // keeps its own independent step even when combined.
     assert.match(result.stdout, /route-progress-flag\.ts: set ROUTE_PROGRESS_ENABLED to false/)
-    // eslint.config.mjs's combined step is --mode + --storybook only —
-    // --route-progress never touches it, so it must not appear here.
-    assert.doesNotMatch(result.stdout, /eslint\.config\.mjs/)
+    // eslint.config.mjs is touched here only by --mode's own standalone step
+    // (it always edits that file, storybook or not). The *combined*
+    // eslint.config.mjs step is --mode + --storybook only — --route-progress
+    // never triggers it, so that specific wording must not appear.
+    assert.doesNotMatch(result.stdout, /remove the navigation ban and the Storybook plugin\/rules/)
   })
 })
