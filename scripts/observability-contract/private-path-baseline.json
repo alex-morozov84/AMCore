@@ -248,12 +248,6 @@
       "kind": "debt"
     },
     {
-      "file": "apps/web/src/app/[locale]/layout.tsx",
-      "target": "ai/models-talk.md",
-      "count": 2,
-      "kind": "debt"
-    },
-    {
       "file": "apps/web/src/entities/user/api/user-queries.msw-integration.test.tsx",
       "target": "ai/models-talk.md",
       "count": 1,
@@ -431,12 +425,6 @@
       "file": "scripts/lib/project-plan-api-notification-integration-test.mjs",
       "target": "ai/TESTING.md",
       "count": 2,
-      "kind": "debt"
-    },
-    {
-      "file": "scripts/lib/project-plan-storybook-ci.mjs",
-      "target": "ai/BACKLOG.md",
-      "count": 1,
       "kind": "debt"
     },
     {

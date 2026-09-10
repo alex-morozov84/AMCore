@@ -1,8 +1,8 @@
 // init:project --mode=single: packages/shared/src/lib/frontend-url.test.ts.
-// Originally targeted apps/api/src/core/auth/frontend-url.spec.ts, but PR #376
-// (the packages/shared test runner, ai/STATUS.md 2026-09-05) moved this suite
-// beside its source and converted it to Vitest -- the plan drifted because
-// this transform was never updated to follow. `localizedFrontendUrl` is
+// Originally targeted apps/api/src/core/auth/frontend-url.spec.ts, but the
+// packages/shared test runner PR moved this suite beside its source and
+// converted it to Vitest -- the plan drifted because this transform was
+// never updated to follow. `localizedFrontendUrl` is
 // exercised with a hardcoded 'ru' locale throughout its describe block;
 // rewritten to use DEFAULT_LOCALE (already imported, and reflecting whichever
 // locale was actually chosen) instead of a second hardcoded literal -- no

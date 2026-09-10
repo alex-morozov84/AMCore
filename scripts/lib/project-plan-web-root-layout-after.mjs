@@ -44,14 +44,15 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // Track 3 PR2 (\`ai/models-talk.md\` FINAL PLAN §3): the per-request CSP
-  // nonce \`src/proxy.ts\` generated, read via \`headers()\` rather than a prop
-  // — this is the documented Next.js pattern (content-security-policy.md)
-  // and keeps every route under this layout on the same mechanism. Calling
-  // \`headers()\` opts this layout into dynamic rendering — the accepted
-  // trade-off from the owner decision that AMCore's core routes prefer
-  // strict security over static optimization (\`ai/models-talk.md\` FINAL
-  // PLAN §0.3).
+  // The per-request CSP nonce \`src/proxy.ts\` generated, read via
+  // \`headers()\` rather than a prop — this is the documented Next.js
+  // pattern (content-security-policy.md) and keeps every route under this
+  // layout on the same mechanism. Calling \`headers()\` opts this layout
+  // into dynamic rendering — AMCore's core routes accept this
+  // deliberately; see docs/frontend/browser-security-and-csp.md →
+  // "Downstream forks: public/marketing routes and route scoping" for the
+  // full trade-off and why it does not generalize to a public marketing
+  // page added under this same layout.
   const nonce = (await headers()).get(NONCE_REQUEST_HEADER) ?? undefined
 
   return (
