@@ -142,10 +142,17 @@ export function installDependencies(root) {
   // The doc comment above says "deliberately not CI=true", but until now
   // nothing actually stripped it -- execFileSync inherits the full
   // process.env by default, and a real GitHub Actions runner always sets
-  // CI=true globally regardless of any workflow step. Never surfaced
-  // locally (no CI=true there) until this suite first ran in real CI.
-  const env = { ...process.env }
-  delete env.CI
+  // both CI=true and GITHUB_ACTIONS=true globally, regardless of any
+  // workflow step. Never surfaced locally (neither var set there) until
+  // this suite first ran in real CI. Deleting CI alone is not enough: pnpm
+  // resolves "is this CI" via the ci-info package, whose vendor-detection
+  // loop independently matches GITHUB_ACTIONS and sets isCI true through
+  // that path regardless of CI. ci-info documents one explicit bypass that
+  // short-circuits its entire vendor scan: CI=false ("Bypass all checks if
+  // CI env is explicitly set to 'false'") -- more robust than trying to
+  // enumerate and strip every vendor marker (GITHUB_ACTIONS today, some
+  // other CI's marker on a future runner) by hand.
+  const env = { ...process.env, CI: 'false' }
   execFileSync('pnpm', ['install'], {
     cwd: root,
     encoding: 'utf8',
