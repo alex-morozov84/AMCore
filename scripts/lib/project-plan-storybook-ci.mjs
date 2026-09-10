@@ -18,7 +18,7 @@ const CI_JOB_BLOCK = `  # amcore:sentinel-block start=storybook-job
     # until GitHub's default 6-hour job timeout killed it instead of failing
     # fast. \`web-e2e\` runs the identical install command and shared this
     # exposure until it got the same fix (timeout-minutes + env vars on its
-    # own install step) per the ai/BACKLOG.md follow-up.
+    # own install step).
     timeout-minutes: 20
     steps:
       - name: Checkout

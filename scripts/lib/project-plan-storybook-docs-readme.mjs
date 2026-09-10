@@ -6,13 +6,13 @@ import path from 'node:path'
 import { fileStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
 
 const INDEX_ROW =
-  '| Write or review a Storybook story                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |\n'
+  '| Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |\n'
 
 const SCAFFOLDING_ROW_BEFORE =
-  '| Initialize a downstream fork (rebrand, single-locale, disable Storybook) | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
+  '| Initialize a downstream fork (rebrand, single-locale, disable Storybook)                 | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
 
 const SCAFFOLDING_ROW_AFTER =
-  '| Initialize a downstream fork (rebrand, single-locale) | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding) |\n'
+  '| Initialize a downstream fork (rebrand, single-locale)                                    | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
 
 const TESTING_MENTION_BEFORE = `- **[Frontend testing](frontend/testing.md)** — the test taxonomy
   (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/

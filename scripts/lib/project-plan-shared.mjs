@@ -10,6 +10,7 @@
 // init-project.test.mjs, alongside telegramGenericMessages.
 import { fileStep, linePatchesTransform, trimLocaleRecordLiteral } from './init-engine.mjs'
 import { resolveSharedPaths } from './project-config.mjs'
+import { buildSharedFrontendUrlTestSteps } from './project-plan-shared-frontend-url-test.mjs'
 
 export function buildSharedLocaleSteps(root, locale) {
   const { sharedConstants, telegramMessages, emailMessages } = resolveSharedPaths(root)
@@ -35,5 +36,6 @@ export function buildSharedLocaleSteps(root, locale) {
     ),
     trimRecordStep(telegramMessages, 'telegramGenericMessages'),
     trimRecordStep(emailMessages, 'emailMessages'),
+    ...buildSharedFrontendUrlTestSteps(root),
   ]
 }

@@ -5,10 +5,12 @@ import path from 'node:path'
 import { fileStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
 
 const INIT_PROJECT_ROW_BEFORE =
-  '| `pnpm init:project` | Apply downstream structural choices such as single-locale mode or disabling Storybook |\n'
+  `| \`pnpm init:project\`                                               | Apply downstream structural choices such as single-locale mode or disabling Storybook                                                                                                                                                                |
+`
 
 const INIT_PROJECT_ROW_AFTER =
-  '| `pnpm init:project` | Apply downstream structural choices such as single-locale mode                        |\n'
+  `| \`pnpm init:project\`                                               | Apply downstream structural choices such as single-locale mode                                                                                                                                                                                       |
+`
 
 const FLAG_NOTE_BEFORE = `\`pnpm init:project\` requires explicit flags. Use
 \`--mode=single --locale=<code>\` to remove locale routing, and/or

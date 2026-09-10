@@ -11,8 +11,10 @@ import { buildWebNavAppShellSteps } from './project-plan-web-nav-appshell.mjs'
 import { buildWebNavEslintGuardsSteps } from './project-plan-web-nav-eslint-guards.mjs'
 import { buildWebNavDalGatingTestSteps } from './project-plan-web-nav-dal-gating-test.mjs'
 import { buildWebNavDalOptionalTestSteps } from './project-plan-web-nav-dal-optional-test.mjs'
+import { buildWebNavPrimaryFallbackSteps } from './project-plan-web-nav-primary-fallback.mjs'
+import { buildWebNavPrimaryFallbackTestSteps } from './project-plan-web-nav-primary-fallback-test.mjs'
 
-export function buildWebNavSteps(root) {
+export function buildWebNavSteps(root, locale) {
   return [
     ...buildWebNavLinkSteps(root),
     ...buildWebNavHooksSteps(root),
@@ -24,5 +26,7 @@ export function buildWebNavSteps(root) {
     ...buildWebNavEslintGuardsSteps(root),
     ...buildWebNavDalGatingTestSteps(root),
     ...buildWebNavDalOptionalTestSteps(root),
+    ...buildWebNavPrimaryFallbackSteps(root),
+    ...buildWebNavPrimaryFallbackTestSteps(root, locale),
   ]
 }

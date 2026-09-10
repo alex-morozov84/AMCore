@@ -35,7 +35,7 @@ export function buildProjectSteps(root, { locale }) {
     ...buildWebZodErrorMapTestSteps(root, locale),
     ...buildWebApiErrorAlertTestSteps(root, locale),
     ...buildWebPagesSteps(root),
-    ...buildWebNavSteps(root),
+    ...buildWebNavSteps(root, locale),
     ...buildWebLocaleDirCleanupSteps(root),
   ]
 }

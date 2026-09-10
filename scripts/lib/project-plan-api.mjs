@@ -4,13 +4,15 @@
 // the specs the real `pnpm --filter api test` in init-project.test.mjs
 // found broken — none of this was in PR3A's original survey, which only
 // covered packages/shared and telegram-messages.ts.
+//
+// locale-negotiation.spec.ts is deliberately absent here: it was later
+// rewritten to mock `acceptsLanguages` directly, so none of its assertions
+// read SUPPORTED_LOCALES anymore and it needs no single-locale transform.
 import { buildApiLocaleFixturesSteps } from './project-plan-api-locale-fixtures.mjs'
 import { buildApiFixtureLocalesSteps } from './project-plan-api-fixture-locales.mjs'
 import { buildApiOauthServiceTestSteps } from './project-plan-api-oauth-service-test.mjs'
 import { buildApiTelegramDelivererTestSteps } from './project-plan-api-telegram-deliverer-test.mjs'
-import { buildApiLocaleNegotiationTestSteps } from './project-plan-api-locale-negotiation-test.mjs'
 import { buildApiNotificationDefinitionTestSteps } from './project-plan-api-notification-definition-tests.mjs'
-import { buildApiFrontendUrlTestSteps } from './project-plan-api-frontend-url-test.mjs'
 import { buildApiEmailIntegrationTestsSteps } from './project-plan-api-email-integration-tests.mjs'
 import { buildApiNotificationIntegrationTestSteps } from './project-plan-api-notification-integration-test.mjs'
 import { buildApiWelcomeIntegrationTestSteps } from './project-plan-api-welcome-integration-test.mjs'
@@ -23,9 +25,7 @@ export function buildApiLocaleSteps(root, locale) {
     ...buildApiFixtureLocalesSteps(root, locale),
     ...buildApiOauthServiceTestSteps(root, locale),
     ...buildApiTelegramDelivererTestSteps(root, locale),
-    ...buildApiLocaleNegotiationTestSteps(root, locale),
     ...buildApiNotificationDefinitionTestSteps(root, locale),
-    ...buildApiFrontendUrlTestSteps(root),
     ...buildApiEmailIntegrationTestsSteps(root, locale),
     ...buildApiNotificationIntegrationTestSteps(root, locale),
     ...buildApiWelcomeIntegrationTestSteps(root, locale),
