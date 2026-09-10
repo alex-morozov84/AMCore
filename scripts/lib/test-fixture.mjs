@@ -139,10 +139,18 @@ export function git(root, args) {
  * refuse on the mismatch.
  */
 export function installDependencies(root) {
+  // The doc comment above says "deliberately not CI=true", but until now
+  // nothing actually stripped it -- execFileSync inherits the full
+  // process.env by default, and a real GitHub Actions runner always sets
+  // CI=true globally regardless of any workflow step. Never surfaced
+  // locally (no CI=true there) until this suite first ran in real CI.
+  const env = { ...process.env }
+  delete env.CI
   execFileSync('pnpm', ['install'], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    env,
   })
 }
 
