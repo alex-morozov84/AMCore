@@ -1,6 +1,6 @@
 // Runs against a disposable copy of the real repo. Expected content was
 // verified empirically (a real `eslint --fix` run against a scratch copy)
-// before being hardcoded here — see project-plan-web-nav-links.mjs's header.
+// before being hardcoded here.
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -109,7 +109,12 @@ describe('web nav rewrites (against a real repo copy)', () => {
     assert.doesNotMatch(content, /i18n\/navigation/)
   })
 
-  test('AppShell.tsx removes LocaleSwitcher and swaps the Link import', () => {
+  // AppShell's Link import (`RouteProgressLink` from
+  // `@/shared/ui/route-progress-link`) needs no swap of its own -- that
+  // wrapper's single-locale variant lives entirely in
+  // project-plan-web-nav-route-progress-link.mjs, same reasoning as
+  // use-logout.ts above.
+  test('AppShell.tsx removes LocaleSwitcher, leaves RouteProgressLink alone', () => {
     copy = createRealRepoCopy()
     const content = applyAndCheck(
       copy.root,
@@ -117,9 +122,6 @@ describe('web nav rewrites (against a real repo copy)', () => {
       'apps/web/src/widgets/app-shell/ui/AppShell.tsx'
     )
     assert.doesNotMatch(content, /LocaleSwitcher/)
-    assert.match(
-      content,
-      /import Link from 'next\/link'\nimport \{ useTranslations \} from 'next-intl'/
-    )
+    assert.match(content, /RouteProgressLink/)
   })
 })

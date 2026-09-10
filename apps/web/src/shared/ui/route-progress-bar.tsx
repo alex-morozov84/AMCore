@@ -12,40 +12,6 @@ import {
 import styles from './route-progress-bar.module.css'
 
 /**
- * Bubbling, never capture. Deliberately does **not** check
- * `event.defaultPrevented`, despite that being FINAL PLAN item 5's original
- * wording: verified against Next's real `next/dist/client/link.js` that
- * `<Link>`'s own `onClick` (`linkClicked()`) unconditionally calls
- * `preventDefault()` as a normal part of doing client-side navigation --
- * and because React registers its root-level synthetic-event listener at
- * (near-)`document` during the initial render, well before this
- * component's own `useEffect` can add its listener, React's handler (and
- * so Next's `preventDefault()`) always runs first. Checking
- * `defaultPrevented` here would therefore reject every real `<Link>` click,
- * not just ones an app cancelled. Confirmed empirically (`nextjs-toploader`,
- * the FINAL PLAN's own cited reference implementation, does not check it
- * either -- read its real source, not assumed). Filters: not the
- * primary/unmodified click, not a same-origin `<a>`, opens elsewhere
- * (`target`/`download`), or the destination path+query is identical to the
- * current one (a pure hash link or a link to the current page).
- */
-function isQualifyingLinkClick(event: MouseEvent): boolean {
-  if (event.button !== 0) return false
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false
-
-  const anchor = (event.target as Element | null)?.closest<HTMLAnchorElement>('a[href]')
-  if (!anchor) return false
-  if (anchor.target && anchor.target !== '_self') return false
-  if (anchor.hasAttribute('download')) return false
-
-  const url = new URL(anchor.getAttribute('href')!, window.location.href)
-  if (!/^https?:$/.test(url.protocol)) return false
-  if (url.origin !== window.location.origin) return false
-
-  return url.pathname + url.search !== window.location.pathname + window.location.search
-}
-
-/**
  * Canonical `pathname[?query]` key, with no trailing `?` for an empty query
  * -- `usePathname()`/`useSearchParams()` and `window.location` disagree on
  * that formatting (`location.search` is `''` for no query, `URLSearchParams
@@ -69,6 +35,17 @@ export interface RouteProgressBarProps {
  * `<Suspense>` (it reads `useSearchParams()`). Purely decorative -- `aria-
  * hidden`, Next's own route announcer owns the accessible navigation
  * announcement.
+ *
+ * `<Link>` clicks no longer start the bar from here -- reconverged FINAL
+ * PLAN item 5 (2026-09-10, Agent 2 diff review): a `document`-level click
+ * listener cannot tell an application's own cancelled navigation apart from
+ * Next's own unconditional `preventDefault()` inside `<Link>`'s click
+ * handler, so a genuinely cancelled Link click still started the bar and
+ * then stranded it until `maxDurationMs`'s safety net. `RouteProgressLink`
+ * (`@/shared/ui/route-progress-link`) now starts the bar per-Link via
+ * Next's `onNavigate`, which only fires for a real, uncancelled navigation.
+ * This file keeps only the two signals a per-Link component cannot cover:
+ * real browser back/forward (`popstate`) and the completion signal.
  */
 export function RouteProgressBar({
   controller = routeProgressController,
@@ -94,24 +71,19 @@ export function RouteProgressBar({
   // stranding the bar until `maxDurationMs`'s safety net.
   const lastRawKeyRef = useRef<string | undefined>(undefined)
 
-  // Start signals: a qualifying Link click, and real browser back/forward
-  // (popstate) -- both listened for once, for the component's whole
-  // lifetime. Programmatic push/replace/back/forward instead start through
-  // `useRouteProgressRouter()`, not this effect.
+  // Start signal: real browser back/forward (popstate) -- listened for
+  // once, for the component's whole lifetime. Link clicks start through
+  // `RouteProgressLink`; programmatic push/replace/back/forward start
+  // through `useRouteProgressRouter()`; neither goes through this effect.
   useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      if (isQualifyingLinkClick(event)) controller.start()
-    }
     function handlePopState() {
       const search = new URLSearchParams(window.location.search).toString()
       const key = toLocationKey(window.location.pathname, search)
       if (key !== lastRawKeyRef.current) controller.start()
     }
-    document.addEventListener('click', handleClick)
     window.addEventListener('popstate', handlePopState)
     window.addEventListener('pagehide', controller.dispose)
     return () => {
-      document.removeEventListener('click', handleClick)
       window.removeEventListener('popstate', handlePopState)
       window.removeEventListener('pagehide', controller.dispose)
       controller.dispose()

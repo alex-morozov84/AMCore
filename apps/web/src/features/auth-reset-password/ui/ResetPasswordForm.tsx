@@ -3,13 +3,13 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 
-import { Link } from '@/i18n/navigation'
 import { useLocalizedForm } from '@/shared/hooks'
 import { cn } from '@/shared/lib/utils'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button, buttonVariants } from '@/shared/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
 import { Input } from '@/shared/ui/input'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import {
   type NewPasswordInput,
@@ -47,9 +47,9 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-destructive">{tErrors('TOKEN_INVALID')}</p>
-        <Link href="/forgot-password" className={cn(buttonVariants(), 'w-full')}>
+        <RouteProgressLink href="/forgot-password" className={cn(buttonVariants(), 'w-full')}>
           {t('requestNewLink')}
-        </Link>
+        </RouteProgressLink>
       </div>
     )
   }
@@ -58,9 +58,9 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-muted-foreground">{t('resetPasswordSuccess')}</p>
-        <Link href="/login" className={cn(buttonVariants(), 'w-full')}>
+        <RouteProgressLink href="/login" className={cn(buttonVariants(), 'w-full')}>
           {t('login')}
-        </Link>
+        </RouteProgressLink>
       </div>
     )
   }

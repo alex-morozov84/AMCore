@@ -3,8 +3,7 @@
 // only the \`{ locale }\` push option is dropped here, since which router
 // implementation backs the adapter is use-route-progress-router.ts's own
 // concern, not these call sites'). Import order verified empirically (real
-// eslint --fix against a disposable copy) rather than guessed — see
-// project-plan-web-nav-links.mjs's header for why that matters here.
+// eslint --fix against a disposable copy) rather than guessed.
 import path from 'node:path'
 import { exactContentStep } from './init-engine.mjs'
 

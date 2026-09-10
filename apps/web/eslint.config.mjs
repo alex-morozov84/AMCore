@@ -144,12 +144,13 @@ const NAVIGATION_PATHS = [
   },
   {
     name: '@/i18n/navigation',
-    importNames: ['useRouter'],
+    importNames: ['useRouter', 'Link'],
     message:
       "Import { useRouteProgressRouter } from " +
-      "'@/shared/lib/route-progress/use-route-progress-router' instead — a raw useRouter() " +
-      'bypasses the route progress bar for push/replace/back/forward. Other exports ' +
-      "(Link, usePathname, redirect, ...) still come from '@/i18n/navigation' directly.",
+      "'@/shared/lib/route-progress/use-route-progress-router' for useRouter(), or " +
+      "{ RouteProgressLink } from '@/shared/ui/route-progress-link' for Link — the raw " +
+      'exports bypass the route progress bar. Other exports (usePathname, redirect, ...) ' +
+      "still come from '@/i18n/navigation' directly.",
   },
 ];
 
@@ -373,6 +374,17 @@ export default [
   {
     name: 'project/import-guards-route-progress-router-adapter',
     files: ['src/shared/lib/route-progress/use-route-progress-router.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],
+    },
+  },
+
+  // Same relaxation, for `Link`: `route-progress-link.tsx` is the one file
+  // allowed to import `@/i18n/navigation`'s real `Link` (reconverged FINAL
+  // PLAN item 5, 2026-09-10, Agent 2 diff review) — that is its entire job.
+  {
+    name: 'project/import-guards-route-progress-link-adapter',
+    files: ['src/shared/ui/route-progress-link.tsx'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],
     },

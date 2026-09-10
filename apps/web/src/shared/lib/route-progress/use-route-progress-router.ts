@@ -13,10 +13,11 @@ function startProgress() {
 
 /**
  * The only sanctioned way to fire a *programmatic* navigation once the route
- * progress bar is enabled — a Link click is already covered by the bar's own
- * document-level listener, but `router.push()`/`replace()`/`back()`/
- * `forward()` calls (form submits, redirects after a mutation, etc.) have no
- * other start signal. Wraps `@/i18n/navigation`'s `useRouter()` one-for-one:
+ * progress bar is enabled — a Link click is already covered by
+ * `RouteProgressLink` (`@/shared/ui/route-progress-link`), but
+ * `router.push()`/`replace()`/`back()`/`forward()` calls (form submits,
+ * redirects after a mutation, etc.) have no other start signal. Wraps
+ * `@/i18n/navigation`'s `useRouter()` one-for-one:
  * every option/type is preserved, only push/replace/back/forward gain a
  * `routeProgressController.start()` call before delegating. `refresh()` and
  * `prefetch()` pass through untouched — neither is a "navigation" the bar

@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 
 import { LogoutButton } from '@/features/auth-logout'
 import { LocaleSwitcher } from '@/features/locale-switcher'
-import { Link } from '@/i18n/navigation'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import {
   Sidebar,
   SidebarContent,
@@ -56,13 +56,17 @@ function NavMenu() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton render={<Link href="/" onClick={() => setOpenMobile(false)} />}>
+        <SidebarMenuButton
+          render={<RouteProgressLink href="/" onClick={() => setOpenMobile(false)} />}
+        >
           <span>{t('dashboard')}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
       <SidebarMenuItem>
         <SidebarMenuButton
-          render={<Link href="/settings/sessions" onClick={() => setOpenMobile(false)} />}
+          render={
+            <RouteProgressLink href="/settings/sessions" onClick={() => setOpenMobile(false)} />
+          }
         >
           <span>{tSessions('title')}</span>
         </SidebarMenuButton>

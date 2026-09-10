@@ -6,7 +6,7 @@
 // replaceExactBlock calls, not exactContentStep, since dal.ts's function
 // bodies are unrelated to this edit and a whole-file snapshot would make
 // the step fail closed on any unrelated change to this file. Import order
-// verified empirically — see project-plan-web-nav-links.mjs's header.
+// verified empirically (a real `eslint --fix` against a disposable copy).
 import path from 'node:path'
 import { fileStep, replaceExactBlock } from './init-engine.mjs'
 

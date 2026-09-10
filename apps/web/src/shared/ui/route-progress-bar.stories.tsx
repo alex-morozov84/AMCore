@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { expect, fireEvent, waitFor, within } from 'storybook/test'
+import { expect, waitFor, within } from 'storybook/test'
 
-import { Link } from '@/i18n/navigation'
 import { createRouteProgressController } from '@/shared/lib/route-progress/route-progress-controller'
 
 import { RouteProgressBar } from './route-progress-bar'
@@ -54,36 +53,15 @@ export const Completing: Story = {
   },
 }
 
-// Proves the document-level listener genuinely detects a real `<Link>`
-// click, not just a plain `<a>` (route-progress-bar.test.tsx's jsdom suite
-// covers plain anchors and the qualifying-click filters in isolation).
-// This is exactly the case that caught a real bug during implementation:
-// Link's own onClick always calls preventDefault() as part of normal
-// client-side routing, which an earlier version of isQualifyingLinkClick
-// mistook for "this click was cancelled" and ignored every real Link click
-// -- see that function's doc comment. Stops at "becomes visible": Storybook
-// has no real App Router to commit a navigation and change usePathname(),
-// so finish() has nothing to react to here -- the full click-to-idle
-// lifecycle against a real, running app is Playwright e2e's job (FINAL PLAN
-// acceptance contract item 3), not this isolated render. fireEvent
-// dispatches an untrusted click, which a browser never runs the default
-// action for, so the anchor's href is never actually followed.
-export const InteractionCycle: Story = {
-  args: {
-    controller: createRouteProgressController({ revealDelayMs: 0 }),
-  },
-  render: (args) => (
-    <>
-      <Link href="/storybook-target">Navigate</Link>
-      <RouteProgressBar {...args} />
-    </>
-  ),
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement)
-    const link = canvas.getByRole('link', { name: 'Navigate' })
-    fireEvent.click(link, { button: 0 })
-    await waitFor(() =>
-      expect(canvas.getByTestId('route-progress-bar')).toHaveAttribute('data-phase', 'visible')
-    )
-  },
-}
+// No InteractionCycle story here (removed 2026-09-10, reconverged FINAL
+// PLAN item 5): it used to prove a real `<Link>` click reached the bar's
+// own document-level click listener. That listener is gone -- Link clicks
+// now start the bar via `RouteProgressLink`'s `onNavigate` (see
+// route-progress-link.tsx) -- and `@storybook/nextjs-vite`'s `next/link`
+// mock does not implement `onNavigate` at all (confirmed: it renders a
+// plain `<a>` and React warns "Unknown event handler property
+// `onNavigate`"), so no story in this environment can exercise it. The
+// same coverage now lives in route-progress-link.test.tsx (unit, a
+// controlled mock that does call `onNavigate`) and
+// e2e/mocked/route-progress-bar.spec.ts (a real `<Link>` click against the
+// real `next dev` server, where `onNavigate` genuinely fires).
