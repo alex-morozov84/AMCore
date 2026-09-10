@@ -68,7 +68,7 @@ export function RouteProgressBar({
   const searchParams = useSearchParams()
   const lastKeyRef = useRef(toLocationKey(pathname, searchParams.toString()))
   // Separate from \`lastKeyRef\` for structural symmetry with the multi-locale
-  // version of this file: there, \`usePathname()\` (\`@/i18n/navigation\`) is
+  // version of this file: there, the locale-aware \`usePathname()\` hook is
   // locale-*stripped* while \`handlePopState\` below only has the locale-
   // *prefixed* \`window.location.pathname\`, and comparing those two formats
   // directly caused a real regression (see \`route-progress-bar.test.tsx\`).

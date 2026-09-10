@@ -52,7 +52,9 @@ function hrefToKey(href: LinkProps['href']): string {
     return url.search ? \`\${url.pathname}\${url.search}\` : url.pathname
   }
   const pathname = href.pathname ?? ''
-  const search = href.query ? new URLSearchParams(href.query as Record<string, string>).toString() : ''
+  const search = href.query
+    ? new URLSearchParams(href.query as Record<string, string>).toString()
+    : ''
   return search ? \`\${pathname}?\${search}\` : pathname
 }
 
@@ -82,7 +84,10 @@ function hrefToKey(href: LinkProps['href']): string {
 export const RouteProgressLink = forwardRef<
   HTMLAnchorElement,
   LinkProps & RouteProgressLinkOwnProps
->(function RouteProgressLink({ onNavigate, href, controller = routeProgressController, ...rest }, ref) {
+>(function RouteProgressLink(
+  { onNavigate, href, controller = routeProgressController, ...rest },
+  ref
+) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 

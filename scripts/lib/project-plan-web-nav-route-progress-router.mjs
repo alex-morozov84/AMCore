@@ -31,7 +31,8 @@ function startProgress() {
  * progress bar is enabled — a Link click is already covered by
  * \`RouteProgressLink\` (\`@/shared/ui/route-progress-link\`), but
  * \`router.push()\`/\`replace()\`/\`back()\`/\`forward()\` calls (form submits,
- * redirects after a mutation, etc.) have no other start signal. Wraps \`@/i18n/navigation\`'s \`useRouter()\` one-for-one:
+ * redirects after a mutation, etc.) have no other start signal. Wraps
+ * \`@/i18n/navigation\`'s \`useRouter()\` one-for-one:
  * every option/type is preserved, only push/replace/back/forward gain a
  * \`routeProgressController.start()\` call before delegating. \`refresh()\` and
  * \`prefetch()\` pass through untouched — neither is a "navigation" the bar
@@ -69,6 +70,7 @@ export function useRouteProgressRouter() {
 }
 `
 
+
 const AFTER = `'use client'
 
 import { useMemo } from 'react'
@@ -86,7 +88,8 @@ function startProgress() {
  * progress bar is enabled — a Link click is already covered by
  * \`RouteProgressLink\` (\`@/shared/ui/route-progress-link\`), but
  * \`router.push()\`/\`replace()\`/\`back()\`/\`forward()\` calls (form submits,
- * redirects after a mutation, etc.) have no other start signal. Wraps \`next/navigation\`'s \`useRouter()\` one-for-one:
+ * redirects after a mutation, etc.) have no other start signal. Wraps
+ * \`next/navigation\`'s \`useRouter()\` one-for-one:
  * every option/type is preserved, only push/replace/back/forward gain a
  * \`routeProgressController.start()\` call before delegating. \`refresh()\` and
  * \`prefetch()\` pass through untouched — neither is a "navigation" the bar
@@ -123,6 +126,7 @@ export function useRouteProgressRouter() {
   )
 }
 `
+
 
 export function buildWebNavRouteProgressRouterSteps(root) {
   return [
