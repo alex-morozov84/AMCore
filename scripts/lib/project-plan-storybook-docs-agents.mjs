@@ -25,7 +25,9 @@ const COMMANDS_NOTE_AFTER = `\`pnpm init:project\` is intentionally flag-driven:
 \`--mode=single --locale=<code>\` to remove locale routing.
 `
 
-const BEFORE = `API: Jest (unit) + Jest/Testcontainers (e2e). Web: Vitest for unit/component
+const BEFORE = `API: Jest (unit) + Jest/Testcontainers (e2e). Shared: Vitest for
+\`packages/shared\`'s own schema/lib unit tests (\`pnpm --filter shared test\`,
+included in the default \`pnpm test\`). Web: Vitest for unit/component
 tests, \`msw/node\` for selected same-origin \`/api/*\` integration tests,
 Vitest/Testcontainers for real-Redis BFF session-vault tests
 (\`pnpm --filter web test:integration\`, needs Docker, excluded from the default
@@ -40,7 +42,9 @@ paths; see [\`docs/frontend/testing.md\`](docs/frontend/testing.md) for the web
 taxonomy.
 `
 
-const AFTER = `API: Jest (unit) + Jest/Testcontainers (e2e). Web: Vitest for unit/component
+const AFTER = `API: Jest (unit) + Jest/Testcontainers (e2e). Shared: Vitest for
+\`packages/shared\`'s own schema/lib unit tests (\`pnpm --filter shared test\`,
+included in the default \`pnpm test\`). Web: Vitest for unit/component
 tests, \`msw/node\` for selected same-origin \`/api/*\` integration tests,
 Vitest/Testcontainers for real-Redis BFF session-vault tests
 (\`pnpm --filter web test:integration\`, needs Docker, excluded from the default

@@ -118,6 +118,81 @@ jobs:
           pnpm --filter api test:e2e -- process-role.e2e-spec.ts shutdown-drain.e2e-spec.ts
           pnpm --filter web test:integration
 
+  scaffolding-contract:
+    name: Scaffolding contract (fast)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Structural/read-only checks against the real repo (no nested/
+      # disposable-copy install -- the "Install dependencies" step above
+      # still runs -- no Docker, ~6s): every pnpm init:project before/after
+      # fixture in scripts/lib/ still matches the real file it targets, plus
+      # the fixture-composition invariants (no two edit steps target the
+      # same file, every scaffold dimension composes safely with every
+      # other). Does NOT cover the private-path ratchet -- that is the
+      # separate "promtool" job, display name "Observability contract
+      # (static)", already required.
+      # NOT the full pnpm test:scripts either (see the parallel
+      # "Scaffolding contract (full)" job below for that) — this is the
+      # cheap layer meant to fail fast on every PR, not gated by which paths
+      # changed: a change anywhere in the repo can drift a scaffolding
+      # fixture (this job's own introduction was prompted by exactly that —
+      # apps/web and docs changes drifting scripts/lib/*.mjs fixtures with
+      # no path filter that would have caught it).
+      - name: Run scaffolding contract tests (fast layer)
+        run: node --test --test-concurrency=1 scripts/lib/*.test.mjs
+
+  scaffolding-contract-full:
+    name: Scaffolding contract (full, real install/build/test)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # End-to-end: applies pnpm init:brand/init:project to disposable
+      # copies of the real repo and runs a real pnpm install plus
+      # typecheck/lint/build/test against the result. Genuinely slow
+      # (~9 minutes, real installs) — a separate parallel job with its own
+      # generous timeout, deliberately not folded into the fast layer above
+      # or the main "test" job's "Run tests" step. needs only [lint,
+      # typecheck], same as "test" itself, so this runs alongside "test"
+      # rather than queueing behind it.
+      - name: Run scaffolding contract tests (full, real end-to-end)
+        run: pnpm test:scripts
+
   docker-image-smoke:
     name: Docker production image smoke
     runs-on: ubuntu-latest

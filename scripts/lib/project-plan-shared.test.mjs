@@ -14,9 +14,9 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 describe('buildSharedLocaleSteps (against the real repo, read-only)', () => {
   test('trims SUPPORTED_LOCALES/DEFAULT_LOCALE and the telegram/email message maps to one locale', () => {
     const steps = buildSharedLocaleSteps(REPO_ROOT, 'ru')
-    assert.equal(steps.length, 3)
+    assert.equal(steps.length, 4)
 
-    const [constants, telegram, email] = steps
+    const [constants, telegram, email, frontendUrlTest] = steps
     assert.match(constants.after, /export const SUPPORTED_LOCALES = \['ru'\] as const/)
     assert.match(constants.after, /export const DEFAULT_LOCALE: SupportedLocale = 'ru'/)
     assert.doesNotMatch(constants.after, /'en'/)
@@ -26,6 +26,10 @@ describe('buildSharedLocaleSteps (against the real repo, read-only)', () => {
 
     assert.match(email.after, /ru: \{/)
     assert.doesNotMatch(email.after, /en: \{/)
+
+    assert.match(frontendUrlTest.target, /frontend-url\.test\.ts$/)
+    assert.match(frontendUrlTest.after, /localizedFrontendUrl\('https:\/\/app\.example\.com', DEFAULT_LOCALE, 'verify-email'\)/)
+    assert.doesNotMatch(frontendUrlTest.after, /Lives in `apps\/api`/)
   })
 
   test('fails closed for a locale that has no block to keep', () => {

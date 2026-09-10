@@ -1,18 +1,24 @@
-import type { Metadata } from 'next'
+// Text fixture for project-plan-web-root-layout.mjs's move-and-rewrite step
+// -- the single-static-locale rewrite of apps/web/src/app/[locale]/layout.tsx.
+// Split out to stay under the repo's ~150-line-per-file guidance, same
+// reason as project-plan-web-root-layout-before.mjs. Import order (DEFAULT_LOCALE
+// before CSPProvider) verified empirically (real eslint --fix against a
+// disposable copy at the real apps/web/src/app/layout.tsx path) rather than
+// guessed -- see project-plan-web-nav-links.mjs's header for why that matters.
+export const ROOT_LAYOUT_AFTER = `import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { headers } from 'next/headers'
 import { NextIntlClientProvider } from 'next-intl'
-import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { getTranslations } from 'next-intl/server'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { CSPProvider } from '@base-ui/react/csp-provider'
 
-import { resolveLocaleParam } from '@/i18n/params'
-import { routing } from '@/i18n/routing'
 import { getThemeInitScript } from '@/shared/lib'
 import { NONCE_REQUEST_HEADER } from '@/shared/lib/csp/constants'
 
 import { Providers } from './providers'
 
-import '../globals.css'
+import './globals.css'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -24,22 +30,8 @@ const geistMono = Geist_Mono({
   subsets: ['latin', 'cyrillic'],
 })
 
-type LocaleParams = { locale: string }
-
-/**
- * Pre-render every locale at build time instead of resolving them on demand.
- */
-export function generateStaticParams() {
-  return routing.locales.map((locale) => ({ locale }))
-}
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<LocaleParams>
-}): Promise<Metadata> {
-  const locale = await resolveLocaleParam(params)
-  const t = await getTranslations({ locale, namespace: 'meta' })
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations({ locale: DEFAULT_LOCALE, namespace: 'meta' })
 
   return {
     title: t('title'),
@@ -47,39 +39,29 @@ export async function generateMetadata({
   }
 }
 
-export default async function LocaleLayout({
+export default async function RootLayout({
   children,
-  params,
 }: Readonly<{
   children: React.ReactNode
-  params: Promise<LocaleParams>
 }>) {
-  const locale = await resolveLocaleParam(params)
-
-  // Must run before any other next-intl call in this subtree, otherwise the
-  // locale is read from the request headers and the route silently opts out of
-  // static rendering.
-  setRequestLocale(locale)
-
-  // The per-request CSP nonce `src/proxy.ts` generated, read via
-  // `headers()` rather than a prop — this is the documented Next.js
+  // The per-request CSP nonce \`src/proxy.ts\` generated, read via
+  // \`headers()\` rather than a prop — this is the documented Next.js
   // pattern (content-security-policy.md) and keeps every route under this
-  // layout on the same mechanism. Calling `headers()` opts this layout
-  // (and therefore every locale route, including the two previously-SSG
-  // auth-link pages) into dynamic rendering — AMCore's core routes accept
-  // this deliberately; see docs/frontend/browser-security-and-csp.md →
+  // layout on the same mechanism. Calling \`headers()\` opts this layout
+  // into dynamic rendering — AMCore's core routes accept this
+  // deliberately; see docs/frontend/browser-security-and-csp.md →
   // "Downstream forks: public/marketing routes and route scoping" for the
   // full trade-off and why it does not generalize to a public marketing
   // page added under this same layout.
   const nonce = (await headers()).get(NONCE_REQUEST_HEADER) ?? undefined
 
   return (
-    // suppressHydrationWarning: the theme-init script below sets the `dark`
+    // suppressHydrationWarning: the theme-init script below sets the \`dark\`
     // class on this element before React hydrates, so its class attribute
     // legitimately differs from what the server rendered — see
     // docs/frontend/brand-theme-and-tokens.md.
-    <html lang={locale} suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang={DEFAULT_LOCALE} suppressHydrationWarning>
+      <body className={\`\${geistSans.variable} \${geistMono.variable} antialiased\`}>
         {/* Raw <script> (not next/script) as the first thing in <body>,
             deliberately — next/script's beforeInteractive strategy is loaded
             by Next's own client bootstrap chunk, which is fetched
@@ -88,7 +70,7 @@ export default async function LocaleLayout({
             has no such gap: the browser executes it synchronously as it
             parses the document, before anything after it can paint. See
             docs/frontend/brand-theme-and-tokens.md for the full reasoning.
-            `nonce` is required once CSP enforces script-src without
+            \`nonce\` is required once CSP enforces script-src without
             'unsafe-inline' (Track 3) — harmless to set under Report-Only too. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
         {/* Threads the same nonce to the handful of Base UI components that
@@ -98,7 +80,7 @@ export default async function LocaleLayout({
             violate CSP. See docs/frontend/ CSP guide (Track 3 PR4). */}
         <CSPProvider nonce={nonce}>
           {/* Rendered from a Server Component, so locale/messages/formats/timeZone
-              are inherited from `i18n/request.ts` — do not pass them by hand. */}
+              are inherited from \`i18n/request.ts\` — do not pass them by hand. */}
           <NextIntlClientProvider>
             <Providers>{children}</Providers>
           </NextIntlClientProvider>
@@ -107,3 +89,4 @@ export default async function LocaleLayout({
     </html>
   )
 }
+`

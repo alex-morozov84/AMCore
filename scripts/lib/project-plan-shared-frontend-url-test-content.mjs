@@ -1,25 +1,11 @@
-// init:project --mode=single: frontend-url.spec.ts. Found via the real
-// `pnpm --filter api test` in init-project.test.mjs — `localizedFrontendUrl`
-// is exercised with a hardcoded 'ru' locale throughout its describe block.
-// Rewritten to use DEFAULT_LOCALE (already imported, and reflecting
-// whichever locale was actually chosen) instead of a second hardcoded
-// literal — no locale branching needed in this generator, since the test
-// content itself is now locale-generic. One assertion in the sibling
-// `localePathPrefix` describe block (added in PR3A specifically to stay
-// independently testable — see that function's own doc comment) still
-// hardcodes a bare 'ru' as the *typed* first argument, which is a real
-// SupportedLocale position, not a plain string array entry — dropped, since
-// the first assertion already proves the "more than one locale" branch.
-import path from 'node:path'
-import { exactContentStep } from './init-engine.mjs'
+// Text fixtures for project-plan-shared-frontend-url-test.mjs, split out to
+// stay under the repo's ~150-line-per-file guidance.
+export const FRONTEND_URL_TEST_BEFORE = `import { describe, expect, it } from 'vitest'
 
-const BEFORE = `import { DEFAULT_LOCALE, localePathPrefix, localizedFrontendUrl } from '@amcore/shared'
+import { DEFAULT_LOCALE } from '../constants'
 
-/**
- * Lives in \`apps/api\` rather than beside the helper because \`packages/shared\`
- * has no test runner configured — see the backlog item on that gap. The API is
- * the helper's main consumer (every user-facing link it emails).
- */
+import { localePathPrefix, localizedFrontendUrl } from './frontend-url'
+
 describe('localizedFrontendUrl', () => {
   it('prefixes the locale, including the default one', () => {
     // \`localePrefix: 'always'\` — the default locale is prefixed too, so a link
@@ -84,13 +70,12 @@ describe('localePathPrefix', () => {
 })
 `
 
-const AFTER = `import { DEFAULT_LOCALE, localePathPrefix, localizedFrontendUrl } from '@amcore/shared'
+export const FRONTEND_URL_TEST_AFTER = `import { describe, expect, it } from 'vitest'
 
-/**
- * Lives in \`apps/api\` rather than beside the helper because \`packages/shared\`
- * has no test runner configured — see the backlog item on that gap. The API is
- * the helper's main consumer (every user-facing link it emails).
- */
+import { DEFAULT_LOCALE } from '../constants'
+
+import { localePathPrefix, localizedFrontendUrl } from './frontend-url'
+
 describe('localizedFrontendUrl', () => {
   // Single-locale mode (pnpm init:project --mode=single): SUPPORTED_LOCALES
   // has exactly one entry, so localePathPrefix() omits the prefix entirely —
@@ -157,13 +142,3 @@ describe('localePathPrefix', () => {
   })
 })
 `
-
-export function buildApiFrontendUrlTestSteps(root) {
-  return [
-    exactContentStep(
-      path.join(root, 'apps/api/src/core/auth/frontend-url.spec.ts'),
-      { expectedBefore: BEFORE, after: AFTER },
-      'frontend-url.spec.ts: use DEFAULT_LOCALE generically instead of a hardcoded second locale'
-    ),
-  ]
-}

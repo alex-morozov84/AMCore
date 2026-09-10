@@ -1,4 +1,9 @@
-import type { Metadata } from 'next'
+// Text fixture for project-plan-web-root-layout.mjs's move-and-rewrite step
+// -- the current (pre-transform) content of
+// apps/web/src/app/[locale]/layout.tsx. Split out to stay under the repo's
+// ~150-line-per-file guidance, same reason as
+// project-plan-api-render-robustness-before.mjs.
+export const ROOT_LAYOUT_BEFORE = `import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { headers } from 'next/headers'
 import { NextIntlClientProvider } from 'next-intl'
@@ -61,10 +66,10 @@ export default async function LocaleLayout({
   // static rendering.
   setRequestLocale(locale)
 
-  // The per-request CSP nonce `src/proxy.ts` generated, read via
-  // `headers()` rather than a prop — this is the documented Next.js
+  // The per-request CSP nonce \`src/proxy.ts\` generated, read via
+  // \`headers()\` rather than a prop — this is the documented Next.js
   // pattern (content-security-policy.md) and keeps every route under this
-  // layout on the same mechanism. Calling `headers()` opts this layout
+  // layout on the same mechanism. Calling \`headers()\` opts this layout
   // (and therefore every locale route, including the two previously-SSG
   // auth-link pages) into dynamic rendering — AMCore's core routes accept
   // this deliberately; see docs/frontend/browser-security-and-csp.md →
@@ -74,12 +79,12 @@ export default async function LocaleLayout({
   const nonce = (await headers()).get(NONCE_REQUEST_HEADER) ?? undefined
 
   return (
-    // suppressHydrationWarning: the theme-init script below sets the `dark`
+    // suppressHydrationWarning: the theme-init script below sets the \`dark\`
     // class on this element before React hydrates, so its class attribute
     // legitimately differs from what the server rendered — see
     // docs/frontend/brand-theme-and-tokens.md.
     <html lang={locale} suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={\`\${geistSans.variable} \${geistMono.variable} antialiased\`}>
         {/* Raw <script> (not next/script) as the first thing in <body>,
             deliberately — next/script's beforeInteractive strategy is loaded
             by Next's own client bootstrap chunk, which is fetched
@@ -88,7 +93,7 @@ export default async function LocaleLayout({
             has no such gap: the browser executes it synchronously as it
             parses the document, before anything after it can paint. See
             docs/frontend/brand-theme-and-tokens.md for the full reasoning.
-            `nonce` is required once CSP enforces script-src without
+            \`nonce\` is required once CSP enforces script-src without
             'unsafe-inline' (Track 3) — harmless to set under Report-Only too. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
         {/* Threads the same nonce to the handful of Base UI components that
@@ -98,7 +103,7 @@ export default async function LocaleLayout({
             violate CSP. See docs/frontend/ CSP guide (Track 3 PR4). */}
         <CSPProvider nonce={nonce}>
           {/* Rendered from a Server Component, so locale/messages/formats/timeZone
-              are inherited from `i18n/request.ts` — do not pass them by hand. */}
+              are inherited from \`i18n/request.ts\` — do not pass them by hand. */}
           <NextIntlClientProvider>
             <Providers>{children}</Providers>
           </NextIntlClientProvider>
@@ -107,3 +112,4 @@ export default async function LocaleLayout({
     </html>
   )
 }
+`

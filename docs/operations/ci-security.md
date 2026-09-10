@@ -6,16 +6,18 @@ of workflow self-hardening to keep the example forkable.
 
 ## Current Gates
 
-| Workflow                | Trigger                                 | Tooling                                                                                             | CI behavior                          |
-| ----------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                | report-only, uploads SARIF           |
-| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                                                                            | blocking on `high+`                  |
-| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                       | gitleaks blocks; OSV is report-only  |
-| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                              | Trivy report-only; boot-smoke blocks |
-| `ci.yml`                | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job) | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                           | blocking                             |
-| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                             | blocking                             |
-| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                  | blocking (squash title = commit msg) |
+| Workflow                | Trigger                                 | Tooling                                                                                              | CI behavior                          |
+| ----------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                 | report-only, uploads SARIF           |
+| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                                                                             | blocking on `high+`                  |
+| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                        | gitleaks blocks; OSV is report-only  |
+| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                               | Trivy report-only; boot-smoke blocks |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job)  | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                            | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Scaffolding contract — fast (`scripts/lib/*.test.mjs`, structural/fixture checks, no nested install) | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Scaffolding contract — full (`pnpm test:scripts`, real install/typecheck/lint/build/test)            | blocking                             |
+| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                              | blocking                             |
+| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                   | blocking (squash title = commit msg) |
 
 ## What Each Gate Proves
 
@@ -52,15 +54,40 @@ of workflow self-hardening to keep the example forkable.
   scrape-target/rule-group/Alertmanager-discovery state, Grafana's dashboard
   APIs against the committed dashboard JSON, a real Grafana→Prometheus query
   round trip, and a from-scratch Grafana old-volume migration smoke.
+- **Scaffolding contract (fast)** — job id `scaffolding-contract` — every
+  `pnpm init:brand`/`pnpm init:project` before/after fixture in `scripts/lib/`
+  still matches the real file it targets, and the fixture-composition
+  invariants (no two edit steps target the same file, every scaffold
+  dimension composes safely with every other). Read-only against the real
+  repo, no nested/disposable-copy install (the job's own top-level
+  `pnpm install --frozen-lockfile` still runs), no Docker, ~6 seconds. Does
+  **not** cover the
+  public/private-path ratchet — that is the separate "Observability contract
+  (static)" job above. No path filter: a change anywhere in the repo can
+  drift a scaffolding fixture (this job exists because exactly that
+  happened — `apps/web` and `docs/` changes drifted `scripts/lib/*.mjs`
+  fixtures across several PRs with nothing in CI to catch it).
+- **Scaffolding contract (full)** — job id `scaffolding-contract-full` —
+  applies `pnpm init:brand`/`pnpm init:project` to disposable copies of the
+  real repo and runs a real `pnpm install` plus typecheck/lint/build/test
+  against the result, for both of `pnpm init:project`'s structural-choice
+  scenarios. Genuinely slow (~9 minutes measured locally); `timeout-minutes:
+20` gives it the same headroom as this pipeline's other real-install/build
+  jobs. `needs: [lint, typecheck]` only, same as `test`/`web-e2e`, so it runs
+  alongside them rather than queueing after `test`.
 
-**Both new observability-contract job contexts are listed in the tracked
+**The observability-contract and scaffolding-contract job contexts (four in
+total: static/live, fast/full) are all listed in the tracked
 `.github/rulesets/main.json`'s `required_status_checks`** — as with every
 ruleset entry in this file, that is the _declared intent_ checked into
 version control, not live GitHub state. Applying it (making the check
 actually required to merge) is the separate owner action described in
 [Strict security setup after forking](#strict-security-setup-after-forking)
 below — required-check contexts only become selectable in that flow after
-they have run at least once on the repository.
+they have run at least once on the repository. A newly added job context
+(such as the scaffolding-contract pair) needs that same one-time
+re-application after its first real run on the repository, exactly like a
+brand-new observability-contract job would.
 
 ## Handling CodeQL alerts (false positives)
 
@@ -187,9 +214,11 @@ setup. It is **idempotent** — safe to re-run (it also removes the retired
 
 Notes:
 
-- `setup-repo-security.sh`, `verify-action-pins.sh`, and the optional
-  `.husky/pre-push` hook require a Unix-like shell (`bash`/`sh`) on macOS,
-  Linux, or WSL rather than native Windows PowerShell.
+- `setup-repo-security.sh`, `verify-action-pins.sh`, and the `.husky/pre-push`
+  hook (see [Local Pre-Push Checks](#local-pre-push-checks) — only its
+  workflow-lint layer is optional/graceful-if-absent, not the whole hook)
+  require a Unix-like shell (`bash`/`sh`) on macOS, Linux, or WSL rather than
+  native Windows PowerShell.
 - Install `gh` and `jq` via your OS package manager or from their upstream
   releases, then ensure they are on your `PATH`.
 - Required status-check contexts only become selectable after those checks have
@@ -280,24 +309,30 @@ the authoritative local check; run it before relying on a clean commit if
 you're touching a workspace's ESLint config or adding a new lintable
 workspace.
 
-### Optional Local Workflow-Lint Tooling
+### Local Pre-Push Checks
 
-The repository also ships a convenience `.husky/pre-push` hook that runs:
+`.husky/pre-push` runs two kinds of check, in this order:
 
-- `bash ./scripts/verify-action-pins.sh`
-- `actionlint`
-- `zizmor --offline .github/workflows/*.yml`
+1. **Mandatory, not graceful-if-absent** — `pnpm test:observability-contract`
+   (the static half only, not `:live`): ~0.5s, no Docker, no external binary.
+   `pnpm` is a hard requirement for this repo (husky itself only runs via a
+   pnpm-managed install), so unlike the tools below there is no "not
+   installed locally" case to tolerate. This is what catches a leaked private
+   `ai/<name>.md`-shaped path citation (AGENTS.md → "Never cite a private
+   `ai/<name>.md`-shaped path from public code or docs") before it can reach
+   a PR, not only when CI runs or someone remembers to check by hand.
+2. **Optional, graceful-if-absent workflow-lint convenience layer**:
+   - `bash ./scripts/verify-action-pins.sh`
+   - `actionlint`
+   - `zizmor --offline .github/workflows/*.yml`
 
-The hook is **graceful-if-absent**:
-
-- if `actionlint` or `zizmor` is not installed locally, the hook prints a
-  warning and skips that check;
-- CI remains the hard gate via `workflow-lint.yml`.
-
-To opt into the full local loop, install `actionlint` and `zizmor` from their
-upstream GitHub releases and place the binaries on your `PATH`. Match the versions
-pinned in `.github/workflows/workflow-lint.yml` — that workflow is the source of
-truth, so no version is duplicated here.
+   If `actionlint` or `zizmor` is not installed locally, the hook prints a
+   warning and skips that check; CI remains the hard gate via
+   `workflow-lint.yml`. To opt into the full local loop, install `actionlint`
+   and `zizmor` from their upstream GitHub releases and place the binaries on
+   your `PATH`. Match the versions pinned in
+   `.github/workflows/workflow-lint.yml` — that workflow is the source of
+   truth, so no version is duplicated here.
 
 ### CLI Tool Versions
 

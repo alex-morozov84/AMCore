@@ -39,7 +39,9 @@
           { "context": "Lint workflows" },
           { "context": "PR title" },
           { "context": "Observability contract (static)" },
-          { "context": "Observability contract (live)" }
+          { "context": "Observability contract (live)" },
+          { "context": "Scaffolding contract (fast)" },
+          { "context": "Scaffolding contract (full, real install/build/test)" }
         ]
       }
     },

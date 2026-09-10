@@ -128,16 +128,25 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   for `/docs`.
 - **Never cite a private `ai/<name>.md`-shaped path from public code or docs.**
   A comment pointing at the maintainer's internal planning thread or logging
-  notes inside `apps/*`, `packages/*`, or public `docs/` ships to every fork
-  and contributor checkout, which has no `ai/` directory — the citation is
-  dead on arrival for everyone but the maintainer. `pnpm test:observability-contract`'s
-  private-path ratchet (ADR-078) mechanically fails a PR that adds one — it
-  scans every git-tracked file, not just Markdown, and its baseline may only
-  shrink, never grow. Put the rationale inline (self-contained — explain the
-  _why_, don't point at it) or link the ADR once one exists; never a private
-  planning-thread section. Run `pnpm test:observability-contract` before
-  pushing any change that touches `apps/*`/`packages/*`/public `docs/` code
-  comments.
+  notes inside **any git-tracked file** — `apps/*`, `packages/*`, `scripts/*`,
+  or public `docs/` included — ships to every fork and contributor checkout,
+  which has no `ai/` directory — the citation is dead on arrival for everyone
+  but the maintainer. This applies just as much to a scaffolding-transform
+  fixture that copies real source text verbatim (`scripts/lib/*.mjs`'s
+  before/after constants) as to hand-written prose: copying a file that
+  already carries a citation reproduces it in a second public file.
+  `pnpm test:observability-contract`'s private-path ratchet (ADR-078)
+  mechanically fails a PR that adds one — it scans every git-tracked file,
+  not just Markdown, and its baseline may only shrink, never grow. Put the
+  rationale inline (self-contained — explain the _why_, don't point at it) or
+  link the ADR/public doc once one exists; never a private planning-thread
+  section. `.husky/pre-push` runs the static (non-`:live`) half of
+  `pnpm test:observability-contract` automatically on every push (see
+  `docs/operations/ci-security.md`), so this is enforced mechanically, not
+  only by remembering the rule — but a fast local check is still worth
+  running proactively (`pnpm test:observability-contract`) whenever a change
+  touches a git-tracked file outside `ai/` itself, rather than discovering a
+  violation only at push time.
 - First-time setup of `strict` repo protections (they do not travel with a
   fork): `bash scripts/setup-repo-security.sh` — see
   `docs/operations/ci-security.md` → _Strict security setup after forking_. The

@@ -18,6 +18,16 @@ run_check() {
   "$@"
 }
 
+# Not gated by run_check's command -v skip: pnpm is a hard requirement for
+# this repo (husky itself only runs via a pnpm-managed install), so unlike
+# actionlint/zizmor there is no "not installed locally" case to tolerate.
+# Fast (~0.5s, no Docker) — only the private-path ratchet and PromQL-fence
+# checks, not the :live variant. Catches a leaked ai/*-path citation (ADR-078,
+# AGENTS.md "Never cite a private ai/<name>.md-shaped path") before it can
+# reach a PR, not just when someone remembers to run it by hand.
+echo "pre-push: running observability contract (static)" >&2
+pnpm test:observability-contract
+
 run_check "action pin verifier" bash ./scripts/verify-action-pins.sh
 run_check "actionlint" actionlint
 run_check "zizmor" zizmor --offline .github/workflows/*.yml

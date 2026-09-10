@@ -34,7 +34,7 @@ function applyAllSteps(root, locale) {
     ...buildWebStructureSteps(root),
     ...buildWebConfigSteps(root),
     ...buildWebPagesSteps(root),
-    ...buildWebNavSteps(root),
+    ...buildWebNavSteps(root, locale),
     ...buildWebLocaleDirCleanupSteps(root),
   ]
   for (const step of steps) step.write()
