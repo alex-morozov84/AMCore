@@ -1,8 +1,6 @@
 #!/usr/bin/env node
-// `pnpm init:project` (Track 10, ADR-071; route-progress added P1 item 8) —
-// one-time structural transforms for a downstream fork. See
-// ai/models-talk.md's FINAL PLAN and ai/decisions/adr-071-*.md for the full
-// design. Three independent dimensions, each with its own reinitialize
+// `pnpm init:project` — one-time project choices for a downstream fork.
+// Three independent dimensions, each with its own reinitialize
 // guard, usable alone or in any combination:
 //   --mode=single --locale=<code>   removes apps/web's locale routing (destructive)
 //   --storybook=disabled            removes the Storybook surface entirely (destructive)
@@ -19,7 +17,10 @@ import {
   assertMultiLocaleAppStructure,
   prismaFollowUpMessage,
 } from './lib/project-config.mjs'
-import { assertStorybookEnabled, storybookInstallFollowUpMessage } from './lib/project-config-storybook.mjs'
+import {
+  assertStorybookEnabled,
+  storybookInstallFollowUpMessage,
+} from './lib/project-config-storybook.mjs'
 import { assertRouteProgressEnabled } from './lib/project-config-route-progress.mjs'
 import { parseProjectFlags } from './lib/project-flags.mjs'
 import { buildProjectSteps } from './lib/project-plan.mjs'

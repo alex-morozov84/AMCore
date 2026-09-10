@@ -107,7 +107,7 @@ describe('createRouteProgressController', () => {
     expect(controller.getPhase()).toBe('completing')
   })
 
-  it('dispose() clears pending timers and resets to idle without leaking a delayed transition', () => {
+  it('dispose() clears timers, resets to idle, and notifies mounted UI', () => {
     const controller = createRouteProgressController(OPTS)
     const listener = vi.fn()
     controller.subscribe(listener)
@@ -115,6 +115,8 @@ describe('createRouteProgressController', () => {
     listener.mockClear()
     controller.dispose()
     expect(controller.getPhase()).toBe('idle')
+    expect(listener).toHaveBeenCalledTimes(1)
+    listener.mockClear()
     vi.advanceTimersByTime(1000)
     expect(listener).not.toHaveBeenCalled()
   })

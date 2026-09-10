@@ -20,6 +20,11 @@ import { useMemo } from 'react'
 import { useRouter } from '@/i18n/navigation'
 
 import { routeProgressController } from './route-progress-controller'
+import { ROUTE_PROGRESS_ENABLED } from './route-progress-flag'
+
+function startProgress() {
+  if (ROUTE_PROGRESS_ENABLED) routeProgressController.start()
+}
 
 /**
  * The only sanctioned way to fire a *programmatic* navigation once the route
@@ -43,19 +48,19 @@ export function useRouteProgressRouter() {
     () => ({
       ...router,
       push: (...args: Parameters<typeof router.push>) => {
-        routeProgressController.start()
+        startProgress()
         router.push(...args)
       },
       replace: (...args: Parameters<typeof router.replace>) => {
-        routeProgressController.start()
+        startProgress()
         router.replace(...args)
       },
       back: () => {
-        routeProgressController.start()
+        startProgress()
         router.back()
       },
       forward: () => {
-        routeProgressController.start()
+        startProgress()
         router.forward()
       },
     }),
@@ -70,6 +75,11 @@ import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { routeProgressController } from './route-progress-controller'
+import { ROUTE_PROGRESS_ENABLED } from './route-progress-flag'
+
+function startProgress() {
+  if (ROUTE_PROGRESS_ENABLED) routeProgressController.start()
+}
 
 /**
  * The only sanctioned way to fire a *programmatic* navigation once the route
@@ -93,19 +103,19 @@ export function useRouteProgressRouter() {
     () => ({
       ...router,
       push: (...args: Parameters<typeof router.push>) => {
-        routeProgressController.start()
+        startProgress()
         router.push(...args)
       },
       replace: (...args: Parameters<typeof router.replace>) => {
-        routeProgressController.start()
+        startProgress()
         router.replace(...args)
       },
       back: () => {
-        routeProgressController.start()
+        startProgress()
         router.back()
       },
       forward: () => {
-        routeProgressController.start()
+        startProgress()
         router.forward()
       },
     }),

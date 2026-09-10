@@ -90,6 +90,11 @@ export function RouteProgressBar({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const lastKeyRef = useRef(toLocationKey(pathname, searchParams.toString()))
+  // Popstate has only the raw browser URL, so keep a raw key alongside the
+  // hook-derived completion key. Comparing like-for-like prevents a late
+  // popstate handler from starting a phantom progress cycle after the same
+  // location has already committed.
+  const lastRawKeyRef = useRef<string | undefined>(undefined)
 
   // Start signals: a qualifying Link click, and real browser back/forward
   // (popstate) -- both listened for once, for the component's whole
@@ -102,7 +107,7 @@ export function RouteProgressBar({
     function handlePopState() {
       const search = new URLSearchParams(window.location.search).toString()
       const key = toLocationKey(window.location.pathname, search)
-      if (key !== lastKeyRef.current) controller.start()
+      if (key !== lastRawKeyRef.current) controller.start()
     }
     document.addEventListener('click', handleClick)
     window.addEventListener('popstate', handlePopState)
@@ -117,8 +122,13 @@ export function RouteProgressBar({
 
   // Completion signal: the officially-documented usePathname()/
   // useSearchParams() "router events" pattern -- fires once the
-  // destination has actually committed.
+  // destination has actually committed. It also updates the raw key used
+  // by the popstate handler above.
   useEffect(() => {
+    lastRawKeyRef.current = toLocationKey(
+      window.location.pathname,
+      new URLSearchParams(window.location.search).toString()
+    )
     const key = toLocationKey(pathname, searchParams.toString())
     if (key !== lastKeyRef.current) {
       lastKeyRef.current = key

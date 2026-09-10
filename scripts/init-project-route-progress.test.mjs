@@ -10,7 +10,7 @@ import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { createRealRepoCopy, git } from './lib/test-fixture.mjs'
+import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
 
 let copy
@@ -47,6 +47,7 @@ describe('init-project --route-progress=disabled (end-to-end against a real-repo
   test('apply: flips the flag, updates the context field, deletes nothing, and real verification passes', () => {
     copy = createRealRepoCopy()
     commit(copy.root)
+    installDependencies(copy.root)
 
     const result = runInitProject(copy.root, ['--route-progress=disabled', '--yes'], {
       skipVerify: false,

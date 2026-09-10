@@ -35,7 +35,7 @@ export interface RouteProgressController {
   subscribe(listener: () => void): () => void
   start(): void
   finish(): void
-  /** Clears all pending timers without notifying subscribers -- for unmount/pagehide cleanup. */
+  /** Clears pending timers and resets active UI state for unmount/pagehide cleanup. */
   dispose(): void
 }
 
@@ -123,7 +123,7 @@ export function createRouteProgressController(
 
     dispose() {
       clearTimers()
-      phase = 'idle'
+      if (phase !== 'idle') setPhase('idle')
     },
   }
 }

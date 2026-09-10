@@ -135,7 +135,7 @@ describe('RouteProgressBar', () => {
     expect(phaseNode()).toHaveAttribute('data-phase', 'visible')
   })
 
-  // Regression: `usePathname()` (`@/i18n/navigation`) is locale-*stripped*
+  // Regression: the locale-aware `usePathname()` is locale-*stripped*
   // (`/login`), but `handlePopState` only has `window.location.pathname`,
   // which is locale-*prefixed* (`/en/login`) -- these mocks model that real
   // divergence, which the other tests above don't (their mocked `pathname`

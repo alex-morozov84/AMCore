@@ -10,13 +10,20 @@ const back = vi.fn()
 const forward = vi.fn()
 const refresh = vi.fn()
 const prefetch = vi.fn()
+const routeProgressFlag = vi.hoisted(() => ({ enabled: true }))
 
 vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ push, replace, back, forward, refresh, prefetch }),
 }))
+vi.mock('./route-progress-flag', () => ({
+  get ROUTE_PROGRESS_ENABLED() {
+    return routeProgressFlag.enabled
+  },
+}))
 
 afterEach(() => {
   routeProgressController.dispose()
+  routeProgressFlag.enabled = true
 })
 
 describe('useRouteProgressRouter', () => {
@@ -55,5 +62,13 @@ describe('useRouteProgressRouter', () => {
     expect(routeProgressController.getPhase()).toBe('idle')
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(prefetch).toHaveBeenCalledWith('/somewhere')
+  })
+
+  it('delegates without starting timers when the source flag is disabled', () => {
+    routeProgressFlag.enabled = false
+    const { result } = renderHook(() => useRouteProgressRouter())
+    result.current.push('/somewhere')
+    expect(routeProgressController.getPhase()).toBe('idle')
+    expect(push).toHaveBeenCalledWith('/somewhere')
   })
 })

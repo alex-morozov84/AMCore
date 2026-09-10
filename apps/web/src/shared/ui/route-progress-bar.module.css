@@ -24,7 +24,7 @@
   opacity: 0;
   transition:
     transform 200ms ease-out,
-    opacity 200ms ease-out 100ms;
+    opacity 100ms ease-out 100ms;
 }
 
 @keyframes route-progress-crawl {
@@ -49,8 +49,7 @@
   }
 }
 
-/* No crawl/transition for a viewer who asked for less motion -- jump
-   straight to the "in progress" state and only fade, never slide. */
+/* No crawl or transition for a viewer who asked for less motion. */
 @media (prefers-reduced-motion: reduce) {
   .bar[data-phase='visible'] {
     animation: none;
@@ -58,6 +57,6 @@
   }
 
   .bar[data-phase='completing'] {
-    transition: opacity 150ms ease-out;
+    transition: none;
   }
 }
