@@ -8,10 +8,11 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { createRealRepoCopy } from './test-fixture.mjs'
 import { buildWebNavHooksSteps } from './project-plan-web-nav-hooks.mjs'
-import { buildWebNavLogoutSteps } from './project-plan-web-nav-logout.mjs'
 import { buildWebNavBffSteps } from './project-plan-web-nav-bff.mjs'
 import { buildWebNavOauthSteps } from './project-plan-web-nav-oauth.mjs'
 import { buildWebNavAppShellSteps } from './project-plan-web-nav-appshell.mjs'
+import { buildWebNavRouteProgressRouterSteps } from './project-plan-web-nav-route-progress-router.mjs'
+import { buildWebNavRouteProgressBarSteps } from './project-plan-web-nav-route-progress-bar.mjs'
 
 let copy
 
@@ -44,22 +45,21 @@ describe('web nav rewrites (against a real repo copy)', () => {
       const filePath = path.join(copy.root, rel)
       assert.doesNotThrow(() => execFileSync('node', ['--check', filePath]), rel)
       const content = readFileSync(filePath, 'utf8')
-      assert.match(content, /from 'next\/navigation'/)
+      // Navigation-source no longer lives here (P1 item 8 moved it into
+      // useRouteProgressRouter() / use-route-progress-router.ts's own
+      // transform) -- only the { locale } push option drop is this file's
+      // concern now.
+      assert.match(content, /useRouteProgressRouter/)
       assert.match(content, /router\.push\('\/'\)/)
       assert.doesNotMatch(content, /i18n\/navigation|locale:/)
     }
   })
 
-  test('use-logout.ts swaps to next/navigation', () => {
-    copy = createRealRepoCopy()
-    const content = applyAndCheck(
-      copy.root,
-      buildWebNavLogoutSteps,
-      'apps/web/src/features/auth-logout/model/use-logout.ts'
-    )
-    assert.match(content, /from 'next\/navigation'/)
-    assert.doesNotMatch(content, /i18n\/navigation/)
-  })
+  // use-logout.ts has no transform of its own: since P1 item 8 migrated it
+  // to useRouteProgressRouter(), it calls only push('/login') with no
+  // locale option, so nothing about its content needs to change for
+  // single-locale mode -- the navigation-source swap lives entirely in
+  // use-route-progress-router.ts now (see that transform's own test file).
 
   test('dal.ts drops the locale object from both redirect() calls', () => {
     copy = createRealRepoCopy()
@@ -85,6 +85,28 @@ describe('web nav rewrites (against a real repo copy)', () => {
     assert.match(content, /new URL\('\/', request\.url\)/)
     assert.match(content, /new URL\('\/login', request\.url\)/)
     assert.doesNotMatch(content, /\$\{locale\}/)
+  })
+
+  test('use-route-progress-router.ts drops locale-aware navigation', () => {
+    copy = createRealRepoCopy()
+    const content = applyAndCheck(
+      copy.root,
+      buildWebNavRouteProgressRouterSteps,
+      'apps/web/src/shared/lib/route-progress/use-route-progress-router.ts'
+    )
+    assert.match(content, /from 'next\/navigation'/)
+    assert.doesNotMatch(content, /i18n\/navigation/)
+  })
+
+  test('route-progress-bar.tsx drops locale-aware navigation', () => {
+    copy = createRealRepoCopy()
+    const content = applyAndCheck(
+      copy.root,
+      buildWebNavRouteProgressBarSteps,
+      'apps/web/src/shared/ui/route-progress-bar.tsx'
+    )
+    assert.match(content, /usePathname, useSearchParams \} from 'next\/navigation'/)
+    assert.doesNotMatch(content, /i18n\/navigation/)
   })
 
   test('AppShell.tsx removes LocaleSwitcher and swaps the Link import', () => {

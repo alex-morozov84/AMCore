@@ -1,11 +1,9 @@
 // init:project --mode=single: route-progress-bar.tsx (P1 item 8). Merges
 // usePathname into the existing next/navigation useSearchParams import --
 // single-locale mode has no [locale] segment, so usePathname() needs no
-// locale awareness either. Import order verified empirically (real
-// eslint --fix against a disposable copy at the real path): no blank-line
-// reflow needed here, unlike use-route-progress-router.ts's own transform.
-// The before text lives in project-plan-web-nav-route-progress-bar-before.mjs
-// for the same line-count reason.
+// locale awareness. Import order verified empirically (eslint --fix
+// against a disposable copy), not guessed. Before text lives in
+// project-plan-web-nav-route-progress-bar-before.mjs (line-count guidance).
 import path from 'node:path'
 import { exactContentStep } from './init-engine.mjs'
 import { ROUTE_PROGRESS_BAR_BEFORE } from './project-plan-web-nav-route-progress-bar-before.mjs'
@@ -81,8 +79,14 @@ export interface RouteProgressBarProps {
  * hidden\`, Next's own route announcer owns the accessible navigation
  * announcement.
  */
-export function RouteProgressBar({ controller = routeProgressController }: RouteProgressBarProps = {}) {
-  const phase = useSyncExternalStore(controller.subscribe, controller.getPhase, () => 'idle' as const)
+export function RouteProgressBar({
+  controller = routeProgressController,
+}: RouteProgressBarProps = {}) {
+  const phase = useSyncExternalStore(
+    controller.subscribe,
+    controller.getPhase,
+    () => 'idle' as const
+  )
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const lastKeyRef = useRef(toLocationKey(pathname, searchParams.toString()))
@@ -125,7 +129,12 @@ export function RouteProgressBar({ controller = routeProgressController }: Route
   if (phase === 'idle' || phase === 'delaying') return null
 
   return (
-    <div aria-hidden="true" data-phase={phase} data-testid="route-progress-bar" className={styles.bar} />
+    <div
+      aria-hidden="true"
+      data-phase={phase}
+      data-testid="route-progress-bar"
+      className={styles.bar}
+    />
   )
 }
 `

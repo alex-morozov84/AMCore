@@ -73,8 +73,14 @@ export interface RouteProgressBarProps {
  * hidden\`, Next's own route announcer owns the accessible navigation
  * announcement.
  */
-export function RouteProgressBar({ controller = routeProgressController }: RouteProgressBarProps = {}) {
-  const phase = useSyncExternalStore(controller.subscribe, controller.getPhase, () => 'idle' as const)
+export function RouteProgressBar({
+  controller = routeProgressController,
+}: RouteProgressBarProps = {}) {
+  const phase = useSyncExternalStore(
+    controller.subscribe,
+    controller.getPhase,
+    () => 'idle' as const
+  )
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const lastKeyRef = useRef(toLocationKey(pathname, searchParams.toString()))
@@ -117,7 +123,12 @@ export function RouteProgressBar({ controller = routeProgressController }: Route
   if (phase === 'idle' || phase === 'delaying') return null
 
   return (
-    <div aria-hidden="true" data-phase={phase} data-testid="route-progress-bar" className={styles.bar} />
+    <div
+      aria-hidden="true"
+      data-phase={phase}
+      data-testid="route-progress-bar"
+      className={styles.bar}
+    />
   )
 }
 `

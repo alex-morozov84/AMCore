@@ -19,7 +19,10 @@ import { buildWebNavEslintGuardsSteps } from './project-plan-web-nav-eslint-guar
 import { buildWebNavDalGatingTestSteps } from './project-plan-web-nav-dal-gating-test.mjs'
 import { buildWebNavDalOptionalTestSteps } from './project-plan-web-nav-dal-optional-test.mjs'
 import { buildWebNavRouteProgressRouterSteps } from './project-plan-web-nav-route-progress-router.mjs'
+import { buildWebNavRouteProgressRouterTestSteps } from './project-plan-web-nav-route-progress-router-test.mjs'
 import { buildWebNavRouteProgressBarSteps } from './project-plan-web-nav-route-progress-bar.mjs'
+import { buildWebNavRouteProgressBarTestSteps } from './project-plan-web-nav-route-progress-bar-test.mjs'
+import { buildWebNavRouteProgressBarStoriesSteps } from './project-plan-web-nav-route-progress-bar-stories.mjs'
 
 export function buildWebNavSteps(root) {
   return [
@@ -33,6 +36,9 @@ export function buildWebNavSteps(root) {
     ...buildWebNavDalGatingTestSteps(root),
     ...buildWebNavDalOptionalTestSteps(root),
     ...buildWebNavRouteProgressRouterSteps(root),
+    ...buildWebNavRouteProgressRouterTestSteps(root),
     ...buildWebNavRouteProgressBarSteps(root),
+    ...buildWebNavRouteProgressBarTestSteps(root),
+    ...buildWebNavRouteProgressBarStoriesSteps(root),
   ]
 }
