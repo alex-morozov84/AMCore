@@ -81,6 +81,18 @@ export function RouteProgressBar({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const lastKeyRef = useRef(toLocationKey(pathname, searchParams.toString()))
+  // Separate from `lastKeyRef`: `usePathname()` (`@/i18n/navigation`) is
+  // locale-*stripped* (`/login`), while `handlePopState` below only has
+  // `window.location.pathname`, which is locale-*prefixed* (`/en/login`).
+  // Comparing a stripped key against a prefixed one is never equal, so
+  // `handlePopState` needs its own raw-URL ref updated in lockstep with
+  // `lastKeyRef` -- see this file's `route-progress-bar.test.tsx` for the
+  // regression this fixes: a real bug found via hands-on owner testing
+  // (repeated Link toggles, then browser Back) where the mismatch let a
+  // stale-by-the-time-it-runs `handlePopState` fire a phantom `start()`
+  // *after* the real navigation had already committed and finished,
+  // stranding the bar until `maxDurationMs`'s safety net.
+  const lastRawKeyRef = useRef<string | undefined>(undefined)
 
   // Start signals: a qualifying Link click, and real browser back/forward
   // (popstate) -- both listened for once, for the component's whole
@@ -93,7 +105,7 @@ export function RouteProgressBar({
     function handlePopState() {
       const search = new URLSearchParams(window.location.search).toString()
       const key = toLocationKey(window.location.pathname, search)
-      if (key !== lastKeyRef.current) controller.start()
+      if (key !== lastRawKeyRef.current) controller.start()
     }
     document.addEventListener('click', handleClick)
     window.addEventListener('popstate', handlePopState)
@@ -108,8 +120,15 @@ export function RouteProgressBar({
 
   // Completion signal: the officially-documented usePathname()/
   // useSearchParams() "router events" pattern -- fires once the
-  // destination has actually committed.
+  // destination has actually committed. Also the single place that keeps
+  // `lastRawKeyRef` current, since a commit is the only moment both the
+  // semantic (`pathname`) and raw (`window.location`) URLs are guaranteed
+  // to agree.
   useEffect(() => {
+    lastRawKeyRef.current = toLocationKey(
+      window.location.pathname,
+      new URLSearchParams(window.location.search).toString()
+    )
     const key = toLocationKey(pathname, searchParams.toString())
     if (key !== lastKeyRef.current) {
       lastKeyRef.current = key

@@ -135,6 +135,26 @@ describe('RouteProgressBar', () => {
     expect(phaseNode()).toHaveAttribute('data-phase', 'visible')
   })
 
+  // Regression: `usePathname()` (`@/i18n/navigation`) is locale-*stripped*
+  // (`/login`), but `handlePopState` only has `window.location.pathname`,
+  // which is locale-*prefixed* (`/en/login`) -- these mocks model that real
+  // divergence, which the other tests above don't (their mocked `pathname`
+  // always equals the raw pushState path). Found via hands-on owner testing
+  // (repeated Link toggles between two pages, then browser Back): comparing
+  // the raw popstate key against the stripped `lastKeyRef` made a popstate
+  // landing back on an already-committed page look "different" every time,
+  // firing a phantom `start()` with no `finish()` ever coming -- the bar
+  // was rescued only by `maxDurationMs`'s 6s safety net.
+  it('does not spuriously start on a popstate landing back on the already-committed location (locale-prefix mismatch)', () => {
+    pathname.mockReturnValue('/login')
+    window.history.pushState({}, '', '/en/login')
+    render(<RouteProgressBar />)
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    advance(120)
+    expect(phaseNode()).toBeNull()
+  })
+
   it('finishes and fades out once the pathname commits', () => {
     const { rerender } = render(<RouteProgressBar />)
     clickAnchor('/en/other')
