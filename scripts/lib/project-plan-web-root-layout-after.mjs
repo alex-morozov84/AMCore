@@ -1,11 +1,16 @@
 // Text fixture for project-plan-web-root-layout.mjs's move-and-rewrite step
 // -- the single-static-locale rewrite of apps/web/src/app/[locale]/layout.tsx.
 // Split out to stay under the repo's ~150-line-per-file guidance, same
-// reason as project-plan-web-root-layout-before.mjs. Import order (DEFAULT_LOCALE
-// before CSPProvider) verified empirically (real eslint --fix against a
-// disposable copy at the real apps/web/src/app/layout.tsx path) rather than
-// guessed -- see project-plan-web-nav-links.mjs's header for why that matters.
-export const ROOT_LAYOUT_AFTER = `import type { Metadata } from 'next'
+// reason as project-plan-web-root-layout-before.mjs. Includes the
+// RouteProgressBar mount (P1 item 8): the route-progress feature is
+// orthogonal to locale mode, only removed by its own
+// --route-progress=disabled scaffold flag, so --mode=single alone must
+// still ship it. Import order verified empirically (real eslint --fix
+// against a disposable copy at the real apps/web/src/app/layout.tsx path)
+// rather than guessed -- CSPProvider sorts after DEFAULT_LOCALE here,
+// unlike the multi-locale original's ordering.
+export const ROOT_LAYOUT_AFTER = `import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { headers } from 'next/headers'
 import { NextIntlClientProvider } from 'next-intl'
@@ -15,6 +20,8 @@ import { CSPProvider } from '@base-ui/react/csp-provider'
 
 import { getThemeInitScript } from '@/shared/lib'
 import { NONCE_REQUEST_HEADER } from '@/shared/lib/csp/constants'
+import { ROUTE_PROGRESS_ENABLED } from '@/shared/lib/route-progress/route-progress-flag'
+import { RouteProgressBar } from '@/shared/ui/route-progress-bar'
 
 import { Providers } from './providers'
 
@@ -82,6 +89,14 @@ export default async function RootLayout({
           {/* Rendered from a Server Component, so locale/messages/formats/timeZone
               are inherited from \`i18n/request.ts\` — do not pass them by hand. */}
           <NextIntlClientProvider>
+            {/* Suspense: RouteProgressBar reads useSearchParams(). See
+                docs/frontend/route-progress.md; disabled entirely (no DOM,
+                listeners, or timers) when ROUTE_PROGRESS_ENABLED is false. */}
+            {ROUTE_PROGRESS_ENABLED && (
+              <Suspense fallback={null}>
+                <RouteProgressBar />
+              </Suspense>
+            )}
             <Providers>{children}</Providers>
           </NextIntlClientProvider>
         </CSPProvider>

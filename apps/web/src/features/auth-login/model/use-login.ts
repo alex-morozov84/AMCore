@@ -5,12 +5,12 @@ import type { LoginInput } from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { userKeys } from '@/entities/user'
-import { useRouter } from '@/i18n/navigation'
 import { authApi } from '@/shared/api'
 import { useFormMutation } from '@/shared/hooks'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 export function useLogin(setError?: UseFormSetError<LoginInput>) {
-  const router = useRouter()
+  const router = useRouteProgressRouter()
   const queryClient = useQueryClient()
 
   return useFormMutation({

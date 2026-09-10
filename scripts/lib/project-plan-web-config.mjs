@@ -84,6 +84,15 @@ const NAVIGATION_PATHS_BLOCK = `const NAVIGATION_PATHS = [
       "Import locale-aware navigation from '@/i18n/navigation'. " +
       'Non-navigating helpers such as notFound() may still come from next/navigation.',
   },
+  {
+    name: '@/i18n/navigation',
+    importNames: ['useRouter'],
+    message:
+      "Import { useRouteProgressRouter } from " +
+      "'@/shared/lib/route-progress/use-route-progress-router' instead — a raw useRouter() " +
+      'bypasses the route progress bar for push/replace/back/forward. Other exports ' +
+      "(Link, usePathname, redirect, ...) still come from '@/i18n/navigation' directly.",
+  },
 ];
 
 `
@@ -95,6 +104,17 @@ const NAVIGATION_SOURCE_EXEMPTION_BLOCK = `  // Deliberate relaxation over a str
   {
     name: 'project/import-guards-navigation-source',
     files: ['src/i18n/navigation.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],
+    },
+  },
+
+  // Same relaxation, narrower: \`use-route-progress-router.ts\` is the one file
+  // allowed to call \`@/i18n/navigation\`'s real \`useRouter()\` — that is its
+  // entire job (FINAL PLAN item 6). The layer-barrel pattern still applies.
+  {
+    name: 'project/import-guards-route-progress-router-adapter',
+    files: ['src/shared/lib/route-progress/use-route-progress-router.ts'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],
     },

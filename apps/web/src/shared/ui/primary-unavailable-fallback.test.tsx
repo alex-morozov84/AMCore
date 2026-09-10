@@ -10,7 +10,9 @@ import { PrimaryUnavailableFallback } from './primary-unavailable-fallback'
 
 const refresh = vi.fn()
 
-vi.mock('@/i18n/navigation', () => ({ useRouter: () => ({ refresh }) }))
+vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
+  useRouteProgressRouter: () => ({ refresh }),
+}))
 
 const catalogues = { en, ru } as const
 

@@ -2,11 +2,11 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { useRouter } from '@/i18n/navigation'
 import { authApi } from '@/shared/api'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 export function useLogout() {
-  const router = useRouter()
+  const router = useRouteProgressRouter()
   const queryClient = useQueryClient()
 
   return useMutation({
