@@ -55,6 +55,13 @@ export default {
     // standard config prefers is not what Tailwind accepts.
     'import-notation': null,
     'at-rule-no-unknown': [true, { ignoreAtRules: TAILWIND_AT_RULES }],
+    // Same reasoning as at-rule-no-unknown above: this rule validates a
+    // prelude against CSS-spec grammar, which Tailwind's own directives
+    // (@apply's utility-class list, @theme's token declarations, …) were
+    // never going to match. Added in stylelint 17.15.0 (the rule didn't
+    // exist before), so this pairing has to be explicit rather than
+    // inherited from stylelint-config-standard.
+    'at-rule-prelude-no-invalid': [true, { ignoreAtRules: TAILWIND_AT_RULES }],
   },
   overrides: [
     {
