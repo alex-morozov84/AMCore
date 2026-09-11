@@ -117,6 +117,7 @@ test('reduced motion uses neither crawl animation nor completion transition', as
   })
 
   await page.goto('/en/login')
+  await page.locator('html[data-route-progress-ready]').waitFor()
   const bar = page.getByTestId('route-progress-bar')
   await page.getByRole('link', { name: /forgot your password/i }).click({ noWaitAfter: true })
   await expect(bar).toBeVisible()
