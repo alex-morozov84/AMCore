@@ -4,21 +4,22 @@
 import path from 'node:path'
 import { fileStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
 
-const INIT_PROJECT_ROW_BEFORE =
-  `| \`pnpm init:project\`                                               | Apply downstream structural choices such as single-locale mode or disabling Storybook                                                                                                                                                                |
+const INIT_PROJECT_ROW_BEFORE = `| \`pnpm init:project\`                                               | Apply downstream structural choices: single-locale mode, disabling Storybook, or disabling the route-progress bar's default                                                                                                                          |
 `
 
-const INIT_PROJECT_ROW_AFTER =
-  `| \`pnpm init:project\`                                               | Apply downstream structural choices such as single-locale mode                                                                                                                                                                                       |
+const INIT_PROJECT_ROW_AFTER = `| \`pnpm init:project\`                                               | Apply downstream structural choices: single-locale mode, or disabling the route-progress bar's default                                                                                                                                               |
 `
 
-const FLAG_NOTE_BEFORE = `\`pnpm init:project\` requires explicit flags. Use
+const FLAG_NOTE_BEFORE = `\`pnpm init:project\` requires at least one explicit flag, in any combination:
+\`--mode=single --locale=<code>\` to remove locale routing, \`--storybook=disabled\`
+to remove Storybook, and/or \`--route-progress=disabled\` to turn off the top
+route-progress bar's default (non-destructive, unlike the other two). See
+`
+
+const FLAG_NOTE_AFTER = `\`pnpm init:project\` requires at least one explicit flag, in any combination:
 \`--mode=single --locale=<code>\` to remove locale routing, and/or
-\`--storybook=disabled\` to remove Storybook. See
-`
-
-const FLAG_NOTE_AFTER = `\`pnpm init:project\` requires explicit flags. Use
-\`--mode=single --locale=<code>\` to remove locale routing. See
+\`--route-progress=disabled\` to turn off the top route-progress bar's
+default (non-destructive, unlike the other one). See
 `
 
 const COMMAND_ROWS =
