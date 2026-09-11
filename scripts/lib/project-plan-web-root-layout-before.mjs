@@ -116,7 +116,7 @@ export default async function LocaleLayout({
                 <RouteProgressBar />
               </Suspense>
             )}
-            <Providers>{children}</Providers>
+            <Providers nonce={nonce}>{children}</Providers>
           </NextIntlClientProvider>
         </CSPProvider>
       </body>

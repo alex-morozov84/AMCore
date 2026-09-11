@@ -96,7 +96,7 @@ client" — see `ThemeProvider.tsx`'s implementation.
 
 ## No-flash: the pre-hydration script
 
-`app/layout.tsx` renders a **raw `<script dangerouslySetInnerHTML={{ __html:
+`app/[locale]/layout.tsx` renders a **raw `<script dangerouslySetInnerHTML={{ __html:
 getThemeInitScript() }} />`** as the first thing inside `<body>` — deliberately
 _not_ `next/script`. This looks unusual (it bypasses a built-in Next.js
 primitive that exists for exactly this "load a script" job) and is worth
@@ -155,7 +155,10 @@ real React hydration-mismatch warning instead.
 **AMCore ships a real CSP by default** (Track 3, ADR-074) — this script
 already receives the per-request nonce `src/proxy.ts` generates
 (`app/[locale]/layout.tsx`'s `<script nonce={nonce}>`), never
-`unsafe-inline`. See
+`unsafe-inline`. The same nonce is threaded further down the provider tree
+(`Providers` → `QueryProvider`) as `styleNonce` for `ReactQueryDevtools`,
+which otherwise injects its own un-nonced inline `<style>` in development.
+See
 [Browser security headers and CSP](./browser-security-and-csp.md) for the
 full policy, enforcement mode, and how to extend it.
 
@@ -188,7 +191,7 @@ product, but it is too strong as AMCore's universal default.
 
 A cookie-backed variant normally changes ownership like this:
 
-1. `app/layout.tsx` reads `cookies()` and derives `initialTheme`.
+1. `app/[locale]/layout.tsx` reads `cookies()` and derives `initialTheme`.
 2. `<html>` renders the matching class/style on the server.
 3. A tiny pre-hydration script still exists as a resilience layer: it reads
    `document.cookie`, falls back to `matchMedia`, and corrects the DOM before
@@ -235,7 +238,7 @@ cannot safely do for you:
    update those by hand to match your new palette.
 3. **Site metadata** — `init:brand` updates `manifest.ts`'s `name`/
    `short_name`/`description`, root `package.json`'s `name`/`description`,
-   and `app/layout.tsx`'s actual metadata source
+   and `app/[locale]/layout.tsx`'s actual metadata source
    (`messages/en.json`'s `meta.title`/`meta.description`; `ru.json`'s
    `meta.title` only — `meta.description` is never auto-translated, update
    it by hand).

@@ -96,6 +96,28 @@ WEB_CSP_MODE="enforce"       # force enforcement locally, e.g. to reproduce a vi
 An unrecognized value throws at request time rather than silently falling
 back — see `apps/web/src/shared/lib/csp/csp-mode.ts`.
 
+## Known development-console noise
+
+`next dev` intentionally uses report-only CSP, so the browser logs a violation
+without blocking the offending resource. This keeps the policy observable while
+Next's development tooling continues to work. It does **not** make every CSP
+warning harmless: identify the source before deciding whether to ignore it.
+
+| Console source or message                                                                                      | Expected in development?                                | Meaning and action                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `next-devtools` bundle, `font-styles.tsx`, or its bundled `react-dom-client.production.js`                     | Yes, currently                                          | Next's dev overlay injects inline styles without exposing a supported nonce hook. This dependency-owned noise is absent from the production build. Re-evaluate after a Next.js upgrade.                                                                                                                    |
+| `QueryProvider` or `ReactQueryDevtools` `style-src-elem` violation                                             | No                                                      | AMCore passes the request nonce through `styleNonce`. Treat its reappearance as an application regression. Check both the closed toggle and opened panel.                                                                                                                                                  |
+| `Encountered a script tag while rendering React component` at `[locale]/layout.tsx` during an `en`/`ru` switch | Yes, currently                                          | React sees the raw theme-init script during client navigation. The initial-document script already ran synchronously before paint; replacing it with an inert `<template>` would break that no-flash guarantee. Re-evaluate when React or Next changes client-navigation handling for root-layout scripts. |
+| `/_next/hmr` WebSocket failure                                                                                 | Only when the dev server is stopped or the tab is stale | Reload after starting the server. Repeated failures while the server is healthy indicate a real HMR, proxy, or network problem.                                                                                                                                                                            |
+| A preloaded Geist `.woff2` was not used promptly                                                               | Possible after a stale/offline load                     | Next preloads the configured `next/font` subsets. Investigate if it repeats on fresh loads with a healthy server; a stale cached tab alone does not establish a font defect.                                                                                                                               |
+
+Unknown violations, new application-file sources, or any violation in an
+enforced production/real-stack run are **not** covered by this list. Inspect the
+violated directive and source/blocked URL, fix application-owned tags by passing
+the request nonce where supported, and never silence console noise by adding
+`'unsafe-inline'`. The production acceptance target remains zero CSP violations
+during normal navigation; see [Testing](./testing.md#csp-and-security-headers).
+
 ## HSTS
 
 `Strict-Transport-Security` is emitted unconditionally (not gated on
