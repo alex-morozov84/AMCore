@@ -79,6 +79,10 @@ export function RouteProgressBar({
   // \`RouteProgressLink\`; programmatic push/replace/back/forward start
   // through \`useRouteProgressRouter()\`; neither goes through this effect.
   useEffect(() => {
+    // Browser tests wait for this marker before exercising navigation. A
+    // native control can be interactive before this Suspense island hydrates,
+    // which otherwise tests a pre-hydration page rather than the progress bar.
+    document.documentElement.dataset.routeProgressReady = ''
     function handlePopState() {
       const search = new URLSearchParams(window.location.search).toString()
       const key = toLocationKey(window.location.pathname, search)
@@ -87,6 +91,7 @@ export function RouteProgressBar({
     window.addEventListener('popstate', handlePopState)
     window.addEventListener('pagehide', controller.dispose)
     return () => {
+      delete document.documentElement.dataset.routeProgressReady
       window.removeEventListener('popstate', handlePopState)
       window.removeEventListener('pagehide', controller.dispose)
       controller.dispose()
