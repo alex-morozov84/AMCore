@@ -38,7 +38,7 @@ foundation with auth, organizations, API keys, storage/media, notifications,
 AI capabilities, audit, observability, CI/security, and production operations.
 pnpm + Turborepo monorepo.
 
-- `apps/api` — NestJS 11 backend (Postgres 16 + Prisma 7, Redis + BullMQ, Zod
+- `apps/api` — NestJS 11 backend (Postgres 18 + Prisma 7, Redis + BullMQ, Zod
   validation, JWT/OAuth/API-keys, CASL RBAC). The starter core.
 - `apps/web` — Next.js 16 frontend/admin starter, Feature-Sliced Design, with
   locale-routed UI, localized API/form errors, design tokens, theme support, and

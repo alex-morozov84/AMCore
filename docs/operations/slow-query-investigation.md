@@ -64,8 +64,9 @@ it is queried directly, by design — see [Observability](observability.md)).
 **`pg_stat_statements` aggregates by `(userid, dbid, queryid, toplevel)` —
 never by `application_name`.** (`toplevel` distinguishes a statement run
 directly from one nested inside a function/procedure; verified against the
-view's real column list on Postgres 16 — not four independent dimensions to
-reason about, just the actual composite key PostgreSQL uses.)
+view's real column list on PostgreSQL 16 and reverified on PostgreSQL 18 —
+not four independent dimensions to reason about, just the actual composite
+key PostgreSQL uses.)
 
 Since every AMCore process (`web` **and** `worker`) connects as the same
 `amcore_runtime` role, `pg_stat_statements` cannot attribute a slow query to

@@ -46,6 +46,12 @@ Already running? Reach for whichever concern below applies.
   migrator/owner role for `prisma migrate deploy` versus a DML-only runtime
   role for the running app, the setup script, and adopting it on an existing
   database.
+- **[PostgreSQL major-version upgrade](postgresql-major-upgrade.md)** — why a
+  major bump (e.g. 16 → 18) is not just an image-tag change, the storage
+  contract the official image changed in 18, which migration mechanism fits
+  your deployment (managed-provider native upgrade, AMCore's own
+  dump/restore, or `pg_upgrade`), the restore procedure for both the default
+  and role-separated setups, and the write-freeze/rollback boundary.
 - **[Secret rotation](secret-rotation.md)** — what actually happens (verified
   against this repo's real request path and a real Postgres) when you rotate
   `JWT_SECRET`, database credentials, `REDIS_URL`, OAuth secrets, or

@@ -66,7 +66,7 @@ docker compose up -d backup
 ```
 
 The `backup` service runs on the same image family as the reference stack
-(`postgres:16-alpine` — no third-party backup image, consistent with this
+(`postgres:18-alpine` — no third-party backup image, consistent with this
 repo's supply-chain/pin discipline). It targets the same database the app
 uses — `COMPOSE_DATABASE_URL` if set, otherwise the bundled `postgres`
 service — so it works whether you're on local-infra or a managed/VPS DB.
@@ -163,8 +163,8 @@ It mounts the shared backup volume **read-only**, finds the most recent
 lives only inside that one container's own filesystem** (`initdb`/`pg_ctl`
 against a scratch data directory under `/tmp`), then checks that the
 restored database actually has tables in it — everything is gone whether the
-drill passes or fails. `postgres:16-alpine` declares
-`/var/lib/postgresql/data` as a Docker volume, which would otherwise leave an
+drill passes or fails. `postgres:18-alpine` declares
+`/var/lib/postgresql` as a Docker volume, which would otherwise leave an
 empty anonymous volume behind on every run regardless of `/tmp` being used
 for the actual scratch data; the compose service overrides that path with a
 `tmpfs` mount instead, so no Docker volume is ever created there — `run
@@ -236,6 +236,10 @@ buried in `docker compose logs`.
 - **Secret rotation** (JWT secret, database/Redis credentials, OAuth
   credentials, storage/AI provider keys) is a separate operator runbook — see
   [Secret rotation](secret-rotation.md).
+- **Moving to a new PostgreSQL major version** is a distinct procedure from
+  routine backup/restore, even though it reuses the same `pg_dump`/
+  `pg_restore` tools — see [PostgreSQL major-version
+  upgrade](postgresql-major-upgrade.md).
 - Redis is not covered — it holds queues/cache/rate-limit state, not durable
   application data; see "Redis production profile" in
   [deployment.md](deployment.md) for its persistence (AOF) requirements.

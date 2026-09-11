@@ -59,6 +59,7 @@ find for something, that page is under-documented; please open an issue.
 | Roll out with minimal downtime (health-gated restart, blue-green)                        | [`operations/deployment.md`](operations/deployment.md#zerolow-downtime-rollout--stated-honestly)                                  |
 | Back up or restore the database                                                          | [`operations/backup-restore.md`](operations/backup-restore.md)                                                                    |
 | Set up production database role separation                                               | [`operations/database-role-separation.md`](operations/database-role-separation.md)                                                |
+| Move an existing deployment to a new PostgreSQL major version                            | [`operations/postgresql-major-upgrade.md`](operations/postgresql-major-upgrade.md)                                                |
 | Rotate `JWT_SECRET`, DB/Redis credentials, OAuth secrets, or API keys                    | [`operations/secret-rotation.md`](operations/secret-rotation.md)                                                                  |
 | Decide which platform to deploy AMCore on (K8s, Cloud Run, Fly, Render, Railway, Vercel) | [`operations/deployment-platforms.md`](operations/deployment-platforms.md)                                                        |
 | Understand the CI / repo-security workflow                                               | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
@@ -127,7 +128,8 @@ find for something, that page is under-documented; please open an issue.
   profile), the production deploy profile (build-once/promote-by-digest,
   GitHub Environments), the `docker-compose.prod.yml` image-pull production
   overlay (immutable digests, restart policies, log rotation), Postgres
-  backup/restore, production database role separation, secret rotation,
+  backup/restore, PostgreSQL major-version upgrades, production database
+  role separation, secret rotation,
   the deployment platforms decision matrix (Kubernetes, Cloud Run, Fly,
   Render, Railway, Vercel), observability, CI/repo security, audit log,
   webhooks, and idempotency.

@@ -57,7 +57,7 @@ export interface E2ETestContext {
 export async function setupE2ETestInfrastructure(): Promise<
   Pick<E2ETestContext, 'postgresContainer' | 'redisContainer'>
 > {
-  const postgresContainer = await new PostgreSqlContainer('postgres:16-alpine')
+  const postgresContainer = await new PostgreSqlContainer('postgres:18-alpine')
     .withDatabase('amcore_test')
     .withUsername('test')
     .withPassword('test')

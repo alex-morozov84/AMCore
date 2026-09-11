@@ -27,6 +27,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sets that flag's initial value (non-destructive, unlike the other two
   `init:project` dimensions).
 
+### Changed
+
+- **PostgreSQL 16 → 18.** The shipped/bundled reference database major moves
+  from PostgreSQL 16 to 18 (`postgres:18-alpine`) across `docker-compose.yml`
+  (`postgres`, `backup`, `restore`, `restore-drill`) and both API
+  Testcontainers e2e pins. PostgreSQL 18's own Docker image changed its
+  storage contract (`VOLUME /var/lib/postgresql`, not the pre-18
+  `.../data`), so this is not an in-place data upgrade: a fresh
+  `docker compose up` gets a new, empty PG18 volume
+  (`postgres_data_pg18`), and an existing deployment's PG16 data must be
+  migrated following the new
+  [PostgreSQL major-version upgrade runbook](docs/operations/postgresql-major-upgrade.md)
+  — the old `postgres_data` volume is never touched automatically. Prisma
+  7.10.0 officially supports PostgreSQL 18. PostgreSQL 19 is not yet
+  released as of this change and is intentionally not the target.
+
 ### Fixed
 
 - **Scaffolding-transform drift repair** (PR #401). Several

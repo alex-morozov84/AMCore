@@ -24,11 +24,16 @@ material for offline password guessing. Keep `track_utility=off` as the primary
 control and use strong, unique, randomly generated passwords as defense in
 depth.
 
-If the module must first restart with PostgreSQL's default, perform no
-password-bearing operation until the live-SQL path's second restart completes
-and a new connection confirms `SHOW pg_stat_statements.track_utility` returns
-`off`. A configuration reload affects new sessions but does not rewrite this
-setting in existing backend sessions. See bootstrap's [live-SQL
+If the module must first load with PostgreSQL's default, perform no
+password-bearing operation until the live-SQL path's `pg_reload_conf()` step
+completes and a connection confirms `SHOW pg_stat_statements.track_utility`
+returns `off`. `track_utility` is a `context=superuser` setting, so a
+configuration reload propagates the change to every already-open backend
+session, not only new ones — verified live against real PostgreSQL 16 and
+PostgreSQL 18 containers (a backend's session held open across the reload
+observed its own value flip without reconnecting). A reload is sufficient
+here; no restart is required beyond the one already needed to load the
+module itself. See bootstrap's [live-SQL
 path](pg-stat-statements-setup.md#path-b-live-sql-only).
 
 ## Keep the remaining defaults

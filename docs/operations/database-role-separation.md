@@ -168,12 +168,12 @@ implicitly.
 This whole approach works whether your admin connection is a true Postgres
 superuser or a managed provider's `CREATEROLE`-holding admin user (verified
 against both). If your admin connection has `CREATEROLE` rather than true
-superuser, Postgres 16 itself _separately_ leaves you with a permanent,
+superuser, PostgreSQL 16+ itself _separately_ leaves you with a permanent,
 built-in admin-only membership over roles you create — verified this grants
 no `SET ROLE`/data access on its own, only the ability to further manage the
-role (e.g. change its password or drop it). This script neither adds to
-nor removes that separate, Postgres-native grant; it's an unavoidable
-property of `CREATEROLE`, not a gap here.
+role (e.g. change its password or drop it); reverified against PostgreSQL
+18.6. This script neither adds to nor removes that separate, Postgres-native
+grant; it's an unavoidable property of `CREATEROLE`, not a gap here.
 
 Wire the resulting connection strings, using the passwords you set via
 `\password` above (never the literal text you'd have typed into `CREATE
