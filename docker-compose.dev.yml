@@ -12,7 +12,7 @@ services:
   #     POSTGRES_PASSWORD: amcore
   #     POSTGRES_DB: amcore
   #   volumes:
-  #     - postgres_dev_data:/var/lib/postgresql/data
+  #     - postgres_dev_data:/var/lib/postgresql
   #   healthcheck:
   #     test: ['CMD-SHELL', 'pg_isready -U amcore -d amcore']
   #     interval: 10s

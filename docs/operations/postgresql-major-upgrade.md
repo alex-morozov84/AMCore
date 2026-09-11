@@ -149,15 +149,23 @@ server.
    ### ADR-076 role-separated deployment
 
    Cluster roles (`amcore_migrator`, `amcore_runtime`, `amcore_observer`)
-   are **not** part of a per-database `pg_dump` — provision them first, or
-   the restore fails on every `GRANT ... TO amcore_runtime` statement the
-   dump contains.
+   are **not** part of a per-database `pg_dump`. Provision the canonical
+   roles explicitly: the restore requires `amcore_migrator` as its target
+   role, while the ACL replay is deliberately skipped and rebuilt afterward.
 
-   1. Run [`setup-roles.sql`](../../docker/postgres/setup-roles.sql) **Step
-      1 only** (role creation, `NOLOGIN`, no passwords yet) against the
-      fresh PostgreSQL 18 cluster.
-   2. Grant your restore administrator temporary membership (with `SET`
-      capability) in `amcore_migrator`, then restore as that role:
+   1. From [`setup-roles.sql`](../../docker/postgres/setup-roles.sql), run
+      **Step 1** to create `amcore_migrator` and `amcore_runtime`, then run
+      the separate optional-observer block to create `amcore_observer`.
+      Follow the script's `NOLOGIN` -> `\password` -> `LOGIN` sequence for
+      all three roles; do not run Step 2 or Step 3 yet.
+   2. Grant your restore administrator temporary membership with `SET`
+      capability in `amcore_migrator`, then restore as that role (replace
+      `<admin-user>` in both commands):
+
+      ```sql
+      GRANT amcore_migrator TO <admin-user>
+        WITH INHERIT FALSE, SET TRUE;
+      ```
 
       ```bash
       pg_restore --role=amcore_migrator --no-owner --no-privileges \
@@ -168,15 +176,21 @@ server.
 
       `--no-privileges` deliberately skips replaying the dump's ACLs —
       those describe the _old_ cluster's roles and would fail the same way
-      unqualified `--no-owner` restore does. Revoke the temporary
-      `amcore_migrator` membership once the restore completes.
+      unqualified `--no-owner` restore does. Once the restore completes:
+
+      ```sql
+      REVOKE amcore_migrator FROM <admin-user>;
+      ```
 
    3. Reapply [`setup-roles.sql`](../../docker/postgres/setup-roles.sql)
-      **Step 3** as `amcore_migrator` to recreate the canonical runtime
-      grants and default privileges from scratch, against the now-restored
-      objects. This _replaces_ Step 2 of the normal onboarding flow (which
-      assumes `prisma migrate deploy` created the objects) — do not also
-      rerun the historical migration history over already-restored objects.
+      **Step 3** through the restore administrator to recreate the canonical
+      runtime grants and default privileges against the now-restored objects.
+      The script itself takes temporary membership, switches to the migrator
+      role, and revokes that membership afterward; do not run the wrapper as
+      an already-set `amcore_migrator` session. This _replaces_ Step 2 of the
+      normal onboarding flow (which assumes `prisma migrate deploy` created
+      the objects) — do not also rerun the historical migration history over
+      already-restored objects.
    4. Provision `pg_stat_statements` and `pg_monitor` for `amcore_observer`
       separately, following [Bootstrap](pg-stat-statements-setup.md) and
       [the `amcore_observer` role](pg-stat-statements-observer-role.md) —
