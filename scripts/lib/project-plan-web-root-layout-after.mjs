@@ -97,7 +97,7 @@ export default async function RootLayout({
                 <RouteProgressBar />
               </Suspense>
             )}
-            <Providers>{children}</Providers>
+            <Providers nonce={nonce}>{children}</Providers>
           </NextIntlClientProvider>
         </CSPProvider>
       </body>
