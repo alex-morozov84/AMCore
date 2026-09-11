@@ -12,14 +12,18 @@ import '@/shared/lib/zod-jitless'
 
 interface ProvidersProps {
   children: ReactNode
+  /** CSP nonce from `[locale]/layout.tsx` — threaded to `QueryProvider` so its
+   * `ReactQueryDevtools` instance can nonce its inline styles instead of
+   * violating `style-src-elem` in dev. */
+  nonce?: string
 }
 
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children, nonce }: ProvidersProps) {
   const t = useTranslations('common')
 
   return (
     <ThemeProvider>
-      <QueryProvider>
+      <QueryProvider nonce={nonce}>
         <PWAProvider>{children}</PWAProvider>
         <Toaster closeLabel={t('close')} />
       </QueryProvider>
