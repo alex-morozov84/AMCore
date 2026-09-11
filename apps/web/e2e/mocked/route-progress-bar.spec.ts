@@ -25,6 +25,7 @@ test('a delayed Link navigation shows the bar, then hides it once the route reso
   })
 
   await page.goto('/en/login')
+  await page.locator('html[data-route-progress-ready]').waitFor()
   const bar = page.getByTestId('route-progress-bar')
   await expect(bar).toBeHidden()
 
@@ -49,6 +50,7 @@ test('a delayed programmatic navigation (router.replace via the locale switcher)
   })
 
   await page.goto('/en/login')
+  await page.locator('html[data-route-progress-ready]').waitFor()
   const bar = page.getByTestId('route-progress-bar')
   await page.getByRole('combobox', { name: /language/i }).selectOption('ru')
 
