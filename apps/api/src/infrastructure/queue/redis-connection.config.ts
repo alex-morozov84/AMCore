@@ -13,6 +13,12 @@ import { URL } from 'url'
  * - **username / password / db** are all parsed (Redis 6 ACL support).
  * - **retryStrategy** mirrors `RedisConnectionService` (the main app client) so
  *   both Redis clients reconnect on one consistent curve.
+ * - **protocol: 2** pins RESP2 explicitly. ioredis 6 defaults to RESP3, which
+ *   changes several reply shapes (maps, doubles, big numbers); BullMQ's own
+ *   peer range (`ioredis: >=5.0.0`) doesn't rule RESP3 out, but nothing in
+ *   BullMQ's source pins a protocol either, so the default flip would apply
+ *   silently. Revisit only once BullMQ's own docs/changelog state RESP3
+ *   support explicitly.
  *
  * Deliberately does NOT set `maxRetriesPerRequest`: on the producer connection
  * `null` would make `queue.add()` hang forever during an outage, and BullMQ
@@ -29,6 +35,8 @@ export function buildBullConnection(redisUrl: string): RedisOptions {
     db: url.pathname ? parseInt(url.pathname.slice(1), 10) || 0 : 0,
     // Mirror RedisConnectionService: backoff 50ms per attempt, capped at 2s.
     retryStrategy: (times: number) => Math.min(times * 50, 2000),
+    // Pin RESP2 explicitly -- see the file-level comment above.
+    protocol: 2,
   }
 
   // URL getters keep credentials percent-encoded; decode so special characters
