@@ -68,4 +68,10 @@ describe('buildBullConnection', () => {
 
     expect(opts.maxRetriesPerRequest).toBeUndefined()
   })
+
+  it('pins RESP2 explicitly (ioredis 6 defaults to RESP3)', () => {
+    const opts = buildBullConnection('redis://localhost:6379')
+
+    expect(opts.protocol).toBe(2)
+  })
 })
