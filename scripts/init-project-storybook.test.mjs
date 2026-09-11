@@ -68,7 +68,7 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     // two separate fileSteps that would have silently clobbered each other.
     assert.match(
       result.stdout,
-      /update PROJECT_CONTEXT\.md fields \(single-locale \+ storybook-disabled\)/
+      /update PROJECT_CONTEXT\.md fields for the combined dimensions/
     )
     assert.match(result.stdout, /remove the navigation ban and the Storybook plugin\/rules/)
   })
