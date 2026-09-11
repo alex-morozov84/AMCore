@@ -58,8 +58,9 @@ return <ProductDetail data={product.data} />
 
 `PrimaryUnavailableFallback` maps the closed reason union to translated copy;
 it never renders the raw reason, retry delay, or an exception. Its button calls
-locale-aware `router.refresh()` from `@/i18n/navigation`, which requests a new
-Server Component payload without resetting unaffected client state.
+`router.refresh()` through `useRouteProgressRouter()` (a deliberate pass-through
+that does not start the bar), requesting a new Server Component payload without
+resetting unaffected client state.
 
 `router.refresh()` does **not** invalidate the server-side cache. Next 16.3.4
 does not cache `fetch` by default, so the transport above retries fresh data. If

@@ -4,10 +4,10 @@
 import path from 'node:path'
 import { fileStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
 
-const INIT_PROJECT_ROW_BEFORE = `| \`pnpm init:project\`                                               | Apply downstream structural choices: single-locale mode, disabling Storybook, or disabling the route-progress bar's default                                                                                                                          |
+const INIT_PROJECT_ROW_BEFORE = `| \`pnpm init:project\`                                               | Apply downstream project choices: single-locale mode, disabling Storybook, or disabling the route-progress bar's default                                                                                                                             |
 `
 
-const INIT_PROJECT_ROW_AFTER = `| \`pnpm init:project\`                                               | Apply downstream structural choices: single-locale mode, or disabling the route-progress bar's default                                                                                                                                               |
+const INIT_PROJECT_ROW_AFTER = `| \`pnpm init:project\`                                               | Apply downstream project choices: single-locale mode, or disabling the route-progress bar's default                                                                                                                                                  |
 `
 
 const FLAG_NOTE_BEFORE = `\`pnpm init:project\` requires at least one explicit flag, in any combination:

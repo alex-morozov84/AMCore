@@ -23,13 +23,14 @@ const ONBOARDING_FLAGS_AFTER = `> \`pnpm init:project\` (single-locale, destruct
 > route-progress bar's default, non-destructive) — see
 `
 
-const ONBOARDING_STRUCTURAL_BEFORE = `> flags. \`init:project\` records structural choices such as single-locale
-> mode, Storybook removal, and the route-progress bar's default. Still set
-> by hand: where the
+const ONBOARDING_STRUCTURAL_BEFORE = `> flags. \`init:project\` records project choices: structural single-locale
+> mode/Storybook removal and the non-structural route-progress default.
+> Still set by hand: where the
 `
 
-const ONBOARDING_STRUCTURAL_AFTER = `> flags. \`init:project\` records structural choices such as single-locale
-> mode and the route-progress bar's default. Still set by hand: where the
+const ONBOARDING_STRUCTURAL_AFTER = `> flags. \`init:project\` records project choices: structural single-locale
+> mode and the non-structural route-progress default. Still set by hand:
+> where the
 `
 
 const TOOLING_SENTENCE_BEFORE = `Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,

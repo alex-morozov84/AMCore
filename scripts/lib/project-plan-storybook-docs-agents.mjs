@@ -7,14 +7,14 @@ const OPERATING_CONTEXT_BEFORE = `   and ask the owner to initialize it. The sup
    \`pnpm init:brand\` first, then \`pnpm init:project --mode=single --locale=<code>\`,
    \`pnpm init:project --storybook=disabled\`, and/or
    \`pnpm init:project --route-progress=disabled\`, in any combination, only for the
-   structural choices the fork actually wants; see
+   project choices the fork actually wants; see
    \`docs/frontend/brand-theme-and-tokens.md#project-scaffolding\`.
 `
 
 const OPERATING_CONTEXT_AFTER = `   and ask the owner to initialize it. The supported fork-initialization path is
    \`pnpm init:brand\` first, then \`pnpm init:project --mode=single --locale=<code>\`
    and/or \`pnpm init:project --route-progress=disabled\`, in any combination, only
-   for the structural choices the fork actually wants; see
+   for the project choices the fork actually wants; see
    \`docs/frontend/brand-theme-and-tokens.md#project-scaffolding\`.
 `
 

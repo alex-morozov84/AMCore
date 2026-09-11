@@ -203,9 +203,9 @@ pnpm dev
 > `upstream-starter` to `downstream-product` when you provide a product
 > name, and records the product identity, upstream-sync policy, and workflow
 > mode (`strict`, `flexible`, or `custom`) from the corresponding prompts or
-> flags. `init:project` records structural choices such as single-locale
-> mode, Storybook removal, and the route-progress bar's default. Still set
-> by hand: where the
+> flags. `init:project` records project choices: structural single-locale
+> mode/Storybook removal and the non-structural route-progress default.
+> Still set by hand: where the
 > roadmap/status/product-specific decisions live, and anything GitHub-side
 > (branch protection, secrets, environments). Repository files _declare_ the
 > technical policy; GitHub-side enforcement is separate external state. For
