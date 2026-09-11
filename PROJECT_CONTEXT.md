@@ -19,6 +19,7 @@ separate product from the starter.
 - **base_locale:** en
 - **supported_locales:** [en, ru]
 - **frontend_storybook:** enabled
+- **frontend_route_progress:** enabled
 - **theme_persistence:** local-storage
 - **initialized_from_amcore_version:** N/A — this checkout is AMCore itself.
 
@@ -46,7 +47,7 @@ For `downstream-product`, record at minimum:
 - workflow mode: `strict`, `flexible`, or `custom`;
 - where the product roadmap, current status, and product-specific decisions live;
 - the frontend starter choices below (`i18n_mode`, `frontend_storybook`,
-  `theme_persistence`, `initialized_from_amcore_version`).
+  `frontend_route_progress`, `theme_persistence`, `initialized_from_amcore_version`).
 
 Do not infer mode from directory names, package names, git remotes, or the presence
 of GitHub settings. The owner of a downstream product must declare the mode here.
@@ -72,6 +73,15 @@ actually made instead of leaving them implicit in deleted/kept files:
   stories, Storybook scripts/dependencies, the CI job, and Storybook-specific
   public docs, not a `SKIP_STORYBOOK` bypass that leaves the surface present
   but unused.
+- **`frontend_route_progress`:** `enabled` or `disabled`. AMCore upstream
+  ships the top route-progress bar (`shared/ui/route-progress-bar.tsx`)
+  enabled by default — see `docs/frontend/route-progress.md`. Unlike
+  `frontend_storybook`, `disabled` is **non-destructive**: it only sets the
+  `ROUTE_PROGRESS_ENABLED` source flag's initial value to `false` in
+  `shared/lib/route-progress/route-progress-flag.ts` and records the choice
+  here — no file, test, story, or wiring is removed, so a developer can
+  flip the flag back to `true` by hand at any time without re-running
+  scaffolding.
 - **`theme_persistence`:** `local-storage` (AMCore's default) or
   `cookie-ssr` (an advanced, opt-in downstream variant — see
   `docs/frontend/brand-theme-and-tokens.md` → _Cookie-backed SSR theme
@@ -86,10 +96,13 @@ init:brand` for everything above `i18n_mode`; `pnpm init:project
 --mode=single --locale=<code>` for `i18n_mode`/`base_locale`/
 `supported_locales` specifically (the one-time, destructive route-topology
 transform described in `docs/frontend/i18n-and-errors.md` → "Downstream:
-running a single-locale app"); and `pnpm init:project --storybook=disabled`
-for `frontend_storybook` (the one-time, destructive removal described
-above). The two `init:project` dimensions are independent — either flag
-works alone or both together in one invocation. A field can also be set by
+running a single-locale app"); `pnpm init:project --storybook=disabled` for
+`frontend_storybook` (the one-time, destructive removal described above);
+and `pnpm init:project --route-progress=disabled` for
+`frontend_route_progress` (the one-time, non-destructive flag flip
+described above — the only one of the three that removes nothing). The
+three `init:project` dimensions are independent — any one flag alone, or
+any combination together in one invocation. A field can also be set by
 hand in a downstream fork. Their absence means "AMCore's shipped defaults
 apply," not "undecided."
 

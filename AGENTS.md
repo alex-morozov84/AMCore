@@ -11,9 +11,10 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    (`strict`, `flexible`, or `custom`). Do not guess from git remotes or names.
    If the file is missing or still says `upstream-starter` in a product fork, stop
    and ask the owner to initialize it. The supported fork-initialization path is
-   `pnpm init:brand` first, then `pnpm init:project --mode=single --locale=<code>`
-   and/or `pnpm init:project --storybook=disabled` only if the fork wants those
-   one-time structural choices; see
+   `pnpm init:brand` first, then `pnpm init:project --mode=single --locale=<code>`,
+   `pnpm init:project --storybook=disabled`, and/or
+   `pnpm init:project --route-progress=disabled`, in any combination, only for the
+   project choices the fork actually wants; see
    `docs/frontend/brand-theme-and-tokens.md#project-scaffolding`.
 2. Detect the working-context overlay:
    - **`ai/` directory present** → maintainer copy of the product named in
@@ -53,15 +54,17 @@ pnpm dev                # run all apps (or: pnpm --filter api dev)
 pnpm lint               # lint        pnpm typecheck   # types
 pnpm test               # unit tests  pnpm build       # build all
 pnpm init:brand         # downstream fork identity/brand/theme initializer
-pnpm init:project       # downstream structural choices; run with flags
+pnpm init:project       # downstream project choices; run with flags
 pnpm --filter api test:e2e            # e2e (Jest + Testcontainers, needs Docker)
 pnpm --filter api db:migrate          # prisma migrate dev (LOCAL dev only)
 docker compose up                     # full stack (Postgres+Redis+migrate+api+web)
 ```
 
 `pnpm init:project` is intentionally flag-driven: use
-`--mode=single --locale=<code>` to remove locale routing, and/or
-`--storybook=disabled` to remove Storybook from a fork.
+`--mode=single --locale=<code>` to remove locale routing,
+`--storybook=disabled` to remove Storybook from a fork, and/or
+`--route-progress=disabled` to turn off the top route-progress bar's
+default (non-destructive — see `PROJECT_CONTEXT.md`).
 
 Production migrates with `db:migrate:prod` (`prisma migrate deploy`) as a one-shot
 step, never `db:migrate`. See `docs/operations/deployment.md`.
@@ -244,9 +247,13 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   1. **Never inline user-facing text.** Add the key to `messages/en.json` (the
      source of truth) and to **every** other catalogue. Keys are type-checked;
      a catalogue mismatch fails a test.
-  2. **Import navigation from `@/i18n/navigation`**, never `next/link` or
-     locale-unaware `next/navigation` helpers — they drop the locale prefix
-     silently. An ESLint rule enforces this.
+  2. **Use `RouteProgressLink` for internal navigating links and
+     `useRouteProgressRouter()` for programmatic navigation.** They wrap the
+     locale-aware helpers and keep the top progress bar correct. Import other
+     locale-aware helpers (`usePathname`, `redirect`, etc.) from
+     `@/i18n/navigation`; never use locale-unaware `next/link` or navigation
+     APIs for these jobs. ESLint enforces the boundaries. See
+     `docs/frontend/route-progress.md`.
   3. **Translate API failures by `errorCode`**, never the backend's `message`
      (English, developer-facing). Use `<ApiErrorAlert>` / `useApiError()`. A new
      shared error code with no translation fails the build.

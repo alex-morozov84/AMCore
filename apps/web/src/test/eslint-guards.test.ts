@@ -99,10 +99,20 @@ describe('custom ESLint guards fire on the defect they exist for', () => {
     ).not.toContain('no-restricted-syntax')
   })
 
+  it('bans importing Link straight from @/i18n/navigation', async () => {
+    const messages = await lint(
+      `import { Link } from '@/i18n/navigation'\nexport const L = Link\n`,
+      'src/guard-fixture.ts'
+    )
+
+    expect(messages.map((m) => m.ruleId)).toContain('no-restricted-imports')
+    expect(messages[0]?.message).toMatch(/RouteProgressLink/)
+  })
+
   it('leaves compliant code alone', async () => {
     expect(
       await ruleIds(
-        `import { Link } from '@/i18n/navigation'\nexport const L = Link\n`,
+        `import { usePathname } from '@/i18n/navigation'\nexport const p = usePathname\n`,
         'src/guard-fixture.ts'
       )
     ).toHaveLength(0)

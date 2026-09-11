@@ -20,6 +20,7 @@ guessing.
 | [Testing](./testing.md)                                                 | The frontend test taxonomy, Playwright mocked/server-mocked/real-stack lanes, accessibility scanning, and the tool-neutral dev loop                                                                                                                                                                                                    |
 | [Storybook](./storybook.md)                                             | The component workshop: what's wired (a11y/theme/MSW/i18n decorators), story conventions, the CLI-safety/`optimizeDeps.include` rules, and running a fork without Storybook                                                                                                                                                            |
 | [Bundle baseline and budget](./bundle-budget.md)                        | Per-route client bundle size methodology, the current baseline, the non-vacuity proof, and why CI enforcement is deferred                                                                                                                                                                                                              |
+| [Top route progress bar](./route-progress.md)                           | The global navigation-progress indicator: what starts/finishes it, the `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion, and the `ROUTE_PROGRESS_ENABLED` dev/agent flag                                                                                                                                        |
 
 This index is the public entry point for the current frontend starter surface;
 see `architecture-and-conventions.md`'s "See also" section for related guides.
@@ -39,7 +40,9 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
 - Rebranding a downstream fork (logo, PWA icons, tokens, theme mode) →
   [Brand, theme, and design tokens § Downstream rebrand checklist](./brand-theme-and-tokens.md#downstream-rebrand-checklist)
 - Initializing a downstream fork (`pnpm init:brand`/`pnpm init:project`:
-  identity, single-locale, disabling Storybook) →
+  identity, locale/Storybook shape, route-progress default) →
   [Brand, theme, and design tokens § Project scaffolding](./brand-theme-and-tokens.md#project-scaffolding)
 - Adding a third-party script/style origin, or running CSP in report-only →
   [Browser security headers and CSP](./browser-security-and-csp.md)
+- Adding a navigating `<Link>` or a programmatic `router.push()`/`replace()` →
+  [Top route progress bar § The two building blocks](./route-progress.md#the-two-building-blocks-use-these-not-raw-next-apis)

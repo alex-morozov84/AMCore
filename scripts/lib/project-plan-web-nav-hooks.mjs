@@ -1,9 +1,9 @@
 // init:project --mode=single: use-login.ts and use-register.ts (nearly
-// identical shape). use-logout.ts is a separate file
-// (project-plan-web-nav-logout.mjs) to stay under the repo's
-// ~150-line-per-file guidance. Import order verified empirically (real
-// eslint --fix against a disposable copy) rather than guessed — see
-// project-plan-web-nav-links.mjs's header for why that matters here.
+// identical shape, both migrated to useRouteProgressRouter() in P1 item 8 --
+// only the \`{ locale }\` push option is dropped here, since which router
+// implementation backs the adapter is use-route-progress-router.ts's own
+// concern, not these call sites'). Import order verified empirically (real
+// eslint --fix against a disposable copy) rather than guessed.
 import path from 'node:path'
 import { exactContentStep } from './init-engine.mjs'
 
@@ -14,12 +14,12 @@ import type { LoginInput } from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { userKeys } from '@/entities/user'
-import { useRouter } from '@/i18n/navigation'
 import { authApi } from '@/shared/api'
 import { useFormMutation } from '@/shared/hooks'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 export function useLogin(setError?: UseFormSetError<LoginInput>) {
-  const router = useRouter()
+  const router = useRouteProgressRouter()
   const queryClient = useQueryClient()
 
   return useFormMutation({
@@ -40,16 +40,16 @@ export function useLogin(setError?: UseFormSetError<LoginInput>) {
 const USE_LOGIN_AFTER = `'use client'
 
 import type { UseFormSetError } from 'react-hook-form'
-import { useRouter } from 'next/navigation'
 import type { LoginInput } from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { userKeys } from '@/entities/user'
 import { authApi } from '@/shared/api'
 import { useFormMutation } from '@/shared/hooks'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 export function useLogin(setError?: UseFormSetError<LoginInput>) {
-  const router = useRouter()
+  const router = useRouteProgressRouter()
   const queryClient = useQueryClient()
 
   return useFormMutation({
@@ -72,12 +72,12 @@ import type { RegisterInput } from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { userKeys } from '@/entities/user'
-import { useRouter } from '@/i18n/navigation'
 import { authApi } from '@/shared/api'
 import { useFormMutation } from '@/shared/hooks'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 export function useRegister(setError?: UseFormSetError<RegisterInput>) {
-  const router = useRouter()
+  const router = useRouteProgressRouter()
   const queryClient = useQueryClient()
 
   return useFormMutation({
@@ -98,16 +98,16 @@ export function useRegister(setError?: UseFormSetError<RegisterInput>) {
 const USE_REGISTER_AFTER = `'use client'
 
 import type { UseFormSetError } from 'react-hook-form'
-import { useRouter } from 'next/navigation'
 import type { RegisterInput } from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { userKeys } from '@/entities/user'
 import { authApi } from '@/shared/api'
 import { useFormMutation } from '@/shared/hooks'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 export function useRegister(setError?: UseFormSetError<RegisterInput>) {
-  const router = useRouter()
+  const router = useRouteProgressRouter()
   const queryClient = useQueryClient()
 
   return useFormMutation({

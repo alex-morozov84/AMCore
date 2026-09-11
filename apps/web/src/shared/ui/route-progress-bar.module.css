@@ -1,0 +1,62 @@
+/* Fixed, out-of-flow bar: never participates in layout, so it can never
+   cause layout shift. transform/opacity only -- no width/height animation,
+   which would trigger layout/paint on every frame. */
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--primary);
+  transform-origin: left center;
+  transform: scaleX(0);
+  opacity: 1;
+  pointer-events: none;
+  z-index: 2000;
+}
+
+.bar[data-phase='visible'] {
+  animation: route-progress-crawl 4s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+}
+
+.bar[data-phase='completing'] {
+  transform: scaleX(1);
+  opacity: 0;
+  transition:
+    transform 200ms ease-out,
+    opacity 100ms ease-out 100ms;
+}
+
+@keyframes route-progress-crawl {
+  0% {
+    transform: scaleX(0);
+  }
+
+  20% {
+    transform: scaleX(0.25);
+  }
+
+  50% {
+    transform: scaleX(0.55);
+  }
+
+  80% {
+    transform: scaleX(0.75);
+  }
+
+  100% {
+    transform: scaleX(0.9);
+  }
+}
+
+/* No crawl or transition for a viewer who asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .bar[data-phase='visible'] {
+    animation: none;
+    transform: scaleX(0.9);
+  }
+
+  .bar[data-phase='completing'] {
+    transition: none;
+  }
+}

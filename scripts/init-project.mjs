@@ -1,34 +1,32 @@
 #!/usr/bin/env node
-// `pnpm init:project` (Track 10, ADR-071) — one-time, destructive structural
-// transforms for a downstream fork. See ai/models-talk.md's FINAL PLAN and
-// ai/decisions/adr-071-*.md for the full design. Two independent dimensions,
-// each with its own reinitialize guard, usable alone or together:
-//   --mode=single --locale=<code>   removes apps/web's locale routing
-//   --storybook=disabled            removes the Storybook surface entirely
-// Unlike init:brand, neither is repeatable: re-running a dimension already
-// applied is refused by its own assert* guard (see project-config.mjs and
-// project-config-storybook.mjs).
+// `pnpm init:project` — one-time project choices for a downstream fork.
+// Three independent dimensions, each with its own reinitialize
+// guard, usable alone or in any combination:
+//   --mode=single --locale=<code>   removes apps/web's locale routing (destructive)
+//   --storybook=disabled            removes the Storybook surface entirely (destructive)
+//   --route-progress=disabled       flips the route-progress bar's default off (non-destructive)
+// Unlike init:brand, none is repeatable: re-running a dimension already
+// applied is refused by its own assert* guard (see project-config.mjs,
+// project-config-storybook.mjs, project-config-route-progress.mjs). Flag
+// parsing/validation lives in project-flags.mjs (line-count guidance).
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { runInitCommand, runProjectVerification } from './lib/init-engine.mjs'
 import {
-  EngineError,
-  parseCommonFlags,
-  runInitCommand,
-  runProjectVerification,
-} from './lib/init-engine.mjs'
-import {
-  PROJECT_MODES,
   assertKnownLocale,
   assertMultiLocaleAppStructure,
   prismaFollowUpMessage,
 } from './lib/project-config.mjs'
 import {
-  STORYBOOK_VALUES,
   assertStorybookEnabled,
   storybookInstallFollowUpMessage,
 } from './lib/project-config-storybook.mjs'
+import { assertRouteProgressEnabled } from './lib/project-config-route-progress.mjs'
+import { parseProjectFlags } from './lib/project-flags.mjs'
 import { buildProjectSteps } from './lib/project-plan.mjs'
 import { buildStorybookDisableSteps } from './lib/project-plan-storybook.mjs'
+import { buildRouteProgressFlagSteps } from './lib/project-plan-route-progress-flag.mjs'
+import { buildRouteProgressContextSteps } from './lib/project-plan-route-progress-context.mjs'
 import { combinedTargets, buildCombinedSteps } from './lib/project-plan-combined.mjs'
 
 // Testability seams for scripts/*.test.mjs — see init-brand.mjs's header for
@@ -47,40 +45,9 @@ const testVerifyOverride =
       ? () => []
       : undefined
 
-function parseProjectFlags(argv) {
-  const flags = parseCommonFlags(argv, {
-    mode: { type: 'string' },
-    locale: { type: 'string' },
-    storybook: { type: 'string' },
-  })
-
-  if (!flags.mode && !flags.storybook) {
-    throw new EngineError(
-      'at least one of --mode or --storybook is required, e.g. --mode=single --locale=en, ' +
-        'or --storybook=disabled, or both together'
-    )
-  }
-
-  if (flags.mode) {
-    if (!PROJECT_MODES.includes(flags.mode)) {
-      throw new EngineError(`--mode=${flags.mode} is not one of: ${PROJECT_MODES.join(', ')}`)
-    }
-    if (!flags.locale) {
-      throw new EngineError('--locale is required when --mode is given, e.g. --locale=en')
-    }
-  }
-
-  if (flags.storybook && !STORYBOOK_VALUES.includes(flags.storybook)) {
-    throw new EngineError(
-      `--storybook=${flags.storybook} is not one of: ${STORYBOOK_VALUES.join(', ')}`
-    )
-  }
-
-  return flags
-}
-
 async function main() {
   const flags = parseProjectFlags(process.argv.slice(2))
+  const routeProgress = Boolean(flags['route-progress'])
 
   if (flags.mode) {
     assertKnownLocale(ROOT, flags.locale)
@@ -89,13 +56,21 @@ async function main() {
   if (flags.storybook) {
     assertStorybookEnabled(ROOT)
   }
+  if (routeProgress) {
+    assertRouteProgressEnabled(ROOT)
+  }
 
-  // --mode and --storybook, when both given, each independently want to
-  // edit PROJECT_CONTEXT.md and apps/web/eslint.config.mjs — see
+  // Whenever 2+ dimensions are active, each independently wants to edit one
+  // or more of the same shared targets (PROJECT_CONTEXT.md; apps/web/
+  // eslint.config.mjs for --mode + --storybook specifically) — see
   // project-plan-combined.mjs's header. Drop those targets from each
   // dimension's own steps and use the combined replacement instead.
-  const both = Boolean(flags.mode && flags.storybook)
-  const overlap = both ? new Set(combinedTargets(ROOT)) : new Set()
+  const dims = {
+    locale: flags.mode ? flags.locale : undefined,
+    storybook: flags.storybook,
+    routeProgress,
+  }
+  const overlap = new Set(combinedTargets(ROOT, dims))
 
   const steps = [
     ...(flags.mode
@@ -104,7 +79,13 @@ async function main() {
     ...(flags.storybook
       ? buildStorybookDisableSteps(ROOT).filter((s) => !overlap.has(s.target))
       : []),
-    ...(both ? buildCombinedSteps(ROOT, flags.locale) : []),
+    ...(routeProgress
+      ? [
+          ...buildRouteProgressFlagSteps(ROOT),
+          ...buildRouteProgressContextSteps(ROOT).filter((s) => !overlap.has(s.target)),
+        ]
+      : []),
+    ...buildCombinedSteps(ROOT, dims),
   ]
 
   if (flags.mode) {
@@ -119,6 +100,7 @@ async function main() {
   const dimensions = [
     flags.mode && `single-locale (--locale=${flags.locale})`,
     flags.storybook && 'Storybook-disable',
+    routeProgress && 'route-progress-disable',
   ].filter(Boolean)
 
   // --storybook edits apps/web/package.json's dependency list, which
@@ -129,13 +111,23 @@ async function main() {
   // doc comment for why running `pnpm install` here isn't the fix either.
   const defaultVerify = flags.storybook ? () => [] : runProjectVerification
 
+  // --route-progress is non-destructive (owner decision, 2026-09-09): no
+  // file is moved or deleted, only a source flag's value and a context
+  // record. The confirm message says so explicitly rather than reusing the
+  // other two dimensions' "cannot be undone" wording, which would be untrue
+  // for a --route-progress-only apply.
+  const destructive = Boolean(flags.mode || flags.storybook)
+  const confirmMessage = destructive
+    ? `Apply the ${dimensions.join(' + ')} transform? ` +
+      'This moves/deletes files and cannot be undone by re-running this command.'
+    : `Apply the ${dimensions.join(' + ')} transform? ` +
+      'This only edits a source flag and PROJECT_CONTEXT.md — reversible by hand at any time.'
+
   await runInitCommand({
     cwd: ROOT,
     flags,
     steps,
-    confirmMessage:
-      `Apply the ${dimensions.join(' + ')} transform? ` +
-      'This moves/deletes files and cannot be undone by re-running this command.',
+    confirmMessage,
     verify: testVerifyOverride ?? defaultVerify,
   })
 }

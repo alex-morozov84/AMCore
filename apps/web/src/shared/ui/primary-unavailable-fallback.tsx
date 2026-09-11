@@ -3,8 +3,8 @@
 import { useTranslations } from 'next-intl'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 
-import { useRouter } from '@/i18n/navigation'
 import type { UnavailableReason } from '@/shared/api/server'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 import { Alert, AlertDescription } from './alert'
 import { Button } from './button'
@@ -36,14 +36,15 @@ export interface PrimaryUnavailableFallbackProps {
  * the caller branches on `PrimaryRenderOutcome` directly and renders this
  * in place of the real content.
  *
- * The retry control calls `router.refresh()` (locale-aware, via
- * `@/i18n/navigation`) to re-run the Server Component tree for the current
- * route - not `catchError`'s `retry()`, since there is no error boundary in
- * this path to recover from.
+ * The retry control calls `router.refresh()` (via
+ * `useRouteProgressRouter()`, which passes `refresh()` straight through
+ * unstarted) to re-run the Server Component tree for the current route -
+ * not `catchError`'s `retry()`, since there is no error boundary in this
+ * path to recover from.
  */
 export function PrimaryUnavailableFallback({ reason }: PrimaryUnavailableFallbackProps) {
   const t = useTranslations('common')
-  const router = useRouter()
+  const router = useRouteProgressRouter()
 
   return (
     <Alert variant="destructive">

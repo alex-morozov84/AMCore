@@ -179,9 +179,10 @@ output and ADR-071 for the safety model. It does:
 
 1. Move everything from `src/app/[locale]/` up into `src/app/`.
 2. Delete `src/proxy.ts`, `src/i18n/routing.ts`, `src/i18n/navigation.ts`, and
-   `src/i18n/params.ts`; rewrite `Link` and navigation hooks to import from
-   `next/link` and `next/navigation` again, and drop the ESLint rule that
-   blocks them.
+   `src/i18n/params.ts`; keep `RouteProgressLink` and
+   `useRouteProgressRouter()` as the consumer-facing adapters while rewriting
+   their underlying imports to `next/link`/`next/navigation`, and remove the
+   locale-aware import guards that are no longer applicable.
 3. Return a static locale from `src/i18n/request.ts` — next-intl's
    ["without i18n routing"](https://next-intl.dev/docs/getting-started/app-router/without-i18n-routing)
    setup.

@@ -9,10 +9,10 @@ const INDEX_ROW =
   '| Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |\n'
 
 const SCAFFOLDING_ROW_BEFORE =
-  '| Initialize a downstream fork (rebrand, single-locale, disable Storybook)                 | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
+  '| Initialize a downstream fork (rebrand, locale/Storybook shape, route-progress default)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
 
 const SCAFFOLDING_ROW_AFTER =
-  '| Initialize a downstream fork (rebrand, single-locale)                                    | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
+  '| Initialize a downstream fork (rebrand, locale shape, route-progress default)             | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
 
 const TESTING_MENTION_BEFORE = `- **[Frontend testing](frontend/testing.md)** — the test taxonomy
   (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/

@@ -261,17 +261,24 @@ when you answer the corresponding prompts.
 
 ### Project scaffolding
 
-`pnpm init:project` (ADR-071) is the separate, one-time, **destructive**
-sibling command for structural choices `init:brand` deliberately never
-touches — `init:project --mode=single --locale=<code>` removes locale
-routing entirely (see
-[i18n & errors § Downstream: running a single-locale app](./i18n-and-errors.md#downstream-running-a-single-locale-app))
-and `init:project --storybook=disabled` removes the Storybook surface (see
-[Storybook § Downstream: disabling Storybook](./storybook.md#downstream-disabling-storybook)).
-Either flag works alone or both together in one invocation. See
-`PROJECT_CONTEXT.md`'s "Frontend Starter Choices" section and ADR-071 for
-the full contract and safety model (dry-run, typed confirmation, fail-closed
-on drift).
+`pnpm init:project` is the separate, one-time sibling command for
+project choices `init:brand` deliberately never touches. It covers two
+structural dimensions and one reversible source default, each with its own
+reinitialize guard:
+`--mode=single --locale=<code>` removes locale routing entirely, **destructively**
+(see
+[i18n & errors § Downstream: running a single-locale app](./i18n-and-errors.md#downstream-running-a-single-locale-app));
+`--storybook=disabled` removes the Storybook surface, also **destructively**
+(see
+[Storybook § Downstream: disabling Storybook](./storybook.md#downstream-disabling-storybook));
+`--route-progress=disabled` only flips the top route-progress bar's source
+flag to its disabled default and is **non-destructive** — no file is moved
+or deleted, and the choice can be reversed by hand at any later point (see
+[Top route progress bar § `pnpm init:project --route-progress=disabled`](./route-progress.md#pnpm-initproject---route-progressdisabled)).
+Any one flag alone, or any combination together, works in one invocation.
+See `PROJECT_CONTEXT.md`'s "Frontend Starter Choices" section for the full
+contract, and `pnpm init:project --help` for its dry-run, typed-confirmation,
+and fail-closed safety controls.
 
 ## Inline style and contrast
 

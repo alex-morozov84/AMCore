@@ -51,6 +51,7 @@ Feature-specific admin surfaces remain intentionally product-owned.
 | **i18n (web)**           | ✅ Shipped      | `next-intl` locale routing (`/en`, `/ru`), API/form errors localized by machine-readable code (never raw backend `message`), ICU plurals via `useLocalizedForm()`                           |
 | **Auth & sessions**      | ✅ Shipped      | BFF/Token-Handler pattern, full email/password reference flow (login, register, forgot/reset, email verification), OAuth, active-sessions screen                                            |
 | **Shared UI**            | ✅ Shipped      | shadcn/Base UI primitives kept to AMCore's lint/i18n/token contract, a Sidebar app shell                                                                                                    |
+| **Route progress bar**   | ✅ Shipped      | First-party (no dependency) top navigation-progress indicator, reduced-motion aware, toggleable via a documented dev/agent-facing flag                                                      |
 | **Component workshop**   | ✅ Shipped      | Storybook wired to the same MSW/theme/i18n stack as the real app; every story doubles as a Vitest test with a CI-gating axe check                                                           |
 | **Browser security**     | ✅ Shipped      | Security-header baseline, nonce-based Content Security Policy (enforced in production by default), a minimal violation-reporting endpoint                                                   |
 | **Testing pyramid**      | ✅ Shipped      | Vitest + MSW, Playwright mocked/server-mocked/real-stack lanes proving auth/BFF/cookies/Redis end to end                                                                                    |
@@ -126,6 +127,7 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | Frontend testing                    | [`docs/frontend/testing.md`](docs/frontend/testing.md) — Vitest/MSW, Storybook, Playwright mocked/server-mocked/real-stack lanes, and automated a11y scans                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Storybook                           | [`docs/frontend/storybook.md`](docs/frontend/storybook.md) — component workshop, story conventions, a11y gate, and maintenance procedures                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Bundle baseline and budget          | [`docs/frontend/bundle-budget.md`](docs/frontend/bundle-budget.md) — per-route client bundle methodology, the current baseline, and why CI enforcement is deferred                                                                                                                                                                                                                                                                                                                                                                                               |
+| Top route progress bar              | [`docs/frontend/route-progress.md`](docs/frontend/route-progress.md) — what starts/finishes it, the `RouteProgressLink`/`useRouteProgressRouter()` adapters, and the `ROUTE_PROGRESS_ENABLED` dev/agent flag                                                                                                                                                                                                                                                                                                                                                     |
 | Add an env variable                 | [`docs/backend/architecture-and-conventions.md#adding-an-environment-variable`](docs/backend/architecture-and-conventions.md#adding-an-environment-variable)                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Auth, OAuth, sessions               | [`docs/auth/`](docs/auth/README.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | RBAC / authorization                | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -192,15 +194,18 @@ pnpm dev
 > [`docs/operations/deployment.md`](docs/operations/deployment.md).
 
 > **Building a product from this starter?** Run `pnpm init:brand` (product
-> identity, logo/icons, theme) and, if needed, the one-time, destructive
-> `pnpm init:project` (single-locale and/or disabling Storybook) — see
+> identity, logo/icons, theme) and, if needed, the one-time
+> `pnpm init:project` (single-locale and/or disabling Storybook, both
+> destructive; disabling the route-progress bar's default, non-destructive)
+> — see
 > [`docs/frontend/brand-theme-and-tokens.md` → Project scaffolding](docs/frontend/brand-theme-and-tokens.md#project-scaffolding).
 > `init:brand` updates [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) from
 > `upstream-starter` to `downstream-product` when you provide a product
 > name, and records the product identity, upstream-sync policy, and workflow
 > mode (`strict`, `flexible`, or `custom`) from the corresponding prompts or
-> flags. `init:project` records structural choices such as single-locale mode
-> and Storybook removal. Still set by hand: where the
+> flags. `init:project` records project choices: structural single-locale
+> mode/Storybook removal and the non-structural route-progress default.
+> Still set by hand: where the
 > roadmap/status/product-specific decisions live, and anything GitHub-side
 > (branch protection, secrets, environments). Repository files _declare_ the
 > technical policy; GitHub-side enforcement is separate external state. For

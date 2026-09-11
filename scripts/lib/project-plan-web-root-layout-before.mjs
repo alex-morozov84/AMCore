@@ -3,7 +3,8 @@
 // apps/web/src/app/[locale]/layout.tsx. Split out to stay under the repo's
 // ~150-line-per-file guidance, same reason as
 // project-plan-api-render-robustness-before.mjs.
-export const ROOT_LAYOUT_BEFORE = `import type { Metadata } from 'next'
+export const ROOT_LAYOUT_BEFORE = `import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { headers } from 'next/headers'
 import { NextIntlClientProvider } from 'next-intl'
@@ -14,6 +15,8 @@ import { resolveLocaleParam } from '@/i18n/params'
 import { routing } from '@/i18n/routing'
 import { getThemeInitScript } from '@/shared/lib'
 import { NONCE_REQUEST_HEADER } from '@/shared/lib/csp/constants'
+import { ROUTE_PROGRESS_ENABLED } from '@/shared/lib/route-progress/route-progress-flag'
+import { RouteProgressBar } from '@/shared/ui/route-progress-bar'
 
 import { Providers } from './providers'
 
@@ -105,6 +108,14 @@ export default async function LocaleLayout({
           {/* Rendered from a Server Component, so locale/messages/formats/timeZone
               are inherited from \`i18n/request.ts\` — do not pass them by hand. */}
           <NextIntlClientProvider>
+            {/* Suspense: RouteProgressBar reads useSearchParams(). See
+                docs/frontend/route-progress.md; disabled entirely (no DOM,
+                listeners, or timers) when ROUTE_PROGRESS_ENABLED is false. */}
+            {ROUTE_PROGRESS_ENABLED && (
+              <Suspense fallback={null}>
+                <RouteProgressBar />
+              </Suspense>
+            )}
             <Providers>{children}</Providers>
           </NextIntlClientProvider>
         </CSPProvider>

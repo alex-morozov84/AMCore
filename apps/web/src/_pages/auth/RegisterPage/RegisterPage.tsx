@@ -2,8 +2,8 @@ import { useTranslations } from 'next-intl'
 
 import { OAuthSection } from '@/features/auth-oauth'
 import { RegisterForm } from '@/features/auth-register'
-import { Link } from '@/i18n/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 interface RegisterPageProps {
   oauthProviders: string[]
@@ -29,9 +29,9 @@ export function RegisterPage({ oauthProviders }: RegisterPageProps) {
           a non-color way to be told apart from plain text at rest, not only
           on hover/focus (axe `link-in-text-block`) — this text/link pair is
           also below the 3:1 contrast ratio the color-only cue would need. */}
-          <Link href="/login" className="text-primary underline">
+          <RouteProgressLink href="/login" className="text-primary underline">
             {t('login')}
-          </Link>
+          </RouteProgressLink>
         </p>
       </CardContent>
     </Card>

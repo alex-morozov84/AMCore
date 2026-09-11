@@ -5,18 +5,18 @@ import path from 'node:path'
 import { fileStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
 
 const INDEX_ROW =
-  '| [Storybook](./storybook.md)                                             | The component workshop: what\'s wired (a11y/theme/MSW/i18n decorators), story conventions, the CLI-safety/`optimizeDeps.include` rules, and running a fork without Storybook                                                                                                                                                            |\n'
+  "| [Storybook](./storybook.md)                                             | The component workshop: what's wired (a11y/theme/MSW/i18n decorators), story conventions, the CLI-safety/`optimizeDeps.include` rules, and running a fork without Storybook                                                                                                                                                            |\n"
 
 const START_HERE_BULLET =
   '- Writing or reviewing a `shared/ui`/feature-flow story → [Storybook](./storybook.md)\n'
 
 const SCAFFOLDING_BULLET_BEFORE = `- Initializing a downstream fork (\`pnpm init:brand\`/\`pnpm init:project\`:
-  identity, single-locale, disabling Storybook) →
+  identity, locale/Storybook shape, route-progress default) →
   [Brand, theme, and design tokens § Project scaffolding](./brand-theme-and-tokens.md#project-scaffolding)
 `
 
 const SCAFFOLDING_BULLET_AFTER = `- Initializing a downstream fork (\`pnpm init:brand\`/\`pnpm init:project\`:
-  identity, single-locale) →
+  identity, locale shape, route-progress default) →
   [Brand, theme, and design tokens § Project scaffolding](./brand-theme-and-tokens.md#project-scaffolding)
 `
 

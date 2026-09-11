@@ -18,14 +18,14 @@ afterEach(() => {
 })
 
 describe('init-project --storybook=disabled (end-to-end against a real-repo copy)', () => {
-  test('rejects a command with neither --mode nor --storybook', () => {
+  test('rejects a command with none of --mode, --storybook, or --route-progress', () => {
     copy = createRealRepoCopy()
     commit(copy.root)
 
     const result = runInitProject(copy.root, ['--dry-run'])
 
     assert.equal(result.status, 1)
-    assert.match(result.stderr, /at least one of --mode or --storybook is required/)
+    assert.match(result.stderr, /at least one of --mode, --storybook, or --route-progress is required/)
   })
 
   test('rejects an unknown --storybook value', () => {
@@ -68,7 +68,7 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     // two separate fileSteps that would have silently clobbered each other.
     assert.match(
       result.stdout,
-      /update PROJECT_CONTEXT\.md fields \(single-locale \+ storybook-disabled\)/
+      /update PROJECT_CONTEXT\.md fields for the combined dimensions/
     )
     assert.match(result.stdout, /remove the navigation ban and the Storybook plugin\/rules/)
   })

@@ -5,7 +5,8 @@ import { useLocale, useTranslations } from 'next-intl'
 import { SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
 
 import { useCurrentUser } from '@/entities/user'
-import { usePathname, useRouter } from '@/i18n/navigation'
+import { usePathname } from '@/i18n/navigation'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 import { usePersistLocale } from '../model/use-persist-locale'
 
@@ -26,7 +27,7 @@ interface LocaleSwitcherProps {
 export function LocaleSwitcher({ className }: LocaleSwitcherProps) {
   const t = useTranslations('locale')
   const locale = useLocale()
-  const router = useRouter()
+  const router = useRouteProgressRouter()
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
   // `data` is `undefined` both while loading and on a 401 (no session) —

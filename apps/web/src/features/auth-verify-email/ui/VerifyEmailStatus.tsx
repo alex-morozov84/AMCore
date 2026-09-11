@@ -4,10 +4,10 @@ import { useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { useCurrentUser } from '@/entities/user'
-import { Link } from '@/i18n/navigation'
 import { cn } from '@/shared/lib/utils'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { buttonVariants } from '@/shared/ui/button'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import { Spinner } from '@/shared/ui/spinner'
 
 import { useVerifyEmail } from '../model/use-verify-email'
@@ -43,9 +43,9 @@ export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-destructive">{tErrors('TOKEN_INVALID')}</p>
-        <Link href="/resend-verification" className={cn(buttonVariants(), 'w-full')}>
+        <RouteProgressLink href="/resend-verification" className={cn(buttonVariants(), 'w-full')}>
           {t('resendVerification')}
-        </Link>
+        </RouteProgressLink>
       </div>
     )
   }
@@ -55,9 +55,9 @@ export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-muted-foreground">{t('verifyEmailSuccess')}</p>
-        <Link href={destination} className={cn(buttonVariants(), 'w-full')}>
+        <RouteProgressLink href={destination} className={cn(buttonVariants(), 'w-full')}>
           {currentUser?.user ? t('goToDashboard') : t('login')}
-        </Link>
+        </RouteProgressLink>
       </div>
     )
   }
@@ -66,9 +66,9 @@ export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
     return (
       <div className="space-y-4 text-center">
         <ApiErrorAlert error={error} />
-        <Link href="/resend-verification" className={cn(buttonVariants(), 'w-full')}>
+        <RouteProgressLink href="/resend-verification" className={cn(buttonVariants(), 'w-full')}>
           {t('resendVerification')}
-        </Link>
+        </RouteProgressLink>
       </div>
     )
   }

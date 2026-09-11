@@ -1,8 +1,8 @@
 import { useTranslations } from 'next-intl'
 
 import { ForgotPasswordForm } from '@/features/auth-forgot-password'
-import { Link } from '@/i18n/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 export function ForgotPasswordPage() {
   const t = useTranslations('auth')
@@ -20,9 +20,9 @@ export function ForgotPasswordPage() {
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {/* `underline`, not `hover:underline` — see LoginPage/RegisterPage's
           identical link-in-text-block reasoning. */}
-          <Link href="/login" className="text-primary underline">
+          <RouteProgressLink href="/login" className="text-primary underline">
             {t('backToLogin')}
-          </Link>
+          </RouteProgressLink>
         </p>
       </CardContent>
     </Card>

@@ -16,6 +16,7 @@ import { buildWebI18nFixturesSteps } from './project-plan-web-i18n-fixtures.mjs'
 import { buildWebOAuthAlertTestSteps } from './project-plan-web-oauth-alert-test.mjs'
 import { buildWebZodErrorMapTestSteps } from './project-plan-web-zod-error-map-test.mjs'
 import { buildWebApiErrorAlertTestSteps } from './project-plan-web-api-error-alert-test.mjs'
+import { buildWebPrimaryUnavailableFallbackTestSteps } from './project-plan-web-primary-unavailable-fallback-test.mjs'
 import { buildWebPagesSteps } from './project-plan-web-pages.mjs'
 import { buildWebNavSteps } from './project-plan-web-nav.mjs'
 import { buildApiLocaleSteps } from './project-plan-api.mjs'
@@ -34,8 +35,9 @@ export function buildProjectSteps(root, { locale }) {
     ...buildWebOAuthAlertTestSteps(root, locale),
     ...buildWebZodErrorMapTestSteps(root, locale),
     ...buildWebApiErrorAlertTestSteps(root, locale),
+    ...buildWebPrimaryUnavailableFallbackTestSteps(root, locale),
     ...buildWebPagesSteps(root),
-    ...buildWebNavSteps(root, locale),
+    ...buildWebNavSteps(root),
     ...buildWebLocaleDirCleanupSteps(root),
   ]
 }

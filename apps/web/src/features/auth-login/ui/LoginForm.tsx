@@ -3,12 +3,12 @@
 import { useTranslations } from 'next-intl'
 import { type LoginInput, loginSchema } from '@amcore/shared'
 
-import { Link } from '@/i18n/navigation'
 import { useLocalizedForm } from '@/shared/hooks'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
 import { Input } from '@/shared/ui/input'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import { useLogin } from '../model/use-login'
 
@@ -57,9 +57,12 @@ export function LoginForm() {
                 <FormLabel>{t('password')}</FormLabel>
                 {/* `underline`, not `hover:underline` — see LoginPage's
                 identical link-in-text-block reasoning below. */}
-                <Link href="/forgot-password" className="text-sm text-primary underline">
+                <RouteProgressLink
+                  href="/forgot-password"
+                  className="text-sm text-primary underline"
+                >
                   {t('forgotPassword')}
-                </Link>
+                </RouteProgressLink>
               </div>
               <FormControl>
                 <Input type="password" {...field} />

@@ -30,16 +30,16 @@ conventions, see [`docs/backend/architecture-and-conventions.md`](../backend/arc
 `apps/web` follows Feature-Sliced Design (FSD) on top of Next's App Router.
 The two systems own different things, and the layer names say which:
 
-| Path                   | Owns                                                                                                         | Notes                                                                                                                        |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `src/app/`             | Next App Router files only: `page`, `layout`, `loading`, `error`, metadata, route handlers when truly needed | Thin — see [Route thinness](#route-thinness). Routes live under a `[locale]` segment — see [Locale routing](#locale-routing) |
-| `src/i18n/`            | Locale routing config, locale-aware navigation helpers, request config, param validation                     | Import navigation from here, never from `next/link` / `next/navigation` — see [Locale routing](#locale-routing)              |
-| `src/_pages/`          | FSD Pages layer: page composition                                                                            | Canonical FSD meaning, unchanged                                                                                             |
-| `src/_app/` (optional) | FSD App layer: app-level providers/config that live outside Next's own route files                           | Use only if app-level wiring doesn't fit naturally in `src/app/layout.tsx` / `providers.tsx`                                 |
-| `src/widgets/`         | Composed UI blocks made of multiple features/entities                                                        | Canonical FSD meaning, unchanged                                                                                             |
-| `src/features/`        | Single user-interaction-driven slices (e.g. `auth-login`)                                                    | Canonical FSD meaning, unchanged                                                                                             |
-| `src/entities/`        | Business-domain data + its UI (e.g. `user`)                                                                  | Canonical FSD meaning, unchanged                                                                                             |
-| `src/shared/`          | Generic reusable code with no business meaning: UI primitives, API client, hooks, lib, store                 | Canonical FSD meaning, unchanged                                                                                             |
+| Path                   | Owns                                                                                                         | Notes                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/`             | Next App Router files only: `page`, `layout`, `loading`, `error`, metadata, route handlers when truly needed | Thin — see [Route thinness](#route-thinness). Routes live under a `[locale]` segment — see [Locale routing](#locale-routing)       |
+| `src/i18n/`            | Locale routing config, locale-aware navigation helpers, request config, param validation                     | Link/router consumers use the progress-aware adapters; other locale helpers come from here — see [Locale routing](#locale-routing) |
+| `src/_pages/`          | FSD Pages layer: page composition                                                                            | Canonical FSD meaning, unchanged                                                                                                   |
+| `src/_app/` (optional) | FSD App layer: app-level providers/config that live outside Next's own route files                           | Use only if app-level wiring doesn't fit naturally in `src/app/layout.tsx` / `providers.tsx`                                       |
+| `src/widgets/`         | Composed UI blocks made of multiple features/entities                                                        | Canonical FSD meaning, unchanged                                                                                                   |
+| `src/features/`        | Single user-interaction-driven slices (e.g. `auth-login`)                                                    | Canonical FSD meaning, unchanged                                                                                                   |
+| `src/entities/`        | Business-domain data + its UI (e.g. `user`)                                                                  | Canonical FSD meaning, unchanged                                                                                                   |
+| `src/shared/`          | Generic reusable code with no business meaning: UI primitives, API client, hooks, lib, store                 | Canonical FSD meaning, unchanged                                                                                                   |
 
 The underscore prefix on `_pages`/`_app` exists so the FSD layer names don't
 read as Next reserved directories — Next's own routing only ever looks inside
@@ -121,12 +121,14 @@ standalone server — `next start` does not reproduce the fault.
 
 Two rules that are easy to get wrong:
 
-- **Import navigation from `@/i18n/navigation`, never from `next/link` or
-  `next/navigation`.** The Next.js originals do not know about the `[locale]`
-  segment and drop the prefix silently — a Russian user ends up back on the
-  English route with no error anywhere. An ESLint rule enforces this;
-  `notFound()` and other non-navigating helpers may still come from
-  `next/navigation`.
+- **Use `RouteProgressLink` for internal navigating links and
+  `useRouteProgressRouter()` for programmatic navigation.** They wrap
+  `@/i18n/navigation` and preserve both the locale prefix and the global
+  progress signal. Import other locale-aware helpers directly from
+  `@/i18n/navigation`. Never bypass these with `next/link` or locale-unaware
+  `next/navigation`; ESLint enforces both boundaries. `notFound()` and other
+  non-navigating helpers may still come from `next/navigation`. See
+  [Top route progress bar](./route-progress.md).
 - **Call `setRequestLocale(locale)` before any other next-intl call** in each
   page/layout that should render statically, passing it through
   `resolveLocaleParam(params)` from `@/i18n/params` so the URL segment is
