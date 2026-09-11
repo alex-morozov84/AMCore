@@ -36,6 +36,7 @@ find for something, that page is under-documented; please open an issue.
 | Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |
 | Initialize a downstream fork (rebrand, single-locale, disable Storybook)                 | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |
 | Check or update the frontend bundle baseline                                             | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                          |
+| Add a navigating Link / programmatic navigation, or configure the route-progress bar     | [`frontend/route-progress.md`](frontend/route-progress.md)                                                                        |
 | Add an environment variable                                                              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
 | Add an external service / infra dependency                                               | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency) |
 | Add UI copy, a locale, or an error message                                               | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
@@ -105,6 +106,10 @@ find for something, that page is under-documented; please open an issue.
 - **[Bundle baseline and budget](frontend/bundle-budget.md)** — the
   per-route client bundle size methodology, the current baseline, the
   non-vacuity proof, and why CI enforcement is deferred.
+- **[Top route progress bar](frontend/route-progress.md)** — the global
+  navigation-progress indicator: what starts/finishes it, the
+  `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion,
+  and the `ROUTE_PROGRESS_ENABLED` dev/agent flag.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
   sessions, OAuth, [RBAC](auth/rbac.md), [API keys](auth/api-keys.md), invites,
   CSRF, and the [auth contracts reference](auth/reference.md).

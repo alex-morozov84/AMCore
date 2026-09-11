@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Top route progress bar** (P1 item 8). A first-party (no dependency),
+  YouTube-style navigation-progress indicator fixed to the top of the
+  viewport, reduced-motion aware, and styled entirely from semantic design
+  tokens (the first `shared/ui` component to use a CSS Module). `<Link>`
+  clicks start it through a new `RouteProgressLink`
+  (`shared/ui/route-progress-link.tsx`), using `next/link`'s `onNavigate` so
+  an application's own cancelled navigation is correctly distinguished from
+  Next's own internal `preventDefault()`; programmatic navigation starts it
+  through `useRouteProgressRouter()`. Both are now the only sanctioned way
+  to navigate anywhere `@/i18n/navigation`'s `Link`/`useRouter` were used
+  directly before, enforced by an ESLint guard. Toggleable via a documented,
+  non-runtime `ROUTE_PROGRESS_ENABLED` source flag — see
+  [Top route progress bar](docs/frontend/route-progress.md) for the full
+  contract, and [Project scaffolding](docs/frontend/brand-theme-and-tokens.md#project-scaffolding)
+  for the new `pnpm init:project --route-progress=disabled` flag, which only
+  sets that flag's initial value (non-destructive, unlike the other two
+  `init:project` dimensions).
+
+### Fixed
+
+- **Scaffolding-transform drift repair** (PR #401). Several
+  `pnpm init:project` transforms (`--storybook=disabled` and others) had
+  drifted from the real source files they rewrite, silently failing for a
+  downstream fork; repaired and, for the first time, wired the full
+  scaffold-transform contract suite into CI as two required jobs
+  (`scaffolding-contract`, `scaffolding-contract-full`) so this class of
+  drift fails a PR instead of a fork. Also fixed a `pnpm test:scripts`
+  frozen-lockfile bug in CI specifically (a `ci-info`/`GITHUB_ACTIONS`
+  interaction, only reproducible in real CI) and widened the private
+  `ai/*`-path citation guard (`pnpm test:observability-contract`,
+  ADR-078) to cover `scripts/*`, not just `apps/*`/`packages/*`/public
+  `docs/`.
+
 ## [0.9.0] - 2026-09-09
 
 ### Added

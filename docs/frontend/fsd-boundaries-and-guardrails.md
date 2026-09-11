@@ -209,6 +209,9 @@ Tailwind gets noisy. They are not a way around the tokens.
 ```
 
 Class selectors are **camelCase**, because they are read as `styles.chartGrid`.
+A real example: `shared/ui/route-progress-bar.module.css`, used for the top
+route-progress bar's multi-step `@keyframes` crawl and phase-driven fade —
+see [Top route progress bar](./route-progress.md#reduced-motion-tokens-and-csp).
 
 `app/globals.css` is deliberately exempt: it is where tokens are declared, so
 raw colour is correct there.

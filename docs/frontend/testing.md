@@ -119,9 +119,12 @@ fixture (`next/experimental/testmode/playwright/msw`, gated behind
 
 Current flows: locale redirect, login/register client-side validation
 (no network call reaches the BFF), a mocked API failure rendering the
-localized `ApiErrorAlert` fallback, stored-theme persistence/no-flash, and
-the OAuth entry-point's visibility (shown/hidden based on a mocked
-`apps/api` response).
+localized `ApiErrorAlert` fallback, stored-theme persistence/no-flash, the
+OAuth entry-point's visibility (shown/hidden based on a mocked `apps/api`
+response), and the top route-progress bar's full lifecycle — a real
+`<Link>` click, a programmatic navigation, browser Back, a fast/already-resolved
+navigation, a modifier-click exclusion, and reduced motion (see
+[Top route progress bar](./route-progress.md)).
 
 ```bash
 pnpm --filter @amcore/shared build    # needed on a clean checkout before direct Playwright runs
