@@ -68,7 +68,7 @@ capabilities without inheriting an unrelated sample domain.
 
 | Layer             | Technology                                                                     |
 | ----------------- | ------------------------------------------------------------------------------ |
-| **Backend**       | NestJS 11, PostgreSQL 16, Prisma 7, Redis, BullMQ                              |
+| **Backend**       | NestJS 11, PostgreSQL 18, Prisma 7, Redis, BullMQ                              |
 | **Auth**          | JWT + Refresh Tokens, OAuth 2.0 / OIDC, API Keys                               |
 | **Email**         | Resend, vendored React Email primitives + `@react-email/render`, FormatJS i18n |
 | **Storage**       | S3-compatible storage, local dev driver, memory test driver                    |

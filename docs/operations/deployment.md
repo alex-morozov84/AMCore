@@ -647,6 +647,9 @@ indefinitely:
 - [Backup & restore](backup-restore.md) — which backup strategy fits your
   deployment, and the `restore-drill` profile that rehearses an actual
   restore.
+- [PostgreSQL major-version upgrade](postgresql-major-upgrade.md) — moving
+  an existing deployment to a new PostgreSQL major (e.g. 16 → 18); not the
+  same as the routine migration/rollout above.
 - [Secret rotation](secret-rotation.md) — rotating `JWT_SECRET`, database
   credentials, `REDIS_URL`, OAuth secrets, and third-party API keys once
   they're already running in production.

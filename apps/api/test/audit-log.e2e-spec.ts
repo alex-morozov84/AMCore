@@ -8,7 +8,7 @@ describe('AuditLog append-only trigger', () => {
   let container: StartedPostgreSqlContainer | null = null
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:16-alpine')
+    container = await new PostgreSqlContainer('postgres:18-alpine')
       .withDatabase('amcore_test')
       .withUsername('test')
       .withPassword('test')

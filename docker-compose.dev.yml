@@ -3,7 +3,7 @@
 
 services:
   # postgres:
-  #   image: postgres:16-alpine
+  #   image: postgres:18-alpine
   #   container_name: amcore-postgres-dev
   #   ports:
   #     - '5432:5432'
@@ -12,7 +12,7 @@ services:
   #     POSTGRES_PASSWORD: amcore
   #     POSTGRES_DB: amcore
   #   volumes:
-  #     - postgres_dev_data:/var/lib/postgresql/data
+  #     - postgres_dev_data:/var/lib/postgresql
   #   healthcheck:
   #     test: ['CMD-SHELL', 'pg_isready -U amcore -d amcore']
   #     interval: 10s

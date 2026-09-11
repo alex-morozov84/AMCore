@@ -190,7 +190,7 @@ Railway's own Compose-migration guidance maps each Compose service to one
 Railway service 1:1 — "each service defined in your Compose file maps to a
 separate Railway service within a project" — so `api` and `worker` translate
 directly. The same guidance pushes toward Railway's **managed** Postgres and
-Redis instead of the `image: postgres:16`/`image: redis:7-alpine` containers
+Redis instead of the `image: postgres:18`/`image: redis:7-alpine` containers
 this repo's `docker-compose.yml` defines directly, citing automatic backups,
 connection pooling, and no manual volume configuration as the reason
 ([Docker Compose on Railway](https://docs.railway.com/guides/docker-compose)).

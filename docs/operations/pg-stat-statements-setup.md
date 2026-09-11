@@ -84,11 +84,24 @@ so this path has a short exposure window and must run in this order:
    ALTER SYSTEM SET pg_stat_statements.track = 'top';
    ```
 
-5. Restart the server again. A reload is insufficient: settings with
-   `context=superuser` become defaults for new sessions, but already-open
-   backend sessions retain their old values.
+5. Reload the configuration — a restart is not required here:
 
-6. Connect again and verify before performing any password-bearing operation:
+   ```sql
+   SELECT pg_reload_conf();
+   ```
+
+   `pg_stat_statements.track_utility` and `.track` are `context=superuser`
+   settings, unlike `shared_preload_libraries` in Step 3
+   (`context=postmaster`, which genuinely needs a restart). A reload
+   propagates a `context=superuser` change to every already-open backend
+   immediately, not only to new connections — verified live against real
+   PostgreSQL 16 and PostgreSQL 18 containers, holding one backend's session
+   open across the reload and observing its own `SHOW` output flip without
+   reconnecting.
+
+6. Verify before performing any password-bearing operation (any already-open
+   session, or a fresh connection, will now correctly report the hardened
+   values):
 
    ```sql
    SHOW pg_stat_statements.track_utility; -- must be off

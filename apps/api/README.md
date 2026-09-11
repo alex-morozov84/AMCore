@@ -13,7 +13,7 @@ shape is generated from Swagger/OpenAPI at `/docs` in development.
 | Area           | Baseline                                                     |
 | -------------- | ------------------------------------------------------------ |
 | Framework      | NestJS 11                                                    |
-| Database       | PostgreSQL 16, Prisma 7, schema-per-area modularity          |
+| Database       | PostgreSQL 18, Prisma 7, schema-per-area modularity          |
 | Cache / queues | Redis, BullMQ                                                |
 | Validation     | Zod + `nestjs-zod`, shared contracts in `packages/shared`    |
 | Auth           | JWT/refresh sessions, OAuth/OIDC, API keys, CASL permissions |

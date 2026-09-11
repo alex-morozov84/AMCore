@@ -122,7 +122,7 @@ services:
   # Skip these (empty COMPOSE_PROFILES) when using a managed/VPS DB or Redis.
   # ---------------------------------------------------------------------------
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     profiles: ['local-infra']
     # Loads pg_stat_statements at server start (verified: this module cannot be
     # added without a restart — see docs/operations/pg-stat-statements-setup.md)
@@ -147,8 +147,13 @@ services:
       POSTGRES_DB: amcore
     ports:
       - '5432:5432'
+    # postgres:18+ images declare VOLUME /var/lib/postgresql (PGDATA lives at
+    # /var/lib/postgresql/18/docker inside it) — the pre-18 /var/lib/postgresql/data
+    # mount point is gone; see docs/operations/postgresql-major-upgrade.md.
+    # A distinct volume name (not the old postgres_data) so an existing PG16
+    # deployment's data is never silently mounted into a PG18 server.
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_pg18:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U amcore -d amcore']
       interval: 10s
@@ -317,7 +322,7 @@ services:
   # docs/operations/backup-restore.md.
   # ---------------------------------------------------------------------------
   backup:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     profiles: ['backup']
     entrypoint: ['sh', '/scripts/backup.sh']
     environment:
@@ -340,7 +345,7 @@ services:
   #   docker compose --profile restore run --rm restore <dump-filename>
   # ---------------------------------------------------------------------------
   restore:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     profiles: ['restore']
     entrypoint: ['sh', '/scripts/restore.sh']
     environment:
@@ -364,19 +369,20 @@ services:
   #   docker compose --profile restore-drill run --rm restore-drill
   # ---------------------------------------------------------------------------
   restore-drill:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     profiles: ['restore-drill']
     entrypoint: ['sh', '/scripts/restore-drill.sh']
-    # tmpfs, not a volume: postgres:16-alpine declares /var/lib/postgresql/data
-    # as a VOLUME, so Docker allocates an anonymous volume there for every
-    # container regardless of what the entrypoint actually uses. The script
-    # never writes there (its scratch instance lives under /tmp instead), but
-    # without this override `docker compose up restore-drill` (rather than the
-    # documented `run --rm`) would still leave that unused anonymous volume
-    # behind after `down` — tmpfs is RAM-backed and gone with the container,
-    # no Docker volume object ever created either way.
+    # tmpfs, not a volume: postgres:18-alpine declares /var/lib/postgresql
+    # (not the pre-18 /var/lib/postgresql/data) as a VOLUME, so Docker
+    # allocates an anonymous volume there for every container regardless of
+    # what the entrypoint actually uses. The script never writes there (its
+    # scratch instance lives under /tmp instead), but without this override
+    # `docker compose up restore-drill` (rather than the documented `run
+    # --rm`) would still leave that unused anonymous volume behind after
+    # `down` — tmpfs is RAM-backed and gone with the container, no Docker
+    # volume object ever created either way.
     tmpfs:
-      - /var/lib/postgresql/data
+      - /var/lib/postgresql
     volumes:
       - ./docker/postgres/restore-drill.sh:/scripts/restore-drill.sh:ro
       - postgres_backups:/backups:ro
@@ -487,7 +493,7 @@ secrets:
     environment: METRICS_AUTH_TOKEN
 
 volumes:
-  postgres_data:
+  postgres_data_pg18:
   redis_data:
   caddy_data:
   caddy_config:

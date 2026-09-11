@@ -148,8 +148,8 @@ you haven't split these roles yet, do that first; a single shared DB role has
 no rotation story better than "change the password and restart everything at
 once."
 
-**Verified against a real Postgres 16 container:** an `ALTER ROLE ... PASSWORD`
-statement (the one `\password` below sends, internally, with an already-hashed
+**Verified against real PostgreSQL 16 and PostgreSQL 18 containers:** an
+`ALTER ROLE ... PASSWORD` statement (the one `\password` below sends, internally, with an already-hashed
 value — see the note after step 2) does **not** affect connections that are
 already established and authenticated — a session opened with the old
 password keeps running new queries successfully for its entire lifetime.
