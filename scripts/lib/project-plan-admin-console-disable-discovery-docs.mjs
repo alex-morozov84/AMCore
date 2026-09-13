@@ -11,6 +11,10 @@ const ROOT_BLOCK = [
 ].join('\n')
 const ROOT_DOC_MAP_ROW =
   '| Operations Console                  | [`docs/operations-console/`](docs/operations-console/README.md) — current SUPER_ADMIN-facing foundation, topology, session security, scaffolding, deployment, verification, and extension contract                                                                                                                                                                                                                                                                                                                                                               |\n'
+const ROOT_CAPABILITY_ROW =
+  '| **Operations Console**   | ✅ Foundational | Optional localized `SUPER_ADMIN` control-plane shell with path/host topology, isolated host sessions, downstream scaffold choice, and a documented extension contract                       |\n'
+const ROOT_PROJECT_TREE_ROW =
+  '│   ├── operations-console/ # SUPER_ADMIN console usage, configuration, deployment, and extension\n'
 
 const DOCS_INDEX_ROW =
   '| Configure, deploy, or safely extend Operations Console                                   | [`operations-console/`](operations-console/README.md)                                                                             |\n'
@@ -39,7 +43,9 @@ export function removeConsoleFrontendDiscoveryLink(content) {
 }
 
 export function removeConsoleRootGuideLink(content) {
-  return removeExactBlock(removeExactBlock(content, ROOT_BLOCK), ROOT_DOC_MAP_ROW)
+  const withoutGuide = removeExactBlock(content, ROOT_BLOCK)
+  const withoutMap = removeExactBlock(withoutGuide, ROOT_DOC_MAP_ROW)
+  return removeExactBlock(removeExactBlock(withoutMap, ROOT_CAPABILITY_ROW), ROOT_PROJECT_TREE_ROW)
 }
 
 export function removeConsoleDocsIndexLinks(content) {

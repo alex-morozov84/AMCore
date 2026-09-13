@@ -106,6 +106,9 @@ describe('init-project --admin-console', () => {
         rel
       )
     }
+    const rootReadme = readFileSync(path.join(root, 'README.md'), 'utf8')
+    assert.equal(rootReadme.includes('| **Operations Console**'), false)
+    assert.equal(rootReadme.includes('│   ├── operations-console/'), false)
   })
 
   it('rejects unchanged, repeated, and invalid transitions without writing', () => {
