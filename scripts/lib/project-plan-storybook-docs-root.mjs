@@ -66,23 +66,21 @@ const CAPABILITIES_A11Y_ROW_AFTER = `| **Accessibility (a11y)** | ✅ Shipped   
 const CAPABILITIES_WORKSHOP_ROW = `| **Component workshop**   | ✅ Shipped      | Storybook wired to the same MSW/theme/i18n stack as the real app; every story doubles as a Vitest test with a CI-gating axe check                                                           |
 `
 
+export function removeStorybookDocsRoot(content) {
+  let next = replaceExactBlock(content, FRONTEND_TESTING_ROW_BEFORE, FRONTEND_TESTING_ROW_AFTER)
+  next = removeExactBlock(next, STORYBOOK_ROW)
+  next = replaceExactBlock(next, TOOLING_SENTENCE_BEFORE, TOOLING_SENTENCE_AFTER)
+  next = replaceExactBlock(next, ONBOARDING_FLAGS_BEFORE, ONBOARDING_FLAGS_AFTER)
+  next = replaceExactBlock(next, ONBOARDING_STRUCTURAL_BEFORE, ONBOARDING_STRUCTURAL_AFTER)
+  next = replaceExactBlock(next, CAPABILITIES_A11Y_ROW_BEFORE, CAPABILITIES_A11Y_ROW_AFTER)
+  return removeExactBlock(next, CAPABILITIES_WORKSHOP_ROW)
+}
+
 export function buildStorybookDocsRootSteps(root) {
   return [
     fileStep(
       path.join(root, 'README.md'),
-      (content) => {
-        let next = replaceExactBlock(
-          content,
-          FRONTEND_TESTING_ROW_BEFORE,
-          FRONTEND_TESTING_ROW_AFTER
-        )
-        next = removeExactBlock(next, STORYBOOK_ROW)
-        next = replaceExactBlock(next, TOOLING_SENTENCE_BEFORE, TOOLING_SENTENCE_AFTER)
-        next = replaceExactBlock(next, ONBOARDING_FLAGS_BEFORE, ONBOARDING_FLAGS_AFTER)
-        next = replaceExactBlock(next, ONBOARDING_STRUCTURAL_BEFORE, ONBOARDING_STRUCTURAL_AFTER)
-        next = replaceExactBlock(next, CAPABILITIES_A11Y_ROW_BEFORE, CAPABILITIES_A11Y_ROW_AFTER)
-        return removeExactBlock(next, CAPABILITIES_WORKSHOP_ROW)
-      },
+      removeStorybookDocsRoot,
       'README.md: remove the Storybook doc-map row, index row, tooling mention, and onboarding-callout mentions'
     ),
   ]

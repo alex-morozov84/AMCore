@@ -532,7 +532,8 @@ existing edge contract. Select product-web path mode explicitly when needed:
 
 ```bash
 CADDY_WEB_DOMAIN="app.example.com" \
-docker compose -f docker-compose.yml -f docker-compose.web.yml up -d
+docker compose --profile edge \
+  -f docker-compose.yml -f docker-compose.web.yml up -d
 ```
 
 `docker/caddy/Caddyfile.web` fronts the product web host but creates no
@@ -549,7 +550,8 @@ configuration explicitly and set both hostnames:
 ```bash
 CADDY_WEB_DOMAIN="app.example.com" \
 ADMIN_CONSOLE_HOSTNAME="console.example.com" \
-docker compose -f docker-compose.yml -f docker-compose.console-host.yml up -d
+docker compose --profile edge \
+  -f docker-compose.yml -f docker-compose.console-host.yml up -d
 ```
 
 The override mounts `docker/caddy/Caddyfile.console-host`; it is the only
@@ -583,14 +585,13 @@ check applies to query strings.
 The console application checks that header only in host mode; the proxy and
 private container network are the trust boundary, not a raw client header.
 
-PR2B exposes one console BFF target: `GET /api/console/access`. It relays only
-the empty status from the API's bearer-only `GET /api/v1/admin/access` policy
-probe: `204` for a live `SUPER_ADMIN`, `401` or `403` for denial, and `503` for
-an unavailable or unexpected upstream. It never returns profile or role data.
-Every later console BFF target needs its own API-side `SUPER_ADMIN` guard; this
-page admission probe is not authorization for console data. `/api/csp-report`
-is intentionally not a console BFF target and remains the existing
-unauthenticated CSP-report receiver.
+The console BFF's `GET /api/console/access` relays only the empty status from
+the API's bearer-only `GET /api/v1/admin/access` policy probe: `204` for a live
+`SUPER_ADMIN`, `401` or `403` for denial, and `503` for an unavailable or
+unexpected upstream. It never returns profile or role data. Every future data
+target needs its own API-side `SUPER_ADMIN` guard; page admission is not data
+authorization. `/api/csp-report` is intentionally not a console BFF target and
+remains the existing unauthenticated CSP-report receiver.
 
 Host-mode console login and logout use public `/api/auth/login` and
 `/api/auth/logout` paths; the selected proxy maps them internally to the fixed

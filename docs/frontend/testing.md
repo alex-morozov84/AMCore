@@ -306,6 +306,7 @@ every fork.
 | `pnpm --filter web test:storybook`      | Storybook interaction + accessibility gate (browser-mode Vitest/Playwright Chromium)         |
 | `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked lanes (auto-starts `next dev`)                             |
 | `pnpm --filter web test:e2e:real-stack` | Playwright real-stack lane — boot `docker compose --profile local-infra up -d --build` first |
+| `pnpm test:console-session-e2e`         | Isolated Compose + Playwright console HTTPS/cookie/Redis audience lane                       |
 
 On a clean checkout, run `pnpm --filter @amcore/shared build` before either
 Playwright command. `apps/web` imports `@amcore/shared` through its built

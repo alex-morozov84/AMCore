@@ -93,6 +93,22 @@ describe('init-project --admin-console', () => {
     ]) {
       assert.equal(existsSync(path.join(root, rel)), true, rel)
     }
+    for (const rel of [
+      'README.md',
+      'docs/README.md',
+      'docs/frontend/README.md',
+      'docs/auth/README.md',
+      'docs/operations/README.md',
+    ]) {
+      assert.equal(
+        readFileSync(path.join(root, rel), 'utf8').includes('operations-console/README.md'),
+        false,
+        rel
+      )
+    }
+    const rootReadme = readFileSync(path.join(root, 'README.md'), 'utf8')
+    assert.equal(rootReadme.includes('| **Operations Console**'), false)
+    assert.equal(rootReadme.includes('│   ├── operations-console/'), false)
   })
 
   it('rejects unchanged, repeated, and invalid transitions without writing', () => {

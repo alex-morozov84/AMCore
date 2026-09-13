@@ -31,6 +31,10 @@ import { removeStorybookFromEslintConfig } from './project-plan-storybook-eslint
 import { removeStorybookFromPackage } from './project-plan-storybook-package.mjs'
 import { removeStorybookFromFrontendReadme } from './project-plan-storybook-docs-frontend-readme.mjs'
 import { removeStorybookArchitectureBullet } from './project-plan-storybook-docs-misc.mjs'
+import {
+  buildConsoleStorybookDocsSteps,
+  consoleStorybookDocsTargets,
+} from './project-plan-combined-console-storybook-docs.mjs'
 
 /**
  * Which shared targets need a combined step for this exact set of active
@@ -56,7 +60,8 @@ export function combinedTargets(root, dims) {
     targets.push(
       path.join(root, 'apps/web/package.json'),
       path.join(root, 'docs/frontend/architecture-and-conventions.md'),
-      path.join(root, 'docs/frontend/README.md')
+      path.join(root, 'docs/frontend/README.md'),
+      ...consoleStorybookDocsTargets(root)
     )
   }
   return targets
@@ -120,7 +125,8 @@ export function buildCombinedSteps(root, dims) {
         path.join(root, 'docs/frontend/README.md'),
         (content) => removeConsoleFrontendIndexRow(removeStorybookFromFrontendReadme(content)),
         'docs/frontend/README.md: remove Storybook and console-only index entries'
-      )
+      ),
+      ...buildConsoleStorybookDocsSteps(root)
     )
   }
 

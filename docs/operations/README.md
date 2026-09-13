@@ -33,6 +33,10 @@ Already running? Reach for whichever concern below applies.
   SSE-behind-a-proxy guidance, and the `docker-compose.prod.yml` image-pull
   rollout (immutable digests, restart policies, log rotation, honest
   zero/low-downtime guidance).
+- **[Operations Console](../operations-console/README.md)** — optional
+  `SUPER_ADMIN` control-plane topology, host session boundary, scaffold choice,
+  proxy deployment, verification, and extension rules. The detailed nginx/Caddy
+  host-mode mappings remain in [Deployment & migrations](deployment.md#operations-console-host-mode-reference).
 - **[Production deploy profile](production-deploy-profile.md)** — the
   build-once/promote-by-digest contract, the `staging`/`production` GitHub
   Environments setup, and the secrets/variables checklist that gates a

@@ -87,12 +87,15 @@ src/_pages/dashboard/DashboardPage/DashboardPage.tsx → owns the actual composi
 ### Operations Console shell
 
 The Operations Console is a separate system-control-plane slice, not a product
-dashboard or downstream backoffice. Its route plumbing stays under
-`app/[locale]/admin/`; `_pages/console/` composes the current page, and
-`widgets/console-shell` owns its Control Room shell. The shell reuses the
-generic `shared/ui/sidebar` primitive rather than copying it or sharing the
-product `widgets/app-shell`. Console-internal links use `RouteProgressLink`,
-like every other internal navigation.
+dashboard or downstream backoffice. Upstream route plumbing starts under
+`app/[locale]/admin/`; a single-locale or custom-slug scaffold relocates it, so
+downstream work must inspect its generated config and actual route tree.
+`_pages/console/` composes the current page, and `widgets/console-shell` owns its
+Control Room shell. The shell reuses the generic `shared/ui/sidebar` primitive
+rather than copying it or sharing the product `widgets/app-shell`.
+Console-internal links use `RouteProgressLink`, like every other internal
+navigation. See the [Operations Console guide](../operations-console/README.md)
+for its user, deployment, security, and extension contracts.
 
 ## Browser security headers and CSP
 

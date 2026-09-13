@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operations Console guide.** Adds one discoverable public guide for the
+  shipped foundation's `SUPER_ADMIN` boundary, topology, isolated host session,
+  downstream scaffold, deployment, verification, and safe extension contract.
+
 - **Operations Console scaffold.** `pnpm init:project` now supports the
   one-time `--admin-console=disabled|path|host` choice and optional page slug,
   with an owned-path manifest that removes only console frontend/runtime
