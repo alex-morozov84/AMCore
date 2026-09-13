@@ -4,13 +4,13 @@ vi.mock('server-only', () => ({}))
 
 import { getBackendAccessToken } from '@/shared/api/server/access-token'
 
-import { proxyConsoleAccessProbe } from './access-probe'
+import { probeConsoleAccess } from './access-probe'
 
 vi.mock('@/shared/api/server/access-token', () => ({ getBackendAccessToken: vi.fn() }))
 
 const mockedAccessToken = vi.mocked(getBackendAccessToken)
 
-describe('proxyConsoleAccessProbe', () => {
+describe('probeConsoleAccess', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
   })
@@ -22,49 +22,50 @@ describe('proxyConsoleAccessProbe', () => {
   it('fails closed without a server-held bearer credential', async () => {
     mockedAccessToken.mockResolvedValue(null)
 
-    const response = await proxyConsoleAccessProbe()
+    const status = await probeConsoleAccess()
 
-    expect(response.status).toBe(401)
-    expect(await response.text()).toBe('')
+    expect(status).toBe(401)
   })
 
   it('forwards only the no-content success status', async () => {
     mockedAccessToken.mockResolvedValue('access-token')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
 
-    const response = await proxyConsoleAccessProbe()
+    const status = await probeConsoleAccess()
 
-    expect(response.status).toBe(204)
-    expect(await response.text()).toBe('')
+    expect(status).toBe(204)
   })
 
   it.each([401, 403])('forwards expected policy denial %i without a body', async (status) => {
     mockedAccessToken.mockResolvedValue('access-token')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })))
 
-    const response = await proxyConsoleAccessProbe()
+    const result = await probeConsoleAccess()
 
-    expect(response.status).toBe(status)
-    expect(await response.text()).toBe('')
+    expect(result).toBe(status)
   })
 
   it('fails closed when the policy probe is unavailable', async () => {
     mockedAccessToken.mockResolvedValue('access-token')
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('unreachable')))
 
-    const response = await proxyConsoleAccessProbe()
+    const status = await probeConsoleAccess()
 
-    expect(response.status).toBe(503)
-    expect(await response.text()).toBe('')
+    expect(status).toBe(503)
   })
 
   it('does not disclose an unexpected upstream response', async () => {
     mockedAccessToken.mockResolvedValue('access-token')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('unexpected', { status: 500 })))
 
-    const response = await proxyConsoleAccessProbe()
+    const status = await probeConsoleAccess()
 
-    expect(response.status).toBe(503)
-    expect(await response.text()).toBe('')
+    expect(status).toBe(503)
+  })
+
+  it('fails closed when server-held bearer acquisition rejects', async () => {
+    mockedAccessToken.mockRejectedValue(new Error('vault unavailable'))
+
+    await expect(probeConsoleAccess()).resolves.toBe(503)
   })
 })

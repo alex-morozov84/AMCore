@@ -1,0 +1,5 @@
+# Explicitly select the Operations Console host-mode Caddy configuration.
+services:
+  caddy:
+    volumes:
+      - ./docker/caddy/Caddyfile.console-host:/etc/caddy/Caddyfile:ro

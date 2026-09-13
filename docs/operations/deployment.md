@@ -529,18 +529,26 @@ ADMIN_CONSOLE_HOSTNAME="console.example.com"
 TRUST_PROXY=1                    # Caddy is exactly one hop in front of the app
 ```
 
-`docker/caddy/Caddyfile` fronts `api:5002`, the product web host, and the
-optional Operations Console host. **OAuth login needs the product web host
-fronted**: per
+`docker/caddy/Caddyfile` is the path-mode configuration: it fronts `api:5002`
+and the product web host, but creates no console hostname. **OAuth login needs
+the product web host fronted**: per
 `docs/auth/oauth.md`'s ADR-068 note, provider callback URLs
 (`GOOGLE_CALLBACK_URL` etc.) point at `apps/web`'s own origin, not `api`'s —
 fronting only `api:5002` leaves OAuth's callback URL unreachable.
 
 ### Operations Console host-mode reference
 
-When the generated console config selects `host`, set
-`ADMIN_CONSOLE_HOSTNAME` to a lowercase FQDN. The Next container validates it
-at startup; an empty or malformed value prevents boot. Keep `web` private:
+When the generated console config selects `host`, select the matching Caddy
+configuration explicitly and set `ADMIN_CONSOLE_HOSTNAME` to a lowercase FQDN:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.console-host.yml up -d
+```
+
+The override mounts `docker/caddy/Caddyfile.console-host`; it is the only
+reference Caddyfile that creates a console host. An absent hostname makes that
+file fail validation rather than creating a placeholder vhost. The Next
+container also validates the hostname at startup. Keep `web` private:
 the reference Compose mapping binds it to `127.0.0.1` by default, and Caddy or
 nginx reaches `web:3000` over the Compose network. Setting
 `WEB_PUBLISH_HOST=0.0.0.0` is an operator-owned exception that requires an
@@ -558,7 +566,8 @@ For the console hostname, both reference proxies apply the same mapping:
 
 `docker/nginx/operations-console.conf` is the nginx reference include. Its
 default TLS vhost rejects unmatched hosts, and both vhosts forward the exact
-`Host` header. `docker/caddy/Caddyfile` carries the equivalent Caddy block.
+`Host` header. `docker/caddy/Caddyfile.console-host` carries the equivalent
+Caddy block.
 The trailing-slash redirect runs before the internal page mapping, so an
 upstream redirect cannot expose `/{locale}/admin/...` as a public location.
 Nginx rejects encoded traversal before mapping. Both references reject direct

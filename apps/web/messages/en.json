@@ -56,9 +56,11 @@
     "search": "Search",
     "noResults": "Nothing found",
     "close": "Close",
-    "notAvailable": "—",
-    "operationsConsoleTitle": "Operations Console",
-    "operationsConsolePlaceholder": "The control plane foundation is ready."
+    "notAvailable": "—"
+  },
+  "console": {
+    "title": "Operations Console",
+    "placeholder": "The control plane foundation is ready."
   },
   "auth": {
     "login": "Sign in",

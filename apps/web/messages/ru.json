@@ -56,9 +56,11 @@
     "search": "Поиск",
     "noResults": "Ничего не найдено",
     "close": "Закрыть",
-    "notAvailable": "—",
-    "operationsConsoleTitle": "Операционная консоль",
-    "operationsConsolePlaceholder": "Основа системной панели управления готова."
+    "notAvailable": "—"
+  },
+  "console": {
+    "title": "Операционная консоль",
+    "placeholder": "Основа системной панели управления готова."
   },
   "auth": {
     "login": "Войти",
