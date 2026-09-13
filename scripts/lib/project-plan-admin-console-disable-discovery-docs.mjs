@@ -9,6 +9,8 @@ const ROOT_BLOCK = [
   'documented there. It is not a product backoffice or a catalog/content admin UI.',
   '',
 ].join('\n')
+const ROOT_DOC_MAP_ROW =
+  '| Operations Console                  | [`docs/operations-console/`](docs/operations-console/README.md) — current SUPER_ADMIN-facing foundation, topology, session security, scaffolding, deployment, verification, and extension contract                                                                                                                                                                                                                                                                                                                                                               |\n'
 
 const DOCS_INDEX_ROW =
   '| Configure, deploy, or safely extend Operations Console                                   | [`operations-console/`](operations-console/README.md)                                                                             |\n'
@@ -37,7 +39,7 @@ export function removeConsoleFrontendDiscoveryLink(content) {
 }
 
 export function removeConsoleRootGuideLink(content) {
-  return removeExactBlock(content, ROOT_BLOCK)
+  return removeExactBlock(removeExactBlock(content, ROOT_BLOCK), ROOT_DOC_MAP_ROW)
 }
 
 export function removeConsoleDocsIndexLinks(content) {
