@@ -5,15 +5,14 @@ import {
   SessionRefreshUnsafeError,
 } from './errors'
 import { startLockRenewal } from './lock-renewal'
-import { redisVaultLock } from './session-lock'
 import type {
   UpstreamRefreshFn,
   UpstreamRefreshResult,
   VaultEntry,
   VaultLock,
+  VaultRecord,
   VaultStore,
 } from './session-vault.types'
-import { redisVaultStore } from './session-vault-store'
 
 import 'server-only'
 
@@ -27,8 +26,8 @@ const LOCK_RENEWAL_INTERVAL_MS = 4 * 1000
 // not the primary bound; renewal is (see round-2 fix in ai/models-talk.md).
 const UPSTREAM_REFRESH_CEILING_MS = 30 * 1000
 
-export interface EnsureFreshSessionDeps {
-  store: VaultStore
+export interface EnsureFreshSessionDeps<TRecord extends VaultRecord = VaultRecord> {
+  store: VaultStore<TRecord>
   lock: VaultLock
   upstreamRefresh: UpstreamRefreshFn
   now?: () => number
@@ -50,14 +49,10 @@ function isFresh(entry: VaultEntry, now: number): boolean {
  * propagates as `SessionVaultUnavailableError` — callers must treat that as
  * "cannot authenticate," never fall back to trusting a cached value.
  */
-export async function ensureFreshSession(
+export async function ensureFreshSession<TRecord extends VaultRecord = VaultRecord>(
   sessionId: string,
-  deps: EnsureFreshSessionDeps = {
-    store: redisVaultStore,
-    lock: redisVaultLock,
-    upstreamRefresh: notConfiguredUpstreamRefresh,
-  }
-): Promise<VaultEntry> {
+  deps: EnsureFreshSessionDeps<TRecord>
+): Promise<TRecord & Pick<VaultEntry, 'version'>> {
   const now = deps.now ?? Date.now
   const entry = await deps.store.get(sessionId)
   if (!entry) throw new SessionNotFoundError(sessionId)
@@ -66,11 +61,11 @@ export async function ensureFreshSession(
   return refreshUnderLock(sessionId, deps, now)
 }
 
-async function refreshUnderLock(
+async function refreshUnderLock<TRecord extends VaultRecord>(
   sessionId: string,
-  deps: EnsureFreshSessionDeps,
+  deps: EnsureFreshSessionDeps<TRecord>,
   now: () => number
-): Promise<VaultEntry> {
+): Promise<TRecord & Pick<VaultEntry, 'version'>> {
   const token = await deps.lock.acquire(sessionId, LOCK_TTL_MS)
   if (!token) throw new SessionLockTimeoutError(sessionId)
 
@@ -88,12 +83,12 @@ async function refreshUnderLock(
   }
 }
 
-async function performRefresh(
+async function performRefresh<TRecord extends VaultRecord>(
   sessionId: string,
-  current: VaultEntry,
+  current: TRecord & Pick<VaultEntry, 'version'>,
   lockToken: string,
-  deps: EnsureFreshSessionDeps
-): Promise<VaultEntry> {
+  deps: EnsureFreshSessionDeps<TRecord>
+): Promise<TRecord & Pick<VaultEntry, 'version'>> {
   const controller = new AbortController()
   const renewal = startLockRenewal(sessionId, lockToken, deps.lock, controller, {
     ttlMs: LOCK_TTL_MS,
@@ -133,8 +128,4 @@ async function performRefresh(
   const latest = await deps.store.get(sessionId)
   if (!latest) throw new SessionNotFoundError(sessionId)
   return latest
-}
-
-function notConfiguredUpstreamRefresh(): never {
-  throw new Error('ensureFreshSession called without an upstreamRefresh implementation')
 }

@@ -1,6 +1,6 @@
 import { SessionVaultUnavailableError } from './errors'
 import { getWebRedisClient } from './redis-client'
-import type { VaultEntry, VaultStore } from './session-vault.types'
+import type { VaultEntry, VaultRecord, VaultStore } from './session-vault.types'
 import { VAULT_TTL_SECONDS } from './vault-constants'
 
 import 'server-only'
@@ -32,18 +32,20 @@ async function withVaultErrors<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 /** Creates an isolated Redis vault store under an explicit session namespace. */
-export function createRedisVaultStore(namespace: string): VaultStore {
+export function createRedisVaultStore<TRecord extends VaultRecord = VaultRecord>(
+  namespace: string
+): VaultStore<TRecord> {
   return {
     async get(sessionId) {
       return withVaultErrors(async () => {
         const raw = await (await getWebRedisClient()).get(entryKey(namespace, sessionId))
-        return raw === null ? null : (JSON.parse(raw) as VaultEntry)
+        return raw === null ? null : (JSON.parse(raw) as TRecord & Pick<VaultEntry, 'version'>)
       })
     },
 
     async create(sessionId, entry) {
       return withVaultErrors(async () => {
-        const versioned: VaultEntry = { ...entry, version: 1 }
+        const versioned = { ...entry, version: 1 }
         await (
           await getWebRedisClient()
         ).set(entryKey(namespace, sessionId), JSON.stringify(versioned), {
@@ -54,7 +56,7 @@ export function createRedisVaultStore(namespace: string): VaultStore {
 
     async setIfVersionMatches(sessionId, expectedVersion, entry) {
       return withVaultErrors(async () => {
-        const versioned: VaultEntry = { ...entry, version: expectedVersion + 1 }
+        const versioned = { ...entry, version: expectedVersion + 1 }
         const reply = await (
           await getWebRedisClient()
         ).eval(CAS_SET_SCRIPT, {

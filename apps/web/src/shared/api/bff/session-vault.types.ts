@@ -5,23 +5,26 @@ import type { UserResponse } from '@amcore/shared'
  * The browser only ever holds the opaque session id (as the `amcore_session`
  * cookie) that keys this entry — see ADR-068.
  */
-export interface VaultEntry {
+export interface VaultRecord {
   refreshToken: string
   accessToken: string
   /** Epoch milliseconds. */
   accessTokenExpiresAt: number
   userSnapshot: UserResponse
+}
+
+export interface VaultEntry extends VaultRecord {
   /** Optimistic-concurrency counter, incremented on every successful write. */
   version: number
 }
 
-export type NewVaultEntry = Omit<VaultEntry, 'version'>
+export type NewVaultEntry<TRecord extends VaultRecord = VaultRecord> = TRecord
 
 /** Redis-backed (or fake, in tests) storage for `VaultEntry` records. */
-export interface VaultStore {
-  get(sessionId: string): Promise<VaultEntry | null>
+export interface VaultStore<TRecord extends VaultRecord = VaultRecord> {
+  get(sessionId: string): Promise<(TRecord & Pick<VaultEntry, 'version'>) | null>
   /** Initial write on login/register/OAuth exchange. Starts `version` at 1. */
-  create(sessionId: string, entry: NewVaultEntry): Promise<void>
+  create(sessionId: string, entry: NewVaultEntry<TRecord>): Promise<void>
   /**
    * Conditional write: succeeds only if the stored entry's `version` still
    * equals `expectedVersion`. Returns whether the write happened.
@@ -29,7 +32,7 @@ export interface VaultStore {
   setIfVersionMatches(
     sessionId: string,
     expectedVersion: number,
-    entry: NewVaultEntry
+    entry: NewVaultEntry<TRecord>
   ): Promise<boolean>
   delete(sessionId: string): Promise<void>
 }

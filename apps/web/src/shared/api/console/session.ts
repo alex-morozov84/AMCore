@@ -11,15 +11,16 @@ import { ACCESS_TOKEN_LIFETIME_MS } from '@/shared/api/bff/vault-constants'
 
 import { CONSOLE_SESSION_COOKIE_NAME } from './session-cookie'
 import { redisConsoleVaultLock } from './session-lock'
+import {
+  CONSOLE_AUDIENCE,
+  type ConsoleVaultEntry,
+  type ConsoleVaultRecord,
+} from './session-vault.types'
 import { redisConsoleVaultStore } from './session-vault-store'
 
 import 'server-only'
 
-export const CONSOLE_AUDIENCE = 'console'
-
-export interface ConsoleVaultEntry extends VaultEntry {
-  audience: typeof CONSOLE_AUDIENCE
-}
+export { CONSOLE_AUDIENCE, type ConsoleVaultEntry, type ConsoleVaultRecord }
 
 export interface ConsoleSessionParams {
   accessToken: string
@@ -43,7 +44,7 @@ export async function mintConsoleSession({
     accessTokenExpiresAt: Date.now() + ACCESS_TOKEN_LIFETIME_MS,
     userSnapshot: user,
     audience: CONSOLE_AUDIENCE,
-  } as Omit<ConsoleVaultEntry, 'version'>)
+  })
   return sessionId
 }
 

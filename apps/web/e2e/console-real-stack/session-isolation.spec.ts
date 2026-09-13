@@ -28,6 +28,35 @@ function setSystemRole(email: string, role: 'USER' | 'SUPER_ADMIN'): void {
   )
 }
 
+function redisKeys(namespace: string): string[] {
+  const output = execFileSync(
+    'docker',
+    [
+      'compose',
+      '-p',
+      project,
+      'exec',
+      '-T',
+      'redis',
+      'redis-cli',
+      '--scan',
+      '--pattern',
+      `${namespace}:*`,
+    ],
+    { encoding: 'utf8' }
+  )
+  return output.split('\n').filter(Boolean)
+}
+
+function redisEntry(key: string): Record<string, unknown> {
+  const output = execFileSync(
+    'docker',
+    ['compose', '-p', project, 'exec', '-T', 'redis', 'redis-cli', '--raw', 'GET', key],
+    { encoding: 'utf8' }
+  )
+  return JSON.parse(output)
+}
+
 test('host session is isolated, origin-guarded, and loses admission after demotion', async ({
   browser,
 }) => {
@@ -45,13 +74,26 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
-  const preLogin = await consolePage.request.get('/en')
-  expect(preLogin.status()).toBe(404)
+  const productSessionConsoleAttempt = await productPage.request.get('https://console.localhost/en')
+  expect(productSessionConsoleAttempt.status()).toBe(404)
 
-  setSystemRole(email, 'SUPER_ADMIN')
   await consolePage.goto('/en/login')
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/password/i).fill('Test1234Secure')
+  const [deniedLogin] = await Promise.all([
+    consolePage.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/auth/login' &&
+        response.request().method() === 'POST'
+    ),
+    consolePage.getByRole('button', { name: /sign in/i }).click(),
+  ])
+  expect(deniedLogin.status()).toBe(403)
+  expect(await console.cookies('https://console.localhost')).not.toContainEqual(
+    expect.objectContaining({ name: '__Host-amcore_console_session' })
+  )
+
+  setSystemRole(email, 'SUPER_ADMIN')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
   await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
 
@@ -63,6 +105,13 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
       sameSite: 'Strict',
     })
   )
+  const productEntries = redisKeys('web:session:v1')
+  const consoleEntries = redisKeys('web:console-session:v1')
+  expect(productEntries).not.toHaveLength(0)
+  expect(consoleEntries).not.toHaveLength(0)
+  expect(redisEntry(productEntries[0])).not.toHaveProperty('audience')
+  expect(redisEntry(consoleEntries[0])).toMatchObject({ audience: 'console' })
+
   const productSessionAttempt = await consolePage.request.get('https://app.localhost/api/auth/me')
   expect(productSessionAttempt.status()).toBe(401)
   const crossOriginLogout = await productPage.request.post(
