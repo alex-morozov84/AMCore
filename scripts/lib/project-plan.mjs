@@ -21,7 +21,7 @@ import { buildWebPagesSteps } from './project-plan-web-pages.mjs'
 import { buildWebNavSteps } from './project-plan-web-nav.mjs'
 import { buildApiLocaleSteps } from './project-plan-api.mjs'
 
-export function buildProjectSteps(root, { locale }) {
+export function buildProjectSteps(root, { locale, deferLocaleCleanup = false }) {
   return [
     ...buildContextSteps(root, locale),
     ...buildSharedLocaleSteps(root, locale),
@@ -38,6 +38,6 @@ export function buildProjectSteps(root, { locale }) {
     ...buildWebPrimaryUnavailableFallbackTestSteps(root, locale),
     ...buildWebPagesSteps(root),
     ...buildWebNavSteps(root),
-    ...buildWebLocaleDirCleanupSteps(root),
+    ...(deferLocaleCleanup ? [] : buildWebLocaleDirCleanupSteps(root)),
   ]
 }

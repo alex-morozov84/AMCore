@@ -1,5 +1,5 @@
 // Source-state validation for the one-time Operations Console scaffold choice.
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import ownedPaths from './admin-console-owned-paths.json' with { type: 'json' }
 import { EngineError, readMarkdownField } from './actions.mjs'
@@ -13,6 +13,32 @@ export const ADMIN_CONSOLE_ROUTE_ROOT = 'apps/web/src/app/[locale]'
 
 const SLUG_PATTERN = /^[a-z0-9-]{1,63}$/
 
+function routeSegments(dir) {
+  const segments = new Set()
+  let hasDynamicSegment = false
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    if (/^\(.*\)$/.test(entry.name) || entry.name.startsWith('@')) {
+      const nested = routeSegments(path.join(dir, entry.name))
+      nested.segments.forEach((segment) => segments.add(segment))
+      hasDynamicSegment ||= nested.hasDynamicSegment
+    } else if (entry.name.startsWith('[')) {
+      hasDynamicSegment = true
+    } else {
+      segments.add(entry.name)
+    }
+  }
+  return { segments, hasDynamicSegment }
+}
+
+function assertAvailableConsoleRoute(root, slug) {
+  const routeRoot = path.join(root, ADMIN_CONSOLE_ROUTE_ROOT)
+  const { segments, hasDynamicSegment } = routeSegments(routeRoot)
+  if (hasDynamicSegment || (slug !== DEFAULT_ADMIN_CONSOLE_SLUG && segments.has(slug))) {
+    throw new EngineError(`--admin-console-slug=${slug} collides with an existing public route`)
+  }
+}
+
 export function assertAdminConsoleSlug(root, slug) {
   if (!SLUG_PATTERN.test(slug)) {
     throw new EngineError('--admin-console-slug must match ^[a-z0-9-]{1,63}$')
@@ -20,6 +46,7 @@ export function assertAdminConsoleSlug(root, slug) {
   if (slug === 'api' || readCurrentSupportedLocales(root).includes(slug)) {
     throw new EngineError(`--admin-console-slug=${slug} collides with an existing URL segment`)
   }
+  assertAvailableConsoleRoute(root, slug)
 }
 
 export function resolveAdminConsolePaths(root, slug = DEFAULT_ADMIN_CONSOLE_SLUG) {

@@ -16,7 +16,7 @@ import { runInitCommand, runProjectVerification } from './lib/init-engine.mjs'
 import { prismaFollowUpMessage } from './lib/project-config.mjs'
 import { storybookInstallFollowUpMessage } from './lib/project-config-storybook.mjs'
 import { DEFAULT_ADMIN_CONSOLE_SLUG } from './lib/project-config-admin-console.mjs'
-import { parseProjectFlags } from './lib/project-flags.mjs'
+import { parseProjectFlags, PROJECT_HELP } from './lib/project-flags.mjs'
 import { prepareProjectInit } from './lib/project-init-plan.mjs'
 
 // Testability seams for scripts/*.test.mjs — see init-brand.mjs's header for
@@ -37,6 +37,10 @@ const testVerifyOverride =
 
 async function main() {
   const flags = parseProjectFlags(process.argv.slice(2))
+  if (flags.help) {
+    console.log(PROJECT_HELP)
+    return
+  }
   const adminConsoleSlug = flags['admin-console-slug'] ?? DEFAULT_ADMIN_CONSOLE_SLUG
   const { steps, confirmMessage } = prepareProjectInit(ROOT, flags, adminConsoleSlug)
 

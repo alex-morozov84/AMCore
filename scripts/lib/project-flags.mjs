@@ -6,8 +6,24 @@ import { STORYBOOK_VALUES } from './project-config-storybook.mjs'
 import { ROUTE_PROGRESS_VALUES } from './project-config-route-progress.mjs'
 import { ADMIN_CONSOLE_VALUES } from './project-config-admin-console.mjs'
 
+export const PROJECT_HELP = `Usage: pnpm init:project [options]
+
+One-time downstream scaffold choices:
+  --mode=single --locale=<code>          remove locale routing
+  --storybook=disabled                   remove Storybook
+  --route-progress=disabled              disable route-progress by default
+  --admin-console=disabled|path|host     choose Operations Console topology
+  --admin-console-slug=<segment>         set the Console page segment for path/host
+
+Common options:
+  --dry-run                              print the exact plan without writing
+  --yes                                  skip interactive confirmation
+  --help                                 show this help
+`
+
 export function parseProjectFlags(argv) {
   const flags = parseCommonFlags(argv, {
+    help: { type: 'boolean', default: false },
     mode: { type: 'string' },
     locale: { type: 'string' },
     storybook: { type: 'string' },
@@ -15,6 +31,8 @@ export function parseProjectFlags(argv) {
     'admin-console': { type: 'string' },
     'admin-console-slug': { type: 'string' },
   })
+
+  if (flags.help) return flags
 
   if (!flags.mode && !flags.storybook && !flags['route-progress'] && !flags['admin-console']) {
     throw new EngineError(

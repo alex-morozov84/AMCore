@@ -1,6 +1,4 @@
-// Builds the typed "steps" a Plan is made of. Every step computes its full
-// before/after diff at build time (nothing here writes) — that's what makes
-// `--dry-run` exact and `apply()` a pure "replay the already-computed plan."
+// Typed scaffold plan steps: compute before/after up front, then replay exactly.
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import {
@@ -54,16 +52,7 @@ export function exactContentStep(filePath, { expectedBefore, after }, summary) {
   }
 }
 
-/**
- * A step that both moves a file AND rewrites its content in one operation —
- * for files that need a structural edit as part of relocating (e.g. a page
- * that loses its locale-resolution boilerplate when it moves out from under
- * `[locale]/`). A plain `moveFileStep` followed by a separate
- * `exactContentStep(newPath, ...)` cannot express this: the plan is built by
- * reading the *current* disk state before any step runs, so the second step
- * would try to read a file at `newPath` that doesn't exist yet. Fails closed
- * exactly like `exactContentStep` if `oldPath`'s content has drifted.
- */
+/** Moves and rewrites atomically; separate steps cannot read a just-created target during plan build. */
 export function moveAndRewriteStep(oldPath, newPath, { expectedBefore, after }, summary) {
   const before = readFileSync(oldPath, 'utf8')
   if (before !== expectedBefore) {
@@ -74,6 +63,7 @@ export function moveAndRewriteStep(oldPath, newPath, { expectedBefore, after }, 
   }
   return {
     kind: 'edit',
+    source: oldPath,
     target: newPath,
     summary,
     changed: true,
@@ -105,6 +95,7 @@ export function copyFileStep(srcPath, destPath, summary) {
 export function moveFileStep(srcPath, destPath, summary) {
   return {
     kind: 'move',
+    source: srcPath,
     target: destPath,
     summary,
     changed: true,

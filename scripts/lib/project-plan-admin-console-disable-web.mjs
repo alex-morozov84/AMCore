@@ -20,7 +20,16 @@ export function removeConsolePackageScript(content) {
   return jsonDeleteTransform(['scripts.test:e2e:console-real-stack'])(content)
 }
 
-export function buildAdminConsoleDisableWebSteps(root) {
+export function buildAdminConsoleDisableWebSteps(root, { keptLocale } = {}) {
+  const catalogueSteps = ['en', 'ru']
+    .filter((locale) => !keptLocale || locale === keptLocale)
+    .map((locale) =>
+      fileStep(
+        path.join(root, `apps/web/messages/${locale}.json`),
+        jsonDeleteTransform(['console']),
+        `remove the ${locale} console message namespace`
+      )
+    )
   return [
     fileStep(
       path.join(root, 'apps/web/src/instrumentation.ts'),
@@ -39,16 +48,7 @@ export function buildAdminConsoleDisableWebSteps(root) {
         ),
       'remove the console-only semantic design token'
     ),
-    fileStep(
-      path.join(root, 'apps/web/messages/en.json'),
-      jsonDeleteTransform(['console']),
-      'remove the English console message namespace'
-    ),
-    fileStep(
-      path.join(root, 'apps/web/messages/ru.json'),
-      jsonDeleteTransform(['console']),
-      'remove the Russian console message namespace'
-    ),
+    ...catalogueSteps,
     fileStep(
       path.join(root, 'apps/web/package.json'),
       removeConsolePackageScript,

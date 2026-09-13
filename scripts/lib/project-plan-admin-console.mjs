@@ -35,7 +35,11 @@ function replaceConsoleSlug(content, slug) {
   return replaceAllExactText(content, '/admin', `/${slug}`)
 }
 
-export function buildAdminConsoleEnableSteps(root, choice) {
+export function buildAdminConsoleEnableSteps(
+  root,
+  choice,
+  { moveRoute = true, rewriteProxy = true } = {}
+) {
   const paths = resolveAdminConsolePaths(root, choice.slug)
   const steps = [
     ...buildAdminConsoleContextSteps(root, choice),
@@ -47,8 +51,13 @@ export function buildAdminConsoleEnableSteps(root, choice) {
   ]
 
   if (choice.slug !== 'admin') {
-    steps.push(
-      moveFileStep(paths.defaultRoute, paths.route, `rename the console route to ${choice.slug}`),
+    if (moveRoute) {
+      steps.push(
+        moveFileStep(paths.defaultRoute, paths.route, `rename the console route to ${choice.slug}`)
+      )
+    }
+    if (rewriteProxy) {
+      steps.push(
       fileStep(
         path.join(root, 'docker/nginx/operations-console.conf'),
         (content) => replaceConsoleSlug(content, choice.slug),
@@ -59,12 +68,13 @@ export function buildAdminConsoleEnableSteps(root, choice) {
         (content) => replaceConsoleSlug(content, choice.slug),
         'rewrite the Caddy physical console route for the chosen slug'
       )
-    )
+      )
+    }
   }
   return steps
 }
 
-export function buildAdminConsoleDisableSteps(root) {
+export function buildAdminConsoleDisableSteps(root, { keptLocale } = {}) {
   const paths = resolveAdminConsolePaths(root)
   const deletionTargets = [
     paths.defaultRoute,
@@ -82,7 +92,7 @@ export function buildAdminConsoleDisableSteps(root) {
       (content) => removeMarkedBlock(content, 'AMCORE_ADMIN_CONSOLE_PROXY'),
       'remove the console nginx proxy block between its owned sentinels'
     ),
-    ...buildAdminConsoleDisableWebSteps(root),
+    ...buildAdminConsoleDisableWebSteps(root, { keptLocale }),
     ...buildAdminConsoleDisableDocsSteps(root),
     fileStep(
       path.join(root, 'PROJECT_CONTEXT.md'),

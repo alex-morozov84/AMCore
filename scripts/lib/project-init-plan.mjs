@@ -7,6 +7,7 @@ import { assertStorybookEnabled } from './project-config-storybook.mjs'
 import { assertRouteProgressEnabled } from './project-config-route-progress.mjs'
 import { assertAdminConsoleTransition } from './project-config-admin-console.mjs'
 import { buildProjectSteps } from './project-plan.mjs'
+import { buildWebLocaleDirCleanupSteps } from './project-plan-web-structure.mjs'
 import { buildStorybookDisableSteps } from './project-plan-storybook.mjs'
 import { buildRouteProgressFlagSteps } from './project-plan-route-progress-flag.mjs'
 import { buildRouteProgressContextSteps } from './project-plan-route-progress-context.mjs'
@@ -14,6 +15,8 @@ import {
   buildAdminConsoleDisableSteps,
   buildAdminConsoleEnableSteps,
 } from './project-plan-admin-console.mjs'
+import { buildAdminConsoleSingleLocaleSteps } from './project-plan-admin-console-single-locale.mjs'
+import { buildAdminConsoleSingleLocaleProxySteps } from './project-plan-admin-console-single-locale-proxy.mjs'
 import { combinedTargets, buildCombinedSteps } from './project-plan-combined.mjs'
 
 function assertDimensions(root, flags, adminConsoleSlug) {
@@ -39,24 +42,48 @@ function dimensionsFor(flags, adminConsoleSlug) {
   }
 }
 
+function singleConsoleChoice(flags, slug) {
+  if (!flags.mode) return undefined
+  if (flags['admin-console'] === 'disabled') return { mode: 'disabled', slug }
+  return { mode: flags['admin-console'] ?? 'path', slug }
+}
+
+function explicitAdminSteps(root, flags, slug) {
+  if (!flags['admin-console']) return []
+  if (flags['admin-console'] === 'disabled') {
+    return buildAdminConsoleDisableSteps(root, { keptLocale: flags.mode ? flags.locale : undefined })
+  }
+  return buildAdminConsoleEnableSteps(
+    root,
+    { mode: flags['admin-console'], slug },
+    { moveRoute: !flags.mode, rewriteProxy: !(flags.mode && flags['admin-console'] === 'host') }
+  )
+}
+
 function ownSteps(root, flags, adminConsoleSlug, overlap) {
   const withoutOverlap = (steps) => steps.filter((step) => !overlap.has(step.target))
-  const adminSteps = flags['admin-console']
-    ? flags['admin-console'] === 'disabled'
-      ? buildAdminConsoleDisableSteps(root)
-      : buildAdminConsoleEnableSteps(root, {
-          mode: flags['admin-console'],
-          slug: adminConsoleSlug,
-        })
+  const consoleChoice = singleConsoleChoice(flags, adminConsoleSlug)
+  const localeSteps = flags.mode
+    ? buildProjectSteps(root, { locale: flags.locale, deferLocaleCleanup: Boolean(consoleChoice) })
     : []
+  const consoleRouteSteps = consoleChoice?.mode === 'disabled'
+    ? []
+    : consoleChoice
+      ? buildAdminConsoleSingleLocaleSteps(root, consoleChoice.slug)
+      : []
 
   return [
-    ...(flags.mode ? withoutOverlap(buildProjectSteps(root, { locale: flags.locale })) : []),
+    ...withoutOverlap(localeSteps),
     ...(flags.storybook ? withoutOverlap(buildStorybookDisableSteps(root)) : []),
     ...(flags['route-progress']
       ? [...buildRouteProgressFlagSteps(root), ...withoutOverlap(buildRouteProgressContextSteps(root))]
       : []),
-    ...withoutOverlap(adminSteps),
+    ...withoutOverlap(explicitAdminSteps(root, flags, adminConsoleSlug)),
+    ...consoleRouteSteps,
+    ...(consoleChoice?.mode === 'host'
+      ? buildAdminConsoleSingleLocaleProxySteps(root, consoleChoice.slug)
+      : []),
+    ...(consoleChoice ? buildWebLocaleDirCleanupSteps(root) : []),
   ]
 }
 
