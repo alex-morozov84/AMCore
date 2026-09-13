@@ -505,7 +505,7 @@ jobs:
       # generated at build time and its `__Host-` cookie requires HTTPS. The
       # harness builds a temporary host-mode checkout and tears it down itself.
       - name: Tear down product real-stack topology
-        run: docker compose down -v
+        run: docker compose --profile local-infra down -v --remove-orphans
 
       - name: Run HTTPS console host-mode real-stack E2E lane
         run: pnpm test:console-session-e2e
@@ -530,7 +530,7 @@ jobs:
 
       - name: Tear down real-stack stack
         if: always()
-        run: docker compose down -v
+        run: docker compose --profile local-infra down -v --remove-orphans
 
   promtool:
     name: Observability contract (static)

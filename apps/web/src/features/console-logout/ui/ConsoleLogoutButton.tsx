@@ -1,6 +1,6 @@
 'use client'
 
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { useMutation } from '@tanstack/react-query'
 import { LogOutIcon } from 'lucide-react'
 
@@ -10,12 +10,11 @@ import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-pr
 import { Button } from '@/shared/ui/button'
 
 export function ConsoleLogoutButton() {
-  const locale = useLocale()
   const router = useRouteProgressRouter()
   const t = useTranslations('console')
   const { mutate, isPending } = useMutation({
     mutationFn: () => apiClient.post<void>(getConsolePublicApiPath('/auth/logout')),
-    onSettled: () => router.replace('/login', { locale }),
+    onSettled: () => router.replace('/login'),
   })
 
   return (
