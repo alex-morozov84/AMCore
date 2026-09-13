@@ -15,9 +15,51 @@
 	reverse_proxy api:5002
 }
 
-# Uncomment to also front apps/web on its own domain (set CADDY_WEB_DOMAIN in
-# .env too). Caddy fronts only the API by default because apps/web is a
-# deliberate starter shell, not a required production surface (see AGENTS.md).
-# {$CADDY_WEB_DOMAIN} {
-# 	reverse_proxy web:3000
-# }
+{$CADDY_WEB_DOMAIN:app.invalid} {
+	reverse_proxy web:3000 {
+		header_up Host {host}
+	}
+}
+
+# AMCORE_ADMIN_CONSOLE_PROXY_START — PR5 owns this block's deletion transform.
+{$ADMIN_CONSOLE_HOSTNAME:console.invalid} {
+	@physicalConsolePath path /admin /admin/*
+	handle @physicalConsolePath {
+		respond 404
+	}
+
+	@consoleTrailingSlash path_regexp consoleTrailingSlash ^(/(?:en|ru)(?:/.*[^/])?)/$
+	handle @consoleTrailingSlash {
+		redir {re.consoleTrailingSlash.1}?{query} 308
+	}
+
+	@cspReport path /api/csp-report
+	handle @cspReport {
+		reverse_proxy web:3000 {
+			header_up Host {host}
+		}
+	}
+
+	@consoleApi path /api/*
+	handle @consoleApi {
+		uri replace /api/ /api/console/
+		reverse_proxy web:3000 {
+			header_up Host {host}
+		}
+	}
+
+	@consolePage path_regexp consolePage ^/(en|ru)(/.*)?$
+	handle @consolePage {
+		rewrite * /{re.consolePage.1}/admin{re.consolePage.2}
+		reverse_proxy web:3000 {
+			header_up Host {host}
+		}
+	}
+
+	handle {
+		reverse_proxy web:3000 {
+			header_up Host {host}
+		}
+	}
+}
+# AMCORE_ADMIN_CONSOLE_PROXY_END

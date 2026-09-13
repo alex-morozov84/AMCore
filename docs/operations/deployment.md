@@ -524,17 +524,57 @@ Enable it by adding `edge` to `COMPOSE_PROFILES` (e.g.
 ```bash
 CADDY_DOMAIN="api.example.com"   # must have an A/AAAA record pointed at this host
 CADDY_EMAIL="ops@example.com"    # ACME account contact (Let's Encrypt)
+CADDY_WEB_DOMAIN="app.example.com"
+ADMIN_CONSOLE_HOSTNAME="console.example.com"
 TRUST_PROXY=1                    # Caddy is exactly one hop in front of the app
 ```
 
-`docker/caddy/Caddyfile` fronts `api:5002` by default — matching the nginx
-example above, and consistent with `apps/web` being a deliberate starter
-shell rather than a required production surface. A commented block in that
-file shows how to also front `apps/web` on a second domain if you want to
-expose it too. **OAuth login needs that second domain fronted**: per
+`docker/caddy/Caddyfile` fronts `api:5002`, the product web host, and the
+optional Operations Console host. **OAuth login needs the product web host
+fronted**: per
 `docs/auth/oauth.md`'s ADR-068 note, provider callback URLs
 (`GOOGLE_CALLBACK_URL` etc.) point at `apps/web`'s own origin, not `api`'s —
 fronting only `api:5002` leaves OAuth's callback URL unreachable.
+
+### Operations Console host-mode reference
+
+When the generated console config selects `host`, set
+`ADMIN_CONSOLE_HOSTNAME` to a lowercase FQDN. The Next container validates it
+at startup; an empty or malformed value prevents boot. Keep `web` private:
+the reference Compose mapping binds it to `127.0.0.1` by default, and Caddy or
+nginx reaches `web:3000` over the Compose network. Setting
+`WEB_PUBLISH_HOST=0.0.0.0` is an operator-owned exception that requires an
+independent firewall.
+
+For the console hostname, both reference proxies apply the same mapping:
+
+| Public request                      | Next upstream                                                        |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| `/{locale}/.../`                    | external `308` to the same public path without `/` (query preserved) |
+| `/{locale}/...`                     | `/{locale}/admin/...`                                                |
+| `/api/...`                          | `/api/console/...`                                                   |
+| `/api/csp-report`                   | unchanged                                                            |
+| `/_next/...` and top-level metadata | unchanged                                                            |
+
+`docker/nginx/operations-console.conf` is the nginx reference include. Its
+default TLS vhost rejects unmatched hosts, and both vhosts forward the exact
+`Host` header. `docker/caddy/Caddyfile` carries the equivalent Caddy block.
+The trailing-slash redirect runs before the internal page mapping, so an
+upstream redirect cannot expose `/{locale}/admin/...` as a public location.
+Nginx rejects encoded traversal before mapping. Both references reject direct
+physical `/admin` paths; Caddy also catches normalized traversal there. Neither
+check applies to query strings.
+The console application checks that header only in host mode; the proxy and
+private container network are the trust boundary, not a raw client header.
+
+PR2B exposes one console BFF target: `GET /api/console/access`. It relays only
+the empty status from the API's bearer-only `GET /api/v1/admin/access` policy
+probe: `204` for a live `SUPER_ADMIN`, `401` or `403` for denial, and `503` for
+an unavailable or unexpected upstream. It never returns profile or role data.
+Every later console BFF target needs its own API-side `SUPER_ADMIN` guard; this
+page admission probe is not authorization for console data. `/api/csp-report`
+is intentionally not a console BFF target and remains the existing
+unauthenticated CSP-report receiver.
 
 A few things that differ from the nginx example on purpose:
 

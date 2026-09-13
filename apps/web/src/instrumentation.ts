@@ -2,6 +2,13 @@ import type { Instrumentation } from 'next'
 
 import { logServerError } from '@/shared/lib/server-logger'
 
+export async function register(): Promise<void> {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { validateAdminConsoleStartupOrExit } = await import('@/shared/lib/admin-console-startup')
+    validateAdminConsoleStartupOrExit()
+  }
+}
+
 /**
  * Next's own hook for **uncaught** server errors that reach an error
  * boundary (`error.js`/`catchError`/the root boundary) - genuinely

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operations Console routing foundation.** Adds the localized console
+  placeholder, live SUPER_ADMIN page probe, host-aware console BFF namespace,
+  startup hostname validation, and nginx/Caddy host-mode reference routing.
+
 - **Operations Console access probe.** `GET /api/v1/admin/access` is a
   bearer-only, live `SUPER_ADMIN` policy check for the future Operations
   Console. It returns an empty `204` and never exposes profile, role, or
