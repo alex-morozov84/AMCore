@@ -69,7 +69,15 @@
     "controlPlane": "System control plane",
     "accessPolicy": "Live access policy",
     "protected": "Protected",
-    "overviewEyebrow": "Control Room"
+    "overviewEyebrow": "Control Room",
+    "loginTitle": "Console sign in",
+    "loginDescription": "Sign in with a platform administrator account.",
+    "loginEmail": "Email",
+    "loginPassword": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…"
   },
   "auth": {
     "login": "Sign in",

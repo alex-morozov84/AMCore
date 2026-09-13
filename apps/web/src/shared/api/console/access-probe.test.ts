@@ -3,20 +3,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 
 import { getBackendAccessToken } from '@/shared/api/server/access-token'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { probeConsoleAccess } from './access-probe'
+import { getConsoleAccessToken } from './session'
 
 vi.mock('@/shared/api/server/access-token', () => ({ getBackendAccessToken: vi.fn() }))
+vi.mock('./session', () => ({ getConsoleAccessToken: vi.fn() }))
 
 const mockedAccessToken = vi.mocked(getBackendAccessToken)
+const mockedConsoleAccessToken = vi.mocked(getConsoleAccessToken)
+const mutableConfig = ADMIN_CONSOLE_CONFIG as { mode: 'disabled' | 'path' | 'host' }
+const originalMode = ADMIN_CONSOLE_CONFIG.mode
 
 describe('probeConsoleAccess', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    mutableConfig.mode = originalMode
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    mutableConfig.mode = originalMode
   })
 
   it('fails closed without a server-held bearer credential', async () => {
@@ -67,5 +75,19 @@ describe('probeConsoleAccess', () => {
     mockedAccessToken.mockRejectedValue(new Error('vault unavailable'))
 
     await expect(probeConsoleAccess()).resolves.toBe(503)
+  })
+
+  it('uses only the console-held bearer in host mode', async () => {
+    mutableConfig.mode = 'host'
+    mockedConsoleAccessToken.mockResolvedValue('console-token')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
+
+    await expect(probeConsoleAccess()).resolves.toBe(204)
+
+    expect(mockedAccessToken).not.toHaveBeenCalled()
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:5002/api/v1/admin/access',
+      expect.objectContaining({ headers: { Authorization: 'Bearer console-token' } })
+    )
   })
 })

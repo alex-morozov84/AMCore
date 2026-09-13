@@ -32,6 +32,22 @@ raw token lives in the bundled web client.
 
 One user can have many sessions (one per device). They're fully independent.
 
+## Operations Console host mode
+
+The optional Operations Console host is a separate browser-session audience,
+not another URL for the product session. Its browser holds only
+`__Host-amcore_console_session`; the `__Host-` prefix requires `Secure`,
+`Path=/`, and no `Domain`, so the cookie is host-only and cannot be shared with
+a sibling product host. The opaque identifier resolves only in Redis keys under
+`web:console-session:v1:*`, whose entries persist `audience: 'console'`.
+
+The product `amcore_session` and `web:session:v1:*` remain unchanged. Neither
+side reads the other cookie or namespace. Console admission is additionally a
+live `SUPER_ADMIN` policy probe on every protected request, so a role demotion
+takes effect on the next request even when the stored access token is still
+within its normal lifetime. Console logout deletes only this console vault
+entry and cookie.
+
 ---
 
 ## Token rotation

@@ -48,6 +48,14 @@ server-side. The only short exception is the OAuth callback handoff described in
 onto the frontend origin and immediately consumed/deleted by
 `/{locale}/auth/callback`.
 
+When the optional Operations Console uses its separate host mode, it has a
+second, deliberately isolated BFF boundary: `__Host-amcore_console_session`
+points only to `web:console-session:v1:*` entries carrying the `console`
+audience. It is not a product session and cannot authenticate product BFF
+routes; conversely, `amcore_session` cannot admit the console. See
+[Sessions](./sessions.md#operations-console-host-mode) and
+[CSRF Posture](./csrf.md#operations-console-host-mode).
+
 ---
 
 ## Quick start
