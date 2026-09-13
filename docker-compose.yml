@@ -253,7 +253,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     ports:
-      - '3000:3000'
+      - '${WEB_PUBLISH_HOST:-127.0.0.1}:3000:3000'
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       API_URL: ${API_URL:-http://api:5002}
@@ -279,6 +279,7 @@ services:
       # "enforce" (the module's own environment-aware default); see
       # .env.example for the full contract.
       WEB_CSP_MODE: ${WEB_CSP_MODE:-}
+      ADMIN_CONSOLE_HOSTNAME: ${ADMIN_CONSOLE_HOSTNAME:-}
     depends_on:
       api:
         condition: service_healthy
@@ -302,8 +303,6 @@ services:
       # inside the `caddy` container at startup — only when `edge` is active.
       CADDY_DOMAIN: ${CADDY_DOMAIN:-}
       CADDY_EMAIL: ${CADDY_EMAIL:-}
-      # Only used if you uncomment the apps/web block in the Caddyfile.
-      CADDY_WEB_DOMAIN: ${CADDY_WEB_DOMAIN:-}
     ports:
       - '80:80'
       - '443:443'

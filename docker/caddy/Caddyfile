@@ -14,10 +14,3 @@
 {$CADDY_DOMAIN} {
 	reverse_proxy api:5002
 }
-
-# Uncomment to also front apps/web on its own domain (set CADDY_WEB_DOMAIN in
-# .env too). Caddy fronts only the API by default because apps/web is a
-# deliberate starter shell, not a required production surface (see AGENTS.md).
-# {$CADDY_WEB_DOMAIN} {
-# 	reverse_proxy web:3000
-# }

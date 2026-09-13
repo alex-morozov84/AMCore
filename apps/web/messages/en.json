@@ -58,6 +58,10 @@
     "close": "Close",
     "notAvailable": "—"
   },
+  "console": {
+    "title": "Operations Console",
+    "placeholder": "The control plane foundation is ready."
+  },
   "auth": {
     "login": "Sign in",
     "logout": "Sign out",
