@@ -31,6 +31,9 @@
   --line-soft: #f0f0f0;
   --line-strong: #d4d4d4;
 
+  /* Operations Console: functional control-plane signal, not product primary. */
+  --console-accent: #7c3aed;
+
   /* shadcn components — neutral, not a brand color */
   --primary: #171717;
   --primary-foreground: #fafafa;
@@ -89,6 +92,7 @@
   --border: #333;
   --line-soft: #262626;
   --line-strong: #404040;
+  --console-accent: #7c3aed;
   --primary: #e5e5e5;
   --primary-foreground: #171717;
   --secondary: #262626;
@@ -144,6 +148,7 @@
   --color-border: var(--border);
   --color-line-soft: var(--line-soft);
   --color-line-strong: var(--line-strong);
+  --color-console-accent: var(--console-accent);
 
   /* shadcn */
   --color-primary: var(--primary);

@@ -84,6 +84,16 @@ src/app/[locale]/(dashboard)/page.tsx               → imports and renders a _p
 src/_pages/dashboard/DashboardPage/DashboardPage.tsx → owns the actual composition
 ```
 
+### Operations Console shell
+
+The Operations Console is a separate system-control-plane slice, not a product
+dashboard or downstream backoffice. Its route plumbing stays under
+`app/[locale]/admin/`; `_pages/console/` composes the current page, and
+`widgets/console-shell` owns its Control Room shell. The shell reuses the
+generic `shared/ui/sidebar` primitive rather than copying it or sharing the
+product `widgets/app-shell`. Console-internal links use `RouteProgressLink`,
+like every other internal navigation.
+
 ## Browser security headers and CSP
 
 `src/proxy.ts` (next-intl's locale-routing middleware) also generates a

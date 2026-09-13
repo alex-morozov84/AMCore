@@ -60,7 +60,16 @@
   },
   "console": {
     "title": "Operations Console",
-    "placeholder": "The control plane foundation is ready."
+    "placeholder": "The control plane foundation is ready.",
+    "overview": "Overview",
+    "navigation": "Console navigation",
+    "mobileNavigation": "Operations Console navigation",
+    "mobileNavigationDescription": "Navigate the Operations Console.",
+    "toggleNavigation": "Toggle console navigation",
+    "controlPlane": "System control plane",
+    "accessPolicy": "Live access policy",
+    "protected": "Protected",
+    "overviewEyebrow": "Control Room"
   },
   "auth": {
     "login": "Sign in",

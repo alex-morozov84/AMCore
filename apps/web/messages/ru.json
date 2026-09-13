@@ -60,7 +60,16 @@
   },
   "console": {
     "title": "Операционная консоль",
-    "placeholder": "Основа системной панели управления готова."
+    "placeholder": "Основа системной панели управления готова.",
+    "overview": "Обзор",
+    "navigation": "Навигация консоли",
+    "mobileNavigation": "Навигация операционной консоли",
+    "mobileNavigationDescription": "Переходы в операционной консоли.",
+    "toggleNavigation": "Переключить навигацию консоли",
+    "controlPlane": "Системная плоскость управления",
+    "accessPolicy": "Актуальная проверка доступа",
+    "protected": "Защищено",
+    "overviewEyebrow": "Control Room"
   },
   "auth": {
     "login": "Войти",

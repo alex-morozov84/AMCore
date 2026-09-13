@@ -22,14 +22,15 @@ a user override their OS preference.
 
 ### Token set
 
-| Group             | Tokens                                                                                            | Notes                                                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Core surfaces     | `background`, `foreground`, `card`, `popover`, `surface-elevated`, `surface-sunken`               | `surface-elevated` sits visually above `background` (e.g. a raised panel); `surface-sunken` recedes (e.g. a well/input background) |
-| Foreground steps  | `foreground-soft`, `foreground-muted`, `foreground-faint`                                         | Decreasing emphasis, for secondary/tertiary text                                                                                   |
-| Borders           | `border`, `line-soft`, `line-strong`                                                              | `border` is the shadcn-standard name; `line-*` are AMCore's extension for finer control                                            |
-| shadcn components | `primary`, `secondary`, `accent`, `muted`, `destructive`, `input`, `ring` (+ `-foreground` pairs) | `accent` is a **hover surface** (used by ghost/outline button variants), not the brand color — don't confuse it with `primary`     |
-| Status            | `success`, `warning`, `info`, `danger` (+ `-soft` background pairs)                               | See [Contrast](#contrast) for why the shade differs from the "obvious" bright version                                              |
-| Charts / sidebar  | `chart-1`..`chart-5`, `sidebar-*`                                                                 | Distinguishable hues independent of `primary` — a chart shouldn't visually imply "this series is the brand"                        |
+| Group              | Tokens                                                                                            | Notes                                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Core surfaces      | `background`, `foreground`, `card`, `popover`, `surface-elevated`, `surface-sunken`               | `surface-elevated` sits visually above `background` (e.g. a raised panel); `surface-sunken` recedes (e.g. a well/input background)       |
+| Foreground steps   | `foreground-soft`, `foreground-muted`, `foreground-faint`                                         | Decreasing emphasis, for secondary/tertiary text                                                                                         |
+| Borders            | `border`, `line-soft`, `line-strong`                                                              | `border` is the shadcn-standard name; `line-*` are AMCore's extension for finer control                                                  |
+| shadcn components  | `primary`, `secondary`, `accent`, `muted`, `destructive`, `input`, `ring` (+ `-foreground` pairs) | `accent` is a **hover surface** (used by ghost/outline button variants), not the brand color — don't confuse it with `primary`           |
+| Status             | `success`, `warning`, `info`, `danger` (+ `-soft` background pairs)                               | See [Contrast](#contrast) for why the shade differs from the "obvious" bright version                                                    |
+| Charts / sidebar   | `chart-1`..`chart-5`, `sidebar-*`                                                                 | Distinguishable hues independent of `primary` — a chart shouldn't visually imply "this series is the brand"                              |
+| Operations Console | `console-accent`                                                                                  | Functional system-control-plane signal for active console navigation, live-status indication, and links; it is not a product brand token |
 
 **The default palette is neutral (shadcn gray), not a brand color.** `primary`/
 `accent`/`ring` are neutral grays, not the AM logo's violet — the token
