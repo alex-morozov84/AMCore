@@ -1,5 +1,5 @@
-import { ConsolePlaceholderPage } from '@/_pages/console'
+import { OverviewPage } from '@/_pages/console'
 
 export default function AdminPage() {
-  return <ConsolePlaceholderPage />
+  return <OverviewPage />
 }

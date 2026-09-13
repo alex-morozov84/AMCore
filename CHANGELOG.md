@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operations Console Control Room shell.** Adds the isolated console
+  Sidebar composition, localized overview placeholder, semantic console accent,
+  and progress-aware console navigation without expanding console sessions,
+  BFF/API contracts, or product-backoffice scope.
+
 - **Operations Console routing foundation.** Adds the localized console
   placeholder, live SUPER_ADMIN page probe, host-aware console BFF namespace,
   startup hostname validation, and nginx/Caddy host-mode reference routing.
