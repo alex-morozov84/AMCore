@@ -1,5 +1,22 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common'
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
@@ -55,9 +72,9 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('access')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Check Operations Console access — SUPER_ADMIN only' })
-  @ApiResponse({ status: 204, description: 'Console access granted' })
+  @ApiNoContentResponse({ description: 'Console access granted' })
   @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
   @ApiResponse({ status: 403, description: 'SUPER_ADMIN required' })
   checkAccess(): undefined {
