@@ -25,11 +25,15 @@ component, assert on \`data-slot\`/\`data-variant\` attributes and behavior
 (click, open/close, variant switching), not implementation detail.
 `
 
+export function removeStorybookArchitectureBullet(content) {
+  return removeExactBlock(content, ARCHITECTURE_BULLET)
+}
+
 export function buildStorybookDocsMiscSteps(root) {
   return [
     fileStep(
       path.join(root, 'docs/frontend/architecture-and-conventions.md'),
-      (content) => removeExactBlock(content, ARCHITECTURE_BULLET),
+      removeStorybookArchitectureBullet,
       'architecture-and-conventions.md: remove the Storybook "See also" bullet'
     ),
     fileStep(

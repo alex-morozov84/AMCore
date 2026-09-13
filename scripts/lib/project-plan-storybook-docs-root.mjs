@@ -14,23 +14,26 @@ const FRONTEND_TESTING_ROW_AFTER = `| Frontend testing                    | [\`d
 const STORYBOOK_ROW = `| Storybook                           | [\`docs/frontend/storybook.md\`](docs/frontend/storybook.md) — component workshop, story conventions, a11y gate, and maintenance procedures                                                                                                                                                                                                                                                                                                                                                                                                                        |
 `
 
-const ONBOARDING_FLAGS_BEFORE = `> \`pnpm init:project\` (single-locale and/or disabling Storybook, both
-> destructive; disabling the route-progress bar's default, non-destructive)
+const ONBOARDING_FLAGS_BEFORE = `> \`pnpm init:project\` (single-locale, Storybook, or Operations Console shape,
+> all one-time; route-progress's default is non-destructive)
 > — see
 `
 
-const ONBOARDING_FLAGS_AFTER = `> \`pnpm init:project\` (single-locale, destructive; disabling the
-> route-progress bar's default, non-destructive) — see
+const ONBOARDING_FLAGS_AFTER = `> \`pnpm init:project\` (single-locale or Operations Console shape, both
+> one-time; route-progress's default is non-destructive) — see
 `
 
 const ONBOARDING_STRUCTURAL_BEFORE = `> flags. \`init:project\` records project choices: structural single-locale
-> mode/Storybook removal and the non-structural route-progress default.
+> mode/Storybook removal, the console \`disabled|path|host\` choice and optional
+> page slug, plus the non-structural route-progress default. Console hostnames
+> remain deployment configuration (\`ADMIN_CONSOLE_HOSTNAME\`), not a slug.
 > Still set by hand: where the
 `
 
 const ONBOARDING_STRUCTURAL_AFTER = `> flags. \`init:project\` records project choices: structural single-locale
-> mode and the non-structural route-progress default. Still set by hand:
-> where the
+> mode, the console \`disabled|path|host\` choice and optional page slug, plus the
+> non-structural route-progress default. Console hostnames remain deployment
+> configuration (\`ADMIN_CONSOLE_HOSTNAME\`), not a slug. Still set by hand: where the
 `
 
 const TOOLING_SENTENCE_BEFORE = `Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,

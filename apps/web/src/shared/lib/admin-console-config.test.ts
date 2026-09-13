@@ -15,6 +15,8 @@ afterEach(() => {
 
 describe('admin console startup config', () => {
   it('does not require a hostname in the generated path mode', () => {
+    mutableConfig.mode = 'path'
+
     expect(getConsoleHostname({})).toBeUndefined()
     expect(() => validateAdminConsoleStartup({})).not.toThrow()
   })

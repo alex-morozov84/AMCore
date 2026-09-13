@@ -266,8 +266,8 @@ when you answer the corresponding prompts.
 ### Project scaffolding
 
 `pnpm init:project` is the separate, one-time sibling command for
-project choices `init:brand` deliberately never touches. It covers two
-structural dimensions and one reversible source default, each with its own
+project choices `init:brand` deliberately never touches. It covers three
+destructive, one-time dimensions and one reversible source default, each with its own
 reinitialize guard:
 `--mode=single --locale=<code>` removes locale routing entirely, **destructively**
 (see
@@ -280,6 +280,12 @@ flag to its disabled default and is **non-destructive** — no file is moved
 or deleted, and the choice can be reversed by hand at any later point (see
 [Top route progress bar § `pnpm init:project --route-progress=disabled`](./route-progress.md#pnpm-initproject---route-progressdisabled)).
 Any one flag alone, or any combination together, works in one invocation.
+`--admin-console=disabled|path|host` chooses the optional Operations Console:
+the pristine upstream `path/admin` default can become host mode, a custom path
+slug, or a full removal of console-owned frontend/runtime wiring. Its optional
+`--admin-console-slug=<segment>` is a URL segment, never a hostname; host mode
+continues to receive `ADMIN_CONSOLE_HOSTNAME` at deployment. A chosen console
+state is terminal for this v1 scaffold, like the other destructive dimensions.
 See `PROJECT_CONTEXT.md`'s "Frontend Starter Choices" section for the full
 contract, and `pnpm init:project --help` for its dry-run, typed-confirmation,
 and fail-closed safety controls.

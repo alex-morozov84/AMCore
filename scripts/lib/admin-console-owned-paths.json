@@ -1,0 +1,27 @@
+{
+  "directories": [
+    "apps/web/src/app/api/console",
+    "apps/web/src/_pages/console",
+    "apps/web/src/features/console-login",
+    "apps/web/src/features/console-logout",
+    "apps/web/src/shared/api/console",
+    "apps/web/src/widgets/console-shell",
+    "apps/web/e2e/console-real-stack"
+  ],
+  "files": [
+    "apps/web/src/shared/lib/admin-console-config.test.ts",
+    "apps/web/src/shared/lib/admin-console-config.ts",
+    "apps/web/src/shared/lib/admin-console-startup.ts",
+    "apps/web/src/shared/lib/console-host-guard.test.ts",
+    "apps/web/src/shared/lib/console-host-guard.ts",
+    "apps/web/src/shared/lib/console-public-api-path.test.ts",
+    "apps/web/src/shared/lib/console-public-api-path.ts",
+    "apps/web/src/shared/lib/console-public-href.test.ts",
+    "apps/web/src/shared/lib/console-public-href.ts",
+    "apps/web/playwright.console-real-stack.config.ts",
+    "docker-compose.console-host.yml",
+    "docker-compose.console-session-e2e.yml",
+    "docker/caddy/Caddyfile.console-host",
+    "scripts/run-console-session-e2e.mjs"
+  ]
+}

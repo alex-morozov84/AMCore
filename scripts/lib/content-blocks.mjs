@@ -42,6 +42,39 @@ export function replaceAllExactText(content, before, after) {
   return content.split(before).join(after)
 }
 
+/** Removes exactly one named start/end sentinel block, markers included. */
+export function removeMarkedBlock(content, name) {
+  const start = `# ${name}_START`
+  const end = `# ${name}_END`
+  const starts = content.split(start).length - 1
+  const ends = content.split(end).length - 1
+  if (starts !== 1 || ends !== 1) {
+    throw new EngineError(
+      `expected one ${name} sentinel pair, found ${starts} start and ${ends} end`
+    )
+  }
+  const startIndex = content.indexOf(start)
+  const endIndex = content.indexOf(end, startIndex)
+  if (endIndex < startIndex) throw new EngineError(`${name} sentinel end precedes its start`)
+  const afterEnd = content.indexOf('\n', endIndex)
+  return (
+    content.slice(0, startIndex) + content.slice(afterEnd === -1 ? content.length : afterEnd + 1)
+  )
+}
+
+/** Removes one Markdown section bounded by its exact heading and the next heading. */
+export function removeMarkdownSection(content, heading, nextHeading) {
+  const starts = content.split(heading).length - 1
+  const ends = content.split(nextHeading).length - 1
+  if (starts !== 1 || ends !== 1) {
+    throw new EngineError(`expected one ${heading} section ending at ${nextHeading}`)
+  }
+  const startIndex = content.indexOf(heading)
+  const endIndex = content.indexOf(nextHeading, startIndex)
+  if (endIndex < startIndex) throw new EngineError(`${heading} end heading precedes its start`)
+  return content.slice(0, startIndex) + content.slice(endIndex)
+}
+
 /**
  * Keeps only `locale`'s block inside a flat, one-level-deep
  * `{ <locale>: { ... }, <locale>: { ... } }` object literal whose blocks

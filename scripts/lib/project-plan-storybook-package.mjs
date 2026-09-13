@@ -22,11 +22,15 @@ const DEV_DEPENDENCY_PATHS = [
   'devDependencies.path-to-regexp',
 ]
 
+export function removeStorybookFromPackage(content) {
+  return jsonDeleteTransform([...SCRIPT_PATHS, ...DEV_DEPENDENCY_PATHS])(content)
+}
+
 export function buildStorybookPackageSteps(root) {
   return [
     fileStep(
       path.join(root, 'apps/web/package.json'),
-      jsonDeleteTransform([...SCRIPT_PATHS, ...DEV_DEPENDENCY_PATHS]),
+      removeStorybookFromPackage,
       'apps/web/package.json: remove the Storybook scripts and devDependencies'
     ),
   ]

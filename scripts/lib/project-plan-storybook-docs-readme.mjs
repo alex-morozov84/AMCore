@@ -29,6 +29,15 @@ const TESTING_MENTION_AFTER = `- **[Frontend testing](frontend/testing.md)** —
   drawn on, and the tool-neutral runtime-verification workflow.
 `
 
+const BRAND_MAP_BEFORE = `  downstream rebrand checklist, and initializing a fork's locale, Storybook,
+  route-progress, and Operations Console topology with \`pnpm init:brand\` /
+  \`pnpm init:project\`.
+`
+
+const BRAND_MAP_AFTER = `  downstream rebrand checklist, and initializing a fork's locale, route-progress,
+  and Operations Console topology with \`pnpm init:brand\` / \`pnpm init:project\`.
+`
+
 export function buildStorybookDocsReadmeSteps(root) {
   return [
     fileStep(
@@ -36,7 +45,8 @@ export function buildStorybookDocsReadmeSteps(root) {
       (content) => {
         const next = removeExactBlock(content, INDEX_ROW)
         const next2 = replaceExactBlock(next, SCAFFOLDING_ROW_BEFORE, SCAFFOLDING_ROW_AFTER)
-        return replaceExactBlock(next2, TESTING_MENTION_BEFORE, TESTING_MENTION_AFTER)
+        const next3 = replaceExactBlock(next2, TESTING_MENTION_BEFORE, TESTING_MENTION_AFTER)
+        return replaceExactBlock(next3, BRAND_MAP_BEFORE, BRAND_MAP_AFTER)
       },
       'docs/README.md: remove the Storybook index row and doc-map entry'
     ),

@@ -67,6 +67,21 @@ export function setMarkdownField(content, { label, value, insertAfterLabel }) {
   return `${content.slice(0, insertAt)}\n- **${label}:** ${value}${content.slice(insertAt)}`
 }
 
+/** Deletes named one-line Markdown fields, failing closed on absence or duplication. */
+export function removeMarkdownFields(content, labels) {
+  return labels.reduce((current, label) => {
+    const regex = markdownFieldRegex(label)
+    const matches = [...current.matchAll(new RegExp(regex.source, 'gm'))]
+    if (matches.length !== 1) {
+      throw new EngineError(`expected exactly one field "${label}", found ${matches.length}`)
+    }
+    return (
+      current.slice(0, matches[0].index) +
+      current.slice(matches[0].index + matches[0][0].length + 1)
+    )
+  }, content)
+}
+
 /** Sets a dotted path (`meta.title`) on a plain object, creating intermediate objects as needed. */
 export function setJsonPath(obj, dottedPath, value) {
   const keys = dottedPath.split('.')
