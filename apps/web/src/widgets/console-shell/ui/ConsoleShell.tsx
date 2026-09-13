@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { LayoutDashboardIcon, ShieldCheckIcon } from 'lucide-react'
 
+import { getConsoleOverviewHref } from '@/shared/lib/console-public-href'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import {
   Sidebar,
@@ -29,6 +30,7 @@ interface ConsoleShellProps {
 function ConsoleNavigation() {
   const t = useTranslations('console')
   const { setOpenMobile } = useSidebar()
+  const overviewHref = getConsoleOverviewHref()
 
   return (
     <SidebarMenu aria-label={t('navigation')}>
@@ -37,7 +39,7 @@ function ConsoleNavigation() {
           isActive
           tooltip={t('overview')}
           className="border-l-2 border-console-accent bg-console-accent/5 text-sidebar-foreground hover:bg-console-accent/10"
-          render={<RouteProgressLink href="/admin" onClick={() => setOpenMobile(false)} />}
+          render={<RouteProgressLink href={overviewHref} onClick={() => setOpenMobile(false)} />}
         >
           <LayoutDashboardIcon aria-hidden="true" />
           <span>{t('overview')}</span>

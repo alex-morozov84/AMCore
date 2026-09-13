@@ -1,7 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+
 import { ConsoleShell } from './ConsoleShell'
+
+const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as {
+  mode: 'disabled' | 'path' | 'host'
+}
+const originalMode = ADMIN_CONSOLE_CONFIG.mode
 
 const meta = {
   title: 'widgets/console-shell/ConsoleShell',
@@ -43,5 +50,20 @@ export const Collapsed: Story = {
 
     await waitFor(() => expect(title).not.toBeVisible())
     expect(footer).not.toBeVisible()
+  },
+}
+
+export const HostMode: Story = {
+  ...Overview,
+  beforeEach: () => {
+    mutableConfig.mode = 'host'
+    return () => {
+      mutableConfig.mode = originalMode
+    }
+  },
+  play: async ({ canvasElement }) => {
+    const overviewLink = canvasElement.querySelector('a[href="/en"]')
+
+    expect(overviewLink).toBeInTheDocument()
   },
 }
