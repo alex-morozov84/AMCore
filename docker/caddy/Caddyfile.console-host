@@ -3,6 +3,10 @@
 	email {$CADDY_EMAIL}
 }
 
+:443 {
+	respond 404
+}
+
 {$CADDY_DOMAIN} {
 	reverse_proxy api:5002
 }

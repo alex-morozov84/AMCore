@@ -1,5 +1,13 @@
-# Explicitly select the Operations Console host-mode Caddy configuration.
+# Explicitly select Caddy Operations Console host mode over the API-only edge default.
 services:
   caddy:
+    environment:
+      CADDY_WEB_DOMAIN: ${CADDY_WEB_DOMAIN:?CADDY_WEB_DOMAIN is required for console host mode}
+      ADMIN_CONSOLE_HOSTNAME: ${ADMIN_CONSOLE_HOSTNAME:?ADMIN_CONSOLE_HOSTNAME is required for console host mode}
     volumes:
       - ./docker/caddy/Caddyfile.console-host:/etc/caddy/Caddyfile:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started

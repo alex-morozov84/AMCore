@@ -14,9 +14,3 @@
 {$CADDY_DOMAIN} {
 	reverse_proxy api:5002
 }
-
-{$CADDY_WEB_DOMAIN} {
-	reverse_proxy web:3000 {
-		header_up Host {host}
-	}
-}

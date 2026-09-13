@@ -12,8 +12,7 @@
 #   REDIS_URL are for `pnpm dev` and do not affect this stack.)
 #
 # Optional bundled edge (COMPOSE_PROFILES=...,edge): an automatic-HTTPS Caddy
-# reverse proxy in front of `api` and an explicitly configured product web host.
-# This REPLACES a reverse proxy — use only if
+# reverse proxy in front of `api`. This REPLACES a reverse proxy — use only if
 # you don't already run nginx/Traefik/a cloud LB. See deployment.md → "TLS &
 # reverse proxy" → "Optional bundled edge: Caddy".
 #
@@ -304,11 +303,6 @@ services:
       # inside the `caddy` container at startup — only when `edge` is active.
       CADDY_DOMAIN: ${CADDY_DOMAIN:-}
       CADDY_EMAIL: ${CADDY_EMAIL:-}
-      # Required whenever the optional Caddy edge profile is enabled.
-      CADDY_WEB_DOMAIN: ${CADDY_WEB_DOMAIN:-}
-      # Required only when docker-compose.console-host.yml selects the console
-      # host-mode Caddyfile; the default path-mode Caddyfile has no console host.
-      ADMIN_CONSOLE_HOSTNAME: ${ADMIN_CONSOLE_HOSTNAME:-}
     ports:
       - '80:80'
       - '443:443'
@@ -320,8 +314,6 @@ services:
     depends_on:
       api:
         condition: service_healthy
-      web:
-        condition: service_started
 
   # ---------------------------------------------------------------------------
   # Optional bundled backup — OPTIONAL, only with COMPOSE_PROFILES=...,backup.

@@ -524,14 +524,19 @@ Enable it by adding `edge` to `COMPOSE_PROFILES` (e.g.
 ```bash
 CADDY_DOMAIN="api.example.com"   # must have an A/AAAA record pointed at this host
 CADDY_EMAIL="ops@example.com"    # ACME account contact (Let's Encrypt)
-CADDY_WEB_DOMAIN="app.example.com"
-ADMIN_CONSOLE_HOSTNAME="console.example.com"
 TRUST_PROXY=1                    # Caddy is exactly one hop in front of the app
 ```
 
-`docker/caddy/Caddyfile` is the path-mode configuration: it fronts `api:5002`
-and the product web host, but creates no console hostname. **OAuth login needs
-the product web host fronted**: per
+The base `docker/caddy/Caddyfile` remains API-only and therefore preserves the
+existing edge contract. Select product-web path mode explicitly when needed:
+
+```bash
+CADDY_WEB_DOMAIN="app.example.com" \
+docker compose -f docker-compose.yml -f docker-compose.web.yml up -d
+```
+
+`docker/caddy/Caddyfile.web` fronts the product web host but creates no
+console hostname. **OAuth login needs the product web host fronted**: per
 `docs/auth/oauth.md`'s ADR-068 note, provider callback URLs
 (`GOOGLE_CALLBACK_URL` etc.) point at `apps/web`'s own origin, not `api`'s —
 fronting only `api:5002` leaves OAuth's callback URL unreachable.
@@ -539,9 +544,11 @@ fronting only `api:5002` leaves OAuth's callback URL unreachable.
 ### Operations Console host-mode reference
 
 When the generated console config selects `host`, select the matching Caddy
-configuration explicitly and set `ADMIN_CONSOLE_HOSTNAME` to a lowercase FQDN:
+configuration explicitly and set both hostnames:
 
 ```bash
+CADDY_WEB_DOMAIN="app.example.com" \
+ADMIN_CONSOLE_HOSTNAME="console.example.com" \
 docker compose -f docker-compose.yml -f docker-compose.console-host.yml up -d
 ```
 
@@ -567,7 +574,7 @@ For the console hostname, both reference proxies apply the same mapping:
 `docker/nginx/operations-console.conf` is the nginx reference include. Its
 default TLS vhost rejects unmatched hosts, and both vhosts forward the exact
 `Host` header. `docker/caddy/Caddyfile.console-host` carries the equivalent
-Caddy block.
+Caddy block and rejects unmatched HTTP hosts before proxying.
 The trailing-slash redirect runs before the internal page mapping, so an
 upstream redirect cannot expose `/{locale}/admin/...` as a public location.
 Nginx rejects encoded traversal before mapping. Both references reject direct

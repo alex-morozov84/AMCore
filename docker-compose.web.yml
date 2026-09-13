@@ -1,0 +1,12 @@
+# Explicitly select Caddy product-web path mode over the API-only edge default.
+services:
+  caddy:
+    environment:
+      CADDY_WEB_DOMAIN: ${CADDY_WEB_DOMAIN:?CADDY_WEB_DOMAIN is required for product-web path mode}
+    volumes:
+      - ./docker/caddy/Caddyfile.web:/etc/caddy/Caddyfile:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
