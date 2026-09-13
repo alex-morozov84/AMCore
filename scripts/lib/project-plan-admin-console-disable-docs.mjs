@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileStep, removeExactBlock, removeMarkdownSection } from './init-engine.mjs'
 import {
   buildAdminConsoleDiscoveryDocsRemovalSteps,
+  removeConsoleAuthenticationIndexLink,
   removeConsoleFrontendDiscoveryLink,
 } from './project-plan-admin-console-disable-discovery-docs.mjs'
 
@@ -20,7 +21,7 @@ const AUTH_README_BLOCK = [
 const CONSOLE_TOKEN_ROW =
   '| Operations Console | `console-accent`                                                                                  | Functional system-control-plane signal for active console navigation, live-status indication, and links; it is not a product brand token |\n'
 const CONSOLE_INDEX_ROW =
-  '| [Operations Console](../operations-console/README.md)                                                             | The isolated `SUPER_ADMIN` control-plane foundation: FSD ownership, topology, session boundary, deployment, verification, and extension rules                                                                                                                                                                                           |\n'
+  '| [Operations Console](../operations-console/README.md)                   | The isolated `SUPER_ADMIN` control-plane foundation: FSD ownership, topology, session boundary, deployment, verification, and extension rules                                                                                                                                                                                          |\n'
 const ENV_BLOCK = [
   '# For console host mode use docker-compose.console-host.yml as well; it requires',
   '# both CADDY_WEB_DOMAIN and ADMIN_CONSOLE_HOSTNAME.',
@@ -66,7 +67,8 @@ export function buildAdminConsoleDisableDocsSteps(root) {
     ),
     fileStep(
       path.join(root, 'docs/auth/README.md'),
-      (content) => removeExactBlock(content, AUTH_README_BLOCK),
+      (content) =>
+        removeConsoleAuthenticationIndexLink(removeExactBlock(content, AUTH_README_BLOCK)),
       'remove the Operations Console authentication overview'
     ),
     fileStep(

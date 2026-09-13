@@ -11,7 +11,7 @@ const ROOT_BLOCK = [
 ].join('\n')
 
 const DOCS_INDEX_ROW =
-  '| Configure, deploy, or safely extend Operations Console                                   | [`operations-console/`](operations-console/README.md)                                                                              |\n'
+  '| Configure, deploy, or safely extend Operations Console                                   | [`operations-console/`](operations-console/README.md)                                                                             |\n'
 const DOCS_INDEX_BLOCK = [
   '- **[Operations Console](operations-console/README.md)** — the optional',
   '  `SUPER_ADMIN` control-plane foundation: topology, host-session boundary,',
@@ -36,22 +36,25 @@ export function removeConsoleFrontendDiscoveryLink(content) {
   return removeExactBlock(content, FRONTEND_START_BLOCK)
 }
 
+export function removeConsoleRootGuideLink(content) {
+  return removeExactBlock(content, ROOT_BLOCK)
+}
+
+export function removeConsoleDocsIndexLinks(content) {
+  return removeExactBlock(removeExactBlock(content, DOCS_INDEX_ROW), DOCS_INDEX_BLOCK)
+}
+
+export function removeConsoleAuthenticationIndexLink(content) {
+  return removeExactBlock(content, AUTH_INDEX_ROW)
+}
+
 export function buildAdminConsoleDiscoveryDocsRemovalSteps(root) {
   return [
-    fileStep(
-      path.join(root, 'README.md'),
-      (content) => removeExactBlock(content, ROOT_BLOCK),
-      'remove console guide link'
-    ),
+    fileStep(path.join(root, 'README.md'), removeConsoleRootGuideLink, 'remove console guide link'),
     fileStep(
       path.join(root, 'docs/README.md'),
-      (content) => removeExactBlock(removeExactBlock(content, DOCS_INDEX_ROW), DOCS_INDEX_BLOCK),
+      removeConsoleDocsIndexLinks,
       'remove console documentation index links'
-    ),
-    fileStep(
-      path.join(root, 'docs/auth/README.md'),
-      (content) => removeExactBlock(content, AUTH_INDEX_ROW),
-      'remove console authentication index link'
     ),
     fileStep(
       path.join(root, 'docs/operations/README.md'),

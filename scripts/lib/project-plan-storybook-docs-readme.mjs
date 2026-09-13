@@ -9,10 +9,10 @@ const INDEX_ROW =
   '| Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |\n'
 
 const SCAFFOLDING_ROW_BEFORE =
-  '| Initialize a downstream fork (rebrand, locale/Storybook shape, route-progress default)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
+  '| Initialize a downstream fork (rebrand, locale/Storybook/console shape, route-progress)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
 
 const SCAFFOLDING_ROW_AFTER =
-  '| Initialize a downstream fork (rebrand, locale shape, route-progress default)             | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
+  '| Initialize a downstream fork (rebrand, locale/console shape, route-progress)             | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
 
 const TESTING_MENTION_BEFORE = `- **[Frontend testing](frontend/testing.md)** — the test taxonomy
   (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/
@@ -38,16 +38,18 @@ const BRAND_MAP_AFTER = `  downstream rebrand checklist, and initializing a fork
   and Operations Console topology with \`pnpm init:brand\` / \`pnpm init:project\`.
 `
 
+export function removeStorybookDocsReadme(content) {
+  const next = removeExactBlock(content, INDEX_ROW)
+  const next2 = replaceExactBlock(next, SCAFFOLDING_ROW_BEFORE, SCAFFOLDING_ROW_AFTER)
+  const next3 = replaceExactBlock(next2, TESTING_MENTION_BEFORE, TESTING_MENTION_AFTER)
+  return replaceExactBlock(next3, BRAND_MAP_BEFORE, BRAND_MAP_AFTER)
+}
+
 export function buildStorybookDocsReadmeSteps(root) {
   return [
     fileStep(
       path.join(root, 'docs/README.md'),
-      (content) => {
-        const next = removeExactBlock(content, INDEX_ROW)
-        const next2 = replaceExactBlock(next, SCAFFOLDING_ROW_BEFORE, SCAFFOLDING_ROW_AFTER)
-        const next3 = replaceExactBlock(next2, TESTING_MENTION_BEFORE, TESTING_MENTION_AFTER)
-        return replaceExactBlock(next3, BRAND_MAP_BEFORE, BRAND_MAP_AFTER)
-      },
+      removeStorybookDocsReadme,
       'docs/README.md: remove the Storybook index row and doc-map entry'
     ),
   ]
