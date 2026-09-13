@@ -22,7 +22,7 @@ Thanks for your interest in contributing. This document explains how to set up t
 | `pnpm format:check`                                               | Check Prettier formatting                                                                                                                                                                                                                            |
 | `pnpm format`                                                     | Format code with Prettier                                                                                                                                                                                                                            |
 | `pnpm init:brand`                                                 | Initialize a downstream fork's identity, brand, assets, and theme choices                                                                                                                                                                            |
-| `pnpm init:project`                                               | Apply downstream project choices: single-locale mode, disabling Storybook, or disabling the route-progress bar's default                                                                                                                             |
+| `pnpm init:project`                                               | Apply downstream project choices: locale mode, Storybook, route-progress default, and Operations Console topology                                                                                                                                    |
 | `docker compose --profile local-infra --profile monitoring up -d` | Optional dev-only Prometheus + Grafana + Alertmanager harness scraping this stack's real metrics — needs `METRICS_AUTH_TOKEN`/`GF_SECURITY_ADMIN_PASSWORD` set in `.env`; see [`docs/operations/observability.md`](docs/operations/observability.md) |
 | `pnpm test:observability-contract`                                | Static observability-contract checks (metric references, runbook links/anchors/panel citations, private-path ratchet, image-pin consistency) — no Docker needed                                                                                      |
 | `pnpm test:observability-contract:live`                           | Live observability-contract checks — boots the monitoring harness above and Grafana's old-volume migration smoke, then tears both down; needs Docker                                                                                                 |
@@ -34,6 +34,10 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 to remove Storybook, and/or `--route-progress=disabled` to turn off the top
 route-progress bar's default (non-destructive, unlike the other two). See
 [`docs/frontend/brand-theme-and-tokens.md` → Project scaffolding](docs/frontend/brand-theme-and-tokens.md#project-scaffolding).
+
+`--admin-console=disabled|path|host` is another one-time choice. Its optional
+`--admin-console-slug=<segment>` changes the page path only; the host stays the
+deployment-time `ADMIN_CONSOLE_HOSTNAME` setting.
 
 ### API-specific test commands
 

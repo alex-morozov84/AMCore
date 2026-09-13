@@ -6,15 +6,17 @@ import { fileStep, replaceExactBlock } from './init-engine.mjs'
 const OPERATING_CONTEXT_BEFORE = `   and ask the owner to initialize it. The supported fork-initialization path is
    \`pnpm init:brand\` first, then \`pnpm init:project --mode=single --locale=<code>\`,
    \`pnpm init:project --storybook=disabled\`, and/or
-   \`pnpm init:project --route-progress=disabled\`, in any combination, only for the
+   \`pnpm init:project --route-progress=disabled\`, and/or
+   \`pnpm init:project --admin-console=disabled|path|host\`, in any combination, only for the
    project choices the fork actually wants; see
    \`docs/frontend/brand-theme-and-tokens.md#project-scaffolding\`.
 `
 
 const OPERATING_CONTEXT_AFTER = `   and ask the owner to initialize it. The supported fork-initialization path is
    \`pnpm init:brand\` first, then \`pnpm init:project --mode=single --locale=<code>\`
-   and/or \`pnpm init:project --route-progress=disabled\`, in any combination, only
-   for the project choices the fork actually wants; see
+   and/or \`pnpm init:project --route-progress=disabled\`, and/or
+   \`pnpm init:project --admin-console=disabled|path|host\`, in any combination,
+   only for the project choices the fork actually wants; see
    \`docs/frontend/brand-theme-and-tokens.md#project-scaffolding\`.
 `
 
@@ -22,13 +24,15 @@ const COMMANDS_NOTE_BEFORE = `\`pnpm init:project\` is intentionally flag-driven
 \`--mode=single --locale=<code>\` to remove locale routing,
 \`--storybook=disabled\` to remove Storybook from a fork, and/or
 \`--route-progress=disabled\` to turn off the top route-progress bar's
-default (non-destructive — see \`PROJECT_CONTEXT.md\`).
+default (non-destructive), and/or \`--admin-console=disabled|path|host\` for the
+one-time Operations Console topology choice (see \`PROJECT_CONTEXT.md\`).
 `
 
 const COMMANDS_NOTE_AFTER = `\`pnpm init:project\` is intentionally flag-driven: use
 \`--mode=single --locale=<code>\` to remove locale routing, and/or
 \`--route-progress=disabled\` to turn off the top route-progress bar's
-default (non-destructive — see \`PROJECT_CONTEXT.md\`).
+default (non-destructive), and/or \`--admin-console=disabled|path|host\` for the
+one-time Operations Console topology choice (see \`PROJECT_CONTEXT.md\`).
 `
 
 const BEFORE = `API: Jest (unit) + Jest/Testcontainers (e2e). Shared: Vitest for

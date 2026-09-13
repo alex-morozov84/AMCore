@@ -13,6 +13,7 @@ import { buildWebGlobalTypesSteps } from './project-plan-web-global-types.mjs'
 import { buildWebMessagesSteps } from './project-plan-web-messages.mjs'
 import { buildWebMessagesTestSteps } from './project-plan-web-messages-test.mjs'
 import { buildWebI18nFixturesSteps } from './project-plan-web-i18n-fixtures.mjs'
+import { buildWebSingleLocaleTestCatalogueSteps } from './project-plan-web-single-locale-test-catalogues.mjs'
 import { buildWebOAuthAlertTestSteps } from './project-plan-web-oauth-alert-test.mjs'
 import { buildWebZodErrorMapTestSteps } from './project-plan-web-zod-error-map-test.mjs'
 import { buildWebApiErrorAlertTestSteps } from './project-plan-web-api-error-alert-test.mjs'
@@ -21,7 +22,7 @@ import { buildWebPagesSteps } from './project-plan-web-pages.mjs'
 import { buildWebNavSteps } from './project-plan-web-nav.mjs'
 import { buildApiLocaleSteps } from './project-plan-api.mjs'
 
-export function buildProjectSteps(root, { locale }) {
+export function buildProjectSteps(root, { locale, deferLocaleCleanup = false }) {
   return [
     ...buildContextSteps(root, locale),
     ...buildSharedLocaleSteps(root, locale),
@@ -32,12 +33,13 @@ export function buildProjectSteps(root, { locale }) {
     ...buildWebMessagesSteps(root, locale),
     ...buildWebMessagesTestSteps(root, locale),
     ...buildWebI18nFixturesSteps(root, locale),
+    ...buildWebSingleLocaleTestCatalogueSteps(root, locale),
     ...buildWebOAuthAlertTestSteps(root, locale),
     ...buildWebZodErrorMapTestSteps(root, locale),
     ...buildWebApiErrorAlertTestSteps(root, locale),
     ...buildWebPrimaryUnavailableFallbackTestSteps(root, locale),
     ...buildWebPagesSteps(root),
     ...buildWebNavSteps(root),
-    ...buildWebLocaleDirCleanupSteps(root),
+    ...(deferLocaleCleanup ? [] : buildWebLocaleDirCleanupSteps(root)),
   ]
 }

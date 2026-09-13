@@ -19,7 +19,7 @@ const originalMode = ADMIN_CONSOLE_CONFIG.mode
 describe('probeConsoleAccess', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    mutableConfig.mode = originalMode
+    mutableConfig.mode = 'path'
   })
 
   afterEach(() => {

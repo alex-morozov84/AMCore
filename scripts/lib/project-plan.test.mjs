@@ -5,8 +5,8 @@
 // computed from the pre-first-step content). Caught live: auth.service.spec.ts
 // (two builders owned a fileStep for it), then PROJECT_CONTEXT.md/
 // eslint.config.mjs when --mode and --storybook combine (see
-// project-plan-combined.mjs). Covers all seven non-empty combinations of
-// the three dimensions (FINAL PLAN item 10), mirroring init-project.mjs's
+// project-plan-combined.mjs). Covers the console dimension together with every
+// existing scaffold dimension, mirroring init-project.mjs's
 // own filter+combine composition — not a naive concatenation, which would
 // trivially fail on any combined case by design (the whole reason
 // project-plan-combined.mjs exists).
@@ -14,44 +14,43 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildProjectSteps } from './project-plan.mjs'
-import { buildStorybookDisableSteps } from './project-plan-storybook.mjs'
-import { buildRouteProgressFlagSteps } from './project-plan-route-progress-flag.mjs'
-import { buildRouteProgressContextSteps } from './project-plan-route-progress-context.mjs'
-import { combinedTargets, buildCombinedSteps } from './project-plan-combined.mjs'
+import { prepareProjectInit } from './project-init-plan.mjs'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
-function assertNoDuplicateEditTargets(steps) {
-  const editTargets = steps.filter((step) => step.kind === 'edit').map((step) => step.target)
-  const seen = new Set()
-  const duplicates = new Set()
-  for (const target of editTargets) {
-    if (seen.has(target)) duplicates.add(target)
-    seen.add(target)
-  }
-  assert.deepEqual([...duplicates], [])
+function isNested(path, parent) {
+  return path === parent || path.startsWith(`${parent}/`)
 }
 
-/** Mirrors init-project.mjs's own filter+combine composition exactly. */
-function composedSteps({ locale, storybook, routeProgress }) {
-  const dims = { locale, storybook, routeProgress }
-  const overlap = new Set(combinedTargets(REPO_ROOT, dims))
-  return [
-    ...(locale
-      ? buildProjectSteps(REPO_ROOT, { locale }).filter((s) => !overlap.has(s.target))
-      : []),
-    ...(storybook
-      ? buildStorybookDisableSteps(REPO_ROOT).filter((s) => !overlap.has(s.target))
-      : []),
-    ...(routeProgress
-      ? [
-          ...buildRouteProgressFlagSteps(REPO_ROOT),
-          ...buildRouteProgressContextSteps(REPO_ROOT).filter((s) => !overlap.has(s.target)),
-        ]
-      : []),
-    ...buildCombinedSteps(REPO_ROOT, dims),
-  ]
+function assertNoDestructivePathConflict(steps) {
+  const writers = steps.filter((step) => step.kind !== 'delete')
+  assert.equal(new Set(writers.map((step) => step.target)).size, writers.length)
+  const moves = steps.filter((step) => step.source)
+  assert.equal(new Set(moves.map((step) => step.source)).size, moves.length)
+
+  for (const [index, step] of steps.entries()) {
+    if (step.kind !== 'delete') continue
+    for (const earlier of steps.slice(0, index).filter((candidate) => candidate.kind !== 'delete')) {
+      assert.equal(isNested(earlier.target, step.target), false, `${step.target} removes ${earlier.target}`)
+    }
+    for (const later of steps.slice(index + 1)) {
+      assert.equal(isNested(later.target, step.target), false, `${step.target} precedes ${later.target}`)
+      if (later.source) {
+        assert.equal(isNested(later.source, step.target), false, `${step.target} precedes ${later.source}`)
+      }
+    }
+  }
+}
+
+function composedSteps({ locale, storybook, routeProgress, adminConsole }) {
+  const flags = {
+    mode: locale ? 'single' : undefined,
+    locale,
+    storybook,
+    'route-progress': routeProgress ? 'disabled' : undefined,
+    'admin-console': adminConsole?.mode,
+  }
+  return prepareProjectInit(REPO_ROOT, flags, adminConsole?.slug ?? 'admin').steps
 }
 
 const COMBINATIONS = [
@@ -62,24 +61,47 @@ const COMBINATIONS = [
   { name: 'locale + route-progress', locale: 'en', routeProgress: true },
   { name: 'storybook + route-progress', storybook: 'disabled', routeProgress: true },
   { name: 'all three', locale: 'en', storybook: 'disabled', routeProgress: true },
+  { name: 'console disabled alone', adminConsole: { mode: 'disabled', slug: 'admin' } },
+  { name: 'console host alone', adminConsole: { mode: 'host', slug: 'panel' } },
+  { name: 'single en preserves default console', locale: 'en' },
+  { name: 'single ru keeps host default', locale: 'ru', adminConsole: { mode: 'host', slug: 'admin' } },
+  { name: 'single en keeps host custom', locale: 'en', adminConsole: { mode: 'host', slug: 'panel' } },
+  { name: 'single ru keeps path custom', locale: 'ru', adminConsole: { mode: 'path', slug: 'panel' } },
+  { name: 'single en disables console', locale: 'en', adminConsole: { mode: 'disabled', slug: 'admin' } },
+  { name: 'single ru disables console', locale: 'ru', adminConsole: { mode: 'disabled', slug: 'admin' } },
+  {
+    name: 'storybook + console',
+    storybook: 'disabled',
+    adminConsole: { mode: 'disabled', slug: 'admin' },
+  },
+  {
+    name: 'route-progress + console',
+    routeProgress: true,
+    adminConsole: { mode: 'host', slug: 'panel' },
+  },
+  {
+    name: 'all dimensions',
+    locale: 'en',
+    storybook: 'disabled',
+    routeProgress: true,
+    adminConsole: { mode: 'disabled', slug: 'admin' },
+  },
 ]
 
 describe('init:project plans (structural, against the real repo — read-only)', () => {
   for (const combo of COMBINATIONS) {
-    test(`${combo.name}: no two edit-kind steps target the same file`, () => {
-      assertNoDuplicateEditTargets(composedSteps(combo))
+    test(`${combo.name}: has no destructive path conflict`, () => {
+      assertNoDestructivePathConflict(composedSteps(combo))
     })
   }
 
-  test('regression guard: a naive concatenation of all three dimensions DOES collide', () => {
-    // Proves the guards above are non-vacuous — if project-plan-combined.mjs's
-    // filtering were ever removed, this is the failure it exists to catch.
-    const steps = [
-      ...buildProjectSteps(REPO_ROOT, { locale: 'en' }),
-      ...buildStorybookDisableSteps(REPO_ROOT),
-      ...buildRouteProgressFlagSteps(REPO_ROOT),
-      ...buildRouteProgressContextSteps(REPO_ROOT),
-    ]
-    assert.throws(() => assertNoDuplicateEditTargets(steps))
+  test('regression guard: a move sourced below a deleted parent is rejected', () => {
+    const steps = composedSteps({ locale: 'en', adminConsole: { mode: 'host', slug: 'panel' } })
+    steps.push({
+      kind: 'move',
+      source: path.join(REPO_ROOT, 'apps/web/src/app/[locale]/admin/layout.tsx'),
+      target: path.join(REPO_ROOT, 'apps/web/src/app/bad/layout.tsx'),
+    })
+    assert.throws(() => assertNoDestructivePathConflict(steps))
   })
 })

@@ -18,14 +18,17 @@ afterEach(() => {
 })
 
 describe('init-project --storybook=disabled (end-to-end against a real-repo copy)', () => {
-  test('rejects a command with none of --mode, --storybook, or --route-progress', () => {
+  test('rejects a command with none of the supported scaffold flags', () => {
     copy = createRealRepoCopy()
     commit(copy.root)
 
     const result = runInitProject(copy.root, ['--dry-run'])
 
     assert.equal(result.status, 1)
-    assert.match(result.stderr, /at least one of --mode, --storybook, or --route-progress is required/)
+    assert.match(
+      result.stderr,
+      /at least one of --mode, --storybook, --route-progress, or --admin-console is required/
+    )
   })
 
   test('rejects an unknown --storybook value', () => {
@@ -66,10 +69,7 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     assert.match(result.stdout, /ci\.yml: remove the storybook job/)
     // Proves the combined-step path (project-plan-combined.mjs) ran, not
     // two separate fileSteps that would have silently clobbered each other.
-    assert.match(
-      result.stdout,
-      /update PROJECT_CONTEXT\.md fields for the combined dimensions/
-    )
+    assert.match(result.stdout, /update PROJECT_CONTEXT\.md fields for the combined dimensions/)
     assert.match(result.stdout, /remove the navigation ban and the Storybook plugin\/rules/)
   })
 

@@ -13,7 +13,8 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    and ask the owner to initialize it. The supported fork-initialization path is
    `pnpm init:brand` first, then `pnpm init:project --mode=single --locale=<code>`,
    `pnpm init:project --storybook=disabled`, and/or
-   `pnpm init:project --route-progress=disabled`, in any combination, only for the
+   `pnpm init:project --route-progress=disabled`, and/or
+   `pnpm init:project --admin-console=disabled|path|host`, in any combination, only for the
    project choices the fork actually wants; see
    `docs/frontend/brand-theme-and-tokens.md#project-scaffolding`.
 2. Detect the working-context overlay:
@@ -64,7 +65,8 @@ docker compose up                     # full stack (Postgres+Redis+migrate+api+w
 `--mode=single --locale=<code>` to remove locale routing,
 `--storybook=disabled` to remove Storybook from a fork, and/or
 `--route-progress=disabled` to turn off the top route-progress bar's
-default (non-destructive — see `PROJECT_CONTEXT.md`).
+default (non-destructive), and/or `--admin-console=disabled|path|host` for the
+one-time Operations Console topology choice (see `PROJECT_CONTEXT.md`).
 
 Production migrates with `db:migrate:prod` (`prisma migrate deploy`) as a one-shot
 step, never `db:migrate`. See `docs/operations/deployment.md`.

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operations Console scaffold.** `pnpm init:project` now supports the
+  one-time `--admin-console=disabled|path|host` choice and optional page slug,
+  with an owned-path manifest that removes only console frontend/runtime
+  wiring when disabled. The runtime hostname remains separate deployment
+  configuration.
+
 - **Operations Console host-mode sessions.** Adds a separate host-only
   `__Host-amcore_console_session` cookie, Redis vault namespace and `console`
   audience, live-super-admin credential admission, exact console-origin

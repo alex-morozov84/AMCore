@@ -77,8 +77,9 @@ find for something, that page is under-documented; please open an issue.
   each, what is deliberately not covered, and how to add a guard.
 - **[Brand, theme, and design tokens](frontend/brand-theme-and-tokens.md)** —
   token architecture, light/dark/system modes, the no-flash mechanism, the
-  downstream rebrand checklist, and initializing a fork with
-  `pnpm init:brand` / `pnpm init:project`.
+  downstream rebrand checklist, and initializing a fork's locale, Storybook,
+  route-progress, and Operations Console topology with `pnpm init:brand` /
+  `pnpm init:project`.
 - **[Shared UI & shadcn](frontend/shared-ui-and-shadcn.md)** — the `shared/ui`
   reuse rule, the current primitive inventory, and the safe procedure for
   running the shadcn CLI (why a bare `shadcn add` against the live tree isn't

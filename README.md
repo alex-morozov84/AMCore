@@ -195,8 +195,8 @@ pnpm dev
 
 > **Building a product from this starter?** Run `pnpm init:brand` (product
 > identity, logo/icons, theme) and, if needed, the one-time
-> `pnpm init:project` (single-locale and/or disabling Storybook, both
-> destructive; disabling the route-progress bar's default, non-destructive)
+> `pnpm init:project` (single-locale, Storybook, or Operations Console shape,
+> all one-time; route-progress's default is non-destructive)
 > — see
 > [`docs/frontend/brand-theme-and-tokens.md` → Project scaffolding](docs/frontend/brand-theme-and-tokens.md#project-scaffolding).
 > `init:brand` updates [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) from
@@ -204,7 +204,9 @@ pnpm dev
 > name, and records the product identity, upstream-sync policy, and workflow
 > mode (`strict`, `flexible`, or `custom`) from the corresponding prompts or
 > flags. `init:project` records project choices: structural single-locale
-> mode/Storybook removal and the non-structural route-progress default.
+> mode/Storybook removal, the console `disabled|path|host` choice and optional
+> page slug, plus the non-structural route-progress default. Console hostnames
+> remain deployment configuration (`ADMIN_CONSOLE_HOSTNAME`), not a slug.
 > Still set by hand: where the
 > roadmap/status/product-specific decisions live, and anything GitHub-side
 > (branch protection, secrets, environments). Repository files _declare_ the

@@ -20,6 +20,8 @@ afterEach(() => {
 
 describe('console host guard', () => {
   it('allows every host in the generated path mode', () => {
+    mutableConfig.mode = 'path'
+
     expect(isConsoleHost('app.example.test')).toBe(true)
     expect(isConsoleHost('console.example.test')).toBe(true)
   })

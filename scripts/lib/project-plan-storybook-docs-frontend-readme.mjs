@@ -20,15 +20,17 @@ const SCAFFOLDING_BULLET_AFTER = `- Initializing a downstream fork (\`pnpm init:
   [Brand, theme, and design tokens § Project scaffolding](./brand-theme-and-tokens.md#project-scaffolding)
 `
 
+export function removeStorybookFromFrontendReadme(content) {
+  const withoutIndex = removeExactBlock(content, INDEX_ROW)
+  const withoutStartHere = removeExactBlock(withoutIndex, START_HERE_BULLET)
+  return replaceExactBlock(withoutStartHere, SCAFFOLDING_BULLET_BEFORE, SCAFFOLDING_BULLET_AFTER)
+}
+
 export function buildStorybookDocsFrontendReadmeSteps(root) {
   return [
     fileStep(
       path.join(root, 'docs/frontend/README.md'),
-      (content) => {
-        const next = removeExactBlock(content, INDEX_ROW)
-        const next2 = removeExactBlock(next, START_HERE_BULLET)
-        return replaceExactBlock(next2, SCAFFOLDING_BULLET_BEFORE, SCAFFOLDING_BULLET_AFTER)
-      },
+      removeStorybookFromFrontendReadme,
       'docs/frontend/README.md: remove the Storybook index row, Start-here bullet, and stale scaffolding mention'
     ),
   ]

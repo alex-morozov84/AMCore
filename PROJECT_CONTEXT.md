@@ -116,18 +116,18 @@ running a single-locale app"); `pnpm init:project --storybook=disabled` for
 `frontend_storybook` (the one-time, destructive removal described above);
 and `pnpm init:project --route-progress=disabled` for
 `frontend_route_progress` (the one-time, non-destructive flag flip
-described above — the only one of the three that removes nothing). The
-three `init:project` dimensions are independent — any one flag alone, or
+described above — the only one of the four that removes nothing). The four
+`init:project` dimensions are independent — any one flag alone, or
 any combination together in one invocation. A field can also be set by
 hand in a downstream fork. Their absence means "AMCore's shipped defaults
 apply," not "undecided."
 
-The Operations Console fields record the intended downstream scaffold choice;
-the corresponding `pnpm init:project --admin-console=...` transform is not
-implemented in this checkout yet. They are documentation for people and
-scaffolding, never runtime configuration. A future product backoffice remains
-a separate downstream FSD/API area with product authorization; it must not use
-the Operations Console's routes, session audience, or `SUPER_ADMIN` role.
+The Operations Console fields are maintained by `pnpm init:project
+--admin-console=disabled|path|host [--admin-console-slug=<segment>]`. The
+choice is one-time: from AMCore's pristine `enabled/path/admin` default, choose
+host, a custom path slug, or disabled. The slug is a page-path segment, while
+`ADMIN_CONSOLE_HOSTNAME` remains a deployment-time host setting. These fields
+are documentation for people and scaffolding, never runtime configuration.
 
 ## Workflow Modes
 
