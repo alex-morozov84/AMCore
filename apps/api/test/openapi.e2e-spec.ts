@@ -68,6 +68,7 @@ const EXPECTED: Record<string, Expected> = {
   // auth-invites
   'post /auth/invites/accept': { status: '200', kind: 'json' },
   // admin
+  'get /admin/access': { status: '204', kind: 'none' },
   'get /admin/users': { status: '200', kind: 'json' },
   'patch /admin/users/{id}': { status: '200', kind: 'json' },
   'post /admin/cleanup': { status: '200', kind: 'json' },
@@ -328,6 +329,17 @@ describe('OpenAPI success surface (e2e)', () => {
     }
 
     expect(violations).toEqual([])
+  })
+
+  it('documents the bearer-only, no-content Operations Console access probe', () => {
+    const operation = document.paths['/admin/access']?.get
+    const noContentResponse = operation?.responses?.['204'] as { content?: unknown } | undefined
+
+    expect(operation?.security).toEqual([{ bearer: [] }])
+    expect(noContentResponse?.content).toBeUndefined()
+    expect(operation?.responses).toHaveProperty('401')
+    expect(operation?.responses).toHaveProperty('403')
+    expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
   })
 
   it('documents a multipart/form-data request body with a binary file field for both upload operations', () => {

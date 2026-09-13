@@ -64,7 +64,7 @@ Response:
 
 ```json
 {
-  "user": { "id": "cm...", "email": "alex@example.com", "systemRole": "USER" },
+  "user": { "id": "cm...", "email": "alex@example.com" },
   "accessToken": "eyJhbGci..."
 }
 ```

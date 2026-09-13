@@ -141,6 +141,9 @@ The allowlist:
 > `:orgId` parameters to the principal's bound org so cross-tenant catalogue
 > reads cannot slip through function-level policies.
 
+The `/admin/**` boundary includes `GET /admin/access`; a SUPER_ADMIN-owned API
+key is rejected there with `401` rather than acting as a console credential.
+
 Adding API-key acceptance to a new route requires updating the internally
 recorded bearer-only auth decision plus a matching entry in the shared
 ADR-034 allowlist

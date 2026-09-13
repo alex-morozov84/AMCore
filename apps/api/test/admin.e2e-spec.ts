@@ -72,6 +72,49 @@ describe('Admin (e2e)', () => {
     })
   })
 
+  describe('GET /admin/access', () => {
+    it('returns 401 without a bearer token', async () => {
+      await request(app.getHttpServer()).get('/admin/access').expect(401)
+    })
+
+    it('returns 403 for a regular USER', async () => {
+      const { token } = await registerAndGetToken('access-user@example.com')
+
+      await request(app.getHttpServer())
+        .get('/admin/access')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403)
+    })
+
+    it('returns 403 for an organization ADMIN', async () => {
+      const { token } = await registerAndGetToken('access-org-admin@example.com')
+
+      await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Access Probe Organization' })
+        .expect(201)
+
+      await request(app.getHttpServer())
+        .get('/admin/access')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403)
+    })
+
+    it('returns an empty 204 for a SUPER_ADMIN', async () => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      const response = await request(app.getHttpServer())
+        .get('/admin/access')
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(204)
+
+      expect(response.text).toBe('')
+      expect(response.headers['content-length']).toBeUndefined()
+    })
+  })
+
   describe('GET /admin/users', () => {
     it('returns paginated user list for SUPER_ADMIN', async () => {
       const { userId } = await registerAndGetToken('superadmin@example.com')
@@ -520,6 +563,15 @@ describe('Admin (e2e)', () => {
         .expect(401)
     })
 
+    it('SUPER_ADMIN-owned API key → GET /admin/access → 401', async () => {
+      const { apiKey } = await setupSuperAdminWithKey()
+
+      await request(app.getHttpServer())
+        .get('/admin/access')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+    })
+
     it('SUPER_ADMIN-owned API key → PATCH /admin/users/:id → 401', async () => {
       const { apiKey, userId } = await setupSuperAdminWithKey()
 
@@ -600,6 +652,27 @@ describe('Admin (e2e)', () => {
       // B's still-valid pre-demotion token is now denied: claim SA ∩ DB USER.
       await request(app.getHttpServer())
         .get('/admin/users')
+        .set('Authorization', `Bearer ${b.token}`)
+        .expect(403)
+    })
+
+    it('denies a demoted SUPER_ADMIN on the next access-probe request', async () => {
+      const a = await makeSuperAdmin('access-admin-a@example.com')
+      const b = await makeSuperAdmin('access-admin-b@example.com')
+
+      await request(app.getHttpServer())
+        .get('/admin/access')
+        .set('Authorization', `Bearer ${b.token}`)
+        .expect(204)
+
+      await request(app.getHttpServer())
+        .patch(`/admin/users/${b.userId}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ systemRole: SystemRole.User })
+        .expect(200)
+
+      await request(app.getHttpServer())
+        .get('/admin/access')
         .set('Authorization', `Bearer ${b.token}`)
         .expect(403)
     })
