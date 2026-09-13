@@ -18,10 +18,13 @@
     "apps/web/src/shared/lib/console-public-api-path.ts",
     "apps/web/src/shared/lib/console-public-href.test.ts",
     "apps/web/src/shared/lib/console-public-href.ts",
+    "apps/web/src/shared/lib/require-super-admin.test.ts",
+    "apps/web/src/shared/lib/require-super-admin.ts",
     "apps/web/playwright.console-real-stack.config.ts",
     "docker-compose.console-host.yml",
     "docker-compose.console-session-e2e.yml",
     "docker/caddy/Caddyfile.console-host",
-    "scripts/run-console-session-e2e.mjs"
+    "scripts/run-console-session-e2e.mjs",
+    "scripts/run-console-single-locale-proxy-smoke.mjs"
   ]
 }

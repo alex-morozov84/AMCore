@@ -13,6 +13,7 @@ import { buildWebGlobalTypesSteps } from './project-plan-web-global-types.mjs'
 import { buildWebMessagesSteps } from './project-plan-web-messages.mjs'
 import { buildWebMessagesTestSteps } from './project-plan-web-messages-test.mjs'
 import { buildWebI18nFixturesSteps } from './project-plan-web-i18n-fixtures.mjs'
+import { buildWebSingleLocaleTestCatalogueSteps } from './project-plan-web-single-locale-test-catalogues.mjs'
 import { buildWebOAuthAlertTestSteps } from './project-plan-web-oauth-alert-test.mjs'
 import { buildWebZodErrorMapTestSteps } from './project-plan-web-zod-error-map-test.mjs'
 import { buildWebApiErrorAlertTestSteps } from './project-plan-web-api-error-alert-test.mjs'
@@ -32,6 +33,7 @@ export function buildProjectSteps(root, { locale, deferLocaleCleanup = false }) 
     ...buildWebMessagesSteps(root, locale),
     ...buildWebMessagesTestSteps(root, locale),
     ...buildWebI18nFixturesSteps(root, locale),
+    ...buildWebSingleLocaleTestCatalogueSteps(root, locale),
     ...buildWebOAuthAlertTestSteps(root, locale),
     ...buildWebZodErrorMapTestSteps(root, locale),
     ...buildWebApiErrorAlertTestSteps(root, locale),

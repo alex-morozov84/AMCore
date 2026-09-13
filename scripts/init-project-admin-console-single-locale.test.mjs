@@ -45,8 +45,10 @@ function assertSingleLocale(root, locale, { mode = 'path', slug = 'admin' } = {}
     const caddy = readFileSync(path.join(root, 'docker/caddy/Caddyfile.console-host'), 'utf8')
     assert.match(nginx, new RegExp(`/${slug}/\\$1 break`))
     assert.match(nginx, new RegExp(`rewrite \\^ /${slug} break`))
+    assert.ok(nginx.includes('location ~* "\\.[a-z0-9]{1,16}$"'))
     assert.match(caddy, new RegExp(`/${slug}\\{path\\}`))
     assert.match(caddy, new RegExp(`rewrite \\* /${slug}\\n`))
+    assert.match(caddy, /@staticAsset path_regexp staticAsset/)
   }
 }
 

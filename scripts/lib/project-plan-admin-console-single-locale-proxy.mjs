@@ -1,6 +1,10 @@
 // Rewrites host-mode references to the non-localized console route shape.
 import path from 'node:path'
 import { fileStep, replaceAllExactText, replaceExactBlock } from './init-engine.mjs'
+import {
+  CADDY_STATIC_ASSETS,
+  NGINX_STATIC_ASSETS,
+} from './project-plan-admin-console-single-locale-proxy-assets.mjs'
 
 const MULTI_TRAILING = `    location ~ ^(/(?:en|ru)(?:/.*[^/])?)/$ {
         return 308 $scheme://$host$1$is_args$args;
@@ -35,7 +39,7 @@ function nginxPageBlock(slug) {
     location = /favicon.ico { proxy_pass http://web:3000; }
     location = /manifest.webmanifest { proxy_pass http://web:3000; }
 
-    location = / {
+${NGINX_STATIC_ASSETS}    location = / {
         rewrite ^ /${slug} break;
         proxy_pass http://web:3000;
         proxy_set_header Host $host;
@@ -66,7 +70,7 @@ function caddyPageBlock(slug) {
 \t\t}
 \t}
 
-\t@consoleRoot path /
+${CADDY_STATIC_ASSETS}\t@consoleRoot path /
 \thandle @consoleRoot {
 \t\trewrite * /${slug}
 \t\treverse_proxy web:3000 {
