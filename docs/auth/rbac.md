@@ -76,6 +76,16 @@ the token claim **and** the live DB role satisfy the requirement
 
 This mirrors the org-permission freshness contract below.
 
+### Operations Console access probe
+
+`GET /api/v1/admin/access` is a purpose-specific, bearer-only policy probe for
+the future Operations Console. It returns `204 No Content` only when the JWT
+claim and current database role are both `SUPER_ADMIN`; it deliberately returns
+no profile, role, permission, or admin data. Missing or API-key credentials are
+rejected with `401`; a `USER`, organization owner, or organization-role holder
+receives `403`. As with every `@SystemRoles` route, a demotion denies the next
+request even if its existing JWT has not expired.
+
 ### Administering `SUPER_ADMIN`
 
 Promote an existing user through the admin API (requires a current

@@ -1,5 +1,22 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common'
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
@@ -53,6 +70,16 @@ import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
 @SystemRoles(SystemRole.SuperAdmin)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
+
+  @Get('access')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Check Operations Console access — SUPER_ADMIN only' })
+  @ApiNoContentResponse({ description: 'Console access granted' })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({ status: 403, description: 'SUPER_ADMIN required' })
+  checkAccess(): undefined {
+    return undefined
+  }
 
   @Get('users')
   @ApiOperation({ summary: 'List all users — SUPER_ADMIN only' })

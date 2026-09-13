@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operations Console access probe.** `GET /api/v1/admin/access` is a
+  bearer-only, live `SUPER_ADMIN` policy check for the future Operations
+  Console. It returns an empty `204` and never exposes profile, role, or
+  permission data; missing credentials and API keys receive `401`, while
+  non-super-admin bearer sessions receive `403`.
+
 - **Top route progress bar.** A first-party (no dependency),
   YouTube-style navigation-progress indicator fixed to the top of the
   viewport, reduced-motion aware, and styled entirely from semantic design
