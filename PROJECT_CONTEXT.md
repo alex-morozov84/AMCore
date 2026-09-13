@@ -21,6 +21,9 @@ separate product from the starter.
 - **frontend_storybook:** enabled
 - **frontend_route_progress:** enabled
 - **theme_persistence:** local-storage
+- **admin_console:** enabled
+- **admin_console_mode:** path
+- **admin_console_slug:** admin
 - **initialized_from_amcore_version:** N/A — this checkout is AMCore itself.
 
 One field per line, machine-editable by the fork initialization tooling (see
@@ -47,7 +50,8 @@ For `downstream-product`, record at minimum:
 - workflow mode: `strict`, `flexible`, or `custom`;
 - where the product roadmap, current status, and product-specific decisions live;
 - the frontend starter choices below (`i18n_mode`, `frontend_storybook`,
-  `frontend_route_progress`, `theme_persistence`, `initialized_from_amcore_version`).
+  `frontend_route_progress`, `theme_persistence`, `admin_console`,
+  `admin_console_mode`, `admin_console_slug`, `initialized_from_amcore_version`).
 
 Do not infer mode from directory names, package names, git remotes, or the presence
 of GitHub settings. The owner of a downstream product must declare the mode here.
@@ -87,6 +91,18 @@ actually made instead of leaving them implicit in deleted/kept files:
   `docs/frontend/brand-theme-and-tokens.md` → _Cookie-backed SSR theme
   (advanced variant)_). This field records the product's choice; it does not
   imply a second live theme implementation ships in the starter itself.
+- **`admin_console`:** `enabled` or `disabled`. AMCore upstream's default is
+  `enabled`; the Operations Console is the `SystemRole.SUPER_ADMIN`-only
+  system control plane, not a generic product backoffice. Disabling its future
+  frontend surface does not remove backend admin, audit, health, or metrics
+  capabilities.
+- **`admin_console_mode`:** `path` or `host`, present only when
+  `admin_console` is `enabled`. `path` serves console pages on the product
+  host; `host` serves them on a separate host. The mode is a deployment and
+  routing choice, not an authorization role.
+- **`admin_console_slug`:** the literal URL path segment for console pages,
+  present only when `admin_console` is `enabled`; AMCore upstream's default is
+  `admin`. It is not a hostname or subdomain label, including in `host` mode.
 - **`initialized_from_amcore_version`:** the AMCore tag or commit the fork
   was initialized from, e.g. `v0.4.0`. Lets later tooling and upstream-sync
   decisions know the fork's starting baseline.
@@ -105,6 +121,13 @@ three `init:project` dimensions are independent — any one flag alone, or
 any combination together in one invocation. A field can also be set by
 hand in a downstream fork. Their absence means "AMCore's shipped defaults
 apply," not "undecided."
+
+The Operations Console fields record the intended downstream scaffold choice;
+the corresponding `pnpm init:project --admin-console=...` transform is not
+implemented in this checkout yet. They are documentation for people and
+scaffolding, never runtime configuration. A future product backoffice remains
+a separate downstream FSD/API area with product authorization; it must not use
+the Operations Console's routes, session audience, or `SUPER_ADMIN` role.
 
 ## Workflow Modes
 
