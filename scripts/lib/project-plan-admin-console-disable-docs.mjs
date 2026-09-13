@@ -1,6 +1,10 @@
 // Exact console-only documentation/config cleanup for --admin-console=disabled.
 import path from 'node:path'
 import { fileStep, removeExactBlock, removeMarkdownSection } from './init-engine.mjs'
+import {
+  buildAdminConsoleDiscoveryDocsRemovalSteps,
+  removeConsoleFrontendDiscoveryLink,
+} from './project-plan-admin-console-disable-discovery-docs.mjs'
 
 const AUTH_README_BLOCK = [
   'When the optional Operations Console uses its separate host mode, it has a',
@@ -16,7 +20,7 @@ const AUTH_README_BLOCK = [
 const CONSOLE_TOKEN_ROW =
   '| Operations Console | `console-accent`                                                                                  | Functional system-control-plane signal for active console navigation, live-status indication, and links; it is not a product brand token |\n'
 const CONSOLE_INDEX_ROW =
-  '| [Architecture & conventions — Operations Console shell](./architecture-and-conventions.md#operations-console-shell) | The isolated Control Room shell, its FSD ownership, Sidebar reuse, and route-progress navigation contract                                                                                                                                                                                                                              |\n'
+  '| [Operations Console](../operations-console/README.md)                                                             | The isolated `SUPER_ADMIN` control-plane foundation: FSD ownership, topology, session boundary, deployment, verification, and extension rules                                                                                                                                                                                           |\n'
 const ENV_BLOCK = [
   '# For console host mode use docker-compose.console-host.yml as well; it requires',
   '# both CADDY_WEB_DOMAIN and ADMIN_CONSOLE_HOSTNAME.',
@@ -33,7 +37,7 @@ export function removeConsoleArchitectureSection(content) {
 }
 
 export function removeConsoleFrontendIndexRow(content) {
-  return removeExactBlock(content, CONSOLE_INDEX_ROW)
+  return removeConsoleFrontendDiscoveryLink(removeExactBlock(content, CONSOLE_INDEX_ROW))
 }
 
 export function buildAdminConsoleDisableDocsSteps(root) {
@@ -100,5 +104,6 @@ export function buildAdminConsoleDisableDocsSteps(root) {
         removeExactBlock(content, '      ADMIN_CONSOLE_HOSTNAME: ${ADMIN_CONSOLE_HOSTNAME:-}\n'),
       'remove the console hostname from the web container environment'
     ),
+    ...buildAdminConsoleDiscoveryDocsRemovalSteps(root),
   ]
 }

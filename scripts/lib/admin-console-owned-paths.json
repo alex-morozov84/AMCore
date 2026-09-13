@@ -6,7 +6,8 @@
     "apps/web/src/features/console-logout",
     "apps/web/src/shared/api/console",
     "apps/web/src/widgets/console-shell",
-    "apps/web/e2e/console-real-stack"
+    "apps/web/e2e/console-real-stack",
+    "docs/operations-console"
   ],
   "files": [
     "apps/web/src/shared/lib/admin-console-config.test.ts",

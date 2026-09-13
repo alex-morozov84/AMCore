@@ -27,6 +27,11 @@ password, email verification/resend) plus an active-sessions screen, and
 documented hooks for consuming media, notifications, and AI through the BFF.
 Feature-specific admin surfaces remain intentionally product-owned.
 
+The optional [Operations Console](docs/operations-console/README.md) is a
+separate, foundation-only `SUPER_ADMIN` control plane: its topology, session
+boundary, downstream scaffold choice, deployment, and safe extension recipe are
+documented there. It is not a product backoffice or a catalog/content admin UI.
+
 ### Backend Starter Capabilities
 
 | Capability        | Status          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
