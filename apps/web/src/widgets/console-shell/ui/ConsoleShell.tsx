@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { LayoutDashboardIcon, ShieldCheckIcon } from 'lucide-react'
 
+import { ConsoleLogoutButton } from '@/features/console-logout'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 import { getConsoleOverviewHref } from '@/shared/lib/console-public-href'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import {
@@ -106,6 +108,7 @@ export function ConsoleShell({ children }: ConsoleShellProps) {
         <header className="flex min-h-14 items-center gap-3 border-b border-line-strong px-4">
           <SidebarTrigger toggleLabel={t('toggleNavigation')} />
           <ConsoleStatusStrip />
+          {ADMIN_CONSOLE_CONFIG.mode === 'host' && <ConsoleLogoutButton />}
         </header>
         <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">{children}</div>
       </SidebarInset>

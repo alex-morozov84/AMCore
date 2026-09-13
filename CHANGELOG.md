@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operations Console host-mode sessions.** Adds a separate host-only
+  `__Host-amcore_console_session` cookie, Redis vault namespace and `console`
+  audience, live-super-admin credential admission, exact console-origin
+  login/logout protection, and product/console session isolation. OAuth is
+  intentionally not reused as a console-host shortcut.
+
 - **Operations Console Control Room shell.** Adds the isolated console
   Sidebar composition, localized overview placeholder, semantic console accent,
   and progress-aware console navigation without expanding console sessions,

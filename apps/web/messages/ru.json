@@ -69,7 +69,15 @@
     "controlPlane": "Системная плоскость управления",
     "accessPolicy": "Актуальная проверка доступа",
     "protected": "Защищено",
-    "overviewEyebrow": "Control Room"
+    "overviewEyebrow": "Control Room",
+    "loginTitle": "Вход в консоль",
+    "loginDescription": "Войдите с учётной записью администратора платформы.",
+    "loginEmail": "Электронная почта",
+    "loginPassword": "Пароль",
+    "signIn": "Войти",
+    "signingIn": "Выполняется вход…",
+    "signOut": "Выйти",
+    "signingOut": "Выполняется выход…"
   },
   "auth": {
     "login": "Войти",

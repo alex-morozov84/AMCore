@@ -64,6 +64,17 @@ auto-attaching the cookie, and browsers always send `Origin` on cross-origin POS
 The enforced guarantee is therefore: **any browser cross-origin POST must come from an
 allowlisted origin** — which is exactly the situation where cookie-CSRF is possible.
 
+## Operations Console host mode
+
+Console login and logout are a narrower, host-only cookie surface. They require
+an explicit `Origin` or `Referer` resolving to the exact configured
+`https://ADMIN_CONSOLE_HOSTNAME` origin; missing, malformed, product-host, and
+other sibling-origin values are rejected. The console does not extend the
+product `WEB_TRUSTED_ORIGINS` allowlist, because same-site subdomains are still
+different origins for this browser-to-BFF boundary. `SameSite=Strict` and the
+host-only `__Host-amcore_console_session` cookie are complementary controls,
+not substitutes for this exact-origin check.
+
 ## Bull Board
 
 Bull Board is not mounted in production unless explicitly enabled, and it is never

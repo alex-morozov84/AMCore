@@ -428,10 +428,10 @@ jobs:
     # `playwright install --with-deps chromium` can hang indefinitely on an
     # unanswered needrestart prompt instead of failing fast, and this job had
     # no timeout-minutes, so a hang would run until GitHub's default 6-hour
-    # job timeout. 30 minutes is a reasoned bound, not a measured one — this
-    # job runs both Playwright E2E lanes plus a full real-stack docker compose
-    # boot, so it needs more headroom than storybook's 20.
-    timeout-minutes: 30
+    # job timeout. 45 minutes is a reasoned bound, not a measured one — this
+    # job runs both existing Playwright E2E lanes plus two full real-stack Docker
+    # topologies, so it needs more headroom than storybook's 20.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -501,6 +501,15 @@ jobs:
         working-directory: apps/web
         run: pnpm test:e2e:real-stack
 
+      # The console contract needs a second, isolated topology: host-mode is
+      # generated at build time and its `__Host-` cookie requires HTTPS. The
+      # harness builds a temporary host-mode checkout and tears it down itself.
+      - name: Tear down product real-stack topology
+        run: docker compose down -v
+
+      - name: Run HTTPS console host-mode real-stack E2E lane
+        run: pnpm test:console-session-e2e
+
       - name: Dump compose logs on failure
         if: failure()
         run: |
@@ -515,6 +524,7 @@ jobs:
           path: |
             apps/web/playwright-report/
             apps/web/playwright-report-real-stack/
+            apps/web/playwright-report-console-real-stack/
             apps/web/test-results/
           retention-days: 7
 

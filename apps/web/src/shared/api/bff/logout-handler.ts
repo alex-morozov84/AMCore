@@ -2,15 +2,13 @@ import { NextResponse } from 'next/server'
 import { AuthErrorCode } from '@amcore/shared'
 
 import { apiErrorResponse } from './api-error-response'
+import { revokeBackendSession } from './backend-session-revocation'
 import { type CurrentVaultSession, getCurrentVaultSession } from './current-session'
 import { isTrustedOrigin } from './origin-guard'
 import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultStore } from './session-vault-store'
 
 import 'server-only'
-
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
-const REFRESH_COOKIE_NAME = 'refresh_token'
 
 /**
  * Logout is a **dedicated** handler, not routed through the generic
@@ -44,7 +42,7 @@ export async function handleLogout(request: Request): Promise<NextResponse> {
   const current = await readCurrentSessionSafely()
   if (current) {
     await Promise.all([
-      callBackendLogout(current.entry.refreshToken),
+      revokeBackendSession(current.entry.refreshToken),
       deleteVaultEntry(current.sessionId),
     ])
   }
@@ -68,23 +66,6 @@ async function readCurrentSessionSafely(): Promise<CurrentVaultSession | null> {
   } catch (error) {
     console.error('[bff] reading the current session failed during logout', error)
     return null
-  }
-}
-
-async function callBackendLogout(refreshToken: string): Promise<void> {
-  try {
-    const response = await fetch(`${API_URL}/api/v1/auth/logout`, {
-      method: 'POST',
-      headers: { Cookie: `${REFRESH_COOKIE_NAME}=${refreshToken}` },
-    })
-    // `fetch` only rejects on network-level failures — a non-2xx backend
-    // response (500, 403, ...) resolves normally and was previously
-    // silently ignored.
-    if (!response.ok) {
-      console.error(`[bff] backend logout call returned status ${response.status}`)
-    }
-  } catch (error) {
-    console.error('[bff] backend logout call failed', error)
   }
 }
 

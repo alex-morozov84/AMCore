@@ -15,6 +15,7 @@
     "test:storybook": "vitest run --project=storybook",
     "test:e2e": "playwright test",
     "test:e2e:real-stack": "playwright test --config=playwright.real-stack.config.ts",
+    "test:e2e:console-real-stack": "playwright test --config=playwright.console-real-stack.config.ts",
     "lint:css": "stylelint \"src/**/*.css\"",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"

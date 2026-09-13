@@ -592,6 +592,14 @@ page admission probe is not authorization for console data. `/api/csp-report`
 is intentionally not a console BFF target and remains the existing
 unauthenticated CSP-report receiver.
 
+Host-mode console login and logout use public `/api/auth/login` and
+`/api/auth/logout` paths; the selected proxy maps them internally to the fixed
+`app/api/console/auth/**` namespace. They set only the host-only
+`__Host-amcore_console_session` cookie and use the separate
+`web:console-session:v1:*` Redis namespace. Do not expose the physical
+`/api/console/**` paths publicly on the console host, and do not share the
+product `amcore_session` cookie or its Redis entries with this boundary.
+
 A few things that differ from the nginx example on purpose:
 
 - **No `client_max_body_size`-equivalent needed.** Caddy's `reverse_proxy`
