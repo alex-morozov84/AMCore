@@ -1,17 +1,25 @@
 // Static inventory of the scaffolding suite's real install-bearing
-// scenarios (BACKLOG item 14, PR1 §C) — declares INPUT only (flags, install
-// timing, extra manual verify commands some test files run outside the CLI
-// itself). Which verification stages actually ran, their counts, and
-// success are never assumed here — `instrumented-run.mjs` measures that live
-// from each real run, per PR1's "classifier must not generate the
-// expectations it then checks as truth" constraint.
+// scenarios (BACKLOG item 14, PR1 §C). Every scenario's manual-verify
+// command list and loop cardinality is *derived* from
+// scripts/lib/scaffold-scenario-recipes.mjs — the exact same arrays the real
+// end-to-end tests iterate over — instead of being retyped here, so this
+// registry cannot drift from what the suite actually runs (BACKLOG item 14,
+// PR1 correction: a hand-typed copy previously omitted a verify step and
+// reordered the rest, undetected by either copy's own tests).
 //
-// Every entry cites the exact test file/lines it mirrors so a reviewer can
-// diff this registry against the real suite by hand; `scenario-registry.test.mjs`
-// additionally asserts each citation's flag string still appears verbatim in
-// that file, so silent drift fails a fast test instead of only being caught
-// by someone re-reading both files side by side.
-export const SCENARIOS = [
+// Only `flags`/`installBefore`/`skipVerify`/`topology` for the three
+// scenarios that use the CLI's own internal verify (no manual command list
+// to share) remain hand-declared here; their citation is still checked by
+// scenario-registry.test.mjs's drift detector.
+import {
+  STORYBOOK_MANUAL_VERIFY_STEPS,
+  ADMIN_CONSOLE_VERIFY_STEPS,
+  ADMIN_CONSOLE_ENABLED_TOPOLOGIES,
+  ADMIN_CONSOLE_SINGLE_LOCALE_BUILD_STEPS,
+  ADMIN_CONSOLE_SINGLE_LOCALE_REPRESENTATIVE_SCENARIOS,
+} from '../lib/scaffold-scenario-recipes.mjs'
+
+const CLI_VERIFIED_SCENARIOS = [
   {
     name: 'single-locale-en',
     flags: ['--mode=single', '--locale=en', '--yes'],
@@ -33,7 +41,8 @@ export const SCENARIOS = [
     flags: ['--storybook=disabled', '--yes'],
     installBefore: true,
     skipVerify: false,
-    topology: 'multi-locale, Storybook removed — CLI verify is a documented no-op ' +
+    topology:
+      'multi-locale, Storybook removed — CLI verify is a documented no-op ' +
       '(init-project.mjs: `defaultVerify = flags.storybook ? () => [] : ...`)',
     citation: 'scripts/init-project-storybook.test.mjs:100-118',
   },
@@ -43,54 +52,44 @@ export const SCENARIOS = [
     installBefore: false,
     installAfter: true,
     skipVerify: true,
-    postApplySteps: [['typecheck'], ['lint'], ['--filter', 'web', 'test'], ['--filter', 'web', 'build']],
+    postApplySteps: STORYBOOK_MANUAL_VERIFY_STEPS,
+    // postApplySteps is the shared STORYBOOK_MANUAL_VERIFY_STEPS recipe, not
+    // a literal in this file — see scaffold-scenario-recipes.mjs.
     topology: 'multi-locale, Storybook removed, verified manually after the follow-up pnpm install',
-    citation: 'scripts/init-project-storybook.test.mjs:131-148',
+    citation: 'scripts/init-project-storybook.test.mjs:133-141',
   },
-  {
-    name: 'admin-console-path-panel',
-    flags: ['--admin-console=path', '--admin-console-slug=panel', '--yes'],
+]
+
+const ADMIN_CONSOLE_SCENARIOS = ADMIN_CONSOLE_ENABLED_TOPOLOGIES.map(([mode, slug]) => ({
+  name: `admin-console-${mode}-${slug}`,
+  flags: [`--admin-console=${mode}`, `--admin-console-slug=${slug}`, '--yes'],
+  installBefore: true,
+  skipVerify: true,
+  postApplySteps: ADMIN_CONSOLE_VERIFY_STEPS,
+  topology: `multi-locale, console enabled, ${mode} topology, custom slug`,
+  citation: 'scripts/init-project-admin-console.test.mjs (ADMIN_CONSOLE_ENABLED_TOPOLOGIES)',
+}))
+
+function singleLocaleName(locale, expected) {
+  const mode = expected.mode ?? 'default'
+  return `admin-console-single-locale-${locale}-${mode}${expected.slug ? `-${expected.slug}` : ''}`
+}
+
+const ADMIN_CONSOLE_SINGLE_LOCALE_SCENARIOS = ADMIN_CONSOLE_SINGLE_LOCALE_REPRESENTATIVE_SCENARIOS.map(
+  ([locale, args, expected]) => ({
+    name: singleLocaleName(locale, expected),
+    flags: ['--mode=single', `--locale=${locale}`, ...args, '--yes'],
     installBefore: true,
     skipVerify: true,
-    postApplySteps: [['typecheck'], ['lint'], ['--filter', 'web', 'test'], ['--filter', 'web', 'build']],
-    topology: 'multi-locale, console enabled, path topology, custom slug',
-    citation: 'scripts/init-project-admin-console.test.mjs:28-37,151-159',
-  },
-  {
-    name: 'admin-console-host-panel',
-    flags: ['--admin-console=host', '--admin-console-slug=panel', '--yes'],
-    installBefore: true,
-    skipVerify: true,
-    postApplySteps: [['typecheck'], ['lint'], ['--filter', 'web', 'test'], ['--filter', 'web', 'build']],
-    topology: 'multi-locale, console enabled, host topology, custom slug',
-    citation: 'scripts/init-project-admin-console.test.mjs:28-37,151-159',
-  },
-  {
-    // The declarative SCENARIOS table in this test file parameterizes
-    // --locale per case (`--locale=${locale}`), so no single flag string is
-    // ever literal — cited for context, not for the drift-detector's exact
-    // per-flag match (see scenario-registry.test.mjs).
-    name: 'admin-console-single-locale-ru-host-panel',
-    flags: ['--mode=single', '--locale=ru', '--admin-console=host', '--admin-console-slug=panel', '--yes'],
-    installBefore: true,
-    skipVerify: true,
-    postApplySteps: [
-      ['--filter', 'shared', 'build'],
-      ['--filter', 'web', 'build'],
-    ],
-    topology: 'single-locale (ru), console enabled, host topology, custom slug',
-    citation: 'scripts/init-project-admin-console-single-locale.test.mjs:87-96',
-  },
-  {
-    name: 'admin-console-single-locale-en-disabled',
-    flags: ['--mode=single', '--locale=en', '--admin-console=disabled', '--yes'],
-    installBefore: true,
-    skipVerify: true,
-    postApplySteps: [
-      ['--filter', 'shared', 'build'],
-      ['--filter', 'web', 'build'],
-    ],
-    topology: 'single-locale (en), console disabled',
-    citation: 'scripts/init-project-admin-console-single-locale.test.mjs:87-96',
-  },
+    postApplySteps: ADMIN_CONSOLE_SINGLE_LOCALE_BUILD_STEPS,
+    topology: `single-locale (${locale}), console ${expected.mode ?? 'enabled'}${expected.slug ? ', custom slug' : ''}`,
+    citation:
+      'scripts/init-project-admin-console-single-locale.test.mjs (ADMIN_CONSOLE_SINGLE_LOCALE_REPRESENTATIVE_SCENARIOS)',
+  })
+)
+
+export const SCENARIOS = [
+  ...CLI_VERIFIED_SCENARIOS,
+  ...ADMIN_CONSOLE_SCENARIOS,
+  ...ADMIN_CONSOLE_SINGLE_LOCALE_SCENARIOS,
 ]

@@ -9,6 +9,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
+import { STORYBOOK_MANUAL_VERIFY_STEPS } from './lib/scaffold-scenario-recipes.mjs'
 
 let copy
 
@@ -140,13 +141,7 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     // The exact manual step the printed follow-up asks for.
     installDependencies(copy.root)
 
-    for (const args of [
-      ['typecheck'],
-      ['lint'],
-      ['--filter', 'web', 'build'],
-      ['--filter', 'api', 'test'],
-      ['--filter', 'web', 'test'],
-    ]) {
+    for (const args of STORYBOOK_MANUAL_VERIFY_STEPS) {
       const verify = spawnSync('pnpm', args, {
         cwd: copy.root,
         encoding: 'utf8',

@@ -140,24 +140,30 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Structural/read-only checks against the real repo (no nested/
-      # disposable-copy install -- the "Install dependencies" step above
-      # still runs -- no Docker, ~6s): every pnpm init:project before/after
-      # fixture in scripts/lib/ still matches the real file it targets, plus
-      # the fixture-composition invariants (no two edit steps target the
-      # same file, every scaffold dimension composes safely with every
-      # other). Does NOT cover the private-path ratchet -- that is the
-      # separate "promtool" job, display name "Observability contract
-      # (static)", already required.
+      # Structural/read-only checks against the real repo (disposable copies
+      # in scripts/measure/'s own tests never run a real `pnpm install`
+      # inside them -- the top-level "Install dependencies" step above is
+      # the only real install -- no Docker, ~10s): every pnpm init:project
+      # before/after fixture in scripts/lib/ still matches the real file it
+      # targets, the fixture-composition invariants (no two edit steps
+      # target the same file, every scaffold dimension composes safely with
+      # every other), and scripts/measure/'s baseline-measurement tool
+      # (BACKLOG item 14) — its own unit/inventory-contract tests and real,
+      # fast failure-path regressions (install exception, failed command,
+      # partial internal verification preserved). Does NOT cover the
+      # private-path ratchet -- that is the separate "promtool" job, display
+      # name "Observability contract (static)", already required.
       # NOT the full pnpm test:scripts either (see the parallel
       # "Scaffolding contract (full)" job below for that) — this is the
       # cheap layer meant to fail fast on every PR, not gated by which paths
       # changed: a change anywhere in the repo can drift a scaffolding
       # fixture (this job's own introduction was prompted by exactly that —
       # apps/web and docs changes drifting scripts/lib/*.mjs fixtures with
-      # no path filter that would have caught it).
+      # no path filter that would have caught it). Uses the same
+      # `test:scripts:fast` pnpm script the full `test:scripts` command also
+      # runs first, so the two globs cannot diverge from each other.
       - name: Run scaffolding contract tests (fast layer)
-        run: node --test --test-concurrency=1 scripts/lib/*.test.mjs
+        run: pnpm test:scripts:fast
 
   scaffolding-contract-full:
     name: Scaffolding contract (full, real install/build/test)

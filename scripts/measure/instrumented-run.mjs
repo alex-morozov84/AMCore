@@ -7,7 +7,7 @@
 import { createRealRepoCopy, installDependencies } from '../lib/test-fixture.mjs'
 import { commit, runInitProject } from '../lib/init-project-test-helpers.mjs'
 import { withPeakDiskSampling } from './fs-usage.mjs'
-import { parseVerificationStages, summarizeVerificationCounters } from './verify-output.mjs'
+import { deriveApplyOutcome } from './apply-outcome.mjs'
 import { stampScenario, classifyComparability } from './provenance.mjs'
 import { fingerprintTree } from './fingerprint.mjs'
 import { runPnpm, saveDiagnostics, bucketFor } from './pnpm-stage.mjs'
@@ -31,39 +31,59 @@ function record(state, scenarioName, stage) {
   return stage.ok
 }
 
+/**
+ * Runs `installDependencies` as an ordinary, recorded stage instead of an
+ * uncaught throw. `installDependencies` is `execFileSync`-based and throws
+ * on a non-zero `pnpm install` exit; a real install failure must produce a
+ * failed-scenario record with diagnostics, not abort the whole report
+ * (BACKLOG item 14, PR1 Round 8 correction).
+ */
 function runInstallStage(state, scenario, root, label) {
   const start = performance.now()
-  installDependencies(root)
+  // Counted on attempt, not only on success — the install genuinely ran.
   state.counters.installs += 1
-  record(state, scenario.name, { label, ok: true, durationMs: performance.now() - start, ranAt: new Date().toISOString() })
+  let ok = true
+  let output = ''
+  try {
+    installDependencies(root)
+  } catch (error) {
+    ok = false
+    output = `${error.stdout ?? ''}${error.stderr ?? ''}` || (error.message ?? String(error))
+  }
+  record(state, scenario.name, { label, ok, durationMs: performance.now() - start, ranAt: new Date().toISOString(), output })
 }
 
 function runApplyStage(state, scenario, root) {
   const start = performance.now()
   const result = runInitProject(root, scenario.flags, { skipVerify: scenario.skipVerify })
-  const ok = result.status === 0
-  record(state, scenario.name, {
-    label: 'apply',
-    ok,
-    durationMs: performance.now() - start,
-    ranAt: new Date().toISOString(),
-    output: `${result.stdout ?? ''}${result.stderr ?? ''}`,
-  })
-  if (ok) Object.assign(state.counters, summarizeVerificationCounters(parseVerificationStages(result.stdout ?? '')))
+  const { counters, applyStage, failedInternalStage } = deriveApplyOutcome(
+    result,
+    performance.now() - start,
+    new Date().toISOString()
+  )
+  Object.assign(state.counters, counters)
+  if (failedInternalStage) {
+    state.stages.push(applyStage)
+    record(state, scenario.name, failedInternalStage)
+  } else {
+    record(state, scenario.name, applyStage)
+  }
 }
 
 function runPostApplySteps(state, scenario, root) {
   for (const args of scenario.postApplySteps ?? []) {
     if (state.failedStage) break
     const stage = runPnpm(root, args)
-    if (record(state, scenario.name, stage)) {
-      const bucket = bucketFor(args)
-      if (bucket) state.counters[bucket] += 1
-    }
+    // Counted on run, not only on success — the (possibly expensive) command
+    // did execute even if it then failed.
+    const bucket = bucketFor(args)
+    if (bucket) state.counters[bucket] += 1
+    record(state, scenario.name, stage)
   }
 }
 
-async function execute(scenario, root) {
+/** Exported for direct testing without a real disposable-copy/full-scenario round trip. */
+export async function execute(scenario, root) {
   const state = makeState()
   if (scenario.installBefore) runInstallStage(state, scenario, root, 'install')
   if (!state.failedStage) runApplyStage(state, scenario, root)

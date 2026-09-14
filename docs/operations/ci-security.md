@@ -54,14 +54,20 @@ of workflow self-hardening to keep the example forkable.
   scrape-target/rule-group/Alertmanager-discovery state, Grafana's dashboard
   APIs against the committed dashboard JSON, a real Grafana→Prometheus query
   round trip, and a from-scratch Grafana old-volume migration smoke.
-- **Scaffolding contract (fast)** — job id `scaffolding-contract` — every
-  `pnpm init:brand`/`pnpm init:project` before/after fixture in `scripts/lib/`
-  still matches the real file it targets, and the fixture-composition
-  invariants (no two edit steps target the same file, every scaffold
-  dimension composes safely with every other). Read-only against the real
-  repo, no nested/disposable-copy install (the job's own top-level
-  `pnpm install --frozen-lockfile` still runs), no Docker, ~6 seconds. Does
-  **not** cover the
+- **Scaffolding contract (fast)** — job id `scaffolding-contract`, runs
+  `pnpm test:scripts:fast` — every `pnpm init:brand`/`pnpm init:project`
+  before/after fixture in `scripts/lib/` still matches the real file it
+  targets, the fixture-composition invariants (no two edit steps target the
+  same file, every scaffold dimension composes safely with every other), and
+  the `scripts/measure/` baseline-measurement tool's own unit/inventory-
+  contract tests plus real, fast failure-path regressions (an install
+  exception, a failed command, partial internal verification preserved on a
+  failed run). Read-only against the real repo — the disposable repo copies
+  a few of these tests create never run a real `pnpm install` inside them,
+  only the job's own top-level `pnpm install --frozen-lockfile` — no Docker,
+  ~10 seconds. `test:scripts:fast` is also the first half of the full
+  `pnpm test:scripts` command below, so the fast job and the full command
+  cannot drift onto two different test sets. Does **not** cover the
   public/private-path ratchet — that is the separate "Observability contract
   (static)" job above. No path filter: a change anywhere in the repo can
   drift a scaffolding fixture (this job exists because exactly that

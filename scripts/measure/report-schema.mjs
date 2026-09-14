@@ -6,21 +6,38 @@
 //
 // Bumping SCHEMA_VERSION is required whenever a field is added, removed, or
 // changes meaning — comparisons across baseline runs must never silently mix
-// two incompatible report shapes.
-export const SCHEMA_VERSION = '1.0.0'
+// two incompatible report shapes. 1.1.0 (Round 8 correction): counters,
+// flags, fingerprint, transform-inventory items, and topology were
+// previously validated as opaque containers (any object/array passed) —
+// strengthened to check field-level shape and value ranges, so schema
+// "1.1.0" actually protects the semantics later comparisons rely on.
+export const SCHEMA_VERSION = '1.1.0'
 
 const isString = (v) => typeof v === 'string'
 const isBoolean = (v) => typeof v === 'boolean'
 const isNumber = (v) => typeof v === 'number' && Number.isFinite(v)
+const isNonNegativeInt = (v) => Number.isInteger(v) && v >= 0
 const isNullableString = (v) => v === null || isString(v)
 const isArray = (v) => Array.isArray(v)
 const isObject = (v) => typeof v === 'object' && v !== null
+const isStringArray = (v) => isArray(v) && v.every(isString)
 
 const STAGE_SHAPE = { label: isString, ranAt: isString, ok: isBoolean, durationMs: isNumber }
 
+const COUNTER_FIELDS = ['repoCopies', 'installs', 'typecheckRuns', 'lintRuns', 'buildRuns', 'testRuns']
+const isCounters = (v) => isObject(v) && COUNTER_FIELDS.every((field) => isNonNegativeInt(v[field]))
+
+const isFingerprint = (v) =>
+  v === null ||
+  (isObject(v) &&
+    isString(v.treeHash) &&
+    isNonNegativeInt(v.fileCount) &&
+    isObject(v.significantValues) &&
+    Object.values(v.significantValues).every(isNullableString))
+
 const SCENARIO_SHAPE = {
   scenarioName: isString,
-  flags: isArray,
+  flags: isStringArray,
   startedAt: isString,
   repoSha: isString,
   repoDirty: isBoolean,
@@ -28,7 +45,7 @@ const SCENARIO_SHAPE = {
   cliSha: isString,
   comparable: isBoolean,
   comparabilityReason: isNullableString,
-  counters: isObject,
+  counters: isCounters,
   stages: isArray,
   wallTimeMs: isNumber,
   peakDiskUsageBytes: isNumber,
@@ -36,8 +53,24 @@ const SCENARIO_SHAPE = {
   success: isBoolean,
   failedStage: isNullableString,
   diagnosticsPath: isNullableString,
-  fingerprint: (v) => v === null || (isObject(v) && isString(v.treeHash)),
+  fingerprint: isFingerprint,
 }
+
+const DOMAIN_FIELDS = ['docs', 'tests', 'ci', 'proxy']
+const isDomain = (v) => isObject(v) && DOMAIN_FIELDS.every((field) => typeof v[field] === 'boolean')
+const isHistogram = (v) => isObject(v) && Object.values(v).every((count) => Number.isInteger(count) && count > 0)
+
+const TRANSFORM_INVENTORY_ITEM_SHAPE = {
+  modulePath: isString,
+  dimension: isString,
+  histogram: isHistogram,
+  primaryShape: isString,
+  unclassifiedReason: isNullableString,
+  domain: isDomain,
+}
+
+const isCandidateGroup = (v) => isArray(v) && v.length > 1 && v.every(isString)
+const isTopology = (v) => isObject(v) && isArray(v.candidateEquivalentGroups) && v.candidateEquivalentGroups.every(isCandidateGroup)
 
 // Only `scenarios`/`transformInventory` array-ness is checked at this level
 // — each element's own shape is walked separately in `validateReport` so a
@@ -51,7 +84,7 @@ const REPORT_SHAPE = {
   pnpmVersion: isString,
   scenarios: isArray,
   transformInventory: isArray,
-  topology: isObject,
+  topology: isTopology,
 }
 
 /** Walks one object against a `{field: predicate}` shape, returning a list of field-level errors. */
@@ -77,6 +110,12 @@ function validateScenario(scenario, index) {
   return errors
 }
 
+function validateTransformInventory(transformInventory) {
+  return transformInventory.flatMap((item, index) =>
+    validateShape(item, TRANSFORM_INVENTORY_ITEM_SHAPE).map((err) => `transformInventory[${index}]: ${err}`)
+  )
+}
+
 /**
  * Validates a full baseline report. Returns `{ valid, errors }` — every
  * error names its exact field path so a schema drift is actionable, not a
@@ -88,6 +127,9 @@ export function validateReport(report) {
 
   const scenarioErrors = report.scenarios.flatMap((scenario, index) => validateScenario(scenario, index))
   if (scenarioErrors.length > 0) return { valid: false, errors: scenarioErrors }
+
+  const inventoryErrors = validateTransformInventory(report.transformInventory)
+  if (inventoryErrors.length > 0) return { valid: false, errors: inventoryErrors }
 
   if (report.schemaVersion !== SCHEMA_VERSION) {
     return {

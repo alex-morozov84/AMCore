@@ -90,7 +90,7 @@ export function createFixtureRepo() {
     'fixture',
   ])
 
-  return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) }
+  return { root, cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }) }
 }
 
 /**
@@ -100,6 +100,11 @@ export function createFixtureRepo() {
  * project-plan-web-structure.test.mjs and friends). `git archive` only
  * copies tracked files, so `ai/` (gitignored) is never present — same
  * safety property `createFixtureRepo()`'s guard tests rely on.
+ *
+ * `cleanup()` retries on `ENOTEMPTY` (Node's native `rmSync`
+ * `maxRetries`/`retryDelay`) — observed as a real, transient failure
+ * (BACKLOG item 14, PR1) when a fast scenario's cleanup runs immediately
+ * after a subprocess exits, before the OS has fully released a file handle.
  */
 export function createRealRepoCopy() {
   const root = mkdtempSync(path.join(tmpdir(), 'amcore-real-repo-copy-'))
@@ -112,7 +117,7 @@ export function createRealRepoCopy() {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
-  return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) }
+  return { root, cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }) }
 }
 
 export function git(root, args) {

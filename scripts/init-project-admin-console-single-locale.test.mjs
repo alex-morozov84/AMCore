@@ -5,6 +5,10 @@ import path from 'node:path'
 import { afterEach, describe, it } from 'node:test'
 import { INIT_PROJECT, commit, runInitProject } from './lib/init-project-test-helpers.mjs'
 import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
+import {
+  ADMIN_CONSOLE_SINGLE_LOCALE_BUILD_STEPS,
+  ADMIN_CONSOLE_SINGLE_LOCALE_REPRESENTATIVE_SCENARIOS,
+} from './lib/scaffold-scenario-recipes.mjs'
 
 const copies = []
 const OTHER_LOCALE = { en: 'ru', ru: 'en' }
@@ -54,10 +58,7 @@ function assertSingleLocale(root, locale, { mode = 'path', slug = 'admin' } = {}
 
 function buildWeb(root) {
   installDependencies(root)
-  for (const args of [
-    ['--filter', 'shared', 'build'],
-    ['--filter', 'web', 'build'],
-  ]) {
+  for (const args of ADMIN_CONSOLE_SINGLE_LOCALE_BUILD_STEPS) {
     const result = spawnSync('pnpm', args, { cwd: root, encoding: 'utf8' })
     assert.equal(result.status, 0, result.stdout + result.stderr)
   }
@@ -83,10 +84,7 @@ describe('init:project single-locale console topology', () => {
   }
 
   it('builds representative retained and disabled outputs', () => {
-    for (const [locale, args, expected] of [
-      ['ru', ['--admin-console=host', '--admin-console-slug=panel'], { mode: 'host', slug: 'panel' }],
-      ['en', ['--admin-console=disabled'], { mode: 'disabled' }],
-    ]) {
+    for (const [locale, args, expected] of ADMIN_CONSOLE_SINGLE_LOCALE_REPRESENTATIVE_SCENARIOS) {
       const root = copy()
       apply(root, ['--mode=single', `--locale=${locale}`, ...args])
       assertSingleLocale(root, locale, expected)
