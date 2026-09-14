@@ -69,6 +69,14 @@ test('overlapping edits from two operations fail closed, naming both', () => {
   )
 })
 
+test('identical edits from agreeing operations deduplicate', () => {
+  const model = modelOf("export default ['x'];\n")
+  const node = findUniqueNode(model, (candidate) => isStringLiteralText(candidate, 'x'), ctx())
+  model.removeNode(node, ctx('op-a'))
+  model.removeNode(node, ctx('op-b'))
+  assert.equal(serializeStructuralModel(model), 'export default [];\n')
+})
+
 test('output that no longer parses fails closed with invalid-output-parse — no adapter opt-in needed', () => {
   const model = modelOf('export default [1];\n')
   model.replaceNode(model.sourceFile.statements[0].expression, '(((', ctx())

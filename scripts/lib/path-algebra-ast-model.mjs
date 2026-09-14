@@ -88,6 +88,18 @@ function clipTriviaOverlaps(path, text, sorted) {
   return clipped
 }
 
+function dedupeIdenticalEdits(sorted) {
+  return sorted.filter((edit, index) => {
+    const previous = sorted[index - 1]
+    return !(
+      previous &&
+      edit.start === previous.start &&
+      edit.end === previous.end &&
+      edit.replacement === previous.replacement
+    )
+  })
+}
+
 /**
  * Parses `text` once (fails closed with `INVALID_INPUT_PARSE`) and returns
  * the model adapters share. `removeNode` / `replaceNode` record edits tagged
@@ -127,7 +139,7 @@ export function parseStructuralModel(path, text) {
  */
 export function serializeStructuralModel(model) {
   const sorted = [...model.edits].sort((a, b) => a.start - b.start || a.end - b.end)
-  const edits = clipTriviaOverlaps(model.path, model.text, sorted)
+  const edits = clipTriviaOverlaps(model.path, model.text, dedupeIdenticalEdits(sorted))
   let output = model.text
   for (const edit of edits.reverse()) {
     output = output.slice(0, edit.start) + edit.replacement + output.slice(edit.end)

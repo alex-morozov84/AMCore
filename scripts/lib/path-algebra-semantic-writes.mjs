@@ -21,7 +21,7 @@ function canonicalizeClaim(fact, claim, index) {
   const invalid = (reason) =>
     claimError(CONFLICT_CODES.INVALID_SEMANTIC_WRITE, fact, `claim #${index} ${reason}`)
   if (claim === null || typeof claim !== 'object') throw invalid('must be an object')
-  if (typeof claim.location !== 'string' || claim.location.length === 0) {
+  if (typeof claim.location !== 'string' || claim.location.trim().length === 0) {
     throw invalid('must have a non-empty string "location"')
   }
   let canonicalValue

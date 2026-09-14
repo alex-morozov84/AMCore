@@ -42,6 +42,13 @@ test('a claim without a location, or with an empty one, is rejected', () => {
   )
 })
 
+test('a whitespace-only location is rejected', () => {
+  assert.throws(
+    derive(() => [{ location: '   ', value: 1 }]),
+    conflict(CONFLICT_CODES.INVALID_SEMANTIC_WRITE)
+  )
+})
+
 test('a claim whose value has no canonical JSON form is rejected', () => {
   assert.throws(
     derive(() => [{ location: 'loc' }]),
