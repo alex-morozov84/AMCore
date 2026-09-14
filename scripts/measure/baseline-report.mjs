@@ -8,6 +8,7 @@ import { collectRunProvenance, classifyComparability } from './provenance.mjs'
 import { SCENARIOS } from './scenario-registry.mjs'
 import { runInstrumentedScenario } from './instrumented-run.mjs'
 import { buildTransformInventory } from './transform-inventory.mjs'
+import { buildOperationInventory } from './operation-inventory.mjs'
 import { groupCandidateEquivalents } from './fingerprint.mjs'
 
 async function runScenarios(scenarios, runProvenance, onProgress) {
@@ -50,6 +51,7 @@ export async function buildBaselineReport({ scenarioFilter, onProgress } = {}) {
     comparability,
     scenarios,
     transformInventory: buildTransformInventory(),
+    operationInventory: buildOperationInventory(),
     topology: { candidateEquivalentGroups: equivalentGroups },
   }
   const { valid, errors } = validateReport(report)
@@ -59,7 +61,8 @@ export async function buildBaselineReport({ scenarioFilter, onProgress } = {}) {
 
 function shapeCounts(inventory) {
   const counts = {}
-  for (const module of inventory) counts[module.primaryShape] = (counts[module.primaryShape] ?? 0) + 1
+  for (const module of inventory)
+    counts[module.primaryShape] = (counts[module.primaryShape] ?? 0) + 1
   return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b))
 }
 
@@ -75,13 +78,22 @@ export function renderHumanSummary(report) {
   for (const s of report.scenarios) {
     const status = s.success ? 'OK' : `FAILED at "${s.failedStage}"`
     const diskMb = (s.peakDiskUsageBytes / 1e6).toFixed(1)
-    lines.push(`  - ${s.scenarioName}: ${status}, ${Math.round(s.wallTimeMs)}ms, ${s.counters.installs} install(s), peak disk ${diskMb}MB`)
+    lines.push(
+      `  - ${s.scenarioName}: ${status}, ${Math.round(s.wallTimeMs)}ms, ${s.counters.installs} install(s), peak disk ${diskMb}MB`
+    )
   }
   lines.push('', `Transform inventory: ${report.transformInventory.length} modules`)
-  for (const [shape, count] of shapeCounts(report.transformInventory)) lines.push(`  - ${shape}: ${count}`)
+  for (const [shape, count] of shapeCounts(report.transformInventory))
+    lines.push(`  - ${shape}: ${count}`)
+  lines.push(
+    '',
+    `Operation inventory: ${report.operationInventory.operations.length} scenario operations, ` +
+      `${report.operationInventory.exactCopyEdges.length} exact-copy synchronization edges`
+  )
   if (report.topology.candidateEquivalentGroups.length > 0) {
     lines.push('', 'Candidate equivalent topology groups (not acted on automatically):')
-    for (const group of report.topology.candidateEquivalentGroups) lines.push(`  - ${group.join(', ')}`)
+    for (const group of report.topology.candidateEquivalentGroups)
+      lines.push(`  - ${group.join(', ')}`)
   }
   return lines.join('\n')
 }

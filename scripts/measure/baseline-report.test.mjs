@@ -26,6 +26,7 @@ function fakeReport(overrides = {}) {
       { primaryShape: 'whole-file-legacy-before-after' },
       { primaryShape: 'structured-config' },
     ],
+    operationInventory: { operations: [], exactCopyEdges: [] },
     topology: { candidateEquivalentGroups: [] },
     ...overrides,
   }
@@ -40,7 +41,9 @@ describe('renderHumanSummary', () => {
   })
 
   test('surfaces a non-comparable reason instead of hiding it', () => {
-    const text = renderHumanSummary(fakeReport({ comparability: { comparable: false, reason: 'dirty tree' } }))
+    const text = renderHumanSummary(
+      fakeReport({ comparability: { comparable: false, reason: 'dirty tree' } })
+    )
     assert.match(text, /Comparable revision: NO — dirty tree/)
   })
 

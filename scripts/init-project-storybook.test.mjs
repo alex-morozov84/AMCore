@@ -9,7 +9,11 @@ import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
-import { STORYBOOK_MANUAL_VERIFY_STEPS } from './lib/scaffold-scenario-recipes.mjs'
+import {
+  STORYBOOK_DISABLED_INSTALL_BEFORE_SCENARIO,
+  STORYBOOK_DISABLED_MANUAL_SCENARIO,
+  STORYBOOK_MANUAL_VERIFY_STEPS,
+} from './lib/scaffold-scenario-recipes.mjs'
 
 let copy
 
@@ -109,8 +113,8 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     // rather than attempted and reported as a false "FAILED".
     installDependencies(copy.root)
 
-    const result = runInitProject(copy.root, ['--storybook=disabled', '--yes'], {
-      skipVerify: false,
+    const result = runInitProject(copy.root, STORYBOOK_DISABLED_INSTALL_BEFORE_SCENARIO.flags, {
+      skipVerify: STORYBOOK_DISABLED_INSTALL_BEFORE_SCENARIO.skipVerify,
     })
 
     assert.equal(result.status, 0, result.stdout + result.stderr)
@@ -135,7 +139,9 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     copy = createRealRepoCopy()
     commit(copy.root)
 
-    const result = runInitProject(copy.root, ['--storybook=disabled', '--yes'])
+    const result = runInitProject(copy.root, STORYBOOK_DISABLED_MANUAL_SCENARIO.flags, {
+      skipVerify: STORYBOOK_DISABLED_MANUAL_SCENARIO.skipVerify,
+    })
     assert.equal(result.status, 0, result.stdout + result.stderr)
 
     // The exact manual step the printed follow-up asks for.

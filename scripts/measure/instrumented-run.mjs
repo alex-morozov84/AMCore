@@ -1,9 +1,4 @@
-// Runs one scenario from scenario-registry.mjs against a fresh disposable
-// repo copy, instrumenting counters/stage timing/disk usage (BACKLOG item
-// 14, PR1 §B). Reuses the existing test harness (`createRealRepoCopy`,
-// `commit`, `installDependencies`, `runInitProject`) unmodified — this file
-// only wraps it with measurement. Opt-in: nothing here runs unless a caller
-// explicitly calls `runInstrumentedScenario`.
+// Opt-in measurement of one real scenario in a disposable repository copy.
 import { createRealRepoCopy, installDependencies } from '../lib/test-fixture.mjs'
 import { commit, runInitProject } from '../lib/init-project-test-helpers.mjs'
 import { withPeakDiskSampling } from './fs-usage.mjs'
@@ -15,15 +10,26 @@ import { runPnpm, saveDiagnostics, bucketFor } from './pnpm-stage.mjs'
 function makeState() {
   return {
     stages: [],
-    counters: { repoCopies: 1, installs: 0, typecheckRuns: 0, lintRuns: 0, buildRuns: 0, testRuns: 0 },
+    counters: {
+      repoCopies: 1,
+      installs: 0,
+      typecheckRuns: 0,
+      lintRuns: 0,
+      buildRuns: 0,
+      testRuns: 0,
+    },
     failedStage: null,
     diagnosticsPath: null,
   }
 }
 
-/** Records one finished stage, capturing diagnostics for the first failure only. Returns `stage.ok`. */
 function record(state, scenarioName, stage) {
-  state.stages.push({ label: stage.label, ranAt: stage.ranAt, ok: stage.ok, durationMs: stage.durationMs })
+  state.stages.push({
+    label: stage.label,
+    ranAt: stage.ranAt,
+    ok: stage.ok,
+    durationMs: stage.durationMs,
+  })
   if (!stage.ok && !state.failedStage) {
     state.failedStage = stage.label
     state.diagnosticsPath = saveDiagnostics(scenarioName, stage)
@@ -38,24 +44,30 @@ function record(state, scenarioName, stage) {
  * failed-scenario record with diagnostics, not abort the whole report
  * (BACKLOG item 14, PR1 Round 8 correction).
  */
-function runInstallStage(state, scenario, root, label) {
+function runInstallStage(state, scenario, root, label, install) {
   const start = performance.now()
   // Counted on attempt, not only on success — the install genuinely ran.
   state.counters.installs += 1
   let ok = true
   let output = ''
   try {
-    installDependencies(root)
+    install(root)
   } catch (error) {
     ok = false
     output = `${error.stdout ?? ''}${error.stderr ?? ''}` || (error.message ?? String(error))
   }
-  record(state, scenario.name, { label, ok, durationMs: performance.now() - start, ranAt: new Date().toISOString(), output })
+  record(state, scenario.name, {
+    label,
+    ok,
+    durationMs: performance.now() - start,
+    ranAt: new Date().toISOString(),
+    output,
+  })
 }
 
-function runApplyStage(state, scenario, root) {
+function runApplyStage(state, scenario, root, apply) {
   const start = performance.now()
-  const result = runInitProject(root, scenario.flags, { skipVerify: scenario.skipVerify })
+  const result = apply(root, scenario.flags, { skipVerify: scenario.skipVerify })
   const { counters, applyStage, failedInternalStage } = deriveApplyOutcome(
     result,
     performance.now() - start,
@@ -70,10 +82,10 @@ function runApplyStage(state, scenario, root) {
   }
 }
 
-function runPostApplySteps(state, scenario, root) {
+function runPostApplySteps(state, scenario, root, runCommand) {
   for (const args of scenario.postApplySteps ?? []) {
     if (state.failedStage) break
-    const stage = runPnpm(root, args)
+    const stage = runCommand(root, args)
     // Counted on run, not only on success — the (possibly expensive) command
     // did execute even if it then failed.
     const bucket = bucketFor(args)
@@ -83,14 +95,17 @@ function runPostApplySteps(state, scenario, root) {
 }
 
 /** Exported for direct testing without a real disposable-copy/full-scenario round trip. */
-export async function execute(scenario, root) {
+export async function execute(scenario, root, dependencies = {}) {
+  const install = dependencies.install ?? installDependencies
+  const apply = dependencies.apply ?? runInitProject
+  const runCommand = dependencies.runCommand ?? runPnpm
   const state = makeState()
-  if (scenario.installBefore) runInstallStage(state, scenario, root, 'install')
-  if (!state.failedStage) runApplyStage(state, scenario, root)
+  if (scenario.installBefore) runInstallStage(state, scenario, root, 'install', install)
+  if (!state.failedStage) runApplyStage(state, scenario, root, apply)
   if (!state.failedStage && scenario.installAfter) {
-    runInstallStage(state, scenario, root, 'install (post-apply)')
+    runInstallStage(state, scenario, root, 'install (post-apply)', install)
   }
-  runPostApplySteps(state, scenario, root)
+  runPostApplySteps(state, scenario, root, runCommand)
   return {
     stages: state.stages,
     counters: state.counters,

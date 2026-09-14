@@ -58,6 +58,29 @@ describe('instrumented-run: real failure paths (BACKLOG item 14, PR1 Round 8 cor
     assert.ok(!outcome.stages.some((s) => s.label === 'lint'))
   })
 
+  test('a failed known verification command increments its named counter', async () => {
+    const failedLint = {
+      label: 'lint',
+      ok: false,
+      durationMs: 5,
+      ranAt: 't0',
+      output: 'lint failed',
+    }
+    const scenario = {
+      name: 'failed-lint',
+      flags: [],
+      skipVerify: true,
+      postApplySteps: [['lint']],
+    }
+    const outcome = await execute(scenario, '/unused', {
+      apply: () => ({ status: 0, stdout: '' }),
+      runCommand: () => failedLint,
+    })
+
+    assert.equal(outcome.failedStage, 'lint')
+    assert.equal(outcome.counters.lintRuns, 1)
+  })
+
   test('runInstrumentedScenario surfaces a real failure end-to-end without throwing, and skips fingerprinting', async () => {
     const provenance = collectRunProvenance()
     const scenario = {

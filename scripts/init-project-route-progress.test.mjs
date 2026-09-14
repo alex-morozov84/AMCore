@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
+import { ROUTE_PROGRESS_DISABLED_SCENARIO } from './lib/scaffold-scenario-recipes.mjs'
 
 let copy
 
@@ -49,8 +50,8 @@ describe('init-project --route-progress=disabled (end-to-end against a real-repo
     commit(copy.root)
     installDependencies(copy.root)
 
-    const result = runInitProject(copy.root, ['--route-progress=disabled', '--yes'], {
-      skipVerify: false,
+    const result = runInitProject(copy.root, ROUTE_PROGRESS_DISABLED_SCENARIO.flags, {
+      skipVerify: ROUTE_PROGRESS_DISABLED_SCENARIO.skipVerify,
     })
 
     assert.equal(result.status, 0, result.stdout + result.stderr)

@@ -86,8 +86,10 @@ of workflow self-hardening to keep the example forkable.
   `scripts/measure/`) is a separate, opt-in maintainer tool — not a CI gate,
   never runs automatically. It re-applies the scaffolding suite's real
   install-bearing scenarios with instrumentation (copy/install/build/test
-  counts, per-stage wall time, disk usage, generated-tree fingerprints) and
-  statically classifies every `scripts/lib/project-plan-*.mjs` transform
+  counts, observed-stage wall time, disk usage, generated-tree fingerprints),
+  inventories the real plans' source/target operations and exact-copy
+  synchronization edges, and statically classifies every
+  `scripts/lib/project-plan-*.mjs` transform
   module by its authoring shape (whole-file copy, narrow exact-text block,
   owned/sentinel block, structured config, delete/move, or unclassified with
   a reason). It exists to give the scaffolding engine's own future

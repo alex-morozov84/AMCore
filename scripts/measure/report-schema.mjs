@@ -1,17 +1,8 @@
-// Versioned, dependency-free schema/validator for the scaffolding baseline
-// report (BACKLOG item 14, PR1). No schema-validation library is added here
-// deliberately — root `scripts/*` tooling stays dependency-light per
-// ADR-071, and this report's shape is small and stable enough that a plain
-// hand-rolled walk is clearer than a new dependency for one internal file.
-//
-// Bumping SCHEMA_VERSION is required whenever a field is added, removed, or
-// changes meaning — comparisons across baseline runs must never silently mix
-// two incompatible report shapes. 1.1.0 (Round 8 correction): counters,
-// flags, fingerprint, transform-inventory items, and topology were
-// previously validated as opaque containers (any object/array passed) —
-// strengthened to check field-level shape and value ranges, so schema
-// "1.1.0" actually protects the semantics later comparisons rely on.
-export const SCHEMA_VERSION = '1.1.0'
+// Versioned dependency-free validator for comparable baseline reports.
+// Bump the version whenever a field or its meaning changes.
+import { isOperationInventory, validateOperationInventory } from './operation-report-schema.mjs'
+
+export const SCHEMA_VERSION = '1.2.0'
 
 const isString = (v) => typeof v === 'string'
 const isBoolean = (v) => typeof v === 'boolean'
@@ -24,7 +15,14 @@ const isStringArray = (v) => isArray(v) && v.every(isString)
 
 const STAGE_SHAPE = { label: isString, ranAt: isString, ok: isBoolean, durationMs: isNumber }
 
-const COUNTER_FIELDS = ['repoCopies', 'installs', 'typecheckRuns', 'lintRuns', 'buildRuns', 'testRuns']
+const COUNTER_FIELDS = [
+  'repoCopies',
+  'installs',
+  'typecheckRuns',
+  'lintRuns',
+  'buildRuns',
+  'testRuns',
+]
 const isCounters = (v) => isObject(v) && COUNTER_FIELDS.every((field) => isNonNegativeInt(v[field]))
 
 const isFingerprint = (v) =>
@@ -58,7 +56,8 @@ const SCENARIO_SHAPE = {
 
 const DOMAIN_FIELDS = ['docs', 'tests', 'ci', 'proxy']
 const isDomain = (v) => isObject(v) && DOMAIN_FIELDS.every((field) => typeof v[field] === 'boolean')
-const isHistogram = (v) => isObject(v) && Object.values(v).every((count) => Number.isInteger(count) && count > 0)
+const isHistogram = (v) =>
+  isObject(v) && Object.values(v).every((count) => Number.isInteger(count) && count > 0)
 
 const TRANSFORM_INVENTORY_ITEM_SHAPE = {
   modulePath: isString,
@@ -70,12 +69,11 @@ const TRANSFORM_INVENTORY_ITEM_SHAPE = {
 }
 
 const isCandidateGroup = (v) => isArray(v) && v.length > 1 && v.every(isString)
-const isTopology = (v) => isObject(v) && isArray(v.candidateEquivalentGroups) && v.candidateEquivalentGroups.every(isCandidateGroup)
+const isTopology = (v) =>
+  isObject(v) &&
+  isArray(v.candidateEquivalentGroups) &&
+  v.candidateEquivalentGroups.every(isCandidateGroup)
 
-// Only `scenarios`/`transformInventory` array-ness is checked at this level
-// — each element's own shape is walked separately in `validateReport` so a
-// deep error names its exact path (`scenarios[1].stages[0]: ...`) instead of
-// being swallowed into one generic "scenarios has an unexpected shape".
 const REPORT_SHAPE = {
   schemaVersion: isString,
   generatedAt: isString,
@@ -84,10 +82,10 @@ const REPORT_SHAPE = {
   pnpmVersion: isString,
   scenarios: isArray,
   transformInventory: isArray,
+  operationInventory: isOperationInventory,
   topology: isTopology,
 }
 
-/** Walks one object against a `{field: predicate}` shape, returning a list of field-level errors. */
 function validateShape(obj, shape) {
   if (!isObject(obj)) return ['expected an object']
   const errors = []
@@ -112,7 +110,9 @@ function validateScenario(scenario, index) {
 
 function validateTransformInventory(transformInventory) {
   return transformInventory.flatMap((item, index) =>
-    validateShape(item, TRANSFORM_INVENTORY_ITEM_SHAPE).map((err) => `transformInventory[${index}]: ${err}`)
+    validateShape(item, TRANSFORM_INVENTORY_ITEM_SHAPE).map(
+      (err) => `transformInventory[${index}]: ${err}`
+    )
   )
 }
 
@@ -125,11 +125,16 @@ export function validateReport(report) {
   const errors = validateShape(report, REPORT_SHAPE)
   if (errors.length > 0) return { valid: false, errors }
 
-  const scenarioErrors = report.scenarios.flatMap((scenario, index) => validateScenario(scenario, index))
+  const scenarioErrors = report.scenarios.flatMap((scenario, index) =>
+    validateScenario(scenario, index)
+  )
   if (scenarioErrors.length > 0) return { valid: false, errors: scenarioErrors }
 
   const inventoryErrors = validateTransformInventory(report.transformInventory)
   if (inventoryErrors.length > 0) return { valid: false, errors: inventoryErrors }
+
+  const operationErrors = validateOperationInventory(report.operationInventory)
+  if (operationErrors.length > 0) return { valid: false, errors: operationErrors }
 
   if (report.schemaVersion !== SCHEMA_VERSION) {
     return {
