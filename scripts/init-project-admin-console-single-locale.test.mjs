@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, it } from 'node:test'
 import { INIT_PROJECT, commit, runInitProject } from './lib/init-project-test-helpers.mjs'
@@ -13,9 +13,7 @@ import {
 const copies = []
 const OTHER_LOCALE = { en: 'ru', ru: 'en' }
 
-afterEach(() =>
-  copies.splice(0).forEach((copy) => rmSync(copy.root, { recursive: true, force: true }))
-)
+afterEach(() => copies.splice(0).forEach((fixture) => fixture.cleanup()))
 
 function copy() {
   const fixture = createRealRepoCopy()
