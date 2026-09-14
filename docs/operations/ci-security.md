@@ -71,10 +71,24 @@ of workflow self-hardening to keep the example forkable.
   applies `pnpm init:brand`/`pnpm init:project` to disposable copies of the
   real repo and runs a real `pnpm install` plus typecheck/lint/build/test
   against the result, for both of `pnpm init:project`'s structural-choice
-  scenarios. Genuinely slow (~9 minutes measured locally); `timeout-minutes:
-20` gives it the same headroom as this pipeline's other real-install/build
+  scenarios. Genuinely slow — 8–14.6 minutes measured across real CI runs,
+  the single longest required job in this pipeline; `timeout-minutes: 20`
+  gives it the same headroom as this pipeline's other real-install/build
   jobs. `needs: [lint, typecheck]` only, same as `test`/`web-e2e`, so it runs
   alongside them rather than queueing after `test`.
+- **Scaffolding baseline measurement** (`pnpm measure:scaffold`,
+  `scripts/measure/`) is a separate, opt-in maintainer tool — not a CI gate,
+  never runs automatically. It re-applies the scaffolding suite's real
+  install-bearing scenarios with instrumentation (copy/install/build/test
+  counts, per-stage wall time, disk usage, generated-tree fingerprints) and
+  statically classifies every `scripts/lib/project-plan-*.mjs` transform
+  module by its authoring shape (whole-file copy, narrow exact-text block,
+  owned/sentinel block, structured config, delete/move, or unclassified with
+  a reason). It exists to give the scaffolding engine's own future
+  simplification work a measured baseline instead of an estimate. Run it
+  locally with `pnpm measure:scaffold` (`--only=<scenario-name>` to iterate
+  on one scenario) — see the header comment in
+  `scripts/measure/run-baseline.mjs` for full usage.
 
 **The observability-contract and scaffolding-contract job contexts (four in
 total: static/live, fast/full) are all listed in the tracked

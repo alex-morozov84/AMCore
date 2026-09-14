@@ -108,7 +108,7 @@ amcore/
 │   ├── operations/     # Deployment, observability, security, and production runbooks
 │   └── storage/        # File storage documentation
 ├── docker/         # Caddy edge profile; Postgres backup/restore/restore-drill scripts and the DB role-separation SQL; the optional Prometheus/Grafana/Alertmanager monitoring profile
-├── scripts/        # Fork init (init:brand/init:project), repo-security setup, dependency-freshness, the observability-contract CI checks
+├── scripts/        # Fork init (init:brand/init:project), scaffolding baseline measurement, repo-security setup, dependency-freshness, the observability-contract CI checks
 └── .github/        # CI, Dependabot, issue/PR templates, and a non-active deploy workflow template
 ```
 

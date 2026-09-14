@@ -26,6 +26,7 @@ Thanks for your interest in contributing. This document explains how to set up t
 | `docker compose --profile local-infra --profile monitoring up -d` | Optional dev-only Prometheus + Grafana + Alertmanager harness scraping this stack's real metrics — needs `METRICS_AUTH_TOKEN`/`GF_SECURITY_ADMIN_PASSWORD` set in `.env`; see [`docs/operations/observability.md`](docs/operations/observability.md) |
 | `pnpm test:observability-contract`                                | Static observability-contract checks (metric references, runbook links/anchors/panel citations, private-path ratchet, image-pin consistency) — no Docker needed                                                                                      |
 | `pnpm test:observability-contract:live`                           | Live observability-contract checks — boots the monitoring harness above and Grafana's old-volume migration smoke, then tears both down; needs Docker                                                                                                 |
+| `pnpm measure:scaffold`                                           | Opt-in scaffolding baseline measurement/inventory (maintainer tool) — not part of `test:scripts` or any CI gate; see [`docs/operations/ci-security.md`](docs/operations/ci-security.md#current-gates)                                                |
 
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 

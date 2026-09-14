@@ -31,7 +31,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "prepare": "husky",
     "init:brand": "node scripts/init-brand.mjs",
-    "init:project": "node scripts/init-project.mjs"
+    "init:project": "node scripts/init-project.mjs",
+    "measure:scaffold": "node scripts/measure/run-baseline.mjs"
   },
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",
