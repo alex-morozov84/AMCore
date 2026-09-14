@@ -7,9 +7,12 @@ import { filesForFacts, filesInRoots, pathsForSeams, seamMatchesFile } from './o
 import { seamCoversDetector } from './ownership-seams.mjs'
 import { identifierOccurrences, rangesOverlap, seamRanges } from './ownership-seam-ranges.mjs'
 
-function featureTargets(manifest, inventory) {
+function featureTargets(manifest, inventory, projection) {
   const targets = filesInRoots(inventory)
-  for (const file of filesForFacts(inventory, manifest.facts.sharedModules)) targets.add(file)
+  const shared = filesForFacts(inventory, manifest.facts.sharedModules)
+  for (const file of shared) {
+    if (!projection?.universalSharedModules.has(file)) targets.add(file)
+  }
   return targets
 }
 
@@ -48,8 +51,15 @@ function exemptFiles(manifest, inventory) {
   return exempt
 }
 
-export function detectUndeclaredContributions(root, manifest, inventory, graph, changedFiles) {
-  const targets = featureTargets(manifest, inventory)
+export function detectUndeclaredContributions(
+  root,
+  manifest,
+  inventory,
+  graph,
+  changedFiles,
+  projection
+) {
+  const targets = featureTargets(manifest, inventory, projection)
   const exempt = exemptFiles(manifest, inventory)
   const scope = changedFiles ?? [...inventory.surface.keys()]
   const missing = []

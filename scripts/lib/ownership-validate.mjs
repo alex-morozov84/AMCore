@@ -9,8 +9,9 @@ export function validateOwnership(root, manifest, options = {}) {
   const inventory = validateManifestInventory(root, manifest)
   validateSeams(root, manifest, inventory)
   const graph = createImportGraph(root, manifest, inventory)
-  detectUndeclaredContributions(root, manifest, inventory, graph, options.changedFiles)
-  assertNoRelevantUnresolvedReferences(root, manifest, inventory, graph)
   const selection = { manifest, inventory }
-  return { inventory, graph, projection: projectOwnership(graph, [selection]) }
+  const projection = projectOwnership(graph, [selection])
+  detectUndeclaredContributions(root, manifest, inventory, graph, options.changedFiles, projection)
+  assertNoRelevantUnresolvedReferences(root, manifest, inventory, graph)
+  return { inventory, graph, projection }
 }
