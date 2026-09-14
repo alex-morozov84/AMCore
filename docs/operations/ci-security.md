@@ -54,14 +54,20 @@ of workflow self-hardening to keep the example forkable.
   scrape-target/rule-group/Alertmanager-discovery state, Grafana's dashboard
   APIs against the committed dashboard JSON, a real Grafana→Prometheus query
   round trip, and a from-scratch Grafana old-volume migration smoke.
-- **Scaffolding contract (fast)** — job id `scaffolding-contract` — every
-  `pnpm init:brand`/`pnpm init:project` before/after fixture in `scripts/lib/`
-  still matches the real file it targets, and the fixture-composition
-  invariants (no two edit steps target the same file, every scaffold
-  dimension composes safely with every other). Read-only against the real
-  repo, no nested/disposable-copy install (the job's own top-level
-  `pnpm install --frozen-lockfile` still runs), no Docker, ~6 seconds. Does
-  **not** cover the
+- **Scaffolding contract (fast)** — job id `scaffolding-contract`, runs
+  `pnpm test:scripts:fast` — every `pnpm init:brand`/`pnpm init:project`
+  before/after fixture in `scripts/lib/` still matches the real file it
+  targets, the fixture-composition invariants (no two edit steps target the
+  same file, every scaffold dimension composes safely with every other), and
+  the `scripts/measure/` baseline-measurement tool's own unit/inventory-
+  contract tests plus real, fast failure-path regressions (an install
+  exception, a failed command, partial internal verification preserved on a
+  failed run). Read-only against the real repo — the disposable repo copies
+  a few of these tests create never run a real `pnpm install` inside them,
+  only the job's own top-level `pnpm install --frozen-lockfile` — no Docker,
+  ~10 seconds. `test:scripts:fast` is also the first half of the full
+  `pnpm test:scripts` command below, so the fast job and the full command
+  cannot drift onto two different test sets. Does **not** cover the
   public/private-path ratchet — that is the separate "Observability contract
   (static)" job above. No path filter: a change anywhere in the repo can
   drift a scaffolding fixture (this job exists because exactly that
@@ -71,10 +77,26 @@ of workflow self-hardening to keep the example forkable.
   applies `pnpm init:brand`/`pnpm init:project` to disposable copies of the
   real repo and runs a real `pnpm install` plus typecheck/lint/build/test
   against the result, for both of `pnpm init:project`'s structural-choice
-  scenarios. Genuinely slow (~9 minutes measured locally); `timeout-minutes:
-20` gives it the same headroom as this pipeline's other real-install/build
+  scenarios. Genuinely slow — 8–14.6 minutes measured across real CI runs,
+  the single longest required job in this pipeline; `timeout-minutes: 20`
+  gives it the same headroom as this pipeline's other real-install/build
   jobs. `needs: [lint, typecheck]` only, same as `test`/`web-e2e`, so it runs
   alongside them rather than queueing after `test`.
+- **Scaffolding baseline measurement** (`pnpm measure:scaffold`,
+  `scripts/measure/`) is a separate, opt-in maintainer tool — not a CI gate,
+  never runs automatically. It re-applies the scaffolding suite's real
+  install-bearing scenarios with instrumentation (copy/install/build/test
+  counts, observed-stage wall time, disk usage, generated-tree fingerprints),
+  inventories the real plans' source/target operations and exact-copy
+  synchronization edges, and statically classifies every
+  `scripts/lib/project-plan-*.mjs` transform
+  module by its authoring shape (whole-file copy, narrow exact-text block,
+  owned/sentinel block, structured config, delete/move, or unclassified with
+  a reason). It exists to give the scaffolding engine's own future
+  simplification work a measured baseline instead of an estimate. Run it
+  locally with `pnpm measure:scaffold` (`--only=<scenario-name>` to iterate
+  on one scenario) — see the header comment in
+  `scripts/measure/run-baseline.mjs` for full usage.
 
 **The observability-contract and scaffolding-contract job contexts (four in
 total: static/live, fast/full) are all listed in the tracked

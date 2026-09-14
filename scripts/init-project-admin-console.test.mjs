@@ -6,6 +6,10 @@ import { afterEach, describe, it } from 'node:test'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
 import { createRealRepoCopy, installDependencies } from './lib/test-fixture.mjs'
 import ownedPaths from './lib/admin-console-owned-paths.json' with { type: 'json' }
+import {
+  ADMIN_CONSOLE_VERIFY_STEPS,
+  ADMIN_CONSOLE_ENABLED_SCENARIOS,
+} from './lib/scaffold-scenario-recipes.mjs'
 
 const copies = []
 
@@ -26,12 +30,7 @@ function apply(root, args) {
 }
 
 function verifyGeneratedWeb(root) {
-  for (const args of [
-    ['typecheck'],
-    ['lint'],
-    ['--filter', 'web', 'test'],
-    ['--filter', 'web', 'build'],
-  ]) {
+  for (const args of ADMIN_CONSOLE_VERIFY_STEPS) {
     const result = spawnSync('pnpm', args, { cwd: root, encoding: 'utf8', env: { ...process.env } })
     assert.equal(result.status, 0, `pnpm ${args.join(' ')}: ${result.stdout}${result.stderr}`)
   }
@@ -150,13 +149,13 @@ describe('init-project --admin-console', () => {
   })
 
   it('builds both enabled topology outputs after actual CLI application', () => {
-    for (const [mode, slug] of [
-      ['path', 'panel'],
-      ['host', 'panel'],
-    ]) {
+    for (const scenario of ADMIN_CONSOLE_ENABLED_SCENARIOS) {
       const root = copy()
       installDependencies(root)
-      apply(root, [`--admin-console=${mode}`, `--admin-console-slug=${slug}`])
+      apply(
+        root,
+        scenario.flags.filter((flag) => flag !== '--yes')
+      )
       verifyGeneratedWeb(root)
     }
   })

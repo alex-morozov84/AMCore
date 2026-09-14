@@ -9,6 +9,12 @@ import {
   EngineError,
 } from './actions.mjs'
 
+function measurementModule() {
+  if (process.env.AMCORE_MEASURE_OPERATIONS !== '1') return undefined
+  const match = new Error().stack?.match(/\/scripts\/lib\/(project-plan-[^():]+\.mjs):\d+:\d+/)
+  return match ? `scripts/lib/${match[1]}` : null
+}
+
 /** A step that rewrites one text file via a pure `content => content` transform. */
 export function fileStep(filePath, transform, summary) {
   const before = readFileSync(filePath, 'utf8')
@@ -16,6 +22,8 @@ export function fileStep(filePath, transform, summary) {
   const changed = before !== after
   return {
     kind: 'edit',
+    adapterClass: transform.adapterClass ?? 'custom-edit-unclassified',
+    modulePath: measurementModule(),
     target: filePath,
     summary: changed ? summary : `${summary} (already up to date)`,
     changed,
@@ -43,6 +51,8 @@ export function exactContentStep(filePath, { expectedBefore, after }, summary) {
   }
   return {
     kind: 'edit',
+    adapterClass: 'whole-file-legacy-before-after',
+    modulePath: measurementModule(),
     target: filePath,
     summary: before === after ? `${summary} (already up to date)` : summary,
     changed: before !== after,
@@ -63,6 +73,8 @@ export function moveAndRewriteStep(oldPath, newPath, { expectedBefore, after }, 
   }
   return {
     kind: 'edit',
+    adapterClass: 'move-and-rewrite',
+    modulePath: measurementModule(),
     source: oldPath,
     target: newPath,
     summary,
@@ -81,6 +93,9 @@ export function moveAndRewriteStep(oldPath, newPath, { expectedBefore, after }, 
 export function copyFileStep(srcPath, destPath, summary) {
   return {
     kind: 'copy',
+    adapterClass: 'copy',
+    modulePath: measurementModule(),
+    source: srcPath,
     target: destPath,
     summary,
     changed: true,
@@ -95,6 +110,8 @@ export function copyFileStep(srcPath, destPath, summary) {
 export function moveFileStep(srcPath, destPath, summary) {
   return {
     kind: 'move',
+    adapterClass: 'move',
+    modulePath: measurementModule(),
     source: srcPath,
     target: destPath,
     summary,
@@ -110,6 +127,8 @@ export function moveFileStep(srcPath, destPath, summary) {
 export function deleteFileStep(targetPath, summary) {
   return {
     kind: 'delete',
+    adapterClass: 'delete',
+    modulePath: measurementModule(),
     target: targetPath,
     summary,
     changed: true,
@@ -118,30 +137,38 @@ export function deleteFileStep(targetPath, summary) {
 }
 
 /** `content => content` applying a list of `{ label, value, insertAfterLabel }` markdown-field ops in order. */
+function taggedTransform(adapterClass, transform) {
+  transform.adapterClass = adapterClass
+  return transform
+}
+
 export function markdownFieldsTransform(ops) {
-  return (content) => ops.reduce((acc, op) => setMarkdownField(acc, op), content)
+  return taggedTransform('structured-config', (content) =>
+    ops.reduce((acc, op) => setMarkdownField(acc, op), content)
+  )
 }
 
 /** `content => content` applying a list of `{ regex, value }` single-capture-group line patches in order. */
 export function linePatchesTransform(ops) {
-  return (content) =>
+  return taggedTransform('structured-config', (content) =>
     ops.reduce((acc, op) => replaceCapturedField(acc, op.regex, op.value), content)
+  )
 }
 
 /** `content => content` parsing JSON, setting dotted-path keys, and re-serializing at 2-space indent. */
 export function jsonPatchTransform(patches) {
-  return (content) => {
+  return taggedTransform('structured-config', (content) => {
     const obj = JSON.parse(content)
     for (const [key, value] of Object.entries(patches)) setJsonPath(obj, key, value)
     return `${JSON.stringify(obj, null, 2)}\n`
-  }
+  })
 }
 
 /** `content => content` parsing JSON, deleting dotted-path keys, and re-serializing at 2-space indent. */
 export function jsonDeleteTransform(paths) {
-  return (content) => {
+  return taggedTransform('structured-config', (content) => {
     const obj = JSON.parse(content)
     for (const path of paths) deleteJsonPath(obj, path)
     return `${JSON.stringify(obj, null, 2)}\n`
-  }
+  })
 }

@@ -10,6 +10,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
+import { SINGLE_LOCALE_EN_SCENARIO } from './lib/scaffold-scenario-recipes.mjs'
 
 let copy
 
@@ -59,8 +60,8 @@ describe('init-project (end-to-end against a real-repo copy)', () => {
     // itself never installs (see verify.mjs's header).
     installDependencies(copy.root)
 
-    const result = runInitProject(copy.root, ['--mode=single', '--locale=en', '--yes'], {
-      skipVerify: false,
+    const result = runInitProject(copy.root, SINGLE_LOCALE_EN_SCENARIO.flags, {
+      skipVerify: SINGLE_LOCALE_EN_SCENARIO.skipVerify,
     })
 
     assert.equal(result.status, 0, result.stdout + result.stderr)

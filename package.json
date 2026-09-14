@@ -22,7 +22,8 @@
     "lint:fix": "turbo run lint -- --fix",
     "test": "turbo test",
     "test:console-session-e2e": "node scripts/run-console-session-e2e.mjs",
-    "test:scripts": "node --test --test-concurrency=1 scripts/lib/*.test.mjs scripts/*.test.mjs",
+    "test:scripts:fast": "node --test --test-concurrency=1 scripts/lib/*.test.mjs scripts/measure/*.test.mjs",
+    "test:scripts": "pnpm test:scripts:fast && node --test --test-concurrency=1 scripts/*.test.mjs",
     "test:observability-contract": "node --test --test-concurrency=1 scripts/observability-contract/*.test.mjs scripts/observability-contract/live/*.test.mjs",
     "test:observability-contract:live": "bash scripts/observability-contract/run-live.sh",
     "typecheck": "turbo typecheck",
@@ -31,7 +32,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "prepare": "husky",
     "init:brand": "node scripts/init-brand.mjs",
-    "init:project": "node scripts/init-project.mjs"
+    "init:project": "node scripts/init-project.mjs",
+    "measure:scaffold": "node scripts/measure/run-baseline.mjs"
   },
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",

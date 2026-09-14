@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Scaffolding baseline measurement tool.** `pnpm measure:scaffold`
+  (`scripts/measure/`) — an opt-in maintainer tool that instruments the
+  scaffolding suite's real scenarios (install/build/test counts, observed-stage
+  timing, disk usage, generated-tree fingerprints), inventories the operations
+  emitted by their real plans, and statically classifies every transform module
+  by its authoring shape. Not a CI gate; gathers the
+  measured baseline needed for the scaffolding engine's own future
+  simplification work.
+
 - **Operations Console guide.** Adds one discoverable public guide for the
   shipped foundation's `SUPER_ADMIN` boundary, topology, isolated host session,
   downstream scaffold, deployment, verification, and safe extension contract.
