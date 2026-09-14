@@ -33,13 +33,19 @@ export const CONFLICT_CODES = Object.freeze({
   // PR2/M2 (FINAL PLAN §2.2) — structural operation composition.
   UNKNOWN_OPERATION_KEY: 'unknown-operation-key',
   DUPLICATE_OPERATION_DEFINITION: 'duplicate-operation-definition',
+  INVALID_OPERATION_DEFINITION: 'invalid-operation-definition',
   INVALID_OPERATION_PARAMS: 'invalid-operation-params',
   STRUCTURAL_PARAMS_CONFLICT: 'structural-params-conflict',
   EMPTY_SEMANTIC_WRITES: 'empty-semantic-writes',
+  INVALID_SEMANTIC_WRITE: 'invalid-semantic-write',
   SEMANTIC_WRITE_CONFLICT: 'semantic-write-conflict',
+  UNKNOWN_OPERATION_DEPENDENCY: 'unknown-operation-dependency',
   MISSING_OPERATION_DEPENDENCY: 'missing-operation-dependency',
   OPERATION_DEPENDENCY_CYCLE: 'operation-dependency-cycle',
-  MISSING_ANCHOR: 'missing-anchor',
-  AMBIGUOUS_ANCHOR: 'ambiguous-anchor',
+  // Structural (AST) model — parse once, edit by node, serialize once.
+  INVALID_INPUT_PARSE: 'invalid-input-parse',
+  MISSING_SEMANTIC_NODE: 'missing-semantic-node',
+  AMBIGUOUS_SEMANTIC_NODE: 'ambiguous-semantic-node',
+  OVERLAPPING_STRUCTURAL_EDITS: 'overlapping-structural-edits',
   INVALID_OUTPUT_PARSE: 'invalid-output-parse',
 })

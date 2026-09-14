@@ -5,16 +5,38 @@
 // order never depends on registration order, fact order, or CLI-flag order.
 import { PathAlgebraConflictError, CONFLICT_CODES } from './path-algebra-errors.mjs'
 
+function dependencyError(code, key, dependency, reason) {
+  return new PathAlgebraConflictError(code, {
+    paths: [],
+    dimensions: [],
+    detail: `operationKey "${key}" depends on "${dependency}", which ${reason}`,
+  })
+}
+
+/**
+ * A dependency must be a registered key (else the definition is wrong:
+ * `UNKNOWN_OPERATION_DEPENDENCY`) *and* part of this path's active set
+ * (else the call site is incomplete: `MISSING_OPERATION_DEPENDENCY`).
+ */
 function assertDependenciesPresent(registry, activeKeys) {
   const active = new Set(activeKeys)
   for (const key of activeKeys) {
     for (const dependency of registry.get(key).dependsOn) {
       if (active.has(dependency)) continue
-      throw new PathAlgebraConflictError(CONFLICT_CODES.MISSING_OPERATION_DEPENDENCY, {
-        paths: [],
-        dimensions: [],
-        detail: `operationKey "${key}" depends on "${dependency}", which is not part of this composition`,
-      })
+      if (!registry.has(dependency)) {
+        throw dependencyError(
+          CONFLICT_CODES.UNKNOWN_OPERATION_DEPENDENCY,
+          key,
+          dependency,
+          'is not a registered operation'
+        )
+      }
+      throw dependencyError(
+        CONFLICT_CODES.MISSING_OPERATION_DEPENDENCY,
+        key,
+        dependency,
+        'is not part of this composition'
+      )
     }
   }
 }
@@ -39,7 +61,10 @@ function buildDependencyGraph(registry, activeKeys) {
 }
 
 function runKahn({ inDegree, dependents }) {
-  const ready = [...inDegree.entries()].filter(([, degree]) => degree === 0).map(([key]) => key).sort()
+  const ready = [...inDegree.entries()]
+    .filter(([, degree]) => degree === 0)
+    .map(([key]) => key)
+    .sort()
   const ordered = []
   while (ready.length > 0) {
     const key = ready.shift()
@@ -55,9 +80,10 @@ function runKahn({ inDegree, dependents }) {
 /**
  * Topologically orders `activeKeys` per their registered `dependsOn`
  * edges, breaking ties (and ordering every key with no dependency at all)
- * by lexicographic key. Throws `MISSING_OPERATION_DEPENDENCY` for a
- * dependency outside the active set, or `OPERATION_DEPENDENCY_CYCLE` for a
- * cycle among the active keys.
+ * by lexicographic key. Throws `UNKNOWN_OPERATION_DEPENDENCY` for an
+ * unregistered dependency, `MISSING_OPERATION_DEPENDENCY` for a registered
+ * one outside the active set, or `OPERATION_DEPENDENCY_CYCLE` for a cycle
+ * among the active keys.
  */
 export function orderOperationKeys(registry, activeKeys) {
   assertDependenciesPresent(registry, activeKeys)
