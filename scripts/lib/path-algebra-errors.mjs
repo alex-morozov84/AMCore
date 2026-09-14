@@ -30,4 +30,16 @@ export const CONFLICT_CODES = Object.freeze({
   COMPETING_MOVE_DESTINATION: 'competing-move-destination',
   MOVE_CYCLE: 'move-cycle',
   UNRESOLVED_OVERLAP: 'unresolved-overlap',
+  // PR2/M2 (FINAL PLAN §2.2) — structural operation composition.
+  UNKNOWN_OPERATION_KEY: 'unknown-operation-key',
+  DUPLICATE_OPERATION_DEFINITION: 'duplicate-operation-definition',
+  INVALID_OPERATION_PARAMS: 'invalid-operation-params',
+  STRUCTURAL_PARAMS_CONFLICT: 'structural-params-conflict',
+  EMPTY_SEMANTIC_WRITES: 'empty-semantic-writes',
+  SEMANTIC_WRITE_CONFLICT: 'semantic-write-conflict',
+  MISSING_OPERATION_DEPENDENCY: 'missing-operation-dependency',
+  OPERATION_DEPENDENCY_CYCLE: 'operation-dependency-cycle',
+  MISSING_ANCHOR: 'missing-anchor',
+  AMBIGUOUS_ANCHOR: 'ambiguous-anchor',
+  INVALID_OUTPUT_PARSE: 'invalid-output-parse',
 })
