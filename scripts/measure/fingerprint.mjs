@@ -7,7 +7,16 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 
+/**
+ * Lists the tree's real current files, respecting `.gitignore`. `git
+ * ls-files` alone reflects the *last commit*, not the working tree — a
+ * scaffold transform writes/deletes/moves files without committing, so a
+ * deleted-but-still-indexed path would otherwise throw ENOENT when hashed.
+ * `git add -A` first refreshes the index to match what's actually on disk
+ * (new files staged, deleted files unstaged) without creating a commit.
+ */
 function trackedFiles(root) {
+  execFileSync('git', ['add', '-A'], { cwd: root })
   return execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
     .split('\n')
     .filter(Boolean)

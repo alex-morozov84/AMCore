@@ -1,6 +1,6 @@
 import { test, describe, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { createFixtureRepo, git } from '../lib/test-fixture.mjs'
 import { fingerprintTree, groupCandidateEquivalents } from './fingerprint.mjs'
@@ -27,11 +27,25 @@ describe('fingerprintTree', () => {
     assert.notEqual(before, after)
   })
 
-  test('does not change for an untracked (never git add-ed) file', () => {
+  test('picks up a new file the caller never staged — a scaffold transform writes without committing', () => {
     const fixture = freshFixture()
     const before = fingerprintTree(fixture.root).treeHash
-    writeFileSync(path.join(fixture.root, 'scratch-untracked.txt'), 'noise')
-    assert.equal(fingerprintTree(fixture.root).treeHash, before)
+    writeFileSync(path.join(fixture.root, 'new-generated-file.txt'), 'from a transform')
+    const after = fingerprintTree(fixture.root)
+    assert.notEqual(after.treeHash, before)
+    assert.equal(after.fileCount, fingerprintTree(fixture.root).fileCount)
+  })
+
+  test('does not throw and reflects a deletion the caller never committed (regression)', () => {
+    // A real scaffold transform (e.g. init:project --mode=single) deletes
+    // tracked files without committing. git ls-files alone would still list
+    // the deleted path and hashFile() would throw ENOENT reading it.
+    const fixture = freshFixture()
+    const before = fingerprintTree(fixture.root)
+    rmSync(path.join(fixture.root, 'apps/web/messages/ru.json'))
+    const after = fingerprintTree(fixture.root)
+    assert.equal(after.fileCount, before.fileCount - 1)
+    assert.notEqual(after.treeHash, before.treeHash)
   })
 
   test('reports fileCount matching git ls-files', () => {
