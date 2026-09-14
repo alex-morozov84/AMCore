@@ -79,8 +79,10 @@ export function buildMoveGraph(moveFacts) {
   const bySource = dedupeSources(moveFacts)
   assertNoCompetingDestinations(bySource)
   assertAcyclic(bySource)
+  const destinations = new Set([...bySource.values()].map(({ to }) => to))
   return {
     isSource: (path) => bySource.has(path),
+    rootSources: () => [...bySource.keys()].filter((source) => !destinations.has(source)).sort(),
     dimensionsOf: (source) => [...(bySource.get(source)?.dimensions ?? [])],
     /** Follows the (already-validated-acyclic) chain from `source` to its final destination. */
     finalDestinationOf(source) {

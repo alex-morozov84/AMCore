@@ -19,6 +19,11 @@ describe('normalizeRelativePath', () => {
     assert.throws(() => normalizeRelativePath('C:\\Windows\\System32'), InvalidPathError)
   })
 
+  test('rejects Windows rooted and UNC paths', () => {
+    assert.throws(() => normalizeRelativePath(String.raw`\rooted`), InvalidPathError)
+    assert.throws(() => normalizeRelativePath(String.raw`\\server\share`), InvalidPathError)
+  })
+
   test('rejects a path that escapes the repository root via ".."', () => {
     assert.throws(() => normalizeRelativePath('../etc/passwd'), InvalidPathError)
   })

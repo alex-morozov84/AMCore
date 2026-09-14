@@ -19,7 +19,7 @@ export function normalizeRelativePath(rawPath) {
   if (typeof rawPath !== 'string' || rawPath.length === 0) {
     throw new InvalidPathError(rawPath, 'must be a non-empty string')
   }
-  if (rawPath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(rawPath)) {
+  if (rawPath.startsWith('/') || rawPath.startsWith('\\') || /^[a-zA-Z]:[\\/]/.test(rawPath)) {
     throw new InvalidPathError(rawPath, 'must be repository-relative, not absolute')
   }
   const segments = rawPath.split(/[\\/]+/).filter((segment) => segment.length > 0 && segment !== '.')

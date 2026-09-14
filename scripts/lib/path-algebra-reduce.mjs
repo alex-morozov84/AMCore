@@ -12,6 +12,7 @@ import {
 } from './path-algebra-absorption.mjs'
 import { topologicalOrder } from './path-algebra-topological-order.mjs'
 import { PathAlgebraConflictError, CONFLICT_CODES } from './path-algebra-errors.mjs'
+import { validateFacts } from './path-algebra-facts.mjs'
 
 function normalizeFact(fact) {
   if (fact.kind === 'move') {
@@ -103,7 +104,7 @@ function materialize({ deletePaths, absorbedDeletes, moveGraph, moveSourcePaths,
 }
 
 function partitionFacts(rawFacts) {
-  const facts = rawFacts.map(normalizeFact)
+  const facts = validateFacts(rawFacts).map(normalizeFact)
   return {
     deleteFacts: facts.filter((f) => f.kind === 'delete'),
     moveFacts: facts.filter((f) => f.kind === 'move'),
@@ -125,7 +126,7 @@ export function reducePathAlgebra(rawFacts) {
   const deleteByPath = dedupeDeletes(deleteFacts)
   const deletePaths = [...deleteByPath.keys()].sort()
   const moveGraph = buildMoveGraph(moveFacts)
-  const moveSourcePaths = [...new Set(moveFacts.map((f) => f.from))].sort()
+  const moveSourcePaths = moveGraph.rootSources()
 
   assertNoDeleteConflicts(deleteByPath, moveGraph, contentFacts)
   assertNoUnresolvedMoveIntoDoomedDirectory({ deletePaths, moveGraph, moveSourcePaths })

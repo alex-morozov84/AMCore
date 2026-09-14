@@ -43,6 +43,21 @@ describe('reducePathAlgebra — basic composition and path validation', () => {
 })
 
 describe('reducePathAlgebra — dedup and conflicts', () => {
+  test('a move chain collapses to one operation at the final destination', () => {
+    const ops = reducePathAlgebra([
+      { kind: 'move', from: 'a', to: 'b', dimension: 'x' },
+      { kind: 'move', from: 'b', to: 'c', dimension: 'y' },
+      { kind: 'content', path: 'b', dimension: 'rewrite' },
+    ])
+    assert.equal(ops.length, 1)
+    assert.deepEqual(ops[0], {
+      kind: 'move',
+      from: 'a',
+      to: 'c',
+      carriedContent: [{ kind: 'content', path: 'b', dimension: 'rewrite' }],
+    })
+  })
+
   test('identical deletes from two dimensions deduplicate to one operation', () => {
     const ops = reducePathAlgebra([
       { kind: 'delete', path: 'a/b.ts', dimension: 'x' },
