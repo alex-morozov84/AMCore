@@ -8,11 +8,8 @@
 // and pass on every apply here, not be skipped for a manual follow-up.
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
-import path from 'node:path'
-import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
+import { createRealRepoCopy, git } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
-import { ROUTE_PROGRESS_DISABLED_SCENARIO } from './lib/scaffold-scenario-recipes.mjs'
 
 let copy
 
@@ -43,43 +40,6 @@ describe('init-project --route-progress=disabled (end-to-end against a real-repo
     assert.match(result.stdout, /update frontend_route_progress for the disabled choice/)
     assert.match(result.stdout, /--dry-run: no files were written/)
     assert.equal(git(copy.root, ['status', '--porcelain']).trim(), '')
-  })
-
-  test('apply: flips the flag, updates the context field, deletes nothing, and real verification passes', () => {
-    copy = createRealRepoCopy()
-    commit(copy.root)
-    installDependencies(copy.root)
-
-    const result = runInitProject(copy.root, ROUTE_PROGRESS_DISABLED_SCENARIO.flags, {
-      skipVerify: ROUTE_PROGRESS_DISABLED_SCENARIO.skipVerify,
-    })
-
-    assert.equal(result.status, 0, result.stdout + result.stderr)
-    // Non-destructive: real automated verification ran and passed, unlike
-    // --storybook=disabled's printed manual follow-up.
-    assert.match(result.stdout, /typecheck: OK/)
-    assert.match(result.stdout, /lint: OK/)
-
-    const flag = readFileSync(
-      path.join(copy.root, 'apps/web/src/shared/lib/route-progress/route-progress-flag.ts'),
-      'utf8'
-    )
-    assert.match(flag, /export const ROUTE_PROGRESS_ENABLED = false/)
-
-    const context = readFileSync(path.join(copy.root, 'PROJECT_CONTEXT.md'), 'utf8')
-    assert.match(context, /- \*\*frontend_route_progress:\*\* disabled/)
-
-    // Nothing deleted: the component, controller, adapter, tests, and story
-    // all still exist (owner decision: reversible by editing the flag back).
-    for (const rel of [
-      'apps/web/src/shared/ui/route-progress-bar.tsx',
-      'apps/web/src/shared/ui/route-progress-bar.test.tsx',
-      'apps/web/src/shared/ui/route-progress-bar.stories.tsx',
-      'apps/web/src/shared/lib/route-progress/route-progress-controller.ts',
-      'apps/web/src/shared/lib/route-progress/use-route-progress-router.ts',
-    ]) {
-      assert.equal(existsSync(path.join(copy.root, rel)), true, rel)
-    }
   })
 
   test('re-running after a successful apply fails closed with a clear message', () => {

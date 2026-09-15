@@ -6,18 +6,19 @@ of workflow self-hardening to keep the example forkable.
 
 ## Current Gates
 
-| Workflow                | Trigger                                 | Tooling                                                                                              | CI behavior                          |
-| ----------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                 | report-only, uploads SARIF           |
-| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                                                                             | blocking on `high+`                  |
-| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                        | gitleaks blocks; OSV is report-only  |
-| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                               | Trivy report-only; boot-smoke blocks |
-| `ci.yml`                | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job)  | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                            | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Scaffolding contract — fast (`scripts/lib/*.test.mjs`, structural/fixture checks, no nested install) | blocking                             |
-| `ci.yml`                | `push`, `pull_request`                  | Scaffolding contract — full (`pnpm test:scripts`, real install/typecheck/lint/build/test)            | blocking                             |
-| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                              | blocking                             |
-| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                   | blocking (squash title = commit msg) |
+| Workflow                     | Trigger                                 | Tooling                                                                                              | CI behavior                          |
+| ---------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `codeql.yml`                 | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                 | report-only, uploads SARIF           |
+| `dependency-review.yml`      | `pull_request`                          | GitHub Dependency Review                                                                             | blocking on `high+`                  |
+| `security-scans.yml`         | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                        | gitleaks blocks; OSV is report-only  |
+| `ci.yml`                     | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                               | Trivy report-only; boot-smoke blocks |
+| `ci.yml`                     | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job)  | blocking                             |
+| `ci.yml`                     | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                            | blocking                             |
+| `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — fast (`scripts/lib/*.test.mjs`, structural/fixture checks, no nested install) | blocking                             |
+| `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — six-row covering array (`pnpm test:scripts`)                                  | blocking                             |
+| `scaffolding-exhaustive.yml` | weekly schedule, manual                 | Original eight real-install scaffolding recipes (`pnpm test:scripts:exhaustive`)                     | backstop, not required               |
+| `workflow-lint.yml`          | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                              | blocking                             |
+| `pr-title.yml`               | `pull_request`                          | Conventional-Commits PR-title lint                                                                   | blocking (squash title = commit msg) |
 
 ## What Each Gate Proves
 
@@ -73,19 +74,23 @@ of workflow self-hardening to keep the example forkable.
   drift a scaffolding fixture (this job exists because exactly that
   happened — `apps/web` and `docs/` changes drifted `scripts/lib/*.mjs`
   fixtures across several PRs with nothing in CI to catch it).
-- **Scaffolding contract (full)** — job id `scaffolding-contract-full` —
-  applies `pnpm init:brand`/`pnpm init:project` to disposable copies of the
-  real repo and runs a real `pnpm install` plus typecheck/lint/build/test
-  against the result, for both of `pnpm init:project`'s structural-choice
-  scenarios. Genuinely slow — 8–14.6 minutes measured across real CI runs,
-  the single longest required job in this pipeline; `timeout-minutes: 20`
-  gives it the same headroom as this pipeline's other real-install/build
-  jobs. `needs: [lint, typecheck]` only, same as `test`/`web-e2e`, so it runs
-  alongside them rather than queueing after `test`.
+- **Scaffolding contract (full)** — job id `scaffolding-contract-full` keeps
+  the required display name `Scaffolding contract (full, real
+install/build/test)`. Its six independent repositories cover the cross-
+  product of multi/single locale routing and Console path/host/disabled
+  topology. en/ru and both optional project toggles are distributed pairwise;
+  multi- and single-locale host
+  rows verify the distinct proxy/static-asset outputs. Every row installs and
+  builds once, with typecheck/lint/test profiles assigned to preserve the old
+  runtime obligations. There is no path selector: every PR runs all six rows.
+  The original eight recipes run unchanged through
+  `pnpm test:scripts:exhaustive` in the non-required weekly/manual
+  `scaffolding-exhaustive.yml` backstop. Both modes create a fresh worktree per
+  row and never share mutable install/build state.
 - **Scaffolding baseline measurement** (`pnpm measure:scaffold`,
   `scripts/measure/`) is a separate, opt-in maintainer tool — not a CI gate,
-  never runs automatically. It re-applies the scaffolding suite's real
-  install-bearing scenarios with instrumentation (copy/install/build/test
+  never runs automatically. It re-applies the required six-row covering array
+  with instrumentation (copy/install/build/test
   counts, observed-stage wall time, disk usage, generated-tree fingerprints),
   inventories the real plans' source/target operations and exact-copy
   synchronization edges, and statically classifies every
@@ -94,8 +99,8 @@ of workflow self-hardening to keep the example forkable.
   owned/sentinel block, structured config, delete/move, or unclassified with
   a reason). It exists to give the scaffolding engine's own future
   simplification work a measured baseline instead of an estimate. Run it
-  locally with `pnpm measure:scaffold` (`--only=<scenario-name>` to iterate
-  on one scenario) — see the header comment in
+  locally with `pnpm measure:scaffold` (`--only=coverage-multi-path` to iterate
+  on one row) — see the header comment in
   `scripts/measure/run-baseline.mjs` for full usage.
 
 **The observability-contract and scaffolding-contract job contexts (four in

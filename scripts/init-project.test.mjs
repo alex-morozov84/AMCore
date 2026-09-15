@@ -7,10 +7,8 @@ import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
-import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
+import { createRealRepoCopy, git } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
-import { SINGLE_LOCALE_EN_SCENARIO } from './lib/scaffold-scenario-recipes.mjs'
 
 let copy
 
@@ -51,39 +49,6 @@ describe('init-project (end-to-end against a real-repo copy)', () => {
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /Prisma: required manual follow-up before production use/)
     assert.match(result.stdout, /pnpm --filter api db:migrate/)
-  })
-
-  test('apply (--locale=en): PROJECT_CONTEXT.md, a real typecheck/lint/build, and an unprefixed link', async () => {
-    copy = createRealRepoCopy()
-    commit(copy.root)
-    // Test-harness setup, not production behavior -- runProjectVerification
-    // itself never installs (see verify.mjs's header).
-    installDependencies(copy.root)
-
-    const result = runInitProject(copy.root, SINGLE_LOCALE_EN_SCENARIO.flags, {
-      skipVerify: SINGLE_LOCALE_EN_SCENARIO.skipVerify,
-    })
-
-    assert.equal(result.status, 0, result.stdout + result.stderr)
-    assert.match(result.stdout, /typecheck: OK/)
-    assert.match(result.stdout, /lint: OK/)
-    assert.match(result.stdout, /web build: OK/)
-
-    const context = readFileSync(path.join(copy.root, 'PROJECT_CONTEXT.md'), 'utf8')
-    assert.match(context, /- \*\*i18n_mode:\*\* single/)
-    assert.match(context, /- \*\*base_locale:\*\* en/)
-    assert.match(context, /- \*\*supported_locales:\*\* \[en\]/)
-    assert.equal(existsSync(path.join(copy.root, 'apps/web/src/app/[locale]')), false)
-
-    // The real typecheck/build above already compiled packages/shared's dist
-    // (apps/web and apps/api both depend on it) -- reuse that build rather
-    // than paying for a second one just to prove this.
-    const sharedDist = pathToFileURL(path.join(copy.root, 'packages/shared/dist/index.js')).href
-    const { localizedFrontendUrl } = await import(sharedDist)
-    assert.equal(
-      localizedFrontendUrl('https://example.com', 'en', 'reset-password', { token: 'abc' }),
-      'https://example.com/reset-password?token=abc'
-    )
   })
 
   test('re-running after a successful apply fails closed with a clear message', () => {

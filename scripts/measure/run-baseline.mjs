@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 // `pnpm measure:scaffold` — opt-in scaffolding baseline measurement and
 // transform inventory (BACKLOG item 14, PR1). Never runs as part of
-// `test:scripts` or any CI job by default: this is a manual/maintainer tool
-// for gathering the evidence item 14's redesign needs, not a new required
-// gate. Each run performs real disposable-copy installs/builds for every
-// registered scenario (scripts/measure/scenario-registry.mjs) — genuinely
-// slow, several minutes; use --only to iterate on one scenario locally.
+// `test:scripts` or any CI job by default: this is a manual/maintainer tool.
+// Each run measures the same six-row covering array as required CI. The
+// original eight recipes remain available through test:scripts:exhaustive.
 //
 // Usage:
-//   pnpm measure:scaffold                         # full baseline, all scenarios
-//   pnpm measure:scaffold --only=single-locale-en  # one scenario (repeatable flag)
+//   pnpm measure:scaffold                         # all required covering rows
+//   pnpm measure:scaffold --only=coverage-multi-path
 //   pnpm measure:scaffold --out=tmp/my-report.json # custom report path
 //
 // Writes a versioned JSON report (report-schema.mjs) plus prints a human
@@ -66,7 +64,9 @@ async function main() {
   console.log(`\n${renderHumanSummary(report)}`)
   console.log(`\nFull report written to ${path.relative(process.cwd(), outPath)}`)
   if (!report.comparability.comparable) {
-    console.log(`\nNOTE: this run is NOT comparable (${report.comparability.reason}) — do not use it as a published baseline.`)
+    console.log(
+      `\nNOTE: this run is NOT comparable (${report.comparability.reason}) — do not use it as a published baseline.`
+    )
   }
   if (report.scenarios.some((s) => !s.success)) process.exitCode = 1
 }

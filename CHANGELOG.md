@@ -69,6 +69,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Scaffolding verification pyramid.** The required full contract now uses
+  six isolated, evidence-backed topology rows instead of eight overlapping
+  install-bearing recipes, with one install and build command per row. The
+  original eight recipes remain available as a weekly/manual exhaustive
+  backstop; required check names and exhaustive fast planning/negative tests
+  are unchanged.
+
 - **Operations Console scaffold ownership.** Console removal and topology
   projection now derive from the public ownership manifest: files under its
   closed feature roots are discovered automatically, while contributions in

@@ -188,14 +188,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # End-to-end: applies pnpm init:brand/init:project to disposable
-      # copies of the real repo and runs a real pnpm install plus
-      # typecheck/lint/build/test against the result. Genuinely slow
-      # (~9 minutes, real installs) — a separate parallel job with its own
-      # generous timeout, deliberately not folded into the fast layer above
-      # or the main "test" job's "Run tests" step. needs only [lint,
-      # typecheck], same as "test" itself, so this runs alongside "test"
-      # rather than queueing behind it.
+      # Six isolated generated repositories cover locale topology x Console
+      # topology plus every optional-toggle pair and both host proxy
+      # shapes. Each row installs and builds once. The original eight recipes
+      # remain in scaffolding-exhaustive.yml as a weekly/manual backstop.
+      # This required check keeps its stable name and has no path selector.
       - name: Run scaffolding contract tests (full, real end-to-end)
         run: pnpm test:scripts
 

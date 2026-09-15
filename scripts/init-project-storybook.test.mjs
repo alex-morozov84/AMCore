@@ -4,16 +4,10 @@
 // come from lib/init-project-test-helpers.mjs.
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { createRealRepoCopy, git, installDependencies } from './lib/test-fixture.mjs'
+import { createRealRepoCopy, git } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
-import {
-  STORYBOOK_DISABLED_INSTALL_BEFORE_SCENARIO,
-  STORYBOOK_DISABLED_MANUAL_SCENARIO,
-  STORYBOOK_MANUAL_VERIFY_STEPS,
-} from './lib/scaffold-scenario-recipes.mjs'
 
 let copy
 
@@ -103,18 +97,11 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     assert.doesNotMatch(eslintConfig, /NAVIGATION_PATHS/)
   })
 
-  test('apply (--storybook=disabled): skips automated verification, prints the manual follow-up', () => {
+  test('apply skips automated verification and prints the manual follow-up', () => {
     copy = createRealRepoCopy()
     commit(copy.root)
-    // Test-harness setup, not production behavior -- installed *before*
-    // apply here specifically to prove the point: apps/web/package.json's
-    // dependency list still changes underneath this install, which is
-    // exactly why automated verification is skipped for this dimension
-    // rather than attempted and reported as a false "FAILED".
-    installDependencies(copy.root)
-
-    const result = runInitProject(copy.root, STORYBOOK_DISABLED_INSTALL_BEFORE_SCENARIO.flags, {
-      skipVerify: STORYBOOK_DISABLED_INSTALL_BEFORE_SCENARIO.skipVerify,
+    const result = runInitProject(copy.root, ['--storybook=disabled', '--yes'], {
+      skipVerify: false,
     })
 
     assert.equal(result.status, 0, result.stdout + result.stderr)
@@ -135,25 +122,4 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     assert.doesNotMatch(context, /docs\/frontend\/storybook\.md/)
   })
 
-  test('after the manual pnpm install the follow-up asks for, real typecheck/lint/build/test all pass', () => {
-    copy = createRealRepoCopy()
-    commit(copy.root)
-
-    const result = runInitProject(copy.root, STORYBOOK_DISABLED_MANUAL_SCENARIO.flags, {
-      skipVerify: STORYBOOK_DISABLED_MANUAL_SCENARIO.skipVerify,
-    })
-    assert.equal(result.status, 0, result.stdout + result.stderr)
-
-    // The exact manual step the printed follow-up asks for.
-    installDependencies(copy.root)
-
-    for (const args of STORYBOOK_MANUAL_VERIFY_STEPS) {
-      const verify = spawnSync('pnpm', args, {
-        cwd: copy.root,
-        encoding: 'utf8',
-        env: { ...process.env, CI: 'true' },
-      })
-      assert.equal(verify.status, 0, `pnpm ${args.join(' ')}: ${verify.stdout}${verify.stderr}`)
-    }
-  })
 })
