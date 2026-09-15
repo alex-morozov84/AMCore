@@ -90,6 +90,15 @@ export function renderHumanSummary(report) {
     `Operation inventory: ${report.operationInventory.operations.length} scenario operations, ` +
       `${report.operationInventory.exactCopyEdges.length} exact-copy synchronization edges`
   )
+  if (report.operationInventory.migrationCounts) {
+    const counts = report.operationInventory.migrationCounts
+    lines.push(
+      `  - migration units: ${counts.legacyOperations} legacy operations, ` +
+        `${counts.semanticFacts} facts, ${counts.semanticClaims} claims, ` +
+        `${counts.sharedContentOperations} shared content operations, ` +
+        `${counts.materializedFilesystemOperations} filesystem operations`
+    )
+  }
   if (report.topology.candidateEquivalentGroups.length > 0) {
     lines.push('', 'Candidate equivalent topology groups (not acted on automatically):')
     for (const group of report.topology.candidateEquivalentGroups)

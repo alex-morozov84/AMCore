@@ -24,6 +24,14 @@ const EXACT_COPY_EDGE_SHAPE = {
   scenarios: isStringArray,
 }
 
+const MIGRATION_COUNTS_SHAPE = {
+  legacyOperations: isNonNegativeInt,
+  semanticFacts: isNonNegativeInt,
+  semanticClaims: isNonNegativeInt,
+  sharedContentOperations: isNonNegativeInt,
+  materializedFilesystemOperations: isNonNegativeInt,
+}
+
 function validateShape(value, shape, prefix) {
   if (!isObject(value)) return [`${prefix}: expected an object`]
   const errors = []
@@ -46,5 +54,12 @@ export function validateOperationInventory(inventory) {
   const edges = inventory.exactCopyEdges.flatMap((item, index) =>
     validateShape(item, EXACT_COPY_EDGE_SHAPE, `operationInventory.exactCopyEdges[${index}]`)
   )
-  return [...operations, ...edges]
+  const migration = inventory.migrationCounts
+    ? validateShape(
+        inventory.migrationCounts,
+        MIGRATION_COUNTS_SHAPE,
+        'operationInventory.migrationCounts'
+      )
+    : []
+  return [...operations, ...edges, ...migration]
 }

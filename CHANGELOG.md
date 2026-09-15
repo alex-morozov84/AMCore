@@ -69,6 +69,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Atomic downstream initialization.** `pnpm init:brand` and
+  `pnpm init:project` now materialize their complete plans before confirmation
+  and apply a confirmed plan in one recoverable filesystem transaction. Shared
+  scaffold files are composed semantically once, and external logo/icon inputs
+  are validated and snapshotted before the prompt. Generated output, flags,
+  guards, dry-run output, confirmation, diagnostics, and post-apply checks are
+  unchanged.
+
 - **PostgreSQL 16 → 18.** The shipped/bundled reference database major moves
   from PostgreSQL 16 to 18 (`postgres:18-alpine`) across `docker-compose.yml`
   (`postgres`, `backup`, `restore`, `restore-drill`) and both API

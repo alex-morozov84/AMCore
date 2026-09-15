@@ -7,6 +7,7 @@ import { createRealRepoCopy } from '../lib/test-fixture.mjs'
 import { parseProjectFlags } from '../lib/project-flags.mjs'
 import { DEFAULT_ADMIN_CONSOLE_SLUG } from '../lib/project-config-admin-console.mjs'
 import { prepareProjectInit } from '../lib/project-init-plan.mjs'
+import { countProjectSemanticClaims } from '../lib/project-semantic-metrics.mjs'
 import { SCENARIOS } from './scenario-registry.mjs'
 
 function relativeTo(root, value) {
@@ -22,11 +23,8 @@ function pathType(value) {
   return 'other'
 }
 
-function scenarioOperations(root, scenario) {
-  const flags = parseProjectFlags(scenario.flags)
-  const slug = flags['admin-console-slug'] ?? DEFAULT_ADMIN_CONSOLE_SLUG
-  const { steps } = prepareProjectInit(root, flags, slug)
-  return steps.map((step, operationIndex) => ({
+function operationRecord(root, scenario, step, operationIndex) {
+  return {
     scenarioName: scenario.name,
     operationIndex,
     kind: step.kind,
@@ -40,7 +38,30 @@ function scenarioOperations(root, scenario) {
     target: relativeTo(root, step.target),
     targetType: pathType(step.target),
     summary: step.summary,
-  }))
+  }
+}
+
+function scenarioInventory(root, scenario) {
+  const flags = parseProjectFlags(scenario.flags)
+  const slug = flags['admin-console-slug'] ?? DEFAULT_ADMIN_CONSOLE_SLUG
+  const plan = prepareProjectInit(root, flags, slug)
+  return {
+    operations: plan.steps.map((step, index) => operationRecord(root, scenario, step, index)),
+    migration: {
+      legacyOperations: plan.legacySteps.length,
+      semanticFacts: plan.sharedContentFacts.length,
+      semanticClaims: countProjectSemanticClaims(plan.sharedContentFacts),
+      sharedContentOperations: plan.sharedContentSteps.length,
+      materializedFilesystemOperations: plan.operationPlan.operationCount,
+    },
+  }
+}
+
+function sumMigration(plans) {
+  const fields = Object.keys(plans[0].migration)
+  return Object.fromEntries(
+    fields.map((field) => [field, plans.reduce((total, plan) => total + plan.migration[field], 0)])
+  )
 }
 
 function exactCopyEdges(operations) {
@@ -65,8 +86,13 @@ export function buildOperationInventory() {
   const previousMeasurementMode = process.env.AMCORE_MEASURE_OPERATIONS
   process.env.AMCORE_MEASURE_OPERATIONS = '1'
   try {
-    const operations = SCENARIOS.flatMap((scenario) => scenarioOperations(copy.root, scenario))
-    return { operations, exactCopyEdges: exactCopyEdges(operations) }
+    const plans = SCENARIOS.map((scenario) => scenarioInventory(copy.root, scenario))
+    const operations = plans.flatMap((plan) => plan.operations)
+    return {
+      operations,
+      exactCopyEdges: exactCopyEdges(operations),
+      migrationCounts: sumMigration(plans),
+    }
   } finally {
     if (previousMeasurementMode === undefined) delete process.env.AMCORE_MEASURE_OPERATIONS
     else process.env.AMCORE_MEASURE_OPERATIONS = previousMeasurementMode

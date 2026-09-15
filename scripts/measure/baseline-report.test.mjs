@@ -71,6 +71,20 @@ describe('renderHumanSummary', () => {
     assert.match(text, /- a, b/)
   })
 
+  test('labels migration units separately from scenario operations', () => {
+    const report = fakeReport()
+    report.operationInventory.migrationCounts = {
+      legacyOperations: 346,
+      semanticFacts: 34,
+      semanticClaims: 116,
+      sharedContentOperations: 32,
+      materializedFilesystemOperations: 366,
+    }
+    const text = renderHumanSummary(report)
+    assert.match(text, /346 legacy operations, 34 facts, 116 claims/)
+    assert.match(text, /32 shared content operations, 366 filesystem operations/)
+  })
+
   test('never includes an absolute filesystem path from this machine', () => {
     const text = renderHumanSummary(fakeReport())
     assert.doesNotMatch(text, /\/Users\/|\/private\/|\/home\//)

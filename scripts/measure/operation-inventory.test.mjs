@@ -6,7 +6,7 @@ describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
 
   test('records real source/target paths and every measured scenario', () => {
-    assert.ok(inventory.operations.length > 100)
+    assert.equal(inventory.operations.length, 367)
     assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
@@ -14,10 +14,22 @@ describe('operation inventory against the real plans', () => {
       )
     )
     assert.ok(
-      inventory.operations.every((operation) =>
-        operation.modulePath?.startsWith('scripts/lib/project-plan-')
+      inventory.operations.every(
+        (operation) =>
+          operation.modulePath?.startsWith('scripts/lib/project-plan-') ||
+          operation.modulePath === 'scripts/lib/project-shared-content.mjs'
       )
     )
+  })
+
+  test('reports migration units separately from legacy operations', () => {
+    assert.deepEqual(inventory.migrationCounts, {
+      legacyOperations: 346,
+      semanticFacts: 34,
+      semanticClaims: 116,
+      sharedContentOperations: 32,
+      materializedFilesystemOperations: 366,
+    })
   })
 
   test('captures file, directory, move, delete, and edit evidence needed by PR2', () => {
@@ -34,6 +46,7 @@ describe('operation inventory against the real plans', () => {
   })
 
   test('publishes one synchronization edge for every distinct exact-copy target', () => {
+    assert.equal(inventory.exactCopyEdges.length, 21)
     const targets = inventory.exactCopyEdges.map((edge) => edge.upstreamSource)
     assert.deepEqual(targets, [...new Set(targets)].sort())
     assert.ok(
