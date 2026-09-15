@@ -65,10 +65,6 @@ export function registerConsoleStructuralOperations(registry) {
   })
 }
 
-export function isConsoleStructuralOperation(key) {
-  return key === 'console.startup-hook' || key === 'console.login-single-locale'
-}
-
 function runtimeConfig(text, { mode, slug }) {
   return replaceExactBlock(
     text,

@@ -73,3 +73,27 @@ test('fails closed when an owned-block anchor is missing or duplicated', () => {
   )
   assert.throws(() => definition.apply(`${source}\n${anchor}\n`), /expected exactly one anchor/)
 })
+
+test('fails closed instead of mixing structural and text adapters on one path', () => {
+  const pathname = 'apps/web/src/instrumentation.ts'
+  assert.throws(
+    () =>
+      materializeProjectContentPath(root, pathname, [
+        {
+          kind: 'content',
+          dimension: 'console',
+          path: pathname,
+          operationKey: 'console.startup-hook',
+          params: {},
+        },
+        {
+          kind: 'content',
+          dimension: 'other',
+          path: pathname,
+          operationKey: 'console.tokens',
+          params: {},
+        },
+      ]),
+    /mixed structural\/text operations/
+  )
+})

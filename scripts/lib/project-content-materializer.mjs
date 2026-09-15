@@ -9,7 +9,6 @@ import {
 } from './path-algebra-structural-compose.mjs'
 import { registerProjectConfigOperations } from './project-config-operations.mjs'
 import {
-  isConsoleStructuralOperation,
   projectConsoleContentDefinition,
   registerConsoleStructuralOperations,
 } from './project-console-content.mjs'
@@ -67,10 +66,14 @@ function materializeText(root, pathname, facts) {
   return { before, after }
 }
 
-function materializeEslint(root, pathname, facts) {
+function structuralRegistry() {
   const registry = createOperationRegistry()
   registerProjectConfigOperations(registry)
   registerConsoleStructuralOperations(registry)
+  return registry
+}
+
+function materializeStructural(root, pathname, facts, registry) {
   const structural = facts.map((fact) => ({ ...fact, kind: 'structural' }))
   const [plan] = planStructuralComposition(registry, structural)
   const before = readFileSync(path.join(root, pathname), 'utf8')
@@ -87,11 +90,14 @@ export function materializeProjectContentPath(root, pathname, facts) {
     }
     return { kind: 'delete', target: path.join(root, pathname), changed: true }
   }
-  const text =
-    pathname === 'apps/web/eslint.config.mjs' ||
-    facts.every((fact) => isConsoleStructuralOperation(fact.operationKey))
-      ? materializeEslint(root, pathname, facts)
-      : materializeText(root, pathname, facts)
+  const registry = structuralRegistry()
+  const structural = facts.filter((fact) => registry.has(fact.operationKey))
+  if (structural.length && structural.length !== facts.length) {
+    throw new Error(`mixed structural/text operations on "${pathname}"`)
+  }
+  const text = structural.length
+    ? materializeStructural(root, pathname, facts, registry)
+    : materializeText(root, pathname, facts)
   return {
     kind: 'edit',
     target: path.join(root, pathname),

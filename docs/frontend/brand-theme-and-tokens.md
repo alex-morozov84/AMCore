@@ -301,8 +301,9 @@ The Operations Console transform derives removal ownership from one manifest.
 Every new file below a declared Console feature root is owned automatically;
 outside those closed roots, a Console-specific code, test, config, or docs
 contribution must declare an owned block, config field, or structural-operation
-seam. Missing, stale, ambiguous, and duplicate declarations fail during
-planning, before the filesystem transaction starts. Shared helpers survive
+seam. Missing declarations detectable through imports or monitored identifiers,
+plus stale, ambiguous, and duplicate declarations, fail during planning before
+the filesystem transaction starts. Shared helpers survive
 removal when an independent production consumer still reaches them; helpers
 and linked tests used only by the Console are removed together.
 
