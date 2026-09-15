@@ -34,13 +34,16 @@ function assertRouteProgress(root, scenario) {
   assert.match(flag, /export const ROUTE_PROGRESS_ENABLED = false/)
 }
 
-function assertHostProxy(root, slug) {
+function assertHostProxy(root, scenario, slug) {
   const nginx = readFileSync(path.join(root, 'docker/nginx/operations-console.conf'), 'utf8')
   const caddy = readFileSync(path.join(root, 'docker/caddy/Caddyfile.console-host'), 'utf8')
-  assert.match(nginx, new RegExp(`/${slug}/\\$1 break`))
-  assert.ok(nginx.includes('location ~* "\\.[a-z0-9]{1,16}$"'))
-  assert.match(caddy, new RegExp(`/${slug}\\{path\\}`))
-  assert.match(caddy, /@staticAsset path_regexp staticAsset/)
+  const single = scenario.factors.proxy === 'single-host'
+  const nginxRewrite = single ? `/${slug}/$1 break` : `/$1/${slug}$2 break`
+  const caddyRewrite = single ? `/${slug}{path}` : `/{re.consolePage.1}/${slug}{re.consolePage.2}`
+  assert.ok(nginx.includes(nginxRewrite))
+  assert.ok(caddy.includes(caddyRewrite))
+  assert.equal(nginx.includes('location ~* "\\.[a-z0-9]{1,16}$"'), single)
+  assert.equal(caddy.includes('@staticAsset path_regexp staticAsset'), single)
 }
 
 function assertConsole(root, scenario) {
@@ -54,7 +57,7 @@ function assertConsole(root, scenario) {
   const config = readFileSync(configPath, 'utf8')
   assert.match(config, new RegExp(`mode: '${mode}'`))
   assert.match(config, new RegExp(`slug: '${slug}'`))
-  if (mode === 'host') assertHostProxy(root, slug)
+  if (mode === 'host') assertHostProxy(root, scenario, slug)
 }
 
 async function assertSingleLocaleUrl(root, scenario) {
