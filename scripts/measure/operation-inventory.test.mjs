@@ -17,16 +17,17 @@ describe('operation inventory against the real plans', () => {
       inventory.operations.every(
         (operation) =>
           operation.modulePath?.startsWith('scripts/lib/project-plan-') ||
-          operation.modulePath === 'scripts/lib/project-shared-content.mjs'
+          operation.modulePath === 'scripts/lib/project-shared-content.mjs' ||
+          operation.modulePath === 'scripts/lib/project-console-facts.mjs'
       )
     )
   })
 
   test('reports migration units separately from legacy operations', () => {
     assert.deepEqual(inventory.migrationCounts, {
-      legacyOperations: 346,
-      semanticFacts: 34,
-      semanticClaims: 116,
+      legacyOperations: 288,
+      semanticFacts: 57,
+      semanticClaims: 150,
       sharedContentOperations: 32,
       materializedFilesystemOperations: 366,
     })

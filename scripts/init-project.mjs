@@ -35,15 +35,7 @@ const testVerifyOverride =
       ? () => []
       : undefined
 
-async function main() {
-  const flags = parseProjectFlags(process.argv.slice(2))
-  if (flags.help) {
-    console.log(PROJECT_HELP)
-    return
-  }
-  const adminConsoleSlug = flags['admin-console-slug'] ?? DEFAULT_ADMIN_CONSOLE_SLUG
-  const { operationPlan, confirmMessage } = prepareProjectInit(ROOT, flags, adminConsoleSlug)
-
+function printFollowUp(flags) {
   if (flags.mode) {
     console.log(prismaFollowUpMessage(flags.locale))
     console.log()
@@ -52,26 +44,35 @@ async function main() {
     console.log(storybookInstallFollowUpMessage())
     console.log()
   }
+}
 
-  // --storybook edits apps/web/package.json's dependency list, which
-  // leaves pnpm-lock.yaml stale the moment apply writes — automated
-  // typecheck/lint/build/test would fail on that mismatch before doing any
-  // real work, not because the transform is wrong. Skipped in favor of the
-  // printed manual follow-up above; see storybookInstallFollowUpMessage's
-  // doc comment for why running `pnpm install` here isn't the fix either.
+// --storybook leaves pnpm-lock.yaml stale, so verification follows the manual
+// install requested by storybookInstallFollowUpMessage instead.
+function buildVerification(flags, assertApplied) {
   const defaultVerify = flags.storybook ? () => [] : runProjectVerification
+  return (root) => {
+    assertApplied()
+    return (testVerifyOverride ?? defaultVerify)(root)
+  }
+}
 
-  // --route-progress is non-destructive (owner decision, 2026-09-09): no
-  // file is moved or deleted, only a source flag's value and a context
-  // record. The confirm message says so explicitly rather than reusing the
-  // other two dimensions' "cannot be undone" wording, which would be untrue
-  // for a --route-progress-only apply.
+// --route-progress is non-destructive: it changes only a source flag and the
+// matching context record, so its confirm message does not claim irreversibility.
+async function main() {
+  const flags = parseProjectFlags(process.argv.slice(2))
+  if (flags.help) {
+    console.log(PROJECT_HELP)
+    return
+  }
+  const slug = flags['admin-console-slug'] ?? DEFAULT_ADMIN_CONSOLE_SLUG
+  const { operationPlan, confirmMessage, assertApplied } = prepareProjectInit(ROOT, flags, slug)
+  printFollowUp(flags)
   await runInitCommand({
     cwd: ROOT,
     flags,
     operationPlan,
     confirmMessage,
-    verify: testVerifyOverride ?? defaultVerify,
+    verify: buildVerification(flags, assertApplied),
   })
 }
 

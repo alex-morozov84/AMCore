@@ -8,6 +8,10 @@ import {
   planStructuralComposition,
 } from './path-algebra-structural-compose.mjs'
 import { registerProjectConfigOperations } from './project-config-operations.mjs'
+import {
+  projectConsoleContentDefinition,
+  registerConsoleStructuralOperations,
+} from './project-console-content.mjs'
 import { projectSharedContentDefinition } from './project-shared-content-operations.mjs'
 
 function conflict(pathname, location, left, right) {
@@ -17,7 +21,9 @@ function conflict(pathname, location, left, right) {
 }
 
 function claimsFor(fact) {
-  const definition = projectSharedContentDefinition(fact.operationKey)
+  const definition =
+    projectSharedContentDefinition(fact.operationKey) ??
+    projectConsoleContentDefinition(fact.operationKey)
   if (!definition) throw new Error(`unknown shared content operation "${fact.operationKey}"`)
   const claims = definition.claims(fact.params)
   if (!Array.isArray(claims) || claims.length === 0) {
@@ -60,9 +66,14 @@ function materializeText(root, pathname, facts) {
   return { before, after }
 }
 
-function materializeEslint(root, pathname, facts) {
+function structuralRegistry() {
   const registry = createOperationRegistry()
   registerProjectConfigOperations(registry)
+  registerConsoleStructuralOperations(registry)
+  return registry
+}
+
+function materializeStructural(root, pathname, facts, registry) {
   const structural = facts.map((fact) => ({ ...fact, kind: 'structural' }))
   const [plan] = planStructuralComposition(registry, structural)
   const before = readFileSync(path.join(root, pathname), 'utf8')
@@ -79,10 +90,14 @@ export function materializeProjectContentPath(root, pathname, facts) {
     }
     return { kind: 'delete', target: path.join(root, pathname), changed: true }
   }
-  const text =
-    pathname === 'apps/web/eslint.config.mjs'
-      ? materializeEslint(root, pathname, facts)
-      : materializeText(root, pathname, facts)
+  const registry = structuralRegistry()
+  const structural = facts.filter((fact) => registry.has(fact.operationKey))
+  if (structural.length && structural.length !== facts.length) {
+    throw new Error(`mixed structural/text operations on "${pathname}"`)
+  }
+  const text = structural.length
+    ? materializeStructural(root, pathname, facts, registry)
+    : materializeText(root, pathname, facts)
   return {
     kind: 'edit',
     target: path.join(root, pathname),

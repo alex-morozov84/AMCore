@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
 import { test } from 'node:test'
 
 import { OWNERSHIP_CODES } from './ownership-errors.mjs'
@@ -6,6 +8,7 @@ import { validateManifestInventory } from './ownership-inventory.mjs'
 import { operationsConsoleDocSeams } from './operations-console-ownership-doc-seams.mjs'
 import { operationsConsoleOwnership } from './operations-console-ownership.mjs'
 import { validateOwnership } from './ownership-validate.mjs'
+import { createRealRepoCopy } from './test-fixture.mjs'
 
 const root = process.cwd()
 
@@ -17,7 +20,7 @@ function cloneManifest(change) {
 
 test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
   const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
-  assert.equal([...inventory.rootFiles.values()].flat().length, 41)
+  assert.equal([...inventory.rootFiles.values()].flat().length, 44)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   assert.ok(operationsConsoleDocSeams.every((seam) => seam.seamKind === 'owned-block'))
   assert.ok(graph.aliases.includes('@/*'))
@@ -74,12 +77,35 @@ test('wrong kind and glob cardinality fail closed', () => {
     (error) => error.code === OWNERSHIP_CODES.KIND_MISMATCH
   )
   const wrongCount = cloneManifest((draft) => {
-    draft.facts.documentation[0].cardinality = 'one'
+    draft.facts.repositoryEntrypoints[0].cardinality = 'one'
   })
   assert.throws(
     () => validateManifestInventory(root, wrongCount),
     (error) => error.code === OWNERSHIP_CODES.CARDINALITY
   )
+})
+
+test('a duplicate owned-block anchor fails closed', () => {
+  const manifest = cloneManifest((draft) => {
+    const seam = draft.seams.find((item) => item.id === 'console.root-capability')
+    seam.selector.text = 'AMCore'
+  })
+  assert.throws(
+    () => validateOwnership(root, manifest),
+    (error) => error.code === OWNERSHIP_CODES.CARDINALITY
+  )
+})
+
+test('a new file inside a closed-world Console root is discovered automatically', () => {
+  const copy = createRealRepoCopy()
+  try {
+    const relative = 'apps/web/src/features/console-login/new-owned-helper.ts'
+    writeFileSync(path.join(copy.root, relative), 'export const owned = true\n')
+    const { inventory } = validateOwnership(copy.root, operationsConsoleOwnership)
+    assert.ok(inventory.rootFiles.get('apps/web/src/features/console-login').includes(relative))
+  } finally {
+    copy.cleanup()
+  }
 })
 
 test('whole-file feature ownership outside a closed root is forbidden', () => {

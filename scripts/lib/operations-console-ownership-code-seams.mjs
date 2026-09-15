@@ -7,7 +7,7 @@ const seam = (id, path, seamKind, selector, detectors, extra = {}) => ({
   selector,
   detectors,
   disposition: 'remove',
-  ...(seamKind === 'structural-operation' ? { operationKey: id } : {}),
+  operationKey: id,
   ...extra,
 })
 
@@ -46,21 +46,24 @@ export const operationsConsoleCodeSeams = [
     'apps/web/messages/en.json',
     'config-field',
     { jsonPath: ['console'] },
-    ['"console":']
+    ['"console":'],
+    { operationKey: 'messages-console' }
   ),
   seam(
     'console.messages.ru',
     'apps/web/messages/ru.json',
     'config-field',
     { jsonPath: ['console'] },
-    ['"console":']
+    ['"console":'],
+    { operationKey: 'messages-console' }
   ),
   seam(
     'console.test-script',
     'apps/web/package.json',
     'config-field',
     { jsonPath: ['scripts', 'test:e2e:console-real-stack'] },
-    ['test:e2e:console-real-stack']
+    ['test:e2e:console-real-stack'],
+    { operationKey: 'package-console' }
   ),
   seam(
     'console.env-example',
@@ -85,7 +88,7 @@ export const operationsConsoleCodeSeams = [
     'structural-operation',
     { identifiers: ['**admin_console:**', '**admin_console_mode:**', '**admin_console_slug:**'] },
     ['console-context-fields'],
-    { occurrences: 3, disposition: 'rewrite' }
+    { occurrences: 3, disposition: 'rewrite', operationKey: 'context-console' }
   ),
   seam(
     'console.context-host-doc',

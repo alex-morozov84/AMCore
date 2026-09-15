@@ -54,29 +54,6 @@ function routeProgressFacts(state) {
     : []
 }
 
-function consoleFacts(state) {
-  if (!state.selected.adminConsole) return []
-  const context = content('console', 'PROJECT_CONTEXT.md', 'context-console', state.adminConsole)
-  if (state.adminConsole.enabled) return [context]
-  const kept = state.selected.locale ? [state.locale.base] : ['en', 'ru']
-  return [
-    context,
-    content('console', 'apps/web/package.json', 'package-console'),
-    content('console', 'README.md', 'readme-console'),
-    content('console', 'docs/README.md', 'docs-index-console'),
-    content('console', 'docs/frontend/README.md', 'frontend-index-console'),
-    content('console', 'docs/frontend/architecture-and-conventions.md', 'architecture-console'),
-    ...kept.map((locale) =>
-      content('console', `apps/web/messages/${locale}.json`, 'messages-console')
-    ),
-  ]
-}
-
 export function buildProjectSharedContentFacts(state) {
-  return [
-    ...localeFacts(state),
-    ...storybookFacts(state),
-    ...routeProgressFacts(state),
-    ...consoleFacts(state),
-  ]
+  return [...localeFacts(state), ...storybookFacts(state), ...routeProgressFacts(state)]
 }

@@ -30,11 +30,12 @@ test('forgotten standalone test importing a feature root needs a seam', () => {
   )
 })
 
-test('detectable undeclared shared code, test and config contributions fail', () => {
+test('detectable undeclared code, test, config and docs contributions fail closed', () => {
   for (const [file, content] of [
     ['src/shared.ts', 'export const value = "FEATURE_TOKEN"\n'],
     ['test/shared.ts', 'const marker = "FEATURE_TOKEN"\n'],
     ['config.json', '{"marker":"FEATURE_TOKEN"}\n'],
+    ['docs/unowned.md', 'An undeclared FEATURE_TOKEN contribution.\n'],
   ]) {
     const root = fixture({ ...base, [file]: content })
     assert.throws(
