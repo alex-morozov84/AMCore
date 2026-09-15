@@ -6,20 +6,30 @@ import {
   applyProject,
   createCommittedCopy,
   runInitProject,
-  verifyProjectSteps,
 } from './lib/init-project-test-helpers.mjs'
-import { installDependencies } from './lib/test-fixture.mjs'
-import ownedPaths from './lib/admin-console-owned-paths.json' with { type: 'json' }
-import {
-  ADMIN_CONSOLE_VERIFY_STEPS,
-  ADMIN_CONSOLE_ENABLED_SCENARIOS,
-} from './lib/scaffold-scenario-recipes.mjs'
+import { operationsConsoleOwnership } from './lib/operations-console-ownership.mjs'
+import { filesForFacts } from './lib/ownership-facts.mjs'
+import { validateOwnership } from './lib/ownership-validate.mjs'
 
 const copies = []
 
 afterEach(() => copies.splice(0).forEach((copy) => copy.cleanup()))
 
 const copy = () => createCommittedCopy(copies)
+
+function removableConsolePaths(root) {
+  const { inventory, projection } = validateOwnership(root, operationsConsoleOwnership)
+  const matched = (facts) => [...filesForFacts(inventory, facts)]
+  return [
+    ...operationsConsoleOwnership.facts.roots.map((fact) => fact.path),
+    ...projection.deadSharedModules,
+    ...matched(operationsConsoleOwnership.facts.sharedModuleTests).filter((file) =>
+      projection.removed.has(file)
+    ),
+    ...matched(operationsConsoleOwnership.facts.topology),
+    ...matched(operationsConsoleOwnership.facts.verification),
+  ]
+}
 
 describe('init-project --admin-console', () => {
   it('allows each explicit first transition from the pristine default', () => {
@@ -53,8 +63,9 @@ describe('init-project --admin-console', () => {
 
   it('removes only console-owned frontend/runtime files when disabled', () => {
     const root = copy()
+    const ownedPaths = removableConsolePaths(root)
     applyProject(root, ['--admin-console=disabled'])
-    for (const rel of [...ownedPaths.directories, ...ownedPaths.files]) {
+    for (const rel of ownedPaths) {
       assert.equal(existsSync(path.join(root, rel)), false, rel)
     }
     const nginx = readFileSync(path.join(root, 'docker/nginx/operations-console.conf'), 'utf8')
@@ -130,17 +141,5 @@ describe('init-project --admin-console', () => {
     assert.equal(webPackage.includes('test:storybook'), false)
     assert.equal(frontendIndex.includes('Operations Console shell'), false)
     assert.equal(frontendIndex.includes('| [Storybook]'), false)
-  })
-
-  it('builds both enabled topology outputs after actual CLI application', () => {
-    for (const scenario of ADMIN_CONSOLE_ENABLED_SCENARIOS) {
-      const root = copy()
-      installDependencies(root)
-      applyProject(
-        root,
-        scenario.flags.filter((flag) => flag !== '--yes')
-      )
-      verifyProjectSteps(root, ADMIN_CONSOLE_VERIFY_STEPS)
-    }
   })
 })

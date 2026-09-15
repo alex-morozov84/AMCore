@@ -19,7 +19,7 @@ function owned(provider, steps) {
   return steps.map((step) => ({ ...step, provider }))
 }
 
-export function buildProjectLegacySteps(root, flags, adminConsoleSlug) {
+export function buildProjectLegacySteps(root, flags) {
   const locale = flags.mode
     ? buildProjectSteps(root, { locale: flags.locale, deferLocaleCleanup: true })
     : []

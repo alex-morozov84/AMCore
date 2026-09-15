@@ -67,10 +67,11 @@ export const operationsConsoleDocSeams = [
   entry(
     'console.frontend-start-link',
     'docs/frontend/README.md',
-    block(
-      '- Configuring or extending the Operations Console →',
-      '  [Operations Console](../operations-console/README.md)'
-    ),
+    {
+      start: '- Configuring or extending the Operations Console →',
+      end: '  [Operations Console](../operations-console/README.md)',
+      preserveFinalNewline: true,
+    },
     undefined,
     { operationKey: 'frontend-index-console' }
   ),

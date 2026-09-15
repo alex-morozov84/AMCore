@@ -1,15 +1,8 @@
 import { buildProjectSharedContentFacts } from './project-shared-content-facts.mjs'
 
 export const EXPECTED_SHARED_COLLISION_GRAPH = Object.freeze({
-  'PROJECT_CONTEXT.md': ['console:edit', 'locale:edit', 'route-progress:edit', 'storybook:edit'],
-  'README.md': ['console:edit', 'storybook:edit'],
+  'PROJECT_CONTEXT.md': ['locale:edit', 'route-progress:edit', 'storybook:edit'],
   'apps/web/eslint.config.mjs': ['locale:edit', 'storybook:edit'],
-  'apps/web/messages/en.json': ['console:edit', 'locale:delete'],
-  'apps/web/messages/ru.json': ['console:edit', 'locale:delete'],
-  'apps/web/package.json': ['console:edit', 'storybook:edit'],
-  'docs/README.md': ['console:edit', 'storybook:edit'],
-  'docs/frontend/README.md': ['console:edit', 'storybook:edit'],
-  'docs/frontend/architecture-and-conventions.md': ['console:edit', 'storybook:edit'],
 })
 
 function state(selected, overrides = {}) {

@@ -17,10 +17,10 @@ export const operationsConsoleDiscoverySeams = [
   entry(
     'console.root-intro',
     'README.md',
-    block(
-      'The optional [Operations Console](docs/operations-console/README.md)',
-      'It is not a product backoffice or a catalog/content admin UI.'
-    ),
+    {
+      start: 'The optional [Operations Console](docs/operations-console/README.md)',
+      end: 'It is not a product backoffice or a catalog/content admin UI.',
+    },
     undefined,
     { operationKey: 'readme-console' }
   ),

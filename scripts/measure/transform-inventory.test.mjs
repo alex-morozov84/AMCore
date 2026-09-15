@@ -18,7 +18,10 @@ describe('transform-inventory: classifyModule (synthetic sources — independent
 
   test('a module using only jsonPatchTransform classifies as structured-config', () => {
     const source = `fileStep(p, jsonPatchTransform({ a: 1 }), 's')\n`
-    assert.equal(classifyModule('project-plan-demo-z.mjs', source).primaryShape, 'structured-config')
+    assert.equal(
+      classifyModule('project-plan-demo-z.mjs', source).primaryShape,
+      'structured-config'
+    )
   })
 
   test('a module with no known token is other-unclassified, with a reason', () => {
@@ -39,7 +42,10 @@ describe('transform-inventory: classifyModule (synthetic sources — independent
   })
 
   test('dimension is derived from the filename prefix', () => {
-    assert.equal(classifyModule('project-plan-storybook-docs-readme.mjs', '').dimension, 'storybook-docs')
+    assert.equal(
+      classifyModule('project-plan-storybook-docs-readme.mjs', '').dimension,
+      'storybook-docs'
+    )
   })
 })
 
@@ -47,7 +53,7 @@ describe('transform-inventory: buildTransformInventory (real repo, ground truth)
   const inventory = buildTransformInventory()
 
   test('classifies every real module (no silent skips)', () => {
-    assert.equal(inventory.length, 69)
+    assert.equal(inventory.length, 62)
     for (const module of inventory) {
       assert.ok(module.primaryShape, `${module.modulePath} has no primaryShape`)
       if (module.primaryShape === 'other-unclassified') {

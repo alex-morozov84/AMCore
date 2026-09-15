@@ -29,6 +29,7 @@ function removeSelector(text, seam) {
   if (endMatch <= startMatch) throw new Error(`${seam.id} end precedes start`)
   const start = lineStart(text, startMatch)
   let end = selector.retainEnd ? lineStart(text, endMatch) : lineEnd(text, endMatch)
+  if (selector.preserveFinalNewline && end === text.length && text.endsWith('\n')) end -= 1
   if (selector.consumeBlankLine && text[end] === '\n') end += 1
   return text.slice(0, start) + text.slice(end)
 }

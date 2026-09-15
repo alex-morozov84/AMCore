@@ -1,4 +1,11 @@
-import path from 'node:path'
+import {
+  insertAt,
+  insertProvider,
+  insertTarget,
+  relative,
+  take,
+  takeOwned,
+} from './project-display-helpers.mjs'
 
 const combinedOrder = [
   'PROJECT_CONTEXT.md',
@@ -10,34 +17,6 @@ const combinedOrder = [
   'docs/README.md',
 ]
 
-function relative(root, target) {
-  return path.relative(root, target).split(path.sep).join('/')
-}
-
-function insertAt(plan, index, steps) {
-  if (steps.length) plan.splice(index, 0, ...steps)
-}
-
-function targetIndex(plan, root, target) {
-  const index = plan.findIndex((step) => relative(root, step.target) === target)
-  if (index < 0) throw new Error(`display-plan anchor is missing: ${target}`)
-  return index
-}
-
-function insertTarget(plan, root, target, steps, offset = 0) {
-  if (steps.length) insertAt(plan, targetIndex(plan, root, target) + offset, steps)
-}
-
-function providerBoundary(plan, provider, before) {
-  const indexes = plan.flatMap((step, index) => (step.provider === provider ? [index] : []))
-  if (!indexes.length) throw new Error(`display-plan provider is missing: ${provider}`)
-  return before ? indexes[0] : indexes.at(-1) + 1
-}
-
-function insertProvider(plan, provider, before, steps) {
-  if (steps.length) insertAt(plan, providerBoundary(plan, provider, before), steps)
-}
-
 function partitionSemantic(root, semanticSteps) {
   const singles = new Map()
   const combined = new Map()
@@ -48,23 +27,6 @@ function partitionSemantic(root, semanticSteps) {
     destination.set(target, step)
   }
   return { singles, combined }
-}
-
-function take(map, ...targets) {
-  return targets.flatMap((target) => {
-    const step = map.get(target)
-    map.delete(target)
-    return step ? [step] : []
-  })
-}
-
-function takeOwned(map, dimension, ...targets) {
-  return targets.flatMap((target) => {
-    const step = map.get(target)
-    if (step?.semanticFacts[0].dimension !== dimension) return []
-    map.delete(target)
-    return [step]
-  })
 }
 
 function insertLocale(plan, root, singles) {

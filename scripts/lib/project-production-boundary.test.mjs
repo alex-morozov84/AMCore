@@ -18,6 +18,13 @@ const DELETED = [
   'project-plan-storybook-docs-root.mjs',
   'project-plan-storybook-docs-readme.mjs',
   'project-plan-storybook-docs-frontend-readme.mjs',
+  'project-plan-admin-console-disable-discovery-docs.mjs',
+  'project-plan-admin-console-disable-docs.mjs',
+  'project-plan-admin-console-disable-web.mjs',
+  'project-plan-admin-console-single-locale-proxy-assets.mjs',
+  'project-plan-admin-console-single-locale-proxy.mjs',
+  'project-plan-admin-console-single-locale.mjs',
+  'project-plan-admin-console.mjs',
 ]
 
 function productionSources() {
@@ -30,7 +37,7 @@ function productionSources() {
   return [...entrypoints, ...library].map((file) => [file, readFileSync(file, 'utf8')])
 }
 
-test('the twelve obsolete modules are absent with no live static import', () => {
+test('obsolete planner modules are absent with no live static import', () => {
   const sources = productionSources()
   for (const name of DELETED) {
     assert.equal(existsSync(path.join(LIB, name)), false, name)
@@ -51,6 +58,6 @@ test('production contains no step.write call and one engine M4 call site', () =>
   assert.equal(engine.match(/\bapplyFilesystem\s*\(/g)?.length, 1)
 })
 
-test('the PR3.1-owned console path registry remains present', () => {
-  assert.equal(existsSync(path.join(LIB, 'admin-console-owned-paths.json')), true)
+test('the superseded console path registry is absent', () => {
+  assert.equal(existsSync(path.join(LIB, 'admin-console-owned-paths.json')), false)
 })
