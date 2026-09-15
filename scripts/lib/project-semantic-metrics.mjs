@@ -1,16 +1,19 @@
 import { createOperationRegistry } from './path-algebra-operation-registry.mjs'
 import { registerProjectConfigOperations } from './project-config-operations.mjs'
 import {
-  isConsoleStructuralOperation,
   projectConsoleContentDefinition,
   registerConsoleStructuralOperations,
 } from './project-console-content.mjs'
 import { projectSharedContentDefinition } from './project-shared-content-operations.mjs'
 
-function structuralClaimCount(fact) {
+function structuralRegistry() {
   const registry = createOperationRegistry()
   registerProjectConfigOperations(registry)
   registerConsoleStructuralOperations(registry)
+  return registry
+}
+
+function structuralClaimCount(registry, fact) {
   return registry.get(fact.operationKey).deriveSemanticWrites(fact.params).length
 }
 
@@ -23,14 +26,14 @@ function textClaimCount(fact) {
 }
 
 export function countProjectSemanticClaims(facts) {
+  const registry = structuralRegistry()
   return facts.reduce(
     (total, fact) =>
       total +
       (fact.kind === 'delete'
         ? fact.claims.length
-        : fact.path === 'apps/web/eslint.config.mjs' ||
-            isConsoleStructuralOperation(fact.operationKey)
-          ? structuralClaimCount(fact)
+        : registry.has(fact.operationKey)
+          ? structuralClaimCount(registry, fact)
           : textClaimCount(fact)),
     0
   )
