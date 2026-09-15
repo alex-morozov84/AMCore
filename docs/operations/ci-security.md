@@ -75,12 +75,11 @@ of workflow self-hardening to keep the example forkable.
   happened — `apps/web` and `docs/` changes drifted `scripts/lib/*.mjs`
   fixtures across several PRs with nothing in CI to catch it).
 - **Scaffolding contract (full)** — job id `scaffolding-contract-full` keeps
-  the required display name `Scaffolding contract (full, real
-install/build/test)`. Its six independent repositories cover the cross-
-  product of multi/single locale routing and Console path/host/disabled
-  topology. en/ru and both optional project toggles are distributed pairwise;
-  multi- and single-locale host
-  rows verify the distinct proxy/static-asset outputs. Every row installs and
+  its required display name unchanged. Its six independent repositories cover
+  the cross-product of multi/single locale routing and Console
+  path/host/disabled topology. en/ru and both optional project toggles are
+  distributed pairwise; multi- and single-locale host rows verify the distinct
+  proxy/static-asset outputs. Every row installs and
   builds once, with typecheck/lint/test profiles assigned to preserve the old
   runtime obligations. There is no path selector: every PR runs all six rows.
   The original eight recipes run unchanged through

@@ -37,7 +37,8 @@ function assertRouteProgress(root, scenario) {
 function assertHostProxy(root, scenario, slug) {
   const nginx = readFileSync(path.join(root, 'docker/nginx/operations-console.conf'), 'utf8')
   const caddy = readFileSync(path.join(root, 'docker/caddy/Caddyfile.console-host'), 'utf8')
-  const single = scenario.factors.proxy === 'single-host'
+  const single =
+    scenario.factors?.proxy === 'single-host' || flagValue(scenario, 'locale') !== undefined
   const nginxRewrite = single ? `/${slug}/$1 break` : `/$1/${slug}$2 break`
   const caddyRewrite = single ? `/${slug}{path}` : `/{re.consolePage.1}/${slug}{re.consolePage.2}`
   assert.ok(nginx.includes(nginxRewrite))
