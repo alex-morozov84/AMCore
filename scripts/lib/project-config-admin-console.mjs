@@ -1,8 +1,9 @@
 // Source-state validation for the one-time Operations Console scaffold choice.
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import ownedPaths from './admin-console-owned-paths.json' with { type: 'json' }
 import { EngineError, readMarkdownField } from './actions.mjs'
+import { operationsConsoleOwnership } from './operations-console-ownership.mjs'
+import { validateManifestInventory } from './ownership-inventory.mjs'
 import { readCurrentSupportedLocales } from './project-config.mjs'
 
 export const ADMIN_CONSOLE_VALUES = ['disabled', 'path', 'host']
@@ -60,9 +61,12 @@ export function resolveAdminConsolePaths(root, slug = DEFAULT_ADMIN_CONSOLE_SLUG
 
 export function assertAdminConsolePristine(root) {
   const paths = resolveAdminConsolePaths(root)
-  const ownedPresent = [...ownedPaths.directories, ...ownedPaths.files].every((target) =>
-    existsSync(path.join(root, target))
-  )
+  let ownedPresent = true
+  try {
+    validateManifestInventory(root, operationsConsoleOwnership)
+  } catch {
+    ownedPresent = false
+  }
   if (!existsSync(paths.defaultRoute) || !existsSync(paths.config) || !ownedPresent) {
     throw new EngineError(
       'Operations Console is not in the pristine upstream state; this one-time choice cannot run again.'

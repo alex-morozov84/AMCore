@@ -42,7 +42,11 @@ async function main() {
     return
   }
   const adminConsoleSlug = flags['admin-console-slug'] ?? DEFAULT_ADMIN_CONSOLE_SLUG
-  const { operationPlan, confirmMessage } = prepareProjectInit(ROOT, flags, adminConsoleSlug)
+  const { operationPlan, confirmMessage, assertApplied } = prepareProjectInit(
+    ROOT,
+    flags,
+    adminConsoleSlug
+  )
 
   if (flags.mode) {
     console.log(prismaFollowUpMessage(flags.locale))
@@ -60,6 +64,10 @@ async function main() {
   // printed manual follow-up above; see storybookInstallFollowUpMessage's
   // doc comment for why running `pnpm install` here isn't the fix either.
   const defaultVerify = flags.storybook ? () => [] : runProjectVerification
+  const verify = (root) => {
+    assertApplied()
+    return (testVerifyOverride ?? defaultVerify)(root)
+  }
 
   // --route-progress is non-destructive (owner decision, 2026-09-09): no
   // file is moved or deleted, only a source flag's value and a context
@@ -71,7 +79,7 @@ async function main() {
     flags,
     operationPlan,
     confirmMessage,
-    verify: testVerifyOverride ?? defaultVerify,
+    verify,
   })
 }
 

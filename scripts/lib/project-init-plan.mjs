@@ -43,12 +43,13 @@ export function prepareProjectInit(root, flags, adminConsoleSlug) {
   const materializationSteps = buildProjectDisplaySteps(
     root,
     legacySteps,
-    factPlan.sharedContentSteps
+    factPlan.sharedContentSteps,
+    factPlan.consoleSteps
   )
   const operationPlan = buildScaffoldOperationPlan({
     root,
     legacySteps,
-    semanticSteps: factPlan.sharedContentSteps,
+    semanticSteps: [...factPlan.sharedContentSteps, ...factPlan.consoleSteps],
     forbiddenLegacyTargets: SHARED_CONTENT_PATHS,
     materializationSteps,
   })

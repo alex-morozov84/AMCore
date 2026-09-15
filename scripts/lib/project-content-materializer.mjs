@@ -8,6 +8,11 @@ import {
   planStructuralComposition,
 } from './path-algebra-structural-compose.mjs'
 import { registerProjectConfigOperations } from './project-config-operations.mjs'
+import {
+  isConsoleStructuralOperation,
+  projectConsoleContentDefinition,
+  registerConsoleStructuralOperations,
+} from './project-console-content.mjs'
 import { projectSharedContentDefinition } from './project-shared-content-operations.mjs'
 
 function conflict(pathname, location, left, right) {
@@ -17,7 +22,9 @@ function conflict(pathname, location, left, right) {
 }
 
 function claimsFor(fact) {
-  const definition = projectSharedContentDefinition(fact.operationKey)
+  const definition =
+    projectSharedContentDefinition(fact.operationKey) ??
+    projectConsoleContentDefinition(fact.operationKey)
   if (!definition) throw new Error(`unknown shared content operation "${fact.operationKey}"`)
   const claims = definition.claims(fact.params)
   if (!Array.isArray(claims) || claims.length === 0) {
@@ -63,6 +70,7 @@ function materializeText(root, pathname, facts) {
 function materializeEslint(root, pathname, facts) {
   const registry = createOperationRegistry()
   registerProjectConfigOperations(registry)
+  registerConsoleStructuralOperations(registry)
   const structural = facts.map((fact) => ({ ...fact, kind: 'structural' }))
   const [plan] = planStructuralComposition(registry, structural)
   const before = readFileSync(path.join(root, pathname), 'utf8')
@@ -80,7 +88,8 @@ export function materializeProjectContentPath(root, pathname, facts) {
     return { kind: 'delete', target: path.join(root, pathname), changed: true }
   }
   const text =
-    pathname === 'apps/web/eslint.config.mjs'
+    pathname === 'apps/web/eslint.config.mjs' ||
+    facts.every((fact) => isConsoleStructuralOperation(fact.operationKey))
       ? materializeEslint(root, pathname, facts)
       : materializeText(root, pathname, facts)
   return {

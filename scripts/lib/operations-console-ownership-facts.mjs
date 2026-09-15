@@ -12,6 +12,7 @@ const roots = [
   'apps/web/src/shared/api/console',
   'apps/web/src/widgets/console-shell',
   'apps/web/e2e/console-real-stack',
+  'docs/operations-console',
 ].map(dir)
 
 const sharedModules = [
@@ -64,7 +65,7 @@ export const operationsConsoleFacts = {
     one(path, { tags: ['topology:host'] })
   ),
   verification,
-  documentation: [many('docs/operations-console/**/*.md')],
+  documentation: [],
   featureEntrypoints,
   repositoryEntrypoints,
 }
