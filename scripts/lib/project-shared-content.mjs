@@ -1,4 +1,5 @@
 import { materializeProjectContentPath } from './project-content-materializer.mjs'
+import { sharedDisplaySummary } from './project-shared-display.mjs'
 import { SHARED_CONTENT_PATHS } from './project-shared-content-facts.mjs'
 
 function groupFacts(facts) {
@@ -11,9 +12,12 @@ function groupFacts(facts) {
   return groups
 }
 
-function summary(pathname, facts) {
-  const dimensions = [...new Set(facts.map((fact) => fact.dimension))].sort().join(' + ')
-  return `${pathname}: compose ${dimensions} shared semantic contributions`
+function cloneFact(fact) {
+  return {
+    ...fact,
+    params: { ...fact.params },
+    ...(fact.claims ? { claims: fact.claims.map((claim) => ({ ...claim })) } : {}),
+  }
 }
 
 export function buildProjectSharedContentSteps(root, facts) {
@@ -24,8 +28,8 @@ export function buildProjectSharedContentSteps(root, facts) {
       ...materializeProjectContentPath(root, pathname, pathFacts),
       adapterClass: 'semantic-shared-content',
       modulePath: 'scripts/lib/project-shared-content.mjs',
-      summary: summary(pathname, pathFacts),
-      semanticFacts: pathFacts.map((fact) => ({ ...fact, params: { ...fact.params } })),
+      summary: sharedDisplaySummary(pathname, pathFacts),
+      semanticFacts: pathFacts.map(cloneFact),
     }
   })
 }

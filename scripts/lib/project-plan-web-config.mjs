@@ -4,7 +4,7 @@
 // navigation.ts-scoped exemption, both meaningless once that file and the
 // [locale] segment are gone).
 import path from 'node:path'
-import { fileStep, exactContentStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
+import { exactContentStep } from './init-engine.mjs'
 
 const REQUEST_BEFORE = `import { hasLocale } from 'next-intl'
 import { getRequestConfig } from 'next-intl/server'
@@ -72,99 +72,14 @@ export default getRequestConfig(async () => ({
 }))
 `
 
-const NAVIGATION_PATHS_BLOCK = `const NAVIGATION_PATHS = [
-  {
-    name: 'next/link',
-    message: "Import { Link } from '@/i18n/navigation' — next/link drops the locale.",
-  },
-  {
-    name: 'next/navigation',
-    importNames: ['redirect', 'permanentRedirect', 'usePathname', 'useRouter'],
-    message:
-      "Import locale-aware navigation from '@/i18n/navigation'. " +
-      'Non-navigating helpers such as notFound() may still come from next/navigation.',
-  },
-  {
-    name: '@/i18n/navigation',
-    importNames: ['useRouter', 'Link'],
-    message:
-      "Import { useRouteProgressRouter } from " +
-      "'@/shared/lib/route-progress/use-route-progress-router' for useRouter(), or " +
-      "{ RouteProgressLink } from '@/shared/ui/route-progress-link' for Link — the raw " +
-      'exports bypass the route progress bar. Other exports (usePathname, redirect, ...) ' +
-      "still come from '@/i18n/navigation' directly.",
-  },
-];
-
-`
-
-const NAVIGATION_SOURCE_EXEMPTION_BLOCK = `  // Deliberate relaxation over a strict subset: \`src/i18n/navigation.ts\` is
-  // where the locale-aware navigation helpers are created, so it is the one
-  // file that must import the originals. It restates the layer-barrel pattern,
-  // which still applies to it.
-  {
-    name: 'project/import-guards-navigation-source',
-    files: ['src/i18n/navigation.ts'],
-    rules: {
-      'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],
-    },
-  },
-
-  // Same relaxation, narrower: \`use-route-progress-router.ts\` is the one file
-  // allowed to call \`@/i18n/navigation\`'s real \`useRouter()\` — that is its
-  // entire job (FINAL PLAN item 6). The layer-barrel pattern still applies.
-  {
-    name: 'project/import-guards-route-progress-router-adapter',
-    files: ['src/shared/lib/route-progress/use-route-progress-router.ts'],
-    rules: {
-      'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],
-    },
-  },
-
-  // Same relaxation, for \`Link\`: \`route-progress-link.tsx\` is the one file
-  // allowed to import \`@/i18n/navigation\`'s real \`Link\` (reconverged FINAL
-  // PLAN item 5, 2026-09-10, Agent 2 diff review) — that is its entire job.
-  {
-    name: 'project/import-guards-route-progress-link-adapter',
-    files: ['src/shared/ui/route-progress-link.tsx'],
-    rules: {
-      'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],
-    },
-  },
-
-`
-
-/**
- * Exported on its own (not just a buildWebConfigSteps closure) so
- * project-plan-combined.mjs can compose it with
- * removeStorybookFromEslintConfig into one fileStep when --mode and
- * --storybook are both given — see that file's header for why two
- * independent fileSteps on the same target silently clobber each other.
- */
-export function removeNavigationBanFromEslintConfig(content) {
-  let next = removeExactBlock(content, NAVIGATION_PATHS_BLOCK)
-  next = removeExactBlock(next, NAVIGATION_SOURCE_EXEMPTION_BLOCK)
-  return replaceExactBlock(
-    next,
-    "      'no-restricted-imports': ['error', { paths: NAVIGATION_PATHS, patterns: [LAYER_BARREL] }],\n",
-    "      'no-restricted-imports': ['error', { patterns: [LAYER_BARREL] }],\n"
-  )
-}
-
 export function buildWebConfigSteps(root) {
   const requestPath = path.join(root, 'apps/web/src/i18n/request.ts')
-  const eslintPath = path.join(root, 'apps/web/eslint.config.mjs')
 
   return [
     exactContentStep(
       requestPath,
       { expectedBefore: REQUEST_BEFORE, after: REQUEST_AFTER },
       'rewrite i18n/request.ts to return a static locale (next-intl "without i18n routing")'
-    ),
-    fileStep(
-      eslintPath,
-      removeNavigationBanFromEslintConfig,
-      'remove the navigation-import ban and its navigation.ts-scoped exemption'
     ),
   ]
 }

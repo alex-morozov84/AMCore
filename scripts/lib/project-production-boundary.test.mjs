@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import path from 'node:path'
+import { test } from 'node:test'
+
+const ROOT = path.resolve('.')
+const LIB = path.join(ROOT, 'scripts/lib')
+const DELETED = [
+  'project-plan-combined.mjs',
+  'project-plan-combined-console-storybook-docs.mjs',
+  'project-plan-context.mjs',
+  'project-plan-web-messages.mjs',
+  'project-plan-route-progress-context.mjs',
+  'project-plan-admin-console-context.mjs',
+  'project-plan-storybook-context.mjs',
+  'project-plan-storybook-package.mjs',
+  'project-plan-storybook-eslint.mjs',
+  'project-plan-storybook-docs-root.mjs',
+  'project-plan-storybook-docs-readme.mjs',
+  'project-plan-storybook-docs-frontend-readme.mjs',
+]
+
+function productionSources() {
+  const entrypoints = readdirSync(path.join(ROOT, 'scripts'))
+    .filter((name) => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
+    .map((name) => path.join(ROOT, 'scripts', name))
+  const library = readdirSync(LIB)
+    .filter((name) => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
+    .map((name) => path.join(LIB, name))
+  return [...entrypoints, ...library].map((file) => [file, readFileSync(file, 'utf8')])
+}
+
+test('the twelve obsolete modules are absent with no live static import', () => {
+  const sources = productionSources()
+  for (const name of DELETED) {
+    assert.equal(existsSync(path.join(LIB, name)), false, name)
+    const importer = sources.find(([, source]) =>
+      new RegExp(`(?:from|import\\()\\s*['"][^'"]*${name.replace('.', '\\.')}`).test(source)
+    )
+    assert.equal(importer, undefined, `${name} still imported by ${importer?.[0]}`)
+  }
+})
+
+test('production contains no step.write call and one engine M4 call site', () => {
+  const sources = productionSources()
+  assert.deepEqual(
+    sources.filter(([, source]) => /\bstep\.write\s*\(/.test(source)).map(([file]) => file),
+    []
+  )
+  const engine = readFileSync(path.join(LIB, 'init-engine.mjs'), 'utf8')
+  assert.equal(engine.match(/\bapplyFilesystem\s*\(/g)?.length, 1)
+})
+
+test('the PR3.1-owned console path registry remains present', () => {
+  assert.equal(existsSync(path.join(LIB, 'admin-console-owned-paths.json')), true)
+})

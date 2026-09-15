@@ -1,13 +1,4 @@
-import path from 'node:path'
-
-import { buildProjectSteps } from './project-plan.mjs'
-import { buildStorybookDisableSteps } from './project-plan-storybook.mjs'
-import { buildRouteProgressFlagSteps } from './project-plan-route-progress-flag.mjs'
-import { buildRouteProgressContextSteps } from './project-plan-route-progress-context.mjs'
-import {
-  buildAdminConsoleDisableSteps,
-  buildAdminConsoleEnableSteps,
-} from './project-plan-admin-console.mjs'
+import { buildProjectSharedContentFacts } from './project-shared-content-facts.mjs'
 
 export const EXPECTED_SHARED_COLLISION_GRAPH = Object.freeze({
   'PROJECT_CONTEXT.md': ['console:edit', 'locale:edit', 'route-progress:edit', 'storybook:edit'],
@@ -21,39 +12,43 @@ export const EXPECTED_SHARED_COLLISION_GRAPH = Object.freeze({
   'docs/frontend/architecture-and-conventions.md': ['console:edit', 'storybook:edit'],
 })
 
-function providerVariants(root) {
+function state(selected, overrides = {}) {
   return {
-    locale: [
-      ...buildProjectSteps(root, { locale: 'en' }),
-      ...buildProjectSteps(root, { locale: 'ru' }),
-    ],
-    storybook: buildStorybookDisableSteps(root),
-    'route-progress': [
-      ...buildRouteProgressFlagSteps(root),
-      ...buildRouteProgressContextSteps(root),
-    ],
-    console: [
-      ...buildAdminConsoleDisableSteps(root),
-      ...buildAdminConsoleDisableSteps(root, { keptLocale: 'en' }),
-      ...buildAdminConsoleDisableSteps(root, { keptLocale: 'ru' }),
-      ...buildAdminConsoleEnableSteps(root, { mode: 'path', slug: 'panel' }),
-      ...buildAdminConsoleEnableSteps(root, { mode: 'host', slug: 'panel' }),
-    ],
+    selected: {
+      locale: false,
+      storybook: false,
+      routeProgress: false,
+      adminConsole: false,
+      ...selected,
+    },
+    locale: { mode: 'multi', base: 'en' },
+    storybook: 'enabled',
+    routeProgress: 'enabled',
+    adminConsole: { enabled: true, mode: 'path', slug: 'admin' },
+    ...overrides,
   }
 }
 
-function relative(root, target) {
-  return path.relative(root, target).split(path.sep).join('/')
+function providerVariants() {
+  return [
+    state({ locale: true }, { locale: { mode: 'single', base: 'en' } }),
+    state({ locale: true }, { locale: { mode: 'single', base: 'ru' } }),
+    state({ storybook: true }, { storybook: 'disabled' }),
+    state({ routeProgress: true }, { routeProgress: 'disabled' }),
+    state({ adminConsole: true }, { adminConsole: { enabled: false } }),
+    state({ adminConsole: true }, { adminConsole: { enabled: true, mode: 'host', slug: 'panel' } }),
+  ]
 }
 
-export function buildLegacyCollisionGraph(root) {
+export function buildLegacyCollisionGraph() {
   const targets = new Map()
-  for (const [provider, steps] of Object.entries(providerVariants(root))) {
-    for (const step of steps) {
-      const target = relative(root, step.target)
+  for (const desired of providerVariants()) {
+    for (const fact of buildProjectSharedContentFacts(desired)) {
+      const provider = fact.dimension
+      const target = fact.path
       const contributors = targets.get(target) ?? new Map()
       const kinds = contributors.get(provider) ?? new Set()
-      kinds.add(step.kind)
+      kinds.add(fact.kind === 'delete' ? 'delete' : 'edit')
       contributors.set(provider, kinds)
       targets.set(target, contributors)
     }

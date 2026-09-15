@@ -72,16 +72,6 @@ export function buildAdminConsoleDisableDocsSteps(root) {
       'remove the Operations Console authentication overview'
     ),
     fileStep(
-      path.join(root, 'docs/frontend/architecture-and-conventions.md'),
-      removeConsoleArchitectureSection,
-      'remove the Operations Console FSD section'
-    ),
-    fileStep(
-      path.join(root, 'docs/frontend/README.md'),
-      removeConsoleFrontendIndexRow,
-      'remove the Operations Console frontend index entry'
-    ),
-    fileStep(
       path.join(root, 'docs/frontend/brand-theme-and-tokens.md'),
       (content) => removeExactBlock(content, CONSOLE_TOKEN_ROW),
       'remove the console-only design-token documentation'

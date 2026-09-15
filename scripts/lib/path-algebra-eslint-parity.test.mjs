@@ -6,8 +6,12 @@
 // them. Production M2 modules still import nothing from the engine.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { removeStorybookFromEslintConfig } from './project-plan-storybook-eslint.mjs'
-import { removeNavigationBanFromEslintConfig } from './project-plan-web-config.mjs'
+import { createOperationRegistry } from './path-algebra-operation-registry.mjs'
+import {
+  applyStructuralPlan,
+  planStructuralComposition,
+} from './path-algebra-structural-compose.mjs'
+import { registerProjectConfigOperations } from './project-config-operations.mjs'
 import {
   ESLINT_CONFIG_TEXT,
   NAVIGATION,
@@ -15,17 +19,31 @@ import {
   composeEslint,
 } from './path-algebra-eslint-test-support.mjs'
 
-test('storybook removal matches the existing engine byte-for-byte', () => {
-  assert.equal(composeEslint([STORYBOOK]), removeStorybookFromEslintConfig(ESLINT_CONFIG_TEXT))
+function composeProduction(keys) {
+  const registry = createOperationRegistry()
+  registerProjectConfigOperations(registry)
+  const facts = keys.map((operationKey) => ({
+    kind: 'structural',
+    dimension: operationKey,
+    path: 'apps/web/eslint.config.mjs',
+    operationKey,
+    params: {},
+  }))
+  const [plan] = planStructuralComposition(registry, facts)
+  return applyStructuralPlan(registry, plan, ESLINT_CONFIG_TEXT)
+}
+
+test('storybook removal matches the M2 fixture model byte-for-byte', () => {
+  assert.equal(composeProduction(['project-eslint-remove-storybook']), composeEslint([STORYBOOK]))
 })
 
-test('navigation-ban removal matches the existing engine byte-for-byte', () => {
-  assert.equal(composeEslint([NAVIGATION]), removeNavigationBanFromEslintConfig(ESLINT_CONFIG_TEXT))
+test('navigation-ban removal matches the M2 fixture model byte-for-byte', () => {
+  assert.equal(composeProduction(['project-eslint-remove-navigation']), composeEslint([NAVIGATION]))
 })
 
-test('the two-operation composition matches the engine’s hand-written combined transform byte-for-byte', () => {
+test('the two-operation composition matches the M2 fixture model byte-for-byte', () => {
   assert.equal(
-    composeEslint([STORYBOOK, NAVIGATION]),
-    removeStorybookFromEslintConfig(removeNavigationBanFromEslintConfig(ESLINT_CONFIG_TEXT))
+    composeProduction(['project-eslint-remove-storybook', 'project-eslint-remove-navigation']),
+    composeEslint([STORYBOOK, NAVIGATION])
   )
 })

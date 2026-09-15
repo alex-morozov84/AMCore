@@ -1,6 +1,6 @@
 // Console-only edits in shared web files; paths live in the owned-path manifest.
 import path from 'node:path'
-import { fileStep, jsonDeleteTransform, removeExactBlock } from './init-engine.mjs'
+import { fileStep, removeExactBlock } from './init-engine.mjs'
 
 const REGISTER_BLOCK = `export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
@@ -16,20 +16,7 @@ const LIGHT_TOKEN_BLOCK = `  /* Operations Console: functional control-plane sig
 
 `
 
-export function removeConsolePackageScript(content) {
-  return jsonDeleteTransform(['scripts.test:e2e:console-real-stack'])(content)
-}
-
-export function buildAdminConsoleDisableWebSteps(root, { keptLocale } = {}) {
-  const catalogueSteps = ['en', 'ru']
-    .filter((locale) => !keptLocale || locale === keptLocale)
-    .map((locale) =>
-      fileStep(
-        path.join(root, `apps/web/messages/${locale}.json`),
-        jsonDeleteTransform(['console']),
-        `remove the ${locale} console message namespace`
-      )
-    )
+export function buildAdminConsoleDisableWebSteps(root) {
   return [
     fileStep(
       path.join(root, 'apps/web/src/instrumentation.ts'),
@@ -47,12 +34,6 @@ export function buildAdminConsoleDisableWebSteps(root, { keptLocale } = {}) {
           '  --color-console-accent: var(--console-accent);\n'
         ),
       'remove the console-only semantic design token'
-    ),
-    ...catalogueSteps,
-    fileStep(
-      path.join(root, 'apps/web/package.json'),
-      removeConsolePackageScript,
-      'remove the console real-stack test command'
     ),
   ]
 }

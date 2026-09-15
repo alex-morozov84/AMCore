@@ -40,10 +40,21 @@ function validateClaims(pathname, facts) {
   }
 }
 
+function dedupeFacts(facts) {
+  const seen = new Set()
+  return facts.filter((fact) => {
+    const identity = canonicalStringify([fact.operationKey, fact.params])
+    if (seen.has(identity)) return false
+    seen.add(identity)
+    return true
+  })
+}
+
 function materializeText(root, pathname, facts) {
-  validateClaims(pathname, facts)
+  const uniqueFacts = dedupeFacts(facts)
+  validateClaims(pathname, uniqueFacts)
   const before = readFileSync(path.join(root, pathname), 'utf8')
-  const after = [...facts]
+  const after = [...uniqueFacts]
     .sort((left, right) => left.operationKey.localeCompare(right.operationKey))
     .reduce((text, fact) => claimsFor(fact).definition.apply(text, fact.params), before)
   return { before, after }
@@ -61,6 +72,11 @@ function materializeEslint(root, pathname, facts) {
 export function materializeProjectContentPath(root, pathname, facts) {
   if (facts.some((fact) => fact.kind === 'delete')) {
     if (facts.length !== 1) throw new Error(`delete/content collision on "${pathname}"`)
+    const [fact] = facts
+    const expected = `filesystem:path:${pathname}`
+    if (fact.claims?.length !== 1 || fact.claims[0].location !== expected) {
+      throw new Error(`delete fact for "${pathname}" requires its filesystem semantic claim`)
+    }
     return { kind: 'delete', target: path.join(root, pathname), changed: true }
   }
   const text =

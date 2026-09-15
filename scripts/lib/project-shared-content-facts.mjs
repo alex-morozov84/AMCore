@@ -18,7 +18,12 @@ const content = (dimension, path, operationKey, params = {}) => ({
   params,
 })
 
-const remove = (dimension, path) => ({ kind: 'delete', dimension, path })
+const remove = (dimension, path) => ({
+  kind: 'delete',
+  dimension,
+  path,
+  claims: [{ location: `filesystem:path:${path}`, value: 'absent' }],
+})
 
 function localeFacts(state) {
   if (!state.selected.locale) return []

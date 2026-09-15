@@ -42,7 +42,7 @@ async function main() {
     return
   }
   const adminConsoleSlug = flags['admin-console-slug'] ?? DEFAULT_ADMIN_CONSOLE_SLUG
-  const { steps, confirmMessage } = prepareProjectInit(ROOT, flags, adminConsoleSlug)
+  const { operationPlan, confirmMessage } = prepareProjectInit(ROOT, flags, adminConsoleSlug)
 
   if (flags.mode) {
     console.log(prismaFollowUpMessage(flags.locale))
@@ -69,7 +69,7 @@ async function main() {
   await runInitCommand({
     cwd: ROOT,
     flags,
-    steps,
+    operationPlan,
     confirmMessage,
     verify: testVerifyOverride ?? defaultVerify,
   })

@@ -2,11 +2,7 @@
 // Storybook mention — architecture-and-conventions.md's "See also" bullet
 // and shared-ui-and-shadcn.md's testing-convention paragraph.
 import path from 'node:path'
-import { fileStep, removeExactBlock, replaceExactBlock } from './init-engine.mjs'
-
-const ARCHITECTURE_BULLET =
-  '- [Storybook](./storybook.md) — the component workshop and its own\n' +
-  '  accessibility gate, a fifth layer of the testing pyramid above.\n'
+import { fileStep, replaceExactBlock } from './init-engine.mjs'
 
 const SHARED_UI_TESTING_BEFORE = `Vitest + React Testing Library, matching the existing pattern in
 \`button.test.tsx\`/\`skeleton.test.tsx\`/\`dialog.test.tsx\`: render the
@@ -25,17 +21,8 @@ component, assert on \`data-slot\`/\`data-variant\` attributes and behavior
 (click, open/close, variant switching), not implementation detail.
 `
 
-export function removeStorybookArchitectureBullet(content) {
-  return removeExactBlock(content, ARCHITECTURE_BULLET)
-}
-
 export function buildStorybookDocsMiscSteps(root) {
   return [
-    fileStep(
-      path.join(root, 'docs/frontend/architecture-and-conventions.md'),
-      removeStorybookArchitectureBullet,
-      'architecture-and-conventions.md: remove the Storybook "See also" bullet'
-    ),
     fileStep(
       path.join(root, 'docs/frontend/shared-ui-and-shadcn.md'),
       (content) => replaceExactBlock(content, SHARED_UI_TESTING_BEFORE, SHARED_UI_TESTING_AFTER),

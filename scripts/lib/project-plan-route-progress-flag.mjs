@@ -3,7 +3,7 @@
 // (owner decision, 2026-09-09). This is the one dimension whose apply step
 // never overlaps another dimension's target, so it needs no combined-steps
 // handling of its own (unlike its PROJECT_CONTEXT.md field -- see
-// project-plan-route-progress-context.mjs and project-plan-combined.mjs).
+// the shared semantic PROJECT_CONTEXT.md owner).
 import path from 'node:path'
 import { exactContentStep } from './init-engine.mjs'
 import { ROUTE_PROGRESS_FLAG_PATH } from './project-config-route-progress.mjs'

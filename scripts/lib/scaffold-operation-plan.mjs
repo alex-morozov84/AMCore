@@ -21,7 +21,13 @@ export function buildScaffoldOperationPlan({
   legacySteps,
   semanticSteps = [],
   forbiddenLegacyTargets = [],
+  materializationSteps,
 }) {
   assertNoForbiddenLegacyTargets(root, legacySteps, forbiddenLegacyTargets)
-  return materializeLegacySteps(root, [...legacySteps, ...semanticSteps])
+  const allSteps = [...legacySteps, ...semanticSteps]
+  const ordered = materializationSteps ?? allSteps
+  if (ordered.length !== allSteps.length || ordered.some((step) => !allSteps.includes(step))) {
+    throw new Error('materialization steps must be a complete permutation of planned steps')
+  }
+  return materializeLegacySteps(root, ordered)
 }

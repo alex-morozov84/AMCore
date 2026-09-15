@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildStorybookEslintSteps } from './project-plan-storybook-eslint.mjs'
+import { buildProjectFactPlan } from './project-fact-plan.mjs'
 import { buildStorybookVitestSteps } from './project-plan-storybook-vitest.mjs'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -23,9 +23,13 @@ function assertValidSyntax(content, extension) {
   }
 }
 
-describe('buildStorybookEslintSteps (against the real repo, read-only)', () => {
+describe('shared Storybook ESLint operation (against the real repo, read-only)', () => {
   test('removes the plugin import, ignore entry, and rules block', () => {
-    const [step] = buildStorybookEslintSteps(REPO_ROOT)
+    const step = buildProjectFactPlan(
+      REPO_ROOT,
+      { storybook: 'disabled' },
+      'admin'
+    ).sharedContentSteps.find((candidate) => candidate.target.endsWith('eslint.config.mjs'))
 
     assert.equal(step.changed, true)
     assert.doesNotMatch(step.after, /storybook/i)
