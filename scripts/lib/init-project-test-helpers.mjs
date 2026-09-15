@@ -5,7 +5,7 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { git } from './test-fixture.mjs'
+import { createRealRepoCopy, git } from './test-fixture.mjs'
 
 export const INIT_PROJECT = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -38,4 +38,24 @@ export function runInitProject(root, args, { skipVerify = true } = {}) {
       ...(skipVerify ? { AMCORE_INIT_SKIP_VERIFY: '1' } : {}),
     },
   })
+}
+
+export function createCommittedCopy(copies) {
+  const fixture = createRealRepoCopy()
+  commit(fixture.root)
+  copies.push(fixture)
+  return fixture.root
+}
+
+export function applyProject(root, args) {
+  const result = runInitProject(root, [...args, '--yes'])
+  if (result.status !== 0) throw new Error(result.stderr)
+}
+
+export function verifyProjectSteps(root, steps) {
+  for (const args of steps) {
+    const result = spawnSync('pnpm', args, { cwd: root, encoding: 'utf8', env: { ...process.env } })
+    if (result.status !== 0)
+      throw new Error(`pnpm ${args.join(' ')}: ${result.stdout}${result.stderr}`)
+  }
 }

@@ -1,13 +1,14 @@
 // Shared engine for the Track 10 init tooling (ADR-071): common flags,
 // plan+diff printing, and the apply orchestration (safety guards -> confirm
-// -> write -> verify). `init-brand.mjs` (and later `init-project.mjs`)
-// build a plan with `plan-steps.mjs`/`actions.mjs` and hand it to
-// `runInitCommand`.
+// -> one filesystem transaction -> verify). Both CLIs hand a completely
+// materialized plan to `runInitCommand` before anything is written.
 import { parseArgs } from 'node:util'
 import * as clack from '@clack/prompts'
 import { assertCleanGitTree, assertNotMaintainerCheckout, SafetyError } from './safety.mjs'
 import { unifiedDiff } from './diff.mjs'
 import { runVerification, runProjectVerification } from './verify.mjs'
+import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
+import { buildScaffoldOperationPlan } from './scaffold-operation-plan.mjs'
 
 export * from './actions.mjs'
 export * from './content-blocks.mjs'
@@ -78,10 +79,15 @@ export async function runInitCommand({
   cwd,
   flags,
   steps,
+  operationPlan,
   confirmMessage,
   verify = runVerification,
+  applyFilesystem = applyFilesystemTransaction,
+  requestConfirmation = clack.confirm,
+  isCancellation = clack.isCancel,
 }) {
-  const changed = printPlan(steps)
+  const plan = operationPlan ?? buildScaffoldOperationPlan({ root: cwd, legacySteps: steps })
+  const changed = printPlan(plan.displaySteps)
   if (changed.length === 0) return
   if (flags['dry-run']) {
     console.log('\n--dry-run: no files were written.')
@@ -92,14 +98,14 @@ export async function runInitCommand({
   assertNotMaintainerCheckout(cwd, flags['force-maintainer-checkout'])
 
   if (!flags.yes) {
-    const ok = await clack.confirm({ message: confirmMessage ?? 'Apply these changes?' })
-    if (clack.isCancel(ok) || !ok) {
+    const ok = await requestConfirmation({ message: confirmMessage ?? 'Apply these changes?' })
+    if (isCancellation(ok) || !ok) {
       console.log('Aborted — no files were written.')
       return
     }
   }
 
-  for (const step of changed) step.write()
+  applyFilesystem({ root: cwd, operations: plan.operationsForApply() })
   console.log(`\nApplied ${changed.length} change(s).`)
   reportVerification(verify(cwd))
 }

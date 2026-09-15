@@ -263,6 +263,13 @@ It also records `PROJECT_CONTEXT.md`'s identity fields (`Mode`, `Product`,
 `Purpose`, upstream-sync policy, workflow mode, `initialized_from_amcore_version`)
 when you answer the corresponding prompts.
 
+Both initializer commands finish planning before they ask for confirmation.
+That plan includes an immutable snapshot of any supplied logo or icon, so a
+source file changed after the prompt cannot change what is applied. A confirmed
+run commits its complete filesystem plan as one recoverable transaction; a
+handled write failure restores the tree to its pre-apply state. Dry runs,
+cancelled prompts, and plans with no changes never start a transaction.
+
 ### Project scaffolding
 
 `pnpm init:project` is the separate, one-time sibling command for

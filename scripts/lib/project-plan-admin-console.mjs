@@ -9,10 +9,6 @@ import {
   replaceAllExactText,
   replaceExactBlock,
 } from './init-engine.mjs'
-import {
-  buildAdminConsoleContextSteps,
-  transformAdminConsoleContext,
-} from './project-plan-admin-console-context.mjs'
 import { resolveAdminConsolePaths } from './project-config-admin-console.mjs'
 import { buildAdminConsoleDisableWebSteps } from './project-plan-admin-console-disable-web.mjs'
 import { buildAdminConsoleDisableDocsSteps } from './project-plan-admin-console-disable-docs.mjs'
@@ -42,7 +38,6 @@ export function buildAdminConsoleEnableSteps(
 ) {
   const paths = resolveAdminConsolePaths(root, choice.slug)
   const steps = [
-    ...buildAdminConsoleContextSteps(root, choice),
     fileStep(
       paths.config,
       (content) => replaceExactBlock(content, CONFIG_DEFAULT, configBlock(choice)),
@@ -58,16 +53,16 @@ export function buildAdminConsoleEnableSteps(
     }
     if (rewriteProxy) {
       steps.push(
-      fileStep(
-        path.join(root, 'docker/nginx/operations-console.conf'),
-        (content) => replaceConsoleSlug(content, choice.slug),
-        'rewrite the nginx physical console route for the chosen slug'
-      ),
-      fileStep(
-        path.join(root, 'docker/caddy/Caddyfile.console-host'),
-        (content) => replaceConsoleSlug(content, choice.slug),
-        'rewrite the Caddy physical console route for the chosen slug'
-      )
+        fileStep(
+          path.join(root, 'docker/nginx/operations-console.conf'),
+          (content) => replaceConsoleSlug(content, choice.slug),
+          'rewrite the nginx physical console route for the chosen slug'
+        ),
+        fileStep(
+          path.join(root, 'docker/caddy/Caddyfile.console-host'),
+          (content) => replaceConsoleSlug(content, choice.slug),
+          'rewrite the Caddy physical console route for the chosen slug'
+        )
       )
     }
   }
@@ -94,10 +89,5 @@ export function buildAdminConsoleDisableSteps(root, { keptLocale } = {}) {
     ),
     ...buildAdminConsoleDisableWebSteps(root, { keptLocale }),
     ...buildAdminConsoleDisableDocsSteps(root),
-    fileStep(
-      path.join(root, 'PROJECT_CONTEXT.md'),
-      (content) => transformAdminConsoleContext(content, { mode: 'disabled' }),
-      'record the disabled Operations Console choice'
-    ),
   ]
 }

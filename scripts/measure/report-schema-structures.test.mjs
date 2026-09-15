@@ -71,4 +71,26 @@ describe('report-schema structured fields', () => {
     assert.equal(result.valid, false)
     assert.ok(result.errors.some((error) => error.includes('operationInventory.operations[0]')))
   })
+
+  test('validates optional migration unit counts', () => {
+    const migrationCounts = {
+      legacyOperations: 346,
+      semanticFacts: 34,
+      semanticClaims: 116,
+      sharedContentOperations: 32,
+      materializedFilesystemOperations: 366,
+    }
+    const valid = validReport({
+      operationInventory: { operations: [], exactCopyEdges: [], migrationCounts },
+    })
+    assert.equal(validateReport(valid).valid, true)
+    const malformed = validReport({
+      operationInventory: {
+        operations: [],
+        exactCopyEdges: [],
+        migrationCounts: { ...migrationCounts, semanticClaims: -1 },
+      },
+    })
+    assert.equal(validateReport(malformed).valid, false)
+  })
 })

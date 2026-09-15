@@ -96,7 +96,7 @@ describe('init:project plans (structural, against the real repo — read-only)',
   }
 
   test('regression guard: a move sourced below a deleted parent is rejected', () => {
-    const steps = composedSteps({ locale: 'en', adminConsole: { mode: 'host', slug: 'panel' } })
+    const steps = [...composedSteps({ locale: 'en', adminConsole: { mode: 'host', slug: 'panel' } })]
     steps.push({
       kind: 'move',
       source: path.join(REPO_ROOT, 'apps/web/src/app/[locale]/admin/layout.tsx'),

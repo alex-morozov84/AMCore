@@ -58,12 +58,6 @@ export function removeConsoleAuthenticationIndexLink(content) {
 
 export function buildAdminConsoleDiscoveryDocsRemovalSteps(root) {
   return [
-    fileStep(path.join(root, 'README.md'), removeConsoleRootGuideLink, 'remove console guide link'),
-    fileStep(
-      path.join(root, 'docs/README.md'),
-      removeConsoleDocsIndexLinks,
-      'remove console documentation index links'
-    ),
     fileStep(
       path.join(root, 'docs/operations/README.md'),
       (content) => removeExactBlock(content, OPERATIONS_INDEX_BLOCK),

@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, it } from 'node:test'
-import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
-import { createRealRepoCopy, installDependencies } from './lib/test-fixture.mjs'
+import {
+  applyProject,
+  createCommittedCopy,
+  runInitProject,
+  verifyProjectSteps,
+} from './lib/init-project-test-helpers.mjs'
+import { installDependencies } from './lib/test-fixture.mjs'
 import ownedPaths from './lib/admin-console-owned-paths.json' with { type: 'json' }
 import {
   ADMIN_CONSOLE_VERIFY_STEPS,
@@ -13,34 +17,18 @@ import {
 
 const copies = []
 
-afterEach(() =>
-  copies.splice(0).forEach((copy) => rmSync(copy.root, { recursive: true, force: true }))
-)
+afterEach(() => copies.splice(0).forEach((copy) => copy.cleanup()))
 
-function copy() {
-  const fixture = createRealRepoCopy()
-  commit(fixture.root)
-  copies.push(fixture)
-  return fixture.root
-}
-
-function apply(root, args) {
-  const result = runInitProject(root, [...args, '--yes'])
-  assert.equal(result.status, 0, result.stderr)
-}
-
-function verifyGeneratedWeb(root) {
-  for (const args of ADMIN_CONSOLE_VERIFY_STEPS) {
-    const result = spawnSync('pnpm', args, { cwd: root, encoding: 'utf8', env: { ...process.env } })
-    assert.equal(result.status, 0, `pnpm ${args.join(' ')}: ${result.stdout}${result.stderr}`)
-  }
-}
+const copy = () => createCommittedCopy(copies)
 
 describe('init-project --admin-console', () => {
   it('allows each explicit first transition from the pristine default', () => {
     for (const [mode, slug] of [['disabled'], ['path', 'panel'], ['host', 'panel']]) {
       const root = copy()
-      apply(root, [`--admin-console=${mode}`, ...(slug ? [`--admin-console-slug=${slug}`] : [])])
+      applyProject(root, [
+        `--admin-console=${mode}`,
+        ...(slug ? [`--admin-console-slug=${slug}`] : []),
+      ])
       const context = readFileSync(path.join(root, 'PROJECT_CONTEXT.md'), 'utf8')
       assert.ok(
         context.includes(`**admin_console:** ${mode === 'disabled' ? 'disabled' : 'enabled'}`)
@@ -65,16 +53,12 @@ describe('init-project --admin-console', () => {
 
   it('removes only console-owned frontend/runtime files when disabled', () => {
     const root = copy()
-    apply(root, ['--admin-console=disabled'])
+    applyProject(root, ['--admin-console=disabled'])
     for (const rel of [...ownedPaths.directories, ...ownedPaths.files]) {
       assert.equal(existsSync(path.join(root, rel)), false, rel)
     }
-    assert.equal(
-      readFileSync(path.join(root, 'docker/nginx/operations-console.conf'), 'utf8').includes(
-        'AMCORE_ADMIN_CONSOLE_PROXY'
-      ),
-      false
-    )
+    const nginx = readFileSync(path.join(root, 'docker/nginx/operations-console.conf'), 'utf8')
+    assert.equal(nginx.includes('AMCORE_ADMIN_CONSOLE_PROXY'), false)
     for (const [rel, marker] of [
       ['apps/web/src/instrumentation.ts', 'admin-console-startup'],
       ['apps/web/src/app/globals.css', 'console-accent'],
@@ -114,7 +98,7 @@ describe('init-project --admin-console', () => {
     const root = copy()
     const unchanged = runInitProject(root, ['--admin-console=path', '--yes'])
     assert.match(unchanged.stderr, /already at the upstream default/)
-    apply(root, ['--admin-console=host', '--admin-console-slug=panel'])
+    applyProject(root, ['--admin-console=host', '--admin-console-slug=panel'])
     const repeated = runInitProject(root, ['--admin-console=disabled', '--yes'])
     assert.match(repeated.stderr, /one-time choice cannot run again/)
     const invalid = runInitProject(copy(), [
@@ -127,7 +111,7 @@ describe('init-project --admin-console', () => {
 
   it('composes disabled console with the existing scaffold dimensions', () => {
     const root = copy()
-    apply(root, [
+    applyProject(root, [
       '--admin-console=disabled',
       '--mode=single',
       '--locale=ru',
@@ -152,11 +136,11 @@ describe('init-project --admin-console', () => {
     for (const scenario of ADMIN_CONSOLE_ENABLED_SCENARIOS) {
       const root = copy()
       installDependencies(root)
-      apply(
+      applyProject(
         root,
         scenario.flags.filter((flag) => flag !== '--yes')
       )
-      verifyGeneratedWeb(root)
+      verifyProjectSteps(root, ADMIN_CONSOLE_VERIFY_STEPS)
     }
   })
 })
