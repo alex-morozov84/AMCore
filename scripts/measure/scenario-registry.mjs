@@ -2,3 +2,4 @@
 // end-to-end tests. Expected output remains independently authored in those
 // tests; only flags/install/verification recipes are shared.
 export { SCAFFOLD_COVERING_SCENARIOS as SCENARIOS } from '../lib/scaffold-covering-recipes.mjs'
+export { SCAFFOLD_EXHAUSTIVE_SCENARIOS as INVENTORY_SCENARIOS } from '../lib/scaffold-scenario-recipes.mjs'

@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { SCENARIOS } from './scenario-registry.mjs'
+import { INVENTORY_SCENARIOS, SCENARIOS } from './scenario-registry.mjs'
 import {
   SCAFFOLD_EXHAUSTIVE_SCENARIOS,
   STORYBOOK_DISABLED_MANUAL_SCENARIO,
@@ -41,6 +41,7 @@ describe('scenario-registry', () => {
   })
 
   test('preserves the original eight recipes as the exhaustive backstop', () => {
+    assert.equal(INVENTORY_SCENARIOS, SCAFFOLD_EXHAUSTIVE_SCENARIOS)
     assert.equal(SCAFFOLD_EXHAUSTIVE_SCENARIOS.length, 8)
     assert.deepEqual(
       SCAFFOLD_EXHAUSTIVE_SCENARIOS.map((scenario) => scenario.name),

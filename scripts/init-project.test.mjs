@@ -5,8 +5,6 @@
 // than calling step.write() directly like project-plan-web-*.test.mjs.
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
-import path from 'node:path'
 import { createRealRepoCopy, git } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
 
