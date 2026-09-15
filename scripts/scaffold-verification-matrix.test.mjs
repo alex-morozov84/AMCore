@@ -12,6 +12,8 @@ const scenarios = exhaustive ? SCAFFOLD_EXHAUSTIVE_SCENARIOS : SCAFFOLD_COVERING
 
 async function runScenario(scenario) {
   const copy = createRealRepoCopy()
+  const started = performance.now()
+  console.log(`[scaffolding] start ${scenario.name}`)
   try {
     commit(copy.root)
     const outcome = await execute(scenario, copy.root)
@@ -24,6 +26,9 @@ async function runScenario(scenario) {
     }
   } finally {
     copy.cleanup()
+    console.log(
+      `[scaffolding] finish ${scenario.name} (${Math.round(performance.now() - started)}ms)`
+    )
   }
 }
 

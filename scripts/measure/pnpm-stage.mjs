@@ -9,7 +9,11 @@ const DIAGNOSTICS_DIR = path.resolve('tmp/scaffolding-baseline/diagnostics')
 
 export function runPnpm(root, args) {
   const start = performance.now()
-  const result = spawnSync('pnpm', args, { cwd: root, encoding: 'utf8' })
+  const result = spawnSync('pnpm', args, {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, CI: 'true' },
+  })
   return {
     label: args.join(' '),
     ok: result.status === 0,
