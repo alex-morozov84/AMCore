@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Operations Console scaffold ownership.** Console removal and topology
+  projection now derive from the public ownership manifest: files under its
+  closed feature roots are discovered automatically, while contributions in
+  shared code, configuration, tests, and docs require an explicit fail-closed
+  seam. The `init:project` flags and generated project tree remain unchanged.
+
 - **Transactional downstream initialization.** `pnpm init:brand` and
   `pnpm init:project` now materialize their complete plans before confirmation
   and apply a confirmed plan in one recoverable filesystem transaction. Shared
