@@ -83,8 +83,11 @@ export const operationsConsoleDocSeams = [
   entry(
     'console.scaffold-doc',
     'docs/frontend/brand-theme-and-tokens.md',
-    { text: '`ADMIN_CONSOLE_HOSTNAME`' },
-    ['ADMIN_CONSOLE_HOSTNAME'],
+    {
+      start: '`--admin-console=disabled|path|host` chooses the optional Operations Console:',
+      end: 'and linked tests used only by the Console are removed together.',
+    },
+    ['ADMIN_CONSOLE_HOSTNAME', 'Console transform derives removal ownership'],
     { disposition: 'retain', operationKey: undefined }
   ),
   entry(
