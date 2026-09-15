@@ -43,4 +43,33 @@ describe('scaffold operation plan', () => {
       ['legacy.txt', 'shared.txt']
     )
   })
+
+  it('rejects a duplicate step that hides a missing planned step', () => {
+    fixture = createTransactionFixture()
+    const firstTarget = writeFixture(fixture.root, 'first.txt', 'before')
+    const secondTarget = writeFixture(fixture.root, 'second.txt', 'before')
+    const first = {
+      kind: 'edit',
+      target: firstTarget,
+      before: 'before',
+      after: 'first',
+      changed: true,
+    }
+    const second = {
+      kind: 'edit',
+      target: secondTarget,
+      before: 'before',
+      after: 'second',
+      changed: true,
+    }
+    assert.throws(
+      () =>
+        buildScaffoldOperationPlan({
+          root: fixture.root,
+          legacySteps: [first, second],
+          materializationSteps: [first, first],
+        }),
+      /complete permutation/
+    )
+  })
 })

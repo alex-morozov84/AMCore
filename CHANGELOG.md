@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Atomic downstream initialization.** `pnpm init:brand` and
+- **Transactional downstream initialization.** `pnpm init:brand` and
   `pnpm init:project` now materialize their complete plans before confirmation
   and apply a confirmed plan in one recoverable filesystem transaction. Shared
   scaffold files are composed semantically once, and external logo/icon inputs

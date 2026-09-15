@@ -16,6 +16,20 @@ function assertNoForbiddenLegacyTargets(root, legacySteps, forbiddenTargets) {
   }
 }
 
+function assertCompletePermutation(allSteps, ordered) {
+  if (ordered.length !== allSteps.length) {
+    throw new Error('materialization steps must be a complete permutation of planned steps')
+  }
+  const remaining = [...allSteps]
+  for (const step of ordered) {
+    const index = remaining.indexOf(step)
+    if (index < 0) {
+      throw new Error('materialization steps must be a complete permutation of planned steps')
+    }
+    remaining.splice(index, 1)
+  }
+}
+
 export function buildScaffoldOperationPlan({
   root,
   legacySteps,
@@ -26,8 +40,6 @@ export function buildScaffoldOperationPlan({
   assertNoForbiddenLegacyTargets(root, legacySteps, forbiddenLegacyTargets)
   const allSteps = [...legacySteps, ...semanticSteps]
   const ordered = materializationSteps ?? allSteps
-  if (ordered.length !== allSteps.length || ordered.some((step) => !allSteps.includes(step))) {
-    throw new Error('materialization steps must be a complete permutation of planned steps')
-  }
+  assertCompletePermutation(allSteps, ordered)
   return materializeLegacySteps(root, ordered)
 }
