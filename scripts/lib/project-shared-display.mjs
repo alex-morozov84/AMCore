@@ -3,6 +3,8 @@ const summaries = {
   'context-storybook':
     'update frontend_storybook for the disabled choice and drop the dead doc link',
   'context-route-progress': 'update frontend_route_progress for the disabled choice',
+  'route-progress.set-source-default':
+    'route-progress-flag.ts: set ROUTE_PROGRESS_ENABLED to false',
   'context-console': 'record the Operations Console scaffold choice',
   'project-eslint-remove-navigation':
     'remove the navigation-import ban and its navigation.ts-scoped exemption',

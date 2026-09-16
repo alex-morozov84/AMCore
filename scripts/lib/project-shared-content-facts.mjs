@@ -1,5 +1,6 @@
 export const SHARED_CONTENT_PATHS = Object.freeze([
   'PROJECT_CONTEXT.md',
+  'apps/web/src/shared/lib/route-progress/route-progress-flag.ts',
   'apps/web/eslint.config.mjs',
   'apps/web/package.json',
   'README.md',

@@ -6,6 +6,7 @@ import {
   take,
   takeOwned,
 } from './project-display-helpers.mjs'
+import { ROUTE_PROGRESS_SOURCE_PATH } from './project-route-progress-ownership.mjs'
 
 const combinedOrder = [
   'PROJECT_CONTEXT.md',
@@ -101,6 +102,17 @@ function insertConsoleProvider(plan, root, consoleSteps) {
   insertAt(plan, localeDelete < 0 ? plan.length : localeDelete, consoleSteps)
 }
 
+function insertRouteProgress(plan, root, singles) {
+  const steps = take(singles, ROUTE_PROGRESS_SOURCE_PATH, 'PROJECT_CONTEXT.md')
+  if (!steps.length) return
+  const boundary = plan.findIndex(
+    (step) =>
+      step.provider === 'console' ||
+      (step.kind === 'delete' && relative(root, step.target) === 'apps/web/src/app/[locale]')
+  )
+  insertAt(plan, boundary < 0 ? plan.length : boundary, steps)
+}
+
 export function buildProjectDisplaySteps(root, legacySteps, semanticSteps, consoleSteps = []) {
   const plan = [...legacySteps]
   insertConsoleProvider(plan, root, consoleSteps)
@@ -108,9 +120,7 @@ export function buildProjectDisplaySteps(root, legacySteps, semanticSteps, conso
   if (legacySteps.some((step) => step.provider === 'locale')) insertLocale(plan, root, singles)
   if (legacySteps.some((step) => step.provider === 'storybook'))
     insertStorybook(plan, root, singles)
-  if (legacySteps.some((step) => step.provider === 'route-progress')) {
-    insertProvider(plan, 'route-progress', false, take(singles, 'PROJECT_CONTEXT.md'))
-  }
+  insertRouteProgress(plan, root, singles)
   if (plan.some((step) => step.provider === 'console')) insertConsole(plan, root, singles)
   if (singles.size) throw new Error(`unplaced semantic display steps: ${[...singles.keys()]}`)
   plan.push(...take(combined, ...combinedOrder))
