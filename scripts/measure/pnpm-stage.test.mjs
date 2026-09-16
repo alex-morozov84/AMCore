@@ -2,9 +2,11 @@ import { test, describe, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { rmSync } from 'node:fs'
 import path from 'node:path'
-import { saveDiagnostics, bucketFor } from './pnpm-stage.mjs'
+import { saveDiagnostics, bucketFor, runPnpm } from './pnpm-stage.mjs'
 
-after(() => rmSync(path.resolve('tmp/scaffolding-baseline/diagnostics'), { recursive: true, force: true }))
+after(() =>
+  rmSync(path.resolve('tmp/scaffolding-baseline/diagnostics'), { recursive: true, force: true })
+)
 
 describe('saveDiagnostics', () => {
   test('returns a path relative to the repo root, never absolute', () => {
@@ -29,5 +31,19 @@ describe('bucketFor', () => {
 
   test('returns null for an unrecognized command shape rather than guessing', () => {
     assert.equal(bucketFor(['install']), null)
+  })
+})
+
+describe('runPnpm', () => {
+  test('forces CI mode for deterministic child commands', () => {
+    const stage = runPnpm(process.cwd(), [
+      'exec',
+      'node',
+      '-e',
+      'process.stdout.write(process.env.CI ?? "")',
+    ])
+
+    assert.equal(stage.ok, true)
+    assert.equal(stage.output, 'true')
   })
 })

@@ -1,29 +1,28 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { SCENARIOS } from './scenario-registry.mjs'
+import { INVENTORY_SCENARIOS, SCENARIOS } from './scenario-registry.mjs'
 import {
-  SCAFFOLD_MEASUREMENT_SCENARIOS,
+  SCAFFOLD_EXHAUSTIVE_SCENARIOS,
   STORYBOOK_DISABLED_MANUAL_SCENARIO,
   STORYBOOK_MANUAL_VERIFY_STEPS,
 } from '../lib/scaffold-scenario-recipes.mjs'
+import { SCAFFOLD_COVERING_SCENARIOS } from '../lib/scaffold-covering-recipes.mjs'
 
 describe('scenario-registry', () => {
-  test('re-exports the exact scenario inputs consumed by the real tests', () => {
-    assert.equal(SCENARIOS, SCAFFOLD_MEASUREMENT_SCENARIOS)
+  test('re-exports the required covering scenarios measured after PR4', () => {
+    assert.equal(SCENARIOS, SCAFFOLD_COVERING_SCENARIOS)
   })
 
-  test('contains the independently expected eight named baseline scenarios', () => {
+  test('contains the independently expected six covering scenarios', () => {
     assert.deepEqual(
       SCENARIOS.map((scenario) => scenario.name),
       [
-        'single-locale-en',
-        'route-progress-disabled',
-        'storybook-disabled-install-before',
-        'storybook-disabled-manual-verify-after',
-        'admin-console-path-panel',
-        'admin-console-host-panel',
-        'admin-console-single-locale-ru-host-panel',
-        'admin-console-single-locale-en-disabled',
+        'coverage-multi-path',
+        'coverage-multi-host-route-off',
+        'coverage-multi-disabled',
+        'coverage-single-en-path-route-off',
+        'coverage-single-ru-host',
+        'coverage-single-en-disabled-route-off',
       ]
     )
   })
@@ -35,10 +34,28 @@ describe('scenario-registry', () => {
       assert.ok(scenario.flags.every((flag) => typeof flag === 'string'))
   })
 
-  test('skipVerify scenarios declare an explicit manual verification recipe', () => {
+  test('covering scenarios declare an explicit verification recipe', () => {
     for (const scenario of SCENARIOS) {
       if (scenario.skipVerify) assert.ok(scenario.postApplySteps?.length > 0, scenario.name)
     }
+  })
+
+  test('preserves the original eight recipes as the exhaustive backstop', () => {
+    assert.equal(INVENTORY_SCENARIOS, SCAFFOLD_EXHAUSTIVE_SCENARIOS)
+    assert.equal(SCAFFOLD_EXHAUSTIVE_SCENARIOS.length, 8)
+    assert.deepEqual(
+      SCAFFOLD_EXHAUSTIVE_SCENARIOS.map((scenario) => scenario.name),
+      [
+        'single-locale-en',
+        'route-progress-disabled',
+        'storybook-disabled-install-before',
+        'storybook-disabled-manual-verify-after',
+        'admin-console-path-panel',
+        'admin-console-host-panel',
+        'admin-console-single-locale-ru-host-panel',
+        'admin-console-single-locale-en-disabled',
+      ]
+    )
   })
 
   test('regression: Storybook manual verification includes the API test in the real order', () => {

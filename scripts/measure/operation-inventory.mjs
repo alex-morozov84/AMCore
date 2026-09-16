@@ -8,7 +8,7 @@ import { parseProjectFlags } from '../lib/project-flags.mjs'
 import { DEFAULT_ADMIN_CONSOLE_SLUG } from '../lib/project-config-admin-console.mjs'
 import { prepareProjectInit } from '../lib/project-init-plan.mjs'
 import { countProjectSemanticClaims } from '../lib/project-semantic-metrics.mjs'
-import { SCENARIOS } from './scenario-registry.mjs'
+import { INVENTORY_SCENARIOS } from './scenario-registry.mjs'
 
 function relativeTo(root, value) {
   return value ? path.relative(root, value).split(path.sep).join('/') : null
@@ -86,7 +86,7 @@ export function buildOperationInventory() {
   const previousMeasurementMode = process.env.AMCORE_MEASURE_OPERATIONS
   process.env.AMCORE_MEASURE_OPERATIONS = '1'
   try {
-    const plans = SCENARIOS.map((scenario) => scenarioInventory(copy.root, scenario))
+    const plans = INVENTORY_SCENARIOS.map((scenario) => scenarioInventory(copy.root, scenario))
     const operations = plans.flatMap((plan) => plan.operations)
     return {
       operations,
