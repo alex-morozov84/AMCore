@@ -94,6 +94,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removes six previously retained Storybook-only references from mixed docs,
   CI comments, and `apps/web/.gitignore`, including a link to the deleted
   Storybook guide and obsolete verification recommendations.
+  Single-locale projection now uses the same manifest-backed path and
+  structural-operation pipeline: it statically imports only the selected
+  message catalogue, removes the other catalogue from the generated graph,
+  and synchronizes Russian email-template default expectations with the
+  selected catalogue. It also rewrites the two typed frontend-URL test
+  fixtures to the selected Russian locale after `SupportedLocale` narrows to
+  `"ru"`. Runtime email and URL behavior and the public locale/URL contract
+  are unchanged; the prior Russian projection generated four predictably
+  failing email tests and left shared test fixtures that did not typecheck.
 
 - **PostgreSQL 16 → 18.** The shipped/bundled reference database major moves
   from PostgreSQL 16 to 18 (`postgres:18-alpine`) across `docker-compose.yml`
