@@ -33,12 +33,58 @@ function branchError(ctx, count, expected) {
   })
 }
 
+function functionOwner(node) {
+  let current = node.parent
+  while (current) {
+    if (
+      ts.isFunctionDeclaration(current) ||
+      ts.isFunctionExpression(current) ||
+      ts.isArrowFunction(current) ||
+      ts.isMethodDeclaration(current)
+    )
+      return current
+    current = current.parent
+  }
+}
+
+function inside(node, ancestor) {
+  let current = node
+  while (current) {
+    if (current === ancestor) return true
+    current = current.parent
+  }
+  return false
+}
+
+function orphanedLocaleBinding(model, branch) {
+  const owner = functionOwner(branch)
+  if (!owner) return undefined
+  const parameters = owner.parameters.filter(
+    (parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === 'locale'
+  )
+  if (parameters.length !== 1) return undefined
+  const [parameter] = parameters
+  const outside = findAllNodes(
+    model,
+    (node) =>
+      ts.isIdentifier(node) &&
+      node.text === 'locale' &&
+      node !== parameter.name &&
+      !inside(node, branch.condition),
+    owner
+  )
+  return outside.length === 0 ? parameter.name : undefined
+}
+
 function collapseEnglishBranches(model, { locale, englishBranches }, ctx) {
   const branches = findAllNodes(model, isEnglishBranch)
   if (branches.length !== englishBranches) {
     throw branchError(ctx, branches.length, englishBranches)
   }
   if (locale === 'en') return
+  const bindings = new Set(branches.map((branch) => orphanedLocaleBinding(model, branch)))
+  bindings.delete(undefined)
+  for (const binding of bindings) model.replaceNode(binding, '_locale', ctx)
   for (const branch of branches) {
     const value = branch.whenFalse.getText()
     const replacement =
@@ -56,6 +102,10 @@ export function registerLocaleNotificationDefinitionOperation(registry) {
       claim(
         'ts:notification-definition:impossible-english-branches',
         locale === 'ru' ? 'absent' : 'preserved'
+      ),
+      claim(
+        'ts:notification-definition:orphaned-locale-bindings',
+        locale === 'ru' ? 'underscored' : 'preserved'
       ),
     ],
     adapter: collapseEnglishBranches,
