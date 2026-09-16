@@ -14,6 +14,7 @@ const RU_ONLY = [
   'apps/api/src/core/notifications/definitions/account-telegram-linked.definition.ts',
   'apps/api/src/core/organizations/invite.service.spec.ts',
   'apps/api/src/core/notifications/notification-feed.service.spec.ts',
+  'packages/shared/src/schemas/auth.test.ts',
 ]
 
 export function localeIntentionalDeltas(locale) {

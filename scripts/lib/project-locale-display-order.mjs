@@ -1,5 +1,6 @@
 export const LOCALE_DISPLAY_ORDER = [
   'packages/shared/src/constants/index.ts',
+  'packages/shared/src/schemas/auth.test.ts',
   'apps/api/src/core/notifications/channels/telegram/telegram-messages.ts',
   'apps/api/src/infrastructure/email/messages.ts',
   'packages/shared/src/lib/frontend-url.test.ts',

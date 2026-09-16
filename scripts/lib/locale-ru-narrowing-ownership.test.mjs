@@ -49,4 +49,10 @@ test('rejects mutations that restore EN-only default expectations', () => {
   assertResidualMutation('notification-feed.service.spec.ts', (content) =>
     content.replace("title: 'Профиль обновлён'", "title: 'Profile updated'")
   )
+  assertResidualMutation('packages/shared/src/schemas/auth.test.ts', (content) =>
+    content.replace(
+      "supportedLocaleSchema.safeParse('en').success).toBe(false)",
+      "supportedLocaleSchema.safeParse('en').success).toBe(true)"
+    )
+  )
 })

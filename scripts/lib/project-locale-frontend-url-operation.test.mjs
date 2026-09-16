@@ -79,6 +79,7 @@ test('names the frontend fixture as an RU-only parity delta', () => {
     `${notificationRoot}/definitions/account-telegram-linked.definition.ts`,
     'apps/api/src/core/organizations/invite.service.spec.ts',
     `${notificationRoot}/notification-feed.service.spec.ts`,
+    'packages/shared/src/schemas/auth.test.ts',
   ])
 })
 

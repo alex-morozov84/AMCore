@@ -31,6 +31,7 @@ export const localeOwnership = defineOwnershipManifest({
     'sends an org invite email with hasAccount=false for an unknown email',
     "prisma.user.findUnique.mockResolvedValue({ locale: 'en' } as never)",
     'renders items in the recipient locale and reports no more when within limit',
+    'accepts supported locales and rejects others',
     "locale === 'en'",
   ],
   facts: localeOwnershipFacts,

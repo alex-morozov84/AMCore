@@ -123,6 +123,13 @@ export const localeOwnershipSeams = [
     'locale.notification-feed-test',
     { occurrences: 2 }
   ),
+  seam(
+    'locale.supported-schema-test',
+    'packages/shared/src/schemas/auth.test.ts',
+    { identifiers: ['accepts supported locales and rejects others'] },
+    ['accepts supported locales and rejects others'],
+    'locale.supported-schema-test'
+  ),
   ...[
     ['password-changed', 'account-password-changed.definition.ts', 3],
     ['profile-updated', 'account-profile-updated.definition.ts', 1],

@@ -39,6 +39,11 @@ const contracts = [
     forbidden: ["mockResolvedValue({ locale: 'en' } as never)", "title: 'Profile updated'"],
   },
   {
+    path: 'packages/shared/src/schemas/auth.test.ts',
+    required: ["supportedLocaleSchema.safeParse('en').success).toBe(false)"],
+    forbidden: ["supportedLocaleSchema.safeParse('en').success).toBe(true)"],
+  },
+  {
     path: `${ROOT}/notifications/definitions/account-password-changed.definition.ts`,
     required: ['ru-RU', 'Пароль изменён', 'Ваш пароль был изменён'],
     forbidden: ["locale === 'en'"],
