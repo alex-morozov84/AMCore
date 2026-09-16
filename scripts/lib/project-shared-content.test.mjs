@@ -22,7 +22,7 @@ function flagsFor(locale, storybook, routeProgress, console) {
   }
 }
 
-describe('nine-path shared semantic owner', () => {
+describe('declared shared semantic owner', () => {
   it('materializes the same shared bytes in fact and executable plans', () => {
     for (const locale of locales) {
       for (const storybook of [false, true]) {

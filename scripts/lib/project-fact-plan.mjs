@@ -5,6 +5,7 @@ import {
 import { assertProjectionResiduals } from './ownership-residual.mjs'
 import { materializeConsoleSteps } from './project-console-steps.mjs'
 import { buildProjectDesiredState } from './project-desired-state.mjs'
+import { buildRouteProgressFacts } from './project-route-progress-facts.mjs'
 import { buildProjectSharedContentFacts } from './project-shared-content-facts.mjs'
 import { buildProjectSharedContentSteps } from './project-shared-content.mjs'
 
@@ -29,7 +30,11 @@ export function buildProjectFactPlan(root, flags, adminConsoleSlug) {
   const desiredState = buildProjectDesiredState(root, flags, adminConsoleSlug)
   const console = buildProjectConsoleFacts(root, desiredState)
   const contentFacts = console.facts.filter((fact) => fact.kind === 'content')
-  const sharedContentFacts = [...buildProjectSharedContentFacts(desiredState), ...contentFacts]
+  const sharedContentFacts = [
+    ...buildProjectSharedContentFacts(desiredState),
+    ...buildRouteProgressFacts(root, desiredState),
+    ...contentFacts,
+  ]
   const sharedContentSteps = buildProjectSharedContentSteps(root, sharedContentFacts)
   const consoleSteps = materializeConsoleSteps(root, console.facts, sharedContentSteps)
   assertDisabledProjection(root, desiredState, console, [...sharedContentSteps, ...consoleSteps])

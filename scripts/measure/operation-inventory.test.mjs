@@ -1,6 +1,7 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildOperationInventory } from './operation-inventory.mjs'
+import { ROUTE_PROGRESS_SOURCE_PATH } from '../lib/project-route-progress-ownership.mjs'
 
 describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
@@ -25,10 +26,10 @@ describe('operation inventory against the real plans', () => {
 
   test('reports migration units separately from legacy operations', () => {
     assert.deepEqual(inventory.migrationCounts, {
-      legacyOperations: 288,
-      semanticFacts: 57,
-      semanticClaims: 150,
-      sharedContentOperations: 32,
+      legacyOperations: 287,
+      semanticFacts: 58,
+      semanticClaims: 152,
+      sharedContentOperations: 33,
       materializedFilesystemOperations: 366,
     })
   })
@@ -47,7 +48,11 @@ describe('operation inventory against the real plans', () => {
   })
 
   test('publishes one synchronization edge for every distinct exact-copy target', () => {
-    assert.equal(inventory.exactCopyEdges.length, 21)
+    assert.equal(inventory.exactCopyEdges.length, 20)
+    assert.equal(
+      inventory.exactCopyEdges.some((edge) => edge.upstreamSource === ROUTE_PROGRESS_SOURCE_PATH),
+      false
+    )
     const targets = inventory.exactCopyEdges.map((edge) => edge.upstreamSource)
     assert.deepEqual(targets, [...new Set(targets)].sort())
     assert.ok(

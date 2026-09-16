@@ -12,6 +12,7 @@ import {
   projectConsoleContentDefinition,
   registerConsoleStructuralOperations,
 } from './project-console-content.mjs'
+import { registerRouteProgressStructuralOperations } from './project-route-progress-content.mjs'
 import { projectSharedContentDefinition } from './project-shared-content-operations.mjs'
 
 function conflict(pathname, location, left, right) {
@@ -70,6 +71,7 @@ function structuralRegistry() {
   const registry = createOperationRegistry()
   registerProjectConfigOperations(registry)
   registerConsoleStructuralOperations(registry)
+  registerRouteProgressStructuralOperations(registry)
   return registry
 }
 
