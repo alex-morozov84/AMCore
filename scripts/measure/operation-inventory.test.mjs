@@ -29,7 +29,7 @@ describe('operation inventory against the real plans', () => {
     assert.deepEqual(inventory.migrationCounts, {
       legacyOperations: 207,
       semanticFacts: 82,
-      semanticClaims: 216,
+      semanticClaims: 218,
       sharedContentOperations: 58,
       materializedFilesystemOperations: 374,
     })

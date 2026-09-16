@@ -1,15 +1,6 @@
-// Structural invariant over the full init:project plans, independent of any
-// real-repo copy: fileStep/exactContentStep read their target file once at
-// plan-build time, so two separate steps targeting the same path silently
-// clobber each other at write() time (the second step's `after` was
-// computed from the pre-first-step content). Caught live: auth.service.spec.ts
-// (two builders owned a fileStep for it), then PROJECT_CONTEXT.md/
-// eslint.config.mjs when --mode and --storybook combine (see
-// the shared semantic composer). Covers the console dimension together with every
-// existing scaffold dimension, mirroring init-project.mjs's
-// own filter+combine composition — not a naive concatenation, which would
-// trivially fail on any combined case by design (the whole reason
-// shared-file composition exists).
+// Structural invariant over each final M1-reduced init:project plan. This caught
+// legacy duplicate writers before shared-file semantic composition existed and
+// now also proves that ancestor deletes absorb safe descendant edits before M4.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
@@ -64,7 +55,14 @@ function composedSteps({ locale, storybook, routeProgress, adminConsole }) {
     'route-progress': routeProgress ? 'disabled' : undefined,
     'admin-console': adminConsole?.mode,
   }
-  return prepareProjectInit(REPO_ROOT, flags, adminConsole?.slug ?? 'admin').steps
+  const plan = prepareProjectInit(REPO_ROOT, flags, adminConsole?.slug ?? 'admin')
+  return plan.operationPlan
+    .operationsForApply()
+    .map((operation) =>
+      operation.kind === 'move'
+        ? { ...operation, source: operation.from, target: operation.to }
+        : operation
+    )
 }
 
 const COMBINATIONS = [
@@ -135,8 +133,8 @@ describe('init:project plans (structural, against the real repo — read-only)',
     ]
     steps.push({
       kind: 'move',
-      source: path.join(REPO_ROOT, 'apps/web/src/app/[locale]/admin/layout.tsx'),
-      target: path.join(REPO_ROOT, 'apps/web/src/app/bad/layout.tsx'),
+      source: 'apps/web/src/app/[locale]/admin/layout.tsx',
+      target: 'apps/web/src/app/bad/layout.tsx',
     })
     assert.throws(() => assertNoDestructivePathConflict(steps))
   })
