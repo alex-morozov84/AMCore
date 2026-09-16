@@ -7,7 +7,7 @@ describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
 
   test('records real source/target paths and every measured scenario', () => {
-    assert.equal(inventory.operations.length, 375)
+    assert.equal(inventory.operations.length, 382)
     assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
@@ -31,7 +31,7 @@ describe('operation inventory against the real plans', () => {
       semanticFacts: 82,
       semanticClaims: 218,
       sharedContentOperations: 58,
-      materializedFilesystemOperations: 374,
+      materializedFilesystemOperations: 381,
     })
   })
 
