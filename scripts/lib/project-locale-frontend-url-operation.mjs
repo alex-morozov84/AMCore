@@ -2,7 +2,7 @@ import ts from 'typescript'
 
 import { findUniqueNode } from './path-algebra-ast-query.mjs'
 import { callName, claim, localeParams } from './project-locale-ast-helpers.mjs'
-import { LOCALIZED_URL_SUITE, PREFIX_SUITE } from './project-locale-frontend-url-bodies.mjs'
+import { LOCALIZED_URL_SUITE, prefixSuite } from './project-locale-frontend-url-bodies.mjs'
 
 function suite(model, title, ctx) {
   return findUniqueNode(
@@ -16,15 +16,19 @@ function suite(model, title, ctx) {
   )
 }
 
-function frontendUrl(model, _params, ctx) {
+function frontendUrl(model, { locale }, ctx) {
   model.replaceNode(suite(model, 'localizedFrontendUrl', ctx), LOCALIZED_URL_SUITE, ctx)
-  model.replaceNode(suite(model, 'localePathPrefix', ctx), PREFIX_SUITE, ctx)
+  model.replaceNode(suite(model, 'localePathPrefix', ctx), prefixSuite(locale), ctx)
 }
 
 export function registerLocaleFrontendUrlOperation(registry) {
   registry.define('locale.frontend-url-test', {
     paramsSchema: localeParams,
-    deriveSemanticWrites: () => [claim('ts:frontend-url-test:topology', 'unprefixed')],
+    deriveSemanticWrites: ({ locale }) => [
+      claim('ts:frontend-url-test:topology', 'unprefixed'),
+      claim('ts:frontend-url-test:typed-locale', locale),
+      claim('ts:frontend-url-test:multi-prefix', `/${locale}`),
+    ],
     adapter: frontendUrl,
   })
 }

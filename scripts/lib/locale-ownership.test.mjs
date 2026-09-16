@@ -113,6 +113,20 @@ test('rejects a mutation that restores an English RU default expectation', () =>
     ownershipCode(OWNERSHIP_CODES.RESIDUAL)
   )
 })
+
+test('rejects a mutation that restores an unsupported typed EN fixture', () => {
+  const plan = buildProjectFactPlan(root, { mode: 'single', locale: 'ru' }, 'admin')
+  const target = 'packages/shared/src/lib/frontend-url.test.ts'
+  const mutated = allSteps(plan).map((step) =>
+    step.target.endsWith(target)
+      ? { ...step, after: step.after.replace("localePathPrefix('ru',", "localePathPrefix('en',") }
+      : step
+  )
+  assert.throws(
+    () => validateProjectLocaleOwnership(root, mutated, 'ru'),
+    ownershipCode(OWNERSHIP_CODES.RESIDUAL)
+  )
+})
 function ownershipCode(code) {
   return (error) => error instanceof OwnershipError && error.code === code
 }

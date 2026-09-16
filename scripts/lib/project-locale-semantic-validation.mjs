@@ -1,6 +1,7 @@
 import { OWNERSHIP_CODES, ownershipError } from './ownership-errors.mjs'
 
 const REQUEST_PATH = 'apps/web/src/i18n/request.ts'
+const FRONTEND_URL_TEST = 'packages/shared/src/lib/frontend-url.test.ts'
 
 const emailContracts = [
   {
@@ -48,11 +49,25 @@ function emailResiduals(locale, contract, content) {
   return [...missing, ...stale]
 }
 
+function frontendUrlResiduals(locale, content) {
+  const multi = `localePathPrefix('${locale}', ['en', 'ru'])).toBe('/${locale}')`
+  const single = `localePathPrefix('${locale}', ['${locale}'])).toBe('')`
+  const other = locale === 'en' ? 'ru' : 'en'
+  return [
+    ...(content.includes(multi) ? [] : [`${FRONTEND_URL_TEST}:multi fixture`]),
+    ...(content.includes(single) ? [] : [`${FRONTEND_URL_TEST}:single fixture`]),
+    ...(content.includes(`localePathPrefix('${other}',`)
+      ? [`${FRONTEND_URL_TEST}:unsupported typed locale`]
+      : []),
+  ]
+}
+
 export function assertLocaleSemanticProjection(locale, contents) {
   const residuals = requestResiduals(locale, contents.get(REQUEST_PATH) ?? '')
   for (const contract of emailContracts) {
     residuals.push(...emailResiduals(locale, contract, contents.get(contract.path) ?? ''))
   }
+  residuals.push(...frontendUrlResiduals(locale, contents.get(FRONTEND_URL_TEST) ?? ''))
   if (!residuals.length) return
   throw ownershipError(
     OWNERSHIP_CODES.RESIDUAL,

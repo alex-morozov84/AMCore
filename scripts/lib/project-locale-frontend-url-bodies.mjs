@@ -45,7 +45,7 @@ export const LOCALIZED_URL_SUITE = `describe('localizedFrontendUrl', () => {
   })
 })`
 
-export const PREFIX_SUITE = `describe('localePathPrefix', () => {
+const PREFIX_SUITE_EN = `describe('localePathPrefix', () => {
   // AMCore upstream's own SUPPORTED_LOCALES never shrinks to one entry, so
   // these pass an explicit \`locales\` array rather than relying on the real
   // constant — otherwise the single-locale branch could never be exercised
@@ -63,3 +63,24 @@ export const PREFIX_SUITE = `describe('localePathPrefix', () => {
     expect(localePathPrefix(DEFAULT_LOCALE)).toBe('')
   })
 })`
+
+const PREFIX_SUITE_RU = `describe('localePathPrefix', () => {
+  // AMCore upstream's own SUPPORTED_LOCALES never shrinks to one entry, so
+  // these pass an explicit \`locales\` array rather than relying on the real
+  // constant — otherwise the single-locale branch could never be exercised
+  // and this test would pass vacuously forever. See the doc comment on
+  // \`localePathPrefix\` for why the parameter exists at all.
+  it('prefixes the locale when more than one is supported', () => {
+    expect(localePathPrefix('ru', ['en', 'ru'])).toBe('/ru')
+  })
+
+  it('omits the prefix once exactly one locale is supported (pnpm init:project --mode=single)', () => {
+    expect(localePathPrefix('ru', ['ru'])).toBe('')
+  })
+
+  it('defaults to the real SUPPORTED_LOCALES, which is single-locale after init:project --mode=single', () => {
+    expect(localePathPrefix(DEFAULT_LOCALE)).toBe('')
+  })
+})`
+
+export const prefixSuite = (locale) => (locale === 'en' ? PREFIX_SUITE_EN : PREFIX_SUITE_RU)
