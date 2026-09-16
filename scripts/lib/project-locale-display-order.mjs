@@ -10,6 +10,7 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/api/src/core/auth/user-cache.service.spec.ts',
   'apps/api/src/core/notifications/channels/email-channel.deliverer.spec.ts',
   'apps/api/src/core/notifications/notifications.service.spec.ts',
+  'apps/api/src/core/notifications/notification-feed.service.spec.ts',
   'apps/api/src/core/organizations/invite.service.spec.ts',
   'apps/api/src/core/auth/oauth/oauth.service.spec.ts',
   'apps/api/src/core/notifications/channels/telegram/telegram-channel.deliverer.spec.ts',

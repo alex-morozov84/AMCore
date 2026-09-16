@@ -2,7 +2,7 @@ import ts from 'typescript'
 
 import { findAllNodes, findUniqueNode } from './path-algebra-ast-query.mjs'
 import { normalizeRussianFixtureLiterals } from './project-locale-api-simple-fixtures.mjs'
-import { testCall } from './project-locale-ast-helpers.mjs'
+import { callName, testCall } from './project-locale-ast-helpers.mjs'
 
 function replaceRussianAccesses(model, locale, ctx) {
   const names = findAllNodes(
@@ -62,6 +62,23 @@ export function rewriteInviteService(model, locale, ctx) {
     test
   )
   model.replaceNode(regex, '/^https:\\/\\/app\\.example\\.com\\/invite\\/accept\\?token=.+/', ctx)
+  const fallback = testCall(
+    model,
+    'sends an org invite email with hasAccount=false for an unknown email',
+    ctx
+  )
+  const expectation = findUniqueNode(
+    model,
+    (node) =>
+      ts.isCallExpression(node) &&
+      callName(node) === 'toBe' &&
+      node.expression.getText() === 'expect(data.locale).toBe' &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      ['en', 'ru'].includes(node.arguments[0].text),
+    { ...ctx, describe: 'unknown-recipient base locale expectation' },
+    fallback
+  )
+  if (locale === 'ru') model.replaceNode(expectation.arguments[0], "'ru'", ctx)
 }
 
 export function rewriteTelegramDeliverer(model, locale, ctx) {

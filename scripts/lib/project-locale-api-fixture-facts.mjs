@@ -53,6 +53,11 @@ export function buildLocaleApiFixtureFacts(locale) {
       'locale.telegram-content-test',
       locale
     ),
+    localeContent(
+      'apps/api/src/core/notifications/notification-feed.service.spec.ts',
+      'locale.notification-feed-test',
+      locale
+    ),
     ...fixtures.map(([pathname, operationKey, variant]) =>
       localeContent(pathname, operationKey, locale, { variant })
     ),

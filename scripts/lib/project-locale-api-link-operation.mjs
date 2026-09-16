@@ -22,6 +22,9 @@ export function registerLocaleApiLinkOperation(registry) {
     paramsSchema,
     deriveSemanticWrites: ({ locale, variant }) => [
       claim(`ts:api-link-fixture:${variant}:locale`, locale),
+      ...(variant === 'invite'
+        ? [claim('ts:api-link-fixture:invite:unknown-recipient-locale', locale)]
+        : []),
       absent(`ts:api-link-fixture:${variant}:locale-prefix`),
     ],
     adapter: linkFixture,

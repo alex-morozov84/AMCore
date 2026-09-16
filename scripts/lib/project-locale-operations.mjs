@@ -18,6 +18,7 @@ import { registerLocaleNavigationTestOperation } from './project-locale-navigati
 import { registerLocaleAuthControllerOperation } from './project-locale-auth-controller-operation.mjs'
 import { registerLocaleNotificationDefinitionOperation } from './project-locale-notification-definition-operation.mjs'
 import { registerLocaleTelegramContentOperation } from './project-locale-telegram-content-operation.mjs'
+import { registerLocaleNotificationFeedOperation } from './project-locale-notification-feed-operation.mjs'
 
 export function registerProjectLocaleOperations(registry) {
   registerLocaleApiSuiteOperation(registry)
@@ -39,5 +40,6 @@ export function registerProjectLocaleOperations(registry) {
   registerLocaleFrontendUrlOperation(registry)
   registerLocaleNavigationTestOperation(registry)
   registerLocaleNotificationDefinitionOperation(registry)
+  registerLocaleNotificationFeedOperation(registry)
   registerLocaleTelegramContentOperation(registry)
 }

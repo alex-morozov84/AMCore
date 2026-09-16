@@ -12,6 +12,8 @@ const RU_ONLY = [
   'apps/api/src/core/notifications/definitions/account-password-changed.definition.ts',
   'apps/api/src/core/notifications/definitions/account-profile-updated.definition.ts',
   'apps/api/src/core/notifications/definitions/account-telegram-linked.definition.ts',
+  'apps/api/src/core/organizations/invite.service.spec.ts',
+  'apps/api/src/core/notifications/notification-feed.service.spec.ts',
 ]
 
 export function localeIntentionalDeltas(locale) {

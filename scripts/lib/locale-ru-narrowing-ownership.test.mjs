@@ -41,3 +41,12 @@ test('rejects a mutation that restores a typed EN notification fixture', () => {
     content.replace("renderTelegram!(projection, 'ru')", "renderTelegram!(projection, 'en')")
   )
 })
+
+test('rejects mutations that restore EN-only default expectations', () => {
+  assertResidualMutation('invite.service.spec.ts', (content) =>
+    content.replace("expect(data.locale).toBe('ru')", "expect(data.locale).toBe('en')")
+  )
+  assertResidualMutation('notification-feed.service.spec.ts', (content) =>
+    content.replace("title: 'Профиль обновлён'", "title: 'Profile updated'")
+  )
+})

@@ -29,6 +29,16 @@ const contracts = [
     forbidden: ["'en'"],
   },
   {
+    path: `${ROOT}/organizations/invite.service.spec.ts`,
+    required: ["expect(data.locale).toBe('ru')"],
+    forbidden: ["expect(data.locale).toBe('en')"],
+  },
+  {
+    path: `${ROOT}/notifications/notification-feed.service.spec.ts`,
+    required: ["mockResolvedValue({ locale: 'ru' } as never)", "title: 'Профиль обновлён'"],
+    forbidden: ["mockResolvedValue({ locale: 'en' } as never)", "title: 'Profile updated'"],
+  },
+  {
     path: `${ROOT}/notifications/definitions/account-password-changed.definition.ts`,
     required: ['ru-RU', 'Пароль изменён', 'Ваш пароль был изменён'],
     forbidden: ["locale === 'en'"],
