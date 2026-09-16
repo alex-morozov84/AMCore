@@ -53,7 +53,7 @@ describe('transform-inventory: buildTransformInventory (real repo, ground truth)
   const inventory = buildTransformInventory()
 
   test('classifies every real module (no silent skips)', () => {
-    assert.equal(inventory.length, 62)
+    assert.equal(inventory.length, 61)
     for (const module of inventory) {
       assert.ok(module.primaryShape, `${module.modulePath} has no primaryShape`)
       if (module.primaryShape === 'other-unclassified') {

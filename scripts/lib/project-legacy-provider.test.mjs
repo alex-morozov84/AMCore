@@ -38,7 +38,7 @@ function relative(target) {
   return path.relative(copy.root, target).split(path.sep).join('/')
 }
 
-test('legacy provider emits zero steps or seeds for all nine shared paths', () => {
+test('legacy provider emits zero steps or seeds for every declared shared path', () => {
   const shared = new Set(SHARED_CONTENT_PATHS)
   for (const selected of matrix()) {
     const steps = buildProjectLegacySteps(copy.root, selected, 'panel')

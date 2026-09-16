@@ -16,6 +16,7 @@ const DELETED = [
   'project-plan-storybook-package.mjs',
   'project-plan-storybook-eslint.mjs',
   'project-plan-storybook-docs-root.mjs',
+  'project-plan-route-progress-flag.mjs',
   'project-plan-storybook-docs-readme.mjs',
   'project-plan-storybook-docs-frontend-readme.mjs',
   'project-plan-admin-console-disable-discovery-docs.mjs',

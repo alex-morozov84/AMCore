@@ -8,6 +8,9 @@
 // and pass on every apply here, not be skipped for a manual follow-up.
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
+import { applyFilesystemTransaction } from './lib/filesystem-transaction.mjs'
+import { runInitCommand } from './lib/init-engine.mjs'
+import { prepareProjectInit } from './lib/project-init-plan.mjs'
 import { createRealRepoCopy, git } from './lib/test-fixture.mjs'
 import { commit, runInitProject } from './lib/init-project-test-helpers.mjs'
 
@@ -54,6 +57,46 @@ describe('init-project --route-progress=disabled (end-to-end against a real-repo
     assert.match(second.stderr, /does not declare "export const ROUTE_PROGRESS_ENABLED = true"/)
   })
 
+  test('confirmed apply submits the complete route-progress plan to M4 exactly once', async () => {
+    copy = createRealRepoCopy()
+    commit(copy.root)
+    const prepared = prepareProjectInit(copy.root, { 'route-progress': 'disabled' }, 'admin')
+    const calls = []
+
+    await runInitCommand({
+      cwd: copy.root,
+      flags: { yes: true },
+      operationPlan: prepared.operationPlan,
+      applyFilesystem: (input) => calls.push(input),
+      verify: () => [],
+    })
+
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].operations.length, 2)
+  })
+
+  test('an injected M4 failure rolls both route-progress writes back', () => {
+    copy = createRealRepoCopy()
+    const prepared = prepareProjectInit(copy.root, { 'route-progress': 'disabled' }, 'admin')
+    const operations = prepared.operationPlan.operationsForApply()
+    const before = operations.map((operation) => [operation.target, gitFile(operation.target)])
+
+    assert.throws(
+      () =>
+        applyFilesystemTransaction({
+          root: copy.root,
+          operations,
+          hooks: {
+            beforeMutation: ({ index }) => {
+              if (index === 1) throw new Error('injected route-progress failure')
+            },
+          },
+        }),
+      /injected route-progress failure/
+    )
+    for (const [target, content] of before) assert.equal(gitFile(target), content)
+  })
+
   test('composes with --mode in one dry-run via the combined PROJECT_CONTEXT.md step', () => {
     copy = createRealRepoCopy()
     commit(copy.root)
@@ -77,3 +120,7 @@ describe('init-project --route-progress=disabled (end-to-end against a real-repo
     assert.doesNotMatch(result.stdout, /remove the navigation ban and the Storybook plugin\/rules/)
   })
 })
+
+function gitFile(target) {
+  return git(copy.root, ['hash-object', target])
+}
