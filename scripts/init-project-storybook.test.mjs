@@ -66,8 +66,7 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /Prisma: no DB default change needed/)
     assert.match(result.stdout, /ci\.yml: remove the storybook job/)
-    // Proves the combined-step path (project-plan-combined.mjs) ran, not
-    // two separate fileSteps that would have silently clobbered each other.
+    // Both semantic contributions must accumulate in the shared-file model.
     assert.match(result.stdout, /update PROJECT_CONTEXT\.md fields for the combined dimensions/)
     assert.match(result.stdout, /remove the navigation ban and the Storybook plugin\/rules/)
   })
@@ -121,5 +120,4 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     // docs/frontend/storybook.md, which this same apply deletes.
     assert.doesNotMatch(context, /docs\/frontend\/storybook\.md/)
   })
-
 })

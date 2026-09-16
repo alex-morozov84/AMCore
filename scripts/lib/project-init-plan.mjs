@@ -44,12 +44,17 @@ export function prepareProjectInit(root, flags, adminConsoleSlug) {
     root,
     legacySteps,
     factPlan.sharedContentSteps,
+    factPlan.storybookDisplaySteps,
     factPlan.consoleSteps
   )
   const operationPlan = buildScaffoldOperationPlan({
     root,
     legacySteps,
-    semanticSteps: [...factPlan.sharedContentSteps, ...factPlan.consoleSteps],
+    semanticSteps: [
+      ...factPlan.sharedContentSteps,
+      ...factPlan.storybookSteps,
+      ...factPlan.consoleSteps,
+    ],
     forbiddenLegacyTargets: SHARED_CONTENT_PATHS,
     materializationSteps,
   })

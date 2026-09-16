@@ -7,7 +7,7 @@ describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
 
   test('records real source/target paths and every measured scenario', () => {
-    assert.equal(inventory.operations.length, 367)
+    assert.equal(inventory.operations.length, 375)
     assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
@@ -19,18 +19,19 @@ describe('operation inventory against the real plans', () => {
         (operation) =>
           operation.modulePath?.startsWith('scripts/lib/project-plan-') ||
           operation.modulePath === 'scripts/lib/project-shared-content.mjs' ||
-          operation.modulePath === 'scripts/lib/project-console-facts.mjs'
+          operation.modulePath === 'scripts/lib/project-console-facts.mjs' ||
+          operation.modulePath === 'scripts/lib/project-storybook-facts.mjs'
       )
     )
   })
 
   test('reports migration units separately from legacy operations', () => {
     assert.deepEqual(inventory.migrationCounts, {
-      legacyOperations: 287,
-      semanticFacts: 58,
-      semanticClaims: 152,
-      sharedContentOperations: 33,
-      materializedFilesystemOperations: 366,
+      legacyOperations: 207,
+      semanticFacts: 82,
+      semanticClaims: 218,
+      sharedContentOperations: 58,
+      materializedFilesystemOperations: 374,
     })
   })
 
@@ -48,9 +49,13 @@ describe('operation inventory against the real plans', () => {
   })
 
   test('publishes one synchronization edge for every distinct exact-copy target', () => {
-    assert.equal(inventory.exactCopyEdges.length, 20)
+    assert.equal(inventory.exactCopyEdges.length, 19)
     assert.equal(
       inventory.exactCopyEdges.some((edge) => edge.upstreamSource === ROUTE_PROGRESS_SOURCE_PATH),
+      false
+    )
+    assert.equal(
+      inventory.exactCopyEdges.some((edge) => edge.upstreamSource === 'apps/web/vitest.config.ts'),
       false
     )
     const targets = inventory.exactCopyEdges.map((edge) => edge.upstreamSource)

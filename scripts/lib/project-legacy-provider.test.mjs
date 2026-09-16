@@ -59,6 +59,16 @@ test('legacy provider emits no Operations Console steps', () => {
   }
 })
 
+test('legacy provider emits no Storybook steps', () => {
+  for (const selected of matrix()) {
+    const steps = buildProjectLegacySteps(copy.root, selected, 'panel')
+    assert.equal(
+      steps.some((step) => step.provider === 'storybook'),
+      false
+    )
+  }
+})
+
 test('every remaining legacy content target belongs to exactly one provider', () => {
   const owners = new Map()
   for (const selected of matrix()) {

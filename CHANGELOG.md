@@ -82,13 +82,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shared code, configuration, tests, and docs require an explicit fail-closed
   seam. The `init:project` flags and generated project tree remain unchanged.
 
-- **Transactional downstream initialization.** `pnpm init:brand` and
+- **Transactional and manifest-backed downstream initialization.** `pnpm init:brand` and
   `pnpm init:project` now materialize their complete plans before confirmation
   and apply a confirmed plan in one recoverable filesystem transaction. Shared
   scaffold files are composed semantically once, and external logo/icon inputs
   are validated and snapshotted before the prompt. Generated output, flags,
   guards, dry-run output, confirmation, diagnostics, and post-apply checks are
-  unchanged.
+  unchanged. Storybook removal now derives closed roots, story files, and
+  shared-file seams from the same ownership architecture, replacing its legacy
+  providers without pair-specific adapters. The downstream projection also
+  removes six previously retained Storybook-only references from mixed docs,
+  CI comments, and `apps/web/.gitignore`, including a link to the deleted
+  Storybook guide and obsolete verification recommendations.
 
 - **PostgreSQL 16 → 18.** The shipped/bundled reference database major moves
   from PostgreSQL 16 to 18 (`postgres:18-alpine`) across `docker-compose.yml`

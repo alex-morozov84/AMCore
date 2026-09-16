@@ -23,7 +23,7 @@ test('derives the complete disabled Console projection from the manifest', () =>
   assert.equal(operationsConsoleOwnership.facts.roots.length, 9)
   assert.equal(count(result.consoleFacts, 'delete'), 27)
   assert.equal(count(result.consoleFacts, 'content'), 20)
-  assert.equal(result.consoleSteps.length, 39)
+  assert.equal(result.consoleSteps.length, 38)
   assert.ok(
     result.consoleFacts.some(
       (fact) => fact.kind === 'delete' && fact.path === 'docs/operations-console'

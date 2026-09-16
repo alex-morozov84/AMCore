@@ -5,6 +5,7 @@ import { test } from 'node:test'
 
 const ROOT = path.resolve('.')
 const LIB = path.join(ROOT, 'scripts/lib')
+const MEASURE = path.join(ROOT, 'scripts/measure')
 const DELETED = [
   'project-plan-combined.mjs',
   'project-plan-combined-console-storybook-docs.mjs',
@@ -26,6 +27,16 @@ const DELETED = [
   'project-plan-admin-console-single-locale-proxy.mjs',
   'project-plan-admin-console-single-locale.mjs',
   'project-plan-admin-console.mjs',
+  'project-plan-storybook.mjs',
+  'project-plan-storybook-files.mjs',
+  'project-plan-storybook-ci.mjs',
+  'project-plan-storybook-vitest.mjs',
+  'project-plan-storybook-docs.mjs',
+  'project-plan-storybook-docs-agents.mjs',
+  'project-plan-storybook-docs-contributing.mjs',
+  'project-plan-storybook-docs-testing.mjs',
+  'project-plan-storybook-docs-ci-security.mjs',
+  'project-plan-storybook-docs-misc.mjs',
 ]
 
 function productionSources() {
@@ -36,6 +47,17 @@ function productionSources() {
     .filter((name) => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
     .map((name) => path.join(LIB, name))
   return [...entrypoints, ...library].map((file) => [file, readFileSync(file, 'utf8')])
+}
+
+function requiredScriptSources() {
+  return [LIB, MEASURE].flatMap((directory) =>
+    readdirSync(directory)
+      .filter((name) => name.endsWith('.mjs'))
+      .map((name) => {
+        const file = path.join(directory, name)
+        return [file, readFileSync(file, 'utf8')]
+      })
+  )
 }
 
 test('obsolete planner modules are absent with no live static import', () => {
@@ -61,4 +83,19 @@ test('production contains no step.write call and one engine M4 call site', () =>
 
 test('the superseded console path registry is absent', () => {
   assert.equal(existsSync(path.join(LIB, 'admin-console-owned-paths.json')), false)
+})
+
+test('required script tests are portable without a historical git object', () => {
+  const fullSha = new RegExp(`[0-9a-f]{${20 + 20}}`, 'i')
+  const shellArchive = /git archive\s+(?!HEAD\b)/
+  const argumentArchive = /['"]archive['"]\s*,\s*(?!['"]HEAD['"])/
+  const offenders = requiredScriptSources()
+    .filter(
+      ([, source]) =>
+        (fullSha.test(source) && /archive/.test(source)) ||
+        shellArchive.test(source) ||
+        argumentArchive.test(source)
+    )
+    .map(([file]) => path.relative(ROOT, file))
+  assert.deepEqual(offenders, [])
 })

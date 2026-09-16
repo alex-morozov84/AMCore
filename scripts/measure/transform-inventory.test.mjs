@@ -53,7 +53,7 @@ describe('transform-inventory: buildTransformInventory (real repo, ground truth)
   const inventory = buildTransformInventory()
 
   test('classifies every real module (no silent skips)', () => {
-    assert.equal(inventory.length, 61)
+    assert.equal(inventory.length, 51)
     for (const module of inventory) {
       assert.ok(module.primaryShape, `${module.modulePath} has no primaryShape`)
       if (module.primaryShape === 'other-unclassified') {
@@ -68,14 +68,11 @@ describe('transform-inventory: buildTransformInventory (real repo, ground truth)
     assert.equal(found.primaryShape, 'whole-file-legacy-before-after')
   })
 
-  test('the storybook CI sentinel transform is actually narrow-exact-text-block, not owned-sentinel-block', () => {
-    // Real finding: project-plan-storybook-ci.mjs embeds the whole CI job as a
-    // literal removeExactBlock() target — the amcore:sentinel-block comments
-    // inside that literal are delimiters within the copy, not a
-    // removeMarkedBlock()-style scan. See PR1's implementation report.
-    const found = inventory.find((m) => m.modulePath.endsWith('project-plan-storybook-ci.mjs'))
-    assert.ok(found)
-    assert.equal(found.primaryShape, 'narrow-exact-text-block')
+  test('contains no Storybook legacy transform module', () => {
+    assert.deepEqual(
+      inventory.filter((item) => item.modulePath.includes('project-plan-storybook')),
+      []
+    )
   })
 
   test('output is deterministically ordered by module path', () => {
