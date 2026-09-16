@@ -8,6 +8,7 @@ import {
   planStructuralComposition,
 } from './path-algebra-structural-compose.mjs'
 import { registerProjectConfigOperations } from './project-config-operations.mjs'
+import { registerProjectLocaleOperations } from './project-locale-operations.mjs'
 import {
   projectConsoleContentDefinition,
   registerConsoleStructuralOperations,
@@ -70,23 +71,24 @@ function materializeText(root, pathname, facts) {
   return { before, after }
 }
 
-function structuralRegistry() {
+export function createProjectStructuralRegistry() {
   const registry = createOperationRegistry()
   registerProjectConfigOperations(registry)
+  registerProjectLocaleOperations(registry)
   registerConsoleStructuralOperations(registry)
   registerRouteProgressStructuralOperations(registry)
   registerStorybookStructuralOperations(registry)
   return registry
 }
 
-function materializeStructural(root, pathname, facts, registry) {
+function materializeStructural(root, pathname, facts, registry, sourcePath) {
   const structural = facts.map((fact) => ({ ...fact, kind: 'structural' }))
   const [plan] = planStructuralComposition(registry, structural)
-  const before = readFileSync(path.join(root, pathname), 'utf8')
+  const before = readFileSync(path.join(root, sourcePath ?? pathname), 'utf8')
   return { before, after: applyStructuralPlan(registry, plan, before) }
 }
 
-export function materializeProjectContentPath(root, pathname, facts) {
+export function materializeProjectContentPath(root, pathname, facts, options = {}) {
   if (facts.some((fact) => fact.kind === 'delete')) {
     if (facts.length !== 1) throw new Error(`delete/content collision on "${pathname}"`)
     const [fact] = facts
@@ -96,13 +98,13 @@ export function materializeProjectContentPath(root, pathname, facts) {
     }
     return { kind: 'delete', target: path.join(root, pathname), changed: true }
   }
-  const registry = structuralRegistry()
+  const registry = createProjectStructuralRegistry()
   const structural = facts.filter((fact) => registry.has(fact.operationKey))
   if (structural.length && structural.length !== facts.length) {
     throw new Error(`mixed structural/text operations on "${pathname}"`)
   }
   const text = structural.length
-    ? materializeStructural(root, pathname, facts, registry)
+    ? materializeStructural(root, pathname, facts, registry, options.sourcePath)
     : materializeText(root, pathname, facts)
   return {
     kind: 'edit',

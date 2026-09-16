@@ -50,7 +50,7 @@ function statementRange(text, node, { triviaStart, contentStart }) {
  * trailing comma) the one before; a first element on one line also takes
  * the space after its comma. Anything without a comma is a statement.
  */
-function removalRange(text, node) {
+function removalRange(text, node, options = {}) {
   const trivia = leadingTrivia(text, node)
   const start = trivia.triviaStart
   const trailing = /^\s*,/.exec(text.slice(node.end))
@@ -60,7 +60,11 @@ function removalRange(text, node) {
     return { start, end: end + gap }
   }
   const leading = /,\s*$/.exec(text.slice(0, start))
-  return leading ? { start: leading.index, end: node.end } : statementRange(text, node, trivia)
+  if (leading) return { start: leading.index, end: node.end }
+  const range = statementRange(text, node, trivia)
+  if (options.includeTrailingBlank && text[range.end] === '\n') range.end += 1
+  if (options.includeLeadingBlank && text[range.start - 1] === '\n') range.start -= 1
+  return range
 }
 
 /**
@@ -119,10 +123,21 @@ export function parseStructuralModel(path, text) {
     text,
     sourceFile,
     edits,
-    removeNode: (node, { operationKey }) =>
-      record({ ...removalRange(text, node), replacement: '', operationKey }),
-    replaceNode: (node, replacement, { operationKey }) =>
-      record({ start: node.getStart(), end: node.end, replacement, operationKey }),
+    removeNode: (
+      node,
+      { operationKey, includeLeadingBlank = false, includeTrailingBlank = false }
+    ) =>
+      record({
+        ...removalRange(text, node, { includeLeadingBlank, includeTrailingBlank }),
+        replacement: '',
+        operationKey,
+      }),
+    replaceNode: (node, replacement, { operationKey, includeLeadingComments = false }) => {
+      const start = includeLeadingComments
+        ? leadingTrivia(text, node).contentStart
+        : node.getStart()
+      record({ start, end: node.end, replacement, operationKey })
+    },
     isRemoved: (node) =>
       edits.some(
         (edit) => edit.replacement === '' && edit.start <= node.getStart() && node.end <= edit.end

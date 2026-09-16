@@ -71,6 +71,24 @@ test('obsolete planner modules are absent with no live static import', () => {
   }
 })
 
+test('locale production has no legacy modules or opaque adapter mechanisms', () => {
+  const names = readdirSync(LIB)
+  assert.deepEqual(
+    names.filter((name) => /^project-plan-.*\.mjs$/.test(name)),
+    []
+  )
+  assert.equal(existsSync(path.join(LIB, 'project-plan.mjs')), false)
+  assert.equal(existsSync(path.join(LIB, 'project-legacy-provider.mjs')), false)
+  const localeSources = productionSources().filter(([file]) =>
+    path.basename(file).startsWith('project-locale-')
+  )
+  const forbidden = /exactContentStep|moveAndRewriteStep|expectedBefore|switch\s*\([^)]*pathname/
+  assert.deepEqual(
+    localeSources.filter(([, source]) => forbidden.test(source)).map(([file]) => file),
+    []
+  )
+})
+
 test('production contains no step.write call and one engine M4 call site', () => {
   const sources = productionSources()
   assert.deepEqual(

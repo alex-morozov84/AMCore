@@ -5,7 +5,6 @@ import { assertRouteProgressEnabled } from './project-config-route-progress.mjs'
 import { assertAdminConsoleTransition } from './project-config-admin-console.mjs'
 import { buildProjectFactPlan } from './project-fact-plan.mjs'
 import { buildProjectDisplaySteps } from './project-display-plan.mjs'
-import { buildProjectLegacySteps } from './project-legacy-provider.mjs'
 import { SHARED_CONTENT_PATHS } from './project-shared-content-facts.mjs'
 import { buildScaffoldOperationPlan } from './scaffold-operation-plan.mjs'
 
@@ -39,17 +38,16 @@ function confirmation(flags, adminConsoleSlug) {
 export function prepareProjectInit(root, flags, adminConsoleSlug) {
   assertDimensions(root, flags, adminConsoleSlug)
   const factPlan = buildProjectFactPlan(root, flags, adminConsoleSlug)
-  const legacySteps = buildProjectLegacySteps(root, flags, adminConsoleSlug)
   const materializationSteps = buildProjectDisplaySteps(
     root,
-    legacySteps,
+    factPlan.localeSteps,
     factPlan.sharedContentSteps,
     factPlan.storybookDisplaySteps,
     factPlan.consoleSteps
   )
   const operationPlan = buildScaffoldOperationPlan({
     root,
-    legacySteps,
+    legacySteps: factPlan.localeSteps,
     semanticSteps: [
       ...factPlan.sharedContentSteps,
       ...factPlan.storybookSteps,
@@ -60,7 +58,7 @@ export function prepareProjectInit(root, flags, adminConsoleSlug) {
   })
   return {
     ...factPlan,
-    legacySteps,
+    legacySteps: [],
     operationPlan,
     steps: operationPlan.displaySteps,
     confirmMessage: confirmation(flags, adminConsoleSlug),

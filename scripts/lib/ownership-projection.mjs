@@ -49,8 +49,9 @@ function reachableFrom(entrypoints, forward) {
   const pending = [...entrypoints]
   while (pending.length) {
     const current = pending.pop()
-    if (reachable.has(current) || !forward.has(current)) continue
+    if (reachable.has(current)) continue
     reachable.add(current)
+    if (!forward.has(current)) continue
     for (const edge of forward.get(current)) pending.push(edge.target)
   }
   return reachable

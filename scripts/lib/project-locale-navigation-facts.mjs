@@ -1,0 +1,36 @@
+import { localeContent } from './project-locale-fact-helpers.mjs'
+
+const facts = {
+  'locale.navigation-call': [
+    'apps/web/src/features/auth-login/model/use-login.ts',
+    'apps/web/src/features/auth-register/model/use-register.ts',
+  ],
+  'locale.navigation-dal': ['apps/web/src/shared/api/bff/dal.ts'],
+  'locale.navigation-oauth': ['apps/web/src/shared/api/bff/oauth-exchange-handler.ts'],
+  'locale.navigation-switcher': ['apps/web/src/widgets/app-shell/ui/AppShell.tsx'],
+  'locale.navigation-adapter': [
+    'apps/web/src/shared/lib/route-progress/use-route-progress-router.ts',
+    'apps/web/src/shared/ui/route-progress-link.tsx',
+    'apps/web/src/shared/ui/route-progress-bar.tsx',
+  ],
+}
+
+export function buildLocaleNavigationFacts(locale) {
+  const tests = [
+    ['apps/web/src/shared/api/bff/oauth-exchange-handler.test.ts', 'oauth'],
+    ['apps/web/src/test/eslint-guards.test.ts', 'eslint'],
+    ['apps/web/src/shared/api/bff/dal.gating.test.ts', 'gating'],
+    ['apps/web/src/shared/api/bff/dal.optional-session.test.ts', 'optional'],
+    ['apps/web/src/shared/lib/route-progress/use-route-progress-router.test.ts', 'router'],
+    ['apps/web/src/shared/ui/route-progress-link.test.tsx', 'link'],
+    ['apps/web/src/shared/ui/route-progress-bar.test.tsx', 'bar'],
+  ]
+  return [
+    ...Object.entries(facts).flatMap(([operationKey, paths]) =>
+      paths.map((pathname) => localeContent(pathname, operationKey, locale))
+    ),
+    ...tests.map(([pathname, variant]) =>
+      localeContent(pathname, 'locale.navigation-test', locale, { variant })
+    ),
+  ]
+}

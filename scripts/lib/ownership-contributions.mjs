@@ -16,8 +16,8 @@ function featureTargets(manifest, inventory, projection) {
   return targets
 }
 
-function detectorsForFile(root, file, manifest, graph, targets) {
-  const content = readFileSync(path.join(root, file), 'utf8')
+function detectorsForFile(root, file, manifest, graph, targets, contents) {
+  const content = contents?.get(file) ?? readFileSync(path.join(root, file), 'utf8')
   const detected = manifest.monitoredIdentifiers.flatMap((id) => identifierOccurrences(content, id))
   const imports = (graph.forward.get(file) ?? [])
     .filter((edge) => targets.has(edge.target))
@@ -57,7 +57,8 @@ export function detectUndeclaredContributions(
   inventory,
   graph,
   changedFiles,
-  projection
+  projection,
+  options = {}
 ) {
   const targets = featureTargets(manifest, inventory, projection)
   const exempt = exemptFiles(manifest, inventory)
@@ -65,7 +66,14 @@ export function detectUndeclaredContributions(
   const missing = []
   for (const file of scope.filter((item) => inventory.surface.get(item) === 'file')) {
     if (exempt.has(file)) continue
-    const { content, detected } = detectorsForFile(root, file, manifest, graph, targets)
+    const { content, detected } = detectorsForFile(
+      root,
+      file,
+      manifest,
+      graph,
+      targets,
+      options.contents
+    )
     for (const contribution of detected) {
       if (!declared(manifest, file, contribution, content)) {
         missing.push(`${file}:${contribution.detector}`)
@@ -82,11 +90,13 @@ export function detectUndeclaredContributions(
   return []
 }
 
-export function relevantFiles(root, manifest, inventory, graph) {
+export function relevantFiles(root, manifest, inventory, graph, contents) {
   const targets = featureTargets(manifest, inventory)
   const relevant = new Set([...targets, ...pathsForSeams(inventory, manifest.seams)])
   for (const file of graph.files) {
-    if (detectorsForFile(root, file, manifest, graph, targets).detected.length) relevant.add(file)
+    if (detectorsForFile(root, file, manifest, graph, targets, contents).detected.length) {
+      relevant.add(file)
+    }
   }
   return relevant
 }

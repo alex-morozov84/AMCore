@@ -5,6 +5,8 @@ import {
 import { assertProjectionResiduals } from './ownership-residual.mjs'
 import { materializeConsoleSteps } from './project-console-steps.mjs'
 import { buildProjectDesiredState } from './project-desired-state.mjs'
+import { buildProjectLocalePlan, validateProjectLocaleOwnership } from './project-locale-plan.mjs'
+import { assertLocaleOwnershipApplied } from './project-locale-residual.mjs'
 import { buildRouteProgressFacts } from './project-route-progress-facts.mjs'
 import { buildProjectSharedContentFacts } from './project-shared-content-facts.mjs'
 import { buildProjectSharedContentSteps } from './project-shared-content.mjs'
@@ -39,6 +41,7 @@ function assertStorybookDisabled(root, storybook, steps) {
 
 export function buildProjectFactPlan(root, flags, adminConsoleSlug) {
   const desiredState = buildProjectDesiredState(root, flags, adminConsoleSlug)
+  const locale = buildProjectLocalePlan(root, desiredState)
   const console = buildProjectConsoleFacts(root, desiredState)
   const storybook = buildProjectStorybookFacts(root, desiredState)
   const contentFacts = console.facts.filter((fact) => fact.kind === 'content')
@@ -52,11 +55,17 @@ export function buildProjectFactPlan(root, flags, adminConsoleSlug) {
   const storybookSteps = materializeStorybookSteps(root, storybook.facts)
   const storybookDisplaySteps = buildStorybookDisplaySteps(root, storybookSteps, sharedContentSteps)
   const consoleSteps = materializeConsoleSteps(root, console.facts, sharedContentSteps)
-  const allSteps = [...sharedContentSteps, ...storybookSteps, ...consoleSteps]
+  const allSteps = [...locale.steps, ...sharedContentSteps, ...storybookSteps, ...consoleSteps]
+  const localeValidation = locale.steps.length
+    ? validateProjectLocaleOwnership(root, allSteps, desiredState.locale.base)
+    : undefined
   assertStorybookDisabled(root, storybook, allSteps)
   assertDisabledProjection(root, desiredState, console, allSteps)
   return {
     desiredState,
+    localeFacts: locale.facts,
+    localeSteps: locale.steps,
+    localeValidation,
     sharedContentFacts,
     sharedContentSteps,
     storybookFacts: storybook.facts,
@@ -66,6 +75,7 @@ export function buildProjectFactPlan(root, flags, adminConsoleSlug) {
     consoleSteps,
     assertApplied: () => {
       storybook.assertApplied?.()
+      if (localeValidation) assertLocaleOwnershipApplied(root, localeValidation)
       if (console.validation && !desiredState.adminConsole.enabled) {
         assertConsoleOwnershipApplied(root, console.validation)
       }
