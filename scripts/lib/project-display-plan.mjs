@@ -13,6 +13,7 @@ const combinedOrder = [
   'apps/web/eslint.config.mjs',
   'apps/web/package.json',
   'docs/frontend/architecture-and-conventions.md',
+  'docs/frontend/brand-theme-and-tokens.md',
   'docs/frontend/README.md',
   'README.md',
   'docs/README.md',
@@ -70,6 +71,14 @@ function insertStorybook(plan, root, singles) {
   insertProvider(plan, 'storybook', false, take(singles, 'PROJECT_CONTEXT.md'))
 }
 
+function insertStorybookProvider(plan, root, storybookSteps) {
+  if (!storybookSteps.length) return
+  const localeDelete = plan.findIndex(
+    (step) => step.kind === 'delete' && relative(root, step.target) === 'apps/web/src/app/[locale]'
+  )
+  insertAt(plan, localeDelete < 0 ? plan.length : localeDelete, storybookSteps)
+}
+
 function insertConsole(plan, root, singles) {
   const context = singles.get('PROJECT_CONTEXT.md')
   const enabled = context?.semanticFacts[0].params.enabled
@@ -78,12 +87,18 @@ function insertConsole(plan, root, singles) {
     ...takeOwned(singles, 'console', 'apps/web/messages/en.json', 'apps/web/messages/ru.json'),
     ...take(singles, 'apps/web/package.json'),
   ])
-  insertTarget(
-    plan,
-    root,
-    'docs/frontend/brand-theme-and-tokens.md',
-    take(singles, 'docs/frontend/architecture-and-conventions.md', 'docs/frontend/README.md')
-  )
+  const brandPath = 'docs/frontend/brand-theme-and-tokens.md'
+  if (!plan.some((step) => relative(root, step.target) === brandPath)) {
+    insertProvider(plan, 'console', false, take(singles, brandPath))
+  }
+  if (plan.some((step) => relative(root, step.target) === brandPath)) {
+    insertTarget(
+      plan,
+      root,
+      brandPath,
+      take(singles, 'docs/frontend/architecture-and-conventions.md', 'docs/frontend/README.md')
+    )
+  }
   insertTarget(
     plan,
     root,
@@ -113,13 +128,23 @@ function insertRouteProgress(plan, root, singles) {
   insertAt(plan, boundary < 0 ? plan.length : boundary, steps)
 }
 
-export function buildProjectDisplaySteps(root, legacySteps, semanticSteps, consoleSteps = []) {
+export function buildProjectDisplaySteps(
+  root,
+  legacySteps,
+  semanticSteps,
+  storybookSteps = [],
+  consoleSteps = []
+) {
   const plan = [...legacySteps]
+  insertStorybookProvider(plan, root, storybookSteps)
   insertConsoleProvider(plan, root, consoleSteps)
-  const { singles, combined } = partitionSemantic(root, semanticSteps)
+  const storybookOwned = new Set(storybookSteps)
+  const { singles, combined } = partitionSemantic(
+    root,
+    semanticSteps.filter((step) => !storybookOwned.has(step))
+  )
   if (legacySteps.some((step) => step.provider === 'locale')) insertLocale(plan, root, singles)
-  if (legacySteps.some((step) => step.provider === 'storybook'))
-    insertStorybook(plan, root, singles)
+  if (storybookSteps.length) insertStorybook(plan, root, singles)
   insertRouteProgress(plan, root, singles)
   if (plan.some((step) => step.provider === 'console')) insertConsole(plan, root, singles)
   if (singles.size) throw new Error(`unplaced semantic display steps: ${[...singles.keys()]}`)

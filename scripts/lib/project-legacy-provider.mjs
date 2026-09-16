@@ -2,7 +2,6 @@ import path from 'node:path'
 
 import { buildProjectSteps } from './project-plan.mjs'
 import { buildWebLocaleDirCleanupSteps } from './project-plan-web-structure.mjs'
-import { buildStorybookDisableSteps } from './project-plan-storybook.mjs'
 import { SHARED_CONTENT_PATHS } from './project-shared-content-facts.mjs'
 
 function assertExclusive(root, steps) {
@@ -24,7 +23,6 @@ export function buildProjectLegacySteps(root, flags) {
     : []
   const steps = [
     ...owned('locale', locale),
-    ...owned('storybook', flags.storybook ? buildStorybookDisableSteps(root) : []),
     ...owned('locale', flags.mode ? buildWebLocaleDirCleanupSteps(root) : []),
   ]
   assertExclusive(root, steps)

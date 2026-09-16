@@ -307,6 +307,11 @@ the filesystem transaction starts. Shared helpers survive
 removal when an independent production consumer still reaches them; helpers
 and linked tests used only by the Console are removed together.
 
+The Storybook transform uses the same ownership contract: its closed config
+root and co-located `*.stories.tsx` verification files are discovered
+automatically, while contributions to shared code, config, workflows, and docs
+require narrow declared seams.
+
 ## Inline style and contrast
 
 - **Token-only styling, enforced.** Raw Tailwind color literals

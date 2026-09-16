@@ -1,4 +1,5 @@
 import { buildProjectSharedContentFacts } from './project-shared-content-facts.mjs'
+import { buildStorybookContentFacts } from './project-storybook-facts.mjs'
 
 export const EXPECTED_SHARED_COLLISION_GRAPH = Object.freeze({
   'PROJECT_CONTEXT.md': ['locale:edit', 'route-progress:edit', 'storybook:edit'],
@@ -36,7 +37,11 @@ function providerVariants() {
 export function buildLegacyCollisionGraph() {
   const targets = new Map()
   for (const desired of providerVariants()) {
-    for (const fact of buildProjectSharedContentFacts(desired)) {
+    const facts = [
+      ...buildProjectSharedContentFacts(desired),
+      ...buildStorybookContentFacts(desired),
+    ]
+    for (const fact of facts) {
       const provider = fact.dimension
       const target = fact.path
       const contributors = targets.get(target) ?? new Map()

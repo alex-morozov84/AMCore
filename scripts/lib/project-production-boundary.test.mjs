@@ -26,6 +26,16 @@ const DELETED = [
   'project-plan-admin-console-single-locale-proxy.mjs',
   'project-plan-admin-console-single-locale.mjs',
   'project-plan-admin-console.mjs',
+  'project-plan-storybook.mjs',
+  'project-plan-storybook-files.mjs',
+  'project-plan-storybook-ci.mjs',
+  'project-plan-storybook-vitest.mjs',
+  'project-plan-storybook-docs.mjs',
+  'project-plan-storybook-docs-agents.mjs',
+  'project-plan-storybook-docs-contributing.mjs',
+  'project-plan-storybook-docs-testing.mjs',
+  'project-plan-storybook-docs-ci-security.mjs',
+  'project-plan-storybook-docs-misc.mjs',
 ]
 
 function productionSources() {
