@@ -127,6 +127,7 @@ test('rejects a mutation that restores an unsupported typed EN fixture', () => {
     ownershipCode(OWNERSHIP_CODES.RESIDUAL)
   )
 })
+
 function ownershipCode(code) {
   return (error) => error instanceof OwnershipError && error.code === code
 }

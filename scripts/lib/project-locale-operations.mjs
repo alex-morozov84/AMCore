@@ -15,11 +15,15 @@ import { registerLocaleWelcomeTestOperation } from './project-locale-welcome-tes
 import { registerLocaleRenderOperation } from './project-locale-render-operation.mjs'
 import { registerLocaleFrontendUrlOperation } from './project-locale-frontend-url-operation.mjs'
 import { registerLocaleNavigationTestOperation } from './project-locale-navigation-test-operation.mjs'
+import { registerLocaleAuthControllerOperation } from './project-locale-auth-controller-operation.mjs'
+import { registerLocaleNotificationDefinitionOperation } from './project-locale-notification-definition-operation.mjs'
+import { registerLocaleTelegramContentOperation } from './project-locale-telegram-content-operation.mjs'
 
 export function registerProjectLocaleOperations(registry) {
   registerLocaleApiSuiteOperation(registry)
   registerLocaleApiFixtureOperations(registry)
   registerLocaleAuthServiceOperation(registry)
+  registerLocaleAuthControllerOperation(registry)
   registerLocaleApiLinkOperation(registry)
   registerLocaleConfigOperations(registry)
   registerLocaleEmailTestOperation(registry)
@@ -34,4 +38,6 @@ export function registerProjectLocaleOperations(registry) {
   registerLocaleRenderOperation(registry)
   registerLocaleFrontendUrlOperation(registry)
   registerLocaleNavigationTestOperation(registry)
+  registerLocaleNotificationDefinitionOperation(registry)
+  registerLocaleTelegramContentOperation(registry)
 }

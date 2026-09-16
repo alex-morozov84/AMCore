@@ -59,4 +59,59 @@ export const localeOwnershipSeams = [
     'locale.email-template-test',
     { occurrences: 3 }
   ),
+  seam(
+    'locale.auth-controller-typed-fixture',
+    'apps/api/src/core/auth/auth.controller.spec.ts',
+    { identifiers: ['delegates to the service and returns the wrapped profile'] },
+    ['delegates to the service and returns the wrapped profile'],
+    'locale.auth-controller-typed-fixture'
+  ),
+  seam(
+    'locale.auth-service-typed-fixtures',
+    'apps/api/src/core/auth/auth.service.spec.ts',
+    {
+      identifiers: [
+        'uses the explicit body locale over the negotiated header',
+        'falls back to the negotiated Accept-Language locale when the body omits it',
+      ],
+    },
+    [
+      'uses the explicit body locale over the negotiated header',
+      'falls back to the negotiated Accept-Language locale when the body omits it',
+    ],
+    'locale.auth-service-test',
+    { occurrences: 2 }
+  ),
+  seam(
+    'locale.telegram-content-typed-fixture',
+    'apps/api/src/core/notifications/channels/telegram/telegram-content.spec.ts',
+    {
+      identifiers: [
+        'renders detailed content only from the allowlisted projection (no raw payload leak)',
+      ],
+    },
+    ['renders detailed content only from the allowlisted projection (no raw payload leak)'],
+    'locale.telegram-content-test'
+  ),
+  seam(
+    'locale.notification-registry-typed-fixtures',
+    'apps/api/src/core/notifications/notification-definition.registry.spec.ts',
+    { identifiers: ['renderStored (version-aware, fail-closed)'] },
+    ['renderStored (version-aware, fail-closed)'],
+    'locale.api-fixture'
+  ),
+  ...[
+    ['password-changed', 'account-password-changed.definition.ts', 3],
+    ['profile-updated', 'account-profile-updated.definition.ts', 1],
+    ['telegram-linked', 'account-telegram-linked.definition.ts', 1],
+  ].map(([id, file, occurrences]) =>
+    seam(
+      `locale.notification-definition-${id}`,
+      `apps/api/src/core/notifications/definitions/${file}`,
+      { text: "locale === 'en'" },
+      ["locale === 'en'"],
+      'locale.notification-definition',
+      { occurrences }
+    )
+  ),
 ]

@@ -1,4 +1,5 @@
 import { OWNERSHIP_CODES, ownershipError } from './ownership-errors.mjs'
+import { ruNarrowingResiduals } from './project-locale-ru-narrowing-validation.mjs'
 
 const REQUEST_PATH = 'apps/web/src/i18n/request.ts'
 const FRONTEND_URL_TEST = 'packages/shared/src/lib/frontend-url.test.ts'
@@ -68,6 +69,7 @@ export function assertLocaleSemanticProjection(locale, contents) {
     residuals.push(...emailResiduals(locale, contract, contents.get(contract.path) ?? ''))
   }
   residuals.push(...frontendUrlResiduals(locale, contents.get(FRONTEND_URL_TEST) ?? ''))
+  residuals.push(...ruNarrowingResiduals(locale, contents))
   if (!residuals.length) return
   throw ownershipError(
     OWNERSHIP_CODES.RESIDUAL,

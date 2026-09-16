@@ -62,6 +62,7 @@ test('rejects unsupported locale params at registry validation', () => {
 test('names the frontend fixture as an RU-only parity delta', () => {
   const request = 'apps/web/src/i18n/request.ts'
   const emailRoot = 'apps/api/src/infrastructure/email/templates'
+  const notificationRoot = 'apps/api/src/core/notifications'
   assert.deepEqual(localeIntentionalDeltas('en'), [request])
   assert.deepEqual(localeIntentionalDeltas('ru'), [
     request,
@@ -69,6 +70,13 @@ test('names the frontend fixture as an RU-only parity delta', () => {
     `${emailRoot}/org-invite.integration.spec.ts`,
     `${emailRoot}/password-reset.integration.spec.ts`,
     pathname,
+    'apps/api/src/core/auth/auth.controller.spec.ts',
+    'apps/api/src/core/auth/auth.service.spec.ts',
+    `${notificationRoot}/channels/telegram/telegram-content.spec.ts`,
+    `${notificationRoot}/notification-definition.registry.spec.ts`,
+    `${notificationRoot}/definitions/account-password-changed.definition.ts`,
+    `${notificationRoot}/definitions/account-profile-updated.definition.ts`,
+    `${notificationRoot}/definitions/account-telegram-linked.definition.ts`,
   ])
 })
 

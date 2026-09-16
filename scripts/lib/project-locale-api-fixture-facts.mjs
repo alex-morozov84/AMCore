@@ -43,6 +43,16 @@ export function buildLocaleApiFixtureFacts(locale) {
       'locale.auth-service-test',
       locale
     ),
+    localeContent(
+      'apps/api/src/core/auth/auth.controller.spec.ts',
+      'locale.auth-controller-typed-fixture',
+      locale
+    ),
+    localeContent(
+      'apps/api/src/core/notifications/channels/telegram/telegram-content.spec.ts',
+      'locale.telegram-content-test',
+      locale
+    ),
     ...fixtures.map(([pathname, operationKey, variant]) =>
       localeContent(pathname, operationKey, locale, { variant })
     ),

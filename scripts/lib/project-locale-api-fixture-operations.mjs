@@ -34,6 +34,9 @@ export function registerLocaleApiFixtureOperations(registry) {
     paramsSchema,
     deriveSemanticWrites: ({ locale, variant }) => [
       claim(`ts:api-fixture:${variant}:locale`, locale),
+      ...(variant === 'definition-registry'
+        ? [claim('ts:api-fixture:definition-registry:stored-locale', locale)]
+        : []),
     ],
     adapter: apiFixture,
   })

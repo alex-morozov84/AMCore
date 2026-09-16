@@ -7,7 +7,7 @@ import {
   rewriteAuthServiceSpecialCase,
 } from './project-locale-api-simple-fixtures.mjs'
 
-function replaceLocaleInTest(model, locale, ctx) {
+function rewriteExplicitLocaleTest(model, locale, ctx) {
   const test = testCall(model, 'uses the explicit body locale over the negotiated header', ctx)
   const register = findUniqueNode(
     model,
@@ -21,6 +21,34 @@ function replaceLocaleInTest(model, locale, ctx) {
     register
   )
   for (const literal of literals) model.replaceNode(literal, `'${locale}'`, ctx)
+  if (locale === 'en') return
+  model.replaceNode(test.arguments[0], "'uses the explicit body locale when supplied'", ctx)
+  const assertion = expressionIn(model, test, 'mockCtx.prisma.user.create', ctx)
+  replaceLocaleProperty(model, assertion, 'locale', locale, ctx)
+}
+
+function replaceLocaleProperty(model, root, name, locale, ctx) {
+  const property = findUniqueNode(
+    model,
+    (node) =>
+      ts.isPropertyAssignment(node) &&
+      node.name.getText() === name &&
+      ts.isStringLiteral(node.initializer) &&
+      ['en', 'ru'].includes(node.initializer.text),
+    { ...ctx, describe: `${name} locale fixture` },
+    root
+  )
+  model.replaceNode(property.initializer, `'${locale}'`, ctx)
+}
+
+function rewriteFallbackLocaleTest(model, locale, ctx) {
+  const test = testCall(
+    model,
+    'falls back to the negotiated Accept-Language locale when the body omits it',
+    ctx
+  )
+  replaceLocaleProperty(model, test, 'acceptedLocale', locale, ctx)
+  replaceLocaleProperty(model, test, 'locale', locale, ctx)
 }
 
 function expressionIn(model, root, text, ctx) {
@@ -95,7 +123,8 @@ function rewriteUnchangedLocaleComment(model, locale, ctx) {
 
 function authService(model, { locale }, ctx) {
   normalizeRussianFixtureLiterals(model, locale, ctx)
-  replaceLocaleInTest(model, locale, ctx)
+  rewriteExplicitLocaleTest(model, locale, ctx)
+  rewriteFallbackLocaleTest(model, locale, ctx)
   rewriteAuthServiceSpecialCase(model, ctx)
   rewriteUnchangedLocaleComment(model, locale, ctx)
   rewriteVerificationLink(model, ctx)
@@ -108,6 +137,8 @@ export function registerLocaleAuthServiceOperation(registry) {
     paramsSchema: localeParams,
     deriveSemanticWrites: ({ locale }) => [
       claim('ts:auth-service-test:locale', locale),
+      claim('ts:auth-service-test:explicit-body-locale', locale),
+      claim('ts:auth-service-test:fallback-locale', locale),
       absent('ts:auth-service-test:locale-prefixed-links'),
     ],
     adapter: authService,
