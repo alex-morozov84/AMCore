@@ -19,9 +19,9 @@ describe('scenario-registry', () => {
       [
         'coverage-multi-path',
         'coverage-multi-host-route-off',
-        'coverage-multi-disabled-storybook-off',
-        'coverage-single-en-path-storybook-route-off',
-        'coverage-single-ru-host-storybook-off',
+        'coverage-multi-disabled',
+        'coverage-single-en-path-route-off',
+        'coverage-single-ru-host',
         'coverage-single-en-disabled-route-off',
       ]
     )

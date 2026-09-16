@@ -20,26 +20,35 @@ function row(name, flags, factors, postApplySteps, replaces = []) {
 export const SCAFFOLD_COVERING_SCENARIOS = [
   row(
     'coverage-multi-path',
-    ['--admin-console=path', '--admin-console-slug=panel'],
+    ['--admin-console=path', '--admin-console-slug=panel', '--storybook=disabled'],
     {
       localeTopology: 'multi',
       locales: ['en', 'ru'],
       console: 'path',
-      storybook: 'enabled',
+      storybook: 'disabled',
       routeProgress: 'enabled',
       proxy: 'none',
     },
-    CONSOLE_VERIFY_STEPS,
-    ['admin-console-path-panel']
+    FULL_VERIFY_STEPS,
+    [
+      'admin-console-path-panel',
+      'storybook-disabled-install-before',
+      'storybook-disabled-manual-verify-after',
+    ]
   ),
   row(
     'coverage-multi-host-route-off',
-    ['--admin-console=host', '--admin-console-slug=panel', '--route-progress=disabled'],
+    [
+      '--admin-console=host',
+      '--admin-console-slug=panel',
+      '--storybook=disabled',
+      '--route-progress=disabled',
+    ],
     {
       localeTopology: 'multi',
       locales: ['en', 'ru'],
       console: 'host',
-      storybook: 'enabled',
+      storybook: 'disabled',
       routeProgress: 'disabled',
       proxy: 'multi-host',
     },
@@ -47,53 +56,45 @@ export const SCAFFOLD_COVERING_SCENARIOS = [
     ['admin-console-host-panel']
   ),
   row(
-    'coverage-multi-disabled-storybook-off',
-    ['--admin-console=disabled', '--storybook=disabled'],
+    'coverage-multi-disabled',
+    ['--admin-console=disabled'],
     {
       localeTopology: 'multi',
       locales: ['en', 'ru'],
       console: 'disabled',
-      storybook: 'disabled',
+      storybook: 'enabled',
       routeProgress: 'enabled',
       proxy: 'none',
     },
-    FULL_VERIFY_STEPS,
-    ['storybook-disabled-install-before', 'storybook-disabled-manual-verify-after']
+    WEB_BUILD_STEPS
   ),
   row(
-    'coverage-single-en-path-storybook-route-off',
+    'coverage-single-en-path-route-off',
     [
       '--mode=single',
       '--locale=en',
       '--admin-console=path',
       '--admin-console-slug=panel',
-      '--storybook=disabled',
       '--route-progress=disabled',
     ],
     {
       localeTopology: 'single',
       locales: ['en'],
       console: 'path',
-      storybook: 'disabled',
+      storybook: 'enabled',
       routeProgress: 'disabled',
       proxy: 'none',
     },
     WEB_BUILD_STEPS
   ),
   row(
-    'coverage-single-ru-host-storybook-off',
-    [
-      '--mode=single',
-      '--locale=ru',
-      '--admin-console=host',
-      '--admin-console-slug=panel',
-      '--storybook=disabled',
-    ],
+    'coverage-single-ru-host',
+    ['--mode=single', '--locale=ru', '--admin-console=host', '--admin-console-slug=panel'],
     {
       localeTopology: 'single',
       locales: ['ru'],
       console: 'host',
-      storybook: 'disabled',
+      storybook: 'enabled',
       routeProgress: 'enabled',
       proxy: 'single-host',
     },
@@ -102,12 +103,18 @@ export const SCAFFOLD_COVERING_SCENARIOS = [
   ),
   row(
     'coverage-single-en-disabled-route-off',
-    ['--mode=single', '--locale=en', '--admin-console=disabled', '--route-progress=disabled'],
+    [
+      '--mode=single',
+      '--locale=en',
+      '--admin-console=disabled',
+      '--storybook=disabled',
+      '--route-progress=disabled',
+    ],
     {
       localeTopology: 'single',
       locales: ['en'],
       console: 'disabled',
-      storybook: 'enabled',
+      storybook: 'disabled',
       routeProgress: 'disabled',
       proxy: 'none',
     },

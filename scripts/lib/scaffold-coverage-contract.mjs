@@ -11,6 +11,16 @@ const LEGACY_RECIPES = [
   'admin-console-single-locale-ru-host-panel',
   'admin-console-single-locale-en-disabled',
 ]
+const LEGACY_OBLIGATIONS = {
+  'single-locale-en': ['typecheck', 'lint', 'build', 'api-test', 'web-test'],
+  'route-progress-disabled': ['typecheck', 'lint', 'build', 'api-test', 'web-test'],
+  'storybook-disabled-install-before': ['install'],
+  'storybook-disabled-manual-verify-after': ['typecheck', 'lint', 'build', 'api-test', 'web-test'],
+  'admin-console-path-panel': ['typecheck', 'lint', 'build', 'web-test'],
+  'admin-console-host-panel': ['typecheck', 'lint', 'build', 'web-test'],
+  'admin-console-single-locale-ru-host-panel': ['build'],
+  'admin-console-single-locale-en-disabled': ['build'],
+}
 
 const cross = (left, right, label) => left.flatMap((a) => right.map((b) => `${label}:${a}/${b}`))
 
@@ -53,6 +63,30 @@ function commandCounts(row) {
   }
 }
 
+function capabilities(row) {
+  const result = new Set(['install'])
+  for (const args of row.postApplySteps) {
+    const label = args.join(' ')
+    if (args[0] === 'typecheck') result.add('typecheck')
+    if (args[0] === 'lint') result.add('lint')
+    if (/(^| )build( |$)/.test(label)) result.add('build')
+    if (label === '--filter api test') result.add('api-test')
+    if (label === '--filter web test') result.add('web-test')
+  }
+  return result
+}
+
+function validateLegacyAssignments(rows, errors) {
+  for (const name of LEGACY_RECIPES) {
+    const assigned = rows.filter((row) => row.replaces.includes(name))
+    if (assigned.length !== 1) errors.push(`${name}: expected exactly one retained row`)
+    if (assigned.length !== 1) continue
+    const available = capabilities(assigned[0])
+    const missing = LEGACY_OBLIGATIONS[name].filter((item) => !available.has(item))
+    if (missing.length > 0) errors.push(`${name}: missing obligations ${missing.join(', ')}`)
+  }
+}
+
 export function validateCoveringScenarios(rows) {
   const covered = new Set(rows.flatMap((row) => [...rowCoverage(row)]))
   const missing = [...requiredCoverage()].filter((token) => !covered.has(token))
@@ -65,6 +99,7 @@ export function validateCoveringScenarios(rows) {
     if (counts.installs !== 1) errors.push(`${row.name}: expected exactly one install`)
     if (counts.builds !== 1) errors.push(`${row.name}: expected exactly one build command`)
   }
+  validateLegacyAssignments(rows, errors)
   if (missing.length > 0) errors.push(`missing coverage: ${missing.join(', ')}`)
   return errors
 }

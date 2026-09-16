@@ -82,4 +82,18 @@ describe('scaffolding L3 covering array', () => {
     assert.match(validateCoveringScenarios([duplicateInstall, ...rest]).join('\n'), /one install/)
     assert.match(validateCoveringScenarios([duplicateBuild, ...rest]).join('\n'), /one build/)
   })
+
+  test('mutation: every legacy duty keeps its commands and one retained owner', () => {
+    const storyDuty = 'storybook-disabled-manual-verify-after'
+    const weakened = SCAFFOLD_COVERING_SCENARIOS.map((row) =>
+      row.replaces.includes(storyDuty)
+        ? { ...row, postApplySteps: [['exec', 'turbo', 'run', 'build', '--filter=@amcore/web']] }
+        : row
+    )
+    const duplicated = SCAFFOLD_COVERING_SCENARIOS.map((row, index) =>
+      index === 2 ? { ...row, replaces: [...row.replaces, storyDuty] } : row
+    )
+    assert.match(validateCoveringScenarios(weakened).join('\n'), /missing obligations/)
+    assert.match(validateCoveringScenarios(duplicated).join('\n'), /exactly one retained row/)
+  })
 })
