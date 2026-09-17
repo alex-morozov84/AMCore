@@ -10,6 +10,11 @@ import {
 } from './path-algebra-structural-compose.mjs'
 import { createProjectStructuralRegistry } from './project-content-materializer.mjs'
 import { localeIntentionalDeltas } from './project-locale-intentional-deltas.mjs'
+import {
+  E2E_ROUTE_SURFACES,
+  LOCALE_ONLY_E2E_PATHS,
+  OAUTH_E2E_ROUTE_SURFACE,
+} from './project-locale-e2e-route-surfaces.mjs'
 
 const pathname = 'packages/shared/src/lib/frontend-url.test.ts'
 const source = readFileSync(path.join(process.cwd(), pathname), 'utf8')
@@ -59,13 +64,25 @@ test('rejects unsupported locale params at registry validation', () => {
   assert.throws(() => apply(source, 'de'), invalidParams)
 })
 
-test('names the frontend fixture as an RU-only parity delta', () => {
+test('names shared and RU-only parity deltas', () => {
   const request = 'apps/web/src/i18n/request.ts'
   const emailRoot = 'apps/api/src/infrastructure/email/templates'
   const notificationRoot = 'apps/api/src/core/notifications'
-  assert.deepEqual(localeIntentionalDeltas('en'), [request])
-  assert.deepEqual(localeIntentionalDeltas('ru'), [
+  const shared = [
     request,
+    'packages/shared/src/schemas/auth.test.ts',
+    'apps/api/test/auth.e2e-spec.ts',
+    'apps/web/src/proxy.ts',
+    ...E2E_ROUTE_SURFACES.map(([routePath]) => routePath),
+    ...LOCALE_ONLY_E2E_PATHS,
+    OAUTH_E2E_ROUTE_SURFACE[0],
+  ]
+  assert.deepEqual(localeIntentionalDeltas('en'), shared)
+  assert.deepEqual(localeIntentionalDeltas('ru'), [
+    ...shared,
+    'apps/api/prisma/user.prisma',
+    'apps/api/prisma/migrations/20260801103725_default_locale_en_timezone_utc/migration.sql',
+    'apps/api/src/core/auth/locale-negotiation.spec.ts',
     `${emailRoot}/email-verification.integration.spec.ts`,
     `${emailRoot}/org-invite.integration.spec.ts`,
     `${emailRoot}/password-reset.integration.spec.ts`,
@@ -79,7 +96,6 @@ test('names the frontend fixture as an RU-only parity delta', () => {
     `${notificationRoot}/definitions/account-telegram-linked.definition.ts`,
     'apps/api/src/core/organizations/invite.service.spec.ts',
     `${notificationRoot}/notification-feed.service.spec.ts`,
-    'packages/shared/src/schemas/auth.test.ts',
   ])
 })
 

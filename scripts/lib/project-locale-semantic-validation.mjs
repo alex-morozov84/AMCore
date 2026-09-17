@@ -1,8 +1,18 @@
 import { OWNERSHIP_CODES, ownershipError } from './ownership-errors.mjs'
 import { ruNarrowingResiduals } from './project-locale-ru-narrowing-validation.mjs'
+import { readPrismaLocaleDefault } from './project-locale-prisma-default-operation.mjs'
+import { readSqlLocaleDefault } from './project-locale-sql-default-operation.mjs'
+import { e2eRouteResiduals } from './project-locale-e2e-route-validation.mjs'
+import { proxyResiduals } from './project-locale-proxy-validation.mjs'
+import { e2eUiResiduals } from './project-locale-e2e-ui-validation.mjs'
 
 const REQUEST_PATH = 'apps/web/src/i18n/request.ts'
 const FRONTEND_URL_TEST = 'packages/shared/src/lib/frontend-url.test.ts'
+const CONSTANTS_PATH = 'packages/shared/src/constants/index.ts'
+const PRISMA_PATH = 'apps/api/prisma/user.prisma'
+const SQL_PATH =
+  'apps/api/prisma/migrations/20260801103725_default_locale_en_timezone_utc/migration.sql'
+const AUTH_SCHEMA_TEST = 'packages/shared/src/schemas/auth.test.ts'
 
 const emailContracts = [
   {
@@ -63,12 +73,45 @@ function frontendUrlResiduals(locale, content) {
   ]
 }
 
+function declaredDefault(content) {
+  const matches = [...content.matchAll(/export const DEFAULT_LOCALE(?:: [^=]+)? = '([^']+)'/g)]
+  return matches.length === 1 ? matches[0][1] : undefined
+}
+
+function databaseDefaultResiduals(locale, contents) {
+  const defaults = {
+    shared: declaredDefault(contents.get(CONSTANTS_PATH) ?? ''),
+    prisma: readPrismaLocaleDefault(contents.get(PRISMA_PATH) ?? ''),
+    sql: readSqlLocaleDefault(contents.get(SQL_PATH) ?? ''),
+  }
+  return Object.entries(defaults)
+    .filter(([, value]) => value !== locale)
+    .map(([source, value]) => `${source} locale default ${String(value)} != ${locale}`)
+}
+
+function supportedSchemaResiduals(locale, content) {
+  const other = locale === 'en' ? 'ru' : 'en'
+  const required = [
+    `supportedLocaleSchema.safeParse('${locale}').success).toBe(true)`,
+    `supportedLocaleSchema.safeParse('${other}').success).toBe(false)`,
+    "supportedLocaleSchema.safeParse('de').success).toBe(false)",
+  ]
+  return required
+    .filter((expectation) => !content.includes(expectation))
+    .map((expectation) => `${AUTH_SCHEMA_TEST}:missing ${expectation}`)
+}
+
 export function assertLocaleSemanticProjection(locale, contents) {
   const residuals = requestResiduals(locale, contents.get(REQUEST_PATH) ?? '')
   for (const contract of emailContracts) {
     residuals.push(...emailResiduals(locale, contract, contents.get(contract.path) ?? ''))
   }
   residuals.push(...frontendUrlResiduals(locale, contents.get(FRONTEND_URL_TEST) ?? ''))
+  residuals.push(...databaseDefaultResiduals(locale, contents))
+  residuals.push(...supportedSchemaResiduals(locale, contents.get(AUTH_SCHEMA_TEST) ?? ''))
+  residuals.push(...e2eRouteResiduals(contents))
+  residuals.push(...proxyResiduals(contents))
+  residuals.push(...e2eUiResiduals(locale, contents))
   residuals.push(...ruNarrowingResiduals(locale, contents))
   if (!residuals.length) return
   throw ownershipError(

@@ -22,6 +22,34 @@ const linkedTests = [
   ['packages/shared/src/lib/frontend-url.test.ts', 'packages/shared/src/lib/frontend-url.ts'],
 ].map(([path, module]) => one(path, { module }))
 
+const e2eVerification = [
+  'apps/api/test/oauth.e2e-spec.ts',
+  'apps/web/e2e/console-real-stack/session-isolation.spec.ts',
+  'apps/web/e2e/mocked/accessibility.spec.ts',
+  'apps/web/e2e/mocked/api-error-rendering.spec.ts',
+  'apps/web/e2e/mocked/csp-nonce.spec.ts',
+  'apps/web/e2e/mocked/csp-report-endpoint.spec.ts',
+  'apps/web/e2e/mocked/login-validation.spec.ts',
+  'apps/web/e2e/mocked/route-progress-bar.spec.ts',
+  'apps/web/e2e/mocked/security-headers.spec.ts',
+  'apps/web/e2e/mocked/theme-persistence.spec.ts',
+  'apps/web/e2e/real-stack/accessibility.spec.ts',
+  'apps/web/e2e/real-stack/app-shell.spec.ts',
+  'apps/web/e2e/real-stack/auth-email-link-flows.spec.ts',
+  'apps/web/e2e/real-stack/csp-nonce.spec.ts',
+  'apps/web/e2e/real-stack/helpers.ts',
+  'apps/web/e2e/real-stack/login.spec.ts',
+  'apps/web/e2e/real-stack/register-and-logout.spec.ts',
+  'apps/web/e2e/real-stack/require-session-redirect.spec.ts',
+  'apps/web/e2e/real-stack/sessions.spec.ts',
+  'apps/web/e2e/server-mocked/oauth-visibility.spec.ts',
+].map((path) => one(path, { disposition: 'rewrite' }))
+
+const localeOnlyVerification = [
+  'apps/web/e2e/mocked/locale-redirect.spec.ts',
+  'apps/web/e2e/real-stack/locale-persistence.spec.ts',
+].map((path) => one(path, { disposition: 'delete' }))
+
 const independentConsumers = [
   'apps/api/src/core/auth/auth.service.ts',
   'apps/api/src/core/auth/oauth/oauth.controller.ts',
@@ -53,7 +81,7 @@ export const localeOwnershipFacts = {
   sharedModules,
   sharedModuleTests: linkedTests,
   topology,
-  verification: [],
+  verification: [...e2eVerification, ...localeOnlyVerification],
   documentation: [],
   featureEntrypoints: [],
   repositoryEntrypoints: [
@@ -62,6 +90,7 @@ export const localeOwnershipFacts = {
     one('packages/shared/src/index.ts'),
     one('packages/shared/src/lib/frontend-url.ts'),
     one('apps/web/src/i18n/request.ts'),
+    one('apps/web/src/proxy.ts'),
     many('apps/web/src/app/**/page.tsx'),
     many('apps/web/src/app/**/layout.tsx'),
     many('apps/web/src/app/**/route.ts'),
@@ -69,9 +98,14 @@ export const localeOwnershipFacts = {
 }
 
 export const localeSurfaceRoots = [
+  'apps/api/prisma/user.prisma',
+  'apps/api/prisma/migrations/20260801103725_default_locale_en_timezone_utc/migration.sql',
+  'apps/api/test/auth.e2e-spec.ts',
+  'apps/api/test/oauth.e2e-spec.ts',
   'apps/api/src',
   'apps/web/eslint.config.mjs',
   'apps/web/messages',
+  'apps/web/e2e',
   'apps/web/src',
   'packages/shared/src',
   'PROJECT_CONTEXT.md',

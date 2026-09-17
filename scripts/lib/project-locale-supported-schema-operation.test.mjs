@@ -28,22 +28,32 @@ function apply(text, locale) {
   return applyStructuralPlan(registry, plan, text)
 }
 
-test('rejects the unselected English locale only in RU projection', () => {
-  assert.equal(apply(source, 'en'), source)
+test('accepts only the selected upstream locale in each projection', () => {
+  const en = apply(source, 'en')
   const ru = apply(source, 'ru')
+  assert.match(en, /safeParse\('en'\)\.success\)\.toBe\(true\)/)
+  assert.match(en, /safeParse\('ru'\)\.success\)\.toBe\(false\)/)
+  assert.match(en, /safeParse\('de'\)\.success\)\.toBe\(false\)/)
   assert.match(ru, /safeParse\('ru'\)\.success\)\.toBe\(true\)/)
   assert.match(ru, /safeParse\('en'\)\.success\)\.toBe\(false\)/)
   assert.match(ru, /safeParse\('de'\)\.success\)\.toBe\(false\)/)
   assert.match(ru, /safeParse\('EN'\)\.success\)\.toBe\(false\)/)
 })
 
-test('fails closed when the English expectation is missing or duplicated', () => {
-  const expectation = "expect(supportedLocaleSchema.safeParse('en').success).toBe(true)"
-  assert.throws(() => apply(source.replace(expectation, ''), 'ru'), semanticNode)
-  assert.throws(
-    () => apply(source.replace(expectation, `${expectation}\n    ${expectation}`), 'ru'),
-    semanticNode
-  )
+test('fails closed when either upstream expectation is missing or duplicated', () => {
+  for (const locale of ['en', 'ru']) {
+    const expectation = `expect(supportedLocaleSchema.safeParse('${locale}').success).toBe(true)`
+    assert.throws(() => apply(source.replace(expectation, ''), locale), semanticNode)
+    assert.throws(
+      () => apply(source.replace(expectation, `${expectation}\n    ${expectation}`), locale),
+      semanticNode
+    )
+  }
+})
+
+test('rejects mutations that accept the unselected upstream locale', () => {
+  assert.doesNotMatch(apply(source, 'en'), /safeParse\('ru'\)\.success\)\.toBe\(true\)/)
+  assert.doesNotMatch(apply(source, 'ru'), /safeParse\('en'\)\.success\)\.toBe\(true\)/)
 })
 
 function semanticNode(error) {

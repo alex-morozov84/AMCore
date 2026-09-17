@@ -1,3 +1,9 @@
+import {
+  E2E_ROUTE_SURFACES,
+  OAUTH_E2E_ROUTE_SURFACE,
+} from './project-locale-e2e-route-surfaces.mjs'
+import { E2E_UI_PROFILES, E2E_UI_SURFACES } from './project-locale-e2e-ui-surfaces.mjs'
+
 const seam = (id, path, selector, detectors, operationKey, extra = {}) => ({
   id,
   path,
@@ -11,7 +17,58 @@ const seam = (id, path, selector, detectors, operationKey, extra = {}) => ({
   ...extra,
 })
 
+const e2eRouteSeams = [...E2E_ROUTE_SURFACES, OAUTH_E2E_ROUTE_SURFACE].map(
+  ([path, occurrences], index) =>
+    seam(
+      `locale.e2e-route-${index + 1}`,
+      path,
+      { identifiers: ['/en', '/ru', '/(en|ru)'] },
+      ['locale-prefixed-route'],
+      'locale.e2e-route-topology',
+      { occurrences }
+    )
+)
+
+const e2eUiSeams = E2E_UI_SURFACES.map(({ path, namespaces, expectedReferences }, index) =>
+  seam(
+    `locale.e2e-ui-${index + 1}`,
+    path,
+    {
+      identifiers: [
+        ...new Set(namespaces.flatMap((namespace) => E2E_UI_PROFILES[namespace].map(([en]) => en))),
+      ],
+    },
+    ['english-localized-ui-expectation'],
+    'locale.e2e-ui-expectations',
+    { occurrences: expectedReferences }
+  )
+)
+
 export const localeOwnershipSeams = [
+  ...e2eRouteSeams,
+  ...e2eUiSeams,
+  seam(
+    'locale.proxy-i18n-seam',
+    'apps/web/src/proxy.ts',
+    { identifiers: ['next-intl/middleware', './i18n/routing', 'handleI18nRouting'] },
+    ['next-intl/middleware', './i18n/routing', 'handleI18nRouting'],
+    'locale.proxy-i18n-seam',
+    { occurrences: 4 }
+  ),
+  seam(
+    'locale.prisma-user-default',
+    'apps/api/prisma/user.prisma',
+    { text: 'locale           String  @default("en")' },
+    ['locale           String  @default("en")'],
+    'locale.prisma-user-default'
+  ),
+  seam(
+    'locale.sql-user-default',
+    'apps/api/prisma/migrations/20260801103725_default_locale_en_timezone_utc/migration.sql',
+    { text: 'ALTER COLUMN "locale" SET DEFAULT \'en\'' },
+    ['ALTER COLUMN "locale" SET DEFAULT \'en\''],
+    'locale.sql-user-default'
+  ),
   seam(
     'locale.context',
     'PROJECT_CONTEXT.md',
@@ -62,9 +119,61 @@ export const localeOwnershipSeams = [
   seam(
     'locale.auth-controller-typed-fixture',
     'apps/api/src/core/auth/auth.controller.spec.ts',
-    { identifiers: ['delegates to the service and returns the wrapped profile'] },
-    ['delegates to the service and returns the wrapped profile'],
-    'locale.auth-controller-typed-fixture'
+    {
+      identifiers: [
+        'delegates to the service and returns the wrapped profile',
+        'passes the negotiated Accept-Language locale to the service',
+      ],
+    },
+    [
+      'delegates to the service and returns the wrapped profile',
+      'passes the negotiated Accept-Language locale to the service',
+    ],
+    'locale.auth-controller-typed-fixture',
+    { occurrences: 2 }
+  ),
+  seam(
+    'locale.negotiation-unit-default',
+    'apps/api/src/core/auth/locale-negotiation.spec.ts',
+    { identifiers: ['returns the negotiated supported locale for a matching header'] },
+    ['returns the negotiated supported locale for a matching header'],
+    'locale.database-default-test'
+  ),
+  seam(
+    'locale.auth-e2e-default',
+    'apps/api/test/auth.e2e-spec.ts',
+    {
+      identifiers: [
+        'seeds locale from Accept-Language when no explicit locale is given',
+        'falls back to the DB default for an unsupported Accept-Language',
+        'updates name, locale, and timezone and persists them',
+        'updates only the supplied field and leaves the rest untouched',
+      ],
+    },
+    [
+      'seeds locale from Accept-Language when no explicit locale is given',
+      'falls back to the DB default for an unsupported Accept-Language',
+      'updates name, locale, and timezone and persists them',
+      'updates only the supplied field and leaves the rest untouched',
+    ],
+    'locale.database-default-test',
+    { occurrences: 4 }
+  ),
+  seam(
+    'locale.oauth-e2e-default',
+    'apps/api/test/oauth.e2e-spec.ts',
+    {
+      identifiers: [
+        'seeds a new OAuth user locale from the authorize-time Accept-Language',
+        'falls back to the DB default locale when authorize has no usable Accept-Language',
+      ],
+    },
+    [
+      'seeds a new OAuth user locale from the authorize-time Accept-Language',
+      'falls back to the DB default locale when authorize has no usable Accept-Language',
+    ],
+    'locale.database-default-test',
+    { occurrences: 2 }
   ),
   seam(
     'locale.auth-service-typed-fixtures',

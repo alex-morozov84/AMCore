@@ -35,6 +35,10 @@ describe('single-locale filesystem projection', () => {
         const request = readFileSync(path.join(root, 'apps/web/src/i18n/request.ts'), 'utf8')
         assert.match(request, new RegExp(`messages/${locale}\\.json`))
         assert.doesNotMatch(request, /\bimport\s*\(/)
+        const proxy = readFileSync(path.join(root, 'apps/web/src/proxy.ts'), 'utf8')
+        assert.match(proxy, /NextResponse\.next\(\{\s*request: \{\s*headers: request\.headers/)
+        assert.match(proxy, /Reporting-Endpoints/)
+        assert.doesNotMatch(proxy, /next-intl|handleI18nRouting/)
       }))
   }
 })

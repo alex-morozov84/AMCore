@@ -27,6 +27,17 @@ function assertResidualMutation(target, mutate) {
   )
 }
 
+function assertLocaleResidualMutation(locale, target, mutate) {
+  const plan = buildProjectFactPlan(root, { mode: 'single', locale }, 'admin')
+  const mutated = allSteps(plan).map((step) =>
+    step.target.endsWith(target) ? { ...step, after: mutate(step.after) } : step
+  )
+  assert.throws(
+    () => validateProjectLocaleOwnership(root, mutated, locale),
+    (error) => error instanceof OwnershipError && error.code === OWNERSHIP_CODES.RESIDUAL
+  )
+}
+
 test('rejects a mutation that restores an impossible production EN branch', () => {
   assertResidualMutation('account-profile-updated.definition.ts', (content) =>
     content.replace(
@@ -49,10 +60,34 @@ test('rejects mutations that restore EN-only default expectations', () => {
   assertResidualMutation('notification-feed.service.spec.ts', (content) =>
     content.replace("title: 'Профиль обновлён'", "title: 'Profile updated'")
   )
-  assertResidualMutation('packages/shared/src/schemas/auth.test.ts', (content) =>
+  assertLocaleResidualMutation('ru', 'packages/shared/src/schemas/auth.test.ts', (content) =>
     content.replace(
       "supportedLocaleSchema.safeParse('en').success).toBe(false)",
       "supportedLocaleSchema.safeParse('en').success).toBe(true)"
+    )
+  )
+})
+
+test('rejects a schema mutation that accepts the other upstream locale', () => {
+  assertLocaleResidualMutation('en', 'packages/shared/src/schemas/auth.test.ts', (content) =>
+    content.replace(
+      "supportedLocaleSchema.safeParse('ru').success).toBe(false)",
+      "supportedLocaleSchema.safeParse('ru').success).toBe(true)"
+    )
+  )
+})
+
+test('rejects Prisma, SQL, or shared default-locale mismatches', () => {
+  assertResidualMutation('apps/api/prisma/user.prisma', (content) =>
+    content.replace('@default("ru")', '@default("en")')
+  )
+  assertResidualMutation('migration.sql', (content) =>
+    content.replace("SET DEFAULT 'ru'", "SET DEFAULT 'en'")
+  )
+  assertResidualMutation('packages/shared/src/constants/index.ts', (content) =>
+    content.replace(
+      "DEFAULT_LOCALE: SupportedLocale = 'ru'",
+      "DEFAULT_LOCALE: SupportedLocale = 'en'"
     )
   )
 })

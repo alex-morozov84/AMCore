@@ -27,7 +27,6 @@ export const localeRouteMove = (relative) => ({
 })
 
 export const LOCALE_DELETES = Object.freeze([
-  'apps/web/src/proxy.ts',
   'apps/web/src/i18n/routing.ts',
   'apps/web/src/i18n/navigation.ts',
   'apps/web/src/i18n/params.ts',

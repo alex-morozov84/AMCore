@@ -30,6 +30,9 @@ function claimsFor(fact) {
     projectConsoleContentDefinition(fact.operationKey) ??
     projectStorybookContentDefinition(fact.operationKey)
   if (!definition) throw new Error(`unknown shared content operation "${fact.operationKey}"`)
+  if (definition.paramsSchema && definition.paramsSchema(fact.params) !== true) {
+    throw new Error(`invalid operation params for "${fact.operationKey}"`)
+  }
   const claims = definition.claims(fact.params)
   if (!Array.isArray(claims) || claims.length === 0) {
     throw new Error(`shared content operation "${fact.operationKey}" has no semantic claims`)

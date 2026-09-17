@@ -62,23 +62,20 @@ export function assertKnownLocale(root, locale) {
   }
 }
 
-const PRISMA_LOCALE_DEFAULT_NOTE =
-  'apps/api/prisma/user.prisma has locale String @default("en"); if your single ' +
-  'locale/default locale is not en, update the Prisma default and create a migration ' +
-  'with pnpm --filter api db:migrate.'
+const PRISMA_EN_NOTE =
+  'apps/api/prisma/user.prisma has locale String @default("en"); no migration change is needed.'
 
 /**
- * The one Prisma follow-up the Track 10 decision explicitly keeps manual
- * (ai/models-talk.md): trimming SUPPORTED_LOCALES/DEFAULT_LOCALE never
- * touches the database, so a non-`en` locale needs an explicit, stricter
- * nudge toward the real migration step.
+ * Scaffolding edits source only: it aligns the fresh-fork Prisma and SQL
+ * defaults but never connects to or migrates a live database.
  */
 export function prismaFollowUpMessage(locale) {
-  const prefix =
-    locale === 'en'
-      ? 'Prisma: no DB default change needed (locale is en).'
-      : 'Prisma: required manual follow-up before production use.'
-  return `${prefix} ${PRISMA_LOCALE_DEFAULT_NOTE}`
+  if (locale === 'en')
+    return `Prisma: no DB default change needed (locale is en). ${PRISMA_EN_NOTE}`
+  return (
+    `Prisma: fresh-fork schema and migration defaults were set to ${locale}. ` +
+    'No live database was connected to or migrated.'
+  )
 }
 
 export function resolveSharedPaths(root) {

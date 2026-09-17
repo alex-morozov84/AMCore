@@ -20,6 +20,10 @@ import { registerLocaleNotificationDefinitionOperation } from './project-locale-
 import { registerLocaleTelegramContentOperation } from './project-locale-telegram-content-operation.mjs'
 import { registerLocaleNotificationFeedOperation } from './project-locale-notification-feed-operation.mjs'
 import { registerLocaleSupportedSchemaOperation } from './project-locale-supported-schema-operation.mjs'
+import { registerLocaleDatabaseTestOperation } from './project-locale-database-test-operation.mjs'
+import { registerLocaleE2eRouteOperation } from './project-locale-e2e-route-operation.mjs'
+import { registerLocaleProxyOperation } from './project-locale-proxy-operation.mjs'
+import { registerLocaleE2eUiOperation } from './project-locale-e2e-ui-operation.mjs'
 
 export function registerProjectLocaleOperations(registry) {
   registerLocaleApiSuiteOperation(registry)
@@ -34,6 +38,10 @@ export function registerProjectLocaleOperations(registry) {
   registerLocaleRequestOperation(registry)
   registerLocaleRootLayoutOperation(registry)
   registerLocaleSupportedSchemaOperation(registry)
+  registerLocaleDatabaseTestOperation(registry)
+  registerLocaleE2eRouteOperation(registry)
+  registerLocaleProxyOperation(registry)
+  registerLocaleE2eUiOperation(registry)
   registerLocaleRouteOperations(registry)
   registerLocaleWebSuiteOperations(registry)
   registerLocaleWebMessagesOperation(registry)

@@ -46,7 +46,18 @@ test('accepts EN and RU projected import graphs without exclusions', () => {
         'packages/shared/src/lib/frontend-url.ts'
       )
     )
+    assert.ok(plan.localeValidation.projection.universalSharedModules.has('apps/web/src/proxy.ts'))
+    assert.ok(!plan.localeValidation.projection.removed.has('apps/web/src/proxy.ts'))
   }
+})
+
+test('rejects treating the shared proxy framework entrypoint as locale-owned', () => {
+  const plan = buildProjectFactPlan(root, { mode: 'single', locale: 'en' }, 'admin')
+  const mutated = allSteps(plan).filter((step) => !step.target.endsWith('apps/web/src/proxy.ts'))
+  assert.throws(
+    () => validateProjectLocaleOwnership(root, mutated, 'en'),
+    ownershipCode(OWNERSHIP_CODES.RESIDUAL)
+  )
 })
 
 test('closed roots automatically own a newly nested locale-switcher file', () =>

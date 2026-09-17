@@ -38,15 +38,16 @@ describe('init-project (end-to-end against a real-repo copy)', () => {
     assert.match(result.stderr, /--locale=de is not one of the current supported locales: en, ru/)
   })
 
-  test('--dry-run for a non-en locale prints the stricter Prisma note', () => {
+  test('--dry-run for ru reports source projection without claiming a live migration', () => {
     copy = createRealRepoCopy()
     commit(copy.root)
 
     const result = runInitProject(copy.root, ['--dry-run', '--mode=single', '--locale=ru'])
 
     assert.equal(result.status, 0, result.stderr)
-    assert.match(result.stdout, /Prisma: required manual follow-up before production use/)
-    assert.match(result.stdout, /pnpm --filter api db:migrate/)
+    assert.match(result.stdout, /fresh-fork schema and migration defaults were set to ru/)
+    assert.match(result.stdout, /No live database was connected to or migrated/)
+    assert.doesNotMatch(result.stdout, /pnpm --filter api db:migrate/)
   })
 
   test('re-running after a successful apply fails closed with a clear message', () => {
