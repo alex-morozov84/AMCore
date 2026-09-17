@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // `pnpm init:brand` (Track 10, ADR-071) — repeatable, non-destructive brand/
-// identity initializer for a downstream fork. See ai/models-talk.md's FINAL
-// PLAN and ai/decisions/adr-071-*.md for the full design.
+// identity initializer for a downstream fork. The public safety and extension
+// contract lives in docs/frontend/brand-theme-and-tokens.md.
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseCommonFlags, runInitCommand } from './lib/init-engine.mjs'
 import { collectAnswers, BRAND_FLAG_OPTIONS } from './lib/brand-fields.mjs'
-import { buildBrandSteps } from './lib/brand-plan.mjs'
+import { prepareBrandInit } from './lib/brand-init-plan.mjs'
 
 // Testability seams for scripts/*.test.mjs: AMCORE_INIT_ROOT points the real
 // entrypoint at a disposable fixture tree; AMCORE_INIT_SKIP_VERIFY skips
@@ -32,11 +32,11 @@ const verify =
 async function main() {
   const flags = parseCommonFlags(process.argv.slice(2), BRAND_FLAG_OPTIONS)
   const answers = await collectAnswers({ root: ROOT, flags })
-  const steps = buildBrandSteps(ROOT, answers)
+  const { operationPlan } = prepareBrandInit(ROOT, answers)
   await runInitCommand({
     cwd: ROOT,
     flags,
-    steps,
+    operationPlan,
     confirmMessage: 'Apply these brand/identity changes?',
     ...(verify ? { verify } : {}),
   })

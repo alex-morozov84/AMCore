@@ -270,6 +270,20 @@ run commits its complete filesystem plan as one recoverable transaction; a
 handled write failure restores the tree to its pre-apply state. Dry runs,
 cancelled prompts, and plans with no changes never start a transaction.
 
+`init:brand` and every `init:project` dimension use the same architecture:
+desired-state facts, explicit ownership seams, narrow structural operations,
+one composed operation plan, and one filesystem transaction. Brand identity
+fields, JSON paths, TypeScript nodes, and the five asset destinations are
+claimed explicitly; missing or ambiguous anchors fail before mutation. There
+is no compatibility executor or sequential second mutation pass.
+
+The next initialization stage will combine these choices in one guided wizard
+and automatically remove downstream-only scaffolding machinery after the user
+reviews and confirms the complete result. That finalization is not part of the
+current commands yet, and it will not be exposed as a mandatory separate
+`init:finalize` step. `PROJECT_CONTEXT.md` remains the boundary that prevents
+the AMCore upstream checkout from being finalized accidentally.
+
 ### Project scaffolding
 
 `pnpm init:project` is the separate, one-time sibling command for

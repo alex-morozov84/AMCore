@@ -3,58 +3,25 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
 
+import { OBSOLETE_PRODUCTION_MODULES } from './project-production-boundary-support.mjs'
 import { structuralCopyCandidates } from './project-structural-copy-inventory.mjs'
 
 const ROOT = path.resolve('.')
 const LIB = path.join(ROOT, 'scripts/lib')
 const MEASURE = path.join(ROOT, 'scripts/measure')
-const DELETED = [
-  'project-plan-combined.mjs',
-  'project-plan-combined-console-storybook-docs.mjs',
-  'project-plan-context.mjs',
-  'project-plan-web-messages.mjs',
-  'project-plan-route-progress-context.mjs',
-  'project-plan-admin-console-context.mjs',
-  'project-plan-storybook-context.mjs',
-  'project-plan-storybook-package.mjs',
-  'project-plan-storybook-eslint.mjs',
-  'project-plan-storybook-docs-root.mjs',
-  'project-plan-route-progress-flag.mjs',
-  'project-plan-storybook-docs-readme.mjs',
-  'project-plan-storybook-docs-frontend-readme.mjs',
-  'project-plan-admin-console-disable-discovery-docs.mjs',
-  'project-plan-admin-console-disable-docs.mjs',
-  'project-plan-admin-console-disable-web.mjs',
-  'project-plan-admin-console-single-locale-proxy-assets.mjs',
-  'project-plan-admin-console-single-locale-proxy.mjs',
-  'project-plan-admin-console-single-locale.mjs',
-  'project-plan-admin-console.mjs',
-  'project-plan-storybook.mjs',
-  'project-plan-storybook-files.mjs',
-  'project-plan-storybook-ci.mjs',
-  'project-plan-storybook-vitest.mjs',
-  'project-plan-storybook-docs.mjs',
-  'project-plan-storybook-docs-agents.mjs',
-  'project-plan-storybook-docs-contributing.mjs',
-  'project-plan-storybook-docs-testing.mjs',
-  'project-plan-storybook-docs-ci-security.mjs',
-  'project-plan-storybook-docs-misc.mjs',
-  'project-locale-root-layout-body.mjs',
-  'project-locale-api-suite-bodies.mjs',
-  'project-locale-auth-page-bodies.mjs',
-  'project-locale-email-test-bodies.mjs',
-  'project-locale-frontend-url-bodies.mjs',
-  'project-locale-render-cases.mjs',
-  'project-locale-render-suite.mjs',
-  'project-locale-web-messages-body.mjs',
-]
+const TEST_HELPERS = new Set([
+  'filesystem-transaction-crash-child.mjs',
+  'project-production-boundary-support.mjs',
+])
 
 function productionSources() {
   const entrypoints = readdirSync(path.join(ROOT, 'scripts'))
     .filter((name) => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
     .map((name) => path.join(ROOT, 'scripts', name))
   const library = readdirSync(LIB)
-    .filter((name) => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
+    .filter(
+      (name) => name.endsWith('.mjs') && !name.endsWith('.test.mjs') && !TEST_HELPERS.has(name)
+    )
     .map((name) => path.join(LIB, name))
   return [...entrypoints, ...library].map((file) => [file, readFileSync(file, 'utf8')])
 }
@@ -72,7 +39,7 @@ function requiredScriptSources() {
 
 test('obsolete planner modules are absent with no live static import', () => {
   const sources = productionSources()
-  for (const name of DELETED) {
+  for (const name of OBSOLETE_PRODUCTION_MODULES) {
     assert.equal(existsSync(path.join(LIB, name)), false, name)
     const importer = sources.find(([, source]) =>
       new RegExp(`(?:from|import\\()\\s*['"][^'"]*${name.replace('.', '\\.')}`).test(source)
@@ -81,7 +48,7 @@ test('obsolete planner modules are absent with no live static import', () => {
   }
 })
 
-test('locale production has no legacy modules or opaque adapter mechanisms', () => {
+test('production has no compatibility modules or opaque adapter mechanisms', () => {
   const names = readdirSync(LIB)
   assert.deepEqual(
     names.filter((name) => /^project-plan-.*\.mjs$/.test(name)),
@@ -97,6 +64,14 @@ test('locale production has no legacy modules or opaque adapter mechanisms', () 
     localeSources.filter(([, source]) => forbidden.test(source)).map(([file]) => file),
     []
   )
+  const compatibilityTokens =
+    /\bstep\.write\s*\(|exactContentStep|moveAndRewriteStep|buildProjectLegacySteps|buildLegacyCollisionGraph|materializeLegacySteps|SCAFFOLD_MEASUREMENT_SCENARIOS|legacy-step-/
+  assert.deepEqual(
+    productionSources()
+      .filter(([, source]) => compatibilityTokens.test(source))
+      .map(([file]) => file),
+    []
+  )
 })
 
 test('locale adapters cannot hide whole functions or suites in replacement literals', () => {
@@ -110,11 +85,16 @@ test('locale adapters cannot hide whole functions or suites in replacement liter
   assert.deepEqual(structuralCopyCandidates(hiddenSuite), [{ file: 'hidden.mjs', line: 1 }])
 })
 
-test('production contains no step.write call and one engine M4 call site', () => {
+test('production contains one M4 executor and one engine call site', () => {
   const sources = productionSources()
+  const executorImports = sources.filter(([, source]) =>
+    /import\s*\{[^}]*applyFilesystemTransaction[^}]*\}\s*from\s*['"]\.\/filesystem-transaction\.mjs['"]/.test(
+      source
+    )
+  )
   assert.deepEqual(
-    sources.filter(([, source]) => /\bstep\.write\s*\(/.test(source)).map(([file]) => file),
-    []
+    executorImports.map(([file]) => path.basename(file)),
+    ['init-engine.mjs']
   )
   const engine = readFileSync(path.join(LIB, 'init-engine.mjs'), 'utf8')
   assert.equal(engine.match(/\bapplyFilesystem\s*\(/g)?.length, 1)

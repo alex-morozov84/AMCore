@@ -1,6 +1,5 @@
 // Pure, dependency-free content transforms used by the init tooling (Track
-// 10, ADR-071). No fs access here — plan-steps.mjs wraps these around reads/
-// writes so the transforms themselves stay trivially unit-testable.
+// 10, ADR-071). No filesystem access belongs in this module.
 
 export class EngineError extends Error {}
 

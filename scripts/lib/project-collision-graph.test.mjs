@@ -4,7 +4,7 @@ import { after, describe, it } from 'node:test'
 import { createRealRepoCopy } from './test-fixture.mjs'
 import {
   assertExpectedCollisionGraph,
-  buildLegacyCollisionGraph,
+  buildCollisionGraph,
   EXPECTED_SHARED_COLLISION_GRAPH,
 } from './project-collision-graph.mjs'
 
@@ -13,7 +13,7 @@ after(() => copy.cleanup())
 
 describe('generated remaining-provider collision graph', () => {
   it('matches the exact post-Console-migration snapshot', () => {
-    const graph = buildLegacyCollisionGraph(copy.root)
+    const graph = buildCollisionGraph(copy.root)
     assert.deepEqual(graph, EXPECTED_SHARED_COLLISION_GRAPH)
     assert.deepEqual(Object.keys(graph).sort(), [
       'PROJECT_CONTEXT.md',
@@ -22,7 +22,7 @@ describe('generated remaining-provider collision graph', () => {
   })
 
   it('contains no Console provider or message lifecycle collision', () => {
-    const graph = buildLegacyCollisionGraph(copy.root)
+    const graph = buildCollisionGraph(copy.root)
     assert.equal(graph['apps/web/messages/en.json'], undefined)
     assert.equal(graph['apps/web/messages/ru.json'], undefined)
     assert.ok(
@@ -34,7 +34,7 @@ describe('generated remaining-provider collision graph', () => {
 
   it('fails closed when an unexpected shared path appears', () => {
     const changed = {
-      ...buildLegacyCollisionGraph(copy.root),
+      ...buildCollisionGraph(copy.root),
       'unexpected.md': ['a:edit', 'b:edit'],
     }
     assert.throws(() => assertExpectedCollisionGraph(changed), /collision graph changed/)

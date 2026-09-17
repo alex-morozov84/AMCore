@@ -8,11 +8,7 @@ import { assertCleanGitTree, assertNotMaintainerCheckout, SafetyError } from './
 import { unifiedDiff } from './diff.mjs'
 import { runVerification, runProjectVerification } from './verify.mjs'
 import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
-import { buildScaffoldOperationPlan } from './scaffold-operation-plan.mjs'
 
-export * from './actions.mjs'
-export * from './content-blocks.mjs'
-export * from './plan-steps.mjs'
 export { SafetyError, clack, runVerification, runProjectVerification }
 
 export function parseCommonFlags(argv, extraOptions = {}) {
@@ -78,7 +74,6 @@ function reportVerification(results) {
 export async function runInitCommand({
   cwd,
   flags,
-  steps,
   operationPlan,
   confirmMessage,
   verify = runVerification,
@@ -86,7 +81,8 @@ export async function runInitCommand({
   requestConfirmation = clack.confirm,
   isCancellation = clack.isCancel,
 }) {
-  const plan = operationPlan ?? buildScaffoldOperationPlan({ root: cwd, legacySteps: steps })
+  const plan = operationPlan
+  if (!plan) throw new Error('runInitCommand requires a complete operationPlan')
   const changed = printPlan(plan.displaySteps)
   if (changed.length === 0) return
   if (flags['dry-run']) {

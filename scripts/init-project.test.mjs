@@ -2,7 +2,7 @@
 // createRealRepoCopy: a hand-written fixture can't stand in for apps/web's
 // actual route tree). git-inits the copy itself, since only this file's
 // tests go through the real CLI (and therefore assertCleanGitTree) rather
-// than calling step.write() directly like project-plan-web-*.test.mjs.
+// than calling the planning helpers directly.
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { createRealRepoCopy, git } from './lib/test-fixture.mjs'

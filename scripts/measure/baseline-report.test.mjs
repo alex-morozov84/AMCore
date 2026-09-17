@@ -58,7 +58,7 @@ describe('renderHumanSummary', () => {
   test('aggregates transform-shape counts deterministically (sorted)', () => {
     const text = renderHumanSummary(fakeReport())
     const lines = text.split('\n')
-    const shapeIndex = lines.findIndex((l) => l.includes('Transform inventory'))
+    const shapeIndex = lines.findIndex((l) => l.includes('Archived transform-baseline inventory'))
     assert.match(lines[shapeIndex + 1], /structured-config: 1/)
     assert.match(lines[shapeIndex + 2], /whole-file-legacy-before-after: 2/)
   })
@@ -74,15 +74,15 @@ describe('renderHumanSummary', () => {
   test('labels migration units separately from scenario operations', () => {
     const report = fakeReport()
     report.operationInventory.migrationCounts = {
-      legacyOperations: 346,
+      productionProviders: 24,
+      ownershipManifests: 24,
       semanticFacts: 34,
       semanticClaims: 116,
-      sharedContentOperations: 32,
-      materializedFilesystemOperations: 366,
+      finalFilesystemOperations: 366,
     }
     const text = renderHumanSummary(report)
-    assert.match(text, /346 legacy operations, 34 facts, 116 claims/)
-    assert.match(text, /32 shared content operations, 366 filesystem operations/)
+    assert.match(text, /24 providers, 24 ownership manifests, 34 facts/)
+    assert.match(text, /116 claims, 366 final M4 operations/)
   })
 
   test('never includes an absolute filesystem path from this machine', () => {

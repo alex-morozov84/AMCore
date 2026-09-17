@@ -74,11 +74,11 @@ describe('report-schema structured fields', () => {
 
   test('validates optional migration unit counts', () => {
     const migrationCounts = {
-      legacyOperations: 346,
+      productionProviders: 24,
+      ownershipManifests: 24,
       semanticFacts: 34,
       semanticClaims: 116,
-      sharedContentOperations: 32,
-      materializedFilesystemOperations: 366,
+      finalFilesystemOperations: 366,
     }
     const valid = validReport({
       operationInventory: { operations: [], exactCopyEdges: [], migrationCounts },
