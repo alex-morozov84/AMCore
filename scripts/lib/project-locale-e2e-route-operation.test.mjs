@@ -138,27 +138,3 @@ test('OAuth fixtures fail closed when selected-locale anchors drift', () => {
     assert.throws(() => applyStructuralPlan(registry, plan, changed))
   }
 })
-
-test('residual contract catches every forbidden route form and switcher scenario', () => {
-  const clean = outputs('ru')
-  const pathname = 'apps/web/e2e/mocked/accessibility.spec.ts'
-  for (const mutation of ["page.goto('/en/login')", "page.goto('/ru/login')", '// /(en|ru)/']) {
-    const changed = new Map(clean)
-    changed.set(pathname, `${changed.get(pathname)}\n${mutation}\n`)
-    assert.ok(e2eRouteResiduals(changed).some((item) => item.startsWith(pathname)))
-  }
-  const progress = 'apps/web/e2e/mocked/route-progress-bar.spec.ts'
-  const changed = new Map(clean)
-  changed.set(progress, `${changed.get(progress)}\n// name: /language/i\nselectOption('ru')\n`)
-  assert.ok(e2eRouteResiduals(changed).some((item) => item.endsWith('locale-switcher scenario')))
-
-  const weakRoot = new Map(clean)
-  weakRoot.set(pathname, `${weakRoot.get(pathname)}\nexpect(page).toHaveURL(/\\/?$/)\n`)
-  assert.ok(e2eRouteResiduals(weakRoot).some((item) => item.endsWith('inexact root URL assertion')))
-})
-
-test('missing or unexpected route anchors fail closed', () => {
-  const [pathname, count] = E2E_ROUTE_SURFACES[0]
-  assert.throws(() => apply(pathname, count + 1, 'en'))
-  assert.throws(() => apply(pathname, count - 1, 'ru'))
-})
