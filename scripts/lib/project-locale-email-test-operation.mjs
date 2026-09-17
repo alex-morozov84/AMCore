@@ -1,4 +1,6 @@
-import { EMAIL_TEST_BODIES } from './project-locale-email-test-bodies.mjs'
+import ts from 'typescript'
+
+import { findAllNodes, findUniqueNode } from './path-algebra-ast-query.mjs'
 import { absent, claim, testCall } from './project-locale-ast-helpers.mjs'
 
 const TEMPLATES = ['verification', 'invite', 'reset']
@@ -24,12 +26,73 @@ const titles = {
   },
 }
 
-function subjectBody(template, locale) {
-  if (template === 'invite') {
-    return `it('should localize the subject with the org name', () => {\n    expect(getOrgInviteSubject('Acme Inc.', '${locale}')).toContain('Acme Inc.')\n  })`
+const RU_LITERALS = {
+  verification: new Map([
+    ['24 hours', '24 часа'],
+    ['Verify your email', 'Подтвердите ваш email'],
+    ['Verify Email', 'Подтвердить email'],
+    ['Подтвердите ваш email', 'Verify your email'],
+  ]),
+  invite: new Map([['Sign in to accept the invitation', 'Войти и принять приглашение']]),
+  reset: new Map([
+    ['Password Reset', 'Сброс пароля'],
+    ['60 minutes', '60 минут'],
+  ]),
+}
+
+const INVITE_SIGNUP_LITERALS = new Map([
+  ['Create an account to join', 'Создать аккаунт и присоединиться'],
+  ['Sign in to accept the invitation', 'Войти и принять приглашение'],
+])
+
+function stringLiterals(model, root) {
+  return findAllNodes(model, (node) => ts.isStringLiteral(node), root)
+}
+
+function rewriteLiterals(model, root, replacements, ctx) {
+  const counts = new Map([...replacements].map(([before]) => [before, 0]))
+  for (const node of stringLiterals(model, root)) {
+    const after = replacements.get(node.text)
+    if (after === undefined) continue
+    counts.set(node.text, counts.get(node.text) + 1)
+    model.replaceNode(node, `'${after}'`, ctx)
   }
-  const fn = template === 'verification' ? 'getEmailVerificationSubject' : 'getPasswordResetSubject'
-  return `it('${fn} returns a non-empty subject', () => {\n    expect(${fn}('${locale}')).toBeTruthy()\n  })`
+  for (const [value, count] of counts) {
+    if (count !== 1) throw new Error(`${ctx.operationKey}: expected one "${value}", found ${count}`)
+  }
+}
+
+function rewriteSubjectTest(model, test, locale, ctx) {
+  const assertions = findAllNodes(
+    model,
+    (node) => ts.isExpressionStatement(node) && node.getText().startsWith('expect('),
+    test
+  )
+  if (assertions.length < 2) throw new Error(`${ctx.operationKey}: expected subject assertions`)
+  const selected = assertions.find((node) => node.getText().includes(`'${locale}'`))
+  if (!selected) throw new Error(`${ctx.operationKey}: selected subject assertion is missing`)
+  for (const assertion of assertions) if (assertion !== selected) model.removeNode(assertion, ctx)
+  const title = test.arguments[0]
+  if (title.text.includes('localized, non-empty')) {
+    model.replaceNode(title, `'${title.text.replace('localized, non-empty', 'non-empty')}'`, ctx)
+  }
+}
+
+function rewriteInviteComment(model, test, ctx) {
+  const assertion = findUniqueNode(
+    model,
+    (node) => ts.isExpressionStatement(node) && node.getText().includes("toContain('Acme Inc.')"),
+    { ...ctx, describe: 'invite localized-content assertion' },
+    test
+  )
+  model.replaceNode(
+    assertion,
+    `// Localized content and interpolated props.\n    ${assertion.getText()}`,
+    {
+      ...ctx,
+      includeLeadingComments: true,
+    }
+  )
 }
 
 function defaultTest(model, template, ctx) {
@@ -44,23 +107,23 @@ function defaultTest(model, template, ctx) {
 
 function applyEmailTest(model, { locale, template }, ctx) {
   model.removeNode(testCall(model, titles[template].locale, ctx), ctx)
-  model.replaceNode(
-    testCall(model, titles[template].subject, ctx),
-    subjectBody(template, locale),
-    ctx
-  )
+  rewriteSubjectTest(model, testCall(model, titles[template].subject, ctx), locale, ctx)
   if (locale === 'en') return
+  const defaultLocale = defaultTest(model, template, ctx)
   model.replaceNode(
-    defaultTest(model, template, ctx),
-    EMAIL_TEST_BODIES[template === 'invite' ? 'inviteSignIn' : template],
+    defaultLocale.arguments[0],
+    `'${defaultLocale.arguments[0].text.replace('base locale (English)', 'base (and only) supported locale')}'`,
     ctx
   )
+  if (template === 'invite') rewriteInviteComment(model, defaultLocale, ctx)
+  rewriteLiterals(model, defaultLocale, RU_LITERALS[template], ctx)
   if (template === 'invite') {
-    model.replaceNode(
-      testCall(model, 'should render the sign-up CTA when the recipient has no account', ctx),
-      EMAIL_TEST_BODIES.inviteSignUp,
+    const signup = testCall(
+      model,
+      'should render the sign-up CTA when the recipient has no account',
       ctx
     )
+    rewriteLiterals(model, signup, INVITE_SIGNUP_LITERALS, ctx)
   }
 }
 

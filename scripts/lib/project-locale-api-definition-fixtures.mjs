@@ -3,30 +3,43 @@ import ts from 'typescript'
 import { findAllNodes, findUniqueNode } from './path-algebra-ast-query.mjs'
 import { callName, testCall } from './project-locale-ast-helpers.mjs'
 
-const EMAIL_COPY = {
-  en: ['Your password was changed', 'successfully changed'],
-  ru: ['Ваш пароль был изменён', 'успешно изменён'],
-}
-const IN_APP = { en: 'Password changed', ru: 'Пароль изменён' }
-
 export function rewritePasswordDefinition(model, locale, ctx) {
-  const [title, body] = EMAIL_COPY[locale]
-  model.replaceNode(
-    testCall(model, 'renders detailed email copy from the projection in both locales', ctx),
-    `it('renders detailed email copy from the projection', () => {
-    const rendered = def.renderEmail!({ changedAt }, '${locale}')
-    expect(rendered.title).toBe('${title}')
-    expect(rendered.body).toContain('${body}')
-  })`,
+  const email = testCall(
+    model,
+    'renders detailed email copy from the projection in both locales',
     ctx
   )
-  model.replaceNode(
-    testCall(model, 'renders a neutral in-app title/body without exposing the payload', ctx),
-    `it('renders a neutral in-app title/body without exposing the payload', () => {
-    expect(def.renderInApp({ changedAt }, '${locale}').title).toBe('${IN_APP[locale]}')
-  })`,
+  model.replaceNode(email.arguments[0], "'renders detailed email copy from the projection'", ctx)
+  removeOtherLocaleStatements(model, email, locale, ctx)
+  const inApp = testCall(
+    model,
+    'renders a neutral in-app title/body without exposing the payload',
     ctx
   )
+  const assertions = findAllNodes(model, (node) => ts.isExpressionStatement(node), inApp)
+  const other = assertions.find((node) =>
+    node.getText().includes(`'${locale === 'en' ? 'ru' : 'en'}'`)
+  )
+  if (!other) throw new Error('password definition discarded in-app assertion is missing')
+  model.removeNode(other, ctx)
+}
+
+function removeOtherLocaleStatements(model, test, locale, ctx) {
+  const other = locale === 'en' ? 'ru' : 'en'
+  const declaration = findUniqueNode(
+    model,
+    (node) => ts.isVariableStatement(node) && node.getText().includes(`const ${other} =`),
+    { ...ctx, describe: `unselected ${other} email rendering` },
+    test
+  )
+  model.removeNode(declaration, ctx)
+  const assertions = findAllNodes(
+    model,
+    (node) => ts.isExpressionStatement(node) && node.getText().startsWith(`expect(${other}.`),
+    test
+  )
+  if (assertions.length !== 2) throw new Error(`expected two ${other} email assertions`)
+  for (const assertion of assertions) model.removeNode(assertion, ctx)
 }
 
 export function rewriteRegistryDefinition(model, locale, ctx) {

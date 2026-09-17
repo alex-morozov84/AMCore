@@ -3,6 +3,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
 
+import { structuralCopyCandidates } from './project-structural-copy-inventory.mjs'
+
 const ROOT = path.resolve('.')
 const LIB = path.join(ROOT, 'scripts/lib')
 const MEASURE = path.join(ROOT, 'scripts/measure')
@@ -37,6 +39,14 @@ const DELETED = [
   'project-plan-storybook-docs-testing.mjs',
   'project-plan-storybook-docs-ci-security.mjs',
   'project-plan-storybook-docs-misc.mjs',
+  'project-locale-root-layout-body.mjs',
+  'project-locale-api-suite-bodies.mjs',
+  'project-locale-auth-page-bodies.mjs',
+  'project-locale-email-test-bodies.mjs',
+  'project-locale-frontend-url-bodies.mjs',
+  'project-locale-render-cases.mjs',
+  'project-locale-render-suite.mjs',
+  'project-locale-web-messages-body.mjs',
 ]
 
 function productionSources() {
@@ -87,6 +97,17 @@ test('locale production has no legacy modules or opaque adapter mechanisms', () 
     localeSources.filter(([, source]) => forbidden.test(source)).map(([file]) => file),
     []
   )
+})
+
+test('locale adapters cannot hide whole functions or suites in replacement literals', () => {
+  const localeSources = productionSources().filter(([file]) =>
+    path.basename(file).startsWith('project-locale-')
+  )
+  assert.deepEqual(structuralCopyCandidates(localeSources), [])
+  const hiddenSuite = [
+    ['hidden.mjs', "const fixture = `describe('copied', () => {\n  it('x', () => {})\n})`"],
+  ]
+  assert.deepEqual(structuralCopyCandidates(hiddenSuite), [{ file: 'hidden.mjs', line: 1 }])
 })
 
 test('production contains no step.write call and one engine M4 call site', () => {

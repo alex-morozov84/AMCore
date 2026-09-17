@@ -17,24 +17,6 @@ const paramsSchema = (params) =>
   ['en', 'ru'].includes(params.locale) &&
   params.topology === 'single-unprefixed'
 
-const PROXY_DOC = `/**
- * Generates a per-request CSP nonce and forwards it to the Next renderer.
- *
- * Mutating the original request headers preserves the request identity used by
- * Next's test-mode interception. Both possible inbound CSP headers are cleared
- * before the active policy is installed so a hostile header cannot win Next's
- * nonce-selection order.
- *
- * Next reads its nonce from the request CSP header. The pass-through response
- * therefore forwards the mutated headers through \`request: { headers }\`; the
- * response receives the same policy separately for the browser.
- */`
-
-const MATCHER = `// Cover rendered routes while excluding Next internals, the API proxy,
-  // and paths with file extensions. This keeps CSP nonce/header/reporting
-  // guarantees on every rendered single-locale route.
-  matcher: ['/((?!api|_next|_vercel|.*\\\\..*).*)']`
-
 function uniqueMatcher(model, ctx) {
   return findUniqueNode(
     model,
@@ -45,6 +27,33 @@ function uniqueMatcher(model, ctx) {
       node.initializer.getText() === "['/((?!api|_next|_vercel|.*\\\\..*).*)']",
     { ...ctx, describe: 'unchanged proxy matcher' }
   )
+}
+
+function rewriteProxyDoc(model, doc, ctx) {
+  const after = doc
+    .getText()
+    .replace(
+      /Track 3 PR2[^\n]*\n \* CSP nonce and composes it with next-intl's locale routing\./,
+      'Generates a per-request CSP nonce and forwards it to the Next renderer.'
+    )
+    .replace(/\n \* Composition with next-intl,[\s\S]*?completeness\/observability\.\n \*/, '\n *')
+    .replace(/Framework constraint this exists to satisfy \([^)]*\):/, 'Framework constraint:')
+    .replace(
+      / Found by\n \* Agent 2[\s\S]*?hostile-inbound-header regression test\./,
+      ' The hostile-inbound-header regression test covers this invariant.'
+    )
+  if (after === doc.getText() || /next-intl|ai\/models-talk/.test(after)) {
+    throw new Error(`${ctx.operationKey}: proxy documentation projection failed`)
+  }
+  model.replaceNode(doc, after, ctx)
+}
+
+function rewriteMatcherComment(model, matcher, ctx) {
+  const text = `// Cover rendered routes while excluding Next internals, the API proxy,
+  // and paths with file extensions. This keeps CSP nonce/header/reporting
+  // guarantees on every rendered single-locale route.
+  ${matcher.getText()}`
+  model.replaceNode(matcher, text, { ...ctx, includeLeadingComments: true })
 }
 
 function responseDeclaration(model, ctx) {
@@ -84,13 +93,13 @@ function proxyOperation(model, _params, ctx) {
   model.removeNode(intl, ctx)
   model.removeNode(routing, ctx)
   model.removeNode(handler.parent.parent, ctx)
-  model.replaceNode(doc, PROXY_DOC, ctx)
+  rewriteProxyDoc(model, doc, ctx)
   model.replaceNode(
     response.initializer,
     `NextResponse.next({\n    request: {\n      headers: request.headers,\n    },\n  })`,
     ctx
   )
-  model.replaceNode(matcher, MATCHER, { ...ctx, includeLeadingComments: true })
+  rewriteMatcherComment(model, matcher, ctx)
 }
 
 export function registerLocaleProxyOperation(registry) {

@@ -58,20 +58,10 @@ export function rewriteNavigationAdapter(model, ctx) {
 
 export function removeLocaleSwitcher(model, ctx) {
   model.removeNode(uniqueImport(model, '@/features/locale-switcher', ctx), ctx)
-  const wrapper = findUniqueNode(
+  const switcher = findUniqueNode(
     model,
-    (node) =>
-      ts.isJsxElement(node) &&
-      node.children.some(
-        (child) => ts.isJsxSelfClosingElement(child) && child.tagName.getText() === 'LocaleSwitcher'
-      ),
-    { ...ctx, describe: 'AppShell footer wrapper containing LocaleSwitcher' }
+    (node) => ts.isJsxSelfClosingElement(node) && node.tagName.getText() === 'LocaleSwitcher',
+    { ...ctx, describe: 'AppShell LocaleSwitcher element' }
   )
-  model.replaceNode(
-    wrapper,
-    `<div className="flex items-center justify-between gap-2 px-2">
-            <LogoutButton variant="ghost" showText={false} />
-          </div>`,
-    ctx
-  )
+  model.removeNode(switcher, ctx)
 }

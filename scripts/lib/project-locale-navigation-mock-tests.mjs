@@ -13,18 +13,17 @@ function mockObject(model, call, ctx) {
   )
 }
 
+function addPathnameMock(model, object, ctx) {
+  const source = object.getText()
+  if (!source.startsWith('{')) throw new Error(`${ctx.operationKey}: expected mock object literal`)
+  model.replaceNode(object, source.replace('{', '{\n  usePathname: () => pathname(),'), ctx)
+}
+
 export function rewriteBarTest(model, ctx) {
   const locale = mockCall(model, '@/i18n/navigation', ctx)
   model.removeNode(locale.parent, { ...ctx, includeLeadingBlank: true })
   const next = mockObject(model, mockCall(model, 'next/navigation', ctx), ctx)
-  model.replaceNode(
-    next,
-    `{
-  usePathname: () => pathname(),
-  useSearchParams: () => searchParams(),
-}`,
-    ctx
-  )
+  addPathnameMock(model, next, ctx)
 }
 
 export function rewriteLinkTest(model, ctx) {
@@ -35,14 +34,7 @@ export function rewriteLinkTest(model, ctx) {
   const link = objectProperty(model, localeObject, 'Link', ctx)
   model.replaceNode(link.name, 'default', ctx)
   const next = mockObject(model, mockCall(model, 'next/navigation', ctx), ctx)
-  model.replaceNode(
-    next,
-    `{
-  usePathname: () => pathname(),
-  useSearchParams: () => searchParams(),
-}`,
-    ctx
-  )
+  addPathnameMock(model, next, ctx)
 }
 
 function authenticationCalls(model) {

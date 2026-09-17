@@ -1,7 +1,6 @@
 import ts from 'typescript'
 
-import { findUniqueNode } from './path-algebra-ast-query.mjs'
-import { AUTH_PAGE_BODIES } from './project-locale-auth-page-bodies.mjs'
+import { findAllNodes, findUniqueNode } from './path-algebra-ast-query.mjs'
 import {
   absent,
   attachedJSDoc,
@@ -23,56 +22,88 @@ function removeLocaleImports(model, ctx) {
 function authPage(model, _params, ctx) {
   removeLocaleImports(model, ctx)
   const fn = defaultFunction(model, ctx)
-  const replacement = AUTH_PAGE_BODIES[fn.name?.text]
-  if (!replacement) throw new Error(`unsupported auth page function "${fn.name?.text}"`)
-  model.replaceNode(fn, replacement, ctx)
+  const params = findUniqueNode(
+    model,
+    (node) => ts.isBindingElement(node) && node.name.getText() === 'params',
+    { ...ctx, describe: 'route params binding' },
+    fn
+  )
+  const property = findUniqueNode(
+    model,
+    (node) => ts.isPropertySignature(node) && node.name.getText() === 'params',
+    { ...ctx, describe: 'route params type property' },
+    fn
+  )
+  const locale = findUniqueNode(
+    model,
+    (node) => ts.isVariableDeclaration(node) && node.name.getText() === 'locale',
+    { ...ctx, describe: 'resolved route locale' },
+    fn
+  )
+  const setup = findUniqueNode(
+    model,
+    (node) =>
+      ts.isExpressionStatement(node) && node.expression.getText() === 'setRequestLocale(locale)',
+    { ...ctx, describe: 'route locale setup' },
+    fn
+  )
+  model.removeNode(params, ctx)
+  model.removeNode(property, ctx)
+  model.removeNode(locale.parent.parent, ctx)
+  model.removeNode(setup, ctx)
+  const redirects = findAllNodes(
+    model,
+    (node) => ts.isCallExpression(node) && node.expression.getText() === 'redirectIfAuthenticated',
+    fn
+  )
+  if (redirects.length > 1) throw new Error(`${ctx.operationKey}: ambiguous authenticated redirect`)
+  if (redirects[0]) model.replaceNode(redirects[0].arguments[0], '', ctx)
 }
 
 function authLayout(model, _params, ctx) {
   model.removeNode(uniqueImport(model, '@/features/locale-switcher', ctx), ctx)
-  const wrapper = findUniqueNode(
+  const switcher = findUniqueNode(
     model,
-    (node) =>
-      ts.isJsxElement(node) &&
-      node.children.some(
-        (child) => ts.isJsxSelfClosingElement(child) && child.tagName.getText() === 'LocaleSwitcher'
-      ),
-    { ...ctx, describe: 'auth layout wrapper containing LocaleSwitcher' }
+    (node) => ts.isJsxSelfClosingElement(node) && node.tagName.getText() === 'LocaleSwitcher',
+    { ...ctx, describe: 'LocaleSwitcher element' }
   )
-  model.replaceNode(
-    wrapper,
-    `<main className="flex min-h-screen flex-col items-center justify-center gap-4 p-4">
-      {children}
-    </main>`,
-    ctx
-  )
+  model.removeNode(switcher, ctx)
 }
 
 function callbackRoute(model, _params, ctx) {
   model.removeNode(uniqueImport(model, 'next-intl', ctx), { ...ctx, includeTrailingBlank: true })
   model.removeNode(uniqueImport(model, '@/i18n/routing', ctx), ctx)
-  model.replaceNode(
-    uniqueFunction(model, 'GET', ctx),
-    `export async function GET(request: Request) {
-  return handleOAuthExchange(request)
-}`,
-    ctx
-  )
-  const doc = attachedJSDoc(
+  const fn = uniqueFunction(model, 'GET', ctx)
+  model.removeNode(fn.parameters[1], ctx)
+  const locale = findUniqueNode(
     model,
-    uniqueFunction(model, 'GET', ctx),
-    'A Route Handler, not a page',
-    ctx
+    (node) => ts.isBindingElement(node) && node.name.getText() === 'locale',
+    { ...ctx, describe: 'OAuth callback locale declaration' },
+    fn
   )
-  model.replaceNode(
-    doc,
-    `/**
- * A Route Handler, not a page: cookies can only be set from a Server Action
- * or a Route Handler, never during a Server Component's render — see
- * \`oauth-exchange-handler.ts\`.
- */`,
-    ctx
+  model.removeNode(locale.parent.parent.parent.parent, ctx)
+  const guard = findUniqueNode(
+    model,
+    (node) => ts.isIfStatement(node),
+    {
+      ...ctx,
+      describe: 'OAuth callback locale guard',
+    },
+    fn
   )
+  model.removeNode(guard, ctx)
+  const exchange = findUniqueNode(
+    model,
+    (node) => ts.isCallExpression(node) && node.expression.getText() === 'handleOAuthExchange',
+    { ...ctx, describe: 'handleOAuthExchange call' },
+    fn
+  )
+  model.removeNode(exchange.arguments[1], ctx)
+  const doc = attachedJSDoc(model, fn, 'A Route Handler, not a page', ctx)
+  const nextDoc = doc
+    .getText()
+    .replace(/ The backend always constructs[\s\S]*?rather than trusted\./, '')
+  model.replaceNode(doc, nextDoc, ctx)
 }
 
 export function registerLocaleRouteOperations(registry) {
