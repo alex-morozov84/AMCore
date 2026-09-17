@@ -65,17 +65,19 @@ of workflow self-hardening to keep the example forkable.
   exception, a failed command, partial internal verification preserved on a
   failed run). Read-only against the real repo — the disposable repo copies
   a few of these tests create never run a real `pnpm install` inside them,
-  only the job's own top-level `pnpm install --frozen-lockfile` — no Docker,
-  ~10 seconds. `test:scripts:fast` is also the first half of the full
-  `pnpm test:scripts` command below, so the fast job and the full command
-  cannot drift onto two different test sets. Does **not** cover the
+  only the job's own top-level `pnpm install --frozen-lockfile` — no Docker.
+  `test:scripts:fast` is also the first half of the local aggregate
+  `pnpm test:scripts` command, so local full verification cannot omit it.
+  CI does not repeat this layer inside the parallel full job. Does **not** cover the
   public/private-path ratchet — that is the separate "Observability contract
   (static)" job above. No path filter: a change anywhere in the repo can
   drift a scaffolding fixture (this job exists because exactly that
   happened — `apps/web` and `docs/` changes drifted `scripts/lib/*.mjs`
   fixtures across several PRs with nothing in CI to catch it).
 - **Scaffolding contract (full)** — job id `scaffolding-contract-full` keeps
-  its required display name unchanged. Its six independent repositories cover
+  its required display name unchanged and runs
+  `pnpm test:scripts:generated`, the generated-project half of the local
+  `pnpm test:scripts` aggregate. Its six independent repositories cover
   the cross-product of multi/single locale routing and Console
   path/host/disabled topology. en/ru and both optional project toggles are
   distributed pairwise; multi- and single-locale host rows verify the distinct
