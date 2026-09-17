@@ -63,5 +63,5 @@ export function removeLocaleSwitcher(model, ctx) {
     (node) => ts.isJsxSelfClosingElement(node) && node.tagName.getText() === 'LocaleSwitcher',
     { ...ctx, describe: 'AppShell LocaleSwitcher element' }
   )
-  model.removeNode(switcher, ctx)
+  model.replaceNode(switcher, '', ctx)
 }
