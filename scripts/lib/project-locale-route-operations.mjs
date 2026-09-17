@@ -19,6 +19,23 @@ function removeLocaleImports(model, ctx) {
   model.removeNode(uniqueImport(model, '@/i18n/params', ctx), ctx)
 }
 
+function removeRouteParams(model, fn, params, property, ctx) {
+  const parameter = params.parent.parent
+  const type = property.parent
+  if (
+    ts.isParameter(parameter) &&
+    ts.isObjectBindingPattern(parameter.name) &&
+    parameter.name.elements.length === 1 &&
+    ts.isTypeLiteralNode(type) &&
+    type.members.length === 1
+  ) {
+    model.removeNode(parameter, ctx)
+    return
+  }
+  model.removeNode(params, ctx)
+  model.removeNode(property, ctx)
+}
+
 function authPage(model, _params, ctx) {
   removeLocaleImports(model, ctx)
   const fn = defaultFunction(model, ctx)
@@ -47,8 +64,7 @@ function authPage(model, _params, ctx) {
     { ...ctx, describe: 'route locale setup' },
     fn
   )
-  model.removeNode(params, ctx)
-  model.removeNode(property, ctx)
+  removeRouteParams(model, fn, params, property, ctx)
   model.removeNode(locale.parent.parent, ctx)
   model.removeNode(setup, ctx)
   const redirects = findAllNodes(

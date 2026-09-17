@@ -23,6 +23,7 @@ describe('operation inventory against the real plans', () => {
           operation.modulePath === 'scripts/lib/project-storybook-facts.mjs'
       )
     )
+    assert.ok(inventory.operations.every((operation) => typeof operation.summary === 'string'))
   })
 
   test('reports migration units separately from legacy operations', () => {
