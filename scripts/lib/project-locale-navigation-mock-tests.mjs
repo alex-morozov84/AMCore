@@ -16,7 +16,7 @@ function mockObject(model, call, ctx) {
 function addPathnameMock(model, object, ctx) {
   const source = object.getText()
   if (!source.startsWith('{')) throw new Error(`${ctx.operationKey}: expected mock object literal`)
-  model.replaceNode(object, source.replace('{', '{\n  usePathname: () => pathname(),'), ctx)
+  model.replaceNode(object, `{\n  usePathname: () => pathname(),${source.slice(1)}`, ctx)
 }
 
 export function rewriteBarTest(model, ctx) {
