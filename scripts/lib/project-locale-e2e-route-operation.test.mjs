@@ -76,6 +76,19 @@ test('EN and RU retain shared verification with identical prefixless topology', 
   }
 })
 
+test('root navigation assertions remain exact after removing the locale segment', () => {
+  for (const locale of ['en', 'ru']) {
+    const projected = outputs(locale)
+    const sessions = projected.get('apps/web/e2e/real-stack/sessions.spec.ts')
+    const consoleSession = projected.get(
+      'apps/web/e2e/console-real-stack/session-isolation.spec.ts'
+    )
+    assert.match(sessions, /toHaveURL\('\/'\)/)
+    assert.doesNotMatch(sessions, /toHaveURL\(\/\\\/\?\$\/\)/)
+    assert.match(consoleSession, /toHaveURL\('https:\/\/app\.localhost\/'\)/)
+  }
+})
+
 test('deletes only the two locale-only verification suites', () => {
   const facts = buildLocaleE2eRouteFacts('en')
   const deleted = facts.filter((fact) => fact.kind === 'delete').map((fact) => fact.path)
@@ -138,6 +151,10 @@ test('residual contract catches every forbidden route form and switcher scenario
   const changed = new Map(clean)
   changed.set(progress, `${changed.get(progress)}\n// name: /language/i\nselectOption('ru')\n`)
   assert.ok(e2eRouteResiduals(changed).some((item) => item.endsWith('locale-switcher scenario')))
+
+  const weakRoot = new Map(clean)
+  weakRoot.set(pathname, `${weakRoot.get(pathname)}\nexpect(page).toHaveURL(/\\/?$/)\n`)
+  assert.ok(e2eRouteResiduals(weakRoot).some((item) => item.endsWith('inexact root URL assertion')))
 })
 
 test('missing or unexpected route anchors fail closed', () => {

@@ -1,5 +1,8 @@
 import { parseStructuralModel } from './path-algebra-ast-model.mjs'
-import { routeReferenceInventory } from './project-locale-e2e-route-inventory.mjs'
+import {
+  routeReferenceInventory,
+  weakRootAssertionCount,
+} from './project-locale-e2e-route-inventory.mjs'
 import {
   E2E_ROUTE_SURFACES,
   OAUTH_E2E_ROUTE_SURFACE,
@@ -13,8 +16,10 @@ export function e2eRouteResiduals(contents) {
       residuals.push(`${pathname}:missing projected verification surface`)
       continue
     }
-    const inventory = routeReferenceInventory(parseStructuralModel(pathname, content))
+    const model = parseStructuralModel(pathname, content)
+    const inventory = routeReferenceInventory(model)
     if (inventory.count) residuals.push(`${pathname}:${inventory.count} locale-prefixed routes`)
+    if (weakRootAssertionCount(model)) residuals.push(`${pathname}:inexact root URL assertion`)
     if (content.includes('name: /language/i') && content.includes("selectOption('ru')")) {
       residuals.push(`${pathname}:locale-switcher scenario`)
     }

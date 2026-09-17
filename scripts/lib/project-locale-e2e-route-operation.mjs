@@ -35,6 +35,28 @@ function removeUnavailableUiCase(model, expected, ctx) {
 const covered = (node, ranges) =>
   ranges.some((range) => range.getStart() <= node.getStart() && node.end <= range.end)
 
+const ROOT_URL_ASSERTIONS = new Map([
+  [String.raw`/\/en\/?$/`, "'/'"],
+  [String.raw`/https:\/\/app\.localhost\/en\/?$/`, "'https://app.localhost/'"],
+])
+
+function rewriteExactRootAssertions(model, ctx) {
+  const matches = findAllNodes(model, (node) => {
+    if (!ts.isCallExpression(node) || node.arguments.length !== 1) return false
+    const [argument] = node.arguments
+    return (
+      node.expression.getText().endsWith('.toHaveURL') &&
+      ts.isRegularExpressionLiteral(argument) &&
+      ROOT_URL_ASSERTIONS.has(argument.getText())
+    )
+  })
+  for (const call of matches) {
+    const [argument] = call.arguments
+    model.replaceNode(argument, ROOT_URL_ASSERTIONS.get(argument.getText()), ctx)
+  }
+  return matches.map((call) => call.arguments[0])
+}
+
 function rewriteComment(text) {
   const specific = new Map([
     [
@@ -69,6 +91,7 @@ function e2eRoutes(model, params, ctx) {
   }
   const claimed =
     params.surface === 'oauth' ? rewriteOAuthAssertions(model, params.locale, ctx) : []
+  claimed.push(...rewriteExactRootAssertions(model, ctx))
   claimed.push(...removeUnavailableUiCase(model, params.unavailableUiCases, ctx))
   for (const reference of inventory.references) {
     const node = reference.kind === 'comment' ? commentRange(reference) : reference.node

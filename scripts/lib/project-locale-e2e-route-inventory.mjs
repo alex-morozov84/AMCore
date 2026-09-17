@@ -57,6 +57,23 @@ export function routeReferenceInventory(model) {
   }
 }
 
+export function weakRootAssertionCount(model) {
+  let count = 0
+  const visit = (node) => {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText().endsWith('.toHaveURL') &&
+      node.arguments.length === 1 &&
+      node.arguments[0].getText() === String.raw`/\/?$/`
+    ) {
+      count += 1
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(model.sourceFile)
+  return count
+}
+
 export function rewriteRoutePrefixes(text) {
   return text.replace(ROUTE_PREFIX, (match, slash, offset, input) => {
     const tail = input.slice(offset + match.length)
