@@ -1,4 +1,5 @@
 import { PROJECT_SHARED_CORE_DEFINITIONS } from './project-shared-core-operations.mjs'
+import { LOCALE_DATABASE_DEFAULT_DEFINITIONS } from './project-locale-database-default-operations.mjs'
 import {
   removeStorybookArchitecture,
   removeStorybookDocsIndex,
@@ -16,6 +17,7 @@ const block = (name) => absent(`markdown:block:${name}`)
 
 const definitions = new Map([
   ...PROJECT_SHARED_CORE_DEFINITIONS,
+  ...LOCALE_DATABASE_DEFAULT_DEFINITIONS,
   [
     'readme-storybook',
     {

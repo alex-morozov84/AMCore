@@ -1,8 +1,14 @@
 import { OWNERSHIP_CODES, ownershipError } from './ownership-errors.mjs'
 import { relevantFiles } from './ownership-contributions.mjs'
 
-export function assertNoRelevantUnresolvedReferences(root, manifest, inventory, graph) {
-  const relevant = relevantFiles(root, manifest, inventory, graph)
+export function assertNoRelevantUnresolvedReferences(
+  root,
+  manifest,
+  inventory,
+  graph,
+  options = {}
+) {
+  const relevant = relevantFiles(root, manifest, inventory, graph, options.contents)
   const dynamic = graph.dynamic.filter((item) => relevant.has(item.importer))
   const unresolved = graph.unresolved.filter((item) => relevant.has(item.importer) && item.dynamic)
   const blocked = [...dynamic, ...unresolved]

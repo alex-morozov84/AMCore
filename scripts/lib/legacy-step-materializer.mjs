@@ -17,7 +17,7 @@ function contentFact(dimension, pathname, bytes, mode) {
 function editFacts(root, step, dimension) {
   const target = legacyEndpoint(root, step.target, 'edit target')
   const bytes = Buffer.from(requireText(step, 'after'), 'utf8')
-  if (step.adapterClass !== 'move-and-rewrite') return [contentFact(dimension, target, bytes)]
+  if (!step.source) return [contentFact(dimension, target, bytes)]
   const source = legacyEndpoint(root, step.source, 'move source')
   return [
     { kind: 'move', dimension, from: source, to: target },

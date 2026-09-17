@@ -8,10 +8,18 @@ import { validateSeams } from './ownership-seams.mjs'
 export function validateOwnership(root, manifest, options = {}) {
   const inventory = validateManifestInventory(root, manifest)
   validateSeams(root, manifest, inventory)
-  const graph = createImportGraph(root, manifest, inventory)
+  const graph = createImportGraph(root, manifest, inventory, options)
   const selection = { manifest, inventory }
   const projection = projectOwnership(graph, [selection])
-  detectUndeclaredContributions(root, manifest, inventory, graph, options.changedFiles, projection)
-  assertNoRelevantUnresolvedReferences(root, manifest, inventory, graph)
+  assertNoRelevantUnresolvedReferences(root, manifest, inventory, graph, options)
+  detectUndeclaredContributions(
+    root,
+    manifest,
+    inventory,
+    graph,
+    options.changedFiles,
+    projection,
+    options
+  )
   return { inventory, graph, projection }
 }

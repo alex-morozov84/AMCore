@@ -94,6 +94,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removes six previously retained Storybook-only references from mixed docs,
   CI comments, and `apps/web/.gitignore`, including a link to the deleted
   Storybook guide and obsolete verification recommendations.
+  Single-locale projection now uses the same manifest-backed path and
+  structural-operation pipeline: it statically imports only the selected
+  message catalogue, removes the other catalogue from the generated graph,
+  and synchronizes Russian email-template default expectations with the
+  selected catalogue. It also rewrites the two typed frontend-URL test
+  fixtures to the selected Russian locale after `SupportedLocale` narrows to
+  `"ru"`, removes impossible English notification branches, and keeps the
+  shared, Prisma, and fresh-fork SQL locale defaults aligned. Prefixless OAuth
+  and web browser fixtures now match the generated topology, while RU browser
+  expectations use concrete Russian accessible names. The selected catalogue
+  is statically imported by the generated request config. The corrected
+  projection also retains the shared Next proxy and its CSP nonce/header/
+  reporting guarantees while removing only next-intl routing. Runtime email,
+  notification, OAuth, and URL behavior and the public locale/URL contract are
+  unchanged; the legacy projection generated failing tests, uncompilable RU
+  fixtures, an incorrect RU database default, stale multi-locale browser and
+  EN schema expectations, opposite-locale auth/OAuth fixtures, and removed the
+  independent CSP security entrypoint.
 
 - **PostgreSQL 16 → 18.** The shipped/bundled reference database major moves
   from PostgreSQL 16 to 18 (`postgres:18-alpine`) across `docker-compose.yml`

@@ -37,6 +37,21 @@ test('replaceNode swaps exactly the node text, keeping surrounding trivia', () =
   assert.equal(serializeStructuralModel(model), "const a = 'new'; // note\n")
 })
 
+test('replaceNode can structurally replace an attached leading comment', () => {
+  const model = modelOf('// owned explanation\nconst value = 1\n')
+  model.replaceNode(model.sourceFile.statements[0], 'const value = 2', {
+    ...ctx(),
+    includeLeadingComments: true,
+  })
+  assert.equal(serializeStructuralModel(model), 'const value = 2\n')
+})
+
+test('removeNode can consume one adjacent blank line without copied source text', () => {
+  const model = modelOf('const first = 1\n\nconst second = 2\n')
+  model.removeNode(model.sourceFile.statements[0], { ...ctx(), includeTrailingBlank: true })
+  assert.equal(serializeStructuralModel(model), 'const second = 2\n')
+})
+
 test('isRemoved reports a node inside an earlier removal, so a dependent operation can see it', () => {
   const model = modelOf('export default [{ a: 1 }, { b: 2 }];\n')
   const first = findUniqueNode(

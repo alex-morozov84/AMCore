@@ -178,8 +178,10 @@ automates this — a one-time, destructive transform; see its own `--dry-run`
 output and ADR-071 for the safety model. It does:
 
 1. Move everything from `src/app/[locale]/` up into `src/app/`.
-2. Delete `src/proxy.ts`, `src/i18n/routing.ts`, `src/i18n/navigation.ts`, and
-   `src/i18n/params.ts`; keep `RouteProgressLink` and
+2. Remove next-intl routing from `src/proxy.ts`, but retain that shared Next.js
+   entrypoint for CSP nonce/header propagation and reporting. Delete
+   `src/i18n/routing.ts`, `src/i18n/navigation.ts`, and `src/i18n/params.ts`;
+   keep `RouteProgressLink` and
    `useRouteProgressRouter()` as the consumer-facing adapters while rewriting
    their underlying imports to `next/link`/`next/navigation`, and remove the
    locale-aware import guards that are no longer applicable.
@@ -191,11 +193,10 @@ output and ADR-071 for the safety model. It does:
    becomes dead (no caller), not incorrect, and is a manual follow-up if you
    want it gone too.
 5. Keep one catalogue (deletes the other locale's message file) and trim
-   `SUPPORTED_LOCALES`/`DEFAULT_LOCALE` so the backend, emails, and
-   notifications agree. Prints a manual-follow-up reminder for
-   `apps/api/prisma/user.prisma`'s `locale` column default, which it does
-   not touch — that needs a real `prisma migrate dev` against a live
-   database.
+   `SUPPORTED_LOCALES`/`DEFAULT_LOCALE` so the backend, emails, notifications,
+   the Prisma schema, and the fresh-fork migration source agree. The command
+   only projects source files during fork initialization; it never connects to
+   a database or migrates an existing deployment.
 
 **Do not instead set `localePrefix: 'never'`.** It looks like the obvious way to
 get unprefixed URLs, and it is a trap: next-intl implements `'never'` by

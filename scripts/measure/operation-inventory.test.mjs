@@ -7,7 +7,7 @@ describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
 
   test('records real source/target paths and every measured scenario', () => {
-    assert.equal(inventory.operations.length, 375)
+    assert.equal(inventory.operations.length, 456)
     assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
@@ -17,21 +17,22 @@ describe('operation inventory against the real plans', () => {
     assert.ok(
       inventory.operations.every(
         (operation) =>
-          operation.modulePath?.startsWith('scripts/lib/project-plan-') ||
+          operation.modulePath === 'scripts/lib/project-locale-materializer.mjs' ||
           operation.modulePath === 'scripts/lib/project-shared-content.mjs' ||
           operation.modulePath === 'scripts/lib/project-console-facts.mjs' ||
           operation.modulePath === 'scripts/lib/project-storybook-facts.mjs'
       )
     )
+    assert.ok(inventory.operations.every((operation) => typeof operation.summary === 'string'))
   })
 
   test('reports migration units separately from legacy operations', () => {
     assert.deepEqual(inventory.migrationCounts, {
-      legacyOperations: 207,
+      legacyOperations: 0,
       semanticFacts: 82,
       semanticClaims: 218,
       sharedContentOperations: 58,
-      materializedFilesystemOperations: 374,
+      materializedFilesystemOperations: 454,
     })
   })
 
@@ -41,15 +42,11 @@ describe('operation inventory against the real plans', () => {
     )
     assert.ok(inventory.operations.some((operation) => operation.kind === 'delete'))
     assert.ok(inventory.operations.some((operation) => operation.targetType === 'directory'))
-    assert.ok(
-      inventory.operations.some(
-        (operation) => operation.adapterClass === 'whole-file-legacy-before-after'
-      )
-    )
+    assert.ok(inventory.operations.some((operation) => operation.kind === 'edit'))
   })
 
   test('publishes one synchronization edge for every distinct exact-copy target', () => {
-    assert.equal(inventory.exactCopyEdges.length, 19)
+    assert.equal(inventory.exactCopyEdges.length, 0)
     assert.equal(
       inventory.exactCopyEdges.some((edge) => edge.upstreamSource === ROUTE_PROGRESS_SOURCE_PATH),
       false

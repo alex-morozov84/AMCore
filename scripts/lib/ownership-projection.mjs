@@ -14,7 +14,12 @@ function baseRemoved(selections) {
     for (const file of filesInRoots(selection.inventory)) removed.add(file)
   }
   for (const field of ['featureFiles', 'topology', 'verification', 'documentation']) {
-    for (const file of unionFacts(selections, field)) removed.add(file)
+    for (const { manifest, inventory } of selections) {
+      for (const fact of manifest.facts[field]) {
+        if (fact.disposition === 'rewrite') continue
+        for (const file of filesForFacts(inventory, [fact])) removed.add(file)
+      }
+    }
   }
   return removed
 }
@@ -49,8 +54,9 @@ function reachableFrom(entrypoints, forward) {
   const pending = [...entrypoints]
   while (pending.length) {
     const current = pending.pop()
-    if (reachable.has(current) || !forward.has(current)) continue
+    if (reachable.has(current)) continue
     reachable.add(current)
+    if (!forward.has(current)) continue
     for (const edge of forward.get(current)) pending.push(edge.target)
   }
   return reachable

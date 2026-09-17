@@ -143,7 +143,7 @@ jobs:
       # Structural/read-only checks against the real repo (disposable copies
       # in scripts/measure/'s own tests never run a real `pnpm install`
       # inside them -- the top-level "Install dependencies" step above is
-      # the only real install -- no Docker, ~10s): every pnpm init:project
+      # the only real install -- no Docker): every pnpm init:project
       # before/after fixture in scripts/lib/ still matches the real file it
       # targets, the fixture-composition invariants (no two edit steps
       # target the same file, every scaffold dimension composes safely with
@@ -160,8 +160,10 @@ jobs:
       # fixture (this job's own introduction was prompted by exactly that —
       # apps/web and docs changes drifting scripts/lib/*.mjs fixtures with
       # no path filter that would have caught it). Uses the same
-      # `test:scripts:fast` pnpm script the full `test:scripts` command also
-      # runs first, so the two globs cannot diverge from each other.
+      # `test:scripts:fast` script that the local aggregate `test:scripts`
+      # command also runs first. The parallel full CI job deliberately runs
+      # only `test:scripts:generated`; otherwise CI would execute this entire
+      # layer twice before reaching the generated-project matrix.
       - name: Run scaffolding contract tests (fast layer)
         run: pnpm test:scripts:fast
 
@@ -193,8 +195,10 @@ jobs:
       # shapes. Each row installs and builds once. The original eight recipes
       # remain in scaffolding-exhaustive.yml as a weekly/manual backstop.
       # This required check keeps its stable name and has no path selector.
+      # The fast layer already runs in the parallel scaffolding-contract job;
+      # do not call the local aggregate `test:scripts` here and duplicate it.
       - name: Run scaffolding contract tests (full, real end-to-end)
-        run: pnpm test:scripts
+        run: pnpm test:scripts:generated
 
   docker-image-smoke:
     name: Docker production image smoke

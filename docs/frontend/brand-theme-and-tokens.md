@@ -297,6 +297,11 @@ See `PROJECT_CONTEXT.md`'s "Frontend Starter Choices" section for the full
 contract, and `pnpm init:project --help` for its dry-run, typed-confirmation,
 and fail-closed safety controls.
 
+Run `init:brand` and the selected `init:project` choices while initializing a
+fresh downstream fork, before applying that fork's database migrations. The
+commands project source files only; they never connect to or migrate an
+existing database.
+
 The Operations Console transform derives removal ownership from one manifest.
 Every new file below a declared Console feature root is owned automatically;
 outside those closed roots, a Console-specific code, test, config, or docs

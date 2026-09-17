@@ -6,6 +6,7 @@ const summaries = {
   'route-progress.set-source-default':
     'route-progress-flag.ts: set ROUTE_PROGRESS_ENABLED to false',
   'context-console': 'record the Operations Console scaffold choice',
+  'console.token-doc': 'brand-theme-and-tokens.md: remove the console-accent token guidance',
   'project-eslint-remove-navigation':
     'remove the navigation-import ban and its navigation.ts-scoped exemption',
   'project-eslint-remove-storybook':
@@ -56,6 +57,8 @@ const combined = {
     'docs/frontend/README.md: remove Storybook and console-only index entries',
   'docs/frontend/architecture-and-conventions.md':
     'architecture-and-conventions.md: remove Storybook and console-only documentation',
+  'docs/frontend/brand-theme-and-tokens.md':
+    'brand-theme-and-tokens.md: remove Storybook and console-only documentation',
 }
 
 function messageSummary(fact) {
@@ -67,6 +70,7 @@ function messageSummary(fact) {
 
 export function sharedDisplaySummary(pathname, facts) {
   if (pathname.startsWith('apps/web/messages/')) return messageSummary(facts[0])
-  if (facts.length > 1) return combined[pathname]
-  return summaries[facts[0].operationKey]
+  const summary = facts.length > 1 ? combined[pathname] : summaries[facts[0].operationKey]
+  if (!summary) throw new Error(`missing shared display summary for "${pathname}"`)
+  return summary
 }

@@ -29,7 +29,7 @@ function resolveRecords(root, resolvers, aliases, file, records) {
   }))
 }
 
-export function createImportGraph(root, manifest, inventory) {
+export function createImportGraph(root, manifest, inventory, options = {}) {
   const resolvers = loadTsconfigResolvers(root, manifest.tsconfigs)
   const aliases = configuredAliases(resolvers)
   const files = [...inventory.surface.entries()]
@@ -43,7 +43,8 @@ export function createImportGraph(root, manifest, inventory) {
   const barrels = new Set()
   for (const file of files) {
     kinds.set(file, classify(file, manifest.testGlobs))
-    const scan = scanImports(file, readSource(path.join(root, file)))
+    const source = options.contents?.get(file) ?? readSource(path.join(root, file))
+    const scan = scanImports(file, source)
     if (scan.barrel) barrels.add(file)
     dynamic.push(...scan.unresolvedDynamic.map((item) => ({ ...item, importer: file })))
     const edges = resolveRecords(root, resolvers, aliases, file, scan.records)

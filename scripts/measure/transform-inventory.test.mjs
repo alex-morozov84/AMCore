@@ -52,20 +52,8 @@ describe('transform-inventory: classifyModule (synthetic sources — independent
 describe('transform-inventory: buildTransformInventory (real repo, ground truth)', () => {
   const inventory = buildTransformInventory()
 
-  test('classifies every real module (no silent skips)', () => {
-    assert.equal(inventory.length, 51)
-    for (const module of inventory) {
-      assert.ok(module.primaryShape, `${module.modulePath} has no primaryShape`)
-      if (module.primaryShape === 'other-unclassified') {
-        assert.ok(module.unclassifiedReason, `${module.modulePath} is unclassified with no reason`)
-      }
-    }
-  })
-
-  test('a known whole-file-copy module (project-plan-web-nav-oauth.mjs) is classified as such', () => {
-    const found = inventory.find((m) => m.modulePath.endsWith('project-plan-web-nav-oauth.mjs'))
-    assert.ok(found, 'module not found — has it been renamed?')
-    assert.equal(found.primaryShape, 'whole-file-legacy-before-after')
+  test('reports no remaining legacy transform modules', () => {
+    assert.deepEqual(inventory, [])
   })
 
   test('contains no Storybook legacy transform module', () => {
