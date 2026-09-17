@@ -1,11 +1,4 @@
-import {
-  insertAt,
-  insertProvider,
-  insertTarget,
-  relative,
-  take,
-  takeOwned,
-} from './project-display-helpers.mjs'
+import { insertAt, insertProvider, insertTarget, relative, take, takeOwned } from './project-display-helpers.mjs'
 import { ROUTE_PROGRESS_SOURCE_PATH } from './project-route-progress-ownership.mjs'
 
 const combinedOrder = [
@@ -130,20 +123,20 @@ function insertRouteProgress(plan, root, singles) {
 
 export function buildProjectDisplaySteps(
   root,
-  legacySteps,
-  semanticSteps,
+  localeSteps,
+  contentSteps,
   storybookSteps = [],
   consoleSteps = []
 ) {
-  const plan = [...legacySteps]
+  const plan = [...localeSteps]
   insertStorybookProvider(plan, root, storybookSteps)
   insertConsoleProvider(plan, root, consoleSteps)
   const storybookOwned = new Set(storybookSteps)
   const { singles, combined } = partitionSemantic(
     root,
-    semanticSteps.filter((step) => !storybookOwned.has(step))
+    contentSteps.filter((step) => !storybookOwned.has(step))
   )
-  if (legacySteps.some((step) => step.provider === 'locale')) insertLocale(plan, root, singles)
+  if (localeSteps.some((step) => step.provider === 'locale')) insertLocale(plan, root, singles)
   if (storybookSteps.length) insertStorybook(plan, root, singles)
   insertRouteProgress(plan, root, singles)
   if (plan.some((step) => step.provider === 'console')) insertConsole(plan, root, singles)

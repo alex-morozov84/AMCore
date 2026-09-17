@@ -23,7 +23,6 @@ function operationKeys(plan) {
 
 function assertCurrentTreePlan(plan, expectedKeys) {
   assert.deepEqual(operationKeys(plan), expectedKeys)
-  assert.deepEqual(plan.legacySteps, [])
   assert.ok(
     plan.localeSteps.every(
       (step) =>

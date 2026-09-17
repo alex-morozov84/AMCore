@@ -1,6 +1,7 @@
 // init:project's CLI flag parsing/validation, split out of init-project.mjs
 // to stay under the repo's ~150-line-per-file guidance.
-import { EngineError, parseCommonFlags } from './init-engine.mjs'
+import { EngineError } from './actions.mjs'
+import { parseCommonFlags } from './init-engine.mjs'
 import { PROJECT_MODES } from './project-config.mjs'
 import { STORYBOOK_VALUES } from './project-config-storybook.mjs'
 import { ROUTE_PROGRESS_VALUES } from './project-config-route-progress.mjs'

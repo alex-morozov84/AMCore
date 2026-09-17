@@ -7,69 +7,67 @@ import { buildScaffoldOperationPlan } from './scaffold-operation-plan.mjs'
 let fixture
 afterEach(() => fixture?.cleanup())
 
-describe('scaffold operation plan', () => {
-  it('forbids an opaque legacy seed on a semantic-owner path', () => {
-    fixture = createTransactionFixture()
-    const target = writeFixture(fixture.root, 'shared.json', '{}')
-    const legacySteps = [{ kind: 'edit', target, before: '{}', after: '{"x":1}', changed: true }]
-    assert.throws(
-      () =>
-        buildScaffoldOperationPlan({
-          root: fixture.root,
-          legacySteps,
-          forbiddenLegacyTargets: ['shared.json'],
-        }),
-      /opaque legacy step is forbidden/
-    )
-  })
+function edit(target, after) {
+  return { kind: 'edit', target, before: 'before', after, changed: true, summary: 'edit' }
+}
 
-  it('combines exclusive and semantic steps into one complete immutable plan', () => {
+describe('scaffold operation plan', () => {
+  it('reduces materialized edits into one immutable M4 operation array', () => {
     fixture = createTransactionFixture()
-    const legacy = writeFixture(fixture.root, 'legacy.txt', 'before')
-    const semantic = writeFixture(fixture.root, 'shared.txt', 'before')
+    const first = writeFixture(fixture.root, 'first.txt', 'before', 0o640)
+    const second = writeFixture(fixture.root, 'second.txt', 'before', 0o600)
     const plan = buildScaffoldOperationPlan({
       root: fixture.root,
-      legacySteps: [
-        { kind: 'edit', target: legacy, before: 'before', after: 'legacy', changed: true },
-      ],
-      semanticSteps: [
-        { kind: 'edit', target: semantic, before: 'before', after: 'semantic', changed: true },
-      ],
-      forbiddenLegacyTargets: ['shared.txt'],
+      materializedSteps: [edit(first, 'one'), edit(second, 'two')],
     })
-    assert.equal(plan.operationCount, 2)
+    const operations = plan.operationsForApply()
     assert.deepEqual(
-      plan.operationsForApply().map((operation) => operation.target),
-      ['legacy.txt', 'shared.txt']
+      operations.map((operation) => operation.target),
+      ['first.txt', 'second.txt']
     )
+    assert.deepEqual(
+      operations.map((operation) => operation.mode),
+      [0o640, 0o600]
+    )
+    operations[0].bytes.fill(0)
+    assert.equal(plan.operationsForApply()[0].bytes.toString(), 'one')
   })
 
-  it('rejects a duplicate step that hides a missing planned step', () => {
+  it('rejects a target outside the transaction root', () => {
     fixture = createTransactionFixture()
-    const firstTarget = writeFixture(fixture.root, 'first.txt', 'before')
-    const secondTarget = writeFixture(fixture.root, 'second.txt', 'before')
-    const first = {
-      kind: 'edit',
-      target: firstTarget,
-      before: 'before',
-      after: 'first',
-      changed: true,
-    }
-    const second = {
-      kind: 'edit',
-      target: secondTarget,
-      before: 'before',
-      after: 'second',
-      changed: true,
-    }
     assert.throws(
       () =>
         buildScaffoldOperationPlan({
           root: fixture.root,
-          legacySteps: [first, second],
-          materializationSteps: [first, first],
+          materializedSteps: [edit('/tmp/outside.txt', 'no')],
         }),
-      /complete permutation/
+      /escapes the transaction root/
+    )
+  })
+
+  it('keeps the established destination mode for a move with rewritten content', () => {
+    fixture = createTransactionFixture()
+    const source = writeFixture(fixture.root, 'source.txt', 'before', 0o640)
+    const target = `${fixture.root}/moved.txt`
+    const plan = buildScaffoldOperationPlan({
+      root: fixture.root,
+      materializedSteps: [{ ...edit(target, 'after'), source }],
+    })
+    const [operation] = plan.operationsForApply()
+    assert.equal(operation.kind, 'move')
+    assert.equal(operation.mode, 0o666 & ~process.umask())
+  })
+
+  it('rejects duplicate effective writers before M4', () => {
+    fixture = createTransactionFixture()
+    const target = writeFixture(fixture.root, 'shared.txt', 'before')
+    assert.throws(
+      () =>
+        buildScaffoldOperationPlan({
+          root: fixture.root,
+          materializedSteps: [edit(target, 'one'), edit(target, 'two')],
+        }),
+      /duplicate writer/
     )
   })
 })

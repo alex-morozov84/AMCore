@@ -26,13 +26,13 @@ describe('operation inventory against the real plans', () => {
     assert.ok(inventory.operations.every((operation) => typeof operation.summary === 'string'))
   })
 
-  test('reports migration units separately from legacy operations', () => {
+  test('reports providers, ownership, semantic units, and final M4 operations', () => {
     assert.deepEqual(inventory.migrationCounts, {
-      legacyOperations: 0,
-      semanticFacts: 82,
-      semanticClaims: 218,
-      sharedContentOperations: 58,
-      materializedFilesystemOperations: 454,
+      productionProviders: 10,
+      ownershipManifests: 10,
+      semanticFacts: 632,
+      semanticClaims: 1209,
+      finalFilesystemOperations: 454,
     })
   })
 

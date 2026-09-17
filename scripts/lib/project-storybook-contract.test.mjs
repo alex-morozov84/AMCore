@@ -67,7 +67,7 @@ function assertStorybookContract(plan) {
   assert.ok(deletes.some((fact) => fact.path === 'docs/frontend/storybook.md'))
   assert.ok(deletes.some((fact) => fact.path.endsWith('.stories.tsx')))
   assert.equal(
-    plan.legacySteps.some((step) => /storybook/i.test(`${step.provider} ${step.modulePath}`)),
+    plan.steps.some((step) => /project-plan/.test(step.modulePath ?? '')),
     false
   )
   assert.equal(

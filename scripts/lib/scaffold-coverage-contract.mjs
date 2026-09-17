@@ -1,7 +1,7 @@
 const LOCALE_TOPOLOGIES = ['multi', 'single']
 const CONSOLE_TOPOLOGIES = ['path', 'host', 'disabled']
 const TOGGLES = ['enabled', 'disabled']
-const LEGACY_RECIPES = [
+const HISTORICAL_RECIPES = [
   'single-locale-en',
   'route-progress-disabled',
   'storybook-disabled-install-before',
@@ -11,7 +11,7 @@ const LEGACY_RECIPES = [
   'admin-console-single-locale-ru-host-panel',
   'admin-console-single-locale-en-disabled',
 ]
-const LEGACY_OBLIGATIONS = {
+const HISTORICAL_OBLIGATIONS = {
   'single-locale-en': ['typecheck', 'lint', 'build', 'api-test', 'web-test'],
   'route-progress-disabled': ['typecheck', 'lint', 'build', 'api-test', 'web-test'],
   'storybook-disabled-install-before': ['install'],
@@ -36,7 +36,7 @@ export function requiredCoverage() {
     'locale-value:ru',
     'proxy:multi-host',
     'proxy:single-host',
-    ...LEGACY_RECIPES.map((name) => `legacy:${name}`),
+    ...HISTORICAL_RECIPES.map((name) => `historical:${name}`),
   ])
 }
 
@@ -51,7 +51,7 @@ export function rowCoverage(row) {
     `storybook/route-progress:${f.storybook}/${f.routeProgress}`,
     ...f.locales.map((locale) => `locale-value:${locale}`),
     ...(f.proxy === 'none' ? [] : [`proxy:${f.proxy}`]),
-    ...row.replaces.map((name) => `legacy:${name}`),
+    ...row.replaces.map((name) => `historical:${name}`),
   ])
 }
 
@@ -76,13 +76,13 @@ function capabilities(row) {
   return result
 }
 
-function validateLegacyAssignments(rows, errors) {
-  for (const name of LEGACY_RECIPES) {
+function validateHistoricalAssignments(rows, errors) {
+  for (const name of HISTORICAL_RECIPES) {
     const assigned = rows.filter((row) => row.replaces.includes(name))
     if (assigned.length !== 1) errors.push(`${name}: expected exactly one retained row`)
     if (assigned.length !== 1) continue
     const available = capabilities(assigned[0])
-    const missing = LEGACY_OBLIGATIONS[name].filter((item) => !available.has(item))
+    const missing = HISTORICAL_OBLIGATIONS[name].filter((item) => !available.has(item))
     if (missing.length > 0) errors.push(`${name}: missing obligations ${missing.join(', ')}`)
   }
 }
@@ -99,7 +99,7 @@ export function validateCoveringScenarios(rows) {
     if (counts.installs !== 1) errors.push(`${row.name}: expected exactly one install`)
     if (counts.builds !== 1) errors.push(`${row.name}: expected exactly one build command`)
   }
-  validateLegacyAssignments(rows, errors)
+  validateHistoricalAssignments(rows, errors)
   if (missing.length > 0) errors.push(`missing coverage: ${missing.join(', ')}`)
   return errors
 }

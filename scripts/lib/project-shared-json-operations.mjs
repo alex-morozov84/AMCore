@@ -1,4 +1,4 @@
-import { jsonDeleteTransform } from './plan-steps.mjs'
+import { jsonDeleteTransform } from './content-transforms.mjs'
 
 export const STORYBOOK_PACKAGE_PATHS = Object.freeze([
   'scripts.test:storybook',

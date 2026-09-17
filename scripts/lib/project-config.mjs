@@ -9,9 +9,8 @@ import { EngineError } from './actions.mjs'
 export const PROJECT_MODES = ['single']
 
 /**
- * The reinitialize guard (ADR-071): every individual step here fails closed
- * on a re-run too (exactContentStep/fileStep read the file they expect to
- * still exist), but with a raw ENOENT rather than an explanation. Checking
+ * The reinitialize guard (ADR-071): planning fails closed when required
+ * source files no longer exist, but a raw ENOENT is less useful. Checking
  * the one directory every step in this transform ultimately empties gives a
  * single clear error up front instead of whichever step happens to hit the
  * missing file first.

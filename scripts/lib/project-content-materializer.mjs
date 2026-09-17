@@ -9,6 +9,8 @@ import {
 } from './path-algebra-structural-compose.mjs'
 import { registerProjectConfigOperations } from './project-config-operations.mjs'
 import { registerProjectLocaleOperations } from './project-locale-operations.mjs'
+import { brandContentDefinition } from './brand-content-operations.mjs'
+import { registerBrandStructuralOperations } from './brand-structural-operations.mjs'
 import {
   projectConsoleContentDefinition,
   registerConsoleStructuralOperations,
@@ -27,6 +29,7 @@ function conflict(pathname, location, left, right) {
 function claimsFor(fact) {
   const definition =
     projectSharedContentDefinition(fact.operationKey) ??
+    brandContentDefinition(fact.operationKey) ??
     projectConsoleContentDefinition(fact.operationKey) ??
     projectStorybookContentDefinition(fact.operationKey)
   if (!definition) throw new Error(`unknown shared content operation "${fact.operationKey}"`)
@@ -77,6 +80,7 @@ function materializeText(root, pathname, facts) {
 export function createProjectStructuralRegistry() {
   const registry = createOperationRegistry()
   registerProjectConfigOperations(registry)
+  registerBrandStructuralOperations(registry)
   registerProjectLocaleOperations(registry)
   registerConsoleStructuralOperations(registry)
   registerRouteProgressStructuralOperations(registry)

@@ -25,11 +25,11 @@ const EXACT_COPY_EDGE_SHAPE = {
 }
 
 const MIGRATION_COUNTS_SHAPE = {
-  legacyOperations: isNonNegativeInt,
+  productionProviders: isNonNegativeInt,
+  ownershipManifests: isNonNegativeInt,
   semanticFacts: isNonNegativeInt,
   semanticClaims: isNonNegativeInt,
-  sharedContentOperations: isNonNegativeInt,
-  materializedFilesystemOperations: isNonNegativeInt,
+  finalFilesystemOperations: isNonNegativeInt,
 }
 
 function validateShape(value, shape, prefix) {
