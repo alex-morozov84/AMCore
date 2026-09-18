@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Scaffolding selector shadow evidence.** The existing required full
+  scaffolding job now records a merge-base-trusted, fail-open would-run decision
+  and uploads 30-day JSON evidence while still running all six generated rows
+  unconditionally. The public optional-feature ownership contract now explains
+  automatic closed-root discovery, required shared seams, and the honest
+  reviewer boundary for novel unmarked semantics.
+
 - **Scaffolding baseline measurement tool.** `pnpm measure:scaffold`
   (`scripts/measure/`) — an opt-in maintainer tool that instruments the
   scaffolding suite's real scenarios (install/build/test counts, observed-stage

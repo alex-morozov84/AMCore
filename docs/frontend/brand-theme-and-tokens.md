@@ -331,6 +331,28 @@ root and co-located `*.stories.tsx` verification files are discovered
 automatically, while contributions to shared code, config, workflows, and docs
 require narrow declared seams.
 
+#### Optional-feature extension ownership
+
+Use the ownership boundary, not a list of every feature file:
+
+- Adding `apps/web/src/_pages/console/activity/activity-panel.tsx` below the
+  Console's closed `_pages/console` root is automatic. Do not add a per-file
+  manifest entry.
+- Adding Console navigation to a shared sidebar, an environment/config field,
+  a script, CI workflow, or a mixed documentation page crosses a shared
+  boundary. Register an owned block, config field, structural operation, or
+  other declared extension point; a detectable forgotten contribution fails
+  with the feature, path, marker, and registration action.
+- A new literal, prose statement, or config concept with no registered import,
+  identifier, or marker has no mechanically knowable feature meaning. The
+  author and reviewer must classify it and add a marker/seam when it belongs to
+  an optional feature. The tooling deliberately makes no impossible claim to
+  discover arbitrary semantics.
+
+Adding ordinary functionality does not create a new scaffold dimension. A new
+optional dimension is a deliberate product/architecture decision with its own
+ownership, projection, verification, and documentation contract.
+
 ## Inline style and contrast
 
 - **Token-only styling, enforced.** Raw Tailwind color literals

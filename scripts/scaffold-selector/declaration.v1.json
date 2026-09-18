@@ -1,0 +1,4 @@
+{
+  "schemaVersion": "1.0.0",
+  "fragments": ["contract.v1.json", "inputs.v1.json", "markers.v1.json", "policy.v1.json"]
+}

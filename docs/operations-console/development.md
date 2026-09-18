@@ -27,6 +27,12 @@ have a console-audience step-up BFF/UI flow. Design and review that flow before
 shipping the first such operation; do not reuse the product-session endpoint
 across the host boundary.
 
+Console files added below the closed roots listed above are scaffold-owned
+automatically. A Console contribution to shared navigation, config, scripts,
+CI, or mixed docs must declare a narrow seam or structural operation. Novel
+unmarked semantics remain an explicit author/reviewer classification boundary;
+see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#optional-feature-extension-ownership).
+
 ## Add a functional panel
 
 1. Obtain a narrowly scoped plan and classify every datum as primary or

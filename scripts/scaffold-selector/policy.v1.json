@@ -1,0 +1,55 @@
+{
+  "safeInputs": [
+    {
+      "id": "safe.established-markdown",
+      "matcher": { "kind": "glob", "patterns": ["docs/**/*.md", "*.md"] },
+      "statuses": ["M"],
+      "markerPolicy": "optional-feature-markers",
+      "rationale": "Only existing marker-free prose outside declared scaffold seams is modify-safe."
+    }
+  ],
+  "memberships": [
+    {
+      "id": "membership.stories",
+      "graph": "planning",
+      "glob": "apps/web/src/**/*.stories.tsx",
+      "cardinality": "one-or-more"
+    },
+    {
+      "id": "membership.web-routes",
+      "graph": "planning",
+      "glob": "apps/web/src/app/**/page.tsx",
+      "cardinality": "one-or-more"
+    },
+    {
+      "id": "membership.api-tests",
+      "graph": "generated-verification",
+      "glob": "apps/api/src/**/*.spec.ts",
+      "cardinality": "one-or-more"
+    },
+    {
+      "id": "membership.web-tests",
+      "graph": "generated-verification",
+      "glob": "apps/web/src/**/*.test.ts",
+      "cardinality": "one-or-more"
+    },
+    {
+      "id": "membership.catalogues",
+      "graph": "planning",
+      "glob": "apps/web/messages/*.json",
+      "cardinality": "one-or-more"
+    },
+    {
+      "id": "membership.workspaces",
+      "graph": "generated-verification",
+      "glob": "packages/*/package.json",
+      "cardinality": "one-or-more"
+    },
+    {
+      "id": "membership.console-root",
+      "graph": "planning",
+      "glob": "apps/web/src/features/console-login/**",
+      "cardinality": "one-or-more"
+    }
+  ]
+}

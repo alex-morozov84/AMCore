@@ -1,0 +1,144 @@
+{
+  "inputs": [
+    {
+      "id": "control.selector",
+      "graph": "control",
+      "matcher": { "kind": "root", "patterns": ["scripts/scaffold-selector"] },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "The selector and its declaration cannot authorize their own change."
+    },
+    {
+      "id": "control.workflows",
+      "graph": "control",
+      "matcher": { "kind": "root", "patterns": [".github/workflows"] },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Workflow policy changes require complete verification."
+    },
+    {
+      "id": "control.package-scripts",
+      "graph": "control",
+      "matcher": { "kind": "path", "patterns": ["package.json"] },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Root scripts and tool versions control every scaffold lane."
+    },
+    {
+      "id": "planning.engine",
+      "graph": "planning",
+      "matcher": { "kind": "root", "patterns": ["scripts/lib", "scripts/measure"] },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Desired state, ownership, operations, scenarios, and measurement inputs live here."
+    },
+    {
+      "id": "planning.entrypoints",
+      "graph": "planning",
+      "matcher": {
+        "kind": "glob",
+        "patterns": ["scripts/init-*.mjs", "scripts/*.test.mjs", "scripts/run-console-*.mjs"]
+      },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Production CLIs and generated-project harnesses define scaffold behavior."
+    },
+    {
+      "id": "planning.direct-inputs",
+      "graph": "planning",
+      "matcher": {
+        "kind": "path",
+        "patterns": ["PROJECT_CONTEXT.md", "packages/shared/src/constants/index.ts"]
+      },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Pristine project choices and supported locales feed planning directly."
+    },
+    {
+      "id": "planning.public-seams",
+      "graph": "planning",
+      "matcher": {
+        "kind": "path",
+        "patterns": [
+          "AGENTS.md",
+          "CONTRIBUTING.md",
+          "README.md",
+          "docs/README.md",
+          "docs/auth/README.md",
+          "docs/auth/csrf.md",
+          "docs/auth/sessions.md",
+          "docs/frontend/README.md",
+          "docs/frontend/architecture-and-conventions.md",
+          "docs/frontend/brand-theme-and-tokens.md",
+          "docs/frontend/route-progress.md",
+          "docs/frontend/server-rendered-resilience.md",
+          "docs/frontend/shared-ui-and-shadcn.md",
+          "docs/frontend/storybook.md",
+          "docs/frontend/testing.md",
+          "docs/operations/README.md",
+          "docs/operations/ci-security.md",
+          "docs/operations/deployment.md",
+          "docs/operations-console/development.md"
+        ]
+      },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Mixed public docs contain declared optional-feature seams."
+    },
+    {
+      "id": "planning.feature-doc-roots",
+      "graph": "planning",
+      "matcher": { "kind": "root", "patterns": ["docs/operations-console"] },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Closed optional-feature documentation roots are planning inputs."
+    },
+    {
+      "id": "verification.application",
+      "graph": "generated-verification",
+      "matcher": { "kind": "root", "patterns": ["apps", "packages"] },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Generated repositories compile and test the surviving application and workspaces."
+    },
+    {
+      "id": "verification.toolchain",
+      "graph": "generated-verification",
+      "matcher": {
+        "kind": "path",
+        "patterns": [
+          ".dockerignore",
+          ".env.example",
+          ".npmrc",
+          ".nvmrc",
+          ".prettierignore",
+          ".prettierrc",
+          "commitlint.config.js",
+          "eslint.config.js",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "turbo.json"
+        ]
+      },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Dependency, runtime, and repository toolchain changes can invalidate generated output."
+    },
+    {
+      "id": "verification.runtime-topology",
+      "graph": "generated-verification",
+      "matcher": { "kind": "root", "patterns": ["docker"] },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Proxy and deployment topology are projected or asserted by scaffolding."
+    },
+    {
+      "id": "verification.compose-topology",
+      "graph": "generated-verification",
+      "matcher": { "kind": "glob", "patterns": ["docker-compose*.yml"] },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Compose topology is projected or asserted by scaffolding."
+    }
+  ]
+}

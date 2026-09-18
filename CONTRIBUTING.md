@@ -43,6 +43,14 @@ route-progress bar's default (non-destructive, unlike the other two). See
 `--admin-console-slug=<segment>` changes the page path only; the host stays the
 deployment-time `ADMIN_CONSOLE_HOSTNAME` setting.
 
+When extending an optional feature, files wholly below one of its declared
+closed roots are discovered automatically. Contributions to shared code,
+navigation, config, scripts, CI, or mixed docs require a declared ownership
+seam, structural operation, or registered extension point. Static analysis
+cannot infer arbitrary new meaning with no import or marker, so authors and
+reviewers must explicitly classify novel shared semantics. See the worked
+examples in [Project scaffolding](docs/frontend/brand-theme-and-tokens.md#optional-feature-extension-ownership).
+
 ### API-specific test commands
 
 | Command                                           | Description                                      |
@@ -150,6 +158,9 @@ chore: unify github repository url
    tooling noise). See
    [`docs/frontend/browser-security-and-csp.md`](docs/frontend/browser-security-and-csp.md).
 8. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
+9. For optional-feature work, confirm that closed-root additions are automatic,
+   shared-surface contributions have a declared seam/operation, and any novel
+   unmarked semantics were explicitly classified.
 
 CI runs the same checks on push; fixing any failures before opening a PR saves time.
 
