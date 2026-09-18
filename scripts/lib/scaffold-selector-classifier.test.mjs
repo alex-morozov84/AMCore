@@ -124,3 +124,26 @@ test('glob membership changes select full independently of content changes', () 
   })
   assert.ok(result.reasons.some((reason) => reason.code === 'glob_membership_changed'))
 })
+
+test('affected additions and renames within or across roots remain full', () => {
+  for (const change of [
+    { status: 'A', path: 'apps/web/src/features/console-login/new.ts' },
+    { status: 'R', oldPath: 'apps/api/src/a.ts', path: 'apps/api/src/b.ts' },
+    { status: 'R', oldPath: 'apps/api/src/a.ts', path: 'docs/guide.md' },
+  ])
+    assert.equal(classify(change).required, true)
+})
+
+test('marker addition and deletion both select planning verification', () => {
+  for (const [base, head] of [
+    ['', 'ADMIN_CONSOLE_CONFIG'],
+    ['ADMIN_CONSOLE_CONFIG', ''],
+  ]) {
+    const blobs = {
+      'base:docs/guide.md': { kind: 'text', text: base },
+      'head:docs/guide.md': { kind: 'text', text: head },
+    }
+    const result = classify({ status: 'M', path: 'docs/guide.md' }, blobs)
+    assert.ok(result.reasons.some((reason) => reason.inputId === 'marker.markers'))
+  }
+})
