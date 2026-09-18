@@ -172,10 +172,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Setup pnpm
@@ -186,6 +189,30 @@ jobs:
         with:
           node-version: 24
           cache: 'pnpm'
+
+      - name: Classify scaffolding changes (shadow only)
+        shell: bash
+        env:
+          SELECTOR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          SELECTOR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          SELECTOR_BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
+          SELECTOR_EVENT: ${{ github.event_name }}
+          SELECTOR_OUTPUT: ${{ runner.temp }}/scaffold-selector/decision.json
+        run: |
+          set -euo pipefail
+          trusted="$RUNNER_TEMP/scaffold-selector-trusted"
+          mkdir -p "$(dirname "$SELECTOR_OUTPUT")" "$trusted"
+          printf '%s\n' '{"schemaVersion":"1.0.0","selectorVersion":null,"mode":"shadow","provenance":{"event":"unknown","baseRef":null,"baseSha":null,"headSha":null,"mergeBaseSha":null,"diffRange":null,"declarationSha256":null,"trustSource":"merge-base"},"lanes":{"universalFast":{"required":true,"actualExecution":"run"},"generatedFull":{"required":true,"actualExecution":"run-shadow"},"exhaustiveBackstop":{"required":false,"actualExecution":"scheduled-or-manual"}},"reasons":[{"code":"trusted_selector_missing","paths":[],"detail":"trusted merge-base selector is unavailable"}],"matchedInputs":[],"unknownInputs":[],"diagnostics":["trusted merge-base selector is unavailable"]}' > "$SELECTOR_OUTPUT"
+          [[ "$SELECTOR_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 0
+          [[ "$SELECTOR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 0
+          merge_base=$(git merge-base "$SELECTOR_BASE_SHA" "$SELECTOR_HEAD_SHA") || exit 0
+          [[ "$merge_base" =~ ^[0-9a-f]{40}$ ]] || exit 0
+          git cat-file -e "$merge_base:scripts/scaffold-selector/cli.mjs" 2>/dev/null || exit 0
+          git archive "$merge_base" scripts/scaffold-selector | tar -x -C "$trusted"
+          selector="$trusted/scripts/scaffold-selector"
+          node "$selector/fallback.mjs" --reason selector_error --output "$SELECTOR_OUTPUT" --event "$SELECTOR_EVENT" --base-ref "$SELECTOR_BASE_REF" --base "$SELECTOR_BASE_SHA" --head "$SELECTOR_HEAD_SHA"
+          node "$selector/cli.mjs" --repo "$GITHUB_WORKSPACE" --base "$SELECTOR_BASE_SHA" --head "$SELECTOR_HEAD_SHA" --event "$SELECTOR_EVENT" --base-ref "$SELECTOR_BASE_REF" --declaration "$selector/declaration.v1.json" --selector-version "$merge_base" --output "$SELECTOR_OUTPUT"
+          node "$selector/validate-output.mjs" "$SELECTOR_OUTPUT" || node "$selector/fallback.mjs" --reason output_invalid --output "$SELECTOR_OUTPUT"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -198,7 +225,30 @@ jobs:
       # The fast layer already runs in the parallel scaffolding-contract job;
       # do not call the local aggregate `test:scripts` here and duplicate it.
       - name: Run scaffolding contract tests (full, real end-to-end)
+        id: generated_scaffolding
         run: pnpm test:scripts:generated
+
+      - name: Publish scaffold selector shadow summary
+        if: always()
+        shell: bash
+        env:
+          SELECTOR_DECISION: ${{ runner.temp }}/scaffold-selector/decision.json
+          SELECTOR_ARTIFACT: ${{ runner.temp }}/scaffold-selector/shadow-result.json
+          GENERATED_OUTCOME: ${{ steps.generated_scaffolding.outcome }}
+        run: |
+          set -euo pipefail
+          reporter="$RUNNER_TEMP/scaffold-selector-trusted/scripts/scaffold-selector/report.mjs"
+          if [[ ! -f "$reporter" ]]; then reporter="scripts/scaffold-selector/report.mjs"; fi
+          node "$reporter" --decision "$SELECTOR_DECISION" --artifact "$SELECTOR_ARTIFACT" --summary "$GITHUB_STEP_SUMMARY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --outcome "$GENERATED_OUTCOME"
+
+      - name: Upload scaffold selector shadow evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scaffold-selector-shadow-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/scaffold-selector/shadow-result.json
+          retention-days: 30
+          if-no-files-found: error
 
   docker-image-smoke:
     name: Docker production image smoke

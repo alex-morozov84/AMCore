@@ -39,3 +39,4 @@
 - [ ] No hardcoded values
 - [ ] Types are properly defined
 - [ ] Documentation updated (if needed)
+- [ ] Optional-feature ownership checked: closed-root addition, declared shared seam/operation, or explicitly reviewed unmarked semantics (if applicable)
