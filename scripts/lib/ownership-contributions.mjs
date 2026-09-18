@@ -60,6 +60,23 @@ function missingDetail(manifest, missing) {
     .join('; ')
 }
 
+function collectMissing(root, manifest, inventory, graph, changedFiles, projection, options) {
+  const targets = featureTargets(manifest, inventory, projection)
+  const exempt = exemptFiles(manifest, inventory)
+  const scope = changedFiles ?? [...inventory.surface.keys()]
+  const missing = []
+  for (const file of scope.filter((item) => inventory.surface.get(item) === 'file')) {
+    if (exempt.has(file)) continue
+    const result = detectorsForFile(root, file, manifest, graph, targets, options.contents)
+    for (const contribution of result.detected) {
+      if (!declared(manifest, file, contribution, result.content)) {
+        missing.push({ file, detector: contribution.detector })
+      }
+    }
+  }
+  return missing
+}
+
 export function detectUndeclaredContributions(
   root,
   manifest,
@@ -69,26 +86,15 @@ export function detectUndeclaredContributions(
   projection,
   options = {}
 ) {
-  const targets = featureTargets(manifest, inventory, projection)
-  const exempt = exemptFiles(manifest, inventory)
-  const scope = changedFiles ?? [...inventory.surface.keys()]
-  const missing = []
-  for (const file of scope.filter((item) => inventory.surface.get(item) === 'file')) {
-    if (exempt.has(file)) continue
-    const { content, detected } = detectorsForFile(
-      root,
-      file,
-      manifest,
-      graph,
-      targets,
-      options.contents
-    )
-    for (const contribution of detected) {
-      if (!declared(manifest, file, contribution, content)) {
-        missing.push({ file, detector: contribution.detector })
-      }
-    }
-  }
+  const missing = collectMissing(
+    root,
+    manifest,
+    inventory,
+    graph,
+    changedFiles,
+    projection,
+    options
+  )
   if (missing.length) {
     throw ownershipError(
       OWNERSHIP_CODES.MISSING_SEAM,

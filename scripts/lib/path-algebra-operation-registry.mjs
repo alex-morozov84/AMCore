@@ -79,6 +79,10 @@ export function createOperationRegistry() {
     return definition
   }
 
+  return registryApi(definitions, define, get)
+}
+
+function registryApi(definitions, define, get) {
   return {
     define,
     get,

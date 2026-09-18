@@ -46,6 +46,12 @@ function classify(change, blobs = {}) {
   })
 }
 
+function assertFull(path, code) {
+  const result = classify({ status: 'M', path })
+  assert.equal(result.required, true)
+  assert.ok(result.reasons.some((reason) => reason.code === code))
+}
+
 test('separates planning, verification, control, and modify-safe Markdown', () => {
   for (const [path, code] of [
     ['scripts/lib/manifest.mjs', 'planning_input_changed'],
@@ -53,14 +59,12 @@ test('separates planning, verification, control, and modify-safe Markdown', () =
     ['packages/shared/tsconfig.json', 'verification_source_changed'],
     ['.github/workflows/other.yml', 'control_input_changed'],
   ]) {
-    const result = classify({ status: 'M', path })
-    assert.equal(result.required, true)
-    assert.ok(result.reasons.some((reason) => reason.code === code))
+    assertFull(path, code)
   }
   assert.equal(classify({ status: 'M', path: 'docs/guide.md' }).required, false)
 })
 
-test('fails open for A/D/R, unreadable prose, markers, self-change, and empty diff', () => {
+test('fails open for A/D/R and unreadable prose', () => {
   for (const change of [
     { status: 'A', path: 'docs/new.md' },
     { status: 'D', path: 'docs/guide.md' },
@@ -72,6 +76,9 @@ test('fails open for A/D/R, unreadable prose, markers, self-change, and empty di
     'head:docs/guide.md': { kind: 'binary' },
   }
   assert.equal(classify({ status: 'M', path: 'docs/guide.md' }, binary).required, true)
+})
+
+test('fails open for markers, self-change, and empty diff', () => {
   const marker = {
     'base:docs/guide.md': { kind: 'text', text: '' },
     'head:docs/guide.md': { kind: 'text', text: 'ADMIN_CONSOLE_CONFIG' },
