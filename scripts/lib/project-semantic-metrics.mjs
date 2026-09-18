@@ -1,5 +1,6 @@
 import { createOperationRegistry } from './path-algebra-operation-registry.mjs'
 import { registerProjectConfigOperations } from './project-config-operations.mjs'
+import { registerProjectLocaleOperations } from './project-locale-operations.mjs'
 import {
   projectConsoleContentDefinition,
   registerConsoleStructuralOperations,
@@ -12,6 +13,7 @@ import { registerStorybookStructuralOperations } from './project-storybook-vites
 function structuralRegistry() {
   const registry = createOperationRegistry()
   registerProjectConfigOperations(registry)
+  registerProjectLocaleOperations(registry)
   registerConsoleStructuralOperations(registry)
   registerRouteProgressStructuralOperations(registry)
   registerStorybookStructuralOperations(registry)
@@ -42,5 +44,14 @@ export function countProjectSemanticClaims(facts) {
           ? structuralClaimCount(registry, fact)
           : textClaimCount(fact)),
     0
+  )
+}
+
+export function countAllSemanticClaims(facts) {
+  const content = facts.filter((fact) => fact.kind === 'content')
+  const lifecycle = facts.filter((fact) => fact.kind !== 'content')
+  return (
+    countProjectSemanticClaims(content) +
+    lifecycle.reduce((total, fact) => total + (fact.claims?.length ?? 1), 0)
   )
 }

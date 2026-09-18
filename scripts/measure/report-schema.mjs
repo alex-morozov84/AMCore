@@ -2,7 +2,7 @@
 // Bump the version whenever a field or its meaning changes.
 import { isOperationInventory, validateOperationInventory } from './operation-report-schema.mjs'
 
-export const SCHEMA_VERSION = '1.2.0'
+export const SCHEMA_VERSION = '1.3.0'
 
 const isString = (v) => typeof v === 'string'
 const isBoolean = (v) => typeof v === 'boolean'

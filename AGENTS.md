@@ -104,6 +104,13 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   sandbox. Do not rely on ambient GitHub credentials silently.
 - Keep changes small and focused: **files < 150 lines, functions < 30 lines**;
   one responsibility per file.
+- **Optional-feature ownership is boundary-based.** A file added wholly under
+  an existing closed feature root is owned automatically and needs no scaffold
+  registration. A feature contribution to shared code, navigation, config,
+  scripts, CI, or mixed docs must use a declared ownership seam, structural
+  operation, or registered extension point. Completely novel unmarked meaning
+  cannot be inferred reliably: the author and reviewer must classify it and
+  add a marker/extension contract when it belongs to an optional dimension.
 - **Docs impact check is required.** Before editing, identify which public docs
   the task can affect. When behavior, API contracts, extension points, security
   invariants, operations, commands, or contributor workflow change, update the

@@ -82,7 +82,10 @@ export function renderHumanSummary(report) {
       `  - ${s.scenarioName}: ${status}, ${Math.round(s.wallTimeMs)}ms, ${s.counters.installs} install(s), peak disk ${diskMb}MB`
     )
   }
-  lines.push('', `Transform inventory: ${report.transformInventory.length} modules`)
+  lines.push(
+    '',
+    `Archived transform-baseline inventory: ${report.transformInventory.length} modules`
+  )
   for (const [shape, count] of shapeCounts(report.transformInventory))
     lines.push(`  - ${shape}: ${count}`)
   lines.push(
@@ -93,10 +96,9 @@ export function renderHumanSummary(report) {
   if (report.operationInventory.migrationCounts) {
     const counts = report.operationInventory.migrationCounts
     lines.push(
-      `  - migration units: ${counts.legacyOperations} legacy operations, ` +
-        `${counts.semanticFacts} facts, ${counts.semanticClaims} claims, ` +
-        `${counts.sharedContentOperations} shared content operations, ` +
-        `${counts.materializedFilesystemOperations} filesystem operations`
+      `  - current architecture: ${counts.productionProviders} providers, ` +
+        `${counts.ownershipManifests} ownership manifests, ${counts.semanticFacts} facts, ` +
+        `${counts.semanticClaims} claims, ${counts.finalFilesystemOperations} final M4 operations`
     )
   }
   if (report.topology.candidateEquivalentGroups.length > 0) {

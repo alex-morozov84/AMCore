@@ -1,9 +1,7 @@
 // Structural operation composition (BACKLOG item 14, PR2/M2, FINAL PLAN
 // §2.2) — the orchestrator tying the registry, same-key dedup, semantic-
 // write conflict detection, dependency ordering and adapter application
-// together. Additive only: nothing here is imported by, or imports from,
-// the existing engine (init-engine.mjs, plan-steps.mjs, actions.mjs,
-// project-init-plan.mjs, any project-plan-*.mjs).
+// together.
 import { validateStructuralFacts } from './path-algebra-structural-facts.mjs'
 import { dedupeByOperationKey } from './path-algebra-operation-dedup.mjs'
 import {

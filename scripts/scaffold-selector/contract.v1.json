@@ -1,0 +1,81 @@
+{
+  "contract": {
+    "manifests": [
+      "brand-identity",
+      "operations-console",
+      "route-progress-source-default",
+      "single-locale-projection",
+      "storybook"
+    ],
+    "operations": [
+      "brand.set-manifest-fields",
+      "brand.set-theme-default",
+      "console.login-single-locale",
+      "console.startup-hook",
+      "locale.api-fixture",
+      "locale.api-link-fixture",
+      "locale.api-locale-suite",
+      "locale.auth-controller-typed-fixture",
+      "locale.auth-layout",
+      "locale.auth-page",
+      "locale.auth-service-test",
+      "locale.catalogue-fixture",
+      "locale.database-default-test",
+      "locale.e2e-route-topology",
+      "locale.e2e-ui-expectations",
+      "locale.email-template-test",
+      "locale.frontend-url-test",
+      "locale.global-types",
+      "locale.message-map",
+      "locale.navigation-adapter",
+      "locale.navigation-call",
+      "locale.navigation-dal",
+      "locale.navigation-oauth",
+      "locale.navigation-switcher",
+      "locale.navigation-test",
+      "locale.notification-definition",
+      "locale.notification-feed-test",
+      "locale.oauth-callback-route",
+      "locale.proxy-i18n-seam",
+      "locale.render-robustness-test",
+      "locale.request-config",
+      "locale.root-layout",
+      "locale.supported-locales",
+      "locale.supported-schema-test",
+      "locale.telegram-content-test",
+      "locale.web-locale-suite",
+      "locale.web-messages-test",
+      "locale.welcome-email-test",
+      "project-eslint-remove-navigation",
+      "project-eslint-remove-storybook",
+      "route-progress.set-source-default",
+      "storybook.vitest-project"
+    ],
+    "coveringScenarios": [
+      "coverage-multi-disabled",
+      "coverage-multi-host-route-off",
+      "coverage-multi-path",
+      "coverage-single-en-disabled-route-off",
+      "coverage-single-en-path-route-off",
+      "coverage-single-ru-host"
+    ],
+    "exhaustiveScenarios": [
+      "admin-console-host-panel",
+      "admin-console-path-panel",
+      "admin-console-single-locale-en-disabled",
+      "admin-console-single-locale-ru-host-panel",
+      "route-progress-disabled",
+      "single-locale-en",
+      "storybook-disabled-install-before",
+      "storybook-disabled-manual-verify-after"
+    ],
+    "protectedEntrypoints": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/scaffolding-exhaustive.yml",
+      "package.json",
+      "scripts/init-brand.mjs",
+      "scripts/init-project.mjs",
+      "scripts/scaffold-verification-matrix.test.mjs"
+    ]
+  }
+}

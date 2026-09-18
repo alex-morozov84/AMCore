@@ -2,7 +2,8 @@
 // including a cold agent) or from @clack/prompts (interactive, TTY only).
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { clack, readMarkdownField, readCapturedField } from './init-engine.mjs'
+import { readCapturedField, readMarkdownField } from './actions.mjs'
+import { clack } from './init-engine.mjs'
 import {
   resolvePaths,
   WORKFLOW_MODES,

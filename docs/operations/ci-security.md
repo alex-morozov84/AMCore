@@ -15,7 +15,7 @@ of workflow self-hardening to keep the example forkable.
 | `ci.yml`                     | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job)  | blocking                             |
 | `ci.yml`                     | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                            | blocking                             |
 | `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — fast (`scripts/lib/*.test.mjs`, structural/fixture checks, no nested install) | blocking                             |
-| `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — six-row covering array (`pnpm test:scripts`)                                  | blocking                             |
+| `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — six-row covering array plus shadow selector telemetry                         | blocking; full lane always runs      |
 | `scaffolding-exhaustive.yml` | weekly schedule, manual                 | Original eight real-install scaffolding recipes (`pnpm test:scripts:exhaustive`)                     | backstop, not required               |
 | `workflow-lint.yml`          | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                              | blocking                             |
 | `pr-title.yml`               | `pull_request`                          | Conventional-Commits PR-title lint                                                                   | blocking (squash title = commit msg) |
@@ -88,6 +88,26 @@ of workflow self-hardening to keep the example forkable.
   `pnpm test:scripts:exhaustive` in the non-required weekly/manual
   `scaffolding-exhaustive.yml` backstop. Both modes create a fresh worktree per
   row and never share mutable install/build state.
+
+  The job also runs a conservative change selector in **shadow mode**. Selector
+  code and its versioned data declaration are extracted from the computed Git
+  merge base, so a head change cannot authorize itself. Planning inputs and the
+  generated-repository verification closure are separate graphs; unknown/new,
+  stale, conflicting, unreadable, A/D/R, membership, workflow, selector, and
+  declaration changes fail open to `generatedFull.required: true`. The only
+  initial would-skip class is a marker-free modification to an established
+  Markdown/CHANGELOG file outside known scaffold seams.
+
+  Shadow output never controls execution: setup, install, and all six generated
+  rows remain unconditional, and the fast job remains universal. With
+  `if: always()`, the job appends a bounded summary and uploads the full
+  versioned JSON as `scaffold-selector-shadow-<run-id>-<attempt>` for 30 days.
+  The artifact records merge-base provenance, matched/unknown inputs, reasons,
+  would-run versus actually-ran state, and the full-step outcome. The bootstrap
+  PR is expected to report `trusted_selector_missing` and choose full because
+  its merge base has no trusted selector yet. Missing or invalid output is full.
+  The job has only `contents: read`; no skip is enabled in this phase.
+
 - **Scaffolding baseline measurement** (`pnpm measure:scaffold`,
   `scripts/measure/`) is a separate, opt-in maintainer tool — not a CI gate,
   never runs automatically. It re-applies the required six-row covering array

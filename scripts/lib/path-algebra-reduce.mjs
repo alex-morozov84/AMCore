@@ -1,7 +1,5 @@
 // Main path-algebra reducer (BACKLOG item 14, PR2/M1, FINAL PLAN §2.1) —
-// additive and standalone: not imported by, and does not import from, the
-// existing engine (scripts/lib/init-engine.mjs, plan-steps.mjs,
-// project-plan*.mjs). Takes a flat list of typed facts and produces one
+// Takes a flat list of typed facts and produces one
 // deterministic, order-independent list of materialized operations, or
 // throws a `PathAlgebraConflictError` before anything would be mutated.
 import { normalizeRelativePath, isAncestor } from './path-algebra-normalize.mjs'

@@ -270,6 +270,20 @@ run commits its complete filesystem plan as one recoverable transaction; a
 handled write failure restores the tree to its pre-apply state. Dry runs,
 cancelled prompts, and plans with no changes never start a transaction.
 
+`init:brand` and every `init:project` dimension use the same architecture:
+desired-state facts, explicit ownership seams, narrow structural operations,
+one composed operation plan, and one filesystem transaction. Brand identity
+fields, JSON paths, TypeScript nodes, and the five asset destinations are
+claimed explicitly; missing or ambiguous anchors fail before mutation. There
+is no compatibility executor or sequential second mutation pass.
+
+The next initialization stage will combine these choices in one guided wizard
+and automatically remove downstream-only scaffolding machinery after the user
+reviews and confirms the complete result. That finalization is not part of the
+current commands yet, and it will not be exposed as a mandatory separate
+`init:finalize` step. `PROJECT_CONTEXT.md` remains the boundary that prevents
+the AMCore upstream checkout from being finalized accidentally.
+
 ### Project scaffolding
 
 `pnpm init:project` is the separate, one-time sibling command for
@@ -316,6 +330,28 @@ The Storybook transform uses the same ownership contract: its closed config
 root and co-located `*.stories.tsx` verification files are discovered
 automatically, while contributions to shared code, config, workflows, and docs
 require narrow declared seams.
+
+#### Optional-feature extension ownership
+
+Use the ownership boundary, not a list of every feature file:
+
+- Adding `apps/web/src/_pages/console/activity/activity-panel.tsx` below the
+  Console's closed `_pages/console` root is automatic. Do not add a per-file
+  manifest entry.
+- Adding Console navigation to a shared sidebar, an environment/config field,
+  a script, CI workflow, or a mixed documentation page crosses a shared
+  boundary. Register an owned block, config field, structural operation, or
+  other declared extension point; a detectable forgotten contribution fails
+  with the feature, path, marker, and registration action.
+- A new literal, prose statement, or config concept with no registered import,
+  identifier, or marker has no mechanically knowable feature meaning. The
+  author and reviewer must classify it and add a marker/seam when it belongs to
+  an optional feature. The tooling deliberately makes no impossible claim to
+  discover arbitrary semantics.
+
+Adding ordinary functionality does not create a new scaffold dimension. A new
+optional dimension is a deliberate product/architecture decision with its own
+ownership, projection, verification, and documentation contract.
 
 ## Inline style and contrast
 

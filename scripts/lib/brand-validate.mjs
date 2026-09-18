@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { readPngDimensions, EngineError } from './actions.mjs'
 import { WORKFLOW_MODES, THEME_MODES, THEME_PERSISTENCE_MODES } from './brand-config.mjs'
@@ -61,15 +60,12 @@ export function validateAnswers(answers) {
 }
 
 /** Fails closed with a concrete message rather than a raw fs/decode error. */
-export function validatePngSource(srcPath, expected) {
-  if (!existsSync(srcPath)) {
-    throw new EngineError(`file not found: ${srcPath}`)
-  }
+export function validatePngSnapshot(srcPath, bytes, expected) {
   if (path.extname(srcPath).toLowerCase() !== '.png') {
     throw new EngineError(`expected a .png file, got: ${srcPath}`)
   }
   if (!expected) return
-  const { width, height } = readPngDimensions(readFileSync(srcPath))
+  const { width, height } = readPngDimensions(bytes)
   if (width !== expected.width || height !== expected.height) {
     throw new EngineError(
       `${srcPath} is ${width}x${height}, expected ${expected.width}x${expected.height} — ` +

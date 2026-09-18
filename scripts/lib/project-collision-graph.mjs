@@ -34,7 +34,7 @@ function providerVariants() {
   ]
 }
 
-export function buildLegacyCollisionGraph() {
+export function buildCollisionGraph() {
   const targets = new Map()
   for (const desired of providerVariants()) {
     const facts = [
@@ -67,5 +67,5 @@ export function buildLegacyCollisionGraph() {
 export function assertExpectedCollisionGraph(graph) {
   const actual = JSON.stringify(graph)
   const expected = JSON.stringify(EXPECTED_SHARED_COLLISION_GRAPH)
-  if (actual !== expected) throw new Error(`legacy collision graph changed: ${actual}`)
+  if (actual !== expected) throw new Error(`shared collision graph changed: ${actual}`)
 }

@@ -1,6 +1,4 @@
-// Path/option tables for init-brand, factored out of brand-plan.mjs and
-// brand-fields.mjs so both (and their tests, against a scratch fixture
-// root) resolve the same target files the same way.
+// Path/option tables for init-brand prompts and validation.
 import path from 'node:path'
 
 export function resolvePaths(root) {
