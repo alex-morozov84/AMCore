@@ -10,6 +10,8 @@ import { collectRunProvenance } from './provenance.mjs'
 
 const tempDirs = []
 const copies = []
+const FAILING_PNPM_COMMAND = ['--definitely-not-a-real-option']
+const FAILING_STAGE = FAILING_PNPM_COMMAND.join(' ')
 after(() => {
   tempDirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true }))
   copies.splice(0).forEach((copy) => copy.cleanup())
@@ -45,12 +47,12 @@ describe('instrumented-run: real failure paths (BACKLOG item 14, PR1 Round 8 cor
       flags: ['--route-progress=disabled', '--yes'],
       installBefore: false,
       skipVerify: true,
-      postApplySteps: [['definitely-not-a-real-pnpm-script'], ['lint']],
+      postApplySteps: [FAILING_PNPM_COMMAND, ['lint']],
     }
     const outcome = await execute(scenario, copy.root)
 
     assert.equal(outcome.success, false)
-    assert.equal(outcome.failedStage, 'definitely-not-a-real-pnpm-script')
+    assert.equal(outcome.failedStage, FAILING_STAGE)
     // Counted on run even though it failed.
     assert.equal(outcome.counters.lintRuns, 0) // the unknown command isn't bucketed as lint
     // The second postApplySteps entry ('lint') never ran because the loop
@@ -88,12 +90,12 @@ describe('instrumented-run: real failure paths (BACKLOG item 14, PR1 Round 8 cor
       flags: ['--route-progress=disabled', '--yes'],
       installBefore: false,
       skipVerify: true,
-      postApplySteps: [['definitely-not-a-real-pnpm-script']],
+      postApplySteps: [FAILING_PNPM_COMMAND],
     }
     const record = await runInstrumentedScenario(scenario, provenance)
 
     assert.equal(record.success, false)
-    assert.equal(record.failedStage, 'definitely-not-a-real-pnpm-script')
+    assert.equal(record.failedStage, FAILING_STAGE)
     assert.equal(record.fingerprint, null)
     assert.ok(record.diagnosticsPath)
   })
