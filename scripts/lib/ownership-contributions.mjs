@@ -51,6 +51,15 @@ function exemptFiles(manifest, inventory) {
   return exempt
 }
 
+function missingDetail(manifest, missing) {
+  return missing
+    .map(
+      ({ file, detector }) =>
+        `${manifest.feature}: "${file}" matched "${detector}"; register an owned block, config field, or structural operation in its ownership manifest`
+    )
+    .join('; ')
+}
+
 export function detectUndeclaredContributions(
   root,
   manifest,
@@ -76,15 +85,15 @@ export function detectUndeclaredContributions(
     )
     for (const contribution of detected) {
       if (!declared(manifest, file, contribution, content)) {
-        missing.push(`${file}:${contribution.detector}`)
+        missing.push({ file, detector: contribution.detector })
       }
     }
   }
   if (missing.length) {
     throw ownershipError(
       OWNERSHIP_CODES.MISSING_SEAM,
-      `detectable contributions need a declared seam: ${missing.join(', ')}`,
-      missing.map((item) => item.split(':')[0])
+      `detectable contributions need a declared seam: ${missingDetail(manifest, missing)}`,
+      missing.map((item) => item.file)
     )
   }
   return []

@@ -1,0 +1,51 @@
+{
+  "markerPolicies": [
+    {
+      "id": "optional-feature-markers",
+      "markers": [
+        "--console-accent",
+        "@/widgets/console-shell",
+        "@storybook/nextjs-vite",
+        "ADMIN_CONSOLE_CONFIG",
+        "ADMIN_CONSOLE_HOSTNAME",
+        "ALTER COLUMN \"locale\" SET DEFAULT 'en'",
+        "EmailVerificationEmail(baseProps)",
+        "NAVIGATION_PATHS",
+        "OrgInviteEmail({ ...baseProps, hasAccount: true })",
+        "PasswordResetEmail(baseProps)",
+        "ROUTE_PROGRESS_ENABLED",
+        "__Host-amcore_console_session",
+        "accepts supported locales and rejects others",
+        "delegates to the service and returns the wrapped profile",
+        "docs/frontend/storybook.md",
+        "dynamic-catalogue-import",
+        "english-localized-ui-expectation",
+        "falls back to the DB default locale when authorize has no usable Accept-Language",
+        "falls back to the negotiated Accept-Language locale when the body omits it",
+        "getConsoleOverviewHref",
+        "getConsolePublicApiPath",
+        "locale           String  @default(\"en\")",
+        "locale === 'en'",
+        "locale-prefixed-route",
+        "msw-storybook-addon",
+        "passes the negotiated Accept-Language locale to the service",
+        "prisma.user.findUnique.mockResolvedValue({ locale: 'en' } as never)",
+        "project/import-guards-navigation-source",
+        "renderStored (version-aware, fail-closed)",
+        "renders detailed content only from the allowlisted projection (no raw payload leak)",
+        "renders items in the recipient locale and reports no more when within limit",
+        "requireSuperAdmin",
+        "returns the negotiated supported locale for a matching header",
+        "seeds locale from Accept-Language when no explicit locale is given",
+        "sends an org invite email with hasAccount=false for an unknown email",
+        "storybook-static",
+        "test:e2e:console-real-stack",
+        "test:storybook",
+        "uses the explicit body locale over the negotiated header",
+        "validateAdminConsoleStartupOrExit",
+        "web:console-session:v1",
+        "withConsoleHostGuard"
+      ]
+    }
+  ]
+}

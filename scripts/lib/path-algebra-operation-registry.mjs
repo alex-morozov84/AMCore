@@ -79,5 +79,10 @@ export function createOperationRegistry() {
     return definition
   }
 
-  return { define, get, has: (key) => definitions.has(key) }
+  return {
+    define,
+    get,
+    has: (key) => definitions.has(key),
+    keys: () => [...definitions.keys()].sort(),
+  }
 }
