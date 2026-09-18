@@ -91,6 +91,21 @@ test('prepared projections are deeply immutable and expose no mutable buffers', 
   assertImmutable(projection)
 })
 
+test('prepared projections reject executable callbacks instead of hiding them', () => {
+  const plan = {
+    desiredState: {},
+    localeFacts: [],
+    localeSteps: [],
+    sharedContentFacts: [],
+    sharedContentSteps: [],
+    storybookFacts: [],
+    steps: [{ write: () => {} }],
+    operationPlan: { operationsForApply: () => [] },
+    confirmMessage: '',
+  }
+  assert.throws(() => projectPlan(plan), /cannot contain executable callbacks/)
+})
+
 test('prepared assertions are order-independent and do not mutate matrix records', () => {
   assert.deepEqual(audit(matrix.rows), audit([...matrix.rows].reverse()))
   assert.equal(digest(matrix.rows), initialDigest)

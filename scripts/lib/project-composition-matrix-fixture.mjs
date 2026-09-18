@@ -60,6 +60,9 @@ export function stateKey(state) {
 }
 
 function immutable(value) {
+  if (typeof value === 'function') {
+    throw new Error('project composition projection cannot contain executable callbacks')
+  }
   if (Buffer.isBuffer(value) || ArrayBuffer.isView(value) || value instanceof ArrayBuffer) {
     const bytes =
       value instanceof ArrayBuffer
@@ -74,9 +77,7 @@ function immutable(value) {
   if (value instanceof Map) return immutable([...value.entries()])
   if (value instanceof Set) return immutable([...value.values()])
   if (!value || typeof value !== 'object') return value
-  const entries = Object.entries(value)
-    .filter(([, item]) => typeof item !== 'function')
-    .map(([key, item]) => [key, immutable(item)])
+  const entries = Object.entries(value).map(([key, item]) => [key, immutable(item)])
   return Object.freeze(Object.fromEntries(entries))
 }
 
