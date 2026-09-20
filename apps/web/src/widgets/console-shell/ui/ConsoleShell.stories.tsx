@@ -1,4 +1,4 @@
-import type { UserResponse } from '@amcore/shared'
+import { DEFAULT_LOCALE, type UserResponse } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
@@ -18,7 +18,7 @@ const fixtureUser: UserResponse = {
   name: 'A. Morozov',
   avatarUrl: null,
   phone: null,
-  locale: 'en',
+  locale: DEFAULT_LOCALE,
   timezone: 'UTC',
   createdAt: '2026-01-01T00:00:00.000Z',
   lastLoginAt: '2026-01-01T00:00:00.000Z',
