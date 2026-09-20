@@ -63,6 +63,7 @@ test('path-mode console locale switcher preserves the current page and its query
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
+  await expect(page).toHaveURL(/\/en\/?$/)
 
   await page.goto('/en/admin/organizations?page=2')
   await page.getByRole('combobox', { name: /language/i }).selectOption('ru')
