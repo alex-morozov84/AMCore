@@ -178,6 +178,35 @@ Vitest does not support testing `async` Server Components — exactly the
 shape of `requireSession()`-gated pages and BFF DAL reads — and recommends
 E2E for them.
 
+**Narrow exception: a page whose only `async` work is data already
+resolved by a mock, with no nested `async` children.** The limitation the
+doc above states is specific: RTL's `render()` itself can't invoke
+`<AsyncComponent />` as part of its own tree reconciliation — it never
+awaits a component function that returns a `Promise`. It is not a claim
+that an already-resolved async component's output can't be rendered. Calling
+the page function yourself first — `render(await OverviewPage())` — never
+asks `render()` to do the unsupported thing: you resolve the `async` call in
+plain JS (ordinary `await`, nothing Vitest-specific), and `render()` only
+ever sees an already-resolved, fully synchronous element tree — indistinguishable
+from testing a sync component. This is **not a documented Vitest capability**;
+it follows from plain JS/React semantics, not from anything the guide above
+endorses, so don't cite it as "the docs allow this." It is also **not** a way
+to prove `requireSession()`/cookie/Redis
+behavior (those still need the real-stack lane — nothing else runs a real
+request), but it is a legitimate way to unit-test pure conditional
+branching over an already-mocked `DataOutcome` (e.g. "does this page render
+card A or card B for this outcome"), the kind of thing that doesn't depend
+on any per-request server context. It requires every component in the
+returned tree to be synchronous — a page that composes an `async` _child_
+(not just the page itself) needs that child flattened to a plain function
+receiving its data/translator as props first (see `OverviewDetails` in
+`_pages/console/OverviewPage/`, which dropped its own `getTranslations`
+call in favor of receiving `t` from the already-`async` parent). If a
+future child component gets _real_ async work of its own (its own data
+fetch, not just a translator the parent already resolved), this stops
+being flattenable and the test belongs in the real-stack lane instead —
+don't stretch this technique to cover that case.
+
 ## Accessibility
 
 `@axe-core/playwright` — the only actively-maintained option; `jest-axe`
@@ -323,9 +352,14 @@ dependency graph. The CI `web-e2e` job has this as an explicit step.
   doesn't cross a server-side data read → **mocked E2E lane**
   (`page.route()`, or the `testProxy`/MSW fixture if the boundary is
   server-side).
-- The behavior involves `requireSession()`, cookies, Redis, or an
-  `async` Server Component → **real-stack E2E lane** — nothing else can
-  prove it.
+- The behavior involves `requireSession()`, cookies, Redis, or genuine
+  per-request server context → **real-stack E2E lane** — nothing else can
+  prove it. Pure conditional branching inside an `async` page over an
+  already-mocked `DataOutcome`, with every nested component flattened to
+  synchronous, may instead use the narrow `render(await Page())` unit-test
+  exception described above — it is not a substitute for the real-stack
+  lane whenever session/cookie/Redis/request behavior is what's actually
+  under test.
 - Adding or touching a page/component with visible copy or a popup →
   add or extend an axe scan on the E2E layer that already visits it.
 - Adding or changing a `shared/ui` primitive's variant/state, or a
