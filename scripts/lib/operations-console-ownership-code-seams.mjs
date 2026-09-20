@@ -37,9 +37,19 @@ export const operationsConsoleCodeSeams = [
     'console.tokens',
     'apps/web/src/app/globals.css',
     'structural-operation',
-    { identifiers: ['--console-accent:', '--color-console-accent:', 'var(--console-accent)'] },
-    ['--console-accent'],
-    { occurrences: 4 }
+    {
+      identifiers: [
+        '--console-accent:',
+        '--color-console-accent:',
+        'var(--console-accent)',
+        '--font-console-heading:',
+        'var(--console-font-heading)',
+        '--font-console-mono:',
+        'var(--console-font-mono)',
+      ],
+    },
+    ['--console-accent', '--font-console-heading', '--font-console-mono'],
+    { occurrences: 8 }
   ),
   seam(
     'console.messages.en',

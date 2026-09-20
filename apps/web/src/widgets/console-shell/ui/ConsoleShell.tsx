@@ -62,7 +62,7 @@ export function ConsoleShell({ children, user }: ConsoleShellProps) {
         <SidebarFooter className="border-t border-sidebar-border">
           <span
             data-console-shell="footer"
-            className="px-2 font-[family-name:var(--console-font-mono)] text-xs text-foreground-muted group-data-[collapsible=icon]:hidden"
+            className="px-2 font-console-mono text-xs text-foreground-muted group-data-[collapsible=icon]:hidden"
           >
             {t('controlPlane')}
           </span>

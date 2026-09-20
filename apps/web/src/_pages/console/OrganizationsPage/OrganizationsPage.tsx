@@ -10,7 +10,7 @@ import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fall
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 
-const MONO = 'font-[family-name:var(--console-font-mono)]'
+const MONO = 'font-console-mono'
 
 export interface OrganizationsPageProps {
   page: number

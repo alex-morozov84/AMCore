@@ -7,7 +7,7 @@ import { EnvService } from '@/env/env.service'
 import { ReadinessCheckService } from '@/health'
 
 /**
- * Console Overview status (item 9 PR2).
+ * Console Overview status.
  *
  * Deliberately catches `ReadinessCheckService`'s `ServiceUnavailableException`
  * and returns a typed 200 either way: an observed degraded instance must not

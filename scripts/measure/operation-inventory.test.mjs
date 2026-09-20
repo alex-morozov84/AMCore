@@ -28,19 +28,12 @@ describe('operation inventory against the real plans', () => {
   })
 
   test('reports providers, ownership, semantic units, and final M4 operations', () => {
-    // Item 9 PR2 (Overview + locale switcher): +6 facts/claims/operations,
-    // +4 final filesystem operations, over PR1's 640/1217/460. Revised twice
-    // during PR2 itself: a runtime `SUPPORTED_LOCALES.length` guard on
-    // `ConsoleLocaleSwitcher.tsx` first seemed enough, but single-locale
-    // mode rewrites `useRouteProgressRouter()` to the plain `next/navigation`
-    // router (no object href, no `locale` option), so the component's own
-    // navigation call cannot type-check there regardless of any internal
-    // branch. The working fix instead deletes the file whole under
-    // single-locale mode - the same pattern the product `LocaleSwitcher`
-    // already uses - via `LOCALE_DELETES`, a new
-    // `locale.navigation-console-switcher` operation removing its
-    // `ConsoleShell.tsx` usage (2 locales), and a `removeImports` seam
-    // acknowledging its own `@/i18n/navigation` import disappears with it.
+    // `ConsoleLocaleSwitcher.tsx` is deleted whole under single-locale mode
+    // (`LOCALE_DELETES`), not hidden at runtime: single-locale mode rewrites
+    // `useRouteProgressRouter()` to the plain `next/navigation` router (no
+    // object href, no `locale` option), so its navigation call cannot
+    // type-check there regardless of any internal branch. Same pattern as
+    // the product `LocaleSwitcher`'s removal.
     assert.deepEqual(inventory.migrationCounts, {
       productionProviders: 10,
       ownershipManifests: 10,

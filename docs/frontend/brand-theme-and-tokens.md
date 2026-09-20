@@ -44,6 +44,31 @@ dependency-free. This is a starter-priorities trade-off (verifiable and
 owned over matching the newest upstream scaffold cosmetically), not an
 oversight.
 
+### A font scoped to one feature/layout
+
+`--font-sans`/`--font-mono` in `@theme inline` cover the whole app. A feature
+that needs its **own** font — the Operations Console does, loading IBM Plex
+Sans/JetBrains Mono only inside
+`apps/web/src/app/[locale]/admin/layout.tsx` so a downstream fork that
+disables the console never ships a dangling font import — still gets a real
+Tailwind utility, not a repeated arbitrary-value class at every call site:
+
+1. Load the font with `next/font/google` (or `next/font/local`) **inside the
+   feature's own layout**, giving it a distinct `variable` name (e.g.
+   `--console-font-mono`), and apply the returned `.variable` class names to
+   that layout's wrapping element — this is the
+   [documented Next.js Tailwind pattern](https://nextjs.org/docs/app/api-reference/components/font#tailwind-css),
+   not a workaround.
+2. Map that variable into a real utility in `globals.css`'s `@theme inline`
+   block: `--font-console-mono: var(--console-font-mono);` generates
+   `font-console-mono`, usable anywhere. This is a one-line, `var()`-only
+   addition — the same "a variable is a token reference" exemption the
+   arbitrary-value color rule already makes, and it belongs in the existing
+   `console.tokens` seam so a downstream removal stays complete.
+3. Never use `font-[family-name:var(--console-font-mono)]` at call sites —
+   if you find yourself repeating an arbitrary-value class with the same
+   `var(...)` more than once, step 2 is missing, not optional polish.
+
 ## Light / dark / system modes
 
 Default is **`system`**: the resolved theme follows the OS preference unless

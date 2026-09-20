@@ -237,6 +237,17 @@ Stated so nobody assumes coverage that does not exist:
   a malformed `@theme` is not.
 - **Transitive layer violations.** The import rules see one import at a time, not
   the graph reachable through it.
+- **Arbitrary values that duplicate a real utility.** Only a raw _colour_
+  arbitrary value is banned (see above); a non-colour one like `w-[32px]` or
+  `tracking-[0.05em]` passes lint even when a stock utility already covers
+  that exact value (`w-8`, `tracking-wider`) — the codebase has shipped one
+  of these unnoticed. There is no rule that flags "this arbitrary value equals
+  an existing scale entry." Before writing an arbitrary value, check whether
+  the [Tailwind docs](https://tailwindcss.com/docs) already have a utility for
+  that exact number; if a design genuinely needs an in-between or off-scale
+  value (a font size or letter-spacing tuned to a pinned design, for example),
+  the arbitrary value is correct and does not need a token — this guard is
+  about redundancy, not about banning arbitrary values generally.
 
 ## Adding a guard
 

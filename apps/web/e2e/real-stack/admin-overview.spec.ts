@@ -29,9 +29,9 @@ test('path-mode Overview panel renders real readiness, version and process role 
   // A fresh docker-compose stack is healthy - assert the ready state, not
   // the not-ready one, and confirm it never says the console is unhealthy.
   await expect(page.getByText('API instance not ready')).not.toBeVisible()
-  await expect(page.getByText('database')).toBeVisible()
-  await expect(page.getByText('redis')).toBeVisible()
-  await expect(page.getByText('Version')).toBeVisible()
+  await expect(page.getByText('Database')).toBeVisible()
+  await expect(page.getByText('Cache (Redis)')).toBeVisible()
+  await expect(page.getByText('API version')).toBeVisible()
   await expect(page.getByText('Process role')).toBeVisible()
 
   const html = await page.content()

@@ -20,7 +20,7 @@ import { PrismaModule } from '@/prisma/prisma.module'
     ReadinessCheckService,
   ],
   // AdminModule reuses the same readiness definition for the console
-  // Overview endpoint (item 9 PR2) rather than redefining it.
+  // Overview endpoint rather than redefining it.
   exports: [ReadinessCheckService],
 })
 export class HealthModule {}

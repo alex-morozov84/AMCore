@@ -203,6 +203,13 @@
   /* Fonts */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Operations Console: these variables are only ever set (by next/font/google)
+     inside apps/web/src/app/[locale]/admin/layout.tsx, so font-console-heading/
+     font-console-mono only resolve outside of `initial`/browser default within
+     that subtree - by design, since only console UI ever uses them. */
+  --font-console-heading: var(--console-font-heading);
+  --font-console-mono: var(--console-font-mono);
 }
 
 html {

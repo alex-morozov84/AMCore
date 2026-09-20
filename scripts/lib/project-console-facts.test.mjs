@@ -21,11 +21,9 @@ function factFor(facts, operationKey) {
 test('derives the complete disabled Console projection from the manifest', () => {
   const result = plan({ 'admin-console': 'disabled' })
   assert.equal(operationsConsoleOwnership.facts.roots.length, 9)
-  // +2 (27->29): the Organizations panel's path-mode e2e files. +1 (29->30):
-  // the Overview panel's path-mode e2e file (item 9 PR2) - all registered in
-  // operationsConsoleFacts.verification (outside every closed root). A
-  // closed-root addition (e.g. ConsoleLocaleSwitcher.tsx) does not add its
-  // own delete fact - the root's single delete fact already covers it.
+  // Each file registered in operationsConsoleFacts.verification (outside
+  // every closed root) adds its own delete fact. A closed-root addition
+  // does not - the root's single delete fact already covers it.
   assert.equal(count(result.consoleFacts, 'delete'), 30)
   assert.equal(count(result.consoleFacts, 'content'), 20)
   assert.equal(result.consoleSteps.length, 41)
