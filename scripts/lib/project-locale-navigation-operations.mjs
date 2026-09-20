@@ -4,7 +4,11 @@ import {
   rewriteDal,
   rewriteOAuth,
 } from './project-locale-navigation-core.mjs'
-import { removeLocaleSwitcher, rewriteNavigationAdapter } from './project-locale-navigation-ui.mjs'
+import {
+  removeLocaleSwitcher,
+  rewriteNavigationAdapter,
+  rewritePlainPathnameAdapter,
+} from './project-locale-navigation-ui.mjs'
 
 const definitions = [
   [
@@ -44,6 +48,14 @@ const definitions = [
       paramsSchema: localeParams,
       deriveSemanticWrites: () => [claim('ts:navigation-adapter:source', 'next')],
       adapter: rewriteNavigationAdapter,
+    },
+  ],
+  [
+    'locale.navigation-plain-pathname',
+    {
+      paramsSchema: localeParams,
+      deriveSemanticWrites: () => [claim('ts:navigation-plain-pathname:source', 'next')],
+      adapter: rewritePlainPathnameAdapter,
     },
   ],
   [

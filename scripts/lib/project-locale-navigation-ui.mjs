@@ -56,6 +56,17 @@ export function rewriteNavigationAdapter(model, ctx) {
   model.replaceNode(rawKey, retainedRawKey(rawKey), { ...ctx, includeLeadingComments: true })
 }
 
+/**
+ * For a consumer that imports only `usePathname` from `@/i18n/navigation`
+ * and nothing else (no `useRouter`/`Link`, no file-specific state like
+ * `route-progress-bar.tsx`'s `lastRawKeyRef`) - a plain one-line swap, unlike
+ * {@link rewriteNavigationAdapter}'s file-specific branches above.
+ */
+export function rewritePlainPathnameAdapter(model, ctx) {
+  const localeImport = uniqueImport(model, '@/i18n/navigation', ctx)
+  model.replaceNode(localeImport, `import { usePathname } from 'next/navigation'`, ctx)
+}
+
 export function removeLocaleSwitcher(model, ctx) {
   model.removeNode(uniqueImport(model, '@/features/locale-switcher', ctx), ctx)
   const switcher = findUniqueNode(
