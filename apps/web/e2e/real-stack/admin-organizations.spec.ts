@@ -71,7 +71,7 @@ test('path-mode Organizations panel denies a demoted session with a live re-chec
 /**
  * Next's installed *Layouts and Pages* docs: a layout persists and does not
  * rerender on client-side navigation between sibling pages underneath it.
- * `(protected)/layout.tsx` alone calling `requireSuperAdmin()` would stop
+ * A role check only in `(protected)/layout.tsx` would stop
  * being a real gate the moment a second protected page exists - it would
  * only run once, on whichever page first mounted the layout. Each protected
  * page must call it itself. This proves that with a real client-side

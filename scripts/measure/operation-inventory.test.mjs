@@ -7,7 +7,8 @@ describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
 
   test('records real source/target paths and every measured scenario', () => {
-    assert.equal(inventory.operations.length, 456)
+    // +2: see the console-facts verification-entry comment below.
+    assert.equal(inventory.operations.length, 458)
     assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
@@ -27,12 +28,16 @@ describe('operation inventory against the real plans', () => {
   })
 
   test('reports providers, ownership, semantic units, and final M4 operations', () => {
+    // +2 facts/claims/operations: the Organizations panel's path-mode e2e
+    // files (admin-helpers.ts, admin-organizations.spec.ts) are registered
+    // in operationsConsoleFacts.verification, since they are detectable
+    // console contributions outside every closed directory root.
     assert.deepEqual(inventory.migrationCounts, {
       productionProviders: 10,
       ownershipManifests: 10,
-      semanticFacts: 632,
-      semanticClaims: 1209,
-      finalFilesystemOperations: 454,
+      semanticFacts: 634,
+      semanticClaims: 1211,
+      finalFilesystemOperations: 456,
     })
   })
 
