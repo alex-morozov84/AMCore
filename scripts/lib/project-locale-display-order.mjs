@@ -99,5 +99,7 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/src/shared/ui/route-progress-link.test.tsx',
   'apps/web/src/shared/ui/route-progress-bar.tsx',
   'apps/web/src/shared/ui/route-progress-bar.test.tsx',
+  'apps/web/src/widgets/console-shell/ui/ConsoleNavigation.tsx',
+  'apps/web/src/widgets/console-shell/ui/ConsoleBreadcrumb.tsx',
   'apps/web/src/app/[locale]',
 ]

@@ -9,3 +9,8 @@ export function getConsoleOverviewHref(): string {
   if (ADMIN_CONSOLE_CONFIG.mode === 'path') return `/${ADMIN_CONSOLE_CONFIG.slug}`
   return '/'
 }
+
+/** Same topology rule as {@link getConsoleOverviewHref}, for the Organizations panel. */
+export function getConsoleOrganizationsHref(): string {
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/organizations`
+}

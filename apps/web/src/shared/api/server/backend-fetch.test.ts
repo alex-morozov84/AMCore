@@ -183,6 +183,30 @@ describe('fetchBackend - orchestration', () => {
       )
       expect(fetchMock).not.toHaveBeenCalled()
     })
+
+    it('a custom tokenResolver is used instead of the product session, with no fallback to it', async () => {
+      vi.mocked(getBackendAccessToken).mockResolvedValue('product-token')
+      const customResolver = vi.fn().mockResolvedValue('console-token')
+      const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
+
+      await fetchBackend('/things/p1', schema, { auth: 'required', tokenResolver: customResolver })
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+      expect((init.headers as Headers).get('Authorization')).toBe('Bearer console-token')
+      expect(getBackendAccessToken).not.toHaveBeenCalled()
+    })
+
+    it("'required' with a custom tokenResolver that resolves null still throws, never falling back to the product session", async () => {
+      vi.mocked(getBackendAccessToken).mockResolvedValue('product-token')
+      const customResolver = vi.fn().mockResolvedValue(null)
+      const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
+
+      await expect(
+        fetchBackend('/things/p1', schema, { auth: 'required', tokenResolver: customResolver })
+      ).rejects.toBeInstanceOf(BackendAuthRequiredError)
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(getBackendAccessToken).not.toHaveBeenCalled()
+    })
   })
 
   describe('deadline and cancellation', () => {

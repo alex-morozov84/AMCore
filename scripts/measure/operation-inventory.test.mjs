@@ -7,7 +7,8 @@ describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
 
   test('records real source/target paths and every measured scenario', () => {
-    assert.equal(inventory.operations.length, 456)
+    // +6: see the migrationCounts comment below.
+    assert.equal(inventory.operations.length, 464)
     assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
@@ -27,12 +28,19 @@ describe('operation inventory against the real plans', () => {
   })
 
   test('reports providers, ownership, semantic units, and final M4 operations', () => {
+    // +6 facts/claims/operations over the original 632/1209/454: +2 for the
+    // Organizations panel's path-mode e2e files registered in
+    // operationsConsoleFacts.verification (detectable console contributions
+    // outside every closed directory root), +4 for ConsoleNavigation.tsx and
+    // ConsoleBreadcrumb.tsx needing their own locale.navigation-plain-pathname
+    // rewrite (2 files x 2 locales) so single-locale mode doesn't leave a
+    // dangling `@/i18n/navigation` import after that module is removed.
     assert.deepEqual(inventory.migrationCounts, {
       productionProviders: 10,
       ownershipManifests: 10,
-      semanticFacts: 632,
-      semanticClaims: 1209,
-      finalFilesystemOperations: 454,
+      semanticFacts: 640,
+      semanticClaims: 1217,
+      finalFilesystemOperations: 460,
     })
   })
 

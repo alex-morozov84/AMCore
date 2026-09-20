@@ -20,19 +20,33 @@ function cloneManifest(change) {
 
 test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
   const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
-  assert.equal([...inventory.rootFiles.values()].flat().length, 44)
+  // 44 -> 53 -> 57: Organizations added nine files below existing closed
+  // roots (two page files, one route, four console API files, two host e2e
+  // files), then the <150-line split of ConsoleShell.tsx (Agent 2 diff
+  // review) added four more sibling files under the same closed
+  // widgets/console-shell root.
+  assert.equal([...inventory.rootFiles.values()].flat().length, 57)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   assert.ok(operationsConsoleDocSeams.every((seam) => seam.seamKind === 'owned-block'))
   assert.ok(graph.aliases.includes('@/*'))
   const layout = 'apps/web/src/app/[locale]/admin/(protected)/layout.tsx'
   const superAdmin = 'apps/web/src/shared/lib/require-super-admin.ts'
   assert.ok(graph.forward.get(layout).some((edge) => edge.target === superAdmin))
+  // Each protected page now calls requireSuperAdmin() itself, not only the
+  // shared layout (installed Next docs: layouts don't rerender on
+  // client-side navigation between sibling pages, so a layout-only check
+  // stops being a real gate once a second protected page exists).
   assert.deepEqual(
     graph.reverse
       .get(superAdmin)
       .map((edge) => edge.importer)
       .sort(),
-    [layout, 'apps/web/src/shared/lib/require-super-admin.test.ts'].sort()
+    [
+      layout,
+      'apps/web/src/app/[locale]/admin/(protected)/organizations/page.tsx',
+      'apps/web/src/app/[locale]/admin/(protected)/page.tsx',
+      'apps/web/src/shared/lib/require-super-admin.test.ts',
+    ].sort()
   )
   assert.equal(graph.kinds.get('apps/web/src/instrumentation.test.ts'), 'test')
   assert.equal(graph.kinds.get('scripts/run-console-session-e2e.mjs'), 'production')

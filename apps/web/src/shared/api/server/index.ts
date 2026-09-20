@@ -2,6 +2,7 @@ import 'server-only'
 
 // Direct server-to-apps/api transport (ADR-079). Server Components only -
 // never import this from a Client Component or a browser-facing module.
+export { type TokenResolver } from './auth-header'
 export { type BackendFetchOptions, fetchBackend } from './backend-fetch'
 export {
   degradeSecondary,

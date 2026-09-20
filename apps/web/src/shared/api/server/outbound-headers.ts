@@ -3,7 +3,7 @@ import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
 
 import { resolveTrustedClientIp } from '../bff/trusted-client-ip'
 
-import { type BackendAuthMode, resolveAuthHeader } from './auth-header'
+import { type BackendAuthMode, resolveAuthHeader, type TokenResolver } from './auth-header'
 
 import 'server-only'
 
@@ -16,11 +16,12 @@ export type OutboundHeadersResult = { headers: Headers } | { authUnavailable: tr
  */
 export async function buildOutboundHeaders(
   correlationId: string,
-  authMode: BackendAuthMode
+  authMode: BackendAuthMode,
+  tokenResolver?: TokenResolver
 ): Promise<OutboundHeadersResult> {
   const inbound = await nextHeaders()
   const trustedIp = resolveTrustedClientIp(inbound)
-  const authResult = await resolveAuthHeader(authMode)
+  const authResult = await resolveAuthHeader(authMode, tokenResolver)
   if ('unavailable' in authResult) return { authUnavailable: true }
 
   const outbound = new Headers({

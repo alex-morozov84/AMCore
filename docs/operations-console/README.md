@@ -3,8 +3,8 @@
 The Operations Console is AMCore's optional system control plane for platform
 super-administrators. The shipped foundation provides a protected, localized
 Control Room shell, live access admission, and isolated host-mode login/logout.
-It does not yet provide health, metrics, users, organizations, queues, audit, or
-AI control panels.
+It ships a first functional panel, **Organizations** (read-only). It does not
+yet provide health, metrics, users, queues, audit, or AI control panels.
 
 It is not a product backoffice. Organization owners, organization `ADMIN`s,
 catalogue managers, content editors, and ordinary users do not gain access from
@@ -16,13 +16,22 @@ area with its own roles and permissions.
 After admission, the console shows:
 
 - the localized Control Room shell;
-- one **Overview** navigation item;
-- an access-policy strip; and
-- a placeholder confirming that the foundation is ready.
+- two navigation items, **Overview** and **Organizations**;
+- a header showing the signed-in operator's identity and the current
+  environment.
 
-The access-policy strip describes the protection around the console. It is
-**not** a live health, queue, metrics, or alert reading. No operational action
-is available yet.
+**Overview** still shows only a placeholder confirming the foundation is
+ready — no health/metrics/version content ships yet.
+
+**Organizations** lists every organization in the system: name, slug, and
+created/updated timestamps, paginated. It is **read-only** — there is no way
+to create, edit, delete, or otherwise act on an organization from this panel,
+and no per-organization detail view (the backend has no such endpoint yet).
+If the panel cannot reach its data (the backend is unreachable, times out, or
+returns an unexpected error), it shows a plain "temporarily unavailable"
+message with a retry button — it never silently shows an empty list in place
+of a real failure. An empty list (with no failure) means the system genuinely
+has no organizations yet, which is expected on a fresh installation.
 
 ## Before signing in
 

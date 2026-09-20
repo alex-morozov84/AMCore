@@ -13,6 +13,12 @@ const facts = {
     'apps/web/src/shared/ui/route-progress-link.tsx',
     'apps/web/src/shared/ui/route-progress-bar.tsx',
   ],
+  // Import only `usePathname`, nothing else - a plain adapter swap, not the
+  // file-specific `locale.navigation-adapter` branches above.
+  'locale.navigation-plain-pathname': [
+    'apps/web/src/widgets/console-shell/ui/ConsoleNavigation.tsx',
+    'apps/web/src/widgets/console-shell/ui/ConsoleBreadcrumb.tsx',
+  ],
 }
 
 export function buildLocaleNavigationFacts(locale) {

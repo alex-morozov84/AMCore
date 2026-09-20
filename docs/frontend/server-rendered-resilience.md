@@ -14,8 +14,12 @@ records the design and the rejected error-serialization approaches.
   may hide or disable only that section, or show a small inline note. The caller
   owns that choice; do not show a global toast.
 
-`fetchBackend(path, schema, { auth, timeoutMs?, signal? })` calls `apps/api`
-directly and returns a Zod-validated `DataOutcome<T>`:
+`fetchBackend(path, schema, { auth, timeoutMs?, signal?, tokenResolver? })`
+calls `apps/api` directly and returns a Zod-validated `DataOutcome<T>`. Omit
+`tokenResolver` for the product session (the default); a caller with its own
+isolated session — the Operations Console is the only one today — passes
+its own resolver instead, e.g. `getConsoleAwareAccessToken` (never a
+fallback to the product session, even when it resolves `null`):
 
 ```ts
 type DataOutcome<T> =
@@ -123,6 +127,10 @@ The starter deliberately does not add:
 - stale-if-error data, which needs a real cache and invalidation policy;
 - a fake catalog/demo route.
 
-The Operations Console is the first planned in-repo consumer of the secondary
-path. Its queue, AI-approval, and audit panels must reuse these primitives and
-add durable browser coverage with real sections.
+The Operations Console's Organizations panel is the first real in-repo
+consumer of the primary path (`resolvePrimary`/`PrimaryUnavailableFallback`,
+via `shared/api/console/organizations.ts`), using its own `tokenResolver`
+rather than the product session. Its queue, AI-approval, and audit panels
+are the planned first consumers of the **secondary** path
+(`degradeSecondary`) and must reuse these primitives with durable browser
+coverage over real sections.

@@ -51,14 +51,21 @@ uses for its own outbound call), reusing rather than duplicating the BFF's
 session-vault token resolution, trusted-client-IP relay (ADR-072), and
 outbound header allowlist.
 
-`fetchBackend(path, schema, { auth, timeoutMs?, signal? })` never throws for
-a _known_ availability failure (`429`/`5xx`/timeout/network) or a real `404`
-— it returns a closed `DataOutcome<T>` (`'success' | 'not-found' |
-'unavailable'`) instead, validated against the caller's Zod `schema`. `auth`
-is required on every call (`'none'` never touches the session vault — safe
-for a public read even when Redis is down; `'optional'`/`'required'` differ
-only in whether a genuinely logged-out caller proceeds anonymously or gets a
-`BackendAuthRequiredError`). `degradeSecondary()`/`resolvePrimary()` turn a
+`fetchBackend(path, schema, { auth, timeoutMs?, signal?, tokenResolver? })`
+never throws for a _known_ availability failure (`429`/`5xx`/timeout/network)
+or a real `404` — it returns a closed `DataOutcome<T>` (`'success' |
+'not-found' | 'unavailable'`) instead, validated against the caller's Zod
+`schema`. `auth` is required on every call (`'none'` never touches the
+session vault — safe for a public read even when Redis is down;
+`'optional'`/`'required'` differ only in whether a genuinely logged-out
+caller proceeds anonymously or gets a `BackendAuthRequiredError`).
+`tokenResolver` overrides the product-session token source for a caller
+with its own isolated session domain — today only the Operations Console
+(ADR-081's host/path session split), via `shared/api/console/access-token.ts`'s
+`getConsoleAwareAccessToken`. Omit it for every ordinary product call; the
+default resolves the product session exactly as before, and a custom
+resolver never falls back to it, even when it resolves `null`.
+`degradeSecondary()`/`resolvePrimary()` turn a
 `DataOutcome` into what a page actually renders — both are ordinary render
 branches, never a throw: a secondary section degrades silently (logged
 once, server-side), and primary content renders an explicit unavailable

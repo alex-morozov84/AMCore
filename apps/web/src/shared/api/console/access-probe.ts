@@ -1,7 +1,4 @@
-import { getBackendAccessToken } from '@/shared/api/server/access-token'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
-
-import { getConsoleAccessToken } from './session'
+import { getConsoleAwareAccessToken } from './access-token'
 
 import 'server-only'
 
@@ -12,10 +9,7 @@ export type ConsoleAccessStatus = 204 | 401 | 403 | 503
 /** A live, fail-closed policy probe shared by console pages and BFF handlers. */
 export async function probeConsoleAccess(): Promise<ConsoleAccessStatus> {
   try {
-    const accessToken =
-      ADMIN_CONSOLE_CONFIG.mode === 'host'
-        ? await getConsoleAccessToken()
-        : await getBackendAccessToken()
+    const accessToken = await getConsoleAwareAccessToken()
     return await probeConsoleAccessWithToken(accessToken)
   } catch {
     return 503

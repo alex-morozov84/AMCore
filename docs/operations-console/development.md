@@ -42,8 +42,19 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
 3. Add thin route plumbing and `_pages/console` composition, using the existing
    shell and semantic tokens.
 4. Add copy for every retained locale and progress-aware public navigation.
-5. Put browser-facing calls under `app/api/console/**`, apply the host guard,
-   and independently authorize the corresponding backend endpoint.
+5. Choose the transport deliberately: a **read-only page with no client-side
+   interactivity** (e.g. Organizations) can fetch straight from its Server
+   Component via `shared/api/server`'s `fetchBackend()`, passing a
+   console-aware `tokenResolver` (`shared/api/console/access-token.ts`'s
+   `getConsoleAwareAccessToken`) instead of the product-session default —
+   the host guard is already enforced once, by `admin/layout.tsx`, for every
+   page under it, and no separate Route Handler is needed. A panel with any
+   **browser-initiated** call (a mutation, a client-side poll, anything a
+   `'use client'` component triggers after load) still needs its own handler
+   under `app/api/console/**`, applying `withConsoleHostGuard()` explicitly,
+   since that guard is a per-route-handler concern, not inherited from the
+   page layout. Either way, independently authorize the corresponding
+   backend endpoint — the access probe admits the shell, never the data.
 6. Use the existing graceful-degradation primitives for secondary data. Keep
    primary failures explicit and fail privileged actions closed.
 7. Add focused unit tests, Storybook/a11y states where applicable, and

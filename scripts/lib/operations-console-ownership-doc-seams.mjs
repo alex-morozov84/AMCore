@@ -95,8 +95,8 @@ export const operationsConsoleDocSeams = [
     'console.resilience-doc',
     'docs/frontend/server-rendered-resilience.md',
     block(
-      'The Operations Console is the first planned in-repo consumer',
-      'add durable browser coverage with real sections.'
+      "The Operations Console's Organizations panel is the first real in-repo",
+      'coverage over real sections.'
     )
   ),
   ...operationsConsoleDiscoverySeams,

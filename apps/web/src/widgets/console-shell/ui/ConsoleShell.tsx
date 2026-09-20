@@ -2,12 +2,11 @@
 
 import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
-import { LayoutDashboardIcon, ShieldCheckIcon } from 'lucide-react'
+import type { UserResponse } from '@amcore/shared'
+import { ShieldCheckIcon } from 'lucide-react'
 
 import { ConsoleLogoutButton } from '@/features/console-logout'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
-import { getConsoleOverviewHref } from '@/shared/lib/console-public-href'
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import {
   Sidebar,
   SidebarContent,
@@ -16,57 +15,22 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
-  useSidebar,
 } from '@/shared/ui/sidebar'
+
+import { ConsoleBreadcrumb } from './ConsoleBreadcrumb'
+import { ConsoleNavigation } from './ConsoleNavigation'
+import { ConsoleUserBadge } from './ConsoleUserBadge'
 
 interface ConsoleShellProps {
   children: ReactNode
+  /** Server-resolved (`getConsoleAwareUser`) - chrome only, never an auth decision. */
+  user: UserResponse | null
 }
 
-function ConsoleNavigation() {
-  const t = useTranslations('console')
-  const { setOpenMobile } = useSidebar()
-  const overviewHref = getConsoleOverviewHref()
-
-  return (
-    <SidebarMenu aria-label={t('navigation')}>
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          isActive
-          tooltip={t('overview')}
-          className="border-l-2 border-console-accent bg-console-accent/5 text-sidebar-foreground hover:bg-console-accent/10"
-          render={<RouteProgressLink href={overviewHref} onClick={() => setOpenMobile(false)} />}
-        >
-          <LayoutDashboardIcon aria-hidden="true" />
-          <span>{t('overview')}</span>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    </SidebarMenu>
-  )
-}
-
-function ConsoleStatusStrip() {
-  const t = useTranslations('console')
-
-  return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-xs text-foreground-muted">
-      <span>{t('controlPlane')}</span>
-      <span className="flex items-center gap-2">
-        <span className="size-2 rounded-full bg-console-accent" aria-hidden="true" />
-        {t('accessPolicy')}
-      </span>
-      <span>{t('protected')}</span>
-    </div>
-  )
-}
-
-export function ConsoleShell({ children }: ConsoleShellProps) {
+export function ConsoleShell({ children, user }: ConsoleShellProps) {
   const t = useTranslations('console')
 
   return (
@@ -97,7 +61,7 @@ export function ConsoleShell({ children }: ConsoleShellProps) {
         <SidebarFooter className="border-t border-sidebar-border">
           <span
             data-console-shell="footer"
-            className="px-2 font-mono text-xs text-foreground-muted group-data-[collapsible=icon]:hidden"
+            className="px-2 font-[family-name:var(--console-font-mono)] text-xs text-foreground-muted group-data-[collapsible=icon]:hidden"
           >
             {t('controlPlane')}
           </span>
@@ -105,10 +69,15 @@ export function ConsoleShell({ children }: ConsoleShellProps) {
         <SidebarRail toggleLabel={t('toggleNavigation')} />
       </Sidebar>
       <SidebarInset>
-        <header className="flex min-h-14 items-center gap-3 border-b border-line-strong px-4">
-          <SidebarTrigger toggleLabel={t('toggleNavigation')} />
-          <ConsoleStatusStrip />
-          {ADMIN_CONSOLE_CONFIG.mode === 'host' && <ConsoleLogoutButton />}
+        <header className="flex min-h-14 items-center justify-between gap-3 border-b border-border bg-surface-elevated px-4">
+          <div className="flex items-center gap-3">
+            <SidebarTrigger toggleLabel={t('toggleNavigation')} />
+            <ConsoleBreadcrumb />
+          </div>
+          <div className="flex items-center gap-3">
+            <ConsoleUserBadge user={user} />
+            {ADMIN_CONSOLE_CONFIG.mode === 'host' && <ConsoleLogoutButton />}
+          </div>
         </header>
         <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">{children}</div>
       </SidebarInset>

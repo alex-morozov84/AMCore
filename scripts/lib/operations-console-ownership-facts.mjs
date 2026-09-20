@@ -30,6 +30,13 @@ const verification = [
   'docker-compose.console-session-e2e.yml',
   'scripts/run-console-session-e2e.mjs',
   'scripts/run-console-single-locale-proxy-smoke.mjs',
+  // Path-mode console e2e coverage - lives under the general `e2e/real-stack`
+  // suite (not `e2e/console-real-stack`, which is host-mode's own isolated
+  // stack) since path mode reuses the ordinary product session/stack. Still
+  // wholly console-specific, so it is declared here rather than left as an
+  // undetected contribution outside every closed root.
+  'apps/web/e2e/real-stack/admin-helpers.ts',
+  'apps/web/e2e/real-stack/admin-organizations.spec.ts',
 ].map((path) => one(path, { tags: ['verification:console'] }))
 
 const sharedModuleTests = sharedModules.flatMap((item) =>
