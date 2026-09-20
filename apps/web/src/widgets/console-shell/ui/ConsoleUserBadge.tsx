@@ -22,7 +22,10 @@ export function ConsoleUserBadge({ user }: { user: UserResponse | null }) {
       </span>
       <span className="hidden flex-col leading-tight sm:flex">
         <span className="text-xs font-semibold">{user.name || user.email}</span>
-        <span className="font-[family-name:var(--console-font-mono)] text-[10px] tracking-[0.05em] text-foreground-faint uppercase">
+        {/* `foreground-faint` fails WCAG AA contrast at this size (2.52:1,
+            caught by the Storybook a11y check) - `foreground-muted` is the
+            faintest tier that stays AA-safe for normal-size text. */}
+        <span className="font-[family-name:var(--console-font-mono)] text-[10px] tracking-[0.05em] text-foreground-muted uppercase">
           {t('superAdminRole')}
         </span>
       </span>
