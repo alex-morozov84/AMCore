@@ -18,8 +18,7 @@ export interface OrganizationsPageProps {
 }
 
 /**
- * Read-only Organizations panel (PR1 of the Operations Console functional
- * slices — `ai/models-talk.md`). No detail view: the backend has no
+ * Read-only Organizations panel. No detail view: the backend has no
  * per-organization endpoint, so the paginated list is the whole contract.
  */
 export async function OrganizationsPage({ page, limit }: OrganizationsPageProps) {

@@ -74,8 +74,6 @@
     "paginationNext": "Next",
     "paginationStatus": "Page {page} of {totalPages}",
     "opsPrefix": "OPS",
-    "envProduction": "Production",
-    "envDevelopment": "Development",
     "superAdminRole": "Super admin",
     "navigation": "Console navigation",
     "mobileNavigation": "Operations Console navigation",

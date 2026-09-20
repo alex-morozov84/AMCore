@@ -80,3 +80,25 @@ test('host-mode Organizations panel denies a demoted session with a live re-chec
   await product.close()
   await console.close()
 })
+
+test('the admin route is denied on the product host even for a real SUPER_ADMIN session', async ({
+  browser,
+}) => {
+  const email = uniqueEmail('console-orgs-wronghost')
+  const product = await browser.newContext({
+    baseURL: 'https://app.localhost',
+    ignoreHTTPSErrors: true,
+  })
+  const productPage = await product.newPage()
+  await registerViaUi(productPage, email)
+  setSystemRole(email, 'SUPER_ADMIN')
+
+  // `hasCanonicalConsoleHost()` (`shared/lib/console-host-guard.ts`) gates
+  // `admin/layout.tsx` on the *incoming Host header*, independent of
+  // `requireSuperAdmin()` - the physical path must 404 on the wrong host
+  // even for a genuinely privileged product session.
+  const response = await productPage.goto('/en/admin/organizations')
+  expect(response?.status()).toBe(404)
+
+  await product.close()
+})

@@ -74,8 +74,6 @@
     "paginationNext": "Далее",
     "paginationStatus": "Страница {page} из {totalPages}",
     "opsPrefix": "OPS",
-    "envProduction": "Продакшн",
-    "envDevelopment": "Разработка",
     "superAdminRole": "Супер-админ",
     "navigation": "Навигация консоли",
     "mobileNavigation": "Навигация операционной консоли",
