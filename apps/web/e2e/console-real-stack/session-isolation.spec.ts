@@ -1,61 +1,8 @@
-import { execFileSync } from 'node:child_process'
-
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
 
-const project = process.env.CONSOLE_E2E_PROJECT ?? 'amcore-console-e2e'
-
-function setSystemRole(email: string, role: 'USER' | 'SUPER_ADMIN'): void {
-  execFileSync(
-    'docker',
-    [
-      'compose',
-      '-p',
-      project,
-      'exec',
-      '-T',
-      'postgres',
-      'psql',
-      '-U',
-      'amcore',
-      '-d',
-      'amcore',
-      '-c',
-      `UPDATE core.users SET "systemRole" = '${role}' WHERE "emailCanonical" = '${email}';`,
-    ],
-    { stdio: 'pipe' }
-  )
-}
-
-function redisKeys(namespace: string): string[] {
-  const output = execFileSync(
-    'docker',
-    [
-      'compose',
-      '-p',
-      project,
-      'exec',
-      '-T',
-      'redis',
-      'redis-cli',
-      '--scan',
-      '--pattern',
-      `${namespace}:*`,
-    ],
-    { encoding: 'utf8' }
-  )
-  return output.split('\n').filter(Boolean)
-}
-
-function redisEntry(key: string): Record<string, unknown> {
-  const output = execFileSync(
-    'docker',
-    ['compose', '-p', project, 'exec', '-T', 'redis', 'redis-cli', '--raw', 'GET', key],
-    { encoding: 'utf8' }
-  )
-  return JSON.parse(output)
-}
+import { redisEntry, redisKeys, setSystemRole } from './helpers'
 
 test('host session is isolated, origin-guarded, and loses admission after demotion', async ({
   browser,

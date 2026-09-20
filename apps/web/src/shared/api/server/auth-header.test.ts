@@ -72,4 +72,23 @@ describe('resolveAuthHeader', () => {
 
     await expect(resolveAuthHeader('required')).rejects.toThrow('programming defect')
   })
+
+  it('a custom tokenResolver is used instead of the product session, and never falls back to it', async () => {
+    const customResolver = vi.fn().mockResolvedValue('console-token')
+
+    const result = await resolveAuthHeader('required', customResolver)
+
+    expect(result).toEqual({ header: 'Bearer console-token' })
+    expect(customResolver).toHaveBeenCalledOnce()
+    expect(getBackendAccessToken).not.toHaveBeenCalled()
+  })
+
+  it("'required' with a custom tokenResolver still throws when it resolves null - no product-session fallback", async () => {
+    const customResolver = vi.fn().mockResolvedValue(null)
+
+    await expect(resolveAuthHeader('required', customResolver)).rejects.toBeInstanceOf(
+      BackendAuthRequiredError
+    )
+    expect(getBackendAccessToken).not.toHaveBeenCalled()
+  })
 })

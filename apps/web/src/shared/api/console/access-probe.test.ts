@@ -9,7 +9,15 @@ import { probeConsoleAccess } from './access-probe'
 import { getConsoleAccessToken } from './session'
 
 vi.mock('@/shared/api/server/access-token', () => ({ getBackendAccessToken: vi.fn() }))
-vi.mock('./session', () => ({ getConsoleAccessToken: vi.fn() }))
+// `./access-probe` imports `./access-token`, which also exports
+// `getConsoleAwareUser` (unused here) backed by `dal.ts` - mocked wholesale
+// so this test never pulls in `dal.ts`'s own transitive next-intl
+// navigation import, unresolvable in this test environment.
+vi.mock('@/shared/api/bff/dal', () => ({ getOptionalSession: vi.fn() }))
+vi.mock('./session', () => ({
+  getConsoleAccessToken: vi.fn(),
+  getConsoleSessionEntry: vi.fn(),
+}))
 
 const mockedAccessToken = vi.mocked(getBackendAccessToken)
 const mockedConsoleAccessToken = vi.mocked(getConsoleAccessToken)

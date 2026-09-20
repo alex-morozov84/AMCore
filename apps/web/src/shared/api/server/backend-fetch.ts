@@ -2,7 +2,7 @@ import type { ZodType } from 'zod'
 
 import { parseRetryAfterSeconds } from '../retry-after'
 
-import { type BackendAuthMode } from './auth-header'
+import { type BackendAuthMode, type TokenResolver } from './auth-header'
 import { classifyStatus, classifyThrown } from './classify'
 import { generateCorrelationId } from './correlation-id'
 import { createDeadlineController, withDeadline } from './deadline'
@@ -22,6 +22,11 @@ export interface BackendFetchOptions {
   /** No default - every call site must state its policy explicitly. See
    *  `auth-header.ts` for what each mode does. */
   auth: BackendAuthMode
+  /** Overrides the product session as the token source - for a caller with
+   *  its own isolated session domain (e.g. the Operations Console). Omit
+   *  for every ordinary product call; `auth-header.ts` defaults to the
+   *  product session when this is not provided. */
+  tokenResolver?: TokenResolver
   /** An optional caller-owned cancellation signal, composed with the
    *  deadline below: whichever fires first wins, and a caller's own
    *  cancellation is rethrown rather than classified as `'timeout'`. */
@@ -86,7 +91,10 @@ async function performRequest(
   isCallerCancelled: () => boolean
 ): Promise<RequestResult> {
   try {
-    const headersResult = await withDeadline(buildOutboundHeaders(correlationId, opts.auth), signal)
+    const headersResult = await withDeadline(
+      buildOutboundHeaders(correlationId, opts.auth, opts.tokenResolver),
+      signal
+    )
     if ('authUnavailable' in headersResult) {
       return { kind: 'outcome', outcome: unavailableOutcome('upstream', correlationId) }
     }

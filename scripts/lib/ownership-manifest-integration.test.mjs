@@ -20,7 +20,11 @@ function cloneManifest(change) {
 
 test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
   const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
-  assert.equal([...inventory.rootFiles.values()].flat().length, 44)
+  // 44 -> 51: PR1 (Organizations panel) added 7 files wholly inside already
+  // -declared closed roots (OrganizationsPage/{OrganizationsPage.tsx,index.ts},
+  // the organizations route page.tsx, and shared/api/console/{access-token,
+  // organizations}.{ts,test.ts}) - discovered automatically, no root/seam change.
+  assert.equal([...inventory.rootFiles.values()].flat().length, 51)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   assert.ok(operationsConsoleDocSeams.every((seam) => seam.seamKind === 'owned-block'))
   assert.ok(graph.aliases.includes('@/*'))

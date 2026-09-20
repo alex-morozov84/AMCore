@@ -1,3 +1,4 @@
+import type { UserResponse } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
@@ -10,6 +11,19 @@ const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as {
 }
 const originalMode = ADMIN_CONSOLE_CONFIG.mode
 
+const fixtureUser: UserResponse = {
+  id: 'story-user',
+  email: 'a.morozov@example.com',
+  emailVerified: true,
+  name: 'A. Morozov',
+  avatarUrl: null,
+  phone: null,
+  locale: 'en',
+  timezone: 'UTC',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  lastLoginAt: '2026-01-01T00:00:00.000Z',
+}
+
 const meta = {
   title: 'widgets/console-shell/ConsoleShell',
   component: ConsoleShell,
@@ -20,10 +34,11 @@ type Story = StoryObj<typeof meta>
 
 export const Overview: Story = {
   args: {
+    user: fixtureUser,
     children: (
       <section
         aria-label="Console overview"
-        className="border border-line-strong bg-surface-elevated p-6"
+        className="rounded-lg border border-border bg-surface-elevated p-6 shadow-md"
       >
         <p className="font-mono text-xs tracking-[0.2em] text-foreground-muted uppercase">
           Control Room

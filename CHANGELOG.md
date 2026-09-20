@@ -41,6 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   login/logout protection, and product/console session isolation. OAuth is
   intentionally not reused as a console-host shortcut.
 
+- **Operations Console: Organizations panel.** The first functional console
+  panel — a read-only, paginated list of every organization (name, slug,
+  created/updated timestamps), reusing the console's live `SUPER_ADMIN`
+  admission and a new console-scoped "Control Room" typography/visual
+  treatment shared by the whole shell. `shared/api/server`'s `fetchBackend()`
+  gained an optional `tokenResolver` so a caller with its own isolated
+  session (the console) can supply its own token source without the shared
+  transport needing to know a second session domain exists — every other
+  call site is unaffected.
+
 - **Operations Console Control Room shell.** Adds the isolated console
   Sidebar composition, localized overview placeholder, semantic console accent,
   and progress-aware console navigation without expanding console sessions,

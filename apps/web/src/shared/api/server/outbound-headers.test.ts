@@ -54,4 +54,12 @@ describe('buildOutboundHeaders', () => {
 
     expect('headers' in result && result.headers.get('x-amcore-client-ip')).toBe('203.0.113.9')
   })
+
+  it('forwards a custom tokenResolver through to resolveAuthHeader', async () => {
+    const customResolver = vi.fn()
+
+    await buildOutboundHeaders('corr-1', 'required', customResolver)
+
+    expect(resolveAuthHeader).toHaveBeenCalledWith('required', customResolver)
+  })
 })

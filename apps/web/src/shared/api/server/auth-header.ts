@@ -21,6 +21,15 @@ export type BackendAuthMode = 'none' | 'optional' | 'required'
 
 export type AuthHeaderResult = { header?: string } | { unavailable: true }
 
+/**
+ * A pluggable token source for a caller with its own, isolated session
+ * (e.g. the Operations Console's host/path-aware session — ADR-081), so
+ * this shared transport never has to know a second session domain exists.
+ * Defaults to `getBackendAccessToken` (the product session) below —
+ * every existing call site is unaffected.
+ */
+export type TokenResolver = () => Promise<string | null>
+
 function isAuthInfrastructureFailure(error: unknown): boolean {
   if (error instanceof SessionVaultUnavailableError || error instanceof SessionLockTimeoutError) {
     return true
@@ -30,12 +39,15 @@ function isAuthInfrastructureFailure(error: unknown): boolean {
   return code === 'network' || code === 'timeout'
 }
 
-export async function resolveAuthHeader(mode: BackendAuthMode): Promise<AuthHeaderResult> {
+export async function resolveAuthHeader(
+  mode: BackendAuthMode,
+  tokenResolver: TokenResolver = getBackendAccessToken
+): Promise<AuthHeaderResult> {
   if (mode === 'none') return {}
 
   let token: string | null
   try {
-    token = await getBackendAccessToken()
+    token = await tokenResolver()
   } catch (error) {
     if (!isAuthInfrastructureFailure(error)) throw error
     return { unavailable: true }
