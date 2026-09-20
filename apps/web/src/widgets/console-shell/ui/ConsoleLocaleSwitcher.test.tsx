@@ -1,5 +1,4 @@
 import { NextIntlClientProvider } from 'next-intl'
-import type * as AmcoreShared from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -63,27 +62,5 @@ describe('ConsoleLocaleSwitcher', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'en')
 
     expect(replace).not.toHaveBeenCalled()
-  })
-})
-
-describe('ConsoleLocaleSwitcher (single-locale fork)', () => {
-  it('renders nothing when only one locale is supported', async () => {
-    vi.resetModules()
-    vi.doMock('@amcore/shared', async (importOriginal) => {
-      const actual = await importOriginal<typeof AmcoreShared>()
-      return { ...actual, SUPPORTED_LOCALES: ['en'] }
-    })
-
-    const { ConsoleLocaleSwitcher: SingleLocaleSwitcher } = await import('./ConsoleLocaleSwitcher')
-
-    const { container } = render(
-      <NextIntlClientProvider locale="en" messages={messages}>
-        <SingleLocaleSwitcher />
-      </NextIntlClientProvider>
-    )
-
-    expect(container).toBeEmptyDOMElement()
-
-    vi.doUnmock('@amcore/shared')
   })
 })

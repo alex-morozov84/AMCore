@@ -17,9 +17,16 @@ import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-pr
  * console viewer's language choice is URL/cookie-only (next-intl's own
  * `NEXT_LOCALE` cookie via the navigation router), never a profile
  * mutation. Preserves the current page and its search parameters (e.g.
- * Organizations' `?page=2`) across the switch. Renders nothing when a
- * generated single-locale fork leaves only one entry in
- * `SUPPORTED_LOCALES` — there is nothing to switch between.
+ * Organizations' `?page=2`) across the switch.
+ *
+ * A generated single-locale fork removes this file and its usage in
+ * `ConsoleShell.tsx` entirely (`LOCALE_DELETES` +
+ * `locale.navigation-console-switcher`), the same way the product switcher
+ * is removed — not a runtime `SUPPORTED_LOCALES.length` guard here, because
+ * `useRouteProgressRouter()`'s `replace()` signature itself changes shape
+ * under single-locale mode (plain `next/navigation`, no object href or
+ * `locale` option), so this component cannot type-check in that variant
+ * regardless of any internal branch.
  */
 export function ConsoleLocaleSwitcher() {
   const t = useTranslations('locale')
@@ -28,8 +35,6 @@ export function ConsoleLocaleSwitcher() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
-
-  if (SUPPORTED_LOCALES.length < 2) return null
 
   function onSelect(next: SupportedLocale) {
     if (next === locale) return

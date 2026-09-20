@@ -8,6 +8,9 @@ const facts = {
   'locale.navigation-dal': ['apps/web/src/shared/api/bff/dal.ts'],
   'locale.navigation-oauth': ['apps/web/src/shared/api/bff/oauth-exchange-handler.ts'],
   'locale.navigation-switcher': ['apps/web/src/widgets/app-shell/ui/AppShell.tsx'],
+  // Same removal shape as locale.navigation-switcher, applied to the
+  // console shell's own switcher instead of the product AppShell's.
+  'locale.navigation-console-switcher': ['apps/web/src/widgets/console-shell/ui/ConsoleShell.tsx'],
   'locale.navigation-adapter': [
     'apps/web/src/shared/lib/route-progress/use-route-progress-router.ts',
     'apps/web/src/shared/ui/route-progress-link.tsx',
@@ -18,7 +21,6 @@ const facts = {
   'locale.navigation-plain-pathname': [
     'apps/web/src/widgets/console-shell/ui/ConsoleNavigation.tsx',
     'apps/web/src/widgets/console-shell/ui/ConsoleBreadcrumb.tsx',
-    'apps/web/src/widgets/console-shell/ui/ConsoleLocaleSwitcher.tsx',
   ],
 }
 

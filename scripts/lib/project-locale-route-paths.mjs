@@ -31,5 +31,12 @@ export const LOCALE_DELETES = Object.freeze([
   'apps/web/src/i18n/navigation.ts',
   'apps/web/src/i18n/params.ts',
   'apps/web/src/features/locale-switcher',
+  // Console-only switcher (widgets/console-shell survives single-locale
+  // mode; only this one file inside it needs to go, since it has nothing
+  // left to switch between and its navigation call cannot type-check
+  // against the single-locale router shape - see
+  // `removeConsoleLocaleSwitcher` in project-locale-navigation-ui.mjs).
+  'apps/web/src/widgets/console-shell/ui/ConsoleLocaleSwitcher.tsx',
+  'apps/web/src/widgets/console-shell/ui/ConsoleLocaleSwitcher.test.tsx',
   LOCALE_APP,
 ])

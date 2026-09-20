@@ -8,7 +8,7 @@ describe('operation inventory against the real plans', () => {
 
   test('records real source/target paths and every measured scenario', () => {
     // +6: see the migrationCounts comment below.
-    assert.equal(inventory.operations.length, 464)
+    assert.equal(inventory.operations.length, 474)
     assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
@@ -28,19 +28,25 @@ describe('operation inventory against the real plans', () => {
   })
 
   test('reports providers, ownership, semantic units, and final M4 operations', () => {
-    // +6 facts/claims/operations over the original 632/1209/454: +2 for the
-    // Organizations panel's path-mode e2e files registered in
-    // operationsConsoleFacts.verification (detectable console contributions
-    // outside every closed directory root), +4 for ConsoleNavigation.tsx and
-    // ConsoleBreadcrumb.tsx needing their own locale.navigation-plain-pathname
-    // rewrite (2 files x 2 locales) so single-locale mode doesn't leave a
-    // dangling `@/i18n/navigation` import after that module is removed.
+    // Item 9 PR2 (Overview + locale switcher): +6 facts/claims/operations,
+    // +4 final filesystem operations, over PR1's 640/1217/460. Revised twice
+    // during PR2 itself: a runtime `SUPPORTED_LOCALES.length` guard on
+    // `ConsoleLocaleSwitcher.tsx` first seemed enough, but single-locale
+    // mode rewrites `useRouteProgressRouter()` to the plain `next/navigation`
+    // router (no object href, no `locale` option), so the component's own
+    // navigation call cannot type-check there regardless of any internal
+    // branch. The working fix instead deletes the file whole under
+    // single-locale mode - the same pattern the product `LocaleSwitcher`
+    // already uses - via `LOCALE_DELETES`, a new
+    // `locale.navigation-console-switcher` operation removing its
+    // `ConsoleShell.tsx` usage (2 locales), and a `removeImports` seam
+    // acknowledging its own `@/i18n/navigation` import disappears with it.
     assert.deepEqual(inventory.migrationCounts, {
       productionProviders: 10,
       ownershipManifests: 10,
-      semanticFacts: 640,
-      semanticClaims: 1217,
-      finalFilesystemOperations: 460,
+      semanticFacts: 650,
+      semanticClaims: 1227,
+      finalFilesystemOperations: 467,
     })
   })
 

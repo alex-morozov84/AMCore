@@ -54,4 +54,18 @@ export const localeCoreSeams = [
     ['accepts supported locales and rejects others'],
     'locale.supported-schema-test'
   ),
+  // `ConsoleLocaleSwitcher.tsx` is deleted whole under single-locale mode
+  // (`LOCALE_DELETES`, `locale.navigation-console-switcher` removes its
+  // `ConsoleShell.tsx` usage) - this seam only acknowledges that its
+  // `@/i18n/navigation` import disappears along with the file, the same
+  // `removeImports` mechanism `console.startup-hook` uses in
+  // operations-console-ownership-code-seams.mjs.
+  localeSeam(
+    'locale.console-switcher-deleted',
+    'apps/web/src/widgets/console-shell/ui/ConsoleLocaleSwitcher.tsx',
+    { identifiers: ['@/i18n/navigation'] },
+    ['feature-import'],
+    'locale.navigation-console-switcher',
+    { disposition: 'remove', removeImports: ['apps/web/src/i18n/navigation.ts'] }
+  ),
 ]

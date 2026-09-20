@@ -29,6 +29,7 @@
       "locale.message-map",
       "locale.navigation-adapter",
       "locale.navigation-call",
+      "locale.navigation-console-switcher",
       "locale.navigation-dal",
       "locale.navigation-oauth",
       "locale.navigation-plain-pathname",
