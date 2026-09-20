@@ -12,6 +12,13 @@ const LIGHT_TOKENS = `  /* Operations Console: functional control-plane signal, 
   --console-accent: #7c3aed;
 
 `
+const FONT_TOKENS = `
+  /* Operations Console: these variables are only ever set (by next/font/google)
+     inside apps/web/src/app/[locale]/admin/layout.tsx, so font-console-heading/
+     font-console-mono only resolve outside of \`initial\`/browser default within
+     that subtree - by design, since only console UI ever uses them. */
+  --font-console-heading: var(--console-font-heading);
+  --font-console-mono: var(--console-font-mono);`
 
 const absent = (location) => ({ location, value: 'absent' })
 const noParams = (params) => params && Object.keys(params).length === 0
@@ -76,11 +83,15 @@ function runtimeConfig(text, { mode, slug }) {
 function removeTokens(text) {
   return replaceExactBlock(
     replaceExactBlock(
-      replaceExactBlock(text, LIGHT_TOKENS, ''),
-      '  --console-accent: #7c3aed;\n',
+      replaceExactBlock(
+        replaceExactBlock(text, LIGHT_TOKENS, ''),
+        '  --console-accent: #7c3aed;\n',
+        ''
+      ),
+      '  --color-console-accent: var(--console-accent);\n',
       ''
     ),
-    '  --color-console-accent: var(--console-accent);\n',
+    FONT_TOKENS,
     ''
   )
 }

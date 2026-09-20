@@ -7,8 +7,7 @@ describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
 
   test('records real source/target paths and every measured scenario', () => {
-    // +6: see the migrationCounts comment below.
-    assert.equal(inventory.operations.length, 474)
+    assert.equal(inventory.operations.length, 476)
     assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
@@ -37,9 +36,9 @@ describe('operation inventory against the real plans', () => {
     assert.deepEqual(inventory.migrationCounts, {
       productionProviders: 10,
       ownershipManifests: 10,
-      semanticFacts: 650,
-      semanticClaims: 1227,
-      finalFilesystemOperations: 467,
+      semanticFacts: 652,
+      semanticClaims: 1229,
+      finalFilesystemOperations: 469,
     })
   })
 
