@@ -75,9 +75,23 @@ export const cleanupResultSchema = z.object({
 
 export type CleanupResultResponse = z.infer<typeof cleanupResultSchema>
 
+/**
+ * Closed allowlist of dependency identifiers `GET /admin/overview` may name.
+ * Enforced here (never a plain `z.string()`) and again at the service
+ * boundary (`AdminOverviewService`) so an indicator key outside this set —
+ * present or future — is dropped, never forwarded to the browser.
+ */
+export const ADMIN_OVERVIEW_DEPENDENCY_NAMES = [
+  'database',
+  'redis',
+  'disk',
+  'memory_heap',
+  'storage',
+] as const
+
 /** Per-dependency readiness state, sanitized to name + up/down/unknown only. */
 export const adminOverviewDependencySchema = z.object({
-  name: z.string(),
+  name: z.enum(ADMIN_OVERVIEW_DEPENDENCY_NAMES),
   status: z.enum(['up', 'down', 'unknown']),
 })
 

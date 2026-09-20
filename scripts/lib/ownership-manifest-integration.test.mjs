@@ -23,7 +23,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   // Total file count across every closed console ownership root. Adding or
   // removing a file inside one of those roots changes this number - rerun
   // the test to get the new value rather than computing it by hand.
-  assert.equal([...inventory.rootFiles.values()].flat().length, 65)
+  assert.equal([...inventory.rootFiles.values()].flat().length, 67)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   assert.ok(operationsConsoleDocSeams.every((seam) => seam.seamKind === 'owned-block'))
   assert.ok(graph.aliases.includes('@/*'))

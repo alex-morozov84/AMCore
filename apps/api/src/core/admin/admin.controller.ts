@@ -180,6 +180,16 @@ export class AdminController {
       'Always 200 even when the instance is not ready (see `readiness`); an HTTP 5xx here ' +
       'means the observation itself failed, not that the instance is unhealthy.',
   })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({ status: 403, description: 'SUPER_ADMIN required' })
+  @ApiResponse({
+    status: 503,
+    description:
+      'The observation itself could not be completed (e.g. the request timed out or the ' +
+      'service was otherwise unreachable) — distinct from the typed 200 `readiness: ' +
+      "'not_ready'` response, which means the observation succeeded and found this " +
+      'instance degraded.',
+  })
   getOverview(): Promise<AdminOverviewResponse> {
     return this.overviewService.getOverview()
   }

@@ -1,24 +1,13 @@
-import { getTranslations } from 'next-intl/server'
+import type { getTranslations } from 'next-intl/server'
 import type { AdminOverviewDependency, AdminOverviewResponse } from '@amcore/shared'
 
 import { cn } from '@/shared/lib/utils'
 import { InfoTooltip } from '@/shared/ui/info-tooltip'
 
+import { DEPENDENCY_LABEL_KEY } from './overview-dependency-labels'
+
 const MONO = 'font-console-mono'
 
-const DEPENDENCY_LABEL_KEY = {
-  database: 'overviewDependencyLabelDatabase',
-  redis: 'overviewDependencyLabelRedis',
-  disk: 'overviewDependencyLabelDisk',
-  memory_heap: 'overviewDependencyLabelMemoryHeap',
-  storage: 'overviewDependencyLabelStorage',
-} as const
-
-function dependencyLabelKey(name: string) {
-  return name in DEPENDENCY_LABEL_KEY
-    ? DEPENDENCY_LABEL_KEY[name as keyof typeof DEPENDENCY_LABEL_KEY]
-    : undefined
-}
 const DEPENDENCY_STATUS_KEY = {
   up: 'overviewDependencyStatusUp',
   down: 'overviewDependencyStatusDown',
@@ -42,6 +31,13 @@ const PROCESS_ROLE_KEY = {
 
 interface OverviewDetailsProps {
   overview: AdminOverviewResponse
+  /**
+   * Passed down from `OverviewPage`'s own `getTranslations('console')` call
+   * rather than fetched again here — keeps this a plain synchronous
+   * component (a nested `async` component can't render through plain
+   * ReactDOM outside a real RSC pipeline, which made this untestable).
+   */
+  t: Awaited<ReturnType<typeof getTranslations<'console'>>>
 }
 
 /**
@@ -52,9 +48,7 @@ interface OverviewDetailsProps {
  * text, since an operator seeing this cold has no reason to know what
  * `memory_heap` or `all` mean.
  */
-export async function OverviewDetails({ overview }: OverviewDetailsProps) {
-  const t = await getTranslations('console')
-
+export function OverviewDetails({ overview, t }: OverviewDetailsProps) {
   return (
     <div className="rounded-lg border border-border bg-surface-elevated p-6 shadow-md">
       <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -85,30 +79,27 @@ export async function OverviewDetails({ overview }: OverviewDetailsProps) {
           {t('overviewDependenciesLabel')}
         </p>
         <ul className="mt-2 flex flex-col gap-1">
-          {overview.dependencies.map((dependency) => {
-            const labelKey = dependencyLabelKey(dependency.name)
-            return (
-              <li
-                key={dependency.name}
-                className="flex items-center justify-between gap-4 border-line-soft border-b py-1 text-sm last:border-0"
+          {overview.dependencies.map((dependency) => (
+            <li
+              key={dependency.name}
+              className="flex items-center justify-between gap-4 border-line-soft border-b py-1 text-sm last:border-0"
+            >
+              <span>{t(DEPENDENCY_LABEL_KEY[dependency.name])}</span>
+              <span
+                className={cn(
+                  MONO,
+                  'flex items-center gap-1.5',
+                  DEPENDENCY_TEXT_STYLE[dependency.status]
+                )}
               >
-                <span>{labelKey ? t(labelKey) : dependency.name}</span>
                 <span
-                  className={cn(
-                    MONO,
-                    'flex items-center gap-1.5',
-                    DEPENDENCY_TEXT_STYLE[dependency.status]
-                  )}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={cn('size-2 rounded-full', DEPENDENCY_DOT_STYLE[dependency.status])}
-                  />
-                  {t(DEPENDENCY_STATUS_KEY[dependency.status])}
-                </span>
-              </li>
-            )
-          })}
+                  aria-hidden="true"
+                  className={cn('size-2 rounded-full', DEPENDENCY_DOT_STYLE[dependency.status])}
+                />
+                {t(DEPENDENCY_STATUS_KEY[dependency.status])}
+              </span>
+            </li>
+          ))}
         </ul>
       </div>
     </div>

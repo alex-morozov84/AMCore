@@ -8,6 +8,8 @@ import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-pr
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
 
+import { DEPENDENCY_LABEL_KEY } from './overview-dependency-labels'
+
 interface OverviewNotReadyAlertProps {
   dependencies: AdminOverviewDependency[]
 }
@@ -32,7 +34,9 @@ export function OverviewNotReadyAlert({ dependencies }: OverviewNotReadyAlertPro
         {failing.length > 0 && (
           <span>
             {t('overviewNotReadyDependencies', {
-              dependencies: failing.map((dependency) => dependency.name).join(', '),
+              dependencies: failing
+                .map((dependency) => t(DEPENDENCY_LABEL_KEY[dependency.name]))
+                .join(', '),
             })}
           </span>
         )}

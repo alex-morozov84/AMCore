@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { DEFAULT_LOCALE } from '@amcore/shared'
+import { type AdminOverviewDependency, DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -21,10 +21,12 @@ const messages = {
     overviewNotReadyTitle: 'API instance not ready',
     overviewNotReadyDependencies: 'Affected: {dependencies}',
     overviewRefresh: 'Refresh',
+    overviewDependencyLabelDatabase: 'Database',
+    overviewDependencyLabelRedis: 'Cache (Redis)',
   },
 }
 
-function renderAlert(dependencies: { name: string; status: 'up' | 'down' | 'unknown' }[]) {
+function renderAlert(dependencies: AdminOverviewDependency[]) {
   return render(
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       <OverviewNotReadyAlert dependencies={dependencies} />
@@ -44,7 +46,10 @@ describe('OverviewNotReadyAlert', () => {
     ])
 
     expect(screen.getByText('API instance not ready')).toBeInTheDocument()
-    expect(screen.getByText('Affected: redis')).toBeInTheDocument()
+    // The sanitized human label ("Cache (Redis)"), never the raw wire
+    // identifier ("redis") on its own.
+    expect(screen.getByText('Affected: Cache (Redis)')).toBeInTheDocument()
+    expect(screen.queryByText('Affected: redis')).not.toBeInTheDocument()
     expect(screen.queryByText(/console/i)).not.toBeInTheDocument()
   })
 

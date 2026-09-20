@@ -40,7 +40,7 @@ export async function OverviewPage() {
         <OverviewNotReadyAlert dependencies={overview.dependencies} />
       )}
 
-      <OverviewDetails overview={overview} />
+      <OverviewDetails overview={overview} t={t} />
     </section>
   )
 }

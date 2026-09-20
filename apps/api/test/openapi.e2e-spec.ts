@@ -343,6 +343,19 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
   })
 
+  it('documents the bearer-only Console Overview endpoint with its failure statuses', () => {
+    const operation = document.paths['/admin/overview']?.get
+
+    expect(operation?.security).toEqual([{ bearer: [] }])
+    expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
+    expect(operation?.responses).toHaveProperty('200')
+    expect(operation?.responses).toHaveProperty('401')
+    expect(operation?.responses).toHaveProperty('403')
+    // 503 here means the observation itself failed - distinct from the typed
+    // 200 `readiness: 'not_ready'` response for an observed degraded instance.
+    expect(operation?.responses).toHaveProperty('503')
+  })
+
   it('documents a multipart/form-data request body with a binary file field for both upload operations', () => {
     const MULTIPART_UPLOADS = [
       'post /auth/me/avatar',

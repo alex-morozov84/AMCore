@@ -79,6 +79,21 @@ describe('AdminOverviewService', () => {
     expect(result.dependencies).toEqual([{ name: 'disk', status: 'unknown' }])
   })
 
+  it('drops a dependency name outside the allowlist, never forwarding it to the browser', async () => {
+    readiness.check.mockResolvedValue({
+      status: 'ok',
+      details: {
+        database: { status: 'up' },
+        some_future_indicator: { status: 'up' },
+      },
+    } as any)
+
+    const result = await service.getOverview()
+
+    expect(result.dependencies).toEqual([{ name: 'database', status: 'up' }])
+    expect(JSON.stringify(result)).not.toContain('some_future_indicator')
+  })
+
   it('propagates a non-readiness error instead of misreporting it as not_ready', async () => {
     readiness.check.mockRejectedValue(new Error('unexpected'))
 
