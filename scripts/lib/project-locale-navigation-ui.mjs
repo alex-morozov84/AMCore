@@ -76,3 +76,22 @@ export function removeLocaleSwitcher(model, ctx) {
   )
   model.replaceNode(switcher, '', ctx)
 }
+
+/**
+ * Same shape as {@link removeLocaleSwitcher}, for the console shell's own
+ * switcher (`ConsoleLocaleSwitcher.tsx`, deleted alongside this by
+ * `LOCALE_DELETES`). A single-locale fork has nothing to switch between, and
+ * `ConsoleLocaleSwitcher`'s own navigation call cannot type-check against
+ * the plain `next/navigation` router single-locale mode rewrites
+ * `useRouteProgressRouter()` to - deleting the file, not hiding it at
+ * runtime, is the only option that keeps both variants type-safe.
+ */
+export function removeConsoleLocaleSwitcher(model, ctx) {
+  model.removeNode(uniqueImport(model, './ConsoleLocaleSwitcher', ctx), ctx)
+  const switcher = findUniqueNode(
+    model,
+    (node) => ts.isJsxSelfClosingElement(node) && node.tagName.getText() === 'ConsoleLocaleSwitcher',
+    { ...ctx, describe: 'ConsoleShell ConsoleLocaleSwitcher element' }
+  )
+  model.replaceNode(switcher, '', ctx)
+}

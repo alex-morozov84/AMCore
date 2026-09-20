@@ -5,6 +5,7 @@ import {
   rewriteOAuth,
 } from './project-locale-navigation-core.mjs'
 import {
+  removeConsoleLocaleSwitcher,
   removeLocaleSwitcher,
   rewriteNavigationAdapter,
   rewritePlainPathnameAdapter,
@@ -64,6 +65,14 @@ const definitions = [
       paramsSchema: localeParams,
       deriveSemanticWrites: () => [absent('ts:LocaleSwitcher:import-and-render')],
       adapter: removeLocaleSwitcher,
+    },
+  ],
+  [
+    'locale.navigation-console-switcher',
+    {
+      paramsSchema: localeParams,
+      deriveSemanticWrites: () => [absent('ts:ConsoleLocaleSwitcher:import-and-render')],
+      adapter: removeConsoleLocaleSwitcher,
     },
   ],
 ]

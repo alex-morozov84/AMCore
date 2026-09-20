@@ -14,7 +14,7 @@ export function ConsoleBreadcrumb() {
   const current = items.find((item) => item.href === pathname)
 
   return (
-    <div className="font-[family-name:var(--console-font-mono)] text-[11px] tracking-[0.08em] text-foreground-muted uppercase">
+    <div className="font-console-mono text-[11px] tracking-[0.08em] text-foreground-muted uppercase">
       {t('opsPrefix')}
       {current ? ` / ${current.label}` : ''}
     </div>

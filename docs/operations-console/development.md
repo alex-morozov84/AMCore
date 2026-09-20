@@ -43,7 +43,7 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    shell and semantic tokens.
 4. Add copy for every retained locale and progress-aware public navigation.
 5. Choose the transport deliberately: a **read-only page with no client-side
-   interactivity** (e.g. Organizations) can fetch straight from its Server
+   interactivity** (e.g. Organizations, Overview) can fetch straight from its Server
    Component via `shared/api/server`'s `fetchBackend()`, passing a
    console-aware `tokenResolver` (`shared/api/console/access-token.ts`'s
    `getConsoleAwareAccessToken`) instead of the product-session default —

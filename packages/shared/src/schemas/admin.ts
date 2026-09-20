@@ -74,3 +74,44 @@ export const cleanupResultSchema = z.object({
 })
 
 export type CleanupResultResponse = z.infer<typeof cleanupResultSchema>
+
+/**
+ * Closed allowlist of dependency identifiers `GET /admin/overview` may name.
+ * Enforced here (never a plain `z.string()`) and again at the service
+ * boundary (`AdminOverviewService`) so an indicator key outside this set —
+ * present or future — is dropped, never forwarded to the browser.
+ */
+export const ADMIN_OVERVIEW_DEPENDENCY_NAMES = [
+  'database',
+  'redis',
+  'disk',
+  'memory_heap',
+  'storage',
+] as const
+
+/** Per-dependency readiness state, sanitized to name + up/down/unknown only. */
+export const adminOverviewDependencySchema = z.object({
+  name: z.enum(ADMIN_OVERVIEW_DEPENDENCY_NAMES),
+  status: z.enum(['up', 'down', 'unknown']),
+})
+
+export type AdminOverviewDependency = z.infer<typeof adminOverviewDependencySchema>
+
+/**
+ * Console Overview status (`GET /admin/overview`).
+ *
+ * Always a typed 200, even when the observed instance is degraded:
+ * `readiness: 'not_ready'` is how "this API instance told us it isn't
+ * ready" is reported, kept distinct from a real transport failure
+ * reaching this endpoint itself (network error, timeout, 5xx) — which
+ * must stay classified by the caller as "the observation could not be
+ * fetched", not folded into this same 200 shape.
+ */
+export const adminOverviewResponseSchema = z.object({
+  readiness: z.enum(['ready', 'not_ready']),
+  dependencies: z.array(adminOverviewDependencySchema),
+  version: z.string(),
+  processRole: z.enum(['web', 'worker', 'all']),
+})
+
+export type AdminOverviewResponse = z.infer<typeof adminOverviewResponseSchema>

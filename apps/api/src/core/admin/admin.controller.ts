@@ -21,6 +21,7 @@ import { ZodResponse } from 'nestjs-zod'
 
 import {
   type AdminOrganizationListResponse,
+  type AdminOverviewResponse,
   type AdminUserListResponse,
   type AdminUserResponse,
   AuthType,
@@ -38,7 +39,9 @@ import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorato
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
+import { AdminOverviewService } from './admin-overview.service'
 import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto'
+import { AdminOverviewResponseDto } from './dto/admin-overview-response.dto'
 import { AdminUserListResponseDto, AdminUserResponseDto } from './dto/admin-user-response.dto'
 import { CleanupResultDto } from './dto/cleanup-result.dto'
 import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
@@ -69,7 +72,10 @@ import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
 @Auth(AuthType.Bearer)
 @SystemRoles(SystemRole.SuperAdmin)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly overviewService: AdminOverviewService
+  ) {}
 
   @Get('access')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -162,5 +168,29 @@ export class AdminController {
   ): Promise<AdminOrganizationListResponse> {
     const { page, limit } = pagination
     return this.adminService.findAllOrganizations(page, limit)
+  }
+
+  @Get('overview')
+  @ApiOperation({ summary: 'Console Overview status — SUPER_ADMIN only' })
+  @ZodResponse({
+    type: AdminOverviewResponseDto,
+    status: 200,
+    description:
+      'This API instance’s readiness, dependency states, version and process role. ' +
+      'Always 200 even when the instance is not ready (see `readiness`); an HTTP 5xx here ' +
+      'means the observation itself failed, not that the instance is unhealthy.',
+  })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({ status: 403, description: 'SUPER_ADMIN required' })
+  @ApiResponse({
+    status: 503,
+    description:
+      'The observation itself could not be completed (e.g. the request timed out or the ' +
+      'service was otherwise unreachable) — distinct from the typed 200 `readiness: ' +
+      "'not_ready'` response, which means the observation succeeded and found this " +
+      'instance degraded.',
+  })
+  getOverview(): Promise<AdminOverviewResponse> {
+    return this.overviewService.getOverview()
   }
 }

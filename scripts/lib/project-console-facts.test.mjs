@@ -21,11 +21,12 @@ function factFor(facts, operationKey) {
 test('derives the complete disabled Console projection from the manifest', () => {
   const result = plan({ 'admin-console': 'disabled' })
   assert.equal(operationsConsoleOwnership.facts.roots.length, 9)
-  // +2: the Organizations panel's path-mode e2e files, registered in
-  // operationsConsoleFacts.verification (outside every closed root).
-  assert.equal(count(result.consoleFacts, 'delete'), 29)
+  // Each file registered in operationsConsoleFacts.verification (outside
+  // every closed root) adds its own delete fact. A closed-root addition
+  // does not - the root's single delete fact already covers it.
+  assert.equal(count(result.consoleFacts, 'delete'), 30)
   assert.equal(count(result.consoleFacts, 'content'), 20)
-  assert.equal(result.consoleSteps.length, 40)
+  assert.equal(result.consoleSteps.length, 41)
   assert.ok(
     result.consoleFacts.some(
       (fact) => fact.kind === 'delete' && fact.path === 'docs/operations-console'
@@ -69,7 +70,7 @@ test('composes all dimensions without a combined adapter', () => {
     'route-progress': 'disabled',
     'admin-console': 'disabled',
   })
-  assert.equal(count(result.consoleFacts, 'delete'), 29)
+  assert.equal(count(result.consoleFacts, 'delete'), 30)
   assert.equal(count(result.consoleFacts, 'content'), 19)
   assert.ok(
     result.sharedContentFacts

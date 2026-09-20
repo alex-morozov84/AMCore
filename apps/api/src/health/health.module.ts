@@ -4,6 +4,7 @@ import { TerminusModule } from '@nestjs/terminus'
 import { HealthController } from './health.controller'
 import { PrismaHealthIndicator } from './indicators/prisma.health'
 import { RedisHealthIndicator } from './indicators/redis.health'
+import { ReadinessCheckService } from './readiness-check.service'
 
 import { PrismaModule } from '@/prisma/prisma.module'
 
@@ -16,6 +17,10 @@ import { PrismaModule } from '@/prisma/prisma.module'
   providers: [
     PrismaHealthIndicator, // Custom Prisma health indicator
     RedisHealthIndicator, // Custom Redis health indicator
+    ReadinessCheckService,
   ],
+  // AdminModule reuses the same readiness definition for the console
+  // Overview endpoint rather than redefining it.
+  exports: [ReadinessCheckService],
 })
 export class HealthModule {}

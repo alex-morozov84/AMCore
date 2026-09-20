@@ -17,7 +17,7 @@ export function ConsoleUserBadge({ user }: { user: UserResponse | null }) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="flex size-7 items-center justify-center rounded-md bg-console-accent/8 font-[family-name:var(--console-font-mono)] text-xs font-bold text-console-accent">
+      <span className="flex size-7 items-center justify-center rounded-md bg-console-accent/8 font-console-mono text-xs font-bold text-console-accent">
         {initialsFor(user)}
       </span>
       <span className="hidden flex-col leading-tight sm:flex">
@@ -25,7 +25,7 @@ export function ConsoleUserBadge({ user }: { user: UserResponse | null }) {
         {/* `foreground-faint` fails WCAG AA contrast at this size (2.52:1,
             caught by the Storybook a11y check) - `foreground-muted` is the
             faintest tier that stays AA-safe for normal-size text. */}
-        <span className="font-[family-name:var(--console-font-mono)] text-[10px] tracking-[0.05em] text-foreground-muted uppercase">
+        <span className="font-console-mono text-[10px] tracking-wider text-foreground-muted uppercase">
           {t('superAdminRole')}
         </span>
       </span>

@@ -83,10 +83,15 @@ export { type User, userSchema } from './user'
 
 // Admin schemas
 export {
+  ADMIN_OVERVIEW_DEPENDENCY_NAMES,
   type AdminOrganizationListResponse,
   adminOrganizationListResponseSchema,
   type AdminOrganizationResponse,
   adminOrganizationResponseSchema,
+  type AdminOverviewDependency,
+  adminOverviewDependencySchema,
+  type AdminOverviewResponse,
+  adminOverviewResponseSchema,
   type AdminUserListResponse,
   adminUserListResponseSchema,
   type AdminUserResponse,

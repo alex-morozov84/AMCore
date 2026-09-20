@@ -41,6 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   login/logout protection, and product/console session isolation. OAuth is
   intentionally not reused as a console-host shortcut.
 
+- **Operations Console: Overview panel and locale switcher.** `GET
+/admin/overview` reports this API instance's readiness (reusing the same
+  checks as `/health/ready`), sanitized per-dependency up/down/unknown
+  states, app version, and process role — always a typed `200`, even when
+  the observed instance is degraded, so an "API instance not ready" result
+  is never confused with a real failure to reach the endpoint itself (which
+  still surfaces as the ordinary "temporarily unavailable" state). The
+  console shell also gained a URL/cookie-only language switcher, entirely
+  separate from the product session's locale preference and hidden on a
+  single-locale fork.
+
 - **Operations Console: Organizations panel.** The first functional console
   panel — a read-only, paginated list of every organization (name, slug,
   created/updated timestamps), reusing the console's live `SUPER_ADMIN`

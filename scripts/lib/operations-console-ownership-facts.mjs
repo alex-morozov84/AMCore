@@ -37,6 +37,7 @@ const verification = [
   // undetected contribution outside every closed root.
   'apps/web/e2e/real-stack/admin-helpers.ts',
   'apps/web/e2e/real-stack/admin-organizations.spec.ts',
+  'apps/web/e2e/real-stack/admin-overview.spec.ts',
 ].map((path) => one(path, { tags: ['verification:console'] }))
 
 const sharedModuleTests = sharedModules.flatMap((item) =>

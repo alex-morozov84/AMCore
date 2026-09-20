@@ -7,8 +7,7 @@ describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
 
   test('records real source/target paths and every measured scenario', () => {
-    // +6: see the migrationCounts comment below.
-    assert.equal(inventory.operations.length, 464)
+    assert.equal(inventory.operations.length, 476)
     assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
@@ -28,19 +27,18 @@ describe('operation inventory against the real plans', () => {
   })
 
   test('reports providers, ownership, semantic units, and final M4 operations', () => {
-    // +6 facts/claims/operations over the original 632/1209/454: +2 for the
-    // Organizations panel's path-mode e2e files registered in
-    // operationsConsoleFacts.verification (detectable console contributions
-    // outside every closed directory root), +4 for ConsoleNavigation.tsx and
-    // ConsoleBreadcrumb.tsx needing their own locale.navigation-plain-pathname
-    // rewrite (2 files x 2 locales) so single-locale mode doesn't leave a
-    // dangling `@/i18n/navigation` import after that module is removed.
+    // `ConsoleLocaleSwitcher.tsx` is deleted whole under single-locale mode
+    // (`LOCALE_DELETES`), not hidden at runtime: single-locale mode rewrites
+    // `useRouteProgressRouter()` to the plain `next/navigation` router (no
+    // object href, no `locale` option), so its navigation call cannot
+    // type-check there regardless of any internal branch. Same pattern as
+    // the product `LocaleSwitcher`'s removal.
     assert.deepEqual(inventory.migrationCounts, {
       productionProviders: 10,
       ownershipManifests: 10,
-      semanticFacts: 640,
-      semanticClaims: 1217,
-      finalFilesystemOperations: 460,
+      semanticFacts: 652,
+      semanticClaims: 1229,
+      finalFilesystemOperations: 469,
     })
   })
 

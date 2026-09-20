@@ -1,4 +1,4 @@
-import { DiskHealthIndicator, HealthCheckService, MemoryHealthIndicator } from '@nestjs/terminus'
+import { HealthCheckService, MemoryHealthIndicator } from '@nestjs/terminus'
 import { Test, TestingModule } from '@nestjs/testing'
 
 import { AuthType } from '@amcore/shared'
@@ -6,81 +6,42 @@ import { AuthType } from '@amcore/shared'
 import { HealthController } from './health.controller'
 import { PrismaHealthIndicator } from './indicators/prisma.health'
 import { RedisHealthIndicator } from './indicators/redis.health'
+import { ReadinessCheckService } from './readiness-check.service'
 
 import { AUTH_TYPE_KEY } from '@/core/auth/decorators/auth.decorator'
 import { EnvService } from '@/env/env.service'
-import { StorageHealthIndicator } from '@/infrastructure/storage'
 
 describe('HealthController', () => {
   let controller: HealthController
+  let readiness: jest.Mocked<ReadinessCheckService>
   let healthCheckService: jest.Mocked<HealthCheckService>
   let prismaIndicator: jest.Mocked<PrismaHealthIndicator>
   let redisIndicator: jest.Mocked<RedisHealthIndicator>
-  let diskIndicator: jest.Mocked<DiskHealthIndicator>
   let memoryIndicator: jest.Mocked<MemoryHealthIndicator>
-  let storageIndicator: jest.Mocked<StorageHealthIndicator>
   let env: jest.Mocked<EnvService>
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [HealthController],
       providers: [
-        {
-          provide: HealthCheckService,
-          useValue: {
-            check: jest.fn(),
-          },
-        },
-        {
-          provide: PrismaHealthIndicator,
-          useValue: {
-            isHealthy: jest.fn(),
-          },
-        },
-        {
-          provide: RedisHealthIndicator,
-          useValue: {
-            isHealthy: jest.fn(),
-          },
-        },
-        {
-          provide: DiskHealthIndicator,
-          useValue: {
-            checkStorage: jest.fn(),
-          },
-        },
-        {
-          provide: MemoryHealthIndicator,
-          useValue: {
-            checkHeap: jest.fn(),
-          },
-        },
-        {
-          provide: StorageHealthIndicator,
-          useValue: {
-            isHealthy: jest.fn(),
-          },
-        },
+        { provide: ReadinessCheckService, useValue: { check: jest.fn() } },
+        { provide: HealthCheckService, useValue: { check: jest.fn() } },
+        { provide: PrismaHealthIndicator, useValue: { isHealthy: jest.fn() } },
+        { provide: RedisHealthIndicator, useValue: { isHealthy: jest.fn() } },
+        { provide: MemoryHealthIndicator, useValue: { checkHeap: jest.fn() } },
         {
           provide: EnvService,
-          useValue: {
-            get: jest.fn((key: string) => {
-              if (key === 'HEALTH_DISK_THRESHOLD_PERCENT') return 0.9
-              // STORAGE_HEALTH_ENABLED defaults to off → storage check skipped.
-              return undefined
-            }),
-          },
+          useValue: { get: jest.fn(() => undefined) },
         },
       ],
     }).compile()
 
-    controller = module.get<HealthController>(HealthController)
+    controller = module.get(HealthController)
+    readiness = module.get(ReadinessCheckService)
     healthCheckService = module.get(HealthCheckService)
     prismaIndicator = module.get(PrismaHealthIndicator)
     redisIndicator = module.get(RedisHealthIndicator)
-    diskIndicator = module.get(DiskHealthIndicator)
     memoryIndicator = module.get(MemoryHealthIndicator)
-    storageIndicator = module.get(StorageHealthIndicator)
     env = module.get(EnvService)
   })
 
@@ -98,18 +59,13 @@ describe('HealthController', () => {
     it('should check database and redis connectivity', async () => {
       const mockResult = {
         status: 'ok',
-        info: {
-          database: { status: 'up' },
-          redis: { status: 'up' },
-        },
+        info: { database: { status: 'up' }, redis: { status: 'up' } },
         error: {},
         details: {},
       }
 
       prismaIndicator.isHealthy.mockResolvedValue({ database: { status: 'up' } } as any)
       redisIndicator.isHealthy.mockResolvedValue({ redis: { status: 'up' } } as any)
-
-      // Make healthCheckService.check actually call the indicator functions
       healthCheckService.check.mockImplementation(async (indicators) => {
         await Promise.all(indicators.map((indicator) => indicator()))
         return mockResult as any
@@ -127,48 +83,26 @@ describe('HealthController', () => {
   })
 
   describe('ready', () => {
-    it('should perform full health check (database, redis, disk, memory)', async () => {
-      const mockResult = {
-        status: 'ok',
-        info: {
-          database: { status: 'up' },
-          redis: { status: 'up' },
-          disk: { status: 'up' },
-          memory_heap: { status: 'up' },
-        },
-        error: {},
-        details: {},
-      }
-
-      prismaIndicator.isHealthy.mockResolvedValue({ database: { status: 'up' } } as any)
-      redisIndicator.isHealthy.mockResolvedValue({ redis: { status: 'up' } } as any)
-      diskIndicator.checkStorage.mockResolvedValue({ disk: { status: 'up' } } as any)
-      memoryIndicator.checkHeap.mockResolvedValue({ memory_heap: { status: 'up' } } as any)
-
-      healthCheckService.check.mockImplementation(async (indicators) => {
-        await Promise.all(indicators.map((indicator) => indicator()))
-        return mockResult as any
-      })
+    it('delegates to ReadinessCheckService', async () => {
+      const mockResult = { status: 'ok', details: {} } as any
+      readiness.check.mockResolvedValue(mockResult)
 
       const result = await controller.ready()
 
-      expect(result).toEqual(mockResult)
-      expect(healthCheckService.check).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.any(Function), // database
-          expect.any(Function), // redis
-          expect.any(Function), // disk
-          expect.any(Function), // memory
-        ])
-      )
-      expect(prismaIndicator.isHealthy).toHaveBeenCalledWith('database')
-      expect(redisIndicator.isHealthy).toHaveBeenCalledWith('redis')
-      expect(env.get).toHaveBeenCalledWith('HEALTH_DISK_THRESHOLD_PERCENT')
-      expect(diskIndicator.checkStorage).toHaveBeenCalledWith('disk', {
-        thresholdPercent: 0.9,
-        path: '/',
-      })
-      expect(memoryIndicator.checkHeap).toHaveBeenCalledWith('memory_heap', 1024 * 1024 * 1024)
+      expect(result).toBe(mockResult)
+      expect(readiness.check).toHaveBeenCalled()
+    })
+  })
+
+  describe('check', () => {
+    it('delegates to ReadinessCheckService (alias of readiness)', async () => {
+      const mockResult = { status: 'ok', details: {} } as any
+      readiness.check.mockResolvedValue(mockResult)
+
+      const result = await controller.check()
+
+      expect(result).toBe(mockResult)
+      expect(readiness.check).toHaveBeenCalled()
     })
   })
 
@@ -176,15 +110,12 @@ describe('HealthController', () => {
     it('should perform simple liveness check (memory only)', async () => {
       const mockResult = {
         status: 'ok',
-        info: {
-          memory_heap: { status: 'up' },
-        },
+        info: { memory_heap: { status: 'up' } },
         error: {},
         details: {},
       }
 
       memoryIndicator.checkHeap.mockResolvedValue({ memory_heap: { status: 'up' } } as any)
-
       healthCheckService.check.mockImplementation(async (indicators) => {
         await Promise.all(indicators.map((indicator) => indicator()))
         return mockResult as any
@@ -196,100 +127,21 @@ describe('HealthController', () => {
       expect(healthCheckService.check).toHaveBeenCalledWith([expect.any(Function)])
       expect(memoryIndicator.checkHeap).toHaveBeenCalledWith('memory_heap', 1536 * 1024 * 1024)
     })
-  })
 
-  describe('HEALTH_MEMORY_HEAP_BYTES override', () => {
-    it('passes the configured byte ceiling to both readiness and liveness checks', async () => {
+    it('uses the HEALTH_MEMORY_HEAP_BYTES override when set', async () => {
       const override = 8 * 1024 * 1024 * 1024
       env.get.mockImplementation((key: string) =>
-        key === 'HEALTH_MEMORY_HEAP_BYTES'
-          ? override
-          : key === 'HEALTH_DISK_THRESHOLD_PERCENT'
-            ? 0.9
-            : undefined
+        key === 'HEALTH_MEMORY_HEAP_BYTES' ? override : undefined
       )
       memoryIndicator.checkHeap.mockResolvedValue({ memory_heap: { status: 'up' } } as any)
-      prismaIndicator.isHealthy.mockResolvedValue({ database: { status: 'up' } } as any)
-      redisIndicator.isHealthy.mockResolvedValue({ redis: { status: 'up' } } as any)
-      diskIndicator.checkStorage.mockResolvedValue({ disk: { status: 'up' } } as any)
       healthCheckService.check.mockImplementation(async (indicators) => {
         await Promise.all(indicators.map((indicator) => indicator()))
         return { status: 'ok' } as any
       })
 
-      await controller.ready()
       await controller.live()
 
       expect(memoryIndicator.checkHeap).toHaveBeenCalledWith('memory_heap', override)
-      expect(memoryIndicator.checkHeap).not.toHaveBeenCalledWith('memory_heap', 1024 * 1024 * 1024)
-    })
-  })
-
-  describe('storage health (opt-in)', () => {
-    const runReadiness = async (): Promise<void> => {
-      prismaIndicator.isHealthy.mockResolvedValue({ database: { status: 'up' } } as any)
-      redisIndicator.isHealthy.mockResolvedValue({ redis: { status: 'up' } } as any)
-      diskIndicator.checkStorage.mockResolvedValue({ disk: { status: 'up' } } as any)
-      memoryIndicator.checkHeap.mockResolvedValue({ memory_heap: { status: 'up' } } as any)
-      storageIndicator.isHealthy.mockResolvedValue({ storage: { status: 'up' } } as any)
-      healthCheckService.check.mockImplementation(async (indicators) => {
-        await Promise.all(indicators.map((indicator) => indicator()))
-        return { status: 'ok' } as any
-      })
-      await controller.ready()
-    }
-
-    it('excludes storage from readiness by default', async () => {
-      await runReadiness()
-      expect(storageIndicator.isHealthy).not.toHaveBeenCalled()
-    })
-
-    it('includes storage in readiness when STORAGE_HEALTH_ENABLED is true', async () => {
-      env.get.mockImplementation((key: string) => {
-        if (key === 'HEALTH_DISK_THRESHOLD_PERCENT') return 0.9 as never
-        if (key === 'STORAGE_HEALTH_ENABLED') return true as never
-        return undefined as never
-      })
-      await runReadiness()
-      expect(storageIndicator.isHealthy).toHaveBeenCalledWith('storage')
-    })
-  })
-
-  describe('check', () => {
-    it('should perform the same checks as readiness', async () => {
-      const mockResult = {
-        status: 'ok',
-        info: {
-          database: { status: 'up' },
-          redis: { status: 'up' },
-          disk: { status: 'up' },
-          memory_heap: { status: 'up' },
-        },
-        error: {},
-        details: {},
-      }
-
-      prismaIndicator.isHealthy.mockResolvedValue({ database: { status: 'up' } } as any)
-      redisIndicator.isHealthy.mockResolvedValue({ redis: { status: 'up' } } as any)
-      diskIndicator.checkStorage.mockResolvedValue({ disk: { status: 'up' } } as any)
-      memoryIndicator.checkHeap.mockResolvedValue({ memory_heap: { status: 'up' } } as any)
-
-      healthCheckService.check.mockImplementation(async (indicators) => {
-        await Promise.all(indicators.map((indicator) => indicator()))
-        return mockResult as any
-      })
-
-      const result = await controller.check()
-
-      expect(result).toEqual(mockResult)
-      expect(prismaIndicator.isHealthy).toHaveBeenCalledWith('database')
-      expect(redisIndicator.isHealthy).toHaveBeenCalledWith('redis')
-      expect(env.get).toHaveBeenCalledWith('HEALTH_DISK_THRESHOLD_PERCENT')
-      expect(diskIndicator.checkStorage).toHaveBeenCalledWith('disk', {
-        thresholdPercent: 0.9,
-        path: '/',
-      })
-      expect(memoryIndicator.checkHeap).toHaveBeenCalledWith('memory_heap', 1024 * 1024 * 1024)
     })
   })
 })

@@ -465,6 +465,47 @@ describe('Admin (e2e)', () => {
     })
   })
 
+  describe('GET /admin/overview', () => {
+    it('returns 401 without a bearer token', async () => {
+      await request(app.getHttpServer()).get('/admin/overview').expect(401)
+    })
+
+    it('returns 403 for a regular USER', async () => {
+      const { token } = await registerAndGetToken('user-overview@example.com')
+
+      await request(app.getHttpServer())
+        .get('/admin/overview')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403)
+    })
+
+    it('returns 200 with readiness, sanitized dependencies, version and process role for SUPER_ADMIN', async () => {
+      const { userId } = await registerAndGetToken('superadmin@example.com')
+      const superToken = await promoteToSuperAdmin(userId)
+
+      const res = await request(app.getHttpServer())
+        .get('/admin/overview')
+        .set('Authorization', `Bearer ${superToken}`)
+        .expect(200)
+
+      expect(res.body).toEqual({
+        readiness: 'ready',
+        dependencies: expect.arrayContaining([
+          expect.objectContaining({ name: 'database', status: 'up' }),
+          expect.objectContaining({ name: 'redis', status: 'up' }),
+        ]),
+        version: expect.any(String),
+        processRole: expect.stringMatching(/^(web|worker|all)$/),
+      })
+      // Every dependency status is one of the allowlisted values — no raw
+      // indicator message/detail field leaks onto the wire.
+      for (const dep of res.body.dependencies) {
+        expect(Object.keys(dep).sort()).toEqual(['name', 'status'])
+        expect(['up', 'down', 'unknown']).toContain(dep.status)
+      }
+    })
+  })
+
   /**
    * OA-02: admin routes are bearer-only.
    *
@@ -599,6 +640,15 @@ describe('Admin (e2e)', () => {
         .set('Authorization', `Bearer ${apiKey}`)
         .expect(401)
     })
+
+    it('SUPER_ADMIN-owned API key → GET /admin/overview → 401', async () => {
+      const { apiKey } = await setupSuperAdminWithKey()
+
+      await request(app.getHttpServer())
+        .get('/admin/overview')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(401)
+    })
   })
 
   /**
@@ -673,6 +723,27 @@ describe('Admin (e2e)', () => {
 
       await request(app.getHttpServer())
         .get('/admin/access')
+        .set('Authorization', `Bearer ${b.token}`)
+        .expect(403)
+    })
+
+    it('denies a demoted SUPER_ADMIN on the next overview request', async () => {
+      const a = await makeSuperAdmin('overview-admin-a@example.com')
+      const b = await makeSuperAdmin('overview-admin-b@example.com')
+
+      await request(app.getHttpServer())
+        .get('/admin/overview')
+        .set('Authorization', `Bearer ${b.token}`)
+        .expect(200)
+
+      await request(app.getHttpServer())
+        .patch(`/admin/users/${b.userId}`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send({ systemRole: SystemRole.User })
+        .expect(200)
+
+      await request(app.getHttpServer())
+        .get('/admin/overview')
         .set('Authorization', `Bearer ${b.token}`)
         .expect(403)
     })

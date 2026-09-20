@@ -1,11 +1,9 @@
 import { Controller, Get } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import {
-  DiskHealthIndicator,
   HealthCheck,
   HealthCheckResult,
   HealthCheckService,
-  type HealthIndicatorFunction,
   MemoryHealthIndicator,
 } from '@nestjs/terminus'
 
@@ -13,10 +11,10 @@ import { AuthType } from '@amcore/shared'
 
 import { PrismaHealthIndicator } from './indicators/prisma.health'
 import { RedisHealthIndicator } from './indicators/redis.health'
+import { ReadinessCheckService } from './readiness-check.service'
 
 import { Auth } from '@/core/auth/decorators/auth.decorator'
 import { EnvService } from '@/env/env.service'
-import { StorageHealthIndicator } from '@/infrastructure/storage'
 import { SkipRateLimit } from '@/infrastructure/throttling'
 
 @ApiTags('health')
@@ -25,12 +23,11 @@ import { SkipRateLimit } from '@/infrastructure/throttling'
 @SkipRateLimit()
 export class HealthController {
   constructor(
+    private readonly readiness: ReadinessCheckService,
     private readonly health: HealthCheckService,
     private readonly prisma: PrismaHealthIndicator,
     private readonly redis: RedisHealthIndicator,
-    private readonly disk: DiskHealthIndicator,
     private readonly memory: MemoryHealthIndicator,
-    private readonly storage: StorageHealthIndicator,
     private readonly env: EnvService
   ) {}
 
@@ -40,7 +37,7 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Service is healthy and ready to accept traffic' })
   @ApiResponse({ status: 503, description: 'Service is not ready to accept traffic' })
   check(): Promise<HealthCheckResult> {
-    return this.health.check(this.getReadinessChecks())
+    return this.readiness.check()
   }
 
   /**
@@ -106,7 +103,7 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Service is ready to accept traffic' })
   @ApiResponse({ status: 503, description: 'Service is not ready' })
   ready(): Promise<HealthCheckResult> {
-    return this.health.check(this.getReadinessChecks())
+    return this.readiness.check()
   }
 
   /**
@@ -146,26 +143,5 @@ export class HealthController {
   /** Heap ceiling for the memory check — an env override (e2e) wins over the hardcoded default. */
   private heapThresholdBytes(fallback: number): number {
     return this.env.get('HEALTH_MEMORY_HEAP_BYTES') ?? fallback
-  }
-
-  private getReadinessChecks(): HealthIndicatorFunction[] {
-    const checks: HealthIndicatorFunction[] = [
-      () => this.prisma.isHealthy('database'),
-      () => this.redis.isHealthy('redis'),
-      () =>
-        this.disk.checkStorage('disk', {
-          thresholdPercent: this.env.get('HEALTH_DISK_THRESHOLD_PERCENT'),
-          path: '/',
-        }),
-      () => this.memory.checkHeap('memory_heap', this.heapThresholdBytes(1024 * 1024 * 1024)),
-    ]
-
-    // Opt-in (Decision B): storage is not on the core request hot path, so it
-    // joins readiness only when explicitly enabled.
-    if (this.env.get('STORAGE_HEALTH_ENABLED')) {
-      checks.push(() => this.storage.isHealthy('storage'))
-    }
-
-    return checks
   }
 }

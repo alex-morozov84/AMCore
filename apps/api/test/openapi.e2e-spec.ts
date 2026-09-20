@@ -73,6 +73,7 @@ const EXPECTED: Record<string, Expected> = {
   'patch /admin/users/{id}': { status: '200', kind: 'json' },
   'post /admin/cleanup': { status: '200', kind: 'json' },
   'get /admin/organizations': { status: '200', kind: 'json' },
+  'get /admin/overview': { status: '200', kind: 'json' },
   // api-keys
   'post /api-keys': { status: '201', kind: 'json' },
   'get /api-keys': { status: '200', kind: 'json' },
@@ -340,6 +341,19 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation?.responses).toHaveProperty('401')
     expect(operation?.responses).toHaveProperty('403')
     expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
+  })
+
+  it('documents the bearer-only Console Overview endpoint with its failure statuses', () => {
+    const operation = document.paths['/admin/overview']?.get
+
+    expect(operation?.security).toEqual([{ bearer: [] }])
+    expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
+    expect(operation?.responses).toHaveProperty('200')
+    expect(operation?.responses).toHaveProperty('401')
+    expect(operation?.responses).toHaveProperty('403')
+    // 503 here means the observation itself failed - distinct from the typed
+    // 200 `readiness: 'not_ready'` response for an observed degraded instance.
+    expect(operation?.responses).toHaveProperty('503')
   })
 
   it('documents a multipart/form-data request body with a binary file field for both upload operations', () => {
