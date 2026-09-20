@@ -3,8 +3,9 @@
 The Operations Console is AMCore's optional system control plane for platform
 super-administrators. The shipped foundation provides a protected, localized
 Control Room shell, live access admission, and isolated host-mode login/logout.
-It ships a first functional panel, **Organizations** (read-only). It does not
-yet provide health, metrics, users, queues, audit, or AI control panels.
+It ships two functional panels, **Overview** (this API instance's readiness,
+version, and process role) and **Organizations** (read-only). It does not yet
+provide metrics, users, queues, audit, or AI control panels.
 
 It is not a product backoffice. Organization owners, organization `ADMIN`s,
 catalogue managers, content editors, and ordinary users do not gain access from
@@ -17,11 +18,20 @@ After admission, the console shows:
 
 - the localized Control Room shell;
 - two navigation items, **Overview** and **Organizations**;
-- a header showing the signed-in operator's identity and the current
-  environment.
+- a header showing the signed-in operator's identity, a language switcher
+  (hidden on a single-locale fork), and, in host mode, a sign-out control.
 
-**Overview** still shows only a placeholder confirming the foundation is
-ready — no health/metrics/version content ships yet.
+**Overview** shows this API instance's readiness (reusing the same checks as
+`/health/ready`), a sanitized per-dependency up/down/unknown state, the app
+version, and the process role (`web`/`worker`/`all`). A successfully
+_observed_ degraded instance is not an error: the panel shows an
+**"API instance not ready"** notice naming the affected dependencies, still
+as ordinary page content. Only a real failure to reach the Overview endpoint
+itself (network error, timeout, an actual server error) shows the generic
+"temporarily unavailable" state described below for Organizations — the two
+are deliberately kept visually and semantically distinct, so a console
+operator never mistakes "the console can't reach its own backend" for "the
+backend told us its dependency is down."
 
 **Organizations** lists every organization in the system: name, slug, and
 created/updated timestamps, paginated. It is **read-only** — there is no way

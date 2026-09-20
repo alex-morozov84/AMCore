@@ -134,3 +134,20 @@ rather than the product session. Its queue, AI-approval, and audit panels
 are the planned first consumers of the **secondary** path
 (`degradeSecondary`) and must reuse these primitives with durable browser
 coverage over real sections.
+
+The console's Overview panel (`shared/api/console/overview.ts`) adds a
+distinction the resilience framework itself does not model: a _successfully
+observed_ degraded dependency is not the same failure as _failing to observe
+it at all_. `GET /admin/overview` always answers `200` with a typed
+`readiness: 'ready' | 'not_ready'` payload when the request itself succeeds —
+even a fully degraded instance is `DataOutcome<'success'>` here, and
+`resolvePrimary` only ever sees `'unavailable'` for a real transport failure
+(network error, timeout, an actual 5xx from the endpoint). The page branches
+on `readiness` itself for the observed case (`OverviewNotReadyAlert`, a small
+dedicated presentation — reusing `PrimaryUnavailableFallback`'s generic copy
+here would have collapsed the two distinct failure modes into one message)
+and only reaches `PrimaryUnavailableFallback` for the unavailable case. Any
+future panel that surfaces another service's own health/degraded state
+should follow the same shape: model "observed degraded" as typed success
+data, and reserve `DataOutcome`'s `'unavailable'` strictly for "could not
+observe it."

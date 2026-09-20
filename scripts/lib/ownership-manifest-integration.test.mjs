@@ -20,12 +20,14 @@ function cloneManifest(change) {
 
 test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
   const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
-  // 44 -> 53 -> 57: Organizations added nine files below existing closed
-  // roots (two page files, one route, four console API files, two host e2e
-  // files), then the <150-line split of ConsoleShell.tsx (Agent 2 diff
-  // review) added four more sibling files under the same closed
-  // widgets/console-shell root.
-  assert.equal([...inventory.rootFiles.values()].flat().length, 57)
+  // 44 -> 53 -> 57 -> 64: Organizations added nine files below existing
+  // closed roots (two page files, one route, four console API files, two
+  // host e2e files), then the <150-line split of ConsoleShell.tsx (Agent 2
+  // diff review) added four more sibling files under the same closed
+  // widgets/console-shell root, then Overview + the locale switcher (item 9
+  // PR2) added seven more (overview.ts + test, OverviewNotReadyAlert.tsx +
+  // test, ConsoleLocaleSwitcher.tsx + test, one host e2e spec).
+  assert.equal([...inventory.rootFiles.values()].flat().length, 64)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   assert.ok(operationsConsoleDocSeams.every((seam) => seam.seamKind === 'owned-block'))
   assert.ok(graph.aliases.includes('@/*'))

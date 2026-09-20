@@ -101,5 +101,6 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/src/shared/ui/route-progress-bar.test.tsx',
   'apps/web/src/widgets/console-shell/ui/ConsoleNavigation.tsx',
   'apps/web/src/widgets/console-shell/ui/ConsoleBreadcrumb.tsx',
+  'apps/web/src/widgets/console-shell/ui/ConsoleLocaleSwitcher.tsx',
   'apps/web/src/app/[locale]',
 ]

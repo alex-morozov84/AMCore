@@ -18,6 +18,7 @@ const facts = {
   'locale.navigation-plain-pathname': [
     'apps/web/src/widgets/console-shell/ui/ConsoleNavigation.tsx',
     'apps/web/src/widgets/console-shell/ui/ConsoleBreadcrumb.tsx',
+    'apps/web/src/widgets/console-shell/ui/ConsoleLocaleSwitcher.tsx',
   ],
 }
 

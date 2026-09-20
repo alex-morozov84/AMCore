@@ -73,6 +73,7 @@ const EXPECTED: Record<string, Expected> = {
   'patch /admin/users/{id}': { status: '200', kind: 'json' },
   'post /admin/cleanup': { status: '200', kind: 'json' },
   'get /admin/organizations': { status: '200', kind: 'json' },
+  'get /admin/overview': { status: '200', kind: 'json' },
   // api-keys
   'post /api-keys': { status: '201', kind: 'json' },
   'get /api-keys': { status: '200', kind: 'json' },

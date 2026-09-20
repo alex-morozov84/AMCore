@@ -21,6 +21,7 @@ import {
 } from '@/shared/ui/sidebar'
 
 import { ConsoleBreadcrumb } from './ConsoleBreadcrumb'
+import { ConsoleLocaleSwitcher } from './ConsoleLocaleSwitcher'
 import { ConsoleNavigation } from './ConsoleNavigation'
 import { ConsoleUserBadge } from './ConsoleUserBadge'
 
@@ -75,6 +76,7 @@ export function ConsoleShell({ children, user }: ConsoleShellProps) {
             <ConsoleBreadcrumb />
           </div>
           <div className="flex items-center gap-3">
+            <ConsoleLocaleSwitcher />
             <ConsoleUserBadge user={user} />
             {ADMIN_CONSOLE_CONFIG.mode === 'host' && <ConsoleLogoutButton />}
           </div>
