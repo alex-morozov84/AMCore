@@ -1,4 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,7 +26,7 @@ const messages = {
 
 function renderAlert(dependencies: { name: string; status: 'up' | 'down' | 'unknown' }[]) {
   return render(
-    <NextIntlClientProvider locale="en" messages={messages}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       <OverviewNotReadyAlert dependencies={dependencies} />
     </NextIntlClientProvider>
   )
