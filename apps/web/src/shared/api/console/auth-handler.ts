@@ -31,9 +31,9 @@ export async function handleConsoleLogin(request: Request): Promise<Response> {
   }
 
   const access = await probeConsoleAccessWithToken(upstream.accessToken)
-  if (access !== 204) {
+  if (access.kind !== 'admitted') {
     await revokeBackendSession(upstream.refreshToken)
-    return access === 503 ? unavailable(request) : accessDenied(request)
+    return access.kind === 'denied' ? accessDenied(request) : unavailable(request)
   }
 
   try {

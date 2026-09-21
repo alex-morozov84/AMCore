@@ -12,13 +12,13 @@ control plane, never a product backoffice.
 | Page composition    | `apps/web/src/_pages/console/**`                                                                                                                          |
 | Shell               | `apps/web/src/widgets/console-shell/**`; reuse `shared/ui`, not the product app shell                                                                     |
 | Console BFF         | `apps/web/src/app/api/console/**`; every handler starts with `withConsoleHostGuard()`                                                                     |
-| Live page admission | `requireSuperAdmin()`; never trust a JWT role snapshot or UI state                                                                                        |
+| Live page admission | `ConsolePageFrame` calls `requireSuperAdmin()` on every protected page before mounting chrome; never trust a JWT role snapshot or UI state                |
 | Public navigation   | `RouteProgressLink` and the console public-href helper                                                                                                    |
 
 Do not reuse console routes, BFF namespace, session audience, or `SUPER_ADMIN`
 as shortcuts for a downstream product backoffice. Every backend data endpoint
-must perform its own live `SUPER_ADMIN` authorization; the access probe admits
-the page shell but does not authorize later data access.
+must perform its own live `SUPER_ADMIN` authorization; the page-level admission
+frame may mount chrome but never authorizes later data access.
 
 The current console has no mutations. A future dangerous action must preserve
 the [step-up re-authentication
@@ -47,14 +47,23 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    Component via `shared/api/server`'s `fetchBackend()`, passing a
    console-aware `tokenResolver` (`shared/api/console/access-token.ts`'s
    `getConsoleAwareAccessToken`) instead of the product-session default —
-   the host guard is already enforced once, by `admin/layout.tsx`, for every
-   page under it, and no separate Route Handler is needed. A panel with any
+   every protected page must render through `ConsolePageFrame`, because a
+   persisted App Router layout is not a sufficient re-check on sibling
+   navigation and must not retain chrome after denied/unavailable admission.
+   The frame remounts the shell after an admitted sibling navigation, so it
+   must also read the existing non-sensitive `sidebar_state` preference and
+   pass it to `ConsoleShell`; this preserves the operator's collapsed/expanded
+   choice without ever participating in admission. Pass the frame a
+   page-specific skeleton that mirrors the final page's
+   desktop and narrow-screen layout. Do not add a protected-route
+   `loading.tsx`: it resolves outside the frame and can replace the shell
+   before admission. No separate Route Handler is needed. A panel with any
    **browser-initiated** call (a mutation, a client-side poll, anything a
    `'use client'` component triggers after load) still needs its own handler
    under `app/api/console/**`, applying `withConsoleHostGuard()` explicitly,
    since that guard is a per-route-handler concern, not inherited from the
-   page layout. Either way, independently authorize the corresponding
-   backend endpoint — the access probe admits the shell, never the data.
+   page layout. Either way, independently authorize the corresponding backend
+   endpoint — the admission frame mounts chrome, never grants data access.
 6. Use the existing graceful-degradation primitives for secondary data. Keep
    primary failures explicit and fail privileged actions closed.
 7. Add focused unit tests, Storybook/a11y states where applicable, and

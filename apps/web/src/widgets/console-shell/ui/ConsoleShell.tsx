@@ -29,13 +29,15 @@ interface ConsoleShellProps {
   children: ReactNode
   /** Server-resolved (`getConsoleAwareUser`) - chrome only, never an auth decision. */
   user: UserResponse | null
+  /** Presentation preference read from the non-sensitive sidebar cookie. */
+  defaultSidebarOpen?: boolean
 }
 
-export function ConsoleShell({ children, user }: ConsoleShellProps) {
+export function ConsoleShell({ children, defaultSidebarOpen, user }: ConsoleShellProps) {
   const t = useTranslations('console')
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={defaultSidebarOpen}>
       <Sidebar
         collapsible="icon"
         mobileTitle={t('mobileNavigation')}
@@ -81,7 +83,7 @@ export function ConsoleShell({ children, user }: ConsoleShellProps) {
             {ADMIN_CONSOLE_CONFIG.mode === 'host' && <ConsoleLogoutButton />}
           </div>
         </header>
-        <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">{children}</div>
+        <div className="w-full p-4 sm:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   )

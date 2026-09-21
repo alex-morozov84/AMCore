@@ -10,6 +10,11 @@ import 'server-only'
  * duplicate live probe during one render without retaining a role decision for
  * a later request.
  */
-export const requireSuperAdmin = cache(async (): Promise<void> => {
-  if ((await probeConsoleAccess()) !== 204) notFound()
+export type ConsoleAdmission = 'admitted' | 'unavailable'
+
+export const requireSuperAdmin = cache(async (): Promise<ConsoleAdmission> => {
+  const result = await probeConsoleAccess()
+  if (result.kind === 'admitted') return 'admitted'
+  if (result.kind === 'upstream-unavailable') return 'unavailable'
+  notFound()
 })

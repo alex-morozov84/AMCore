@@ -23,22 +23,32 @@ describe('requireSuperAdmin', () => {
   })
 
   it('admits only the shared live no-content access probe', async () => {
-    mockedProbe.mockResolvedValue(204)
+    mockedProbe.mockResolvedValue({ kind: 'admitted' })
 
-    await expect(requireSuperAdmin()).resolves.toBeUndefined()
+    await expect(requireSuperAdmin()).resolves.toBe('admitted')
 
     expect(mockedProbe).toHaveBeenCalledOnce()
   })
 
-  it.each([401, 403, 503] as const)('fails closed for probe status %i', async (status) => {
-    mockedProbe.mockResolvedValue(status)
+  it.each([401, 403] as const)('fails closed for probe status %i', async (status) => {
+    mockedProbe.mockResolvedValue({ kind: 'denied', status })
 
     await expect(requireSuperAdmin()).rejects.toThrow('not found')
   })
 
-  it('fails closed for a missing server-held bearer credential', async () => {
-    mockedProbe.mockResolvedValue(401)
+  it('returns an unavailable outcome only for an unavailable probe', async () => {
+    mockedProbe.mockResolvedValue({ kind: 'upstream-unavailable' })
 
-    await expect(requireSuperAdmin()).rejects.toThrow('not found')
+    await expect(requireSuperAdmin()).resolves.toBe('unavailable')
+    expect(notFound).not.toHaveBeenCalled()
   })
+
+  it.each(['indeterminate', 'denied'] as const)(
+    'fails closed for %s probe result',
+    async (kind) => {
+      mockedProbe.mockResolvedValue(kind === 'indeterminate' ? { kind } : { kind, status: 401 })
+
+      await expect(requireSuperAdmin()).rejects.toThrow('not found')
+    }
+  )
 })

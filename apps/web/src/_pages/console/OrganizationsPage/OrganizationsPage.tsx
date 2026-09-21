@@ -3,6 +3,7 @@ import { getFormatter, getTranslations } from 'next-intl/server'
 import { fetchConsoleOrganizations } from '@/shared/api/console/organizations'
 import { resolvePrimary } from '@/shared/api/server'
 import { getConsoleOrganizationsHref } from '@/shared/lib/console-public-href'
+import { formatConsoleDate, formatConsoleTime } from '@/shared/lib/format-console-date-time'
 import { cn } from '@/shared/lib/utils'
 import { buttonVariants } from '@/shared/ui/button'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/shared/ui/empty'
@@ -70,17 +71,11 @@ export async function OrganizationsPage({ page, limit }: OrganizationsPageProps)
                   <TableCell className={cn(MONO, 'text-foreground-muted')}>
                     {organization.slug}
                   </TableCell>
-                  <TableCell className={cn(MONO, 'text-foreground-muted')}>
-                    {format.dateTime(new Date(organization.createdAt), {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
+                  <TableCell>
+                    <OrganizationTimestamp value={organization.createdAt} format={format} />
                   </TableCell>
-                  <TableCell className={cn(MONO, 'text-foreground-muted')}>
-                    {format.dateTime(new Date(organization.updatedAt), {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
+                  <TableCell>
+                    <OrganizationTimestamp value={organization.updatedAt} format={format} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -120,5 +115,23 @@ export async function OrganizationsPage({ page, limit }: OrganizationsPageProps)
         </nav>
       )}
     </section>
+  )
+}
+
+function OrganizationTimestamp({
+  value,
+  format,
+}: {
+  value: string
+  format: Awaited<ReturnType<typeof getFormatter>>
+}) {
+  const timestamp = new Date(value)
+  return (
+    <time dateTime={value} className="flex flex-col leading-tight tabular-nums">
+      <span>{formatConsoleDate(format, timestamp)}</span>
+      <span className="mt-1 text-xs text-foreground-muted">
+        {formatConsoleTime(format, timestamp)}
+      </span>
+    </time>
   )
 }

@@ -33,14 +33,14 @@ test('reports every stale Console exact count together', () => {
   )
   assertExactScaffoldCounts([
     { name: 'console roots', expected: 9, actual: operationsConsoleOwnership.facts.roots.length },
-    { name: 'console disabled deletes', expected: 30, actual: count(disabled.consoleFacts, 'delete') },
+    { name: 'console disabled deletes', expected: 32, actual: count(disabled.consoleFacts, 'delete') },
     { name: 'console disabled content', expected: 20, actual: count(disabled.consoleFacts, 'content') },
-    { name: 'console disabled steps', expected: 41, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 43, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     { name: 'console single-locale moves', expected: 4, actual: count(singleHost.consoleFacts, 'move') },
     { name: 'console single-locale proxy facts', expected: 2, actual: singleHost.consoleFacts.filter((fact) => fact.operationKey === 'console.proxy-single-locale').length },
-    { name: 'console single-locale deletes', expected: 30, actual: count(singleDisabled.consoleFacts, 'delete') },
+    { name: 'console single-locale deletes', expected: 32, actual: count(singleDisabled.consoleFacts, 'delete') },
     { name: 'console single-locale content', expected: 19, actual: count(singleDisabled.consoleFacts, 'content') },
   ])
 })

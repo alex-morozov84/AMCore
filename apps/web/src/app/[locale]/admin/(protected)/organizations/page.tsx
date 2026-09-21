@@ -1,7 +1,6 @@
 import { PAGINATION } from '@amcore/shared'
 
-import { OrganizationsPage } from '@/_pages/console'
-import { requireSuperAdmin } from '@/shared/lib/require-super-admin'
+import { ConsolePageFrame, OrganizationsPage, OrganizationsPageSkeleton } from '@/_pages/console'
 
 interface OrganizationsRouteProps {
   searchParams: Promise<{ page?: string | string[] }>
@@ -15,7 +14,10 @@ function parsePage(raw: string | string[] | undefined): number {
 }
 
 export default async function OrganizationsRoute({ searchParams }: OrganizationsRouteProps) {
-  await requireSuperAdmin()
   const { page: rawPage } = await searchParams
-  return <OrganizationsPage page={parsePage(rawPage)} limit={PAGINATION.DEFAULT_LIMIT} />
+  return (
+    <ConsolePageFrame fallback={<OrganizationsPageSkeleton />}>
+      <OrganizationsPage page={parsePage(rawPage)} limit={PAGINATION.DEFAULT_LIMIT} />
+    </ConsolePageFrame>
+  )
 }

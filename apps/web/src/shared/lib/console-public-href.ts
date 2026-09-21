@@ -14,3 +14,8 @@ export function getConsoleOverviewHref(): string {
 export function getConsoleOrganizationsHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/organizations`
 }
+
+/** Same topology rule as {@link getConsoleOverviewHref}, for the Users panel. */
+export function getConsoleUsersHref(): string {
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/users`
+}

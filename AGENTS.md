@@ -104,6 +104,12 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   sandbox. Do not rely on ambient GitHub credentials silently.
 - Keep changes small and focused: **files < 150 lines, functions < 30 lines**;
   one responsibility per file.
+- **Frontend components: cohesion over file count.** Keep page composition
+  separate; extract a table, form, interactive block, or state when it has an
+  independent behavior/boundary/test/reuse case; keep a tiny private leaf with
+  its parent. Create an FSD slice only for a distinct domain responsibility.
+  The size limits do **not** mean one component per file. Details:
+  `docs/frontend/architecture-and-conventions.md#component-organization`.
 - **Optional-feature ownership is boundary-based.** A file added wholly under
   an existing closed feature root is owned automatically and needs no scaffold
   registration. A feature contribution to shared code, navigation, config,
@@ -230,6 +236,17 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   — the only lane that proves auth/BFF/cookies/Redis/App Router end to end)
   are the two Playwright entry points; see that guide for which layer a given
   change belongs in.
+- **Verification plan, not retries.** Before running checks, map each changed
+  risk to the smallest test that proves it; run cheap checks first and each
+  Docker/full-browser check once per unchanged review iteration, only after its
+  covered diff is settled. Re-run a passed check when its covered behavior
+  changes. This avoids redundant review-time reruns; it never replaces a
+  required final-delivery or CI gate at its designated workflow stage. A
+  sandbox, lock, or transport failure is **no verdict**: diagnose the
+  prerequisite, not the whole suite. Long checks use a live persistent PTY,
+  never background/log redirection; in a sandbox, `pnpm --filter web build`
+  always uses the user-approved elevated path. Details:
+  `docs/frontend/testing.md#observable-long-running-checks`.
 - **Frontend server/client boundary — two separate decisions.** Server
   Components are the default; add `'use client'` only at the interactive leaf
   that owns events, effects, browser APIs, a Zustand store or a Query hook —

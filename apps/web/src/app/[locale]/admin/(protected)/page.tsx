@@ -1,7 +1,9 @@
-import { OverviewPage } from '@/_pages/console'
-import { requireSuperAdmin } from '@/shared/lib/require-super-admin'
+import { ConsolePageFrame, OverviewPage, OverviewPageSkeleton } from '@/_pages/console'
 
 export default async function AdminPage() {
-  await requireSuperAdmin()
-  return <OverviewPage />
+  return (
+    <ConsolePageFrame fallback={<OverviewPageSkeleton />}>
+      <OverviewPage />
+    </ConsolePageFrame>
+  )
 }

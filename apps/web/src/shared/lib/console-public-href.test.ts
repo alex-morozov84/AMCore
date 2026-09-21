@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
-import { getConsoleOrganizationsHref, getConsoleOverviewHref } from './console-public-href'
+import {
+  getConsoleOrganizationsHref,
+  getConsoleOverviewHref,
+  getConsoleUsersHref,
+} from './console-public-href'
 
 const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as {
   mode: 'disabled' | 'path' | 'host'
@@ -42,5 +46,20 @@ describe('getConsoleOrganizationsHref', () => {
     mutableConfig.mode = 'host'
 
     expect(getConsoleOrganizationsHref()).toBe('/organizations')
+  })
+})
+
+describe('getConsoleUsersHref', () => {
+  it('nests under the generated slug in path mode', () => {
+    mutableConfig.mode = 'path'
+    mutableConfig.slug = 'operations'
+
+    expect(getConsoleUsersHref()).toBe('/operations/users')
+  })
+
+  it('nests under the host root in host mode', () => {
+    mutableConfig.mode = 'host'
+
+    expect(getConsoleUsersHref()).toBe('/users')
   })
 })
