@@ -64,7 +64,13 @@ export function rewriteNavigationAdapter(model, ctx) {
  */
 export function rewritePlainPathnameAdapter(model, ctx) {
   const localeImport = uniqueImport(model, '@/i18n/navigation', ctx)
-  model.replaceNode(localeImport, `import { usePathname } from 'next/navigation'`, ctx)
+  const intlImport = uniqueImport(model, 'next-intl', ctx)
+  model.replaceNode(
+    intlImport,
+    `import { usePathname } from 'next/navigation'\n${intlImport.getText()}`,
+    ctx
+  )
+  model.removeNode(localeImport, ctx)
 }
 
 export function removeLocaleSwitcher(model, ctx) {
@@ -90,7 +96,8 @@ export function removeConsoleLocaleSwitcher(model, ctx) {
   model.removeNode(uniqueImport(model, './ConsoleLocaleSwitcher', ctx), ctx)
   const switcher = findUniqueNode(
     model,
-    (node) => ts.isJsxSelfClosingElement(node) && node.tagName.getText() === 'ConsoleLocaleSwitcher',
+    (node) =>
+      ts.isJsxSelfClosingElement(node) && node.tagName.getText() === 'ConsoleLocaleSwitcher',
     { ...ctx, describe: 'ConsoleShell ConsoleLocaleSwitcher element' }
   )
   model.replaceNode(switcher, '', ctx)
