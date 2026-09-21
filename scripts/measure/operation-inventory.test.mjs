@@ -9,14 +9,14 @@ describe('operation inventory against the real plans', () => {
 
   test('reports every stale measured exact count together', () => {
     assertExactScaffoldCounts([
-      { name: 'measured operations', expected: 476, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 478, actual: inventory.operations.length },
       { name: 'operation scenarios', expected: 8, actual: new Set(inventory.operations.map((item) => item.scenarioName)).size },
       { name: 'exact-copy edges', expected: 0, actual: inventory.exactCopyEdges.length },
       { name: 'migration providers', expected: 10, actual: inventory.migrationCounts.productionProviders },
       { name: 'migration manifests', expected: 10, actual: inventory.migrationCounts.ownershipManifests },
-      { name: 'migration semantic facts', expected: 652, actual: inventory.migrationCounts.semanticFacts },
-      { name: 'migration semantic claims', expected: 1229, actual: inventory.migrationCounts.semanticClaims },
-      { name: 'migration final filesystem operations', expected: 469, actual: inventory.migrationCounts.finalFilesystemOperations },
+      { name: 'migration semantic facts', expected: 654, actual: inventory.migrationCounts.semanticFacts },
+      { name: 'migration semantic claims', expected: 1231, actual: inventory.migrationCounts.semanticClaims },
+      { name: 'migration final filesystem operations', expected: 471, actual: inventory.migrationCounts.finalFilesystemOperations },
     ])
   })
 

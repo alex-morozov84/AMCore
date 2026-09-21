@@ -3,9 +3,10 @@
 The Operations Console is AMCore's optional system control plane for platform
 super-administrators. The shipped foundation provides a protected, localized
 Control Room shell, live access admission, and isolated host-mode login/logout.
-It ships two functional panels, **Overview** (this API instance's readiness,
-version, and process role) and **Organizations** (read-only). It does not yet
-provide metrics, users, queues, audit, or AI control panels.
+It ships three functional panels, **Overview** (this API instance's readiness,
+version, and process role), **Users** (read-only), and **Organizations**
+(read-only). It does not yet provide metrics, queues, audit, or AI control
+panels.
 
 It is not a product backoffice. Organization owners, organization `ADMIN`s,
 catalogue managers, content editors, and ordinary users do not gain access from
@@ -17,7 +18,7 @@ area with its own roles and permissions.
 After admission, the console shows:
 
 - the localized Control Room shell;
-- two navigation items, **Overview** and **Organizations**;
+- three navigation items, **Overview**, **Users**, and **Organizations**;
 - a header showing the signed-in operator's identity, a language switcher
   (hidden on a single-locale fork), and, in host mode, a sign-out control.
 
@@ -43,6 +44,14 @@ message with a retry button — it never silently shows an empty list in place
 of a real failure. An empty list (with no failure) means the system genuinely
 has no organizations yet, which is expected on a fresh installation.
 
+**Users** is a paginated platform-user inventory. It shows each user's name
+and email, email-verification state, current system role, last sign-in, and
+created/updated timestamps. It is **read-only**: it does not expose a detail
+page, profile fields, sessions, account recovery, deletion, or any role change.
+It has the same explicit unavailable and genuine-empty states as Organizations.
+Changing a system role remains deliberately out of scope until its separate
+fresh-authentication and durable session-revocation security contract is ready.
+
 ## Before signing in
 
 The account must already have `SystemRole.SUPER_ADMIN`. There is no
@@ -52,8 +61,11 @@ admin API and the one-time database bootstrap procedure.
 
 Only `SUPER_ADMIN` is admitted. The console checks the current database role
 through the bearer-only `GET /api/v1/admin/access` probe and returns no identity
-or permission data. Demotion takes effect on the next protected request; a
-failed or unavailable probe fails closed.
+or permission data. Demotion takes effect on the next protected request. An
+absent or denied session, a session-vault/network failure, or an unexpected
+probe response remains a not-found response. Only an explicit `503` response
+from that upstream probe shows the generic unavailable state, with no console
+shell, identity, or data.
 
 ## Sign in and out
 
@@ -74,8 +86,10 @@ Console OAuth is not currently supported.
 
 The protected console deliberately responds as not found when admission fails,
 including when the session is absent, the current role is not `SUPER_ADMIN`, or
-the access service is unavailable. Treat that response as a closed security
-boundary, not proof that the configured route cannot exist.
+the console cannot determine admission safely. An explicit upstream `503` is
+the narrow exception and renders the generic unavailable state without console
+chrome. Treat either response as a closed security boundary, not proof that the
+configured route cannot exist.
 
 ## Configure, deploy, or extend it
 

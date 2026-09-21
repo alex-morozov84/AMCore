@@ -110,6 +110,54 @@ The nonce reaches Server/Client Components via a request header
 extend it for a third-party origin:
 [Browser security headers and CSP](./browser-security-and-csp.md).
 
+## Component organization
+
+Choose component boundaries by **cohesion**, not by a target number of files.
+React permits closely related components to live in one file, and Next.js
+supports co-location; neither requires a file per JSX function.
+
+- Keep page and route composition in a dedicated file.
+- Extract a table, form, interactive block, or loading/error/empty state when
+  it is reusable, has independent state, data, or accessibility behavior,
+  creates a Server/Client Component boundary, needs an independent test or
+  Storybook state, or makes its parent materially easier to understand.
+- Keep a small private, single-use leaf beside its parent when it has no such
+  boundary and the parent remains readable. Typical examples are a table row,
+  a small page link, a formatter, or a column map.
+- Create an FSD folder/slice only when the code owns a distinct domain
+  responsibility — not merely because a JSX fragment can be named.
+- Do not create a file, barrel, or test solely because a private component is
+  5–15 lines long.
+
+The repository limits — files under 150 lines, functions under 30 lines, and
+one cohesive responsibility per file — remain mandatory. They do **not** mean
+one component per file: a `UsersTable` and its private `UserRow`, for example,
+can form one cohesive responsibility. Reassess a co-located leaf when it gains
+its own state, data, accessibility behavior, Client/Server boundary, test, or
+reuse.
+
+## Loading skeletons
+
+A loading state preserves the page's stable context. Do not replace persistent
+chrome such as an application shell, sidebar, header, breadcrumbs, or the
+current user context merely because page data is loading. Put the Suspense
+boundary **inside** that stable frame, so navigation keeps its orientation and
+only the changing content is pending.
+
+A skeleton is a structural preview of the final UI, not a generic collection
+of grey bars. It must mirror the loaded page's information hierarchy,
+containers, column or card layout, spacing, and responsive behavior. In
+particular, a narrow-screen table skeleton must use the same horizontal-scroll
+or reflow strategy as the real table. Reuse the same layout primitives where
+practical, and visually verify both a narrow and desktop viewport.
+
+Use route-level `loading.tsx` only when replacing the entire route segment is
+intentional and safe. If the route has an admission, authorization, or other
+frame that must decide whether chrome may be shown, use a local `<Suspense>`
+fallback after that decision instead. See [Server-rendered graceful
+degradation](./server-rendered-resilience.md) for streaming and error-boundary
+rules.
+
 ## Locale routing
 
 Every route lives under a `[locale]` segment: `src/app/[locale]/(auth)/login/page.tsx`.

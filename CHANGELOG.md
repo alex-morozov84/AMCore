@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operations Console: Users panel.** Adds a read-only, paginated inventory
+  of platform users with identity, email-verification state, current system
+  role, last sign-in, and created/updated timestamps. It reuses the existing
+  live `SUPER_ADMIN` admission and typed admin endpoint without introducing
+  account detail views or system-role mutation.
+
 - **Scaffolding selector shadow evidence.** The existing required full
   scaffolding job now records a merge-base-trusted, fail-open would-run decision
   and uploads 30-day JSON evidence while still running all six generated rows

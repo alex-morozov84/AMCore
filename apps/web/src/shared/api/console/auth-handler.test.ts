@@ -40,7 +40,7 @@ beforeEach(() => {
     refreshToken: 'refresh-token',
     user: { id: 'user-1' },
   } as never)
-  vi.mocked(probeConsoleAccessWithToken).mockResolvedValue(204)
+  vi.mocked(probeConsoleAccessWithToken).mockResolvedValue({ kind: 'admitted' })
   vi.mocked(mintConsoleSession).mockResolvedValue('console-session')
 })
 
@@ -75,7 +75,7 @@ describe('handleConsoleLogin', () => {
   })
 
   it('revokes a rejected backend login without minting a console session', async () => {
-    vi.mocked(probeConsoleAccessWithToken).mockResolvedValue(403)
+    vi.mocked(probeConsoleAccessWithToken).mockResolvedValue({ kind: 'denied', status: 403 })
 
     const response = await handleConsoleLogin(request())
 
@@ -85,7 +85,7 @@ describe('handleConsoleLogin', () => {
   })
 
   it('fails closed when the live policy probe is unavailable', async () => {
-    vi.mocked(probeConsoleAccessWithToken).mockResolvedValue(503)
+    vi.mocked(probeConsoleAccessWithToken).mockResolvedValue({ kind: 'upstream-unavailable' })
 
     await expect(handleConsoleLogin(request())).resolves.toMatchObject({ status: 503 })
     expect(mintConsoleSession).not.toHaveBeenCalled()

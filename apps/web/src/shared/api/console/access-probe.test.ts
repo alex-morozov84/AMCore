@@ -40,7 +40,7 @@ describe('probeConsoleAccess', () => {
 
     const status = await probeConsoleAccess()
 
-    expect(status).toBe(401)
+    expect(status).toEqual({ kind: 'denied', status: 401 })
   })
 
   it('forwards only the no-content success status', async () => {
@@ -49,7 +49,7 @@ describe('probeConsoleAccess', () => {
 
     const status = await probeConsoleAccess()
 
-    expect(status).toBe(204)
+    expect(status).toEqual({ kind: 'admitted' })
   })
 
   it.each([401, 403])('forwards expected policy denial %i without a body', async (status) => {
@@ -58,7 +58,7 @@ describe('probeConsoleAccess', () => {
 
     const result = await probeConsoleAccess()
 
-    expect(result).toBe(status)
+    expect(result).toEqual({ kind: 'denied', status })
   })
 
   it('fails closed when the policy probe is unavailable', async () => {
@@ -67,7 +67,7 @@ describe('probeConsoleAccess', () => {
 
     const status = await probeConsoleAccess()
 
-    expect(status).toBe(503)
+    expect(status).toEqual({ kind: 'indeterminate' })
   })
 
   it('does not disclose an unexpected upstream response', async () => {
@@ -76,13 +76,13 @@ describe('probeConsoleAccess', () => {
 
     const status = await probeConsoleAccess()
 
-    expect(status).toBe(503)
+    expect(status).toEqual({ kind: 'indeterminate' })
   })
 
   it('fails closed when server-held bearer acquisition rejects', async () => {
     mockedAccessToken.mockRejectedValue(new Error('vault unavailable'))
 
-    await expect(probeConsoleAccess()).resolves.toBe(503)
+    await expect(probeConsoleAccess()).resolves.toEqual({ kind: 'indeterminate' })
   })
 
   it('uses only the console-held bearer in host mode', async () => {
@@ -90,12 +90,19 @@ describe('probeConsoleAccess', () => {
     mockedConsoleAccessToken.mockResolvedValue('console-token')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
 
-    await expect(probeConsoleAccess()).resolves.toBe(204)
+    await expect(probeConsoleAccess()).resolves.toEqual({ kind: 'admitted' })
 
     expect(mockedAccessToken).not.toHaveBeenCalled()
     expect(fetch).toHaveBeenCalledWith(
       'http://localhost:5002/api/v1/admin/access',
       expect.objectContaining({ headers: { Authorization: 'Bearer console-token' } })
     )
+  })
+
+  it('preserves only an explicit upstream 503 as unavailable', async () => {
+    mockedAccessToken.mockResolvedValue('access-token')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })))
+
+    await expect(probeConsoleAccess()).resolves.toEqual({ kind: 'upstream-unavailable' })
   })
 })

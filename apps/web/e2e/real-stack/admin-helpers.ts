@@ -48,3 +48,25 @@ export function createOrganization(name: string, slug: string): void {
       `VALUES ('${randomUUID()}', '${name}', '${slug}', now(), now());`
   )
 }
+
+/** Creates future-dated rows so a pagination marker deterministically lands on page two. */
+export function createUsersForPagination(markerEmail: string, fillerPrefix: string): void {
+  const marker = `('${randomUUID()}', '${markerEmail}', '${markerEmail}', now(), now())`
+  const fillers = Array.from({ length: 20 }, (_, index) => {
+    const email = `${fillerPrefix}-${index}@e2e.amcore.test`
+    return `('${randomUUID()}', '${email}', '${email}', now() + interval '${index + 1} seconds', now())`
+  })
+  composeExec(
+    'postgres',
+    'psql',
+    '-U',
+    'amcore',
+    '-d',
+    'amcore',
+    '-c',
+    `INSERT INTO core.users (id, email, "emailCanonical", "createdAt", "updatedAt") VALUES ${[
+      marker,
+      ...fillers,
+    ].join(', ')};`
+  )
+}

@@ -322,6 +322,47 @@ additionally install a tool with extra React-internals capabilities
 because it's tied to one agent environment, not a portable requirement for
 every fork.
 
+### Observable long-running checks
+
+Long-running checks need an observable lifecycle, particularly Docker-backed
+builds and E2E tests. If the terminal integration offers a persistent
+terminal/PTY session, start the command in that session, retain its handle,
+and poll the live output until an exit status is returned. This preserves the
+current phase (build, health checks, test execution, cleanup) and detects a
+real hang.
+
+Do not background a verification command or redirect its output to a file just
+to work around an agent/tool timeout. Those approaches obscure its state, and
+an outer transport timeout can terminate the parent process while the runner's
+cleanup executes. That is **transport interrupted — no verdict**, not a pass or
+failure. Start a fresh observable run instead.
+
+`pnpm test:console-session-e2e` is the reference case: it builds an isolated
+Compose stack, waits for it to become healthy, runs Playwright against the
+HTTPS console host, and tears the stack down in `finally`. Run it as a single
+foreground command and observe all four phases; do not manually start a second
+copy while its cleanup is still removing containers, networks, and volumes.
+
+In an agent environment with a process sandbox, run `pnpm --filter web build`
+with the required user-approved escalation. A sandbox hang, a `.next` lock
+conflict, or a transport interruption is **not** a production-build verdict.
+The escalated build must still use the observable foreground/PTY workflow
+above. This prevents a constrained execution environment from being confused
+with an application failure.
+
+### Verification plan, not retries
+
+Before running a suite, write down which changed risk it proves and choose the
+smallest appropriate layer from [Which layer should I add a test at?](#which-layer-should-i-add-a-test-at).
+Run cheap static/unit checks first. Run a Docker-backed or full-browser check
+once per unchanged review iteration, only after the code it covers is settled;
+a passing result remains valid until that behavior changes. This review-time
+execution discipline does not waive repository-required final-delivery or CI
+gates: run those at the workflow stage that owns them even when an earlier
+targeted check passed. Do not restart a broad suite after a sandbox, lock, or
+transport failure — it has no verdict. Diagnose and repair the failed
+prerequisite, then make one observable run of the affected check.
+
 ## Commands
 
 | Command                                 | What it runs                                                                                 |

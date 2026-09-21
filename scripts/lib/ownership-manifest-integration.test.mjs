@@ -24,22 +24,20 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   assert.ok(operationsConsoleDocSeams.every((seam) => seam.seamKind === 'owned-block'))
   assert.ok(graph.aliases.includes('@/*'))
-  const layout = 'apps/web/src/app/[locale]/admin/(protected)/layout.tsx'
+  const frame = 'apps/web/src/_pages/console/ConsolePageFrame/ConsolePageFrame.tsx'
   const superAdmin = 'apps/web/src/shared/lib/require-super-admin.ts'
-  assert.ok(graph.forward.get(layout).some((edge) => edge.target === superAdmin))
-  // Each protected page now calls requireSuperAdmin() itself, not only the
-  // shared layout (installed Next docs: layouts don't rerender on
-  // client-side navigation between sibling pages, so a layout-only check
-  // stops being a real gate once a second protected page exists).
+  assert.ok(graph.forward.get(frame).some((edge) => edge.target === superAdmin))
+  // Every protected route composes ConsolePageFrame, which live-checks before
+  // mounting chrome. A persisted App Router layout is not a safe sibling-
+  // navigation admission point.
   assert.deepEqual(
     graph.reverse
       .get(superAdmin)
       .map((edge) => edge.importer)
       .sort(),
     [
-      layout,
-      'apps/web/src/app/[locale]/admin/(protected)/organizations/page.tsx',
-      'apps/web/src/app/[locale]/admin/(protected)/page.tsx',
+      frame,
+      'apps/web/src/_pages/console/ConsolePageFrame/ConsolePageFrame.test.tsx',
       'apps/web/src/shared/lib/require-super-admin.test.ts',
     ].sort()
   )
@@ -52,8 +50,8 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   )
   assert.equal([...graph.forward.values()].flat().length, [...graph.reverse.values()].flat().length)
   assertExactScaffoldCounts([
-    { name: 'console closed-root files', expected: 67, actual: [...inventory.rootFiles.values()].flat().length },
-    { name: 'console dead shared modules', expected: 7, actual: projection.deadSharedModules.size },
+    { name: 'console closed-root files', expected: 86, actual: [...inventory.rootFiles.values()].flat().length },
+    { name: 'console dead shared modules', expected: 8, actual: projection.deadSharedModules.size },
     { name: 'console universal shared modules', expected: 0, actual: projection.universalSharedModules.size },
   ])
 })

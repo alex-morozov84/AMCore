@@ -22,6 +22,7 @@ const sharedModules = [
   module('apps/web/src/shared/lib/console-host-guard.ts', ['console-host-guard.test.ts']),
   module('apps/web/src/shared/lib/console-public-api-path.ts', ['console-public-api-path.test.ts']),
   module('apps/web/src/shared/lib/console-public-href.ts', ['console-public-href.test.ts']),
+  module('apps/web/src/shared/lib/format-console-date-time.ts'),
   module('apps/web/src/shared/lib/require-super-admin.ts', ['require-super-admin.test.ts']),
 ]
 
@@ -38,6 +39,7 @@ const verification = [
   'apps/web/e2e/real-stack/admin-helpers.ts',
   'apps/web/e2e/real-stack/admin-organizations.spec.ts',
   'apps/web/e2e/real-stack/admin-overview.spec.ts',
+  'apps/web/e2e/real-stack/admin-users.spec.ts',
 ].map((path) => one(path, { tags: ['verification:console'] }))
 
 const sharedModuleTests = sharedModules.flatMap((item) =>
