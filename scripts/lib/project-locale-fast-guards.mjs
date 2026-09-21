@@ -1,29 +1,21 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import ts from 'typescript'
 
 import { buildProjectLocaleFacts } from './project-locale-facts.mjs'
 import { LOCALE_DELETES } from './project-locale-route-paths.mjs'
+import { localeGuardSourceFiles } from './project-locale-source-files.mjs'
 
 const NAVIGATION = '@/i18n/navigation'
-const SOURCE = /\.(?:[cm]?[jt]sx?)$/
 const FIXTURE = /\.(?:test|spec|stories)\.[jt]sx?$/
 const LOCALE_STATE = { selected: { locale: true }, locale: { mode: 'single', base: 'en' } }
+const PROVIDER_LITERAL_KEYS = new Set(['locale.catalogue-fixture', 'locale.web-locale-suite'])
 
-function walk(root, relative = 'apps/web') {
-  const directory = path.join(root, relative)
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const target = path.join(relative, entry.name)
-    if (entry.isDirectory()) return walk(root, target)
-    return entry.isFile() && SOURCE.test(entry.name) ? [target] : []
-  })
-}
-
-function registeredPaths(prefix) {
+function registeredPaths(matches) {
   return new Set(
     buildProjectLocaleFacts(LOCALE_STATE)
-      .filter((fact) => fact.operationKey?.startsWith(prefix))
+      .filter((fact) => matches(fact.operationKey ?? ''))
       .map((fact) => fact.path)
   )
 }
@@ -69,9 +61,7 @@ function providerLiteral(node) {
         ? initializer.expression
         : undefined
   return (
-    literal &&
-    node.parent.parent.tagName.getText() === 'NextIntlClientProvider' &&
-    literal.text
+    literal && node.parent.parent.tagName.getText() === 'NextIntlClientProvider' && literal.text
   )
 }
 
@@ -88,18 +78,23 @@ function typedFixtureLiteral(node, file) {
   const object = node.parent
   const container = object.parent
   const type =
-    ts.isVariableDeclaration(container) || ts.isAsExpression(container) || ts.isSatisfiesExpression(container)
+    ts.isVariableDeclaration(container) ||
+    ts.isAsExpression(container) ||
+    ts.isSatisfiesExpression(container)
       ? container.type
       : undefined
-  return ts.isObjectLiteralExpression(object) && /\b(?:Supported)?Locale\b/.test(type?.getText() ?? '')
+  return (
+    ts.isObjectLiteralExpression(object) && /\b(?:Supported)?Locale\b/.test(type?.getText() ?? '')
+  )
 }
 
 function fixtureLiterals(source, file) {
   const literals = []
   const visit = (node) => {
     const provider = providerLiteral(node)
-    if (provider || typedFixtureLiteral(node, file)) {
-      literals.push(provider || node.initializer.text)
+    if (provider) literals.push({ kind: 'provider', value: provider })
+    else if (typedFixtureLiteral(node, file)) {
+      literals.push({ kind: 'typed-fixture', value: node.initializer.text })
     }
     ts.forEachChild(node, visit)
   }
@@ -107,7 +102,7 @@ function fixtureLiterals(source, file) {
   return literals
 }
 
-function failuresForFile(root, file, navigationFacts, localeFacts) {
+function failuresForFile(root, file, navigationFacts, localeFacts, providerFacts) {
   const text = readFileSync(path.join(root, file), 'utf8')
   const needsScan =
     text.includes(NAVIGATION) ||
@@ -121,20 +116,31 @@ function failuresForFile(root, file, navigationFacts, localeFacts) {
   const mockOnly = navigation.length > 0 && navigation.every((kind) => kind === 'mock')
   const failures = []
   if (navigation.length > 0 && !mockOnly && !navigationFacts.has(file) && !removable) {
-    failures.push(`${file}: imports "${NAVIGATION}"; add locale.navigation-* or declare it removable`)
+    failures.push(
+      `${file}: imports "${NAVIGATION}"; add locale.navigation-* or declare it removable`
+    )
   }
-  if (!removable && !localeFacts.has(file)) {
+  if (!removable) {
     for (const literal of fixtureLiterals(source, file)) {
-      failures.push(`${file}: hardcoded locale "${literal}"; use DEFAULT_LOCALE or register a locale-specific fixture`)
+      const registered =
+        literal.kind === 'provider' ? providerFacts.has(file) : localeFacts.has(file)
+      if (!registered) {
+        failures.push(
+          `${file}: hardcoded locale "${literal.value}"; use DEFAULT_LOCALE or register a locale-specific fixture`
+        )
+      }
     }
   }
   return failures
 }
 
 export function collectLocaleProjectionGuardFailures(root = process.cwd()) {
-  const navigationFacts = registeredPaths('locale.navigation-')
-  const localeFacts = registeredPaths('locale.')
-  return walk(root).flatMap((file) => failuresForFile(root, file, navigationFacts, localeFacts))
+  const navigationFacts = registeredPaths((key) => key.startsWith('locale.navigation-'))
+  const localeFacts = registeredPaths((key) => key.startsWith('locale.'))
+  const providerFacts = registeredPaths((key) => PROVIDER_LITERAL_KEYS.has(key))
+  return localeGuardSourceFiles(root).flatMap((file) =>
+    failuresForFile(root, file, navigationFacts, localeFacts, providerFacts)
+  )
 }
 
 export function assertLocaleProjectionGuards(root = process.cwd()) {

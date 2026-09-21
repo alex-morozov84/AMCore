@@ -52,14 +52,14 @@ function exemptFiles(manifest, inventory) {
 }
 
 function missingDetail(manifest, missing) {
-  return missing
-    .map(
-      ({ file, detector, target }) => {
-        const matched = target ? `import "${target}"` : `identifier "${detector}"`
-        return `${manifest.feature}: "${file}" matched ${matched}; use a local fixture or register an owned block, config field, or structural operation`
-      }
-    )
+  const detail = missing
+    .map(({ file, detector, target }) => {
+      const matched = target ? `import "${target}"` : `identifier "${detector}"`
+      return `${manifest.feature}: "${file}" matched ${matched}; use a local fixture or register an owned block, config field, or structural operation`
+    })
     .join('; ')
+  if (detail.length <= 700) return detail
+  return `${detail.slice(0, 650)}; ... ${missing.length} total violations`
 }
 
 function collectMissing(root, manifest, inventory, graph, changedFiles, projection, options) {

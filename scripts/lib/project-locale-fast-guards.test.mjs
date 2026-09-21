@@ -55,3 +55,23 @@ test('a registered locale-specific fixture remains allowed', () => {
     copy.cleanup()
   }
 })
+
+test('an unrelated locale operation does not exempt a hardcoded provider locale', () => {
+  expectFailure(
+    'apps/web/src/widgets/console-shell/ui/ConsoleBreadcrumb.tsx',
+    '<NextIntlClientProvider locale="ru" />\n',
+    /ConsoleBreadcrumb\.tsx: hardcoded locale "ru"/
+  )
+})
+
+test('untracked build output is outside the source scan', () => {
+  const copy = fixture(
+    'apps/web/.next/cache/generated.js',
+    "import { usePathname } from '@/i18n/navigation'\n"
+  )
+  try {
+    assert.doesNotThrow(() => assertLocaleProjectionGuards(copy.root))
+  } finally {
+    copy.cleanup()
+  }
+})
