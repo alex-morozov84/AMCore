@@ -2,13 +2,25 @@ import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildOperationInventory } from './operation-inventory.mjs'
 import { ROUTE_PROGRESS_SOURCE_PATH } from '../lib/project-route-progress-ownership.mjs'
+import { assertExactScaffoldCounts } from '../lib/scaffold-exact-counts.mjs'
 
 describe('operation inventory against the real plans', () => {
   const inventory = buildOperationInventory()
 
+  test('reports every stale measured exact count together', () => {
+    assertExactScaffoldCounts([
+      { name: 'measured operations', expected: 476, actual: inventory.operations.length },
+      { name: 'operation scenarios', expected: 8, actual: new Set(inventory.operations.map((item) => item.scenarioName)).size },
+      { name: 'exact-copy edges', expected: 0, actual: inventory.exactCopyEdges.length },
+      { name: 'migration providers', expected: 10, actual: inventory.migrationCounts.productionProviders },
+      { name: 'migration manifests', expected: 10, actual: inventory.migrationCounts.ownershipManifests },
+      { name: 'migration semantic facts', expected: 652, actual: inventory.migrationCounts.semanticFacts },
+      { name: 'migration semantic claims', expected: 1229, actual: inventory.migrationCounts.semanticClaims },
+      { name: 'migration final filesystem operations', expected: 469, actual: inventory.migrationCounts.finalFilesystemOperations },
+    ])
+  })
+
   test('records real source/target paths and every measured scenario', () => {
-    assert.equal(inventory.operations.length, 476)
-    assert.equal(new Set(inventory.operations.map((operation) => operation.scenarioName)).size, 8)
     assert.ok(
       inventory.operations.every(
         (operation) => operation.target && !operation.target.startsWith('/')
@@ -33,13 +45,13 @@ describe('operation inventory against the real plans', () => {
     // object href, no `locale` option), so its navigation call cannot
     // type-check there regardless of any internal branch. Same pattern as
     // the product `LocaleSwitcher`'s removal.
-    assert.deepEqual(inventory.migrationCounts, {
-      productionProviders: 10,
-      ownershipManifests: 10,
-      semanticFacts: 652,
-      semanticClaims: 1229,
-      finalFilesystemOperations: 469,
-    })
+    assert.deepEqual(Object.keys(inventory.migrationCounts).sort(), [
+      'finalFilesystemOperations',
+      'ownershipManifests',
+      'productionProviders',
+      'semanticClaims',
+      'semanticFacts',
+    ])
   })
 
   test('captures file, directory, move, delete, and edit evidence needed by PR2', () => {
@@ -52,7 +64,6 @@ describe('operation inventory against the real plans', () => {
   })
 
   test('publishes one synchronization edge for every distinct exact-copy target', () => {
-    assert.equal(inventory.exactCopyEdges.length, 0)
     assert.equal(
       inventory.exactCopyEdges.some((edge) => edge.upstreamSource === ROUTE_PROGRESS_SOURCE_PATH),
       false

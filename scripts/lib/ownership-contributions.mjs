@@ -54,8 +54,10 @@ function exemptFiles(manifest, inventory) {
 function missingDetail(manifest, missing) {
   return missing
     .map(
-      ({ file, detector }) =>
-        `${manifest.feature}: "${file}" matched "${detector}"; register an owned block, config field, or structural operation in its ownership manifest`
+      ({ file, detector, target }) => {
+        const matched = target ? `import "${target}"` : `identifier "${detector}"`
+        return `${manifest.feature}: "${file}" matched ${matched}; use a local fixture or register an owned block, config field, or structural operation`
+      }
     )
     .join('; ')
 }
@@ -70,7 +72,7 @@ function collectMissing(root, manifest, inventory, graph, changedFiles, projecti
     const result = detectorsForFile(root, file, manifest, graph, targets, options.contents)
     for (const contribution of result.detected) {
       if (!declared(manifest, file, contribution, result.content)) {
-        missing.push({ file, detector: contribution.detector })
+        missing.push({ file, detector: contribution.detector, target: contribution.target })
       }
     }
   }
