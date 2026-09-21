@@ -21,7 +21,7 @@ guessing.
 | [Storybook](./storybook.md)                                             | The component workshop: what's wired (a11y/theme/MSW/i18n decorators), story conventions, the CLI-safety/`optimizeDeps.include` rules, and running a fork without Storybook                                                                                                                                                            |
 | [Bundle baseline and budget](./bundle-budget.md)                        | Per-route client bundle size methodology, the current baseline, the non-vacuity proof, and why CI enforcement is deferred                                                                                                                                                                                                              |
 | [Top route progress bar](./route-progress.md)                           | The global navigation-progress indicator: what starts/finishes it, the `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion, and the `ROUTE_PROGRESS_ENABLED` dev/agent flag                                                                                                                                        |
-| [Operations Console](../operations-console/README.md)                   | The isolated `SUPER_ADMIN` control-plane foundation: FSD ownership, topology, session boundary, deployment, verification, and extension rules                                                                                                                                                                                          |
+| [Operations Console](../operations-console/README.md)                   | The isolated `SUPER_ADMIN` control plane: Overview, read-only Users and Organizations, FSD ownership, topology, session boundary, deployment, verification, and extension rules                                                                                                                                                        |
 
 This index is the public entry point for the current frontend starter surface;
 see `architecture-and-conventions.md`'s "See also" section for related guides.
@@ -47,5 +47,5 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
   [Browser security headers and CSP](./browser-security-and-csp.md)
 - Adding a navigating `<Link>` or a programmatic `router.push()`/`replace()` →
   [Top route progress bar § The two building blocks](./route-progress.md#the-two-building-blocks-use-these-not-raw-next-apis)
-- Configuring or extending the Operations Console →
+- Using, configuring, or extending the Operations Console →
   [Operations Console](../operations-console/README.md)

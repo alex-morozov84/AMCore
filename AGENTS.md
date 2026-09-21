@@ -309,6 +309,9 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - `docs/frontend/` — frontend architecture, i18n/error localization, theme,
   FSD guardrails, shared UI, API consumption, and the testing pyramid; start
   with [`docs/frontend/README.md`](docs/frontend/README.md).
+- `docs/operations-console/` — using, configuring, deploying, and safely
+  extending the optional `SUPER_ADMIN` Operations Console; start with
+  [`docs/operations-console/README.md`](docs/operations-console/README.md).
 - `docs/email/` — email extension contract: `NotificationsService` vs
   `EmailService`, React Email templates, queueing, and secret-link rules.
 - `docs/auth/`, `docs/storage/`, `docs/media/` — feature guides.

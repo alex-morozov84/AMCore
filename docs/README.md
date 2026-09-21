@@ -35,7 +35,7 @@ find for something, that page is under-documented; please open an issue.
 | Add a frontend test / pick the right layer                                               | [`frontend/testing.md`](frontend/testing.md)                                                                                      |
 | Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |
 | Initialize a downstream fork (rebrand, locale/Storybook/console shape, route-progress)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |
-| Configure, deploy, or safely extend Operations Console                                   | [`operations-console/`](operations-console/README.md)                                                                             |
+| Use, configure, deploy, or safely extend Operations Console                              | [`operations-console/`](operations-console/README.md)                                                                             |
 | Check or update the frontend bundle baseline                                             | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                          |
 | Add a navigating Link / programmatic navigation, or configure the route-progress bar     | [`frontend/route-progress.md`](frontend/route-progress.md)                                                                        |
 | Add an environment variable                                                              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)               |
@@ -114,8 +114,9 @@ find for something, that page is under-documented; please open an issue.
   `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion,
   and the `ROUTE_PROGRESS_ENABLED` dev/agent flag.
 - **[Operations Console](operations-console/README.md)** — the optional
-  `SUPER_ADMIN` control-plane foundation: topology, host-session boundary,
-  downstream scaffold, deployment, verification, and safe extension rules.
+  `SUPER_ADMIN` control plane: Overview, read-only Users and Organizations,
+  topology, host-session boundary, downstream scaffolding, deployment,
+  verification, and safe extension rules.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
   sessions, OAuth, [RBAC](auth/rbac.md), [API keys](auth/api-keys.md), invites,
   CSRF, and the [auth contracts reference](auth/reference.md).

@@ -68,12 +68,22 @@ export const operationsConsoleDocSeams = [
     'console.frontend-start-link',
     'docs/frontend/README.md',
     {
-      start: '- Configuring or extending the Operations Console →',
+      start: '- Using, configuring, or extending the Operations Console →',
       end: '  [Operations Console](../operations-console/README.md)',
       preserveFinalNewline: true,
     },
     undefined,
     { operationKey: 'frontend-index-console' }
+  ),
+  entry(
+    'console.agents-doc-map',
+    'AGENTS.md',
+    block(
+      '- `docs/operations-console/` — using, configuring, deploying, and safely',
+      '  [`docs/operations-console/README.md`](docs/operations-console/README.md).'
+    ),
+    ['docs/operations-console/README.md'],
+    { operationKey: 'agents-console' }
   ),
   entry(
     'console.token-doc',

@@ -21,6 +21,7 @@ const summaries = {
   'frontend-index-storybook':
     'docs/frontend/README.md: remove the Storybook index row, Start-here bullet, and stale scaffolding mention',
   'frontend-index-console': 'remove the Operations Console frontend index entry',
+  'agents-console': 'AGENTS.md: remove the Operations Console documentation-map entry',
   'architecture-storybook':
     'architecture-and-conventions.md: remove the Storybook "See also" bullet',
   'storybook.workflow-ci': 'ci.yml: remove the storybook job',
@@ -57,6 +58,7 @@ const combined = {
     'docs/frontend/README.md: remove Storybook and console-only index entries',
   'docs/frontend/architecture-and-conventions.md':
     'architecture-and-conventions.md: remove Storybook and console-only documentation',
+  'AGENTS.md': 'AGENTS.md: remove Storybook and console-only guidance',
   'docs/frontend/brand-theme-and-tokens.md':
     'brand-theme-and-tokens.md: remove Storybook and console-only documentation',
 }
