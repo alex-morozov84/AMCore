@@ -92,6 +92,7 @@ export const operationsConsoleSurfaceRoots = [
   'docker-compose.console-host.yml',
   'docker-compose.console-session-e2e.yml',
   '.env.example',
+  'AGENTS.md',
   'README.md',
   'PROJECT_CONTEXT.md',
   'scripts/run-console-session-e2e.mjs',

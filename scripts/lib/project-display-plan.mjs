@@ -1,4 +1,11 @@
-import { insertAt, insertProvider, insertTarget, relative, take, takeOwned } from './project-display-helpers.mjs'
+import {
+  insertAt,
+  insertProvider,
+  insertTarget,
+  relative,
+  take,
+  takeOwned,
+} from './project-display-helpers.mjs'
 import { ROUTE_PROGRESS_SOURCE_PATH } from './project-route-progress-ownership.mjs'
 
 const combinedOrder = [
@@ -8,6 +15,7 @@ const combinedOrder = [
   'docs/frontend/architecture-and-conventions.md',
   'docs/frontend/brand-theme-and-tokens.md',
   'docs/frontend/README.md',
+  'AGENTS.md',
   'README.md',
   'docs/README.md',
 ]
@@ -96,7 +104,7 @@ function insertConsole(plan, root, singles) {
     plan,
     root,
     'docs/operations/README.md',
-    take(singles, 'README.md', 'docs/README.md')
+    take(singles, 'AGENTS.md', 'README.md', 'docs/README.md')
   )
   if (context && !enabled)
     insertProvider(plan, 'console', false, take(singles, 'PROJECT_CONTEXT.md'))

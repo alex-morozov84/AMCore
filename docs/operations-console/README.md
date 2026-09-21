@@ -49,8 +49,9 @@ and email, email-verification state, current system role, last sign-in, and
 created/updated timestamps. It is **read-only**: it does not expose a detail
 page, profile fields, sessions, account recovery, deletion, or any role change.
 It has the same explicit unavailable and genuine-empty states as Organizations.
-Changing a system role remains deliberately out of scope until its separate
-fresh-authentication and durable session-revocation security contract is ready.
+Changing a system role is not available in the shipped Console. Its separately
+reviewed fresh-authentication, token-containment, and session-revocation flow
+must be implemented and verified before any role action can appear here.
 
 ## Before signing in
 

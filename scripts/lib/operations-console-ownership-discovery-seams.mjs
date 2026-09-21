@@ -19,7 +19,7 @@ export const operationsConsoleDiscoverySeams = [
     'README.md',
     {
       start: 'The optional [Operations Console](docs/operations-console/README.md)',
-      end: 'It is not a product backoffice or a catalog/content admin UI.',
+      end: 'not a product backoffice or a catalog/content admin UI.',
     },
     undefined,
     { operationKey: 'readme-console' }
@@ -34,7 +34,7 @@ export const operationsConsoleDiscoverySeams = [
   entry(
     'console.root-capability',
     'README.md',
-    { text: '| **Operations Console**   | ✅ Foundational' },
+    { text: '| **Operations Console**   | ✅ Shipped' },
     undefined,
     { operationKey: 'readme-console' }
   ),
@@ -55,7 +55,7 @@ export const operationsConsoleDiscoverySeams = [
   entry(
     'console.docs-intent',
     'docs/README.md',
-    { text: '| Configure, deploy, or safely extend Operations Console' },
+    { text: '| Use, configure, deploy, or safely extend Operations Console' },
     undefined,
     { operationKey: 'docs-index-console' }
   ),
@@ -64,7 +64,7 @@ export const operationsConsoleDiscoverySeams = [
     'docs/README.md',
     block(
       '- **[Operations Console](operations-console/README.md)**',
-      'downstream scaffold, deployment, verification, and safe extension rules.'
+      'verification, and safe extension rules.'
     ),
     undefined,
     { operationKey: 'docs-index-console' }
