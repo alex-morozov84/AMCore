@@ -4,6 +4,8 @@ import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 
+import { getConsoleUsersHref } from '@/shared/lib/console-public-href'
+
 vi.mock('server-only', () => ({}))
 vi.mock('@/i18n/navigation', () => ({
   Link: ({ href, children }: { href: string; children: ReactNode }) => (
@@ -39,6 +41,6 @@ it('offers a progress-aware return to the first Users page', async () => {
   expect(screen.getByText('This page is unavailable')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Go to first page' })).toHaveAttribute(
     'href',
-    '/admin/users'
+    getConsoleUsersHref()
   )
 })
