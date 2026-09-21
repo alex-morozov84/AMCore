@@ -7,6 +7,7 @@ import { OWNERSHIP_CODES } from './ownership-errors.mjs'
 import { validateManifestInventory } from './ownership-inventory.mjs'
 import { operationsConsoleDocSeams } from './operations-console-ownership-doc-seams.mjs'
 import { operationsConsoleOwnership } from './operations-console-ownership.mjs'
+import { assertExactScaffoldCounts } from './scaffold-exact-counts.mjs'
 import { validateOwnership } from './ownership-validate.mjs'
 import { createRealRepoCopy } from './test-fixture.mjs'
 
@@ -20,10 +21,6 @@ function cloneManifest(change) {
 
 test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
   const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
-  // Total file count across every closed console ownership root. Adding or
-  // removing a file inside one of those roots changes this number - rerun
-  // the test to get the new value rather than computing it by hand.
-  assert.equal([...inventory.rootFiles.values()].flat().length, 67)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   assert.ok(operationsConsoleDocSeams.every((seam) => seam.seamKind === 'owned-block'))
   assert.ok(graph.aliases.includes('@/*'))
@@ -54,8 +51,11 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       .some((edge) => edge.target === 'scripts/lib/init-project-test-helpers.mjs')
   )
   assert.equal([...graph.forward.values()].flat().length, [...graph.reverse.values()].flat().length)
-  assert.equal(projection.deadSharedModules.size, 7)
-  assert.equal(projection.universalSharedModules.size, 0)
+  assertExactScaffoldCounts([
+    { name: 'console closed-root files', expected: 67, actual: [...inventory.rootFiles.values()].flat().length },
+    { name: 'console dead shared modules', expected: 7, actual: projection.deadSharedModules.size },
+    { name: 'console universal shared modules', expected: 0, actual: projection.universalSharedModules.size },
+  ])
 })
 
 test('a stale listed path fails closed', () => {
