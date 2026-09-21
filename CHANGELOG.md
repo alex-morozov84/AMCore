@@ -162,6 +162,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Single-locale console projection.** Generated single-locale forks now keep
+  the rewritten `next/navigation` pathname imports in the external-import group,
+  so the shipped console breadcrumb and navigation pass the normal lint gate.
+  Scheduled exhaustive failures also retain their stage diagnostics as a
+  short-lived workflow artifact instead of naming a runner-local file that is
+  unavailable after the job ends.
+
 - **Scaffolding-transform drift repair** (PR #401). Several
   `pnpm init:project` transforms (`--storybook=disabled` and others) had
   drifted from the real source files they rewrite, causing initialization to
