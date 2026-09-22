@@ -2,10 +2,16 @@ import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 import {
+  type AdminOrganizationListQuery,
   type AdminOrganizationListResponse,
   type AdminOrganizationResponse,
+  type AdminOrganizationSortField,
+  type AdminSortOrder,
+  type AdminUserListQuery,
   type AdminUserListResponse,
   type AdminUserResponse,
+  type AdminUserSortField,
+  escapeLikeLiteral,
   parseSupportedLocale,
   type RequestPrincipal,
   SystemRole,
@@ -65,6 +71,104 @@ type AdminOrganizationRow = Prisma.OrganizationGetPayload<{
   select: typeof ADMIN_ORGANIZATION_SELECT
 }>
 
+/**
+ * Resolves the admin Users discovery `orderBy` from a closed switch over
+ * the already-validated `sortBy` enum — never a dynamic `{ [sortBy]: ... }`
+ * built from a caller-supplied string. `id` is appended as a deterministic
+ * tie-breaker in the *same* direction as the primary sort, so one ordinary
+ * `(field, id)` B-tree index can serve the query via a forward or backward
+ * scan; a fixed `id asc` under a `desc` primary sort could not be served by
+ * a single simple composite index. `name`/`lastLoginAt` are nullable
+ * columns, so they need explicit `NULLS LAST` in both directions — reversing
+ * an index scan also reverses null placement, so this is not implied by the
+ * tie-breaker direction alone.
+ */
+function resolveUserOrderBy(
+  sortBy: AdminUserSortField,
+  sortOrder: AdminSortOrder | undefined
+): Prisma.UserOrderByWithRelationInput[] {
+  switch (sortBy) {
+    case 'name': {
+      const order = sortOrder ?? 'asc'
+      return [{ name: { sort: order, nulls: 'last' } }, { id: order }]
+    }
+    case 'email': {
+      const order = sortOrder ?? 'asc'
+      return [{ email: order }, { id: order }]
+    }
+    case 'lastLoginAt': {
+      const order = sortOrder ?? 'desc'
+      return [{ lastLoginAt: { sort: order, nulls: 'last' } }, { id: order }]
+    }
+    case 'createdAt': {
+      const order = sortOrder ?? 'desc'
+      return [{ createdAt: order }, { id: order }]
+    }
+    case 'updatedAt': {
+      const order = sortOrder ?? 'desc'
+      return [{ updatedAt: order }, { id: order }]
+    }
+  }
+}
+
+/** Same contract as {@link resolveUserOrderBy}; every Organization sort column is non-nullable. */
+function resolveOrganizationOrderBy(
+  sortBy: AdminOrganizationSortField,
+  sortOrder: AdminSortOrder | undefined
+): Prisma.OrganizationOrderByWithRelationInput[] {
+  switch (sortBy) {
+    case 'name': {
+      const order = sortOrder ?? 'asc'
+      return [{ name: order }, { id: order }]
+    }
+    case 'slug': {
+      const order = sortOrder ?? 'asc'
+      return [{ slug: order }, { id: order }]
+    }
+    case 'createdAt': {
+      const order = sortOrder ?? 'desc'
+      return [{ createdAt: order }, { id: order }]
+    }
+    case 'updatedAt': {
+      const order = sortOrder ?? 'desc'
+      return [{ updatedAt: order }, { id: order }]
+    }
+  }
+}
+
+/**
+ * Case-insensitive literal-contains search over `name OR email`. `search`
+ * is already trimmed/normalized by the Zod schema (undefined means "no
+ * filter"); the term is escaped so a literal `%`/`_`/`\` in it can never be
+ * read as a `LIKE` pattern metacharacter. A `null` `User.name` simply
+ * contributes no match — it does not exclude an `email` match from the
+ * surrounding `OR`.
+ */
+function buildUserSearchWhere(search: string | undefined): Prisma.UserWhereInput | undefined {
+  if (search === undefined) return undefined
+  const literal = escapeLikeLiteral(search)
+  return {
+    OR: [
+      { name: { contains: literal, mode: 'insensitive' } },
+      { email: { contains: literal, mode: 'insensitive' } },
+    ],
+  }
+}
+
+/** Same contract as {@link buildUserSearchWhere}, over `name OR slug`. */
+function buildOrganizationSearchWhere(
+  search: string | undefined
+): Prisma.OrganizationWhereInput | undefined {
+  if (search === undefined) return undefined
+  const literal = escapeLikeLiteral(search)
+  return {
+    OR: [
+      { name: { contains: literal, mode: 'insensitive' } },
+      { slug: { contains: literal, mode: 'insensitive' } },
+    ],
+  }
+}
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -76,16 +180,22 @@ export class AdminService {
     this.logger.setContext(AdminService.name)
   }
 
-  async findAllUsers(page: number, limit: number): Promise<AdminUserListResponse> {
+  async findAllUsers(query: AdminUserListQuery): Promise<AdminUserListResponse> {
+    const { page, limit, search, sortBy, sortOrder } = query
     const skip = (page - 1) * limit
+    // Built once and reused for both calls below: `findMany` and `count`
+    // must describe the identical dataset, or `data` and `total` diverge.
+    const where = buildUserSearchWhere(search)
+    const orderBy = resolveUserOrderBy(sortBy, sortOrder)
     const [rows, total] = await Promise.all([
       this.prisma.user.findMany({
+        where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         select: ADMIN_USER_SELECT,
       }),
-      this.prisma.user.count(),
+      this.prisma.user.count({ where }),
     ])
     return {
       data: rows.map((row) => this.toAdminUserResponse(row)),
@@ -226,16 +336,22 @@ export class AdminService {
     return result
   }
 
-  async findAllOrganizations(page: number, limit: number): Promise<AdminOrganizationListResponse> {
+  async findAllOrganizations(
+    query: AdminOrganizationListQuery
+  ): Promise<AdminOrganizationListResponse> {
+    const { page, limit, search, sortBy, sortOrder } = query
     const skip = (page - 1) * limit
+    const where = buildOrganizationSearchWhere(search)
+    const orderBy = resolveOrganizationOrderBy(sortBy, sortOrder)
     const [rows, total] = await Promise.all([
       this.prisma.organization.findMany({
+        where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         select: ADMIN_ORGANIZATION_SELECT,
       }),
-      this.prisma.organization.count(),
+      this.prisma.organization.count({ where }),
     ])
     return {
       data: rows.map((row) => this.toAdminOrganizationResponse(row)),

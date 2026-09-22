@@ -2,6 +2,8 @@ import { type INestApplication, RequestMethod } from '@nestjs/common'
 import { type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
 import { cleanupOpenApiDoc } from 'nestjs-zod'
 
+import { ADMIN_ORGANIZATION_SORT_FIELDS, ADMIN_USER_SORT_FIELDS } from '@amcore/shared'
+
 import { ADR_034_APIKEY_ALLOWLIST } from '../src/core/auth/decorators/adr-034-api-key-allowlist'
 import { buildSwaggerConfig } from '../src/swagger.config'
 
@@ -354,6 +356,67 @@ describe('OpenAPI success surface (e2e)', () => {
     // 503 here means the observation itself failed - distinct from the typed
     // 200 `readiness: 'not_ready'` response for an observed degraded instance.
     expect(operation?.responses).toHaveProperty('503')
+  })
+
+  it('documents the admin discovery search/sortBy/sortOrder query contract on both list endpoints (ADR-082)', () => {
+    interface ParamLike {
+      name: string
+      in: string
+      required?: boolean
+      schema?: { type?: string; maxLength?: number; enum?: string[] }
+    }
+
+    const DISCOVERY_ENDPOINTS = [
+      { key: 'get /admin/users', sortFields: ADMIN_USER_SORT_FIELDS },
+      { key: 'get /admin/organizations', sortFields: ADMIN_ORGANIZATION_SORT_FIELDS },
+    ] as const
+
+    const violations: string[] = []
+
+    for (const { key, sortFields } of DISCOVERY_ENDPOINTS) {
+      const [, ...pathParts] = key.split(' ')
+      const path = pathParts.join(' ')
+      const operation = document.paths[path]?.get as
+        { parameters?: ParamLike[]; responses?: Record<string, unknown> } | undefined
+      const params = new Map((operation?.parameters ?? []).map((p) => [p.name, p]))
+
+      if (!operation?.responses?.['400']) {
+        violations.push(`${key}: must document a 400 response for invalid discovery query values`)
+      }
+
+      const search = params.get('search')
+      if (!search || search.in !== 'query' || search.required !== false) {
+        violations.push(`${key}: "search" must be documented as an optional query parameter`)
+      } else if (search.schema?.maxLength !== 255) {
+        violations.push(`${key}: "search" schema must document maxLength: 255`)
+      }
+
+      const sortBy = params.get('sortBy')
+      const sortByEnum = sortBy?.schema?.enum ?? []
+      if (!sortBy || sortBy.in !== 'query' || sortBy.required !== false) {
+        violations.push(`${key}: "sortBy" must be documented as an optional query parameter`)
+      } else if (
+        sortByEnum.length !== sortFields.length ||
+        !sortFields.every((f) => sortByEnum.includes(f))
+      ) {
+        violations.push(
+          `${key}: "sortBy" enum [${sortByEnum.join(', ')}] must exactly match the allowlist [${sortFields.join(', ')}]`
+        )
+      }
+
+      const sortOrder = params.get('sortOrder')
+      const sortOrderEnum = sortOrder?.schema?.enum ?? []
+      if (!sortOrder || sortOrder.in !== 'query' || sortOrder.required !== false) {
+        violations.push(`${key}: "sortOrder" must be documented as an optional query parameter`)
+      } else if (
+        sortOrderEnum.length !== 2 ||
+        !['asc', 'desc'].every((v) => sortOrderEnum.includes(v))
+      ) {
+        violations.push(`${key}: "sortOrder" enum must be exactly ["asc", "desc"]`)
+      }
+    }
+
+    expect(violations).toEqual([])
   })
 
   it('documents a multipart/form-data request body with a binary file field for both upload operations', () => {

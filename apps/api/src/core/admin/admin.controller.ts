@@ -21,6 +21,8 @@ import {
 import { ZodResponse } from 'nestjs-zod'
 
 import {
+  ADMIN_ORGANIZATION_SORT_FIELDS,
+  ADMIN_USER_SORT_FIELDS,
   type AdminOrganizationListResponse,
   type AdminOverviewResponse,
   type AdminUserListResponse,
@@ -31,7 +33,6 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling'
 import { Auth } from '../auth/decorators/auth.decorator'
@@ -41,8 +42,10 @@ import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
 import { AdminOverviewService } from './admin-overview.service'
+import { AdminOrganizationListQueryDto } from './dto/admin-organization-list-query.dto'
 import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto'
 import { AdminOverviewResponseDto } from './dto/admin-overview-response.dto'
+import { AdminUserListQueryDto } from './dto/admin-user-list-query.dto'
 import { AdminUserListResponseDto, AdminUserResponseDto } from './dto/admin-user-response.dto'
 import { CleanupResultDto } from './dto/cleanup-result.dto'
 import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
@@ -105,10 +108,23 @@ export class AdminController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    maxLength: 255,
+    description: 'Case-insensitive literal-contains match over name OR email',
+  })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ADMIN_USER_SORT_FIELDS, example: 'createdAt' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid page/limit/sortBy/sortOrder, an oversized search term, or a repeated query key',
+  })
   @ZodResponse({ type: AdminUserListResponseDto, status: 200, description: 'Paginated users' })
-  findAllUsers(@Query() pagination: PaginationQueryDto): Promise<AdminUserListResponse> {
-    const { page, limit } = pagination
-    return this.adminService.findAllUsers(page, limit)
+  findAllUsers(@Query() query: AdminUserListQueryDto): Promise<AdminUserListResponse> {
+    return this.adminService.findAllUsers(query)
   }
 
   @Patch('users/:id')
@@ -171,16 +187,34 @@ export class AdminController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    maxLength: 255,
+    description: 'Case-insensitive literal-contains match over name OR slug',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ADMIN_ORGANIZATION_SORT_FIELDS,
+    example: 'createdAt',
+  })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid page/limit/sortBy/sortOrder, an oversized search term, or a repeated query key',
+  })
   @ZodResponse({
     type: AdminOrganizationListResponseDto,
     status: 200,
     description: 'Paginated organizations',
   })
   findAllOrganizations(
-    @Query() pagination: PaginationQueryDto
+    @Query() query: AdminOrganizationListQueryDto
   ): Promise<AdminOrganizationListResponse> {
-    const { page, limit } = pagination
-    return this.adminService.findAllOrganizations(page, limit)
+    return this.adminService.findAllOrganizations(query)
   }
 
   @Get('overview')

@@ -10,6 +10,41 @@ export type TruncatedBody = {
   _topLevelKeys?: string[]
 }
 
+/**
+ * Query-string keys whose value must never reach a log line in either
+ * representation a request carries it in: the structured `req.query`
+ * object (redacted below via Pino's path-based `redact.paths`) and the
+ * raw `req.url` string (sanitized by `sanitizeRequestUrl`, since Pino's
+ * path redaction cannot reach into a substring of a single string field).
+ * Kept as one list so the two representations can't drift out of sync —
+ * fixing only one of them still leaks the value through the other.
+ */
+const SENSITIVE_QUERY_PARAMS = ['token', 'apiKey', 'search']
+
+/**
+ * Replaces the value of every {@link SENSITIVE_QUERY_PARAMS} key in a
+ * request's raw URL with a redaction marker, preserving the path and every
+ * other query key. Fails closed: an unparseable value never falls back to
+ * the original, possibly-sensitive string.
+ *
+ * `req.url` is a request-target (e.g. `/api/v1/admin/users?search=x`), not
+ * an absolute URL — `WHATWG URL` requires a base to parse one, hence the
+ * fixed dummy origin below; only `pathname`+`search` are ever read back out
+ * of it, so that origin never actually appears in the result.
+ */
+function sanitizeRequestUrl(url: unknown): string {
+  if (typeof url !== 'string' || url.length === 0) return '[REDACTED]'
+  try {
+    const parsed = new URL(url, 'http://sanitize.invalid')
+    for (const key of SENSITIVE_QUERY_PARAMS) {
+      if (parsed.searchParams.has(key)) parsed.searchParams.set(key, '[REDACTED]')
+    }
+    return `${parsed.pathname}${parsed.search}`
+  } catch {
+    return '[REDACTED]'
+  }
+}
+
 // Caps body payloads put into request logs. Small bodies pass through
 // unchanged so Pino's path-based redaction still resolves `req.body.password`
 // etc. Over-cap bodies collapse to a marker with size + top-level keys —
@@ -115,8 +150,7 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
           'req.body.apiKey.secret',
           'req.body.oauthAccount.accessToken',
           'req.body.oauthAccount.refreshToken',
-          'req.query.token',
-          'req.query.apiKey',
+          ...SENSITIVE_QUERY_PARAMS.map((key) => `req.query.${key}`),
           '*.token',
           '*.accessToken',
           '*.refreshToken',
@@ -200,7 +234,7 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
           return {
             id: req.id,
             method: req.method,
-            url: req.url,
+            url: sanitizeRequestUrl(req.url),
             query: req.query,
             params: req.params,
             headers: {

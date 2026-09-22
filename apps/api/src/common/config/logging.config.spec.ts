@@ -1,6 +1,9 @@
-import { RequestMethod } from '@nestjs/common'
+import { Controller, Get, type INestApplication, RequestMethod } from '@nestjs/common'
+import { Test } from '@nestjs/testing'
 import type { ClsService } from 'nestjs-cls'
+import { LoggerModule } from 'nestjs-pino'
 import { PassThrough } from 'stream'
+import request from 'supertest'
 
 import { createLoggingConfig, truncateBody } from './logging.config'
 
@@ -169,6 +172,183 @@ describe('createLoggingConfig', () => {
 
     expect(output).not.toContain('super-secret-hash')
     expect(output).toContain('[REDACTED]')
+  })
+
+  /**
+   * A search-term sentinel must appear NOWHERE in the serialized log
+   * line — neither in the structured `req.query.search` (path-redacted)
+   * nor in the raw `req.url` query string (a single-string field, which
+   * Pino's path redaction cannot reach into; this is what
+   * `sanitizeRequestUrl` fixes). Drives the *real* `req` serializer
+   * end to end, not just the redact-path config, so a fix that covers
+   * only one of the two representations still fails this test.
+   */
+  describe('search-term sentinel is absent from serialized log output', () => {
+    const SENTINEL = 'sentinel-search-alice@example.com'
+
+    function runReqSerializer(url: string, query: Record<string, string>) {
+      const config = createLoggingConfig(clsServiceMock, 4096)
+      const pinoHttp = config.pinoHttp as {
+        redact?: object
+        serializers?: { req?: (req: unknown) => unknown }
+      }
+      const stream = new PassThrough()
+      let output = ''
+      stream.on('data', (chunk) => {
+        output += chunk.toString()
+      })
+
+      const nestjsPinoPath = require.resolve('nestjs-pino')
+      const pinoPath = require.resolve('pino', { paths: [nestjsPinoPath] })
+      const pino = require(pinoPath) as (
+        options: object,
+        destination: NodeJS.WritableStream
+      ) => { info: (obj: object, msg: string) => void }
+
+      const logger = pino({ redact: pinoHttp.redact, serializers: pinoHttp.serializers }, stream)
+      const fakeReq = {
+        id: 'r1',
+        method: 'GET',
+        url,
+        query,
+        params: {},
+        headers: {},
+        body: undefined,
+        socket: {},
+      }
+      logger.info({ req: fakeReq }, 'request')
+      return output
+    }
+
+    it('redacts the sentinel from both req.query and the raw req.url', () => {
+      const output = runReqSerializer(
+        `/api/v1/admin/users?search=${encodeURIComponent(SENTINEL)}`,
+        {
+          search: SENTINEL,
+        }
+      )
+
+      // Checked in both forms — see the real-HTTP-cycle test below for why
+      // checking only the decoded SENTINEL is not sufficient on its own.
+      expect(output).not.toContain(SENTINEL)
+      expect(output).not.toContain(encodeURIComponent(SENTINEL))
+      expect(output).toContain('[REDACTED]')
+    })
+
+    /**
+     * The tests above drive the real `pino` redact/serializer pipeline, but
+     * with a hand-built `fakeReq` — they cannot prove the *real* Express
+     * request object `nestjs-pino`'s `pino-http` middleware constructs
+     * actually has the assumed `url`/`query` shape once it reaches
+     * `createLoggingConfig`'s serializer. This drives an actual HTTP request
+     * through a real `LoggerModule`-wired Nest app (same wiring
+     * `app-imports.ts` uses, minus the dev-only `pino-pretty` transport,
+     * which pipes through an async worker thread this test can't
+     * deterministically await — `stream` and `transport` are also mutually
+     * exclusive at the pino level).
+     */
+    it('redacts the sentinel through a real Nest HTTP request/response cycle', async () => {
+      @Controller()
+      class SentinelProbeController {
+        @Get('probe')
+        probe(): { ok: true } {
+          return { ok: true }
+        }
+      }
+
+      const config = createLoggingConfig(clsServiceMock, 4096)
+      const { transport: _devTransport, ...pinoHttpWithoutTransport } = config.pinoHttp as Record<
+        string,
+        unknown
+      >
+      const stream = new PassThrough()
+      let output = ''
+      stream.on('data', (chunk) => {
+        output += chunk.toString()
+      })
+
+      const moduleRef = await Test.createTestingModule({
+        imports: [LoggerModule.forRoot({ pinoHttp: { ...pinoHttpWithoutTransport, stream } })],
+        controllers: [SentinelProbeController],
+      }).compile()
+
+      const app: INestApplication = moduleRef.createNestApplication()
+      await app.init()
+
+      try {
+        await request(app.getHttpServer())
+          .get(`/probe?search=${encodeURIComponent(SENTINEL)}&page=2`)
+          .expect(200)
+      } finally {
+        await app.close()
+      }
+
+      // Two checks, not one: `req.query.search` is redacted separately from
+      // `req.url`, and `req.url` carries the term percent-encoded (`@` ->
+      // `%40`), not the literal decoded string — checking only the decoded
+      // form would pass even with `url` sanitization completely broken,
+      // since the query-object redaction alone already hides the decoded
+      // form. Verified by deliberately reverting the `url` fix locally: with
+      // only `expect(output).not.toContain(SENTINEL)`, this test still
+      // passed, because the leak was there in percent-encoded form only.
+      expect(output).not.toContain(SENTINEL)
+      expect(output).not.toContain(encodeURIComponent(SENTINEL))
+      expect(output).toContain('[REDACTED]')
+      expect(output).toContain('page=2')
+    })
+
+    it('preserves the path and non-sensitive query keys in the sanitized url', () => {
+      const output = runReqSerializer(
+        `/api/v1/admin/users?search=${encodeURIComponent(SENTINEL)}&page=2&sortBy=name`,
+        { search: SENTINEL, page: '2', sortBy: 'name' }
+      )
+      const parsed = JSON.parse(output) as { req: { url: string } }
+
+      expect(parsed.req.url).toContain('/api/v1/admin/users')
+      expect(parsed.req.url).toContain('page=2')
+      expect(parsed.req.url).toContain('sortBy=name')
+      expect(parsed.req.url).not.toContain(SENTINEL)
+      expect(parsed.req.url).not.toContain(encodeURIComponent(SENTINEL))
+      expect(parsed.req.url).toBe('/api/v1/admin/users?search=%5BREDACTED%5D&page=2&sortBy=name')
+    })
+
+    it('leaves a url with no sensitive query key unchanged', () => {
+      const config = createLoggingConfig(clsServiceMock, 4096)
+      const pinoHttp = config.pinoHttp as {
+        serializers?: { req?: (req: unknown) => unknown }
+      }
+      const reqSerializer = pinoHttp.serializers?.req
+      const result = reqSerializer?.({
+        id: 'r1',
+        method: 'GET',
+        url: '/api/v1/admin/organizations?page=1',
+        query: { page: '1' },
+        params: {},
+        headers: {},
+        socket: {},
+      }) as { url: string }
+
+      expect(result.url).toBe('/api/v1/admin/organizations?page=1')
+    })
+
+    it('fails closed to a redaction marker on a malformed url, never the original', () => {
+      const config = createLoggingConfig(clsServiceMock, 4096)
+      const pinoHttp = config.pinoHttp as {
+        serializers?: { req?: (req: unknown) => unknown }
+      }
+      const reqSerializer = pinoHttp.serializers?.req
+      const result = reqSerializer?.({
+        id: 'r1',
+        method: 'GET',
+        url: undefined,
+        query: {},
+        params: {},
+        headers: {},
+        socket: {},
+      }) as { url: string }
+
+      expect(result.url).toBe('[REDACTED]')
+    })
   })
 
   describe('truncateBody', () => {

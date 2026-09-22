@@ -101,6 +101,47 @@ preserve assets/API/CSP paths, and map only public console pages and API paths.
 See the authoritative [proxy and TLS mapping
 tables](../operations/deployment.md#operations-console-host-mode-reference).
 
+## Database prerequisite: `pg_trgm` (Users/Organizations search)
+
+The Users and Organizations panels' search (ADR-082) is backed by
+PostgreSQL's `pg_trgm` extension. The console's own migration installs it
+(`CREATE EXTENSION IF NOT EXISTS pg_trgm`) — it is a PG13+ _trusted_
+extension, installable by any role with `CREATE` on the target database,
+no superuser grant required, and ships in the stock `postgres` Docker
+image this project runs by default. If you follow [Production Database
+Role Separation](../operations/database-role-separation.md), this means
+the migration-only `amcore_migrator` role can install it; the runtime
+`amcore_runtime` role neither installs nor owns it and only ever queries
+through the resulting indexes.
+
+If you deploy against a managed Postgres provider, confirm it specifically
+allows `pg_trgm` **before** running migrations against it — it is a
+commonly allowlisted contrib extension, but "commonly" is not a
+guarantee for your specific provider and plan tier. A provider that
+disallows it must fail the migration visibly; there is no supported
+fallback that silently serves search without the index it depends on.
+
+## Search terms in logs and browser history
+
+A search term typed into the Users or Organizations panel is not treated
+as a secret, but it is real operator input (an email address, a name) and
+appears in more places than the panel itself:
+
+- **The browser address bar and history**, on whichever machine the
+  operator is using — search state lives in the URL by design (so a
+  console view can be reloaded, bookmarked, or shared). Avoid pasting a
+  console search URL into a chat or ticket if that matters for your
+  deployment.
+- **This API's own structured access logs** are redacted — a search term
+  is stripped from both the request's query object and its raw URL before
+  a line is ever written.
+- **A reverse-proxy access log** (Caddy, nginx, or any edge proxy in
+  front of either topology — **path mode and host mode alike**) is
+  outside this application's runtime and is not redacted by the shipped
+  reference configs. If your deployment retains proxy access logs and
+  that matters for your privacy posture, configure your proxy's own log
+  format to omit or truncate query strings for console routes.
+
 ## Troubleshooting
 
 - Startup fails in host mode: confirm the generated mode is `host` and

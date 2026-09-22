@@ -112,6 +112,39 @@ model User {
   aiConversations         AiConversation[]
   aiApprovalsDecided      AiApproval[]
 
+  // Admin discovery (Operations Console search/sort). Composite indexes
+  // serve `ORDER BY <field>, id` for each allowlisted sort field with a
+  // deterministic id tie-break in the same direction as the primary sort
+  // (see `AdminService.resolveUserOrderBy`) — mirrors the existing
+  // `AuditLog`'s `@@index([createdAt, id])` idiom in this schema. The GIN
+  // trigram indexes back the `pg_trgm`-backed literal-contains search over
+  // `name`/`email` (`AdminService.buildUserSearchWhere`); `pg_trgm` itself
+  // is installed by a migration, not by this schema file.
+  //
+  // `lastLoginAt`'s default sort is `DESC NULLS LAST`
+  // (`AdminService.resolveUserOrderBy`). This schema declaration
+  // (`sort: Desc`) exists so Prisma's own migration-history drift
+  // detection recognizes the index the migration actually creates —
+  // omitting it entirely made Prisma consider the index unowned and
+  // propose dropping it on the next `migrate dev`/`migrate diff` (verified
+  // empirically). It does **not** control NULLS placement: Prisma's schema
+  // DSL has no `nulls:` index modifier that survives to the generated SQL
+  // (a `nulls:` field-index argument parses without error but is silently
+  // dropped — verified empirically, not assumed). The actual
+  // `DESC NULLS LAST` clause is hand-written raw SQL in the migration file
+  // itself, matching this declaration's column list/sort direction exactly
+  // so `prisma migrate diff` reports no drift (also verified empirically:
+  // an empty diff after this exact pairing). A plain ascending index would
+  // only give `DESC NULLS FIRST` on a backward scan — EXPLAIN showed the
+  // planner correctly refusing to use it at all for the real default query,
+  // falling back to a full Seq Scan + Sort.
+  @@index([name, id])
+  @@index([email, id])
+  @@index([lastLoginAt(sort: Desc), id(sort: Desc)])
+  @@index([createdAt, id])
+  @@index([updatedAt, id])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([email(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("users")
   @@schema("core")
 }
@@ -268,6 +301,20 @@ model Organization {
   notifications   Notification[]
   aiConversations AiConversation[]
 
+  // Admin discovery — same contract as `User` above. `slug` still needs its
+  // own trigram index for the contains *search* (the existing unique B-tree
+  // on `slug` alone cannot serve `ILIKE '%term%'`), but deliberately gets NO
+  // extra `(slug, id)` composite: `slug` is `@unique`, so no two rows can
+  // ever tie on it, which makes an `id` tie-breaker structurally impossible
+  // to need. Verified empirically (`EXPLAIN`): the existing unique index
+  // alone already serves `ORDER BY slug, id` in both directions via a cheap
+  // Incremental Sort with one presorted group — adding the composite index
+  // was pure write-overhead with no read benefit.
+  @@index([name, id])
+  @@index([createdAt, id])
+  @@index([updatedAt, id])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([slug(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("organizations")
   @@schema("core")
 }
