@@ -71,35 +71,80 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
 3. Add thin route plumbing and `_pages/console` composition, using the existing
    shell and semantic tokens.
 4. Add copy for every retained locale and progress-aware public navigation.
-5. Choose the transport deliberately: a **read-only page with no client-side
-   interactivity** (e.g. Organizations, Overview) can fetch straight from its Server
+5. Choose the transport deliberately. The line that matters is not "does this
+   page have any `'use client'` component" — Overview's refresh button and
+   Users/Organizations' search input both do — it's **does a browser ever
+   initiate its own API call**. A page can fetch straight from its Server
    Component via `shared/api/server`'s `fetchBackend()`, passing a
    console-aware `tokenResolver` (`shared/api/console/access-token.ts`'s
-   `getConsoleAwareAccessToken`) instead of the product-session default —
-   every protected page must render through `ConsolePageFrame`, because a
-   persisted App Router layout is not a sufficient re-check on sibling
-   navigation and must not retain chrome after denied/unavailable admission.
-   The frame remounts the shell after an admitted sibling navigation, so it
-   must also read the existing non-sensitive `sidebar_state` preference and
-   pass it to `ConsoleShell`; this preserves the operator's collapsed/expanded
-   choice without ever participating in admission. Pass the frame a
-   page-specific skeleton that mirrors the final page's
-   desktop and narrow-screen layout. Do not add a protected-route
-   `loading.tsx`: it resolves outside the frame and can replace the shell
-   before admission. No separate Route Handler is needed. A panel with any
+   `getConsoleAwareAccessToken`) instead of the product-session default, and
+   still have a client component in it — as long as that client component's
+   only job is to change the page's own URL (a router refresh, a debounced
+   search box, a sort-header link) and let the existing Server Component
+   re-fetch on the resulting navigation. No separate Route Handler is needed
+   for that case, Organizations and Overview included. Every protected page
+   must render through `ConsolePageFrame`, because a persisted App Router
+   layout is not a sufficient re-check on sibling navigation and must not
+   retain chrome after denied/unavailable admission. The frame remounts the
+   shell after an admitted sibling navigation, so it must also read the
+   existing non-sensitive `sidebar_state` preference and pass it to
+   `ConsoleShell`; this preserves the operator's collapsed/expanded choice
+   without ever participating in admission. Pass the frame a page-specific
+   skeleton that mirrors the final page's desktop and narrow-screen layout —
+   **and keep it that way**: a skeleton is written once against the page as
+   it looks that day, and every later PR that changes the page's visible
+   structure (a new control, a changed column set, a reflowed header) must
+   update the skeleton in the same PR, or it silently drifts into a shape
+   the real page no longer has. Do not add a protected-route `loading.tsx`:
+   it resolves outside the frame and can replace the shell before admission.
+   Only the part of the page that actually depends on the backend fetch
+   should sit behind a `<Suspense>` at all — static chrome (a heading, a
+   search box that only reads already-parsed `searchParams` props) belongs
+   outside it, rendered by the page immediately. Users is the worked
+   example: `UsersPage` renders its `<h1>` and `SearchInput` directly, then
+   wraps only `UsersResults` (the component that calls `fetchConsoleUsers`)
+   in its own `<Suspense fallback={<UsersResultsSkeleton />}>` — nested
+   inside `UsersPageSkeleton`, which composes a heading/search placeholder
+   with that same `UsersResultsSkeleton` for `ConsolePageFrame`'s own outer
+   fallback (the cold/first-load case). Gating static chrome behind the
+   fetch instead, as a single async component that awaits before rendering
+   anything, means the heading and search box unmount and remount — losing
+   the search box's own in-progress typed value — on every search/sort/page
+   navigation, not just on first load; Organizations and Overview should
+   move to this same shape when next touched (not a requirement to do so
+   opportunistically outside their own PRs). A panel with any genuinely
    **browser-initiated** call (a mutation, a client-side poll, anything a
-   `'use client'` component triggers after load) still needs its own handler
-   under `app/api/console/**`, applying `withConsoleHostGuard()` explicitly,
-   since that guard is a per-route-handler concern, not inherited from the
-   page layout. Either way, independently authorize the corresponding backend
-   endpoint — the admission frame mounts chrome, never grants data access. A
-   mutation reuses the session/origin/token-containment seam described above
-   under "Ownership and security boundaries" rather than a new one-off proxy.
-6. Use the existing graceful-degradation primitives for secondary data. Keep
+   `'use client'` component fetches on its own after load, as opposed to
+   just navigating) still needs its own handler under `app/api/console/**`,
+   applying `withConsoleHostGuard()` explicitly, since that guard is a
+   per-route-handler concern, not inherited from the page layout. Either way,
+   independently authorize the corresponding backend endpoint — the
+   admission frame mounts chrome, never grants data access. A mutation
+   reuses the session/origin/token-containment seam described above under
+   "Ownership and security boundaries" rather than a new one-off proxy.
+6. **Reuse `features/console-discovery` for search/sort, don't reimplement
+   it per panel.** Users (and Organizations, mirroring it) already solved
+   debounced live search, sortable column headers, and canonical
+   `?search=&sortBy=&sortOrder=` URL-building as a console-scoped
+   `features/console-discovery` slice — the same shape as the
+   `features/console-login`/`console-logout` precedent (`ui/` + `model/` +
+   a thin `index.ts` public API), not `shared` (not app-wide) and not
+   `_pages/console` (composition only, per this file's ownership rules
+   above). A future panel that lists, searches, or sorts anything (a queue,
+   an audit log, sessions, or any other tabular data) imports the
+   query-string builder, `SortableColumnHead`, and
+   `SearchInput` from there instead of rebuilding the same debounce/URL
+   plumbing again. Two UI details that look optional but were caught by
+   review and are not: every sortable-but-inactive header shows a neutral
+   sort icon (not just the active column), and a search field's custom
+   clear button uses `type="text"` (never `type="search"`, whose native
+   browser clear button would sit beside a custom one) and refocuses the
+   input after clearing.
+7. Use the existing graceful-degradation primitives for secondary data. Keep
    primary failures explicit and fail privileged actions closed.
-7. Add focused unit tests, Storybook/a11y states where applicable, and
+8. Add focused unit tests, Storybook/a11y states where applicable, and
    browser/real-stack coverage for auth, cookies, Redis, or proxy behavior.
-8. Update the plain-language `SUPER_ADMIN` documentation in the same PR:
+9. Update the plain-language `SUPER_ADMIN` documentation in the same PR:
    purpose, statuses, actions, dangerous operations, and degraded/error states.
 
 Do not describe the panel as available until its implementation and user

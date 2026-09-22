@@ -24,14 +24,24 @@ const messages = {
   console: {
     usersEmptyTitle: 'No users yet',
     usersEmptyDescription: 'Users appear here.',
+    usersNoSearchResultsTitle: 'No matching users',
+    usersNoSearchResultsDescription: 'Try a different term.',
     usersPageOutOfRangeTitle: 'This page is unavailable',
     usersPageOutOfRangeDescription: 'Choose a page.',
     usersPageOutOfRangeAction: 'Go to first page',
   },
 }
 
-async function renderInventory(response: Parameters<typeof UsersInventory>[0]['response']) {
-  const inventory = await UsersInventory({ response })
+async function renderInventory(
+  response: Parameters<typeof UsersInventory>[0]['response'],
+  overrides: Partial<Parameters<typeof UsersInventory>[0]> = {}
+) {
+  const inventory = await UsersInventory({
+    response,
+    baseHref: '/en/admin/users',
+    sortBy: 'createdAt',
+    ...overrides,
+  })
   return render(
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       {inventory}
@@ -40,9 +50,16 @@ async function renderInventory(response: Parameters<typeof UsersInventory>[0]['r
 }
 
 describe('UsersInventory', () => {
-  it('shows an empty system only when total is zero', async () => {
+  it('shows the genuinely-empty state when total is zero and no search is active', async () => {
     await renderInventory({ data: [], total: 0, page: 1, limit: 20 })
     expect(screen.getByText('No users yet')).toBeInTheDocument()
+    expect(screen.queryByText('No matching users')).not.toBeInTheDocument()
+  })
+
+  it('shows the no-results-for-search state when total is zero and a search is active', async () => {
+    await renderInventory({ data: [], total: 0, page: 1, limit: 20 }, { search: 'nonexistent' })
+    expect(screen.getByText('No matching users')).toBeInTheDocument()
+    expect(screen.queryByText('No users yet')).not.toBeInTheDocument()
   })
 
   it('shows an out-of-range state when users exist on earlier pages', async () => {

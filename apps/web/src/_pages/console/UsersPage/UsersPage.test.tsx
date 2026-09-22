@@ -1,57 +1,42 @@
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
 import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
-vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/admin/users' }))
-
-import { fetchConsoleUsers } from '@/shared/api/console/users'
+vi.mock('@/i18n/navigation', () => ({
+  Link: ({ href, children }: { href: string; children: ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+  usePathname: () => '/admin/users',
+}))
+vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
+  useRouteProgressRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+}))
+// `UsersResults` (the part that actually fetches) has its own dedicated
+// test file. Stubbed here as a synchronous spy so this file only exercises
+// what `UsersPage` itself renders directly — the heading and search box —
+// and what props it hands down, without touching the network or hitting
+// this harness's "async Server Component" rendering limitation (see
+// `UsersResults.test.tsx`'s own note on that).
+const usersResultsSpy = vi.fn((_props: unknown) => <div data-testid="results" />)
+vi.mock('./UsersResults', () => ({ UsersResults: (props: unknown) => usersResultsSpy(props) }))
+vi.mock('next-intl/server', () => ({
+  getTranslations: vi
+    .fn()
+    .mockResolvedValue((key: string) => (consoleMessages as Record<string, string>)[key] ?? key),
+}))
 
 import { UsersPage } from './UsersPage'
 
-vi.mock('@/shared/api/console/users', () => ({ fetchConsoleUsers: vi.fn() }))
-vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
-  useRouteProgressRouter: () => ({ refresh: vi.fn() }),
-}))
-vi.mock('next-intl/server', () => ({
-  getFormatter: vi.fn().mockResolvedValue({ dateTime: () => 'Sep 21, 2026, 10:00 AM' }),
-  getTranslations: vi.fn().mockResolvedValue((key: string, values?: Record<string, number>) => {
-    if (key === 'usersTotal') return `${values?.total} users`
-    return (consoleMessages as Record<string, string>)[key] ?? key
-  }),
-}))
-
 const consoleMessages = {
   users: 'Users',
-  usersEmptyTitle: 'No users yet',
-  usersEmptyDescription: 'Platform users will appear here once they exist.',
-  usersColumnUser: 'User',
-  usersColumnVerification: 'Verification',
-  usersColumnRole: 'System role',
-  usersColumnLastLogin: 'Last sign-in',
-  usersColumnCreated: 'Created',
-  usersColumnUpdated: 'Updated',
-  usersEmailVerified: 'Verified',
-  usersEmailUnverified: 'Unverified',
-  usersRoleUser: 'User',
-  superAdminRole: 'Super admin',
-  usersNeverSignedIn: 'Never',
-  usersPageOutOfRangeTitle: 'This page is unavailable',
-  usersPageOutOfRangeDescription: 'Choose a page between 1 and 2.',
-  usersPageOutOfRangeAction: 'Go to first page',
-  paginationPrevious: 'Previous',
-  paginationNext: 'Next',
-  paginationStatus: 'Page 1 of 1',
+  usersSearchLabel: 'Search users',
+  usersSearchPlaceholder: 'Search by name or email',
+  usersSearchClear: 'Clear search',
 }
-const messages = {
-  console: consoleMessages,
-  common: {
-    temporarilyUnavailable: 'This is temporarily unavailable. Please try again.',
-    retry: 'Retry',
-  },
-}
+const messages = { console: consoleMessages }
 
 function renderPage(page: ReactElement) {
   return render(
@@ -66,14 +51,40 @@ beforeEach(() => {
 })
 
 describe('UsersPage', () => {
-  it('keeps a transport failure distinct from an empty inventory', async () => {
-    vi.mocked(fetchConsoleUsers).mockResolvedValue({ status: 'unavailable', reason: 'timeout' })
-
+  it('renders the heading and search box immediately — neither depends on the backend fetch', async () => {
     renderPage(await UsersPage({ page: 1, limit: 20 }))
 
-    expect(
-      screen.getByText('This is temporarily unavailable. Please try again.')
-    ).toBeInTheDocument()
-    expect(screen.queryByText('No users yet')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Users' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Search users')).toBeInTheDocument()
+  })
+
+  it('gives the search box the current search value as its default', async () => {
+    renderPage(await UsersPage({ page: 1, limit: 20, search: 'alice' }))
+
+    expect(screen.getByLabelText('Search users')).toHaveValue('alice')
+  })
+
+  it('forwards page/limit/search/sortBy/sortOrder to UsersResults, defaulting sortBy to createdAt', async () => {
+    renderPage(await UsersPage({ page: 1, limit: 20 }))
+
+    expect(usersResultsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 1,
+        limit: 20,
+        search: undefined,
+        sortBy: 'createdAt',
+        sortOrder: undefined,
+      })
+    )
+  })
+
+  it('forwards an explicit search/sortBy/sortOrder unchanged', async () => {
+    renderPage(
+      await UsersPage({ page: 1, limit: 20, search: 'alice', sortBy: 'name', sortOrder: 'desc' })
+    )
+
+    expect(usersResultsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ search: 'alice', sortBy: 'name', sortOrder: 'desc' })
+    )
   })
 })
