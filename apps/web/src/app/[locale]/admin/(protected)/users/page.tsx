@@ -1,8 +1,14 @@
 import { PAGINATION } from '@amcore/shared'
 
-import { ConsolePageFrame, UsersPage, UsersPageSkeleton } from '@/_pages/console'
-
-import { parsePage, parseSearch, parseSortBy, parseSortOrder } from './parse-query'
+import {
+  ConsolePageFrame,
+  parsePage,
+  parseSearch,
+  parseSortBy,
+  parseSortOrder,
+  UsersPage,
+  UsersPageSkeleton,
+} from '@/_pages/console'
 
 interface UsersRouteProps {
   searchParams: Promise<{

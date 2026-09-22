@@ -8,9 +8,9 @@ import {
   toggleSortOrder,
 } from '@/features/console-discovery'
 import { getConsoleAwareUser } from '@/shared/api/console/access-token'
-import type { UsersSortableField } from '@/shared/lib/users-sortable-fields'
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 
+import type { UsersSortableField } from './parse-query'
 import { UserRow } from './UserRow'
 
 const MONO = 'font-console-mono'

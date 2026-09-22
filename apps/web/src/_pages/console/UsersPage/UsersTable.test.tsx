@@ -28,8 +28,7 @@ vi.mock('next-intl/server', () => ({
   }),
 }))
 
-import { USERS_SORTABLE_FIELDS } from '@/shared/lib/users-sortable-fields'
-
+import { USERS_SORTABLE_FIELDS } from './parse-query'
 import { UsersTable, type UsersTableProps } from './UsersTable'
 
 const consoleMessages = {

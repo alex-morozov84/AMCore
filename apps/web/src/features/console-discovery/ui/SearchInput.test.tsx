@@ -224,6 +224,48 @@ describe('SearchInput', () => {
     })
   })
 
+  it('preserves a newer draft even when TWO of its own navigations are outstanding at once', () => {
+    // Distinct from the test above: there, "ab"'s own navigation had not
+    // been initiated yet when "a"'s stale response arrived. Here, both "a"
+    // and "ab" have already been sent to the router (both debounces fired)
+    // before either response commits — only recognizing the *latest*
+    // self-navigated value, not every outstanding one, was a real gap an
+    // earlier version of this fix had.
+    const { rerender } = renderInput({ defaultValue: '' })
+    const input = screen.getByLabelText('Search users')
+
+    fireEvent.change(input, { target: { value: 'a' } })
+    advance(300)
+    expect(replaceMock).toHaveBeenCalledWith('/en/admin/users?search=a&sortBy=createdAt', {
+      scroll: false,
+    })
+
+    fireEvent.change(input, { target: { value: 'ab' } })
+    advance(300)
+    expect(replaceMock).toHaveBeenCalledWith('/en/admin/users?search=ab&sortBy=createdAt', {
+      scroll: false,
+    })
+
+    // "a"'s response finally commits — arriving *after* "ab" was already
+    // sent, not before.
+    rerender(
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
+        <SearchInput
+          baseHref="/en/admin/users"
+          defaultValue="a"
+          sortBy="createdAt"
+          label="Search users"
+          placeholder="Search by name or email"
+          clearLabel="Clear search"
+          inputId="users-search"
+        />
+      </NextIntlClientProvider>
+    )
+    expect(input).toHaveValue('ab')
+    // The stale echo must not trigger a third, redundant navigation either.
+    expect(replaceMock).toHaveBeenCalledTimes(2)
+  })
+
   it('still resyncs to a genuinely external value even when a self-navigation is also pending', () => {
     const { rerender } = renderInput({ defaultValue: 'alice' })
     const input = screen.getByLabelText('Search users')

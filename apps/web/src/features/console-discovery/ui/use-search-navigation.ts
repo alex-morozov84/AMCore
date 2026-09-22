@@ -35,7 +35,21 @@ export function useSearchNavigation({
   const [value, setValue] = useState(defaultValue)
   const [syncedValue, setSyncedValue] = useState(defaultValue)
   const debounced = useDebouncedValue(value, DEBOUNCE_MS)
-  const lastNavigated = useRef(defaultValue)
+  // The dedup baseline for `navigate()`'s "don't re-issue an identical
+  // `replace()`" check. Plain `useState`, not a ref: it must be updated
+  // during the same render-time branch as the resync logic below (only for
+  // a *genuinely external* change), which refs cannot safely do — React
+  // only allows mutating `.current` from an effect or event handler, never
+  // from the render body itself.
+  const [lastNavigated, setLastNavigated] = useState(defaultValue)
+  // Every value this component has itself asked the router to navigate to
+  // and has not yet seen echoed back via `defaultValue`. A *value* Set, not
+  // a single "most recent" value: two navigations can be outstanding at
+  // once (type `a`, then `ab` before `a`'s response commits), and the
+  // older one's eventual echo must still be recognized as self-initiated,
+  // not mistaken for an external change — recognizing only the latest was
+  // an exact gap an earlier version of this fix had (found in review).
+  const pendingSelfValues = useRef<Set<string>>(new Set([defaultValue]))
 
   // The canonical URL changed from outside this component (Back/Forward, an
   // out-of-range recovery link, a sort-header click that also carries the
@@ -45,32 +59,29 @@ export function useSearchNavigation({
   // render pass — react-hooks/set-state-in-effect).
   //
   // Critically, this must NOT fire merely because `defaultValue` caught up
-  // with this component's *own* last `navigate()` call (the RSC response
-  // for an earlier keystroke committing) — otherwise a newer draft typed
-  // while that navigation was still in flight gets silently erased by the
-  // now-stale value it superseded. `lastNavigated` distinguishes the two:
-  // it already equals `defaultValue` when this is just that self-initiated
-  // navigation catching up.
+  // with one of this component's *own* prior `navigate()` calls (an RSC
+  // response committing) — otherwise a newer draft typed while that
+  // navigation was still in flight gets silently erased by the now-stale
+  // value it superseded. `pendingSelfValues` distinguishes the two: a
+  // self-initiated echo is removed from the set (consumed) without
+  // touching `value`/`lastNavigated`; a genuinely external change resyncs
+  // both.
   if (defaultValue !== syncedValue) {
     setSyncedValue(defaultValue)
-    if (defaultValue !== lastNavigated.current) {
+    if (pendingSelfValues.current.has(defaultValue)) {
+      pendingSelfValues.current.delete(defaultValue)
+    } else {
       setValue(defaultValue)
+      setLastNavigated(defaultValue)
     }
   }
-
-  // Refs may not be mutated during render (unlike the setState calls above,
-  // which React explicitly allows for this exact derived-from-props-reset
-  // pattern) — kept in its own effect, separate from the debounce-triggering
-  // one below, so it never calls setState itself.
-  useEffect(() => {
-    lastNavigated.current = defaultValue
-  }, [defaultValue])
 
   const navigate = useCallback(
     (next: string) => {
       const canonical = next.trim()
-      if (canonical === lastNavigated.current) return
-      lastNavigated.current = canonical
+      if (canonical === lastNavigated) return
+      setLastNavigated(canonical)
+      pendingSelfValues.current.add(canonical)
       router.replace(
         buildDiscoveryHref(baseHref, {
           search: canonical || undefined,
@@ -81,20 +92,20 @@ export function useSearchNavigation({
         { scroll: false }
       )
     },
-    [baseHref, sortBy, sortOrder, router]
+    [baseHref, sortBy, sortOrder, router, lastNavigated]
   )
 
   useEffect(() => {
     // No mount guard needed: on first render `debounced === defaultValue
-    // === lastNavigated.current`, so `navigate` itself already no-ops via
-    // the equality check above.
+    // === lastNavigated`, so `navigate` itself already no-ops via the
+    // equality check above.
     navigate(debounced)
-    // `navigate` intentionally excluded: it is re-created only when
-    // baseHref/sortBy/sortOrder change, and those changes come with their
-    // own navigation already — re-running this effect for that reason
-    // alone would fire a redundant duplicate navigate. (`react-hooks/
-    // exhaustive-deps` only lints `.tsx` files in this project's ESLint
-    // config, so no disable comment is needed in this plain `.ts` hook.)
+    // `navigate` intentionally excluded: besides `lastNavigated` (which
+    // changing alone must not re-fire this effect — only a new `debounced`
+    // value should), it is re-created only when baseHref/sortBy/sortOrder
+    // change, and those changes come with their own navigation already.
+    // (`react-hooks/exhaustive-deps` only lints `.tsx` files in this
+    // project's ESLint config, so no disable comment is needed here.)
   }, [debounced])
 
   return { value, setValue, navigateNow: navigate }
