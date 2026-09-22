@@ -40,13 +40,18 @@ export function toggleSortOrder(
   return effective === 'asc' ? 'desc' : 'asc'
 }
 
-/** The `aria-sort` value for `column`'s header, given the current sort state. */
+/**
+ * The `aria-sort` value for `column`'s header, given the current sort
+ * state — `undefined` (the attribute omitted entirely) for an inactive
+ * column, never the literal string `"none"`: only the currently-sorted
+ * header should carry `aria-sort` at all.
+ */
 export function ariaSortValue(
   column: string,
   current: Pick<DiscoveryQueryState, 'sortBy' | 'sortOrder'>,
   defaultOrderForColumn: DiscoverySortOrder
-): 'ascending' | 'descending' | 'none' {
-  if (column !== current.sortBy) return 'none'
+): 'ascending' | 'descending' | undefined {
+  if (column !== current.sortBy) return undefined
   const effective = current.sortOrder ?? defaultOrderForColumn
   return effective === 'asc' ? 'ascending' : 'descending'
 }

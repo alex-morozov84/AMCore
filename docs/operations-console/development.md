@@ -73,7 +73,7 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
 4. Add copy for every retained locale and progress-aware public navigation.
 5. Choose the transport deliberately. The line that matters is not "does this
    page have any `'use client'` component" — Overview's refresh button and
-   Users/Organizations' search input both do — it's **does a browser ever
+   Users' search input both do — it's **does a browser ever
    initiate its own API call**. A page can fetch straight from its Server
    Component via `shared/api/server`'s `fetchBackend()`, passing a
    console-aware `tokenResolver` (`shared/api/console/access-token.ts`'s
@@ -123,8 +123,8 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    reuses the session/origin/token-containment seam described above under
    "Ownership and security boundaries" rather than a new one-off proxy.
 6. **Reuse `features/console-discovery` for search/sort, don't reimplement
-   it per panel.** Users (and Organizations, mirroring it) already solved
-   debounced live search, sortable column headers, and canonical
+   it per panel.** Users already solved debounced live search, sortable
+   column headers, and canonical
    `?search=&sortBy=&sortOrder=` URL-building as a console-scoped
    `features/console-discovery` slice — the same shape as the
    `features/console-login`/`console-logout` precedent (`ui/` + `model/` +

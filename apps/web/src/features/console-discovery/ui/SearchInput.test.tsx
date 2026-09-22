@@ -183,4 +183,84 @@ describe('SearchInput', () => {
     advance(300)
     expect(replaceMock).not.toHaveBeenCalled()
   })
+
+  it('preserves a newer draft against its own earlier navigation committing, and still commits that draft', () => {
+    const { rerender } = renderInput({ defaultValue: '' })
+    const input = screen.getByLabelText('Search users')
+
+    fireEvent.change(input, { target: { value: 'a' } })
+    advance(300)
+    expect(replaceMock).toHaveBeenCalledWith('/en/admin/users?search=a&sortBy=createdAt', {
+      scroll: false,
+    })
+    replaceMock.mockClear()
+
+    // A newer draft, typed before the "a" navigation's RSC response commits.
+    fireEvent.change(input, { target: { value: 'ab' } })
+
+    // The stale response for "a" arrives and re-renders this component with
+    // its own last-navigated value — not a genuinely external change (e.g.
+    // Back/Forward) — so the newer "ab" draft must survive it.
+    rerender(
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
+        <SearchInput
+          baseHref="/en/admin/users"
+          defaultValue="a"
+          sortBy="createdAt"
+          label="Search users"
+          placeholder="Search by name or email"
+          clearLabel="Clear search"
+          inputId="users-search"
+        />
+      </NextIntlClientProvider>
+    )
+    expect(input).toHaveValue('ab')
+
+    // The later debounce for "ab" (started when it was typed) still commits
+    // — this isn't just a frozen, never-sent draft.
+    advance(300)
+    expect(replaceMock).toHaveBeenCalledWith('/en/admin/users?search=ab&sortBy=createdAt', {
+      scroll: false,
+    })
+  })
+
+  it('still resyncs to a genuinely external value even when a self-navigation is also pending', () => {
+    const { rerender } = renderInput({ defaultValue: 'alice' })
+    const input = screen.getByLabelText('Search users')
+    expect(input).toHaveValue('alice')
+
+    // An external change (e.g. Back/Forward) to a value this component
+    // never itself navigated to.
+    rerender(
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
+        <SearchInput
+          baseHref="/en/admin/users"
+          defaultValue="carol"
+          sortBy="createdAt"
+          label="Search users"
+          placeholder="Search by name or email"
+          clearLabel="Clear search"
+          inputId="users-search"
+        />
+      </NextIntlClientProvider>
+    )
+    expect(input).toHaveValue('carol')
+  })
+
+  it('trims the committed search so the URL never carries a non-canonical whitespace-only value', () => {
+    renderInput({ defaultValue: 'foo' })
+    const input = screen.getByLabelText('Search users')
+
+    fireEvent.change(input, { target: { value: '   ' } })
+    advance(300)
+
+    expect(replaceMock).toHaveBeenCalledWith('/en/admin/users?sortBy=createdAt', {
+      scroll: false,
+    })
+  })
+
+  it('caps the input at 255 characters, matching the backend schema', () => {
+    renderInput()
+    expect(screen.getByLabelText('Search users')).toHaveAttribute('maxlength', '255')
+  })
 })

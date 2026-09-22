@@ -1,18 +1,16 @@
 'use client'
 
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { type FormEvent, useRef } from 'react'
 import { Search, X } from 'lucide-react'
 
-import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
-import { useDebouncedValue } from '@/shared/lib/use-debounced-value'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 
-import { buildDiscoveryHref, type DiscoverySortOrder } from '../model/discovery-query'
+import type { DiscoverySortOrder } from '../model/discovery-query'
 
-const DEBOUNCE_MS = 300
+import { useSearchNavigation } from './use-search-navigation'
 
 export interface SearchInputProps {
   /** The panel's own locale-aware path, e.g. `getConsoleUsersHref()`. */
@@ -30,15 +28,15 @@ export interface SearchInputProps {
 }
 
 /**
- * The panel's one client island. Debounces typing, then navigates via
- * `useRouteProgressRouter().replace()` — never a raw router call, which the
- * repository's own lint rule already forbids outside that hook. No
- * `useSearchParams()` call here (state comes from props, already parsed
+ * The panel's one client island — the debounce/navigation state machine
+ * lives in `useSearchNavigation`; this stays a thin, presentational form.
+ * No `useSearchParams()` call here (state comes from props, already parsed
  * server-side), so no `<Suspense>` boundary is required for this component.
  *
- * `replace`, not `push`: an intermediate keystroke should not create a
- * history entry — only a value the operator actually pauses/submits on is
- * worth a Back-button stop.
+ * Navigation uses `router.replace()`, not `push()` (see the hook): an
+ * intermediate keystroke never adds a history entry — see
+ * `docs/operations-console/README.md` for exactly what that does and does
+ * not guarantee about the Back button.
  */
 export function SearchInput({
   baseHref,
@@ -51,64 +49,22 @@ export function SearchInput({
   inputId,
   className,
 }: SearchInputProps) {
-  const router = useRouteProgressRouter()
-  const [value, setValue] = useState(defaultValue)
-  const [syncedValue, setSyncedValue] = useState(defaultValue)
-  const debounced = useDebouncedValue(value, DEBOUNCE_MS)
-  const lastNavigated = useRef(defaultValue)
+  const { value, setValue, navigateNow } = useSearchNavigation({
+    baseHref,
+    defaultValue,
+    sortBy,
+    sortOrder,
+  })
   const inputRef = useRef<HTMLInputElement>(null)
-
-  // The canonical URL changed from outside this component (Back/Forward,
-  // an out-of-range recovery link, a sort-header click that also carries
-  // the current search forward) — resync the local draft to it. Adjusted
-  // during render, the React-documented way to reset state in response to
-  // a prop change, not inside an effect (which would cause an extra,
-  // avoidable render pass — react-hooks/set-state-in-effect).
-  if (defaultValue !== syncedValue) {
-    setSyncedValue(defaultValue)
-    setValue(defaultValue)
-  }
-
-  // Refs may not be mutated during render (unlike the setState calls
-  // above, which React explicitly allows for this exact derived-from-
-  // props-reset pattern) — kept in its own effect, separate from the
-  // debounce-triggering one below, so it never calls setState itself.
-  useEffect(() => {
-    lastNavigated.current = defaultValue
-  }, [defaultValue])
-
-  const navigate = useCallback(
-    (next: string) => {
-      if (next === lastNavigated.current) return
-      lastNavigated.current = next
-      router.replace(
-        buildDiscoveryHref(baseHref, { search: next || undefined, sortBy, sortOrder, page: 1 }),
-        { scroll: false }
-      )
-    },
-    [baseHref, sortBy, sortOrder, router]
-  )
-
-  useEffect(() => {
-    // No mount guard needed: on first render `debounced === defaultValue
-    // === lastNavigated.current`, so `navigate` itself already no-ops via
-    // the equality check above.
-    navigate(debounced)
-    // `navigate` intentionally excluded: it is re-created only when
-    // baseHref/sortBy/sortOrder change, and those changes come with their
-    // own navigation already — re-running this effect for that reason
-    // alone would fire a redundant duplicate navigate.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debounced])
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    navigate(value)
+    navigateNow(value)
   }
 
   function handleClear() {
     setValue('')
-    navigate('')
+    navigateNow('')
     // The button itself unmounts once `value` clears — without this, focus
     // would fall back to the document instead of staying in the field the
     // operator was just typing into.
@@ -144,6 +100,11 @@ export function SearchInput({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           placeholder={placeholder}
+          // Matches the backend's own `z.string().max(255)`
+          // (`packages/shared/src/schemas/admin.ts`) — capped at the source
+          // so a pasted overlong string can never silently become "no
+          // filter" once normalized server-side.
+          maxLength={255}
           className="pr-8 pl-8"
           autoComplete="off"
         />

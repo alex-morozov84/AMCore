@@ -69,9 +69,11 @@ Both search and sort state live in the page URL (`?search=...&sortBy=...
 sharing the link with another operator. Clicking a sort header or a
 pagination link, like before, adds a Back/Forward stop. Live search typing
 does not — each keystroke's pause updates the current URL in place, the same
-way a browser omnibox autocomplete does, so Back from a search never lands on
-an intermediate, half-typed query; it goes to whatever page was open before
-the search began.
+way a browser omnibox autocomplete does, so live search itself never adds a
+history entry, and Back always goes to whichever entry preceded the one that
+search updated (not necessarily "before the search began" — if the operator
+had already followed a sort or pagination link, Back goes to that entry, not
+past it).
 
 **Changing a user's system role.** Every row except the signed-in operator's
 own offers a menu action to promote a `USER` to `SUPER_ADMIN` or demote a

@@ -59,7 +59,7 @@ export function SortableColumnHead({
       >
         <span aria-hidden="true" className="inline-flex items-center gap-1">
           {visibleLabel}
-          {ariaSort === 'none' ? (
+          {ariaSort === undefined ? (
             // Sortable-but-inactive columns still need a persistent
             // affordance — otherwise nothing on screen distinguishes a
             // sortable header from a plain one until it's clicked. Muted so

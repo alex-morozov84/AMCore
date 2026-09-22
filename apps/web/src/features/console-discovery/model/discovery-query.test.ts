@@ -76,8 +76,8 @@ describe('toggleSortOrder', () => {
 })
 
 describe('ariaSortValue', () => {
-  it('is "none" for a column that is not the active sort', () => {
-    expect(ariaSortValue('name', { sortBy: 'createdAt' }, 'asc')).toBe('none')
+  it('is undefined (attribute omitted) for a column that is not the active sort', () => {
+    expect(ariaSortValue('name', { sortBy: 'createdAt' }, 'asc')).toBeUndefined()
   })
 
   it("reflects the column's default direction when active with no explicit sortOrder", () => {

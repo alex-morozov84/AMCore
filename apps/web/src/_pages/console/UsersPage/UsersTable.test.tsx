@@ -28,6 +28,8 @@ vi.mock('next-intl/server', () => ({
   }),
 }))
 
+import { USERS_SORTABLE_FIELDS } from '@/shared/lib/users-sortable-fields'
+
 import { UsersTable, type UsersTableProps } from './UsersTable'
 
 const consoleMessages = {
@@ -89,7 +91,8 @@ describe('UsersTable', () => {
     await renderTable({ sortBy: 'createdAt', sortOrder: 'desc' })
 
     const nameHeader = screen.getByRole('columnheader', { name: 'Sort by User, ascending' })
-    expect(nameHeader).toHaveAttribute('aria-sort', 'none')
+    // Only the currently-sorted header carries `aria-sort` at all.
+    expect(nameHeader).not.toHaveAttribute('aria-sort')
     // An inactive sortable column must still show *some* icon — otherwise
     // nothing on screen distinguishes it from a plain, non-sortable header
     // until it's clicked.
@@ -111,5 +114,19 @@ describe('UsersTable', () => {
       'href',
       '/en/admin/users?search=alice&sortBy=lastLoginAt&sortOrder=desc'
     )
+  })
+
+  it('renders exactly one sortable header per USERS_SORTABLE_FIELDS entry — no more, no fewer', async () => {
+    // Mechanical enforcement that the rendered headers and the route's
+    // `sortBy` allowlist can never silently drift apart (the class of bug
+    // that let a bookmarked `?sortBy=email` sort the data with no header
+    // ever showing as active).
+    await renderTable()
+
+    const sortLinks = screen.getAllByRole('link', { name: /^Sort by/ })
+    const renderedColumns = sortLinks
+      .map((link) => new URL(link.getAttribute('href')!, 'https://x').searchParams.get('sortBy'))
+      .sort()
+    expect(renderedColumns).toEqual([...USERS_SORTABLE_FIELDS].sort())
   })
 })
