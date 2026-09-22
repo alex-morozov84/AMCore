@@ -121,21 +121,26 @@ model User {
   // `name`/`email` (`AdminService.buildUserSearchWhere`); `pg_trgm` itself
   // is installed by a migration, not by this schema file.
   //
-  // `lastLoginAt` is deliberately NOT indexed here. Its default sort
-  // (`DESC NULLS LAST`) needs an index whose NULLS placement matches that
-  // exact order — a plain ascending index, which is all this schema DSL can
-  // express, would only give `DESC NULLS FIRST` on a backward scan (verified
-  // empirically: EXPLAIN showed the planner falling back to a full Seq Scan
-  // + Sort instead of using it at all). Prisma 7.10.0 accepts a `nulls:`
-  // field-index modifier without error but silently drops it from the
-  // generated SQL — also verified empirically, not assumed — so this one
-  // index is declared as raw SQL in the migration instead
-  // (`"lastLoginAt" DESC NULLS LAST, id DESC`), same as the GIN indexes'
-  // `CREATE EXTENSION` statement. Sorting by `lastLoginAt` ascending (not
-  // the default) is an accepted, honest Seq Scan + Sort fallback — the less
-  // common direction, not worth a second index.
+  // `lastLoginAt`'s default sort is `DESC NULLS LAST`
+  // (`AdminService.resolveUserOrderBy`). This schema declaration
+  // (`sort: Desc`) exists so Prisma's own migration-history drift
+  // detection recognizes the index the migration actually creates —
+  // omitting it entirely made Prisma consider the index unowned and
+  // propose dropping it on the next `migrate dev`/`migrate diff` (verified
+  // empirically). It does **not** control NULLS placement: Prisma's schema
+  // DSL has no `nulls:` index modifier that survives to the generated SQL
+  // (a `nulls:` field-index argument parses without error but is silently
+  // dropped — verified empirically, not assumed). The actual
+  // `DESC NULLS LAST` clause is hand-written raw SQL in the migration file
+  // itself, matching this declaration's column list/sort direction exactly
+  // so `prisma migrate diff` reports no drift (also verified empirically:
+  // an empty diff after this exact pairing). A plain ascending index would
+  // only give `DESC NULLS FIRST` on a backward scan — EXPLAIN showed the
+  // planner correctly refusing to use it at all for the real default query,
+  // falling back to a full Seq Scan + Sort.
   @@index([name, id])
   @@index([email, id])
+  @@index([lastLoginAt(sort: Desc), id(sort: Desc)])
   @@index([createdAt, id])
   @@index([updatedAt, id])
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
