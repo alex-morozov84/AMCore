@@ -20,12 +20,41 @@ as shortcuts for a downstream product backoffice. Every backend data endpoint
 must perform its own live `SUPER_ADMIN` authorization; the page-level admission
 frame may mount chrome but never authorizes later data access.
 
-The current console has no mutations. A future dangerous action must preserve
-the [step-up re-authentication
-boundary](../auth/sessions.md#step-up-re-authentication). Host mode does not yet
-have a console-audience step-up BFF/UI flow. Design and review that flow before
-shipping the first such operation; do not reuse the product-session endpoint
-across the host boundary.
+The Users panel's system-role promote/demote action is the console's first
+mutation, and its BFF plumbing is the reusable seam for the next one — don't
+re-derive it from scratch:
+
+- **Session/origin resolution** lives in
+  `shared/api/console/authenticated-proxy.ts`
+  (`resolveConsoleAccessToken`/`isConsoleRequestOriginTrusted`): it selects
+  the isolated console vault and the strict console-host origin check in host
+  mode, and the product session and `WEB_TRUSTED_ORIGINS` check in path mode.
+  Every console mutation Route Handler resolves through this, not a
+  hand-rolled per-mode branch.
+- **Fixed public routes only.** A console mutation's Route Handler forwards
+  to exactly one backend target it names itself — never a client-supplied
+  path — and validates its request body against the same shared Zod schema
+  the backend DTO uses, before forwarding. See
+  `app/api/console/users/[id]/role/route.ts` for the reference shape.
+- **Token containment.** If a mutation's upstream success response can ever
+  carry a credential (an access/refresh token — `POST /auth/step-up` is the
+  first and, so far, only example), its Route Handler must **not** stream
+  that response back verbatim the way an ordinary mutation proxy does: read
+  the body server-side, discard the credential entirely, and respond without
+  it (`shared/api/console/step-up.ts` is the reference; it responds `204`).
+  Getting this wrong hands a real backend bearer token to browser JavaScript
+  — treat it as a security bug, not a style preference, and add a regression
+  test asserting the response body never contains `accessToken`/
+  `refreshToken` for any such route.
+- **Step-up UX** stays a local, cohesive component beside the page that needs
+  it (see `_pages/console/UsersPage/RoleStepUpDialog.tsx`) until a second
+  console mutation needs the identical dialog — do not pre-emptively promote
+  it to a shared/cross-slice widget before that second real consumer exists.
+
+This preserves the [step-up re-authentication
+boundary](../auth/sessions.md#step-up-re-authentication) for every future
+dangerous action, in both topologies — the host-mode console-audience flow
+this section previously called out as undesigned is now built and reviewed.
 
 Console files added below the closed roots listed above are scaffold-owned
 automatically. A Console contribution to shared navigation, config, scripts,
@@ -63,7 +92,9 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    under `app/api/console/**`, applying `withConsoleHostGuard()` explicitly,
    since that guard is a per-route-handler concern, not inherited from the
    page layout. Either way, independently authorize the corresponding backend
-   endpoint — the admission frame mounts chrome, never grants data access.
+   endpoint — the admission frame mounts chrome, never grants data access. A
+   mutation reuses the session/origin/token-containment seam described above
+   under "Ownership and security boundaries" rather than a new one-off proxy.
 6. Use the existing graceful-degradation primitives for secondary data. Keep
    primary failures explicit and fail privileged actions closed.
 7. Add focused unit tests, Storybook/a11y states where applicable, and

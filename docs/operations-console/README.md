@@ -4,9 +4,9 @@ The Operations Console is AMCore's optional system control plane for platform
 super-administrators. The shipped foundation provides a protected, localized
 Control Room shell, live access admission, and isolated host-mode login/logout.
 It ships three functional panels, **Overview** (this API instance's readiness,
-version, and process role), **Users** (read-only), and **Organizations**
-(read-only). It does not yet provide metrics, queues, audit, or AI control
-panels.
+version, and process role), **Users** (inventory plus system-role
+promote/demote), and **Organizations** (read-only). It does not yet provide
+metrics, queues, audit, or AI control panels.
 
 It is not a product backoffice. Organization owners, organization `ADMIN`s,
 catalogue managers, content editors, and ordinary users do not gain access from
@@ -46,12 +46,35 @@ has no organizations yet, which is expected on a fresh installation.
 
 **Users** is a paginated platform-user inventory. It shows each user's name
 and email, email-verification state, current system role, last sign-in, and
-created/updated timestamps. It is **read-only**: it does not expose a detail
-page, profile fields, sessions, account recovery, deletion, or any role change.
-It has the same explicit unavailable and genuine-empty states as Organizations.
-Changing a system role is not available in the shipped Console. Its separately
-reviewed fresh-authentication, token-containment, and session-revocation flow
-must be implemented and verified before any role action can appear here.
+created/updated timestamps. It does not expose a detail page, profile fields,
+sessions, or account recovery/deletion. It has the same explicit unavailable
+and genuine-empty states as Organizations.
+
+**Changing a user's system role.** Every row except the signed-in operator's
+own offers a menu action to promote a `USER` to `SUPER_ADMIN` or demote a
+`SUPER_ADMIN` back to `USER` — the role is binary, not a list of options. The
+operator's own row never offers this action, whether or not they are
+currently a `SUPER_ADMIN`: the platform never lets an account change its own
+system role, so nothing would happen if it did appear there.
+
+Confirming the action states its consequence up front: **the target user's
+server-side sessions are revoked immediately**, for both directions. An
+already-issued access token remains usable until its short expiry, but it
+cannot be refreshed after the session rows are removed; the target must then
+sign in again. A promoted user's old token likewise retains its old role until
+that re-authentication rather than silently gaining admin power.
+
+Because this is a destructive privileged operation, the platform may ask the
+_operator_ to re-enter their own password before it takes effect (a "step-up"
+challenge) if their console session was not recently (re-)authenticated. This
+is a routine, expected prompt on a session that has been open for a while —
+entering the current password once resumes the original action automatically,
+with no need to repeat the click. If the signed-in operator's account has no
+password (sign-in via an OAuth provider only), that password prompt cannot
+succeed; the console says so plainly, and the change does not go through. In
+every case where the change does not go through — wrong password, that
+OAuth-only case, a network or server problem — the user's displayed role
+stays exactly what it was; nothing is left half-applied.
 
 ## Before signing in
 

@@ -18,6 +18,36 @@ describe('proxyToBackend — session/CSRF gating and auth-failure classification
     vi.mocked(isTrustedOrigin).mockReturnValue(true)
   })
 
+  describe('token-bearing upstream paths', () => {
+    it.each([
+      ['auth', 'refresh'],
+      ['auth', 'step-up'],
+      ['auth', 'oauth', 'exchange'],
+    ])(
+      'rejects %s before checking origin or session (would leak a bearer token to the browser)',
+      async (...segments) => {
+        mockCookieStore(undefined)
+
+        const response = await proxyToBackend(makeRequest(segments.join('/')), segments)
+
+        expect(response.status).toBe(404)
+        expect(isTrustedOrigin).not.toHaveBeenCalled()
+        expect(ensureFreshSession).not.toHaveBeenCalled()
+      }
+    )
+
+    it('does not reject an ordinary path that merely starts with "auth"', async () => {
+      mockCookieStore(undefined)
+
+      const response = await proxyToBackend(makeRequest('auth/me'), ['auth', 'me'])
+
+      // Falls through to the ordinary "no session cookie" branch, not the
+      // token-bearing-path shortcut — proves the check is exact-path, not
+      // a prefix match that would over-block unrelated auth routes.
+      expect(response.status).toBe(401)
+    })
+  })
+
   it('returns 401 when there is no session cookie, without touching ensureFreshSession', async () => {
     mockCookieStore(undefined)
 

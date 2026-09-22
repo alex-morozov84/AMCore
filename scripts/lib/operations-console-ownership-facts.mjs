@@ -26,6 +26,12 @@ const sharedModules = [
   module('apps/web/src/shared/lib/require-super-admin.ts', ['require-super-admin.test.ts']),
 ]
 
+// Client-safe console API calls (unlike `shared/api/console/**`, which is
+// server-only and holds real credentials) live beside the product's own
+// `authApi` in `shared/api/`, not under `shared/lib/` like the modules
+// above — so their test path is derived separately below.
+const sharedApiModules = [module('apps/web/src/shared/api/console-api.ts', ['console-api.test.ts'])]
+
 const verification = [
   'apps/web/playwright.console-real-stack.config.ts',
   'docker-compose.console-session-e2e.yml',
@@ -40,10 +46,15 @@ const verification = [
   'apps/web/e2e/real-stack/admin-organizations.spec.ts',
   'apps/web/e2e/real-stack/admin-overview.spec.ts',
   'apps/web/e2e/real-stack/admin-users.spec.ts',
+  'apps/web/e2e/real-stack/admin-users-role-management.spec.ts',
 ].map((path) => one(path, { tags: ['verification:console'] }))
 
 const sharedModuleTests = sharedModules.flatMap((item) =>
   item.tests.map((test) => one(`apps/web/src/shared/lib/${test}`, { module: item.path }))
+)
+
+const sharedApiModuleTests = sharedApiModules.flatMap((item) =>
+  item.tests.map((test) => one(`apps/web/src/shared/api/${test}`, { module: item.path }))
 )
 
 const featureEntrypoints = [
@@ -69,8 +80,8 @@ const repositoryEntrypoints = [
 export const operationsConsoleFacts = {
   roots,
   featureFiles: [],
-  sharedModules,
-  sharedModuleTests,
+  sharedModules: [...sharedModules, ...sharedApiModules],
+  sharedModuleTests: [...sharedModuleTests, ...sharedApiModuleTests],
   topology: ['docker-compose.console-host.yml', 'docker/caddy/Caddyfile.console-host'].map((path) =>
     one(path, { tags: ['topology:host'] })
   ),

@@ -20,4 +20,12 @@ describe('getConsolePublicApiPath', () => {
     mutableConfig.mode = 'host'
     expect(getConsolePublicApiPath('/auth/login')).toBe('/auth/login')
   })
+
+  it('works for a non-auth BFF suffix too', () => {
+    mutableConfig.mode = 'path'
+    expect(getConsolePublicApiPath('/users/u1/role')).toBe('/console/users/u1/role')
+
+    mutableConfig.mode = 'host'
+    expect(getConsolePublicApiPath('/users/u1/role')).toBe('/users/u1/role')
+  })
 })

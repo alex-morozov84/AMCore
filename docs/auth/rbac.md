@@ -88,13 +88,20 @@ request even if its existing JWT has not expired.
 
 ### Administering `SUPER_ADMIN`
 
-Promote an existing user through the admin API (requires a current
-`SUPER_ADMIN` session):
+Promote (or demote) an existing user through the admin API (requires a
+current `SUPER_ADMIN` session):
 
 ```http
 PATCH /api/v1/admin/users/:userId
 { "systemRole": "SUPER_ADMIN" }
 ```
+
+The Operations Console's Users panel is an authenticated management surface
+for this same endpoint, not a separate contract — see [its user
+guide](../operations-console/README.md#what-a-super-administrator-can-use-today)
+for the confirmation/step-up/session-revocation behavior a browser operator
+sees. Both the API and the Console enforce the same self-change and
+last-`SUPER_ADMIN` guards described above.
 
 **Bootstrapping the first admin** has no API path — set it directly in the
 database:

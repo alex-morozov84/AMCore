@@ -13,6 +13,7 @@ import {
   ApiBearerAuth,
   ApiNoContentResponse,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
@@ -112,6 +113,7 @@ export class AdminController {
 
   @Patch('users/:id')
   @ApiOperation({ summary: 'Update user system role — SUPER_ADMIN only' })
+  @ApiParam({ name: 'id', description: 'Target user ID' })
   // OB-06b: destructive privileged op — require a recently re-authenticated
   // session (step-up) on top of the OB-06a current-role check.
   @RequireFreshAuth()
@@ -120,6 +122,17 @@ export class AdminController {
   // itself would cap every route in the API at the admin limit (caught in
   // Stage 7 final-e2e).
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
+  @ApiResponse({
+    status: 400,
+    description: 'BUSINESS_RULE_VIOLATION — self-role-change or demoting the last SUPER_ADMIN',
+  })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'SUPER_ADMIN required, or STEP_UP_REQUIRED (session not recently re-authenticated)',
+  })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded for this privileged operation' })
   @ZodResponse({ type: AdminUserResponseDto, status: 200, description: 'Updated user' })
   updateUserSystemRole(
     @CurrentUser() actor: RequestPrincipal,
