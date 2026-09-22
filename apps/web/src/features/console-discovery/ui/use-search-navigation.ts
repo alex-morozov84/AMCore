@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 import { useDebouncedValue } from '@/shared/lib/use-debounced-value'
@@ -43,13 +43,9 @@ export function useSearchNavigation({
   // from the render body itself.
   const [lastNavigated, setLastNavigated] = useState(defaultValue)
   // Every value this component has itself asked the router to navigate to
-  // and has not yet seen echoed back via `defaultValue`. A *value* Set, not
-  // a single "most recent" value: two navigations can be outstanding at
-  // once (type `a`, then `ab` before `a`'s response commits), and the
-  // older one's eventual echo must still be recognized as self-initiated,
-  // not mistaken for an external change — recognizing only the latest was
-  // an exact gap an earlier version of this fix had (found in review).
-  const pendingSelfValues = useRef<Set<string>>(new Set([defaultValue]))
+  // and has not yet seen echoed back via `defaultValue`. Starts empty: the
+  // initial URL is already settled, not a navigation initiated here.
+  const [pendingSelfValues, setPendingSelfValues] = useState<ReadonlySet<string>>(() => new Set())
 
   // The canonical URL changed from outside this component (Back/Forward, an
   // out-of-range recovery link, a sort-header click that also carries the
@@ -68,8 +64,10 @@ export function useSearchNavigation({
   // both.
   if (defaultValue !== syncedValue) {
     setSyncedValue(defaultValue)
-    if (pendingSelfValues.current.has(defaultValue)) {
-      pendingSelfValues.current.delete(defaultValue)
+    if (pendingSelfValues.has(defaultValue)) {
+      const nextPending = new Set(pendingSelfValues)
+      nextPending.delete(defaultValue)
+      setPendingSelfValues(nextPending)
     } else {
       setValue(defaultValue)
       setLastNavigated(defaultValue)
@@ -81,7 +79,7 @@ export function useSearchNavigation({
       const canonical = next.trim()
       if (canonical === lastNavigated) return
       setLastNavigated(canonical)
-      pendingSelfValues.current.add(canonical)
+      setPendingSelfValues((current) => new Set(current).add(canonical))
       router.replace(
         buildDiscoveryHref(baseHref, {
           search: canonical || undefined,

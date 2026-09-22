@@ -289,6 +289,41 @@ describe('SearchInput', () => {
     expect(input).toHaveValue('carol')
   })
 
+  it('resyncs when external navigation returns to the initial URL value', () => {
+    const { rerender } = renderInput({ defaultValue: 'alice' })
+    const input = screen.getByLabelText('Search users')
+
+    rerender(
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
+        <SearchInput
+          baseHref="/en/admin/users"
+          defaultValue="bob"
+          sortBy="createdAt"
+          label="Search users"
+          placeholder="Search by name or email"
+          clearLabel="Clear search"
+          inputId="users-search"
+        />
+      </NextIntlClientProvider>
+    )
+    expect(input).toHaveValue('bob')
+
+    rerender(
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
+        <SearchInput
+          baseHref="/en/admin/users"
+          defaultValue="alice"
+          sortBy="createdAt"
+          label="Search users"
+          placeholder="Search by name or email"
+          clearLabel="Clear search"
+          inputId="users-search"
+        />
+      </NextIntlClientProvider>
+    )
+    expect(input).toHaveValue('alice')
+  })
+
   it('trims the committed search so the URL never carries a non-canonical whitespace-only value', () => {
     renderInput({ defaultValue: 'foo' })
     const input = screen.getByLabelText('Search users')
