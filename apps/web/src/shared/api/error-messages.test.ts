@@ -1,6 +1,7 @@
 import {
   ApiKeyScopeErrorCode,
   AuthErrorCode,
+  CommonErrorCode,
   InfrastructureErrorCode,
   InviteErrorCode,
   ResourceErrorCode,
@@ -27,6 +28,7 @@ const backendCodes = [
   ...Object.values(InfrastructureErrorCode),
   ...Object.values(ApiKeyScopeErrorCode),
   ...Object.values(InviteErrorCode),
+  ...Object.values(CommonErrorCode),
 ]
 
 const clientCodes = Object.values(ClientErrorCode)

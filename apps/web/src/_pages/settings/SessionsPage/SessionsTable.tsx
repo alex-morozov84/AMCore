@@ -4,12 +4,11 @@ import { useMemo, useState } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
 import type { Session } from '@amcore/shared'
 import { createColumnHelper, type SortingState, useTable } from '@tanstack/react-table'
-import { MoreHorizontal } from 'lucide-react'
 
 import { useSessions } from '@/entities/user'
 import { RevokeSessionMenuItem } from '@/features/sessions-revoke'
 import { Button } from '@/shared/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
+import { RowActionsMenu } from '@/shared/ui/row-actions-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 
 import { features } from './data-table-features'
@@ -22,15 +21,9 @@ function RowActions({ session }: { session: Session }) {
   if (session.current) return null
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
-        <span className="sr-only">{t('actions')}</span>
-        <MoreHorizontal className="size-4" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <RevokeSessionMenuItem sessionId={session.id} />
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <RowActionsMenu label={t('actions')}>
+      <RevokeSessionMenuItem sessionId={session.id} />
+    </RowActionsMenu>
   )
 }
 

@@ -1,5 +1,6 @@
 // API public API
 export { authApi } from './auth-api'
+export { consoleApi } from './console-api'
 export { apiClient, ApiNetworkError, ApiRequestError } from './http-client'
 export { getQueryClient } from './query-client'
 export { QueryProvider } from './QueryProvider'

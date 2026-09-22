@@ -17,6 +17,19 @@ import 'server-only'
 const API_URL = process.env.API_URL ?? 'http://localhost:5002'
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
+// Backend routes whose success body is a bearer credential
+// (`{ accessToken }`/`{ accessToken, refreshToken }`) and that have no
+// dedicated Next.js Route Handler shadowing them ahead of this catch-all —
+// `auth/login`, `auth/register`, and `auth/oauth/callback` do have one and
+// so never reach this generic proxy in practice, but never assume that
+// stays true; this list is the actual enforced boundary. Streaming any of
+// these straight through to the browser would hand it a real backend
+// credential (ADR-068's central invariant); the console's own step-up flow
+// deliberately does not use this proxy at all (see
+// `shared/api/console/step-up.ts`), and nothing else has a legitimate
+// reason to call these from a browser through this path today.
+const TOKEN_BEARING_PATHS = new Set(['auth/refresh', 'auth/step-up', 'auth/oauth/exchange'])
+
 /**
  * The generic authenticated Route Handler proxy (ADR-068): reads
  * `amcore_session`, ensures a fresh access token via the single-flight
@@ -25,6 +38,10 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
  * responses pass through unmodified.
  */
 export async function proxyToBackend(request: Request, pathSegments: string[]): Promise<Response> {
+  if (TOKEN_BEARING_PATHS.has(pathSegments.join('/'))) {
+    return apiErrorResponse(request, { statusCode: 404, message: 'Not found' })
+  }
+
   if (!SAFE_METHODS.has(request.method) && !isTrustedOrigin(request)) {
     return apiErrorResponse(request, {
       statusCode: 403,

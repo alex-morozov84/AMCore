@@ -136,6 +136,28 @@ can form one cohesive responsibility. Reassess a co-located leaf when it gains
 its own state, data, accessibility behavior, Client/Server boundary, test, or
 reuse.
 
+### Promote to `shared/ui` on genuine reuse
+
+Before building a new interactive pattern — a dialog, a table, a form
+control, a status indicator — check whether `shared/ui` or an existing
+feature already expresses the same shape. Two real occurrences of it, not a
+hypothetical third, is the signal to extract or promote it to `shared/ui`
+with configurable props instead of keeping separate, page-local copies. A
+confirm-then-mutate dialog (state a consequence, then cancel or commit) is a
+concrete example: once a second feature needed the same
+trigger/title/description/confirm/cancel shape, it moved to
+`shared/ui/confirm-dialog.tsx` rather than being copied a second time. The
+same reasoning applies to a shared hook in `shared/lib`/`shared/hooks` when
+the duplicated logic, not just the markup, is what repeats.
+
+This is reuse, not speculative design, and does not relax the rest of this
+guide's "don't build for a future that isn't here yet" stance: do not
+generalize a pattern that has exactly one consumer today on the theory that
+a second one might eventually appear — that is the premature abstraction
+this guide already warns against elsewhere. Promote only once a second real
+consumer exists, or the task you are implementing right now explicitly
+requires the same shape for a second, concrete caller.
+
 ## Loading skeletons
 
 A loading state preserves the page's stable context. Do not replace persistent

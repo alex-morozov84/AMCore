@@ -115,9 +115,12 @@ export class AdminService {
    * no audit event — emitting "role changed" with identical before/
    * after fields would be misleading.
    *
-   * Audit log is emitted strictly **after** the transaction commits,
-   * so a rolled-back attempt never produces a misleading
-   * `system_role_changed` event.
+   * The durable `ADR-045` audit row is written **inside** the same
+   * transaction as the role update (`{ tx }`), so a rolled-back attempt
+   * never produces a misleading `system_role_changed` audit record. The
+   * structured Pino log event is a separate, operational-only emission
+   * *after* commit — it is not the audit trail and its timing does not
+   * need transactional atomicity.
    */
   async updateUserSystemRole(
     id: string,

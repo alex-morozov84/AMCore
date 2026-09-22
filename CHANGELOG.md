@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   live `SUPER_ADMIN` admission and typed admin endpoint without introducing
   account detail views or system-role mutation.
 
+- **Operations Console: user system-role management.** The Users panel can
+  now promote a `USER` to `SUPER_ADMIN` or demote one back, from the existing
+  inventory row. Consumes the already-shipped `PATCH /admin/users/:id`
+  contract (ADR-037 fresh-auth, ADR-045 audit) with a new console-mutation BFF
+  seam (fixed routes, Zod-validated bodies, topology-aware session/origin
+  resolution) reusable by future console mutations. A destructive/sensitive
+  change may prompt the operator to re-enter their password (step-up); the
+  response is never streamed back to the browser, closing an adjacent
+  pre-existing gap in the generic authenticated proxy for any upstream
+  response carrying a bearer credential. Both directions revoke the target
+  user's sessions; self-change and last-`SUPER_ADMIN` protections remain
+  server-enforced, not duplicated client-side.
+
 - **Scaffolding selector shadow evidence.** The existing required full
   scaffolding job now records a merge-base-trusted, fail-open would-run decision
   and uploads 30-day JSON evidence while still running all six generated rows

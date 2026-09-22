@@ -62,6 +62,16 @@ export enum InviteErrorCode {
   INVITE_EMAIL_NOT_VERIFIED = 'INVITE_EMAIL_NOT_VERIFIED',
 }
 
+// Cross-domain error codes not owned by one feature module.
+// `BusinessRuleViolationException` is thrown by admin, organization-member,
+// and invite services alike for a domain invariant that isn't a resource
+// conflict or an auth failure; the frontend renders one generic localized
+// message keyed on this code, never `details.rule`/`message` (those are
+// developer-facing and vary per call site).
+export enum CommonErrorCode {
+  BUSINESS_RULE_VIOLATION = 'BUSINESS_RULE_VIOLATION',
+}
+
 // HTTP Status codes
 export const HTTP_STATUS = {
   OK: 200,
