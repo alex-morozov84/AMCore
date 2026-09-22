@@ -4,14 +4,29 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import en from '../../../../messages/en.json'
-
 import { RoleStepUpDialog } from './RoleStepUpDialog'
 import type { StepUpPhase } from './use-user-role-change'
 
+// Inline, English-only fixture of just the keys this component reads -
+// deliberately not the real catalogue (`messages/en.json`), which is a
+// locale-scaffold-tracked source file this single-locale-agnostic unit test
+// has no reason to depend on.
+const messages = {
+  console: {
+    usersStepUpTitle: 'Confirm your password',
+    usersStepUpDescription: 'This is a sensitive action. Re-enter your password to continue.',
+    usersStepUpSubmit: 'Confirm',
+    loginPassword: 'Password',
+  },
+  common: {
+    cancel: 'Cancel',
+    close: 'Close',
+  },
+}
+
 function renderDialog(phase: StepUpPhase, onSubmit = vi.fn(), onClose = vi.fn()) {
   render(
-    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={en}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       <RoleStepUpDialog phase={phase} isSubmitting={false} onSubmit={onSubmit} onClose={onClose} />
     </NextIntlClientProvider>
   )

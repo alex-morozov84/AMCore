@@ -4,13 +4,30 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import en from '../../../../messages/en.json'
-
 import { useUserRoleChange } from './use-user-role-change'
 import { UserRoleAction } from './UserRoleAction'
 
 vi.mock('./use-user-role-change', () => ({ useUserRoleChange: vi.fn() }))
 vi.mock('./RoleStepUpDialog', () => ({ RoleStepUpDialog: () => null }))
+
+// Inline, English-only fixture of just the keys this component reads -
+// deliberately not the real catalogue (`messages/en.json`), which is a
+// locale-scaffold-tracked source file this single-locale-agnostic unit test
+// has no reason to depend on.
+const messages = {
+  console: {
+    usersColumnActions: 'Actions',
+    usersActionPromote: 'Promote to admin',
+    usersActionDemote: 'Remove admin access',
+    usersPromoteConfirmTitle: 'Promote to SUPER_ADMIN?',
+    usersPromoteConfirmDescription: 'This user will gain full administrative access.',
+    usersDemoteConfirmTitle: 'Remove admin access?',
+    usersDemoteConfirmDescription: 'This user will lose SUPER_ADMIN access.',
+  },
+  common: {
+    cancel: 'Cancel',
+  },
+}
 
 const confirmRoleChange = vi.fn()
 
@@ -28,7 +45,7 @@ beforeEach(() => {
 
 function renderAction(user: { id: string; systemRole: SystemRole }, isSelf: boolean) {
   return render(
-    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={en}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       <UserRoleAction user={user} isSelf={isSelf} />
     </NextIntlClientProvider>
   )

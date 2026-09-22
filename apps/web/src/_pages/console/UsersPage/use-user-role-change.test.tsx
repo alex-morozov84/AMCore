@@ -7,9 +7,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as shared_api from '@/shared/api'
 
-import en from '../../../../messages/en.json'
-
 const refreshMock = vi.fn()
+
+// Inline, English-only fixture of just the keys this hook reads -
+// deliberately not the real catalogue (`messages/en.json`), which is a
+// locale-scaffold-tracked source file this single-locale-agnostic unit test
+// has no reason to depend on.
+const messages = {
+  console: {
+    usersRoleChanged: 'Role updated',
+  },
+  errors: {
+    STEP_UP_REQUIRED: 'Please confirm your password to continue.',
+    STEP_UP_METHOD_UNAVAILABLE: "Password confirmation isn't available for this account.",
+    INVALID_CREDENTIALS: 'Incorrect email or password.',
+    BUSINESS_RULE_VIOLATION: "This action isn't allowed right now.",
+    UNKNOWN_ERROR: 'Something went wrong. Please try again.',
+  },
+}
 
 vi.mock('@/shared/api', async () => {
   const actual = await vi.importActual<typeof shared_api>('@/shared/api')
@@ -39,7 +54,7 @@ function apiError(status: number, errorCode: string): ApiRequestError {
 function wrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return (
-    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={en}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </NextIntlClientProvider>
   )
