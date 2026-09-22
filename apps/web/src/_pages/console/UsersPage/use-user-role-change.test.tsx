@@ -19,7 +19,10 @@ const messages = {
     STEP_UP_REQUIRED: 'Please confirm your password to continue.',
     STEP_UP_METHOD_UNAVAILABLE: "Password confirmation isn't available for this account.",
     INVALID_CREDENTIALS: 'Incorrect email or password.',
+    RATE_LIMIT_EXCEEDED: 'Too many attempts. Please wait a moment and try again.',
+    UNAUTHORIZED: 'Please sign in to continue.',
     BUSINESS_RULE_VIOLATION: "This action isn't allowed right now.",
+    NETWORK_ERROR: "Can't reach the server. Check your connection and try again.",
     UNKNOWN_ERROR: 'Something went wrong. Please try again.',
   },
 }
@@ -32,7 +35,7 @@ vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
 }))
 vi.mock('@/shared/ui/toast', () => ({ toast: { add: vi.fn() } }))
 
-import { ApiRequestError } from '@/shared/api'
+import { ApiNetworkError, ApiRequestError } from '@/shared/api'
 import { consoleApi } from '@/shared/api/console-api'
 import { toast } from '@/shared/ui/toast'
 
@@ -126,6 +129,7 @@ describe('useUserRoleChange', () => {
     await act(() => result.current.submitStepUp('correct-horse'))
 
     expect(result.current.stepUp).toMatchObject({ kind: 'error', terminal: true })
+    expect(consoleApi.updateUserRole).toHaveBeenCalledTimes(2)
     expect(refreshMock).not.toHaveBeenCalled()
   })
 
@@ -140,6 +144,7 @@ describe('useUserRoleChange', () => {
     await act(() => result.current.submitStepUp('wrong'))
 
     expect(result.current.stepUp).toMatchObject({ kind: 'error', terminal: false })
+    expect(consoleApi.updateUserRole).toHaveBeenCalledTimes(1)
   })
 
   it('marks STEP_UP_METHOD_UNAVAILABLE (OAuth-only account) as terminal', async () => {
@@ -155,6 +160,78 @@ describe('useUserRoleChange', () => {
     await act(() => result.current.submitStepUp('anything'))
 
     expect(result.current.stepUp).toMatchObject({ kind: 'error', terminal: true })
+    expect(consoleApi.updateUserRole).toHaveBeenCalledTimes(1)
+  })
+
+  it('surfaces a lost session on the post-step-up retry without starting another challenge', async () => {
+    vi.mocked(consoleApi.updateUserRole)
+      .mockRejectedValueOnce(apiError(403, AuthErrorCode.STEP_UP_REQUIRED))
+      .mockRejectedValueOnce(apiError(401, AuthErrorCode.UNAUTHORIZED))
+    vi.mocked(consoleApi.stepUp).mockResolvedValue(undefined)
+    const { result } = renderHook(() => useUserRoleChange('u1', SystemRole.SuperAdmin), { wrapper })
+    await act(() => result.current.confirmRoleChange())
+
+    await act(() => result.current.submitStepUp('correct-horse'))
+
+    expect(consoleApi.updateUserRole).toHaveBeenCalledTimes(2)
+    expect(result.current.stepUp).toEqual({ kind: 'closed' })
+    expect(toast.add).toHaveBeenCalledWith({
+      type: 'error',
+      title: 'Please sign in to continue.',
+    })
+    expect(refreshMock).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a rate limit during step-up in the dialog and never retries the role mutation', async () => {
+    vi.mocked(consoleApi.updateUserRole).mockRejectedValue(
+      apiError(403, AuthErrorCode.STEP_UP_REQUIRED)
+    )
+    vi.mocked(consoleApi.stepUp).mockRejectedValue(apiError(429, AuthErrorCode.RATE_LIMIT_EXCEEDED))
+    const { result } = renderHook(() => useUserRoleChange('u1', SystemRole.SuperAdmin), { wrapper })
+    await act(() => result.current.confirmRoleChange())
+
+    await act(() => result.current.submitStepUp('correct-horse'))
+
+    expect(result.current.stepUp).toEqual({
+      kind: 'error',
+      message: 'Too many attempts. Please wait a moment and try again.',
+      terminal: false,
+    })
+    expect(consoleApi.updateUserRole).toHaveBeenCalledTimes(1)
+    expect(refreshMock).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a step-up network failure in the dialog and never retries the role mutation', async () => {
+    vi.mocked(consoleApi.updateUserRole).mockRejectedValue(
+      apiError(403, AuthErrorCode.STEP_UP_REQUIRED)
+    )
+    vi.mocked(consoleApi.stepUp).mockRejectedValue(new ApiNetworkError(new Error('offline')))
+    const { result } = renderHook(() => useUserRoleChange('u1', SystemRole.SuperAdmin), { wrapper })
+    await act(() => result.current.confirmRoleChange())
+
+    await act(() => result.current.submitStepUp('correct-horse'))
+
+    expect(result.current.stepUp).toEqual({
+      kind: 'error',
+      message: "Can't reach the server. Check your connection and try again.",
+      terminal: false,
+    })
+    expect(consoleApi.updateUserRole).toHaveBeenCalledTimes(1)
+    expect(refreshMock).not.toHaveBeenCalled()
+  })
+
+  it('surfaces an upstream role-mutation failure without opening step-up or refreshing', async () => {
+    vi.mocked(consoleApi.updateUserRole).mockRejectedValue(apiError(503, 'UNKNOWN_ERROR'))
+    const { result } = renderHook(() => useUserRoleChange('u1', SystemRole.SuperAdmin), { wrapper })
+
+    await act(() => result.current.confirmRoleChange())
+
+    expect(result.current.stepUp).toEqual({ kind: 'closed' })
+    expect(toast.add).toHaveBeenCalledWith({
+      type: 'error',
+      title: 'Something went wrong. Please try again.',
+    })
+    expect(refreshMock).not.toHaveBeenCalled()
   })
 
   it('closeStepUp resets to closed', async () => {

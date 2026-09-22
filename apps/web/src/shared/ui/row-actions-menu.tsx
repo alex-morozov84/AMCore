@@ -26,7 +26,9 @@ export function RowActionsMenu({ label, children, align = 'end' }: RowActionsMen
         <span className="sr-only">{label}</span>
         <MoreHorizontal className="size-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align}>{children}</DropdownMenuContent>
+      <DropdownMenuContent align={align} className="min-w-48">
+        {children}
+      </DropdownMenuContent>
     </DropdownMenu>
   )
 }

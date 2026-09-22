@@ -58,10 +58,11 @@ currently a `SUPER_ADMIN`: the platform never lets an account change its own
 system role, so nothing would happen if it did appear there.
 
 Confirming the action states its consequence up front: **the target user's
-active sessions are ended immediately**, for both directions — a promoted
-user does not silently gain admin power in an already-open session, and a
-demoted user does not keep using one. Either way, that user must sign in
-again.
+server-side sessions are revoked immediately**, for both directions. An
+already-issued access token remains usable until its short expiry, but it
+cannot be refreshed after the session rows are removed; the target must then
+sign in again. A promoted user's old token likewise retains its old role until
+that re-authentication rather than silently gaining admin power.
 
 Because this is a destructive privileged operation, the platform may ask the
 _operator_ to re-enter their own password before it takes effect (a "step-up"

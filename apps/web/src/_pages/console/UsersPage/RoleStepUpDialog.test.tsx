@@ -55,8 +55,9 @@ describe('RoleStepUpDialog', () => {
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument()
   })
 
-  it('replaces the form with only a close action on a terminal error', () => {
-    renderDialog({
+  it('replaces the form with a working close action on a terminal error', async () => {
+    const user = userEvent.setup()
+    const { onClose } = renderDialog({
       kind: 'error',
       message: "Password confirmation isn't available for this account.",
       terminal: true,
@@ -64,6 +65,8 @@ describe('RoleStepUpDialog', () => {
 
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onClose).toHaveBeenCalled()
   })
 
   it('calls onSubmit with the entered password and clears the field', async () => {
@@ -74,6 +77,7 @@ describe('RoleStepUpDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     expect(onSubmit).toHaveBeenCalledWith('correct-horse')
+    expect(screen.getByLabelText('Password')).toHaveValue('')
   })
 
   it('calls onClose when the operator cancels', async () => {

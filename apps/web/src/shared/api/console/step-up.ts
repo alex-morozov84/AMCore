@@ -22,8 +22,8 @@ function originRejected(request: Request): Response {
 /**
  * Console step-up (ADR-037 fresh-auth). Deliberately does not stream the
  * upstream response back verbatim the way an ordinary mutation proxy would:
- * `POST /auth/step-up`'s success body is a real `{ accessToken, refreshToken }`
- * pair. This handler reads that body server-side, discards it entirely (the
+ * `POST /auth/step-up`'s success body contains a real `{ accessToken }`.
+ * This handler reads that body server-side, discards it entirely (the
  * operator's existing session remains valid for the immediate retry —
  * freshness is server-side, not carried by the token), and always responds
  * without a body on success. Error bodies (400/401/403/429) carry no

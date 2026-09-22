@@ -46,14 +46,19 @@ export async function handleConsoleUserRoleUpdate(
   if ('failure' in resolved) return resolved.failure
 
   const trustedClientIp = resolveTrustedClientIp(request.headers)
-  const upstreamResponse = await fetch(
-    `${API_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`,
-    {
+  let upstreamResponse: Response
+  try {
+    upstreamResponse = await fetch(`${API_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`, {
       method: 'PATCH',
       headers: forwardRequestHeaders(request.headers, resolved.token, trustedClientIp),
       body: JSON.stringify(parsed.data),
-    }
-  )
+    })
+  } catch {
+    return apiErrorResponse(request, {
+      statusCode: 503,
+      message: 'Role update temporarily unavailable',
+    })
+  }
 
   return new Response(upstreamResponse.body, {
     status: upstreamResponse.status,

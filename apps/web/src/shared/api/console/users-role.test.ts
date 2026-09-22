@@ -94,4 +94,12 @@ describe('handleConsoleUserRoleUpdate', () => {
     expect(response.status).toBe(400)
     expect(await response.json()).toMatchObject({ errorCode: 'BUSINESS_RULE_VIOLATION' })
   })
+
+  it('maps a network failure reaching the upstream to a controlled 503', async () => {
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'))
+
+    const response = await handleConsoleUserRoleUpdate(request(), 'u1')
+
+    expect(response.status).toBe(503)
+  })
 })

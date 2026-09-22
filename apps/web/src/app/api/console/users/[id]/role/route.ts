@@ -6,6 +6,8 @@ interface RouteContext {
 }
 
 export async function PATCH(request: Request, context: RouteContext): Promise<Response> {
-  const { id } = await context.params
-  return withConsoleHostGuard(request, () => handleConsoleUserRoleUpdate(request, id))
+  return withConsoleHostGuard(request, async () => {
+    const { id } = await context.params
+    return handleConsoleUserRoleUpdate(request, id)
+  })
 }

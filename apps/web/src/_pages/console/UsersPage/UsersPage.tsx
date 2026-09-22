@@ -14,7 +14,7 @@ export interface UsersPageProps {
   limit: number
 }
 
-/** Read-only platform user inventory with no account or role actions. */
+/** Platform user inventory with system-role actions composed by `UsersTable`. */
 export async function UsersPage({ page, limit }: UsersPageProps) {
   const t = await getTranslations('console')
   const outcome = resolvePrimary(await fetchConsoleUsers(page, limit), { source: 'console-users' })
