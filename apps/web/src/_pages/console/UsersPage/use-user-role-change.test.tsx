@@ -5,8 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type * as shared_api from '@/shared/api'
-
 const refreshMock = vi.fn()
 
 // Inline, English-only fixture of just the keys this hook reads -
@@ -26,16 +24,16 @@ const messages = {
   },
 }
 
-vi.mock('@/shared/api', async () => {
-  const actual = await vi.importActual<typeof shared_api>('@/shared/api')
-  return { ...actual, consoleApi: { updateUserRole: vi.fn(), stepUp: vi.fn() } }
-})
+vi.mock('@/shared/api/console-api', () => ({
+  consoleApi: { updateUserRole: vi.fn(), stepUp: vi.fn() },
+}))
 vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
   useRouteProgressRouter: () => ({ refresh: refreshMock }),
 }))
 vi.mock('@/shared/ui/toast', () => ({ toast: { add: vi.fn() } }))
 
-import { ApiRequestError, consoleApi } from '@/shared/api'
+import { ApiRequestError } from '@/shared/api'
+import { consoleApi } from '@/shared/api/console-api'
 import { toast } from '@/shared/ui/toast'
 
 import { useUserRoleChange } from './use-user-role-change'

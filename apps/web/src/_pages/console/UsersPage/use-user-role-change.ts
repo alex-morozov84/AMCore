@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import { AuthErrorCode, type SystemRole } from '@amcore/shared'
 import { useMutation } from '@tanstack/react-query'
 
-import { consoleApi, getErrorCode, useApiError } from '@/shared/api'
+import { getErrorCode, useApiError } from '@/shared/api'
+import { consoleApi } from '@/shared/api/console-api'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 import { toast } from '@/shared/ui/toast'
 
