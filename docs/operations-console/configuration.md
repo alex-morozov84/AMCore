@@ -108,14 +108,18 @@ PostgreSQL's `pg_trgm` extension. The console's own migration installs it
 (`CREATE EXTENSION IF NOT EXISTS pg_trgm`) — it is a PG13+ _trusted_
 extension, installable by any role with `CREATE` on the target database,
 no superuser grant required, and ships in the stock `postgres` Docker
-image this project runs by default.
+image this project runs by default. If you follow [Production Database
+Role Separation](../operations/database-role-separation.md), this means
+the migration-only `amcore_migrator` role can install it; the runtime
+`amcore_runtime` role neither installs nor owns it and only ever queries
+through the resulting indexes.
 
-If you deploy against a managed Postgres provider, confirm it allows
-`pg_trgm` (every major managed provider does — it is one of the most
-commonly allowlisted contrib extensions) **before** running migrations
-against it. A provider that disallows it must fail the migration
-visibly; there is no supported fallback that silently serves search
-without the index it depends on.
+If you deploy against a managed Postgres provider, confirm it specifically
+allows `pg_trgm` **before** running migrations against it — it is a
+commonly allowlisted contrib extension, but "commonly" is not a
+guarantee for your specific provider and plan tier. A provider that
+disallows it must fail the migration visibly; there is no supported
+fallback that silently serves search without the index it depends on.
 
 ## Search terms in logs and browser history
 

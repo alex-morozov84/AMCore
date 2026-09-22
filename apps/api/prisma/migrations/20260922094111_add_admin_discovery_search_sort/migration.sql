@@ -10,8 +10,11 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 -- CreateIndex
 CREATE INDEX "organizations_name_id_idx" ON "core"."organizations"("name", "id");
 
--- CreateIndex
-CREATE INDEX "organizations_slug_id_idx" ON "core"."organizations"("slug", "id");
+-- No composite (slug, id) index: `slug` is already UNIQUE, so no two rows
+-- can ever tie on it and an id tie-breaker is structurally impossible to
+-- need. Verified via EXPLAIN: the existing unique index alone already
+-- serves "ORDER BY slug, id" in both directions through a cheap Incremental
+-- Sort with a single presorted group.
 
 -- CreateIndex
 CREATE INDEX "organizations_createdAt_id_idx" ON "core"."organizations"("createdAt", "id");
@@ -31,8 +34,15 @@ CREATE INDEX "users_name_id_idx" ON "core"."users"("name", "id");
 -- CreateIndex
 CREATE INDEX "users_email_id_idx" ON "core"."users"("email", "id");
 
--- CreateIndex
-CREATE INDEX "users_lastLoginAt_id_idx" ON "core"."users"("lastLoginAt", "id");
+-- CreateIndex (raw SQL, not Prisma schema DSL — see the comment above the
+-- User model in user.prisma). `AdminService.resolveUserOrderBy`'s default
+-- for `lastLoginAt` is `DESC NULLS LAST`; a plain ascending index can only
+-- provide `DESC NULLS FIRST` on a backward scan, which Postgres correctly
+-- refuses to use for this query (verified via EXPLAIN: falls back to a full
+-- Seq Scan + Sort without this exact NULLS clause). Prisma 7.10.0's
+-- `nulls:` field-index modifier validates but is silently dropped from the
+-- generated SQL — also verified, not assumed.
+CREATE INDEX "users_lastLoginAt_id_idx" ON "core"."users"("lastLoginAt" DESC NULLS LAST, "id" DESC);
 
 -- CreateIndex
 CREATE INDEX "users_createdAt_id_idx" ON "core"."users"("createdAt", "id");

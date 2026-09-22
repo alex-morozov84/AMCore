@@ -376,8 +376,13 @@ describe('OpenAPI success surface (e2e)', () => {
     for (const { key, sortFields } of DISCOVERY_ENDPOINTS) {
       const [, ...pathParts] = key.split(' ')
       const path = pathParts.join(' ')
-      const operation = document.paths[path]?.get as { parameters?: ParamLike[] } | undefined
+      const operation = document.paths[path]?.get as
+        { parameters?: ParamLike[]; responses?: Record<string, unknown> } | undefined
       const params = new Map((operation?.parameters ?? []).map((p) => [p.name, p]))
+
+      if (!operation?.responses?.['400']) {
+        violations.push(`${key}: must document a 400 response for invalid discovery query values`)
+      }
 
       const search = params.get('search')
       if (!search || search.in !== 'query' || search.required !== false) {

@@ -117,6 +117,11 @@ export class AdminController {
   })
   @ApiQuery({ name: 'sortBy', required: false, enum: ADMIN_USER_SORT_FIELDS, example: 'createdAt' })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid page/limit/sortBy/sortOrder, an oversized search term, or a repeated query key',
+  })
   @ZodResponse({ type: AdminUserListResponseDto, status: 200, description: 'Paginated users' })
   findAllUsers(@Query() query: AdminUserListQueryDto): Promise<AdminUserListResponse> {
     return this.adminService.findAllUsers(query)
@@ -196,6 +201,11 @@ export class AdminController {
     example: 'createdAt',
   })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid page/limit/sortBy/sortOrder, an oversized search term, or a repeated query key',
+  })
   @ZodResponse({
     type: AdminOrganizationListResponseDto,
     status: 200,

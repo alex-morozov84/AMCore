@@ -267,6 +267,8 @@ describe('Admin (e2e)', () => {
         ['?sortBy=emailVerified', 'unallowlisted sortBy'],
         ['?sortOrder=ascending', 'invalid sortOrder'],
         [`?search=${encodeURIComponent('a'.repeat(256))}`, 'oversized search'],
+        ['?search=a&search=b', 'repeated search query key (array, not a string)'],
+        ['?sortBy=name&sortBy=email', 'repeated sortBy query key'],
       ])('GET /admin/users%s → 400 (%s)', async (qs) => {
         const { userId } = await registerAndGetToken('superadmin@example.com')
         const superToken = await promoteToSuperAdmin(userId)
@@ -308,6 +310,16 @@ describe('Admin (e2e)', () => {
 
         await request(app.getHttpServer())
           .get('/admin/organizations?sortBy=email')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(400)
+      })
+
+      it('rejects a repeated search query key (array, not a string)', async () => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+
+        await request(app.getHttpServer())
+          .get('/admin/organizations?search=a&search=b')
           .set('Authorization', `Bearer ${superToken}`)
           .expect(400)
       })

@@ -120,9 +120,22 @@ model User {
   // trigram indexes back the `pg_trgm`-backed literal-contains search over
   // `name`/`email` (`AdminService.buildUserSearchWhere`); `pg_trgm` itself
   // is installed by a migration, not by this schema file.
+  //
+  // `lastLoginAt` is deliberately NOT indexed here. Its default sort
+  // (`DESC NULLS LAST`) needs an index whose NULLS placement matches that
+  // exact order — a plain ascending index, which is all this schema DSL can
+  // express, would only give `DESC NULLS FIRST` on a backward scan (verified
+  // empirically: EXPLAIN showed the planner falling back to a full Seq Scan
+  // + Sort instead of using it at all). Prisma 7.10.0 accepts a `nulls:`
+  // field-index modifier without error but silently drops it from the
+  // generated SQL — also verified empirically, not assumed — so this one
+  // index is declared as raw SQL in the migration instead
+  // (`"lastLoginAt" DESC NULLS LAST, id DESC`), same as the GIN indexes'
+  // `CREATE EXTENSION` statement. Sorting by `lastLoginAt` ascending (not
+  // the default) is an accepted, honest Seq Scan + Sort fallback — the less
+  // common direction, not worth a second index.
   @@index([name, id])
   @@index([email, id])
-  @@index([lastLoginAt, id])
   @@index([createdAt, id])
   @@index([updatedAt, id])
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
@@ -283,11 +296,16 @@ model Organization {
   notifications   Notification[]
   aiConversations AiConversation[]
 
-  // Admin discovery — same contract as `User` above; `slug` is already
-  // `@unique` (equality lookups), which does not serve a contains/sort
-  // query, so it still needs its own composite and trigram index here.
+  // Admin discovery — same contract as `User` above. `slug` still needs its
+  // own trigram index for the contains *search* (the existing unique B-tree
+  // on `slug` alone cannot serve `ILIKE '%term%'`), but deliberately gets NO
+  // extra `(slug, id)` composite: `slug` is `@unique`, so no two rows can
+  // ever tie on it, which makes an `id` tie-breaker structurally impossible
+  // to need. Verified empirically (`EXPLAIN`): the existing unique index
+  // alone already serves `ORDER BY slug, id` in both directions via a cheap
+  // Incremental Sort with one presorted group — adding the composite index
+  // was pure write-overhead with no read benefit.
   @@index([name, id])
-  @@index([slug, id])
   @@index([createdAt, id])
   @@index([updatedAt, id])
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)

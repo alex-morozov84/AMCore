@@ -1,6 +1,9 @@
-import { RequestMethod } from '@nestjs/common'
+import { Controller, Get, type INestApplication, RequestMethod } from '@nestjs/common'
+import { Test } from '@nestjs/testing'
 import type { ClsService } from 'nestjs-cls'
+import { LoggerModule } from 'nestjs-pino'
 import { PassThrough } from 'stream'
+import request from 'supertest'
 
 import { createLoggingConfig, truncateBody } from './logging.config'
 
@@ -225,8 +228,73 @@ describe('createLoggingConfig', () => {
         }
       )
 
+      // Checked in both forms — see the real-HTTP-cycle test below for why
+      // checking only the decoded SENTINEL is not sufficient on its own.
       expect(output).not.toContain(SENTINEL)
+      expect(output).not.toContain(encodeURIComponent(SENTINEL))
       expect(output).toContain('[REDACTED]')
+    })
+
+    /**
+     * The tests above drive the real `pino` redact/serializer pipeline, but
+     * with a hand-built `fakeReq` — they cannot prove the *real* Express
+     * request object `nestjs-pino`'s `pino-http` middleware constructs
+     * actually has the assumed `url`/`query` shape once it reaches
+     * `createLoggingConfig`'s serializer. This drives an actual HTTP request
+     * through a real `LoggerModule`-wired Nest app (same wiring
+     * `app-imports.ts` uses, minus the dev-only `pino-pretty` transport,
+     * which pipes through an async worker thread this test can't
+     * deterministically await — `stream` and `transport` are also mutually
+     * exclusive at the pino level).
+     */
+    it('redacts the sentinel through a real Nest HTTP request/response cycle', async () => {
+      @Controller()
+      class SentinelProbeController {
+        @Get('probe')
+        probe(): { ok: true } {
+          return { ok: true }
+        }
+      }
+
+      const config = createLoggingConfig(clsServiceMock, 4096)
+      const { transport: _devTransport, ...pinoHttpWithoutTransport } = config.pinoHttp as Record<
+        string,
+        unknown
+      >
+      const stream = new PassThrough()
+      let output = ''
+      stream.on('data', (chunk) => {
+        output += chunk.toString()
+      })
+
+      const moduleRef = await Test.createTestingModule({
+        imports: [LoggerModule.forRoot({ pinoHttp: { ...pinoHttpWithoutTransport, stream } })],
+        controllers: [SentinelProbeController],
+      }).compile()
+
+      const app: INestApplication = moduleRef.createNestApplication()
+      await app.init()
+
+      try {
+        await request(app.getHttpServer())
+          .get(`/probe?search=${encodeURIComponent(SENTINEL)}&page=2`)
+          .expect(200)
+      } finally {
+        await app.close()
+      }
+
+      // Two checks, not one: `req.query.search` is redacted separately from
+      // `req.url`, and `req.url` carries the term percent-encoded (`@` ->
+      // `%40`), not the literal decoded string — checking only the decoded
+      // form would pass even with `url` sanitization completely broken,
+      // since the query-object redaction alone already hides the decoded
+      // form. Verified by deliberately reverting the `url` fix locally: with
+      // only `expect(output).not.toContain(SENTINEL)`, this test still
+      // passed, because the leak was there in percent-encoded form only.
+      expect(output).not.toContain(SENTINEL)
+      expect(output).not.toContain(encodeURIComponent(SENTINEL))
+      expect(output).toContain('[REDACTED]')
+      expect(output).toContain('page=2')
     })
 
     it('preserves the path and non-sensitive query keys in the sanitized url', () => {
@@ -240,6 +308,8 @@ describe('createLoggingConfig', () => {
       expect(parsed.req.url).toContain('page=2')
       expect(parsed.req.url).toContain('sortBy=name')
       expect(parsed.req.url).not.toContain(SENTINEL)
+      expect(parsed.req.url).not.toContain(encodeURIComponent(SENTINEL))
+      expect(parsed.req.url).toBe('/api/v1/admin/users?search=%5BREDACTED%5D&page=2&sortBy=name')
     })
 
     it('leaves a url with no sensitive query key unchanged', () => {
