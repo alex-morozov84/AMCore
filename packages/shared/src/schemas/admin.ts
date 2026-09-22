@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { SystemRole } from '../enums'
 
 import { userResponseSchema } from './auth'
-import { paginatedResponseSchema } from './pagination'
+import { paginatedResponseSchema, paginationQuerySchema } from './pagination'
 
 /** Update user system role (SUPER_ADMIN only) */
 export const updateUserSystemRoleSchema = z.object({
@@ -33,6 +33,48 @@ export const adminUserListResponseSchema = paginatedResponseSchema(adminUserResp
 
 export type AdminUserListResponse = z.infer<typeof adminUserListResponseSchema>
 
+/** Shared sort direction for every admin discovery list query. */
+export const adminSortOrderSchema = z.enum(['asc', 'desc'])
+
+export type AdminSortOrder = z.infer<typeof adminSortOrderSchema>
+
+/**
+ * Normalizes a raw `search` query value to "no filter" on missing or
+ * whitespace-only input. `.trim().min(1)` alone would 400 on a
+ * whitespace-only value instead of treating it as absent — this runs
+ * after the raw string has already passed its length bound, so an
+ * oversized value is still rejected before normalization ever sees it.
+ */
+function normalizeSearch(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined
+  const trimmed = value.trim()
+  return trimmed === '' ? undefined : trimmed
+}
+
+/**
+ * Users discovery list query (`GET /admin/users`). `sortOrder` has no
+ * schema-level default: the per-field default direction (ascending for
+ * text, descending for a timestamp) is resolved in `AdminService`, not
+ * hardcoded once here.
+ */
+export const ADMIN_USER_SORT_FIELDS = [
+  'name',
+  'email',
+  'lastLoginAt',
+  'createdAt',
+  'updatedAt',
+] as const
+
+export type AdminUserSortField = (typeof ADMIN_USER_SORT_FIELDS)[number]
+
+export const adminUserListQuerySchema = paginationQuerySchema.extend({
+  search: z.string().max(255).optional().transform(normalizeSearch),
+  sortBy: z.enum(ADMIN_USER_SORT_FIELDS).default('createdAt'),
+  sortOrder: adminSortOrderSchema.optional(),
+})
+
+export type AdminUserListQuery = z.infer<typeof adminUserListQuerySchema>
+
 /**
  * Admin-facing organization response (OA-08).
  *
@@ -55,6 +97,19 @@ export const adminOrganizationListResponseSchema = paginatedResponseSchema(
 )
 
 export type AdminOrganizationListResponse = z.infer<typeof adminOrganizationListResponseSchema>
+
+/** Organizations discovery list query (`GET /admin/organizations`) — same contract shape as Users. */
+export const ADMIN_ORGANIZATION_SORT_FIELDS = ['name', 'slug', 'createdAt', 'updatedAt'] as const
+
+export type AdminOrganizationSortField = (typeof ADMIN_ORGANIZATION_SORT_FIELDS)[number]
+
+export const adminOrganizationListQuerySchema = paginationQuerySchema.extend({
+  search: z.string().max(255).optional().transform(normalizeSearch),
+  sortBy: z.enum(ADMIN_ORGANIZATION_SORT_FIELDS).default('createdAt'),
+  sortOrder: adminSortOrderSchema.optional(),
+})
+
+export type AdminOrganizationListQuery = z.infer<typeof adminOrganizationListQuerySchema>
 
 /**
  * Manual cleanup-run result (`POST /admin/cleanup`).

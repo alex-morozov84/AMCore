@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operations Console discovery — backend foundation.** `GET /admin/users`
+  and `GET /admin/organizations` accept new optional `search`/`sortBy`/
+  `sortOrder` query parameters: case-insensitive literal-contains search
+  (Users over name/email, Organizations over name/slug) and stable,
+  allowlisted sorting with a deterministic tie-breaker, both operating over
+  the full dataset (ADR-082). A request with none of the new parameters is
+  unaffected. Backend-only in this change — the Users/Organizations console
+  panels do not yet expose search/sort controls in the UI.
+
 - **Operations Console: Users panel.** Adds a read-only, paginated inventory
   of platform users with identity, email-verification state, current system
   role, last sign-in, and created/updated timestamps. It reuses the existing

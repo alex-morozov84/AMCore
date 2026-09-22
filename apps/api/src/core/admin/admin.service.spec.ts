@@ -1,7 +1,12 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 
-import { type RequestPrincipal, SystemRole } from '@amcore/shared'
+import {
+  type AdminOrganizationListQuery,
+  type AdminUserListQuery,
+  type RequestPrincipal,
+  SystemRole,
+} from '@amcore/shared'
 
 import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions'
 import type { CleanupService } from '../../infrastructure/schedule/cleanup.service'
@@ -57,6 +62,30 @@ describe('AdminService', () => {
     systemRole: SystemRole.SuperAdmin,
   }
 
+  function userQuery(overrides: Partial<AdminUserListQuery> = {}): AdminUserListQuery {
+    return {
+      page: 1,
+      limit: 20,
+      sortBy: 'createdAt',
+      search: undefined,
+      sortOrder: undefined,
+      ...overrides,
+    }
+  }
+
+  function orgQuery(
+    overrides: Partial<AdminOrganizationListQuery> = {}
+  ): AdminOrganizationListQuery {
+    return {
+      page: 1,
+      limit: 20,
+      sortBy: 'createdAt',
+      search: undefined,
+      sortOrder: undefined,
+      ...overrides,
+    }
+  }
+
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
     cleanupService = { runCleanup: jest.fn() }
@@ -92,7 +121,7 @@ describe('AdminService', () => {
       prisma.user.findMany.mockResolvedValue([mockUser])
       prisma.user.count.mockResolvedValue(1)
 
-      const result = await service.findAllUsers(1, 20)
+      const result = await service.findAllUsers(userQuery())
 
       expect(result.total).toBe(1)
       expect(result.page).toBe(1)
@@ -107,7 +136,7 @@ describe('AdminService', () => {
       prisma.user.findMany.mockResolvedValue([])
       prisma.user.count.mockResolvedValue(0)
 
-      const result = await service.findAllUsers(2, 10)
+      const result = await service.findAllUsers(userQuery({ page: 2, limit: 10 }))
 
       expect(result.page).toBe(2)
       expect(result.limit).toBe(10)
@@ -125,7 +154,7 @@ describe('AdminService', () => {
       prisma.user.findMany.mockResolvedValue([])
       prisma.user.count.mockResolvedValue(0)
 
-      await service.findAllUsers(1, 20)
+      await service.findAllUsers(userQuery())
 
       expect(prisma.user.findMany).toHaveBeenCalledTimes(1)
       const arg = prisma.user.findMany.mock.calls[0]![0]!
@@ -150,7 +179,7 @@ describe('AdminService', () => {
       prisma.user.findMany.mockResolvedValue([mockUser])
       prisma.user.count.mockResolvedValue(1)
 
-      const result = await service.findAllUsers(1, 20)
+      const result = await service.findAllUsers(userQuery())
       expect(result.data).toHaveLength(1)
       const user = result.data[0]!
 
@@ -162,6 +191,82 @@ describe('AdminService', () => {
       expect(user.updatedAt).toBe(updatedAt.toISOString())
       expect(user.lastLoginAt).toBe(lastLoginAt.toISOString())
     })
+
+    it('no-params query reproduces the pre-discovery default order: createdAt desc, id tie-break', async () => {
+      prisma.user.findMany.mockResolvedValue([])
+      prisma.user.count.mockResolvedValue(0)
+
+      await service.findAllUsers(userQuery())
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: undefined,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        })
+      )
+      expect(prisma.user.count).toHaveBeenCalledWith({ where: undefined })
+    })
+
+    it('search builds a case-insensitive OR over name/email and reuses the identical where for count', async () => {
+      prisma.user.findMany.mockResolvedValue([])
+      prisma.user.count.mockResolvedValue(0)
+
+      await service.findAllUsers(userQuery({ search: 'alice' }))
+
+      const expectedWhere = {
+        OR: [
+          { name: { contains: 'alice', mode: 'insensitive' } },
+          { email: { contains: 'alice', mode: 'insensitive' } },
+        ],
+      }
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expectedWhere })
+      )
+      expect(prisma.user.count).toHaveBeenCalledWith({ where: expectedWhere })
+    })
+
+    it('escapes LIKE metacharacters in a search term so they match literally', async () => {
+      prisma.user.findMany.mockResolvedValue([])
+      prisma.user.count.mockResolvedValue(0)
+
+      await service.findAllUsers(userQuery({ search: '50%_off' }))
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { name: { contains: '50\\%\\_off', mode: 'insensitive' } },
+              { email: { contains: '50\\%\\_off', mode: 'insensitive' } },
+            ],
+          },
+        })
+      )
+    })
+
+    it.each([
+      ['name', undefined, [{ name: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }]],
+      ['name', 'desc', [{ name: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }]],
+      ['email', undefined, [{ email: 'asc' }, { id: 'asc' }]],
+      [
+        'lastLoginAt',
+        undefined,
+        [{ lastLoginAt: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+      ],
+      ['createdAt', 'asc', [{ createdAt: 'asc' }, { id: 'asc' }]],
+      ['updatedAt', undefined, [{ updatedAt: 'desc' }, { id: 'desc' }]],
+    ] as const)(
+      'resolves orderBy for sortBy=%s sortOrder=%s',
+      async (sortBy, sortOrder, expected) => {
+        prisma.user.findMany.mockResolvedValue([])
+        prisma.user.count.mockResolvedValue(0)
+
+        await service.findAllUsers(userQuery({ sortBy, sortOrder }))
+
+        expect(prisma.user.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ orderBy: expected })
+        )
+      }
+    )
   })
 
   describe('updateUserSystemRole', () => {
@@ -471,7 +576,7 @@ describe('AdminService', () => {
       prisma.organization.findMany.mockResolvedValue([mockOrg])
       prisma.organization.count.mockResolvedValue(1)
 
-      const result = await service.findAllOrganizations(1, 20)
+      const result = await service.findAllOrganizations(orgQuery())
 
       expect(result.total).toBe(1)
       expect(result.page).toBe(1)
@@ -488,7 +593,7 @@ describe('AdminService', () => {
       prisma.organization.findMany.mockResolvedValue([])
       prisma.organization.count.mockResolvedValue(0)
 
-      await service.findAllOrganizations(1, 20)
+      await service.findAllOrganizations(orgQuery())
 
       const arg = prisma.organization.findMany.mock.calls[0]![0]!
       expect(arg.select).toBeDefined()
@@ -506,7 +611,7 @@ describe('AdminService', () => {
       prisma.organization.findMany.mockResolvedValue([mockOrg])
       prisma.organization.count.mockResolvedValue(1)
 
-      const result = await service.findAllOrganizations(1, 20)
+      const result = await service.findAllOrganizations(orgQuery())
       expect(result.data).toHaveLength(1)
       const org = result.data[0]!
 
@@ -515,5 +620,57 @@ describe('AdminService', () => {
       expect(typeof org.updatedAt).toBe('string')
       expect(org.createdAt).toBe(createdAt.toISOString())
     })
+
+    it('no-params query reproduces the pre-discovery default order: createdAt desc, id tie-break', async () => {
+      prisma.organization.findMany.mockResolvedValue([])
+      prisma.organization.count.mockResolvedValue(0)
+
+      await service.findAllOrganizations(orgQuery())
+
+      expect(prisma.organization.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: undefined,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        })
+      )
+      expect(prisma.organization.count).toHaveBeenCalledWith({ where: undefined })
+    })
+
+    it('search builds a case-insensitive OR over name/slug and reuses the identical where for count', async () => {
+      prisma.organization.findMany.mockResolvedValue([])
+      prisma.organization.count.mockResolvedValue(0)
+
+      await service.findAllOrganizations(orgQuery({ search: 'acme' }))
+
+      const expectedWhere = {
+        OR: [
+          { name: { contains: 'acme', mode: 'insensitive' } },
+          { slug: { contains: 'acme', mode: 'insensitive' } },
+        ],
+      }
+      expect(prisma.organization.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expectedWhere })
+      )
+      expect(prisma.organization.count).toHaveBeenCalledWith({ where: expectedWhere })
+    })
+
+    it.each([
+      ['name', undefined, [{ name: 'asc' }, { id: 'asc' }]],
+      ['slug', 'desc', [{ slug: 'desc' }, { id: 'desc' }]],
+      ['createdAt', undefined, [{ createdAt: 'desc' }, { id: 'desc' }]],
+      ['updatedAt', 'asc', [{ updatedAt: 'asc' }, { id: 'asc' }]],
+    ] as const)(
+      'resolves orderBy for sortBy=%s sortOrder=%s',
+      async (sortBy, sortOrder, expected) => {
+        prisma.organization.findMany.mockResolvedValue([])
+        prisma.organization.count.mockResolvedValue(0)
+
+        await service.findAllOrganizations(orgQuery({ sortBy, sortOrder }))
+
+        expect(prisma.organization.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ orderBy: expected })
+        )
+      }
+    )
   })
 })

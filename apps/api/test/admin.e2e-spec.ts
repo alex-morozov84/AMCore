@@ -132,6 +132,189 @@ describe('Admin (e2e)', () => {
   })
 
   /**
+   * Admin discovery (search/sort, ADR-082). Real Postgres round trip: proves
+   * the `pg_trgm`-backed literal-contains search and the allowlisted sort
+   * contract actually work against the database, not just against a Prisma
+   * mock (`admin.service.spec.ts` already covers the query-construction
+   * unit contract).
+   */
+  describe('Admin discovery: search + sort', () => {
+    async function registerNamedUser(email: string, name: string) {
+      const res = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password: 'StrongP@ss123', name })
+        .expect(201)
+      return res.body.user.id as string
+    }
+
+    describe('GET /admin/users?search=', () => {
+      it('matches by name OR email, case-insensitively', async () => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+        await registerNamedUser('wonderland@example.com', 'Alice Wonderland')
+        await registerNamedUser('bob@example.com', 'Bob Builder')
+
+        const byName = await request(app.getHttpServer())
+          .get('/admin/users?search=WONDER')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+        expect(byName.body.data).toHaveLength(1)
+        expect(byName.body.data[0].email).toBe('wonderland@example.com')
+
+        const byEmail = await request(app.getHttpServer())
+          .get('/admin/users?search=wonderland@ex')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+        expect(byEmail.body.data).toHaveLength(1)
+      })
+
+      it('treats a whitespace-only search as no filter', async () => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+        await registerNamedUser('whitespace-check@example.com', 'Ann')
+
+        const filtered = await request(app.getHttpServer())
+          .get('/admin/users?search=%20%20%20')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+        const unfiltered = await request(app.getHttpServer())
+          .get('/admin/users')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+
+        expect(filtered.body.total).toBe(unfiltered.body.total)
+      })
+
+      it('matches a literal % / _ / \\ in a search term rather than treating it as a wildcard', async () => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+        await registerNamedUser('literal@example.com', '50%_off\\deal')
+        await registerNamedUser('unrelated@example.com', 'Someone Else')
+
+        const res = await request(app.getHttpServer())
+          .get(`/admin/users?search=${encodeURIComponent('50%_off\\deal')}`)
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+
+        expect(res.body.data).toHaveLength(1)
+        expect(res.body.data[0].email).toBe('literal@example.com')
+      })
+
+      it('matches a Cyrillic name case-insensitively', async () => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+        await registerNamedUser('anna@example.com', 'Анна Иванова')
+
+        const res = await request(app.getHttpServer())
+          .get(`/admin/users?search=${encodeURIComponent('иванов')}`)
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+
+        expect(res.body.data).toHaveLength(1)
+      })
+
+      it('returns a 200 with an empty page for a search matching nothing', async () => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+
+        const res = await request(app.getHttpServer())
+          .get('/admin/users?search=no-such-user-anywhere')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+
+        expect(res.body.total).toBe(0)
+        expect(res.body.data).toEqual([])
+      })
+    })
+
+    describe('GET /admin/users?sortBy=&sortOrder=', () => {
+      it('sorts by name ascending by default', async () => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+        await registerNamedUser('zed@example.com', 'Zed')
+        await registerNamedUser('amy@example.com', 'Amy')
+
+        const res = await request(app.getHttpServer())
+          .get('/admin/users?sortBy=name')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+
+        const names = res.body.data.map((u: { name: string | null }) => u.name).filter(Boolean)
+        const sorted = [...names].sort((a, b) => a.localeCompare(b))
+        expect(names).toEqual(sorted)
+      })
+
+      it('reverses with sortOrder=desc', async () => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+        await registerNamedUser('zed@example.com', 'Zed')
+        await registerNamedUser('amy@example.com', 'Amy')
+
+        const res = await request(app.getHttpServer())
+          .get('/admin/users?sortBy=name&sortOrder=desc')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+
+        const names = res.body.data.map((u: { name: string | null }) => u.name).filter(Boolean)
+        const sorted = [...names].sort((a, b) => b.localeCompare(a))
+        expect(names).toEqual(sorted)
+      })
+    })
+
+    describe('invalid discovery query values', () => {
+      it.each([
+        ['?sortBy=systemRole', 'unallowlisted sortBy'],
+        ['?sortBy=emailVerified', 'unallowlisted sortBy'],
+        ['?sortOrder=ascending', 'invalid sortOrder'],
+        [`?search=${encodeURIComponent('a'.repeat(256))}`, 'oversized search'],
+      ])('GET /admin/users%s → 400 (%s)', async (qs) => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+
+        await request(app.getHttpServer())
+          .get(`/admin/users${qs}`)
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(400)
+      })
+    })
+
+    describe('GET /admin/organizations?search=&sortBy=', () => {
+      it('matches by name OR slug, case-insensitively', async () => {
+        const { userId, token: userToken } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+        await request(app.getHttpServer())
+          .post('/organizations')
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({ name: 'Acme Rockets' })
+          .expect(201)
+        await request(app.getHttpServer())
+          .post('/organizations')
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({ name: 'Umbrella Corp' })
+          .expect(201)
+
+        const res = await request(app.getHttpServer())
+          .get('/admin/organizations?search=ACME')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(200)
+
+        expect(res.body.data).toHaveLength(1)
+        expect(res.body.data[0].name).toBe('Acme Rockets')
+      })
+
+      it('rejects a sortBy that is only valid for Users', async () => {
+        const { userId } = await registerAndGetToken('superadmin@example.com')
+        const superToken = await promoteToSuperAdmin(userId)
+
+        await request(app.getHttpServer())
+          .get('/admin/organizations?sortBy=email')
+          .set('Authorization', `Bearer ${superToken}`)
+          .expect(400)
+      })
+    })
+  })
+
+  /**
    * OA-07: admin responses must not expose `passwordHash` (argon2 hash)
    * or `emailCanonical` (internal normalization). `ZodSerializerDto`
    * strips anything outside `adminUserResponseSchema` at the transport
