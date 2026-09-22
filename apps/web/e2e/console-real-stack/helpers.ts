@@ -25,6 +25,32 @@ export function setSystemRole(email: string, role: 'USER' | 'SUPER_ADMIN'): void
   )
 }
 
+/** See `e2e/real-stack/admin-helpers.ts`'s `ageSessionLastAuthAt` — same
+ * reason, same fixed offset, host-mode's own compose project/exec form. */
+export function ageSessionLastAuthAt(email: string): void {
+  execFileSync(
+    'docker',
+    [
+      'compose',
+      '-p',
+      project,
+      'exec',
+      '-T',
+      'postgres',
+      'psql',
+      '-U',
+      'amcore',
+      '-d',
+      'amcore',
+      '-c',
+      `UPDATE core.sessions SET "lastAuthAt" = now() - interval '20 minutes' ` +
+        `WHERE "userId" = (SELECT id FROM core.users WHERE "emailCanonical" = '${email}') ` +
+        `AND "revokedAt" IS NULL;`,
+    ],
+    { stdio: 'pipe' }
+  )
+}
+
 export function redisKeys(namespace: string): string[] {
   const output = execFileSync(
     'docker',

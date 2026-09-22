@@ -34,6 +34,53 @@ export function setSystemRole(email: string, role: 'USER' | 'SUPER_ADMIN'): void
   )
 }
 
+/**
+ * Counts a user's live (non-revoked) backend session rows. A role change
+ * deletes them outright, but an already-issued, still-time-valid access
+ * token keeps working in the browser until it naturally expires or is
+ * refreshed — deleting the row does not retroactively invalidate it. So the
+ * database, not an immediate browser redirect, is the correct place to
+ * assert that a role change actually revoked the target's sessions.
+ */
+export function countLiveSessions(email: string): number {
+  const output = composeExec(
+    'postgres',
+    'psql',
+    '-U',
+    'amcore',
+    '-d',
+    'amcore',
+    '-t',
+    '-A',
+    '-c',
+    `SELECT count(*) FROM core.sessions s JOIN core.users u ON u.id = s."userId" ` +
+      `WHERE u."emailCanonical" = '${email}' AND s."revokedAt" IS NULL;`
+  )
+  return Number(output.trim())
+}
+
+/**
+ * Ages a user's live session(s) well past `STEP_UP_MAX_AGE_SECONDS` (default
+ * 600s) so the next `@RequireFreshAuth` route (e.g. the role-change PATCH)
+ * returns `STEP_UP_REQUIRED` instead of succeeding silently. A freshly
+ * logged-in operator is always inside the freshness window, so this is the
+ * only way a real-stack test can open the step-up dialog deterministically.
+ */
+export function ageSessionLastAuthAt(email: string): void {
+  composeExec(
+    'postgres',
+    'psql',
+    '-U',
+    'amcore',
+    '-d',
+    'amcore',
+    '-c',
+    `UPDATE core.sessions SET "lastAuthAt" = now() - interval '20 minutes' ` +
+      `WHERE "userId" = (SELECT id FROM core.users WHERE "emailCanonical" = '${email}') ` +
+      `AND "revokedAt" IS NULL;`
+  )
+}
+
 /** See `e2e/console-real-stack/helpers.ts`'s `createOrganization` for why a random UUID is fine here. */
 export function createOrganization(name: string, slug: string): void {
   composeExec(
