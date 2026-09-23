@@ -17,18 +17,29 @@ function scriptKind(path) {
   return ts.ScriptKind.JS
 }
 
-function rootCallName(node) {
-  if (ts.isCallExpression(node)) return rootCallName(node.expression)
-  if (ts.isPropertyAccessExpression(node)) return rootCallName(node.expression)
-  return ts.isIdentifier(node) ? node.text : null
+function wrapperParts(node) {
+  if (ts.isIdentifier(node)) return [node.text]
+  if (ts.isPropertyAccessExpression(node)) {
+    const parts = wrapperParts(node.expression)
+    return parts && [...parts, node.name.text]
+  }
+  if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+    return node.expression.name.text === 'each' ? wrapperParts(node.expression) : null
+  }
+  return null
+}
+
+function isWrapperCall(node) {
+  const parts = wrapperParts(node)
+  if (!parts || !['describe', 'test', 'it'].includes(parts[0])) return false
+  if (parts[0] === 'test' && parts[1] === 'describe') parts.splice(1, 1)
+  return parts.slice(1).every((part) => ['only', 'skip', 'concurrent', 'each'].includes(part))
 }
 
 function isTestCallback(node) {
   const call = node.parent
   return (
-    ts.isCallExpression(call) &&
-    call.arguments.includes(node) &&
-    ['describe', 'test', 'it'].includes(rootCallName(call.expression))
+    ts.isCallExpression(call) && call.arguments.includes(node) && isWrapperCall(call.expression)
   )
 }
 

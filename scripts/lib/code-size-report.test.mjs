@@ -39,12 +39,35 @@ test('test wrappers are omitted but nested helpers are reported', () => {
       'it.skip',
       'test.concurrent',
       'describe.each([1])',
+      'test.describe',
+      'test.describe.only',
+      'test.describe.skip',
     ]) {
       repo.write('helper.test.ts', `${call}('suite', () => {\n${longHelper}\n})\n`)
       const result = repo.run()
       assert.equal(result.status, 0)
       assert.match(result.stdout, /helper @ 2: 30 lines \[review size\]/)
       assert.doesNotMatch(result.stdout, /<callback>/)
+    }
+  } finally {
+    repo.close()
+  }
+})
+
+test('unknown test members are reported while true wrappers omit only their callback', () => {
+  const repo = fixture()
+  try {
+    const callback = ['() => {', ...Array(28).fill('  void 0'), '}'].join('\n')
+    for (const call of ['test.step', 'test.helper']) {
+      repo.write(
+        'step.test.ts',
+        `test.describe('suite', () => {\n${call}('setup', ${callback})\n${longHelper}\n})\n`
+      )
+      const result = repo.run()
+      assert.equal(result.status, 0)
+      assert.match(result.stdout, /<callback> @ 2: 30 lines \[review size\]/)
+      assert.match(result.stdout, /helper @ 32: 30 lines \[review size\]/)
+      assert.doesNotMatch(result.stdout, /<callback> @ 1:/)
     }
   } finally {
     repo.close()
