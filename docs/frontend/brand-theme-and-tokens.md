@@ -350,6 +350,11 @@ plus stale, ambiguous, and duplicate declarations, fail during planning before
 the filesystem transaction starts. Shared helpers survive
 removal when an independent production consumer still reaches them; helpers
 and linked tests used only by the Console are removed together.
+The fast check follows resolved relative imports into files removed by a
+selected feature projection. A new test outside a closed root that imports a
+registered Console helper must itself be registered or use a declared seam.
+Named universal-module expectations flag newly retained shared modules for
+review.
 
 The Storybook transform uses the same ownership contract: its closed config
 root and co-located `*.stories.tsx` verification files are discovered
@@ -368,6 +373,12 @@ Use the ownership boundary, not a list of every feature file:
   boundary. Register an owned block, config field, structural operation, or
   other declared extension point; a detectable forgotten contribution fails
   with the feature, path, marker, and registration action.
+- Anchor an owned documentation block on stable prose or an explicit marker.
+  A numbered-list item's ordinal can change when another step is inserted;
+  an explicitly prefix-preserving block can retain the source list number.
+- In Console UI tests, derive topology-dependent navigation expectations from
+  `getConsole*Href()` or set a path/host fixture in the same test case. URLs
+  supplied as mock or `baseHref` inputs and backend API paths remain valid.
 - A new literal, prose statement, or config concept with no registered import,
   identifier, or marker has no mechanically knowable feature meaning. The
   author and reviewer must classify it and add a marker/seam when it belongs to

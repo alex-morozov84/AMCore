@@ -10,8 +10,9 @@ import { operationsConsoleOwnership } from './operations-console-ownership.mjs'
 import { assertExactScaffoldCounts } from './scaffold-exact-counts.mjs'
 import { validateOwnership } from './ownership-validate.mjs'
 import { createRealRepoCopy } from './test-fixture.mjs'
+import { resolvePublicRepoRoot } from './working-tree-fixture.mjs'
 
-const root = process.cwd()
+const root = resolvePublicRepoRoot()
 
 function cloneManifest(change) {
   const manifest = JSON.parse(JSON.stringify(operationsConsoleOwnership))
@@ -50,9 +51,17 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   )
   assert.equal([...graph.forward.values()].flat().length, [...graph.reverse.values()].flat().length)
   assertExactScaffoldCounts([
-    { name: 'console closed-root files', expected: 124, actual: [...inventory.rootFiles.values()].flat().length },
+    {
+      name: 'console closed-root files',
+      expected: 124,
+      actual: [...inventory.rootFiles.values()].flat().length,
+    },
     { name: 'console dead shared modules', expected: 9, actual: projection.deadSharedModules.size },
-    { name: 'console universal shared modules', expected: 0, actual: projection.universalSharedModules.size },
+    {
+      name: 'console universal shared modules',
+      expected: 0,
+      actual: projection.universalSharedModules.size,
+    },
   ])
 })
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, test } from 'node:test'
 
@@ -7,13 +7,13 @@ import { defineOwnershipManifest } from './ownership-manifest.mjs'
 import { buildProjectStorybookFacts } from './project-storybook-facts.mjs'
 import { validateOwnership } from './ownership-validate.mjs'
 import { storybookOwnership } from './storybook-ownership.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 let copy
 afterEach(() => copy?.cleanup())
 
 function fixture() {
-  copy = createRealRepoCopy()
+  copy = createWorkingTreeCopy()
   return copy.root
 }
 
@@ -90,6 +90,22 @@ describe('Storybook ownership discovery', () => {
     assert.throws(
       () => validateOwnership(root, manifest),
       (error) => error?.code === 'unresolved-dynamic-reference'
+    )
+  })
+
+  test('detects an uncommitted stale doc anchor in the working-tree copy', () => {
+    const root = fixture()
+    const relative = 'docs/operations-console/development.md'
+    const target = path.join(root, relative)
+    const content = readFileSync(target, 'utf8')
+    write(root, relative, content.replace('Add focused unit tests', 'Write focused unit tests'))
+    assert.throws(
+      () => validateOwnership(root, storybookOwnership),
+      (error) =>
+        error?.code === 'manifest-cardinality-mismatch' &&
+        error.message.includes(relative) &&
+        error.message.includes('start') &&
+        error.message.includes('found 0')
     )
   })
 })

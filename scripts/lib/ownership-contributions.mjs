@@ -8,6 +8,7 @@ import { seamCoversDetector } from './ownership-seams.mjs'
 import { identifierOccurrences, rangesOverlap, seamRanges } from './ownership-seam-ranges.mjs'
 
 function featureTargets(manifest, inventory, projection) {
+  if (projection) return new Set(projection.removed)
   const targets = filesInRoots(inventory)
   const shared = filesForFacts(inventory, manifest.facts.sharedModules)
   for (const file of shared) {
@@ -68,7 +69,7 @@ function collectMissing(root, manifest, inventory, graph, changedFiles, projecti
   const scope = changedFiles ?? [...inventory.surface.keys()]
   const missing = []
   for (const file of scope.filter((item) => inventory.surface.get(item) === 'file')) {
-    if (exempt.has(file)) continue
+    if (exempt.has(file) || projection?.removed.has(file)) continue
     const result = detectorsForFile(root, file, manifest, graph, targets, options.contents)
     for (const contribution of result.detected) {
       if (!declared(manifest, file, contribution, result.content)) {

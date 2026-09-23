@@ -7,8 +7,9 @@ import { OWNERSHIP_CODES, OwnershipError } from './ownership-errors.mjs'
 import { buildProjectFactPlan } from './project-fact-plan.mjs'
 import { validateProjectLocaleOwnership } from './project-locale-plan.mjs'
 import { createRealRepoCopy } from './test-fixture.mjs'
+import { resolvePublicRepoRoot } from './working-tree-fixture.mjs'
 
-const root = process.cwd()
+const root = resolvePublicRepoRoot()
 
 function allSteps(plan) {
   return [

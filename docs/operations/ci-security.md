@@ -56,16 +56,22 @@ of workflow self-hardening to keep the example forkable.
   APIs against the committed dashboard JSON, a real Grafana→Prometheus query
   round trip, and a from-scratch Grafana old-volume migration smoke.
 - **Scaffolding contract (fast)** — job id `scaffolding-contract`, runs
-  `pnpm test:scripts:fast` — every `pnpm init:brand`/`pnpm init:project`
-  before/after fixture in `scripts/lib/` still matches the real file it
-  targets, the fixture-composition invariants (no two edit steps target the
-  same file, every scaffold dimension composes safely with every other), and
+  `pnpm test:scripts:fast` — scaffold before/after fixtures in `scripts/lib/`
+  still match their source snapshot, the fixture-composition invariants
+  (no two edit steps target the same file, every scaffold dimension composes
+  safely with every other), and
   the `scripts/measure/` baseline-measurement tool's own unit/inventory-
   contract tests plus real, fast failure-path regressions (an install
   exception, a failed command, partial internal verification preserved on a
   failed run). Read-only against the real repo — the disposable repo copies
   a few of these tests create never run a real `pnpm install` inside them,
   only the job's own top-level `pnpm install --frozen-lockfile` — no Docker.
+  Fast ownership and operation-inventory checks read the current public working
+  tree, including non-ignored untracked files. Mutation fixtures use an
+  isolated copy of that tree; generated-project scenarios still start from
+  committed `HEAD`.
+  A narrow fast assertion check also flags default Console page URLs expected
+  without a test-local topology input.
   `test:scripts:fast` is also the first half of the local aggregate
   `pnpm test:scripts` command, so local full verification cannot omit it.
   CI does not repeat this layer inside the parallel full job. Does **not** cover the
