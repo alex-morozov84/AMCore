@@ -3,7 +3,7 @@
 // applies them, installs dependencies, or derives expectations from output.
 import { existsSync, lstatSync } from 'node:fs'
 import path from 'node:path'
-import { createRealRepoCopy } from '../lib/test-fixture.mjs'
+import { resolvePublicRepoRoot } from '../lib/working-tree-fixture.mjs'
 import { parseProjectFlags } from '../lib/project-flags.mjs'
 import { DEFAULT_ADMIN_CONSOLE_SLUG } from '../lib/project-config-admin-console.mjs'
 import { prepareProjectInit } from '../lib/project-init-plan.mjs'
@@ -72,11 +72,11 @@ function sumMigration(plans) {
 }
 
 export function buildOperationInventory() {
-  const copy = createRealRepoCopy()
+  const root = resolvePublicRepoRoot()
   const previousMeasurementMode = process.env.AMCORE_MEASURE_OPERATIONS
   process.env.AMCORE_MEASURE_OPERATIONS = '1'
   try {
-    const plans = INVENTORY_SCENARIOS.map((scenario) => scenarioInventory(copy.root, scenario))
+    const plans = INVENTORY_SCENARIOS.map((scenario) => scenarioInventory(root, scenario))
     const operations = plans.flatMap((plan) => plan.operations)
     return {
       operations,
@@ -86,6 +86,5 @@ export function buildOperationInventory() {
   } finally {
     if (previousMeasurementMode === undefined) delete process.env.AMCORE_MEASURE_OPERATIONS
     else process.env.AMCORE_MEASURE_OPERATIONS = previousMeasurementMode
-    copy.cleanup()
   }
 }

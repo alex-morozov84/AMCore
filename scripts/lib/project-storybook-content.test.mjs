@@ -88,12 +88,12 @@ describe('Storybook structural content', () => {
     writeFileSync(target, original.replace("`apps/web`'s test surface (Track 7, **ADR-069**;", ''))
     assert.throws(
       () => materializeProjectContentPath(root, pathname, [operation]),
-      /exactly one anchor/
+      /start .* expected 1 found 0; end .* expected 1 found 1/
     )
     writeFileSync(target, `${original}\n\`apps/web\`'s test surface (Track 7, **ADR-069**;\n`)
     assert.throws(
       () => materializeProjectContentPath(root, pathname, [operation]),
-      /exactly one anchor/
+      /start .* expected 1 found 2; end .* expected 1 found 1/
     )
   })
 

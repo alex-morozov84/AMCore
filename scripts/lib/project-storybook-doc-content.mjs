@@ -1,4 +1,5 @@
 import { storybookOwnership } from './storybook-ownership.mjs'
+import { assertBlockOrder, ownedBlockPrefix } from './ownership-seams.mjs'
 
 function uniqueIndex(text, needle, label) {
   const first = text.indexOf(needle)
@@ -23,13 +24,18 @@ function removeOrReplace(text, seam) {
     const match = uniqueIndex(text, selector.text, seam.id)
     return text.slice(0, lineStart(text, match)) + text.slice(lineEnd(text, match))
   }
+  assertBlockOrder(text, seam, seam.path)
   const startMatch = uniqueIndex(text, selector.start, `${seam.id} start`)
   const endMatch = uniqueIndex(text, selector.end, `${seam.id} end`)
   if (endMatch < startMatch) throw new Error(`${seam.id} end precedes start`)
   const start = lineStart(text, startMatch)
   let end = lineEnd(text, endMatch)
   if (selector.consumeBlankLine && text[end] === '\n') end += 1
-  return text.slice(0, start) + (selector.replacement ?? '') + text.slice(end)
+  const prefix = ownedBlockPrefix(text, seam, seam.path)
+  const replacement = prefix
+    ? prefix + selector.replacement.replace(/\n(?=.)/g, `\n${' '.repeat(prefix.length)}`)
+    : (selector.replacement ?? '')
+  return text.slice(0, start) + replacement + text.slice(end)
 }
 
 function seamsFor(operationKey) {

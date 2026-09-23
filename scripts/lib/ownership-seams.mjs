@@ -21,17 +21,34 @@ function selectorCount(content, seam) {
   return seam.selector.identifiers.reduce((sum, id) => sum + countText(content, id), 0)
 }
 
-function assertBlockOrder(content, seam) {
+export function assertBlockOrder(content, seam, file = seam.path ?? seam.glob) {
   const { start, end } = seam.selector
   if (!start || !end) return
   const expected = expectedOccurrences(seam)
-  if (countText(content, start) !== expected || countText(content, end) !== expected) {
-    throw ownershipError(OWNERSHIP_CODES.CARDINALITY, `seam ${seam.id} block cardinality drifted`)
+  const starts = countText(content, start)
+  const ends = countText(content, end)
+  const detail = `seam ${seam.id} source ${file}: start ${JSON.stringify(start)} expected ${expected} found ${starts}; end ${JSON.stringify(end)} expected ${expected} found ${ends}`
+  if (starts !== expected || ends !== expected) {
+    throw ownershipError(OWNERSHIP_CODES.CARDINALITY, detail, [file])
   }
   const startIndex = content.indexOf(start)
   const endIndex = content.indexOf(end, startIndex + start.length)
   if (startIndex >= 0 && endIndex >= startIndex) return
-  throw ownershipError(OWNERSHIP_CODES.CARDINALITY, `seam ${seam.id} has invalid block anchors`)
+  throw ownershipError(OWNERSHIP_CODES.CARDINALITY, `${detail}; invalid anchor order`, [file])
+}
+
+export function ownedBlockPrefix(content, seam, file = seam.path ?? seam.glob) {
+  if (!seam.selector.preserveStartPrefix) return ''
+  assertBlockOrder(content, seam, file)
+  const anchor = content.indexOf(seam.selector.start)
+  const lineStart = content.lastIndexOf('\n', anchor - 1) + 1
+  const prefix = content.slice(lineStart, anchor)
+  if (/^[ \t]*[0-9]+[.)][ \t]+$/.test(prefix)) return prefix
+  throw ownershipError(
+    OWNERSHIP_CODES.CARDINALITY,
+    `seam ${seam.id} source ${file}: expected one Markdown ordered-list prefix before ${JSON.stringify(seam.selector.start)}, found ${JSON.stringify(prefix)}`,
+    [file]
+  )
 }
 
 function expectedOccurrences(seam) {
@@ -42,7 +59,8 @@ export function validateSeams(root, manifest, inventory) {
   for (const seam of manifest.seams) {
     for (const file of inventory.matches.get(seam)) {
       const content = readInventoryFile(root, file)
-      assertBlockOrder(content, seam)
+      assertBlockOrder(content, seam, file)
+      ownedBlockPrefix(content, seam, file)
       const count = selectorCount(content, seam)
       if (count !== expectedOccurrences(seam)) {
         throw ownershipError(

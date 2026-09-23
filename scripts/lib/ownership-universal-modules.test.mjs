@@ -6,6 +6,9 @@ import { validateOwnership } from './ownership-validate.mjs'
 import { buildProjectFactPlan } from './project-fact-plan.mjs'
 import { assertNamedPaths } from './scaffold-named-paths.mjs'
 import { storybookOwnership } from './storybook-ownership.mjs'
+import { resolvePublicRepoRoot } from './working-tree-fixture.mjs'
+
+const root = resolvePublicRepoRoot()
 
 const enModules = [
   'apps/web/messages/en.json',
@@ -22,14 +25,14 @@ const ruModules = [
 
 test('Console and Storybook have no universal shared modules', () => {
   for (const manifest of [operationsConsoleOwnership, storybookOwnership]) {
-    const { projection } = validateOwnership(process.cwd(), manifest)
+    const { projection } = validateOwnership(root, manifest)
     assertNamedPaths(manifest.feature, [], projection.universalSharedModules)
   }
 })
 
 test('single-locale projections retain only the named universal modules', () => {
   for (const locale of ['en', 'ru']) {
-    const plan = buildProjectFactPlan(process.cwd(), { mode: 'single', locale }, 'admin')
+    const plan = buildProjectFactPlan(root, { mode: 'single', locale }, 'admin')
     const expected = locale === 'en' ? enModules : ruModules
     assertNamedPaths(
       `single-${locale}`,
