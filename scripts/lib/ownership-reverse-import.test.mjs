@@ -32,6 +32,7 @@ function inspect(files, options = {}) {
   const inventory = validateManifestInventory(root, manifest)
   const graph = createImportGraph(root, manifest, inventory)
   const projection = projectOwnership(graph, [{ manifest, inventory }])
+  if (options.removeImporter) projection.removed.add(spec)
   return () =>
     detectUndeclaredContributions(
       root,
@@ -54,6 +55,10 @@ test('unregistered sibling spec importing a removed Console helper fails by sour
 
 test('registered verification importer is owned', () => {
   assert.doesNotThrow(inspect(source, { registerSpec: true }))
+})
+
+test('a source removed by a combined projection needs no additional registration', () => {
+  assert.doesNotThrow(inspect(source, { removeImporter: true }))
 })
 
 test('a source under the closed feature root is owned automatically', () => {

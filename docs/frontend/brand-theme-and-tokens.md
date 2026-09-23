@@ -376,6 +376,9 @@ Use the ownership boundary, not a list of every feature file:
 - Anchor an owned documentation block on stable prose or an explicit marker.
   A numbered-list item's ordinal can change when another step is inserted;
   an explicitly prefix-preserving block can retain the source list number.
+- In Console UI tests, derive topology-dependent navigation expectations from
+  `getConsole*Href()` or set a path/host fixture in the same test case. URLs
+  supplied as mock or `baseHref` inputs and backend API paths remain valid.
 - A new literal, prose statement, or config concept with no registered import,
   identifier, or marker has no mechanically knowable feature meaning. The
   author and reviewer must classify it and add a marker/seam when it belongs to

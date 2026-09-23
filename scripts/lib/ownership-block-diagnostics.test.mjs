@@ -18,7 +18,7 @@ function errorHasDetails(error, startCount, endCount) {
   assert.match(error.message, /storybook\.console-development-step/)
   assert.match(error.message, /docs\/operations-console\/development\.md/)
   assert.match(error.message, /start "Add focused unit tests/)
-  assert.match(error.message, /end "   browser\/real-stack coverage/)
+  assert.match(error.message, /end " {3}browser\/real-stack coverage/)
   assert.match(error.message, new RegExp(`start .* found ${startCount}`))
   assert.match(error.message, new RegExp(`end .* found ${endCount}`))
   return true
@@ -30,13 +30,19 @@ test('current block has one ordered-list prefix and retains the current projecti
 })
 
 test('renumbering an earlier step carries the source ordinal into the projection', () => {
-  const renumbered = original.replace('8. Add focused unit tests', '10. Add focused unit tests')
-  assert.equal(ownedBlockPrefix(renumbered, seam, file), '10. ')
+  const renumbered = original
+    .replace(
+      '8. Add focused unit tests',
+      '8. Document the ownership seam.\n9. Add focused unit tests'
+    )
+    .replace('9. Update the plain-language', '10. Update the plain-language')
+  assert.equal(ownedBlockPrefix(renumbered, seam, file), '9. ')
   const projected = storybookOwnedBlockDefinition('storybook.docs-console-development').apply(
     renumbered
   )
-  assert.match(projected, /10\. Add focused unit tests and browser\/real-stack coverage/)
-  assert.match(projected, /\n    accessibility, auth, cookies, Redis/)
+  assert.match(projected, /8\. Document the ownership seam\./)
+  assert.match(projected, /9\. Add focused unit tests and browser\/real-stack coverage/)
+  assert.match(projected, /\n {3}accessibility, auth, cookies, Redis/)
 })
 
 test('missing and duplicate anchors report both searched values and counts', () => {

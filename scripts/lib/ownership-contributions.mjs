@@ -69,7 +69,7 @@ function collectMissing(root, manifest, inventory, graph, changedFiles, projecti
   const scope = changedFiles ?? [...inventory.surface.keys()]
   const missing = []
   for (const file of scope.filter((item) => inventory.surface.get(item) === 'file')) {
-    if (exempt.has(file)) continue
+    if (exempt.has(file) || projection?.removed.has(file)) continue
     const result = detectorsForFile(root, file, manifest, graph, targets, options.contents)
     for (const contribution of result.detected) {
       if (!declared(manifest, file, contribution, result.content)) {

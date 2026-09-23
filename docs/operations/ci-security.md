@@ -70,6 +70,8 @@ of workflow self-hardening to keep the example forkable.
   tree, including non-ignored untracked files. Mutation fixtures use an
   isolated copy of that tree; generated-project scenarios still start from
   committed `HEAD`.
+  A narrow fast assertion check also flags default Console page URLs expected
+  without a test-local topology input.
   `test:scripts:fast` is also the first half of the local aggregate
   `pnpm test:scripts` command, so local full verification cannot omit it.
   CI does not repeat this layer inside the parallel full job. Does **not** cover the
