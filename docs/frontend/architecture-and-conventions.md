@@ -129,12 +129,14 @@ supports co-location; neither requires a file per JSX function.
 - Do not create a file, barrel, or test solely because a private component is
   5–15 lines long.
 
-The repository limits — files under 150 lines, functions under 30 lines, and
-one cohesive responsibility per file — remain mandatory. They do **not** mean
-one component per file: a `UsersTable` and its private `UserRow`, for example,
-can form one cohesive responsibility. Reassess a co-located leaf when it gains
-its own state, data, accessibility behavior, Client/Server boundary, test, or
-reuse.
+The repository's under-150-line file and under-30-line function guidelines
+prompt a cohesion review; size alone does not fail lint or CI. The local
+pre-commit advisory reports staged code, including test files and helpers, and
+the author explains each marked item at review handoff (see
+`CONTRIBUTING.md` → _Size review advisory_). A `UsersTable` and its private
+`UserRow`, for example, can form one cohesive responsibility. Reassess a
+co-located leaf when it gains its own state, data, accessibility behavior,
+Client/Server boundary, test, or reuse.
 
 ### Promote to `shared/ui` on genuine reuse
 

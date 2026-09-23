@@ -33,6 +33,27 @@ Thanks for your interest in contributing. This document explains how to set up t
 
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
+### Size review advisory
+
+The local pre-commit hook prints file and function sizes for staged new or
+changed code after `lint-staged` finishes. File counts cover JS/TS, CSS,
+Prisma, SQL, shell scripts, Dockerfiles, and hooks; function counts cover
+JS/TS, including tests and test helpers. Direct `describe`, `test`, `it`, and
+Playwright `test.describe` suite/case callbacks are omitted, but ordinary
+callbacks such as `test.step` and nested helpers are listed. Files at 150
+lines or functions at 30 lines receive a `review size` marker. The marker is
+advice, not a lint, CI, or commit failure.
+Untouched historical code is not listed. The report reads the staged snapshot,
+so unstaged edits and commits that bypass the hook are not covered.
+
+Before handing a change to Agent 2, inspect the report and state for **each**
+marked file or function whether you split it or kept it together, with a brief
+reason. Judge cohesion and readability; a justified long unit may remain whole.
+The hook prints `size report unavailable` if it cannot inspect the index or
+parse a changed file, without blocking the commit; inspect the diff directly
+in that case. The reporter can also be rerun with
+`node scripts/code-size-report.mjs` while the change is staged.
+
 `pnpm init:project` requires at least one explicit flag, in any combination:
 `--mode=single --locale=<code>` to remove locale routing, `--storybook=disabled`
 to remove Storybook, and/or `--route-progress=disabled` to turn off the top

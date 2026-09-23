@@ -102,8 +102,11 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   create/update/delete PRs, issues, releases, checks, comments, labels, secrets,
   or repository settings, explicitly request approval for access outside the
   sandbox. Do not rely on ambient GitHub credentials silently.
-- Keep changes small and focused: **files < 150 lines, functions < 30 lines**;
-  one responsibility per file.
+- Keep changes small and focused: **files under 150 lines, functions under 30
+  lines** are review prompts, not automatic gates; keep one responsibility per
+  file. The pre-commit size report covers staged code. At Agent 2 handoff, state
+  for each marked item whether you split it or kept it together, with a brief
+  reason. See `CONTRIBUTING.md` → _Size review advisory_.
 - **Frontend components: cohesion over file count.** Keep page composition
   separate; extract a table, form, interactive block, or state when it has an
   independent behavior/boundary/test/reuse case; keep a tiny private leaf with

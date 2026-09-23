@@ -64,6 +64,7 @@ find for something, that page is under-documented; please open an issue.
 | Rotate `JWT_SECRET`, DB/Redis credentials, OAuth secrets, or API keys                    | [`operations/secret-rotation.md`](operations/secret-rotation.md)                                                                  |
 | Decide which platform to deploy AMCore on (K8s, Cloud Run, Fly, Render, Railway, Vercel) | [`operations/deployment-platforms.md`](operations/deployment-platforms.md)                                                        |
 | Understand the CI / repo-security workflow                                               | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
+| Review staged file/function sizes before a PR                                            | [`CONTRIBUTING.md` → Size review advisory](../CONTRIBUTING.md#size-review-advisory)                                               |
 
 ## Documentation map
 

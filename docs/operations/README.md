@@ -92,7 +92,7 @@ Already running? Reach for whichever concern below applies.
   entry points to for "which query," not just "that queries are slow."
 - **[CI & repo security](ci-security.md)** — the CI security gates, what a fork
   inherits (and what it doesn't), the `strict`-mode `setup-repo-security.sh` step,
-  and the action-pin rules.
+  the action-pin rules, and the local pre-commit size advisory.
 - **[Audit log](audit-log.md)** — the append-only privileged-action trail: row
   shape, sensitive-data rules, write modes, and read-access policy.
 - **[Webhooks](webhooks.md)** — the inbound webhook verification primitive:
