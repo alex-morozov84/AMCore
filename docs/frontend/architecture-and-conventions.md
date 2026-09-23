@@ -332,94 +332,13 @@ else needed the store:
 login/register/logout mutate it directly via `queryClient.setQueryData`/
 `queryClient.clear()` rather than an imperative store action.
 
-### Recipe: add search
+### Search
 
-Use `SearchField` by itself when the feature only needs a controlled local
-filter: the feature owns the value and passes `onValueChange` plus an `onClear`
-that resets it. Add `useDebouncedDraft` only when results come from an
-authoritative server/URL state and the field must keep a temporary typing draft
-while navigation is in flight.
-
-Search whose result set is rendered from the URL has two kinds of state: the
-server-parsed URL is authoritative, while the text being typed is a temporary
-client draft. Compose the starter's two console-independent primitives instead
-of rebuilding that coordination:
-
-- `@/shared/ui/search-field` is the controlled, accessible text field. The
-  caller supplies all copy and owns the value, clear action and search policy.
-- `@/shared/lib/use-debounced-draft` owns debounce, immediate commit/discard,
-  and reconciliation with an authoritative value. Supply an opaque identity
-  for the complete canonical view a commit will produce, not only the search
-  string, when sort/page state can change independently. Its commit contract is
-  last-navigation-wins: each new commit supersedes the previous expected echo.
-  Do not use it with a transport that can later apply every superseded response.
-
-The feature adapter still owns URL names, normalization, routing, page-reset
-rules and any form fallback. Its sort, pagination and recovery controls must
-discard an armed draft only when a real current-tab client navigation begins;
-modifier/new-tab activation must leave the current tab untouched. A distinct
-authoritative identity resets the draft. An exact identity still awaiting its
-own router echo is intentionally treated as that echo, because the local props
-do not reveal whether an indistinguishable Back/Forward transition produced it.
-
-Do not use this pair for an entirely local list filter, a command palette, or
-an unrelated form field: those have no server-authoritative URL state to
-reconcile. The Operations Console's `features/console-discovery` slice is the
-reference adapter, not part of the shared contract.
-
-A downstream feature composes the primitives through its own adapter. In this
-abridged example, `catalogIdentity()` and `buildCatalogHref()` are feature-local
-helpers that include search, sort and page policy:
-
-```tsx
-'use client'
-
-import { useCallback } from 'react'
-
-import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
-import { useDebouncedDraft } from '@/shared/lib/use-debounced-draft'
-import { SearchField } from '@/shared/ui/search-field'
-
-const normalizeSearch = (value: string) => value.trim()
-
-export function CatalogSearch({ search, sort, page, labels }: CatalogSearchProps) {
-  const router = useRouteProgressRouter()
-  const expectedIdentity = useCallback(
-    (value: string) => catalogIdentity({ search: value, sort, page: 1 }),
-    [sort]
-  )
-  const commit = useCallback(
-    (value: string) =>
-      router.replace(buildCatalogHref({ search: value, sort, page: 1 }), { scroll: false }),
-    [router, sort]
-  )
-  const draft = useDebouncedDraft({
-    authoritativeValue: search,
-    authoritativeIdentity: catalogIdentity({ search, sort, page }),
-    getCommitIdentity: expectedIdentity,
-    delayMs: 300,
-    normalize: normalizeSearch,
-    onCommit: commit,
-  })
-  const clear = () => {
-    draft.setValue('')
-    draft.commitNow('')
-  }
-
-  return (
-    <SearchField {...labels} value={draft.value} onValueChange={draft.setValue} onClear={clear} />
-  )
-}
-```
-
-This example deliberately does not import `features/console-discovery`.
-`search` query naming, canonical identity, sort preservation, page reset, URL
-construction, GET/no-JavaScript fallback and discrete-navigation draft discard
-belong to the feature. Programmatic navigation uses
-`useRouteProgressRouter()`; navigating links use `RouteProgressLink` or a
-feature wrapper around it. The current Next adapter is last-navigation-wins;
-another transport must establish the same supersession rule before using this
-controller, rather than moving transport policy into `shared`.
+Keep general FSD and Server/Client rules here. For choosing a search pattern,
+using the shared field and draft controller, building a URL-backed feature
+adapter, and testing navigation races, start with the dedicated
+[Frontend search guide](./search/README.md). The feature owns its query,
+result and navigation policy; shared primitives remain Console-independent.
 
 ## Relationship to backend/OpenAPI docs
 
@@ -515,6 +434,8 @@ architectural structure.
 
 ## See also
 
+- [Frontend search](./search/README.md) — choosing and implementing search
+  patterns with the shared field and draft controller.
 - [Brand, theme, and design tokens](./brand-theme-and-tokens.md) — token
   architecture, light/dark/system modes, the no-flash mechanism, and the
   downstream rebrand checklist.

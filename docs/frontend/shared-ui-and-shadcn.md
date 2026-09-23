@@ -57,6 +57,8 @@ Keep behavior outside the primitive. A feature may compose it with
 learn query parameter names, routing, normalization or domain semantics. Its
 co-located RTL tests cover its controlled/accessibility contract; its Storybook
 stories cover empty and populated clear/refocus states.
+For the full field API and feature-level recipes, see
+[Frontend search](./search/README.md).
 
 ## Base UI, not Radix
 

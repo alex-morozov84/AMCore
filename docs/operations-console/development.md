@@ -119,6 +119,8 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    reuses the session/origin/token-containment seam described above under
    "Ownership and security boundaries" rather than a new one-off proxy.
 6. **Compose shared search primitives through `features/console-discovery`.**
+   The [frontend search guide](../frontend/search/README.md) documents the
+   reusable APIs and downstream composition; the rules below are Console-only.
    `SearchField` and `useDebouncedDraft` are console-independent starter
    capabilities under `shared/ui` and `shared/lib`; they remain available in
    a fork that removes the optional Console. The Console slice is the thin
