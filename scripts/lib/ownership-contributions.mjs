@@ -8,6 +8,7 @@ import { seamCoversDetector } from './ownership-seams.mjs'
 import { identifierOccurrences, rangesOverlap, seamRanges } from './ownership-seam-ranges.mjs'
 
 function featureTargets(manifest, inventory, projection) {
+  if (projection) return new Set(projection.removed)
   const targets = filesInRoots(inventory)
   const shared = filesForFacts(inventory, manifest.facts.sharedModules)
   for (const file of shared) {

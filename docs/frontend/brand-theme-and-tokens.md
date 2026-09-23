@@ -350,6 +350,11 @@ plus stale, ambiguous, and duplicate declarations, fail during planning before
 the filesystem transaction starts. Shared helpers survive
 removal when an independent production consumer still reaches them; helpers
 and linked tests used only by the Console are removed together.
+The fast check follows resolved relative imports into files removed by a
+selected feature projection. A new test outside a closed root that imports a
+registered Console helper must itself be registered or use a declared seam.
+Named universal-module expectations flag newly retained shared modules for
+review.
 
 The Storybook transform uses the same ownership contract: its closed config
 root and co-located `*.stories.tsx` verification files are discovered
