@@ -36,10 +36,13 @@ Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 ### Size review advisory
 
 The local pre-commit hook prints file and function sizes for staged new or
-changed code after `lint-staged` finishes. It includes tests and test helpers;
-outer `describe`, `test`, and `it` callbacks organize test cases and are not
-listed as functions. Files at 150 lines or functions at 30 lines receive a
-`review size` marker. The marker is advice, not a lint, CI, or commit failure.
+changed code after `lint-staged` finishes. File counts cover JS/TS, CSS,
+Prisma, SQL, shell scripts, Dockerfiles, and hooks; function counts cover
+JS/TS, including tests and test helpers. Direct `describe`, `test`, `it`, and
+Playwright `test.describe` suite/case callbacks are omitted, but ordinary
+callbacks such as `test.step` and nested helpers are listed. Files at 150
+lines or functions at 30 lines receive a `review size` marker. The marker is
+advice, not a lint, CI, or commit failure.
 Untouched historical code is not listed. The report reads the staged snapshot,
 so unstaged edits and commits that bypass the hook are not covered.
 
