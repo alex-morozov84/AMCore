@@ -1,21 +1,24 @@
 import { Suspense } from 'react'
 import { getTranslations } from 'next-intl/server'
-import type { AdminUserSortField } from '@amcore/shared'
 
-import type { DiscoverySortOrder } from '@/features/console-discovery'
-import { SearchInput } from '@/features/console-discovery'
+import {
+  DiscoverySearchBoundary,
+  type DiscoverySortOrder,
+  SearchInput,
+} from '@/features/console-discovery'
 import { getConsoleUsersHref } from '@/shared/lib/console-public-href'
 
+import { getUsersEffectiveSortOrder, type UsersSortableField } from './parse-query'
 import { UsersResults } from './UsersResults'
 import { UsersResultsSkeleton } from './UsersResultsSkeleton'
 
-const DEFAULT_SORT_BY: AdminUserSortField = 'createdAt'
+const DEFAULT_SORT_BY: UsersSortableField = 'createdAt'
 
 export interface UsersPageProps {
   page: number
   limit: number
   search?: string
-  sortBy?: AdminUserSortField
+  sortBy?: UsersSortableField
   sortOrder?: DiscoverySortOrder
 }
 
@@ -38,26 +41,31 @@ export async function UsersPage({
   return (
     <section className="flex flex-col gap-4">
       <h1 className="text-3xl font-semibold tracking-tight">{t('users')}</h1>
-      <SearchInput
+      <DiscoverySearchBoundary
         baseHref={baseHref}
-        defaultValue={search ?? ''}
+        search={search}
+        page={page}
         sortBy={sortBy}
         sortOrder={sortOrder}
-        label={t('usersSearchLabel')}
-        placeholder={t('usersSearchPlaceholder')}
-        clearLabel={t('usersSearchClear')}
-        inputId="users-search"
-      />
-      <Suspense fallback={<UsersResultsSkeleton />}>
-        <UsersResults
-          page={page}
-          limit={limit}
-          search={search}
-          sortBy={sortBy}
-          sortOrder={sortOrder}
-          baseHref={baseHref}
+        effectiveSortOrder={getUsersEffectiveSortOrder(sortBy, sortOrder)}
+      >
+        <SearchInput
+          label={t('usersSearchLabel')}
+          placeholder={t('usersSearchPlaceholder')}
+          clearLabel={t('usersSearchClear')}
+          inputId="users-search"
         />
-      </Suspense>
+        <Suspense fallback={<UsersResultsSkeleton />}>
+          <UsersResults
+            page={page}
+            limit={limit}
+            search={search}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            baseHref={baseHref}
+          />
+        </Suspense>
+      </DiscoverySearchBoundary>
     </section>
   )
 }

@@ -332,6 +332,33 @@ else needed the store:
 login/register/logout mutate it directly via `queryClient.setQueryData`/
 `queryClient.clear()` rather than an imperative store action.
 
+### URL-backed search drafts
+
+Search whose result set is rendered from the URL has two kinds of state: the
+server-parsed URL is authoritative, while the text being typed is a temporary
+client draft. Compose the starter's two console-independent primitives instead
+of rebuilding that coordination:
+
+- `@/shared/ui/search-field` is the controlled, accessible text field. The
+  caller supplies all copy and owns the value, clear action and search policy.
+- `@/shared/lib/use-debounced-draft` owns debounce, immediate commit/discard,
+  and reconciliation with an authoritative value. Supply an opaque identity
+  for the complete canonical view a commit will produce, not only the search
+  string, when sort/page state can change independently.
+
+The feature adapter still owns URL names, normalization, routing, page-reset
+rules and any form fallback. Its sort, pagination and recovery controls must
+discard an armed draft only when a real current-tab client navigation begins;
+modifier/new-tab activation must leave the current tab untouched. A distinct
+authoritative identity resets the draft. An exact identity still awaiting its
+own router echo is intentionally treated as that echo, because the local props
+do not reveal whether an indistinguishable Back/Forward transition produced it.
+
+Do not use this pair for an entirely local list filter, a command palette, or
+an unrelated form field: those have no server-authoritative URL state to
+reconcile. The Operations Console's `features/console-discovery` slice is the
+reference adapter, not part of the shared contract.
+
 ## Relationship to backend/OpenAPI docs
 
 `docs/frontend/` documents **consumption patterns** — how the frontend calls

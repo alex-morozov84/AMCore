@@ -1,13 +1,16 @@
 import { Suspense } from 'react'
 import { getTranslations } from 'next-intl/server'
 
-import type { DiscoverySortOrder } from '@/features/console-discovery'
-import { SearchInput } from '@/features/console-discovery'
+import {
+  DiscoverySearchBoundary,
+  type DiscoverySortOrder,
+  SearchInput,
+} from '@/features/console-discovery'
 import { getConsoleOrganizationsHref } from '@/shared/lib/console-public-href'
 
 import { OrganizationsResults } from './OrganizationsResults'
 import { OrganizationsResultsSkeleton } from './OrganizationsResultsSkeleton'
-import type { OrganizationsSortableField } from './parse-query'
+import { getOrganizationsEffectiveSortOrder, type OrganizationsSortableField } from './parse-query'
 
 const DEFAULT_SORT_BY: OrganizationsSortableField = 'createdAt'
 
@@ -39,26 +42,31 @@ export async function OrganizationsPage({
   return (
     <section className="flex flex-col gap-4">
       <h1 className="text-3xl font-semibold tracking-tight">{t('organizations')}</h1>
-      <SearchInput
+      <DiscoverySearchBoundary
         baseHref={baseHref}
-        defaultValue={search ?? ''}
+        search={search}
+        page={page}
         sortBy={sortBy}
         sortOrder={sortOrder}
-        label={t('organizationsSearchLabel')}
-        placeholder={t('organizationsSearchPlaceholder')}
-        clearLabel={t('organizationsSearchClear')}
-        inputId="organizations-search"
-      />
-      <Suspense fallback={<OrganizationsResultsSkeleton />}>
-        <OrganizationsResults
-          page={page}
-          limit={limit}
-          search={search}
-          sortBy={sortBy}
-          sortOrder={sortOrder}
-          baseHref={baseHref}
+        effectiveSortOrder={getOrganizationsEffectiveSortOrder(sortBy, sortOrder)}
+      >
+        <SearchInput
+          label={t('organizationsSearchLabel')}
+          placeholder={t('organizationsSearchPlaceholder')}
+          clearLabel={t('organizationsSearchClear')}
+          inputId="organizations-search"
         />
-      </Suspense>
+        <Suspense fallback={<OrganizationsResultsSkeleton />}>
+          <OrganizationsResults
+            page={page}
+            limit={limit}
+            search={search}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            baseHref={baseHref}
+          />
+        </Suspense>
+      </DiscoverySearchBoundary>
     </section>
   )
 }

@@ -10,7 +10,7 @@ import {
 import { getConsoleAwareUser } from '@/shared/api/console/access-token'
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 
-import type { UsersSortableField } from './parse-query'
+import { USERS_DEFAULT_SORT_ORDER, type UsersSortableField } from './parse-query'
 import { UserRow } from './UserRow'
 
 const MONO = 'font-console-mono'
@@ -61,38 +61,54 @@ export async function UsersTable({ users, baseHref, search, sortBy, sortOrder }:
             <SortableColumnHead
               baseHref={baseHref}
               column="name"
-              defaultOrder="asc"
+              defaultOrder={USERS_DEFAULT_SORT_ORDER.name}
               current={current}
               visibleLabel={userColumnLabel}
-              accessibleLabel={accessibleSortLabel('name', 'asc', userColumnLabel)}
+              accessibleLabel={accessibleSortLabel(
+                'name',
+                USERS_DEFAULT_SORT_ORDER.name,
+                userColumnLabel
+              )}
             />
             <TableHead>{t('usersColumnVerification')}</TableHead>
             <TableHead>{t('usersColumnRole')}</TableHead>
             <SortableColumnHead
               baseHref={baseHref}
               column="lastLoginAt"
-              defaultOrder="desc"
+              defaultOrder={USERS_DEFAULT_SORT_ORDER.lastLoginAt}
               current={current}
               visibleLabel={lastLoginColumnLabel}
-              accessibleLabel={accessibleSortLabel('lastLoginAt', 'desc', lastLoginColumnLabel)}
+              accessibleLabel={accessibleSortLabel(
+                'lastLoginAt',
+                USERS_DEFAULT_SORT_ORDER.lastLoginAt,
+                lastLoginColumnLabel
+              )}
               className={MONO}
             />
             <SortableColumnHead
               baseHref={baseHref}
               column="createdAt"
-              defaultOrder="desc"
+              defaultOrder={USERS_DEFAULT_SORT_ORDER.createdAt}
               current={current}
               visibleLabel={createdColumnLabel}
-              accessibleLabel={accessibleSortLabel('createdAt', 'desc', createdColumnLabel)}
+              accessibleLabel={accessibleSortLabel(
+                'createdAt',
+                USERS_DEFAULT_SORT_ORDER.createdAt,
+                createdColumnLabel
+              )}
               className={MONO}
             />
             <SortableColumnHead
               baseHref={baseHref}
               column="updatedAt"
-              defaultOrder="desc"
+              defaultOrder={USERS_DEFAULT_SORT_ORDER.updatedAt}
               current={current}
               visibleLabel={updatedColumnLabel}
-              accessibleLabel={accessibleSortLabel('updatedAt', 'desc', updatedColumnLabel)}
+              accessibleLabel={accessibleSortLabel(
+                'updatedAt',
+                USERS_DEFAULT_SORT_ORDER.updatedAt,
+                updatedColumnLabel
+              )}
               className={MONO}
             />
             <TableHead>{t('usersColumnActions')}</TableHead>

@@ -1,9 +1,12 @@
 import { getTranslations } from 'next-intl/server'
 
-import { buildDiscoveryHref, type DiscoverySortOrder } from '@/features/console-discovery'
+import {
+  buildDiscoveryHref,
+  DiscoveryNavigationLink,
+  type DiscoverySortOrder,
+} from '@/features/console-discovery'
 import { cn } from '@/shared/lib/utils'
 import { buttonVariants } from '@/shared/ui/button'
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import type { OrganizationsSortableField } from './parse-query'
 
@@ -47,9 +50,12 @@ export async function OrganizationsPagination({
 
 function PageLink({ href, label }: { href: string | null; label: string }) {
   return href ? (
-    <RouteProgressLink href={href} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+    <DiscoveryNavigationLink
+      href={href}
+      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+    >
       {label}
-    </RouteProgressLink>
+    </DiscoveryNavigationLink>
   ) : (
     <span aria-hidden="true" />
   )
