@@ -129,6 +129,9 @@ test('path-mode Organizations panel paginates real data with the Next/Previous l
   await expect(page.getByRole('cell', { name: lastOrgName })).toBeVisible()
 
   await page.getByRole('link', { name: /previous/i }).click()
-  await expect(page).toHaveURL(/[?&]page=1\b/)
+  // `page=1` is the canonical URL's default and is omitted, not written out
+  // explicitly (`buildDiscoveryHref`) — so back on page 1 means no `page`
+  // param at all, not `page=1`.
+  await expect(page).not.toHaveURL(/[?&]page=/)
   await expect(page.getByRole('cell', { name: lastOrgName })).toHaveCount(0)
 })

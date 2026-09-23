@@ -9,7 +9,7 @@ describe('operation inventory against the real plans', () => {
 
   test('reports every stale measured exact count together', () => {
     assertExactScaffoldCounts([
-      { name: 'measured operations', expected: 486, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 487, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -28,17 +28,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 663,
+        expected: 664,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1240,
+        expected: 1241,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 479,
+        expected: 480,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

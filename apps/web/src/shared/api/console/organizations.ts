@@ -1,6 +1,8 @@
 import {
   type AdminOrganizationListResponse,
   adminOrganizationListResponseSchema,
+  type AdminOrganizationSortField,
+  type AdminSortOrder,
   PAGINATION,
 } from '@amcore/shared'
 
@@ -10,20 +12,39 @@ import { getConsoleAwareAccessToken } from './access-token'
 
 import 'server-only'
 
+export interface FetchConsoleOrganizationsParams {
+  page?: number
+  limit?: number
+  search?: string
+  sortBy?: AdminOrganizationSortField
+  sortOrder?: AdminSortOrder
+}
+
 /**
  * Read-only organizations list for the console Organizations panel — no
  * detail endpoint exists on the backend, so this is the whole contract.
  * Uses the console's own token source (`getConsoleAwareAccessToken`), never
  * the product session, so a console viewer's data is always console-scoped
- * even in path mode.
+ * even in path mode. `search`/`sortBy`/`sortOrder` are forwarded as-is —
+ * already allowlisted/normalized by the route's own searchParams parsing
+ * before reaching this function, so no additional validation happens here.
  */
 export function fetchConsoleOrganizations(
-  page: number = PAGINATION.DEFAULT_PAGE,
-  limit: number = PAGINATION.DEFAULT_LIMIT
+  params: FetchConsoleOrganizationsParams = {}
 ): Promise<DataOutcome<AdminOrganizationListResponse>> {
-  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  const {
+    page = PAGINATION.DEFAULT_PAGE,
+    limit = PAGINATION.DEFAULT_LIMIT,
+    search,
+    sortBy,
+    sortOrder,
+  } = params
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (search) query.set('search', search)
+  if (sortBy) query.set('sortBy', sortBy)
+  if (sortOrder) query.set('sortOrder', sortOrder)
   return fetchBackend(
-    `/api/v1/admin/organizations?${params.toString()}`,
+    `/api/v1/admin/organizations?${query.toString()}`,
     adminOrganizationListResponseSchema,
     { auth: 'required', tokenResolver: getConsoleAwareAccessToken }
   )

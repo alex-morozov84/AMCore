@@ -29,6 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   UI) that future console panels — Organizations next — build on rather than
   reimplementing.
 
+- **Operations Console: Organizations search and sort.** The Organizations
+  panel now exposes the same debounced live search (contains match over
+  name/slug) and sortable column headers (name, slug, created, updated — all
+  four visible columns, unlike Users) as the Users panel, reusing
+  `features/console-discovery` as-is. Decomposes the previously single-file
+  `OrganizationsPage.tsx` into `OrganizationsTable`/`OrganizationsInventory`/
+  `OrganizationsPagination`/`OrganizationsOutOfRange`/`OrganizationsResults`,
+  mirroring the Users panel's structure.
+
 - **Operations Console: Users panel.** Adds a read-only, paginated inventory
   of platform users with identity, email-verification state, current system
   role, last sign-in, and created/updated timestamps. It reuses the existing

@@ -4,9 +4,10 @@ The Operations Console is AMCore's optional system control plane for platform
 super-administrators. The shipped foundation provides a protected, localized
 Control Room shell, live access admission, and isolated host-mode login/logout.
 It ships three functional panels, **Overview** (this API instance's readiness,
-version, and process role), **Users** (inventory plus system-role
-promote/demote), and **Organizations** (read-only). It does not yet provide
-metrics, queues, audit, or AI control panels.
+version, and process role), **Users** (searchable, sortable inventory plus
+system-role promote/demote), and **Organizations** (searchable, sortable,
+read-only). It does not yet provide metrics, queues, audit, or AI control
+panels.
 
 It is not a product backoffice. Organization owners, organization `ADMIN`s,
 catalogue managers, content editors, and ordinary users do not gain access from
@@ -35,14 +36,24 @@ operator never mistakes "the console can't reach its own backend" for "the
 backend told us its dependency is down."
 
 **Organizations** lists every organization in the system: name, slug, and
-created/updated timestamps, paginated. It is **read-only** — there is no way
-to create, edit, delete, or otherwise act on an organization from this panel,
-and no per-organization detail view (the backend has no such endpoint yet).
-If the panel cannot reach its data (the backend is unreachable, times out, or
-returns an unexpected error), it shows a plain "temporarily unavailable"
-message with a retry button — it never silently shows an empty list in place
-of a real failure. An empty list (with no failure) means the system genuinely
-has no organizations yet, which is expected on a fresh installation.
+created/updated timestamps, searchable and sortable (see below), paginated.
+It is **read-only** — there is no way to create, edit, delete, or otherwise
+act on an organization from this panel, and no per-organization detail view
+(the backend has no such endpoint yet). If the panel cannot reach its data
+(the backend is unreachable, times out, or returns an unexpected error), it
+shows a plain "temporarily unavailable" message with a retry button — it
+never silently shows an empty list in place of a real failure. An empty list
+(with no failure) means the system genuinely has no organizations yet, which
+is expected on a fresh installation.
+
+**Search** matches a contains substring, case-insensitively, against an
+organization's name or slug — same live-typing behavior as Users' search
+below. A search with no matches shows a **"no matching organizations"**
+message, distinct from the genuinely-empty-database message above.
+
+**Sorting** works the same way as Users, on all four visible columns (name,
+slug, created, updated) — Organizations has no non-sortable column, unlike
+Users' verification/system-role columns.
 
 **Users** is a paginated, searchable, sortable platform-user inventory. It
 shows each user's name and email, email-verification state, current system
