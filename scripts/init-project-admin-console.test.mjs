@@ -9,34 +9,13 @@ import {
 } from './lib/init-project-test-helpers.mjs'
 import { operationsConsoleOwnership } from './lib/operations-console-ownership.mjs'
 import { filesForFacts } from './lib/ownership-facts.mjs'
+import { assertSharedSearchRetained } from './lib/shared-search-scaffold-assertions.mjs'
 import { validateOwnership } from './lib/ownership-validate.mjs'
 
 const copies = []
-
 afterEach(() => copies.splice(0).forEach((copy) => copy.cleanup()))
 
 const copy = () => createCommittedCopy(copies)
-
-const SHARED_SEARCH_FILES = [
-  'apps/web/src/shared/lib/debounced-draft-state.ts',
-  'apps/web/src/shared/lib/use-debounced-draft.ts',
-  'apps/web/src/shared/lib/use-debounced-draft.echoes.test.ts',
-  'apps/web/src/shared/lib/use-debounced-draft.races.test.ts',
-  'apps/web/src/shared/lib/use-debounced-draft.test.ts',
-  'apps/web/src/shared/ui/search-field.stories.tsx',
-  'apps/web/src/shared/ui/search-field.test.tsx',
-  'apps/web/src/shared/ui/search-field.tsx',
-]
-
-function assertSharedSearchRetained(root, { storybook = true } = {}) {
-  for (const rel of SHARED_SEARCH_FILES) {
-    const expected = storybook || !rel.endsWith('.stories.tsx')
-    assert.equal(existsSync(path.join(root, rel)), expected, rel)
-    if (expected) {
-      assert.equal(readFileSync(path.join(root, rel), 'utf8').includes('console-discovery'), false)
-    }
-  }
-}
 
 function removableConsolePaths(root) {
   const { inventory, projection } = validateOwnership(root, operationsConsoleOwnership)
