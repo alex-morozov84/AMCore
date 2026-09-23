@@ -133,7 +133,9 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    `DiscoveryNavigationLink` for every sort, pagination and out-of-range
    recovery action: a real current-tab navigation discards an armed draft
    before the link wins, while modifier/new-tab activation leaves this tab's
-   draft alone. A different canonical Back/Forward view resyncs the field;
+   draft alone. Programmatic search uses App Router's last-navigation-wins
+   `replace()` behavior, so only the latest non-discarded search response is an
+   expected self echo. A different canonical Back/Forward view resyncs the field;
    an exact identity still awaiting its own router echo is indistinguishable
    from that echo and deliberately preserves the newer draft. The GET form
    and real link hrefs remain the no-JavaScript fallback.

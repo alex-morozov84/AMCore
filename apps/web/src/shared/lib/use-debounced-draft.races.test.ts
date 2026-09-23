@@ -9,7 +9,7 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
 describe('useDebouncedDraft reconciliation', () => {
-  it('counts a -> b -> a self commits and preserves a newer draft through their echoes', () => {
+  it('tracks only the latest a -> b -> a commit and preserves a newer draft through its echo', () => {
     const onCommit = vi.fn()
     let authoritativeValue = ''
     let authoritativeIdentity = identity('')
@@ -29,12 +29,15 @@ describe('useDebouncedDraft reconciliation', () => {
     }
     act(() => result.current.setValue('newer'))
 
-    for (const value of ['a', 'b', 'a']) {
-      authoritativeValue = value
-      authoritativeIdentity = identity(value)
-      rerender()
-      expect(result.current.value).toBe('newer')
-    }
+    authoritativeValue = 'a'
+    authoritativeIdentity = identity('a')
+    rerender()
+    expect(result.current.value).toBe('newer')
+
+    authoritativeValue = 'external'
+    authoritativeIdentity = identity('external')
+    rerender()
+    expect(result.current.value).toBe('external')
   })
 
   it('preserves the accepted exact pending-identity collision', () => {

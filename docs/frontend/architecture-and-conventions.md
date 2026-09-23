@@ -344,7 +344,9 @@ of rebuilding that coordination:
 - `@/shared/lib/use-debounced-draft` owns debounce, immediate commit/discard,
   and reconciliation with an authoritative value. Supply an opaque identity
   for the complete canonical view a commit will produce, not only the search
-  string, when sort/page state can change independently.
+  string, when sort/page state can change independently. Its commit contract is
+  last-navigation-wins: each new commit supersedes the previous expected echo.
+  Do not use it with a transport that can later apply every superseded response.
 
 The feature adapter still owns URL names, normalization, routing, page-reset
 rules and any form fallback. Its sort, pagination and recovery controls must

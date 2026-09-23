@@ -5,14 +5,6 @@ export interface DebounceSchedule {
   armed: boolean
 }
 
-function consume(counts: ReadonlyMap<string, number>, key: string) {
-  const next = new Map(counts)
-  const remaining = (next.get(key) ?? 0) - 1
-  if (remaining > 0) next.set(key, remaining)
-  else next.delete(key)
-  return next
-}
-
 const nextSchedule = (current: DebounceSchedule, armed: boolean) => ({
   revision: current.revision + 1,
   armed,
@@ -24,22 +16,23 @@ interface ReconcileOptions {
   authoritativeValue: string
   authoritativeIdentity: string
   syncedIdentity: string
-  pending: ReadonlyMap<string, number>
+  pendingIdentity: string | null
   setValue: Setter<string>
   setSyncedIdentity: Setter<string>
   setLastCommitIdentity: Setter<string>
-  setPending: Setter<ReadonlyMap<string, number>>
+  setPendingIdentity: Setter<string | null>
   setSchedule: Setter<DebounceSchedule>
 }
 
 function reconcileAuthority(options: ReconcileOptions) {
-  const { authoritativeIdentity, syncedIdentity, pending } = options
+  const { authoritativeIdentity, syncedIdentity, pendingIdentity } = options
   if (authoritativeIdentity === syncedIdentity) return
   options.setSyncedIdentity(authoritativeIdentity)
-  if ((pending.get(authoritativeIdentity) ?? 0) > 0) {
-    options.setPending(consume(pending, authoritativeIdentity))
+  if (pendingIdentity === authoritativeIdentity) {
+    options.setPendingIdentity(null)
     return
   }
+  options.setPendingIdentity(null)
   options.setValue(options.authoritativeValue)
   options.setLastCommitIdentity(authoritativeIdentity)
   options.setSchedule((current) => nextSchedule(current, false))
@@ -75,17 +68,17 @@ export function useDraftState(authoritativeValue: string, authoritativeIdentity:
   const [value, setValue] = useState(authoritativeValue)
   const [syncedIdentity, setSyncedIdentity] = useState(authoritativeIdentity)
   const [lastCommitIdentity, setLastCommitIdentity] = useState(authoritativeIdentity)
-  const [pending, setPending] = useState<ReadonlyMap<string, number>>(() => new Map())
+  const [pendingIdentity, setPendingIdentity] = useState<string | null>(null)
   const [schedule, setSchedule] = useState<DebounceSchedule>({ revision: 0, armed: false })
   reconcileAuthority({
     authoritativeValue,
     authoritativeIdentity,
     syncedIdentity,
-    pending,
+    pendingIdentity,
     setValue,
     setSyncedIdentity,
     setLastCommitIdentity,
-    setPending,
+    setPendingIdentity,
     setSchedule,
   })
   const actions = useDraftActions(setValue, setLastCommitIdentity, setSchedule)
@@ -98,6 +91,6 @@ export function useDraftState(authoritativeValue: string, authoritativeIdentity:
     cancelDebounce: actions.cancelDebounce,
     lastCommitIdentity,
     setLastCommitIdentity,
-    setPending,
+    setPendingIdentity,
   }
 }

@@ -1,14 +1,6 @@
 'use client'
 
-import {
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useRef,
-} from 'react'
+import { type RefObject, useCallback, useEffect, useEffectEvent, useRef } from 'react'
 
 import { type DebounceSchedule, useDraftState } from './debounced-draft-state'
 
@@ -21,12 +13,6 @@ export interface UseDebouncedDraftOptions {
   delayMs: number
   normalize?: (value: string) => string
   onCommit: (value: string) => void
-}
-
-function increment(counts: ReadonlyMap<string, number>, key: string) {
-  const next = new Map(counts)
-  next.set(key, (next.get(key) ?? 0) + 1)
-  return next
 }
 
 function useDebounceTimer(
@@ -55,7 +41,7 @@ function useDraftCommit(
   options: Pick<UseDebouncedDraftOptions, 'getCommitIdentity' | 'normalize' | 'onCommit'>,
   lastCommitIdentity: string,
   setLastCommitIdentity: (identity: string) => void,
-  setPending: Dispatch<SetStateAction<ReadonlyMap<string, number>>>
+  setPendingIdentity: (identity: string | null) => void
 ) {
   const { getCommitIdentity = identity, normalize = identity, onCommit } = options
   return useCallback(
@@ -64,10 +50,17 @@ function useDraftCommit(
       const commitIdentity = getCommitIdentity(canonical)
       if (commitIdentity === lastCommitIdentity) return
       setLastCommitIdentity(commitIdentity)
-      setPending((current) => increment(current, commitIdentity))
+      setPendingIdentity(commitIdentity)
       onCommit(canonical)
     },
-    [getCommitIdentity, lastCommitIdentity, normalize, onCommit, setLastCommitIdentity, setPending]
+    [
+      getCommitIdentity,
+      lastCommitIdentity,
+      normalize,
+      onCommit,
+      setLastCommitIdentity,
+      setPendingIdentity,
+    ]
   )
 }
 
@@ -94,7 +87,11 @@ function useImmediateDraftActions(
   return { commitNow, discardDraft }
 }
 
-/** Coordinates a temporary string draft with canonical state supplied by its caller. */
+/**
+ * Coordinates a temporary string draft with canonical state supplied by its caller.
+ * Each commit supersedes the previous expected echo; use this only with a
+ * last-navigation-wins adapter.
+ */
 export function useDebouncedDraft({
   authoritativeValue,
   authoritativeIdentity = authoritativeValue,
@@ -104,21 +101,21 @@ export function useDebouncedDraft({
   onCommit,
 }: UseDebouncedDraftOptions) {
   const state = useDraftState(authoritativeValue, authoritativeIdentity)
-  const { value, setValue, schedule, lastCommitIdentity, setLastCommitIdentity, setPending } = state
+  const { value, setValue, schedule, cancelDebounce, resetDraft } = state
   const commit = useDraftCommit(
     { getCommitIdentity, normalize, onCommit },
-    lastCommitIdentity,
-    setLastCommitIdentity,
-    setPending
+    state.lastCommitIdentity,
+    state.setLastCommitIdentity,
+    state.setPendingIdentity
   )
-  const timerRef = useDebounceTimer(value, schedule, delayMs, state.cancelDebounce, commit)
+  const timerRef = useDebounceTimer(value, schedule, delayMs, cancelDebounce, commit)
   const actions = useImmediateDraftActions(
     commit,
     timerRef,
     authoritativeValue,
     authoritativeIdentity,
-    state.cancelDebounce,
-    state.resetDraft
+    cancelDebounce,
+    resetDraft
   )
 
   return { value, setValue, ...actions }
