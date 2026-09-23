@@ -44,11 +44,36 @@ message with a retry button — it never silently shows an empty list in place
 of a real failure. An empty list (with no failure) means the system genuinely
 has no organizations yet, which is expected on a fresh installation.
 
-**Users** is a paginated platform-user inventory. It shows each user's name
-and email, email-verification state, current system role, last sign-in, and
-created/updated timestamps. It does not expose a detail page, profile fields,
-sessions, or account recovery/deletion. It has the same explicit unavailable
-and genuine-empty states as Organizations.
+**Users** is a paginated, searchable, sortable platform-user inventory. It
+shows each user's name and email, email-verification state, current system
+role, last sign-in, and created/updated timestamps. It does not expose a
+detail page, profile fields, sessions, or account recovery/deletion. It has
+the same explicit unavailable and genuine-empty states as Organizations.
+
+**Search** matches a contains substring, case-insensitively, against a user's
+name or email — typing filters live (no Enter/submit needed) after a short
+pause, always against the full backend dataset, never only the rows currently
+on screen. The shown count updates to match. A search with no matches shows a
+**"no matching users"** message, distinct from the genuinely-empty-database
+message above: one means "nothing here yet", the other means "nothing matches
+what you typed" — a cleared search always returns to the full list.
+
+**Sorting** works by clicking a column header (name, last sign-in, created,
+or updated — verification and system role are not sortable); clicking again
+reverses the direction. The active column and its direction are marked for
+assistive technology, and every sortable header shows a neutral indicator
+even before it's the active sort, so it's discoverable by sight alone.
+
+Both search and sort state live in the page URL (`?search=...&sortBy=...
+&sortOrder=...`), so a given result set survives a reload, a bookmark, or
+sharing the link with another operator. Clicking a sort header or a
+pagination link, like before, adds a Back/Forward stop. Live search typing
+does not — each keystroke's pause updates the current URL in place, the same
+way a browser omnibox autocomplete does, so live search itself never adds a
+history entry, and Back always goes to whichever entry preceded the one that
+search updated (not necessarily "before the search began" — if the operator
+had already followed a sort or pagination link, Back goes to that entry, not
+past it).
 
 **Changing a user's system role.** Every row except the signed-in operator's
 own offers a menu action to promote a `USER` to `SUPER_ADMIN` or demote a

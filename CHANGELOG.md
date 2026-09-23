@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unaffected. Backend-only in this change — the Users/Organizations console
   panels do not yet expose search/sort controls in the UI.
 
+- **Operations Console: Users search and sort.** The Users panel now exposes
+  the discovery backend above in the UI: a debounced live search box
+  (contains match over name/email, no Enter needed) and sortable column
+  headers (name, last sign-in, created, updated), both reflected in the
+  page's own URL so a result set survives a reload, a bookmark, or sharing
+  the link. Distinguishes "no results for your search" from the genuinely
+  empty inventory. Introduces a reusable `features/console-discovery` slice
+  (a debounce hook, canonical query-string building, sortable column-header
+  UI) that future console panels — Organizations next — build on rather than
+  reimplementing.
+
 - **Operations Console: Users panel.** Adds a read-only, paginated inventory
   of platform users with identity, email-verification state, current system
   role, last sign-in, and created/updated timestamps. It reuses the existing

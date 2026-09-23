@@ -17,7 +17,7 @@ describe('fetchConsoleUsers', () => {
       data: { data: [], total: 0, page: 1, limit: 20 },
     })
 
-    await fetchConsoleUsers(2, 10)
+    await fetchConsoleUsers({ page: 2, limit: 10 })
 
     expect(fetchBackend).toHaveBeenCalledWith(
       '/api/v1/admin/users?page=2&limit=10',
@@ -26,7 +26,7 @@ describe('fetchConsoleUsers', () => {
     )
   })
 
-  it('defaults to the shared pagination contract', async () => {
+  it('defaults to the shared pagination contract with no discovery params', async () => {
     vi.mocked(fetchBackend).mockResolvedValue({
       status: 'success',
       data: { data: [], total: 0, page: 1, limit: 20 },
@@ -34,6 +34,33 @@ describe('fetchConsoleUsers', () => {
 
     await fetchConsoleUsers()
 
-    expect(vi.mocked(fetchBackend).mock.calls[0][0]).toBe('/api/v1/admin/users?page=1&limit=20')
+    expect(vi.mocked(fetchBackend).mock.calls[0]![0]).toBe('/api/v1/admin/users?page=1&limit=20')
+  })
+
+  it('forwards search/sortBy/sortOrder when present', async () => {
+    vi.mocked(fetchBackend).mockResolvedValue({
+      status: 'success',
+      data: { data: [], total: 0, page: 1, limit: 20 },
+    })
+
+    await fetchConsoleUsers({ search: 'alice', sortBy: 'name', sortOrder: 'desc' })
+
+    expect(vi.mocked(fetchBackend).mock.calls[0]![0]).toBe(
+      '/api/v1/admin/users?page=1&limit=20&search=alice&sortBy=name&sortOrder=desc'
+    )
+  })
+
+  it('omits search/sortBy/sortOrder from the query string when absent', async () => {
+    vi.mocked(fetchBackend).mockResolvedValue({
+      status: 'success',
+      data: { data: [], total: 0, page: 1, limit: 20 },
+    })
+
+    await fetchConsoleUsers({ page: 1, limit: 20 })
+
+    const url = vi.mocked(fetchBackend).mock.calls[0]![0] as string
+    expect(url).not.toContain('search')
+    expect(url).not.toContain('sortBy')
+    expect(url).not.toContain('sortOrder')
   })
 })

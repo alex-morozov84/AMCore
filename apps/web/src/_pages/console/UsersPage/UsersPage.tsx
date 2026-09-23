@@ -1,34 +1,63 @@
+import { Suspense } from 'react'
 import { getTranslations } from 'next-intl/server'
+import type { AdminUserSortField } from '@amcore/shared'
 
-import { fetchConsoleUsers } from '@/shared/api/console/users'
-import { resolvePrimary } from '@/shared/api/server'
-import { cn } from '@/shared/lib/utils'
-import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
+import type { DiscoverySortOrder } from '@/features/console-discovery'
+import { SearchInput } from '@/features/console-discovery'
+import { getConsoleUsersHref } from '@/shared/lib/console-public-href'
 
-import { UsersInventory } from './UsersInventory'
+import { UsersResults } from './UsersResults'
+import { UsersResultsSkeleton } from './UsersResultsSkeleton'
 
-const MONO = 'font-console-mono'
+const DEFAULT_SORT_BY: AdminUserSortField = 'createdAt'
 
 export interface UsersPageProps {
   page: number
   limit: number
+  search?: string
+  sortBy?: AdminUserSortField
+  sortOrder?: DiscoverySortOrder
 }
 
-/** Platform user inventory with system-role actions composed by `UsersTable`. */
-export async function UsersPage({ page, limit }: UsersPageProps) {
+/**
+ * Platform user inventory, searchable/sortable, with system-role actions
+ * composed by `UsersTable`. The heading and search box render immediately
+ * — only `UsersResults` (the part that actually needs the backend fetch)
+ * sits behind its own `<Suspense>`, so neither loses mounted state nor
+ * disappears behind a skeleton on a search/sort/page navigation.
+ */
+export async function UsersPage({
+  page,
+  limit,
+  search,
+  sortBy = DEFAULT_SORT_BY,
+  sortOrder,
+}: UsersPageProps) {
   const t = await getTranslations('console')
-  const outcome = resolvePrimary(await fetchConsoleUsers(page, limit), { source: 'console-users' })
-  if (outcome.status === 'unavailable')
-    return <PrimaryUnavailableFallback reason={outcome.reason} />
+  const baseHref = getConsoleUsersHref()
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-3xl font-semibold tracking-tight">{t('users')}</h1>
-        <p className={cn(MONO, 'text-sm text-foreground-muted')}>
-          {t('usersTotal', { total: outcome.data.total })}
-        </p>
-      </div>
-      <UsersInventory response={outcome.data} />
+      <h1 className="text-3xl font-semibold tracking-tight">{t('users')}</h1>
+      <SearchInput
+        baseHref={baseHref}
+        defaultValue={search ?? ''}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        label={t('usersSearchLabel')}
+        placeholder={t('usersSearchPlaceholder')}
+        clearLabel={t('usersSearchClear')}
+        inputId="users-search"
+      />
+      <Suspense fallback={<UsersResultsSkeleton />}>
+        <UsersResults
+          page={page}
+          limit={limit}
+          search={search}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          baseHref={baseHref}
+        />
+      </Suspense>
     </section>
   )
 }

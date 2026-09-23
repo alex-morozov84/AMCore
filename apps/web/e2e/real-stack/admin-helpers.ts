@@ -96,6 +96,27 @@ export function createOrganization(name: string, slug: string): void {
   )
 }
 
+/**
+ * Inserts one user row directly (no password, never signs in) — fixture
+ * data for search/sort assertions, same direct-SQL approach as
+ * {@link createUsersForPagination}. `createdAt` is caller-controlled so
+ * sort-order assertions don't depend on insertion order or the current
+ * accumulation of prior e2e runs' leftover rows.
+ */
+export function createNamedUser(email: string, name: string, createdAt: Date): void {
+  composeExec(
+    'postgres',
+    'psql',
+    '-U',
+    'amcore',
+    '-d',
+    'amcore',
+    '-c',
+    `INSERT INTO core.users (id, email, "emailCanonical", name, "createdAt", "updatedAt") ` +
+      `VALUES ('${randomUUID()}', '${email}', '${email}', '${name}', '${createdAt.toISOString()}', now());`
+  )
+}
+
 /** Creates future-dated rows so a pagination marker deterministically lands on page two. */
 export function createUsersForPagination(markerEmail: string, fillerPrefix: string): void {
   const marker = `('${randomUUID()}', '${markerEmail}', '${markerEmail}', now(), now())`

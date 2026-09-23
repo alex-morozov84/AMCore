@@ -1,22 +1,40 @@
 import { PAGINATION } from '@amcore/shared'
 
-import { ConsolePageFrame, UsersPage, UsersPageSkeleton } from '@/_pages/console'
+import {
+  ConsolePageFrame,
+  parsePage,
+  parseSearch,
+  parseSortBy,
+  parseSortOrder,
+  UsersPage,
+  UsersPageSkeleton,
+} from '@/_pages/console'
 
 interface UsersRouteProps {
-  searchParams: Promise<{ page?: string | string[] }>
-}
-
-function parsePage(raw: string | string[] | undefined): number {
-  if (typeof raw !== 'string' || !/^[1-9]\d*$/.test(raw)) return PAGINATION.DEFAULT_PAGE
-  const parsed = Number(raw)
-  return Number.isSafeInteger(parsed) ? parsed : PAGINATION.DEFAULT_PAGE
+  searchParams: Promise<{
+    page?: string | string[]
+    search?: string | string[]
+    sortBy?: string | string[]
+    sortOrder?: string | string[]
+  }>
 }
 
 export default async function UsersRoute({ searchParams }: UsersRouteProps) {
-  const { page: rawPage } = await searchParams
+  const {
+    page: rawPage,
+    search: rawSearch,
+    sortBy: rawSortBy,
+    sortOrder: rawSortOrder,
+  } = await searchParams
   return (
     <ConsolePageFrame fallback={<UsersPageSkeleton />}>
-      <UsersPage page={parsePage(rawPage)} limit={PAGINATION.DEFAULT_LIMIT} />
+      <UsersPage
+        page={parsePage(rawPage)}
+        limit={PAGINATION.DEFAULT_LIMIT}
+        search={parseSearch(rawSearch)}
+        sortBy={parseSortBy(rawSortBy)}
+        sortOrder={parseSortOrder(rawSortOrder)}
+      />
     </ConsolePageFrame>
   )
 }

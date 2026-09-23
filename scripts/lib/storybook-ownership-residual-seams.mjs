@@ -44,11 +44,11 @@ export const storybookResidualSeams = [
     'storybook.console-development-step',
     'docs/operations-console/development.md',
     block(
-      '7. Add focused unit tests, Storybook/a11y states where applicable, and',
+      '8. Add focused unit tests, Storybook/a11y states where applicable, and',
       '   browser/real-stack coverage for auth, cookies, Redis, or proxy behavior.',
       {
         replacement:
-          '7. Add focused unit tests and browser/real-stack coverage for visible states,\n' +
+          '8. Add focused unit tests and browser/real-stack coverage for visible states,\n' +
           '   accessibility, auth, cookies, Redis, or proxy behavior as applicable.\n',
       }
     ),

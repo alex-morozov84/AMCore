@@ -2,9 +2,7 @@ import type { ReactNode } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
 import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
-import { expect, it, vi } from 'vitest'
-
-import { getConsoleUsersHref } from '@/shared/lib/console-public-href'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 vi.mock('@/i18n/navigation', () => ({
@@ -31,16 +29,43 @@ const messages = {
   },
 }
 
-it('offers a progress-aware return to the first Users page', async () => {
-  const page = await UsersOutOfRange({ totalPages: 2 })
-  render(
+function renderOutOfRange(page: Awaited<ReturnType<typeof UsersOutOfRange>>) {
+  return render(
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       {page}
     </NextIntlClientProvider>
   )
-  expect(screen.getByText('This page is unavailable')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Go to first page' })).toHaveAttribute(
-    'href',
-    getConsoleUsersHref()
-  )
+}
+
+describe('UsersOutOfRange', () => {
+  it('offers a progress-aware return to page 1, carrying the current sort forward', async () => {
+    const page = await UsersOutOfRange({
+      totalPages: 2,
+      baseHref: '/en/admin/users',
+      sortBy: 'createdAt',
+    })
+    renderOutOfRange(page)
+
+    expect(screen.getByText('This page is unavailable')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to first page' })).toHaveAttribute(
+      'href',
+      '/en/admin/users?sortBy=createdAt'
+    )
+  })
+
+  it('preserves the current search and sortOrder in the recovery link', async () => {
+    const page = await UsersOutOfRange({
+      totalPages: 2,
+      baseHref: '/en/admin/users',
+      search: 'alice',
+      sortBy: 'name',
+      sortOrder: 'desc',
+    })
+    renderOutOfRange(page)
+
+    expect(screen.getByRole('link', { name: 'Go to first page' })).toHaveAttribute(
+      'href',
+      '/en/admin/users?search=alice&sortBy=name&sortOrder=desc'
+    )
+  })
 })
