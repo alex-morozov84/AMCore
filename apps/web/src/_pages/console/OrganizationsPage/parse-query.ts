@@ -7,8 +7,7 @@ import type { DiscoverySortOrder } from '@/features/console-discovery'
  * deliberately excludes `email`), every backend-sortable Organizations
  * field (`name`, `slug`, `createdAt`, `updatedAt`) already has its own
  * visible column, so the UI exposes the full backend set — confirmed with
- * the owner, not assumed (see `ai/models-talk.md`'s "Still open for the PR7
- * implementer").
+ * the product owner, not inferred merely from the backend allowlist.
  *
  * Domain-owned here (the Organizations panel/query contract), mirroring
  * `apps/web/src/_pages/console/UsersPage/parse-query.ts`'s

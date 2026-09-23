@@ -99,7 +99,7 @@
     "organizationsEmptyTitle": "No organizations yet",
     "organizationsEmptyDescription": "Organizations will appear here once they exist.",
     "organizationsNoSearchResultsTitle": "No matching organizations",
-    "organizationsNoSearchResultsDescription": "No organization's name or slug matches your search. Try a different term.",
+    "organizationsNoSearchResultsDescription": "No organization name or slug matches your search. Try a different term.",
     "organizationsSearchLabel": "Search organizations",
     "organizationsSearchPlaceholder": "Search by name or slug",
     "organizationsSearchClear": "Clear search",

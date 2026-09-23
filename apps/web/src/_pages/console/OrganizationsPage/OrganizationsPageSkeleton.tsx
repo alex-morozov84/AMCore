@@ -9,7 +9,8 @@ import { OrganizationsResultsSkeleton } from './OrganizationsResultsSkeleton'
  * box render immediately and stay mounted — see `OrganizationsPage.tsx`),
  * which uses `OrganizationsResultsSkeleton` alone. Keep both in sync with
  * the real markup whenever the Organizations panel's UI changes — see
- * `docs/operations-console/development.md`'s "Add a functional panel" §.
+ * `docs/operations-console/development.md`'s "Add a functional panel"
+ * guidance.
  */
 export function OrganizationsPageSkeleton() {
   return (
