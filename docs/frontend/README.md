@@ -29,6 +29,8 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
 ## Start here
 
 - Extending or adding a route/page → [Architecture & conventions](./architecture-and-conventions.md#the-recipe--adding-a-route)
+- Adding local or URL-backed search →
+  [Architecture & conventions · Add search](./architecture-and-conventions.md#recipe-add-search)
 - Adding copy, a locale, or an error message → [i18n and error localization](./i18n-and-errors.md)
 - Reusing or adding a shared UI primitive → [Shared UI and shadcn](./shared-ui-and-shadcn.md)
 - Writing or reviewing a `shared/ui`/feature-flow story → [Storybook](./storybook.md)

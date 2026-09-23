@@ -28,6 +28,7 @@ find for something, that page is under-documented; please open an issue.
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Add a backend module the AMCore way                                                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                              |
 | Add a route/page on the frontend the AMCore way                                          | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                 |
+| Add local or URL-backed frontend search                                                  | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#recipe-add-search)                          |
 | Know which import/styling rules are enforced                                             | [`frontend/fsd-boundaries-and-guardrails.md`](frontend/fsd-boundaries-and-guardrails.md)                                          |
 | Reuse or add a shared UI primitive (shadcn)                                              | [`frontend/shared-ui-and-shadcn.md`](frontend/shared-ui-and-shadcn.md)                                                            |
 | Consume media/notifications/AI from the frontend                                         | [`frontend/api-consumption.md`](frontend/api-consumption.md)                                                                      |
@@ -148,6 +149,7 @@ there, not here.
 
 - Add a backend module → [Backend architecture & conventions](backend/architecture-and-conventions.md)
 - Add a route/page → [Frontend architecture & conventions · The recipe](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)
+- Add search → [Frontend architecture & conventions · Add search](frontend/architecture-and-conventions.md#recipe-add-search)
 - Add an environment variable → [Backend architecture & conventions · Adding an environment variable](backend/architecture-and-conventions.md#adding-an-environment-variable)
 - Add an external service / infra dependency → [Backend architecture & conventions · Adding an external service / infra dependency](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency)
 - Add an OAuth provider → [Auth · OAuth](auth/oauth.md#adding-a-new-provider)

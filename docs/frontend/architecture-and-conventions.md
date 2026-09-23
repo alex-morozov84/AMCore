@@ -332,7 +332,13 @@ else needed the store:
 login/register/logout mutate it directly via `queryClient.setQueryData`/
 `queryClient.clear()` rather than an imperative store action.
 
-### URL-backed search drafts
+### Recipe: add search
+
+Use `SearchField` by itself when the feature only needs a controlled local
+filter: the feature owns the value and passes `onValueChange` plus an `onClear`
+that resets it. Add `useDebouncedDraft` only when results come from an
+authoritative server/URL state and the field must keep a temporary typing draft
+while navigation is in flight.
 
 Search whose result set is rendered from the URL has two kinds of state: the
 server-parsed URL is authoritative, while the text being typed is a temporary
@@ -360,6 +366,60 @@ Do not use this pair for an entirely local list filter, a command palette, or
 an unrelated form field: those have no server-authoritative URL state to
 reconcile. The Operations Console's `features/console-discovery` slice is the
 reference adapter, not part of the shared contract.
+
+A downstream feature composes the primitives through its own adapter. In this
+abridged example, `catalogIdentity()` and `buildCatalogHref()` are feature-local
+helpers that include search, sort and page policy:
+
+```tsx
+'use client'
+
+import { useCallback } from 'react'
+
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
+import { useDebouncedDraft } from '@/shared/lib/use-debounced-draft'
+import { SearchField } from '@/shared/ui/search-field'
+
+const normalizeSearch = (value: string) => value.trim()
+
+export function CatalogSearch({ search, sort, page, labels }: CatalogSearchProps) {
+  const router = useRouteProgressRouter()
+  const expectedIdentity = useCallback(
+    (value: string) => catalogIdentity({ search: value, sort, page: 1 }),
+    [sort]
+  )
+  const commit = useCallback(
+    (value: string) =>
+      router.replace(buildCatalogHref({ search: value, sort, page: 1 }), { scroll: false }),
+    [router, sort]
+  )
+  const draft = useDebouncedDraft({
+    authoritativeValue: search,
+    authoritativeIdentity: catalogIdentity({ search, sort, page }),
+    getCommitIdentity: expectedIdentity,
+    delayMs: 300,
+    normalize: normalizeSearch,
+    onCommit: commit,
+  })
+  const clear = () => {
+    draft.setValue('')
+    draft.commitNow('')
+  }
+
+  return (
+    <SearchField {...labels} value={draft.value} onValueChange={draft.setValue} onClear={clear} />
+  )
+}
+```
+
+This example deliberately does not import `features/console-discovery`.
+`search` query naming, canonical identity, sort preservation, page reset, URL
+construction, GET/no-JavaScript fallback and discrete-navigation draft discard
+belong to the feature. Programmatic navigation uses
+`useRouteProgressRouter()`; navigating links use `RouteProgressLink` or a
+feature wrapper around it. The current Next adapter is last-navigation-wins;
+another transport must establish the same supersession rule before using this
+controller, rather than moving transport policy into `shared`.
 
 ## Relationship to backend/OpenAPI docs
 
