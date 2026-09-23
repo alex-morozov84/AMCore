@@ -6,7 +6,7 @@ import ts from 'typescript'
 import { localeGuardSourceFiles } from './project-locale-source-files.mjs'
 import { resolvePublicRepoRoot } from './working-tree-fixture.mjs'
 const CONSOLE_TEST =
-  /^apps\/web\/src\/(?:_pages\/console\/|widgets\/console-shell\/|features\/console-discovery\/|shared\/lib\/console-public-href\.test\.)/
+  /^apps\/web\/src\/(?:_pages\/console\/|(?:entities|features|widgets)\/console-[^/]+\/|shared\/lib\/console-public-href\.test\.)/
 const TEST_FILE = /\.test\.[jt]sx?$/
 const DEFAULT_CONSOLE_PATH = /^\/(?:en\/|ru\/)?admin(?:[/?#]|$)/
 function literal(node) {

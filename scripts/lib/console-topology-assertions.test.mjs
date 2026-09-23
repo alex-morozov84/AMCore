@@ -97,3 +97,19 @@ test('the fast repository guard sees a new Console UI test file', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('the repository guard covers a new Console-prefixed FSD slice', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'amcore-console-url-'))
+  try {
+    const sliceFile = 'apps/web/src/features/console-login/ui/ConsoleLoginLink.test.tsx'
+    const target = path.join(root, sliceFile)
+    mkdirSync(path.dirname(target), { recursive: true })
+    writeFileSync(
+      target,
+      "it('route', () => expect(link).toHaveAttribute('href', '/admin/login'))\n"
+    )
+    assert.throws(() => assertConsoleTopologyAssertions(root), /ConsoleLoginLink\.test\.tsx:1/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

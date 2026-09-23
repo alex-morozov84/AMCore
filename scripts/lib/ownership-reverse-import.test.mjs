@@ -24,7 +24,10 @@ function inspect(files, options = {}) {
     facts: {
       verification: options.sharedModule
         ? []
-        : [fileFact(helper), ...(options.registerSpec ? [fileFact(spec)] : [])],
+        : [
+            fileFact(helper, options.rewriteTarget ? { disposition: 'rewrite' } : {}),
+            ...(options.registerSpec ? [fileFact(spec)] : []),
+          ],
       sharedModules: options.sharedModule ? [fileFact(helper)] : [],
     },
     seams: options.seams ?? [],
@@ -82,4 +85,8 @@ test('an explicit removeImports seam covers the import edge', () => {
 test('a universal shared target does not require importer ownership', () => {
   const files = { ...source, 'src/app.ts': `import '../${helper}'\n` }
   assert.doesNotThrow(inspect(files, { sharedModule: true }))
+})
+
+test('a retained rewrite target does not require importer ownership', () => {
+  assert.doesNotThrow(inspect(source, { rewriteTarget: true }))
 })
