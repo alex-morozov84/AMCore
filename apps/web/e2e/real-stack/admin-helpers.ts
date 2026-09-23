@@ -81,8 +81,14 @@ export function ageSessionLastAuthAt(email: string): void {
   )
 }
 
-/** See `e2e/console-real-stack/helpers.ts`'s `createOrganization` for why a random UUID is fine here. */
-export function createOrganization(name: string, slug: string): void {
+/**
+ * See `e2e/console-real-stack/helpers.ts`'s `createOrganization` for why a
+ * random UUID is fine here. `createdAt` defaults to `now()`; pass an
+ * explicit `Date` for deterministic sort-order assertions (mirrors
+ * `createNamedUser`'s own `createdAt` parameter below).
+ */
+export function createOrganization(name: string, slug: string, createdAt?: Date): void {
+  const createdAtSql = createdAt ? `'${createdAt.toISOString()}'` : 'now()'
   composeExec(
     'postgres',
     'psql',
@@ -92,7 +98,7 @@ export function createOrganization(name: string, slug: string): void {
     'amcore',
     '-c',
     `INSERT INTO core.organizations (id, name, slug, "createdAt", "updatedAt") ` +
-      `VALUES ('${randomUUID()}', '${name}', '${slug}', now(), now());`
+      `VALUES ('${randomUUID()}', '${name}', '${slug}', ${createdAtSql}, now());`
   )
 }
 

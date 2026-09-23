@@ -1,23 +1,40 @@
 import { PAGINATION } from '@amcore/shared'
 
-import { ConsolePageFrame, OrganizationsPage, OrganizationsPageSkeleton } from '@/_pages/console'
+import { ConsolePageFrame } from '@/_pages/console'
+import {
+  OrganizationsPage,
+  OrganizationsPageSkeleton,
+  parsePage,
+  parseSearch,
+  parseSortBy,
+  parseSortOrder,
+} from '@/_pages/console/OrganizationsPage'
 
 interface OrganizationsRouteProps {
-  searchParams: Promise<{ page?: string | string[] }>
-}
-
-/** Fails closed to the default page on missing/malformed input, never NaN through to the fetch. */
-function parsePage(raw: string | string[] | undefined): number {
-  if (typeof raw !== 'string' || !/^[1-9]\d*$/.test(raw)) return PAGINATION.DEFAULT_PAGE
-  const parsed = Number(raw)
-  return Number.isSafeInteger(parsed) ? parsed : PAGINATION.DEFAULT_PAGE
+  searchParams: Promise<{
+    page?: string | string[]
+    search?: string | string[]
+    sortBy?: string | string[]
+    sortOrder?: string | string[]
+  }>
 }
 
 export default async function OrganizationsRoute({ searchParams }: OrganizationsRouteProps) {
-  const { page: rawPage } = await searchParams
+  const {
+    page: rawPage,
+    search: rawSearch,
+    sortBy: rawSortBy,
+    sortOrder: rawSortOrder,
+  } = await searchParams
   return (
     <ConsolePageFrame fallback={<OrganizationsPageSkeleton />}>
-      <OrganizationsPage page={parsePage(rawPage)} limit={PAGINATION.DEFAULT_LIMIT} />
+      <OrganizationsPage
+        page={parsePage(rawPage)}
+        limit={PAGINATION.DEFAULT_LIMIT}
+        search={parseSearch(rawSearch)}
+        sortBy={parseSortBy(rawSortBy)}
+        sortOrder={parseSortOrder(rawSortOrder)}
+      />
     </ConsolePageFrame>
   )
 }

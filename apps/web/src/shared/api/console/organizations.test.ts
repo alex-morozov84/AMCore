@@ -17,7 +17,7 @@ describe('fetchConsoleOrganizations', () => {
       data: { data: [], total: 0, page: 1, limit: 20 },
     })
 
-    await fetchConsoleOrganizations(2, 10)
+    await fetchConsoleOrganizations({ page: 2, limit: 10 })
 
     expect(fetchBackend).toHaveBeenCalledWith(
       '/api/v1/admin/organizations?page=2&limit=10',
@@ -26,7 +26,7 @@ describe('fetchConsoleOrganizations', () => {
     )
   })
 
-  it('defaults to page 1 and the default page size', async () => {
+  it('defaults to the shared pagination contract with no discovery params', async () => {
     vi.mocked(fetchBackend).mockResolvedValue({
       status: 'success',
       data: { data: [], total: 0, page: 1, limit: 20 },
@@ -36,5 +36,32 @@ describe('fetchConsoleOrganizations', () => {
 
     const [path] = vi.mocked(fetchBackend).mock.calls[0]
     expect(path).toBe('/api/v1/admin/organizations?page=1&limit=20')
+  })
+
+  it('forwards search/sortBy/sortOrder when present', async () => {
+    vi.mocked(fetchBackend).mockResolvedValue({
+      status: 'success',
+      data: { data: [], total: 0, page: 1, limit: 20 },
+    })
+
+    await fetchConsoleOrganizations({ search: 'acme', sortBy: 'name', sortOrder: 'desc' })
+
+    expect(vi.mocked(fetchBackend).mock.calls[0]![0]).toBe(
+      '/api/v1/admin/organizations?page=1&limit=20&search=acme&sortBy=name&sortOrder=desc'
+    )
+  })
+
+  it('omits search/sortBy/sortOrder from the query string when absent', async () => {
+    vi.mocked(fetchBackend).mockResolvedValue({
+      status: 'success',
+      data: { data: [], total: 0, page: 1, limit: 20 },
+    })
+
+    await fetchConsoleOrganizations({ page: 1, limit: 20 })
+
+    const url = vi.mocked(fetchBackend).mock.calls[0]![0] as string
+    expect(url).not.toContain('search')
+    expect(url).not.toContain('sortBy')
+    expect(url).not.toContain('sortOrder')
   })
 })
