@@ -1,1 +1,2 @@
-CI=true pnpm lint-staged
+CI=true pnpm lint-staged || exit $?
+node scripts/code-size-report.mjs || echo 'size report unavailable: reporter failed' >&2

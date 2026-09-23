@@ -347,6 +347,15 @@ CI is the actual gate, not either hook:
   deliberately ignores `apps/**`/`packages/**` (that root config is for the
   two root-level files only, not a fallback for the workspaces).
 
+  After successful `lint-staged`, the hook prints a read-only size report from
+  the final staged snapshot. It marks files at 150 lines and functions at 30
+  lines for review, including test helpers but excluding direct
+  `describe`/`test`/`it` callbacks. The report is advisory: a size marker or
+  unavailable report cannot fail the commit, and CI has no size gate. ESLint
+  remains blocking on its existing rules, including `--max-warnings=0`; size
+  is deliberately outside that invocation. See `CONTRIBUTING.md` → _Size
+  review advisory_ for the handoff decision required for each marker.
+
 **Do not add a new lintable workspace under `apps/*` or `packages/*` without
 also adding a matching `lint-staged` pattern** in the root `package.json`
 using `pnpm --filter <workspace> exec eslint`, or its staged files
