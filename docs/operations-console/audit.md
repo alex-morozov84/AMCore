@@ -38,8 +38,8 @@ investigation reference; the screen has no event-ID search field.
 
 Selecting an identity suggestion applies that ID immediately without applying
 other unsubmitted changes in the form. For a known ID, open **Filter by exact
-ID**. The filter icon beside an action, actor, target, or organization in a
-result applies its exact value to the current interval. On narrow screens,
+ID**. A result's filter control beside an action, actor, target, or organization
+applies its exact value to the current interval. On narrow screens,
 choose **Show filters** to open the form. There is no general free-text search
 over event contents.
 

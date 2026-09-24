@@ -3,6 +3,7 @@ import { Response } from 'express'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
+import { sanitizeRequestUrl } from '../../config/logging.config'
 import type { ErrorResponse, ValidationError } from '../types'
 
 /**
@@ -38,7 +39,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message,
       errorCode,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: sanitizeRequestUrl(request.url),
       method: request.method,
       correlationId: this.cls.getId(),
       ...(details && { details }),
@@ -61,7 +62,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // Log validation errors for debugging
       const logContext: Record<string, unknown> = {
         statusCode,
-        path: request.url,
+        path: sanitizeRequestUrl(request.url),
       }
       if (validationErrors.length > 0) {
         logContext.validationErrors = validationErrors

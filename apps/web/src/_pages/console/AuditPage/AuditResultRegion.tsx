@@ -5,7 +5,10 @@ import { flushSync } from 'react-dom'
 
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
+import { AuditResultsSkeleton } from './AuditResultsSkeleton'
+
 export const AUDIT_FOCUS_KEY = 'amcore-audit-focus-after-apply'
+export const AUDIT_PAGE_NAVIGATION = 'amcore-audit-page-navigation'
 
 // A history payload can carry an old server result. Its token is never fresh again.
 const seenResults = new Set<string>()
@@ -32,6 +35,7 @@ function AuditResultRegionContent({ readToken, loading, children }: AuditResultR
   const [awaitingFreshRead, setAwaitingFreshRead] = useState(
     () => typeof window !== 'undefined' && seenResults.has(readToken)
   )
+  const [navigating, setNavigating] = useState(false)
 
   useEffect(() => {
     if (awaitingFreshRead) {
@@ -56,16 +60,27 @@ function AuditResultRegionContent({ readToken, loading, children }: AuditResultR
     const refreshHistoryResult = () => {
       flushSync(() => setAwaitingFreshRead(true))
     }
+    const showPendingResult = () => {
+      flushSync(() => setNavigating(true))
+    }
     window.addEventListener('popstate', refreshHistoryResult)
-    return () => window.removeEventListener('popstate', refreshHistoryResult)
+    window.addEventListener(AUDIT_PAGE_NAVIGATION, showPendingResult)
+    return () => {
+      window.removeEventListener('popstate', refreshHistoryResult)
+      window.removeEventListener(AUDIT_PAGE_NAVIGATION, showPendingResult)
+    }
   }, [router])
 
   return (
     <>
-      {awaitingFreshRead && <p role="status">{loading}</p>}
+      {navigating ? (
+        <AuditResultsSkeleton label={loading} />
+      ) : (
+        awaitingFreshRead && <p role="status">{loading}</p>
+      )}
       <section
         ref={region}
-        hidden={awaitingFreshRead}
+        hidden={awaitingFreshRead || navigating}
         aria-live="polite"
         tabIndex={-1}
         className="space-y-4"

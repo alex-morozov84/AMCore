@@ -195,6 +195,20 @@ describe('HttpExceptionFilter', () => {
     )
   })
 
+  it('redacts audit query IDs and cursors in error response and warning path', () => {
+    mockRequest.url = '/api/v1/admin/audit-logs?actorId=secret-actor&cursor=secret-cursor&limit=25'
+
+    filter.catch(new BadRequestException('Invalid cursor'), mockHost)
+
+    const response = mockResponse.json.mock.calls[0][0] as { path: string }
+    const context = mockLogger.warn.mock.calls[0]?.[0] as { path: string }
+    for (const path of [response.path, context.path]) {
+      expect(path).not.toContain('secret-actor')
+      expect(path).not.toContain('secret-cursor')
+      expect(path).toContain('limit=25')
+    }
+  })
+
   it('should include stack trace in development', () => {
     const originalEnv = process.env.NODE_ENV
     process.env.NODE_ENV = 'development'

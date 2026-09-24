@@ -14,6 +14,7 @@ test('host Audit uses the isolated console session and closes after demotion', a
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
+  await expect(productPage).toHaveURL(/https:\/\/app\.localhost\/en\/?$/)
   setSystemRole(email, 'SUPER_ADMIN')
 
   const consoleContext = await browser.newContext({
@@ -24,7 +25,12 @@ test('host Audit uses the isolated console session and closes after demotion', a
   await page.goto('/en/login')
   await page.getByLabel(/email/i).fill(email)
   await page.getByLabel(/password/i).fill('Test1234Secure')
+  const loginResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/auth/login') && response.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: /sign in/i }).click()
+  expect((await loginResponse).status()).toBe(204)
   await expect(page).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
 
   const browserTokens: string[] = []

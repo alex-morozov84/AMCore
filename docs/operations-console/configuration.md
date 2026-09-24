@@ -133,9 +133,9 @@ operator input that may reveal personal or organizational information:
 - **The browser address bar and history**, on whichever machine the
   operator is using. These views can be reloaded, bookmarked, or shared;
   review the URL before pasting it into a chat or ticket.
-- **This API's own structured access logs** are redacted — a search term
-  and the audit ID/cursor values are stripped from both the request's query
-  object and its raw URL before a line is written.
+- **This API's request access logs and exception path fields** redact search
+  terms and audit ID/cursor values in structured query and URL fields.
+  Error-response paths are redacted too.
 - **A reverse-proxy access log** (Caddy, nginx, or any edge proxy in
   front of either topology — **path mode and host mode alike**) is
   outside this application's runtime and is not redacted by the shipped

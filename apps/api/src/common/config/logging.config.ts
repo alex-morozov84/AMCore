@@ -40,7 +40,7 @@ const SENSITIVE_QUERY_PARAMS = [
  * fixed dummy origin below; only `pathname`+`search` are ever read back out
  * of it, so that origin never actually appears in the result.
  */
-function sanitizeRequestUrl(url: unknown): string {
+export function sanitizeRequestUrl(url: unknown): string {
   if (typeof url !== 'string' || url.length === 0) return '[REDACTED]'
   try {
     const parsed = new URL(url, 'http://sanitize.invalid')

@@ -10,6 +10,8 @@ import {
   PaginationPrevious,
 } from '@/shared/ui/pagination'
 
+import { AUDIT_PAGE_NAVIGATION } from './AuditResultRegion'
+
 const KEY = 'amcore-audit-pages-v2'
 const EVENT = 'audit-pages-change'
 type Trail = { scope: string; pages: string[] }
@@ -81,6 +83,7 @@ export function AuditPaging({
               prefetch={false}
               href={previousHref}
               onNavigate={() => {
+                window.dispatchEvent(new Event(AUDIT_PAGE_NAVIGATION))
                 const trail = readTrail()
                 if (trail)
                   writeTrail({
@@ -98,6 +101,7 @@ export function AuditPaging({
               prefetch={false}
               href={nextHref}
               onNavigate={() => {
+                window.dispatchEvent(new Event(AUDIT_PAGE_NAVIGATION))
                 const scope = scopeOf(currentHref)
                 const trail = readTrail()
                 const pages = trail?.scope === scope ? trail.pages : []

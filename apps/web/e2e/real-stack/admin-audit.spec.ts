@@ -49,8 +49,37 @@ test('Audit navigation is deliberate, read-audited and fresh on history travel',
   )
   await expect(page.getByRole('table').getByText(`${marker}-c`)).toBeVisible()
   expect(countAuditViews(email)).toBe(2)
+  const network = await page.context().newCDPSession(page)
+  await network.send('Network.enable')
+  await network.send('Network.emulateNetworkConditions', {
+    offline: false,
+    latency: 150,
+    downloadThroughput: 10 * 1024,
+    uploadThroughput: 10 * 1024,
+  })
+  await page.evaluate(() => {
+    const state = window as typeof window & { auditResultsSkeletonSeen?: boolean }
+    state.auditResultsSkeletonSeen = false
+    const inspect = () => {
+      if (document.querySelector('[role="status"][aria-label="Loading audit events…"]'))
+        state.auditResultsSkeletonSeen = true
+    }
+    new MutationObserver(inspect).observe(document.body, { childList: true, subtree: true })
+  })
   await page.getByRole('link', { name: 'Older' }).click()
   await expect(page.getByRole('table').getByText(`${marker}-b`)).toBeVisible()
+  await network.send('Network.emulateNetworkConditions', {
+    offline: false,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  })
+  expect(
+    await page.evaluate(
+      () =>
+        (window as typeof window & { auditResultsSkeletonSeen?: boolean }).auditResultsSkeletonSeen
+    )
+  ).toBe(true)
   expect(countAuditViews(email)).toBe(3)
   await page.getByRole('link', { name: 'Older' }).click()
   await expect(page.getByRole('table').getByText(`${marker}-a`)).toBeVisible()

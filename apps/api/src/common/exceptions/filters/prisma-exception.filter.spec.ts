@@ -66,6 +66,23 @@ describe('PrismaClientExceptionFilter', () => {
     )
   })
 
+  it('redacts audit query values in database error response path', () => {
+    mockRequest.url = '/api/v1/admin/audit-logs?targetId=secret-target&cursor=secret-cursor'
+    const exception = new Prisma.PrismaClientKnownRequestError('Database error', {
+      code: 'P2024',
+      clientVersion: '7.10.0',
+    })
+
+    filter.catch(exception, mockHost)
+
+    const response = mockResponse.json.mock.calls[0][0] as { path: string }
+    expect(response.path).not.toContain('secret-target')
+    expect(response.path).not.toContain('secret-cursor')
+    expect(new URL(response.path, 'http://test.invalid').searchParams.get('cursor')).toBe(
+      '[REDACTED]'
+    )
+  })
+
   it('should map P2002 on phone to PHONE_ALREADY_EXISTS', () => {
     const exception = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
       code: 'P2002',
