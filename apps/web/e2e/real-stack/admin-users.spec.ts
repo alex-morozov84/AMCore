@@ -139,8 +139,12 @@ test('path-mode Users sort-by-name header orders real rows and toggles aria-sort
   await expect(page.getByText(`ZZZ-${token}`)).toBeVisible()
 
   const userHeader = page.getByRole('columnheader', { name: /^Sort by User,/ })
+  await page.getByLabel(/search users/i).fill('uncommitted-sort-draft')
   await userHeader.getByRole('link').click()
   await expect(page).toHaveURL(/[?&]sortBy=name\b/)
+  await page.waitForTimeout(400)
+  await expect(page).toHaveURL(new RegExp(`[?&]search=${token}\\b`))
+  await expect(page.getByLabel(/search users/i)).toHaveValue(token)
   await expect(userHeader).toHaveAttribute('aria-sort', 'ascending')
   const rowsAsc = page.getByRole('row').filter({ hasText: token })
   await expect(rowsAsc.first()).toContainText(`AAA-${token}`)

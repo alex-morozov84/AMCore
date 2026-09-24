@@ -10,7 +10,7 @@ import {
 import { Table, TableBody, TableHeader, TableRow } from '@/shared/ui/table'
 
 import { OrganizationRow } from './OrganizationRow'
-import type { OrganizationsSortableField } from './parse-query'
+import { ORGANIZATIONS_DEFAULT_SORT_ORDER, type OrganizationsSortableField } from './parse-query'
 
 const MONO = 'font-console-mono'
 
@@ -62,36 +62,52 @@ export async function OrganizationsTable({
             <SortableColumnHead
               baseHref={baseHref}
               column="name"
-              defaultOrder="asc"
+              defaultOrder={ORGANIZATIONS_DEFAULT_SORT_ORDER.name}
               current={current}
               visibleLabel={nameColumnLabel}
-              accessibleLabel={accessibleSortLabel('name', 'asc', nameColumnLabel)}
+              accessibleLabel={accessibleSortLabel(
+                'name',
+                ORGANIZATIONS_DEFAULT_SORT_ORDER.name,
+                nameColumnLabel
+              )}
             />
             <SortableColumnHead
               baseHref={baseHref}
               column="slug"
-              defaultOrder="asc"
+              defaultOrder={ORGANIZATIONS_DEFAULT_SORT_ORDER.slug}
               current={current}
               visibleLabel={slugColumnLabel}
-              accessibleLabel={accessibleSortLabel('slug', 'asc', slugColumnLabel)}
+              accessibleLabel={accessibleSortLabel(
+                'slug',
+                ORGANIZATIONS_DEFAULT_SORT_ORDER.slug,
+                slugColumnLabel
+              )}
               className={MONO}
             />
             <SortableColumnHead
               baseHref={baseHref}
               column="createdAt"
-              defaultOrder="desc"
+              defaultOrder={ORGANIZATIONS_DEFAULT_SORT_ORDER.createdAt}
               current={current}
               visibleLabel={createdColumnLabel}
-              accessibleLabel={accessibleSortLabel('createdAt', 'desc', createdColumnLabel)}
+              accessibleLabel={accessibleSortLabel(
+                'createdAt',
+                ORGANIZATIONS_DEFAULT_SORT_ORDER.createdAt,
+                createdColumnLabel
+              )}
               className={MONO}
             />
             <SortableColumnHead
               baseHref={baseHref}
               column="updatedAt"
-              defaultOrder="desc"
+              defaultOrder={ORGANIZATIONS_DEFAULT_SORT_ORDER.updatedAt}
               current={current}
               visibleLabel={updatedColumnLabel}
-              accessibleLabel={accessibleSortLabel('updatedAt', 'desc', updatedColumnLabel)}
+              accessibleLabel={accessibleSortLabel(
+                'updatedAt',
+                ORGANIZATIONS_DEFAULT_SORT_ORDER.updatedAt,
+                updatedColumnLabel
+              )}
               className={MONO}
             />
           </TableRow>

@@ -27,6 +27,20 @@ export const USERS_SORTABLE_FIELDS = [
 
 export type UsersSortableField = (typeof USERS_SORTABLE_FIELDS)[number]
 
+export const USERS_DEFAULT_SORT_ORDER: Record<UsersSortableField, DiscoverySortOrder> = {
+  name: 'asc',
+  lastLoginAt: 'desc',
+  createdAt: 'desc',
+  updatedAt: 'desc',
+}
+
+export function getUsersEffectiveSortOrder(
+  sortBy: UsersSortableField,
+  sortOrder?: DiscoverySortOrder
+) {
+  return sortOrder ?? USERS_DEFAULT_SORT_ORDER[sortBy]
+}
+
 /**
  * The Users route's `searchParams` → validated-props parsing. Kept as a
  * plain, dependency-free module (not inline in `page.tsx`, and not
@@ -53,10 +67,10 @@ export function parseSearch(raw: string | string[] | undefined): string | undefi
   return trimmed
 }
 
-export function parseSortBy(raw: string | string[] | undefined): AdminUserSortField | undefined {
+export function parseSortBy(raw: string | string[] | undefined): UsersSortableField | undefined {
   if (typeof raw !== 'string') return undefined
   return (USERS_SORTABLE_FIELDS as readonly string[]).includes(raw)
-    ? (raw as AdminUserSortField)
+    ? (raw as UsersSortableField)
     : undefined
 }
 
