@@ -1,8 +1,9 @@
 import type { ComponentType } from 'react'
 import { useTranslations } from 'next-intl'
-import { Building2Icon, LayoutDashboardIcon, UsersIcon } from 'lucide-react'
+import { Building2Icon, LayoutDashboardIcon, ScrollTextIcon, UsersIcon } from 'lucide-react'
 
 import {
+  getConsoleAuditHref,
   getConsoleOrganizationsHref,
   getConsoleOverviewHref,
   getConsoleUsersHref,
@@ -12,6 +13,7 @@ export interface ConsoleNavItem {
   href: string
   label: string
   icon: ComponentType<{ 'aria-hidden'?: boolean | 'true' | 'false' }>
+  prefetch?: boolean
 }
 
 /** Shared by the sidebar nav and the header breadcrumb - one source for both. */
@@ -21,5 +23,6 @@ export function useConsoleNavItems(): ConsoleNavItem[] {
     { href: getConsoleOverviewHref(), label: t('overview'), icon: LayoutDashboardIcon },
     { href: getConsoleUsersHref(), label: t('users'), icon: UsersIcon },
     { href: getConsoleOrganizationsHref(), label: t('organizations'), icon: Building2Icon },
+    { href: getConsoleAuditHref(), label: t('auditTitle'), icon: ScrollTextIcon, prefetch: false },
   ]
 }

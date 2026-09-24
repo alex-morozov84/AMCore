@@ -147,6 +147,16 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    custom clear button is not duplicated by a browser-native search control;
    clearing returns focus to the field.
 
+   Audit is a structured-filter and opaque-cursor exception: its exact ID,
+   action and time filters deliberately submit together. Its current-name
+   lookup suggests at most ten matches; choosing one applies only the safe ID
+   in the URL. The fixed POST handler under `app/api/console/audit/lookup`
+   uses `withConsoleHostGuard()` and topology-aware session/origin resolution.
+   The log list is a Server Component read with the console-aware token and
+   `cache: 'no-store'`; Audit links disable prefetch so merely seeing one does
+   not create a privileged read-audit event. T002's discovery URL and numbered
+   page contract do not apply to Audit; its generic field may be reused only
+   where the interaction contract matches.
 7. Use the existing graceful-degradation primitives for secondary data. Keep
    primary failures explicit and fail privileged actions closed.
 8. Add focused unit tests, Storybook/a11y states where applicable, and

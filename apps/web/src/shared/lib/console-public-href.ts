@@ -19,3 +19,8 @@ export function getConsoleOrganizationsHref(): string {
 export function getConsoleUsersHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/users`
 }
+
+/** Audit is a separate bounded cursor/filter route in both Console topologies. */
+export function getConsoleAuditHref(): string {
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/audit`
+}

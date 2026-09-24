@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
 import {
+  getConsoleAuditHref,
   getConsoleOrganizationsHref,
   getConsoleOverviewHref,
   getConsoleUsersHref,
@@ -61,5 +62,15 @@ describe('getConsoleUsersHref', () => {
     mutableConfig.mode = 'host'
 
     expect(getConsoleUsersHref()).toBe('/users')
+  })
+})
+
+describe('getConsoleAuditHref', () => {
+  it('uses the generated slug in path mode and the root in host mode', () => {
+    mutableConfig.mode = 'path'
+    mutableConfig.slug = 'operations'
+    expect(getConsoleAuditHref()).toBe('/operations/audit')
+    mutableConfig.mode = 'host'
+    expect(getConsoleAuditHref()).toBe('/audit')
   })
 })

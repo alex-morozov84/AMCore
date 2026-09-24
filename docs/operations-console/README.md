@@ -3,10 +3,10 @@
 The Operations Console is AMCore's optional system control plane for platform
 super-administrators. The shipped foundation provides a protected, localized
 Control Room shell, live access admission, and isolated host-mode login/logout.
-It ships three functional panels, **Overview** (this API instance's readiness,
+It ships four functional panels, **Overview** (this API instance's readiness,
 version, and process role), **Users** (searchable, sortable inventory plus
 system-role promote/demote), and **Organizations** (searchable, sortable,
-read-only). It does not yet provide metrics, queues, audit, or AI control
+read-only), and **Audit** (bounded, read-only event browsing). It does not yet provide metrics, queues, or AI control
 panels.
 
 It is not a product backoffice. Organization owners, organization `ADMIN`s,
@@ -19,7 +19,7 @@ area with its own roles and permissions.
 After admission, the console shows:
 
 - the localized Control Room shell;
-- three navigation items, **Overview**, **Users**, and **Organizations**;
+- four navigation items, **Overview**, **Users**, **Organizations**, and **Audit**;
 - a header showing the signed-in operator's identity, a language switcher
   (hidden on a single-locale fork), and, in host mode, a sign-out control.
 
@@ -111,6 +111,43 @@ succeed; the console says so plainly, and the change does not go through. In
 every case where the change does not go through — wrong password, that
 OAuth-only case, a network or server problem — the user's displayed role
 stays exactly what it was; nothing is left half-applied.
+
+**Audit** opens with recent events even when you know no ID. Each row shows
+time in your browser's time zone, event type, actor, target and organization
+when present, and a small
+safe coded result. For a user or organization that still exists, the panel
+also shows its **current** name and a secondary email or slug ahead of the
+technical ID. Those profile details may differ from the event date. The
+user/organization type is shown separately. The labelled **Event ID** at the
+bottom identifies the audit record itself. If no current record
+is found, use the displayed ID as the reference; the panel does not infer a
+historical name or deletion reason. You can copy a safe ID or apply an exact
+actor, target, organization, or action filter directly from the row.
+
+Choose an event type and a time range, then select **Apply filters**. The
+selector lists types known to the current application version; older types
+can still appear and be filtered directly from their row. The range offers
+24-hour and seven-day presets plus precise start/end inputs. Input times,
+event times and the effective result bounds use your browser's time zone;
+the API uses UTC internally.
+You can also enter an ID directly, or search current users by name/email and
+organizations by name/slug. Suggestions appear after a short pause; selecting
+one applies its exact ID filter. The selector shows at most ten matches; if
+more exist, narrow the text. Lookup text stays out of the page URL.
+**Clear filters** returns to recent events. **Older events** advances within
+the selected interval, and the end is stated explicitly. To investigate
+older history, select an earlier interval. Audit has a fixed newest-first
+order; it has no free-text log search, sort menu, export, raw metadata or
+detail viewer.
+
+An empty interval, no matches, invalid cursor and unavailable service have
+separate messages. An invalid cursor can restart the same filtered interval.
+Every successful browse, including an empty one, records a new Audit-viewed
+event before showing the response; this event can appear on a later refresh.
+The default interval is seven days, the maximum is 31 days, and each page
+contains at most 50 events. Only a live `SUPER_ADMIN` bearer session may
+read these rows. See the [audit-log contract](../operations/audit-log.md#read-access)
+for privacy and deployment details.
 
 ## Before signing in
 

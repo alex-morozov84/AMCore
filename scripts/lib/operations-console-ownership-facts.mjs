@@ -46,6 +46,7 @@ const verification = [
   'apps/web/e2e/real-stack/admin-helpers.ts',
   'apps/web/e2e/real-stack/admin-organizations.spec.ts',
   'apps/web/e2e/real-stack/admin-organizations-discovery.spec.ts',
+  'apps/web/e2e/real-stack/admin-audit.spec.ts',
   'apps/web/e2e/real-stack/admin-overview.spec.ts',
   'apps/web/e2e/real-stack/admin-users.spec.ts',
   'apps/web/e2e/real-stack/admin-users-role-management.spec.ts',

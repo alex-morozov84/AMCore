@@ -111,6 +111,21 @@ export {
   type UpdateUserSystemRoleInput,
   updateUserSystemRoleSchema,
 } from './admin'
+export {
+  adminAuditItemSchema,
+  adminAuditLookupInputSchema,
+  type AdminAuditLookupResponse,
+  adminAuditLookupResponseSchema,
+  type AdminAuditQuery,
+  adminAuditQuerySchema,
+  type AdminAuditResponse,
+  adminAuditResponseSchema,
+  auditActionCodeSchema,
+  auditDisplayIdSchema,
+  auditOrganizationIdentitySchema,
+  auditSummarySchema,
+  auditUserIdentitySchema,
+} from './admin-audit'
 
 // Pagination schemas
 export {

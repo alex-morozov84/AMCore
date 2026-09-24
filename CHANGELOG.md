@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Operations Console is removed. The Console now supplies its URL, sort/page
   and navigation policy through a thin feature adapter; pending drafts cannot
   later undo a sort, pagination or recovery-link navigation.
+- **Operations Console: Audit browser.** A live `SUPER_ADMIN` can open recent
+  audit events, filter exact actor/action/target/organization IDs and a bounded
+  time interval, find current users or organizations by name, copy IDs and
+  browse older events with a private cursor. Rows expose only safe coded
+  summaries and explicitly present-day identity labels. Every successful
+  read is audited before rows are returned; raw metadata and export are not
+  exposed.
 
 - **Operations Console discovery — backend foundation.** `GET /admin/users`
   and `GET /admin/organizations` accept new optional `search`/`sortBy`/

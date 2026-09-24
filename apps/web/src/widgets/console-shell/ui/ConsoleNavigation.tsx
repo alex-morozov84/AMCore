@@ -17,7 +17,7 @@ export function ConsoleNavigation() {
 
   return (
     <SidebarMenu aria-label={t('navigation')}>
-      {items.map(({ href, label, icon: Icon }) => {
+      {items.map(({ href, label, icon: Icon, prefetch }) => {
         const isActive = pathname === href
         return (
           <SidebarMenuItem key={href}>
@@ -37,7 +37,13 @@ export function ConsoleNavigation() {
                 // this one.
                 'rounded-md text-foreground-muted data-active:bg-console-accent/8 data-active:font-semibold data-active:text-console-accent data-active:hover:bg-console-accent/12'
               )}
-              render={<RouteProgressLink href={href} onClick={() => setOpenMobile(false)} />}
+              render={
+                <RouteProgressLink
+                  href={href}
+                  prefetch={prefetch}
+                  onClick={() => setOpenMobile(false)}
+                />
+              }
             >
               <Icon aria-hidden="true" />
               <span>{label}</span>

@@ -22,6 +22,12 @@ function boundedString(maxLength: number, pattern: RegExp): MetadataValueRule {
 
 /** A bounded lowercase snake code — toolId, riskClass, outcome, decision, reasonCode (Arc E). */
 const aiCode = boundedString(64, /^[a-z][a-z0-9_]*$/)
+const auditFilterFlag: MetadataValueRule = (value) =>
+  typeof value === 'boolean' ? value : undefined
+const auditResultCount: MetadataValueRule = (value) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 50
+    ? value
+    : undefined
 /** A bounded cuid-shaped id — runId, invocationId, approvalId (Arc E). */
 const aiId = boundedString(64, /^[a-z0-9]+$/)
 /** A bounded assistant slug — lowercase alnum + hyphen (Arc F). */
@@ -88,6 +94,14 @@ const aiConversationControlContext: MetadataSpec = {
 }
 
 const specs: Record<AuditAction, MetadataSpec> = {
+  'admin.audit_logs.viewed': {
+    actor: auditFilterFlag,
+    action: auditFilterFlag,
+    target: auditFilterFlag,
+    organization: auditFilterFlag,
+    time: auditFilterFlag,
+    resultCount: auditResultCount,
+  },
   'admin.cleanup.executed': { counts: cleanupCounts },
   'admin.user.sessions_revoked': { count: true, reason: true },
   'admin.user.system_role_changed': { afterSystemRole: true, beforeSystemRole: true },

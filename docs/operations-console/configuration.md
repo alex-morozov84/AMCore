@@ -121,11 +121,17 @@ guarantee for your specific provider and plan tier. A provider that
 disallows it must fail the migration visibly; there is no supported
 fallback that silently serves search without the index it depends on.
 
-## Search terms in logs and browser history
+## Search and audit filters in logs and browser history
 
 A search term typed into the Users or Organizations panel is not treated
 as a secret, but it is real operator input (an email address, a name) and
 appears in more places than the panel itself:
+
+Audit actor, target and organization IDs, and its encrypted page cursor, also
+live in the panel URL. Current-name lookup text is sent in a same-origin POST
+body and does not enter URL history. The encrypted cursor hides its internal
+anchor and contains no raw audit-row ID, but the filter IDs still deserve the
+same query-string handling as search terms.
 
 - **The browser address bar and history**, on whichever machine the
   operator is using — search state lives in the URL by design (so a
@@ -133,8 +139,8 @@ appears in more places than the panel itself:
   console search URL into a chat or ticket if that matters for your
   deployment.
 - **This API's own structured access logs** are redacted — a search term
-  is stripped from both the request's query object and its raw URL before
-  a line is ever written.
+  and the audit ID/cursor values are stripped from both the request's query
+  object and its raw URL before a line is written.
 - **A reverse-proxy access log** (Caddy, nginx, or any edge proxy in
   front of either topology — **path mode and host mode alike**) is
   outside this application's runtime and is not redacted by the shipped
