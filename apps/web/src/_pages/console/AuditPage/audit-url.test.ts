@@ -10,6 +10,8 @@ describe('Audit URL state', () => {
   it('rejects repeated, unknown and malformed filters', () => {
     for (const query of [
       { actorId: ['one', 'two'] },
+      { actions: ['admin.cleanup.executed', 'admin.audit_logs.viewed'] },
+      { includeReadEvents: ['true', 'false'] },
       { sort: 'asc' },
       { cursor: 'x'.repeat(513) },
       { from: 'yesterday' },

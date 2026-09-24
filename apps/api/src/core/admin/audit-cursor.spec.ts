@@ -28,6 +28,7 @@ describe('private audit cursor', () => {
       [token.slice(0, -1) + (token.endsWith('a') ? 'b' : 'a'), scope],
       [token, { ...scope, operatorId: 'other' }],
       [token, { ...scope, filters: { actorId: 'other' } }],
+      [token, { ...scope, filters: { actorId: 'actor1', includeReadEvents: true } }],
       [token, { ...scope, from: '2026-09-15T00:00:00.000Z' }],
       ['x'.repeat(513), scope],
     ] as const)

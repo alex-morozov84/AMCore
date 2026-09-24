@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
@@ -16,29 +17,44 @@ interface AuditResultRegionProps {
 }
 
 export function AuditResultRegion({ readToken, loading, children }: AuditResultRegionProps) {
+  return (
+    <AuditResultRegionContent key={readToken} readToken={readToken} loading={loading}>
+      {children}
+    </AuditResultRegionContent>
+  )
+}
+
+function AuditResultRegionContent({ readToken, loading, children }: AuditResultRegionProps) {
   const router = useRouteProgressRouter()
   const region = useRef<HTMLElement>(null)
-  const [awaitingFreshRead, setAwaitingFreshRead] = useState(false)
+  const refreshScheduled = useRef(false)
+  // A cached history payload is hidden on its first client render, before effects paint.
+  const [awaitingFreshRead, setAwaitingFreshRead] = useState(
+    () => typeof window !== 'undefined' && seenResults.has(readToken)
+  )
 
   useEffect(() => {
-    const fresh = !seenResults.has(readToken)
+    if (awaitingFreshRead) {
+      if (!refreshScheduled.current) {
+        refreshScheduled.current = true
+        window.setTimeout(() => router.refresh(), 0)
+      }
+      return
+    }
     seenResults.add(readToken)
-    const release = fresh ? window.setTimeout(() => setAwaitingFreshRead(false), 0) : undefined
     try {
-      if (fresh && sessionStorage.getItem(AUDIT_FOCUS_KEY)) {
+      if (sessionStorage.getItem(AUDIT_FOCUS_KEY)) {
         sessionStorage.removeItem(AUDIT_FOCUS_KEY)
         region.current?.focus()
       }
     } catch {
       // Result rendering and navigation do not depend on session storage.
     }
-    return () => window.clearTimeout(release)
-  }, [readToken])
+  }, [awaitingFreshRead, readToken, router])
 
   useEffect(() => {
     const refreshHistoryResult = () => {
-      setAwaitingFreshRead(true)
-      window.setTimeout(() => router.refresh(), 0)
+      flushSync(() => setAwaitingFreshRead(true))
     }
     window.addEventListener('popstate', refreshHistoryResult)
     return () => window.removeEventListener('popstate', refreshHistoryResult)

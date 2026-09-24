@@ -1,8 +1,8 @@
 # Extending Operations Console
 
-Read the [user guide](README.md) and [configuration and
-deployment](configuration.md) first. The console is a `SUPER_ADMIN` system
-control plane, never a product backoffice.
+Start with the [screen guide index](README.md) and [configuration and
+deployment](configuration.md). The console is a `SUPER_ADMIN` system control
+plane, never a product backoffice.
 
 ## Ownership and security boundaries
 
@@ -157,15 +157,18 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    not create a privileged read-audit event. T002's discovery URL and numbered
    page contract do not apply to Audit; its generic field may be reused only
    where the interaction contract matches.
+
 7. Use the existing graceful-degradation primitives for secondary data. Keep
    primary failures explicit and fail privileged actions closed.
 8. Add focused unit tests, Storybook/a11y states where applicable, and
    browser/real-stack coverage for auth, cookies, Redis, or proxy behavior.
-9. Update the plain-language `SUPER_ADMIN` documentation in the same PR:
-   purpose, statuses, actions, dangerous operations, and degraded/error states.
+9. Update the affected [screen guide](README.md) in the same PR. A new panel
+   needs its own page linked from the index. Explain its purpose, typical
+   tasks, visible statuses, available actions, dangerous operations, and
+   degraded or error states in language an operator can use.
 
-Do not describe the panel as available until its implementation and user
-instructions ship together.
+Do not describe a planned panel as available. Its implementation, index link,
+and operator instructions ship together.
 
 ## Verification
 

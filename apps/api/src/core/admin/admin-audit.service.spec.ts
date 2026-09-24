@@ -47,6 +47,18 @@ function fixture() {
 }
 
 describe('AdminAuditService', () => {
+  it('hides audit reads by default and includes them on request or exact action filter', async () => {
+    const { service, tx } = fixture()
+    tx.auditLog.findMany.mockResolvedValue([])
+    await service.list(query, actor)
+    expect(tx.auditLog.findMany.mock.calls[0]?.[0]?.where?.action).toEqual({
+      not: 'admin.audit_logs.viewed',
+    })
+    await service.list({ ...query, includeReadEvents: true }, actor)
+    expect(tx.auditLog.findMany.mock.calls[1]?.[0]?.where?.action).toBeUndefined()
+    await service.list({ ...query, action: 'admin.audit_logs.viewed' }, actor)
+    expect(tx.auditLog.findMany.mock.calls[2]?.[0]?.where?.action).toBe('admin.audit_logs.viewed')
+  })
   it('pages across an unsafe last returned ID and an unsafe lookahead without leaking either', async () => {
     const { service, tx, audit } = fixture()
     const key1 = '00000000-0000-4000-8000-000000000001'
@@ -80,6 +92,10 @@ describe('AdminAuditService', () => {
         OR: [{ createdAt: { lt: when } }, { createdAt: when, id: { lt: hostileId } }],
       },
     ])
+    expect(tx.auditLog.findMany.mock.calls[1]?.[0]?.where?.createdAt).toEqual({
+      gte: new Date(query.from!),
+      lte: when,
+    })
     expect(audit.record).toHaveBeenCalledTimes(2)
   })
 

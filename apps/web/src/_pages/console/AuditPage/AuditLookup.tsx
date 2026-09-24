@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { adminAuditLookupResponseSchema } from '@amcore/shared'
 
 import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
+import { Button } from '@/shared/ui/button'
 
 import type { AuditCopy } from './audit-copy'
 
@@ -23,9 +24,13 @@ export function AuditLookup({ kind, copy, onSelect }: AuditLookupProps) {
   const [error, setError] = useState(false)
   const [busy, setBusy] = useState(false)
   const sequence = useRef(0)
+  const debounce = useRef<number | undefined>(undefined)
+  const lastRequested = useRef('')
 
   const lookup = useCallback(
     async (term: string) => {
+      if (lastRequested.current === term) return
+      lastRequested.current = term
       const requestNumber = ++sequence.current
       setBusy(true)
       setError(false)
@@ -44,7 +49,10 @@ export function AuditLookup({ kind, copy, onSelect }: AuditLookupProps) {
           setHasMore(parsed.hasMore)
         }
       } catch {
-        if (requestNumber === sequence.current) setError(true)
+        if (requestNumber === sequence.current) {
+          lastRequested.current = ''
+          setError(true)
+        }
       } finally {
         if (requestNumber === sequence.current) setBusy(false)
       }
@@ -55,9 +63,16 @@ export function AuditLookup({ kind, copy, onSelect }: AuditLookupProps) {
   useEffect(() => {
     const term = search.trim()
     if (term.length < 2) return
-    const timer = window.setTimeout(() => void lookup(term), 400)
-    return () => window.clearTimeout(timer)
+    debounce.current = window.setTimeout(() => void lookup(term), 400)
+    return () => window.clearTimeout(debounce.current)
   }, [lookup, search])
+
+  function find() {
+    const term = search.trim()
+    if (term.length < 2) return
+    window.clearTimeout(debounce.current)
+    void lookup(term)
+  }
 
   const label = kind === 'user' ? copy.lookupUser : copy.lookupOrganization
   return (
@@ -65,24 +80,36 @@ export function AuditLookup({ kind, copy, onSelect }: AuditLookupProps) {
       <label htmlFor={`audit-lookup-${kind}`} className="block text-sm font-medium">
         {label}
       </label>
-      <div>
+      <div className="flex gap-2">
         <input
           id={`audit-lookup-${kind}`}
           value={search}
           maxLength={80}
           onChange={(event) => {
             sequence.current += 1
+            lastRequested.current = ''
             setSearch(event.target.value)
             setItems([])
             setHasMore(false)
             setBusy(false)
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') event.preventDefault()
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              find()
+            }
           }}
           placeholder={copy.lookupSearch}
-          className="w-full rounded-md border border-input bg-background px-3 py-2"
+          className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2"
         />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={search.trim().length < 2 || busy}
+          onClick={find}
+        >
+          {copy.lookupSubmit}
+        </Button>
       </div>
       {busy && (
         <p role="status" className="text-xs text-muted-foreground">

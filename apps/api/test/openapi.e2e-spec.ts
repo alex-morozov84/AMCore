@@ -378,9 +378,11 @@ describe('OpenAPI success surface (e2e)', () => {
       'actorId',
       'actorType',
       'action',
+      'actions',
       'targetId',
       'targetType',
       'organizationId',
+      'includeReadEvents',
       'from',
       'to',
       'limit',
@@ -395,8 +397,33 @@ describe('OpenAPI success surface (e2e)', () => {
     }
     const ref = response.content?.['application/json']?.schema?.$ref
     expect(ref).toBeDefined()
-    const schema = document.components?.schemas?.[ref!.split('/').at(-1)!]
-    expect(JSON.stringify(schema)).not.toMatch(/"(metadata|ip|requestId|emailHash|pinoEvent)"/)
+    const visited = new Set<string>()
+    const forbidden = new Set(['metadata', 'ip', 'requestId', 'emailHash', 'pinoEvent'])
+    const missingRefs: string[] = []
+    const forbiddenKeys: string[] = []
+    const inspect = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return
+      if (Array.isArray(value)) {
+        value.forEach(inspect)
+        return
+      }
+      const node = value as Record<string, unknown>
+      if (typeof node.$ref === 'string' && !visited.has(node.$ref)) {
+        visited.add(node.$ref)
+        const referenced = document.components?.schemas?.[node.$ref.split('/').at(-1)!]
+        if (referenced) inspect(referenced)
+        else missingRefs.push(node.$ref)
+      }
+      if (node.properties && typeof node.properties === 'object') {
+        for (const key of Object.keys(node.properties)) {
+          if (forbidden.has(key)) forbiddenKeys.push(key)
+        }
+      }
+      Object.values(node).forEach(inspect)
+    }
+    inspect(response.content?.['application/json']?.schema)
+    expect(missingRefs).toEqual([])
+    expect(forbiddenKeys).toEqual([])
   })
 
   it('documents the admin discovery search/sortBy/sortOrder query contract on both list endpoints (ADR-082)', () => {

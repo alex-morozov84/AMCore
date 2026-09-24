@@ -22,16 +22,18 @@ export function auditQueryString(query: Partial<AdminAuditQuery>): string {
     'actorId',
     'actorType',
     'action',
+    'actions',
     'targetId',
     'targetType',
     'organizationId',
+    'includeReadEvents',
     'from',
     'to',
     'limit',
     'cursor',
   ] as const) {
     const value = query[key]
-    if (value !== undefined) params.set(key, String(value))
+    if (value !== undefined) params.set(key, Array.isArray(value) ? value.join(',') : String(value))
   }
   return params.toString()
 }

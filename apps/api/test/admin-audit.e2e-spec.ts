@@ -88,6 +88,26 @@ describe('Admin audit browser (e2e)', () => {
     )
   })
 
+  it('includes audit views when they are explicitly selected with other actions', async () => {
+    const selected = await get('?actions=admin.audit_logs.viewed,admin.audit_probe.absent').expect(
+      200
+    )
+    expect(selected.body.items).toContainEqual(
+      expect.objectContaining({ action: 'admin.audit_logs.viewed' })
+    )
+  })
+
+  it('hides audit views by default and includes them with the explicit switch', async () => {
+    const hidden = await get('?limit=50').expect(200)
+    expect(hidden.body.items).not.toContainEqual(
+      expect.objectContaining({ action: 'admin.audit_logs.viewed' })
+    )
+    const visible = await get('?limit=50&includeReadEvents=true').expect(200)
+    expect(visible.body.items).toContainEqual(
+      expect.objectContaining({ action: 'admin.audit_logs.viewed' })
+    )
+  })
+
   it('returns every legacy-ID row exactly once with private bounded cursors', async () => {
     const createdAt = new Date(Date.now() - 60_000)
     const action = 'admin.audit_probe.created'
@@ -135,15 +155,17 @@ describe('Admin audit browser (e2e)', () => {
   }, 120_000)
 
   it('rejects a mismatched cursor instead of serving a false empty page', async () => {
-    const first = await get('?limit=1')
+    const first = await get('?limit=1&includeReadEvents=true')
     if (first.status !== 200) throw new Error(JSON.stringify(first.body))
     if (!first.body.nextCursor) throw new Error('Expected multiple audit events')
+    expect(first.body.items[0].action).toBe('admin.audit_logs.viewed')
     const params = new URLSearchParams({
       limit: '1',
       from: first.body.from,
       to: first.body.to,
       cursor: first.body.nextCursor,
       action: 'admin.audit_probe.created',
+      includeReadEvents: 'true',
     })
     expect((await get(`?${params}`)).status).toBe(400)
   })

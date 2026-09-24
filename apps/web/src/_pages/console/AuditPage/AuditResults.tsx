@@ -8,17 +8,18 @@ import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import type { AuditCopy } from './audit-copy'
 import { auditCursorReset, auditHref } from './audit-url'
 import { AuditEventRow } from './AuditEventRow'
+import { AuditEventTable } from './AuditEventTable'
 import { AuditPaging } from './AuditPaging'
 import { AuditResultRegion } from './AuditResultRegion'
+import { AuditTimestamp } from './AuditTimestamp'
 
 interface AuditResultsProps {
   baseHref: string
   query: AdminAuditQuery
   copy: AuditCopy
-  locale: string
 }
 
-export async function AuditResults({ baseHref, query, copy, locale }: AuditResultsProps) {
+export async function AuditResults({ baseHref, query, copy }: AuditResultsProps) {
   let result: Awaited<ReturnType<typeof fetchConsoleAudit>>
   try {
     result = await fetchConsoleAudit(query)
@@ -54,41 +55,43 @@ export async function AuditResults({ baseHref, query, copy, locale }: AuditResul
     query.actorId ||
     query.actorType ||
     query.action ||
+    query.actions?.length ||
     query.targetId ||
     query.targetType ||
     query.organizationId
   )
-  const formatTime = (value: string) =>
-    new Intl.DateTimeFormat(locale, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZoneName: 'short',
-    }).format(new Date(value))
   return (
     <AuditResultRegion readToken={crypto.randomUUID()} loading={copy.loading}>
       <p className="text-sm text-muted-foreground">
-        {copy.from}: {formatTime(data.from)} · {copy.to}: {formatTime(data.to)}
+        {copy.from}: <AuditTimestamp value={data.from} inline /> · {copy.to}:{' '}
+        <AuditTimestamp value={data.to} inline />
       </p>
+      {data.items.some(
+        (item) =>
+          item.actorIdentity?.status === 'current' ||
+          item.targetIdentity?.status === 'current' ||
+          item.organizationIdentity?.status === 'current' ||
+          item.targetOrganizationIdentity?.status === 'current'
+      ) && <p className="text-xs text-muted-foreground">{copy.identityNotice}</p>}
       {data.items.length === 0 ? (
         <p role="status" className="rounded-md border border-border p-4">
           {filtered ? copy.noMatches : copy.empty}
         </p>
       ) : (
-        <ol className="space-y-3">
-          {data.items.map((item, index) => (
-            <AuditEventRow
-              key={item.id ?? `unsafe-${index}`}
-              item={item}
-              baseHref={baseHref}
-              query={fixedQuery}
-              copy={copy}
-              locale={locale}
-            />
-          ))}
-        </ol>
+        <>
+          <AuditEventTable items={data.items} baseHref={baseHref} query={fixedQuery} copy={copy} />
+          <ol className="space-y-3 lg:hidden">
+            {data.items.map((item, index) => (
+              <AuditEventRow
+                key={item.id ?? `unsafe-${index}`}
+                item={item}
+                baseHref={baseHref}
+                query={fixedQuery}
+                copy={copy}
+              />
+            ))}
+          </ol>
+        </>
       )}
       {!data.hasMore && data.items.length > 0 && (
         <p className="text-sm text-muted-foreground">{copy.end}</p>

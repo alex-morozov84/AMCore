@@ -5,10 +5,12 @@ import type { AdminAuditQuery } from '@amcore/shared'
 import { getConsoleAuditHref } from '@/shared/lib/console-public-href'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
-import type { AuditCopy } from './audit-copy'
+import { resolveAuditWindow } from './audit-date-window'
 import { auditHref } from './audit-url'
 import { AuditFilters } from './AuditFilters'
 import { AuditResults } from './AuditResults'
+import { AuditResultsSkeleton } from './AuditResultsSkeleton'
+import { AuditTimeZoneProvider } from './AuditTimeZone'
 
 interface AuditPageProps {
   query: AdminAuditQuery | null
@@ -16,9 +18,10 @@ interface AuditPageProps {
 
 export async function AuditPage({ query }: AuditPageProps) {
   const [messages, locale] = await Promise.all([getMessages(), getLocale()])
-  const copy = messages.console.audit as AuditCopy
+  const copy = messages.console.audit
   const baseHref = getConsoleAuditHref()
-  if (!query)
+  const effectiveQuery = query && resolveAuditWindow(query)
+  if (!effectiveQuery)
     return (
       <section className="space-y-4">
         <h1 className="text-3xl font-semibold">{copy.title}</h1>
@@ -38,21 +41,18 @@ export async function AuditPage({ query }: AuditPageProps) {
         <h1 className="text-3xl font-semibold">{copy.title}</h1>
         <p className="text-muted-foreground">{copy.description}</p>
       </div>
-      <AuditFilters
-        key={auditHref(baseHref, query)}
-        baseHref={baseHref}
-        query={query}
-        copy={copy}
-      />
-      <Suspense
-        fallback={
-          <p role="status" className="text-muted-foreground">
-            {copy.loading}
-          </p>
-        }
-      >
-        <AuditResults baseHref={baseHref} query={query} copy={copy} locale={locale} />
-      </Suspense>
+      <AuditTimeZoneProvider>
+        <AuditFilters
+          key={auditHref(baseHref, effectiveQuery)}
+          baseHref={baseHref}
+          query={effectiveQuery}
+          copy={copy}
+          locale={locale}
+        />
+        <Suspense fallback={<AuditResultsSkeleton label={copy.loading} />}>
+          <AuditResults baseHref={baseHref} query={effectiveQuery} copy={copy} />
+        </Suspense>
+      </AuditTimeZoneProvider>
     </section>
   )
 }

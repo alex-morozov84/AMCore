@@ -1,5 +1,12 @@
+import { getMessages } from 'next-intl/server'
+
 import { ConsolePageFrame } from '@/_pages/console'
-import { AuditPage, parseAuditParams, type RawAuditParams } from '@/_pages/console/AuditPage'
+import {
+  AuditPage,
+  AuditPageSkeleton,
+  parseAuditParams,
+  type RawAuditParams,
+} from '@/_pages/console/AuditPage'
 
 interface AuditRouteProps {
   searchParams: Promise<RawAuditParams>
@@ -7,10 +14,9 @@ interface AuditRouteProps {
 
 export default async function AuditRoute({ searchParams }: AuditRouteProps) {
   const query = parseAuditParams(await searchParams)
+  const loading = (await getMessages()).console.audit.loading
   return (
-    <ConsolePageFrame
-      fallback={<div className="h-64 animate-pulse rounded-md bg-muted" aria-hidden="true" />}
-    >
+    <ConsolePageFrame fallback={<AuditPageSkeleton label={loading} />}>
       <AuditPage query={query} />
     </ConsolePageFrame>
   )

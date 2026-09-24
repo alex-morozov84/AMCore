@@ -19,11 +19,12 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
+import { ZodResponse, ZodValidationException } from 'nestjs-zod'
 
 import {
   ADMIN_ORGANIZATION_SORT_FIELDS,
   ADMIN_USER_SORT_FIELDS,
+  adminAuditQuerySchema,
   type AdminAuditResponse,
   type AdminOrganizationListResponse,
   type AdminOverviewResponse,
@@ -45,7 +46,7 @@ import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 import { AdminService } from './admin.service'
 import { AdminAuditService } from './admin-audit.service'
 import { AdminOverviewService } from './admin-overview.service'
-import { AdminAuditQueryDto, AdminAuditResponseDto } from './dto/admin-audit.dto'
+import { AdminAuditResponseDto } from './dto/admin-audit.dto'
 import { AdminOrganizationListQueryDto } from './dto/admin-organization-list-query.dto'
 import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto'
 import { AdminOverviewResponseDto } from './dto/admin-overview-response.dto'
@@ -109,9 +110,24 @@ export class AdminController {
   @ApiQuery({ name: 'actorId', required: false, type: String, maxLength: 128 })
   @ApiQuery({ name: 'actorType', required: false, enum: ['USER', 'API_KEY', 'SYSTEM'] })
   @ApiQuery({ name: 'action', required: false, type: String, maxLength: 96 })
+  @ApiQuery({
+    name: 'actions',
+    required: false,
+    type: String,
+    maxLength: 969,
+    description:
+      'Comma-separated list of 1–10 exact action codes; OR semantics. Cannot combine with action.',
+  })
   @ApiQuery({ name: 'targetId', required: false, type: String, maxLength: 128 })
   @ApiQuery({ name: 'targetType', required: false, type: String })
   @ApiQuery({ name: 'organizationId', required: false, type: String, maxLength: 128 })
+  @ApiQuery({
+    name: 'includeReadEvents',
+    required: false,
+    enum: ['true', 'false'],
+    description:
+      'Defaults to false; an explicit action or actions selection containing the audit-view code includes matching views',
+  })
   @ApiQuery({
     name: 'from',
     required: false,
@@ -148,9 +164,13 @@ export class AdminController {
   })
   listAuditLogs(
     @CurrentUser() actor: RequestPrincipal,
-    @Query() query: AdminAuditQueryDto
+    @Query() rawQuery: Record<string, unknown>
   ): Promise<AdminAuditResponse> {
-    return this.auditService.list(query, actor)
+    // Parse once: the schema transforms action lists and booleans, while the
+    // global DTO pipe would re-parse its transformed output and reject it.
+    const parsed = adminAuditQuerySchema.safeParse(rawQuery)
+    if (!parsed.success) throw new ZodValidationException(parsed.error)
+    return this.auditService.list(parsed.data, actor)
   }
 
   @Get('users')

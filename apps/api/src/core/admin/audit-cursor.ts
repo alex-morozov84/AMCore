@@ -10,7 +10,14 @@ const BASE64URL = /^[A-Za-z0-9_-]+$/
 
 type Filters = Pick<
   AdminAuditQuery,
-  'actorId' | 'actorType' | 'action' | 'targetId' | 'targetType' | 'organizationId'
+  | 'actorId'
+  | 'actorType'
+  | 'action'
+  | 'actions'
+  | 'targetId'
+  | 'targetType'
+  | 'organizationId'
+  | 'includeReadEvents'
 >
 
 export interface AuditCursorScope {
@@ -25,9 +32,11 @@ function digest(filters: Filters): string {
     filters.actorId,
     filters.actorType,
     filters.action,
+    filters.actions?.slice().sort(),
     filters.targetId,
     filters.targetType,
     filters.organizationId,
+    !!filters.includeReadEvents,
   ]
   return createHash('sha256').update(JSON.stringify(values)).digest('base64url')
 }

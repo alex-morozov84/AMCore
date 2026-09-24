@@ -50,10 +50,35 @@ function filters(
   query: AdminAuditQuery
 ): Pick<
   AdminAuditQuery,
-  'actorId' | 'actorType' | 'action' | 'targetId' | 'targetType' | 'organizationId'
+  | 'actorId'
+  | 'actorType'
+  | 'action'
+  | 'actions'
+  | 'targetId'
+  | 'targetType'
+  | 'organizationId'
+  | 'includeReadEvents'
 > {
-  const { actorId, actorType, action, targetId, targetType, organizationId } = query
-  return { actorId, actorType, action, targetId, targetType, organizationId }
+  const {
+    actorId,
+    actorType,
+    action,
+    actions,
+    targetId,
+    targetType,
+    organizationId,
+    includeReadEvents,
+  } = query
+  return {
+    actorId,
+    actorType,
+    action,
+    actions,
+    targetId,
+    targetType,
+    organizationId,
+    includeReadEvents,
+  }
 }
 
 @Injectable()
@@ -89,8 +114,22 @@ export class AdminAuditService {
         )
           throw new BadRequestException('Invalid cursor')
         const where: Prisma.AuditLogWhereInput = {
-          createdAt: { gte: new Date(window.from), lt: new Date(window.to) },
-          ...filters(query),
+          createdAt: {
+            gte: new Date(window.from),
+            ...(anchor ? { lte: anchor.createdAt } : { lt: new Date(window.to) }),
+          },
+          actorId: query.actorId,
+          actorType: query.actorType,
+          action:
+            query.action ??
+            (query.actions?.length
+              ? { in: query.actions }
+              : query.includeReadEvents
+                ? undefined
+                : { not: 'admin.audit_logs.viewed' }),
+          targetId: query.targetId,
+          targetType: query.targetType,
+          organizationId: query.organizationId,
           ...(anchor
             ? {
                 AND: [
@@ -155,7 +194,7 @@ export class AdminAuditService {
         category: AuditCategory.SECURITY,
         metadata: {
           actor: !!(query.actorId || query.actorType),
-          action: !!query.action,
+          action: !!(query.action || query.actions?.length),
           target: !!(query.targetId || query.targetType),
           organization: !!query.organizationId,
           time: !!(query.from || query.to),

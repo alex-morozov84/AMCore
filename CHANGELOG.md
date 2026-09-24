@@ -21,7 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   browse older events with a private cursor. Rows expose only safe coded
   summaries and explicitly present-day identity labels. Every successful
   read is audited before rows are returned; raw metadata and export are not
-  exposed.
+  exposed. The browser offers a compact table, mobile cards, UTC/local time
+  display, user lookup as actor or target, page history, a collapsed mobile
+  filter form, multiple action selection, and an explicit option to show
+  audit-read events, which are hidden from the default result.
 
 - **Operations Console discovery — backend foundation.** `GET /admin/users`
   and `GET /admin/organizations` accept new optional `search`/`sortBy`/

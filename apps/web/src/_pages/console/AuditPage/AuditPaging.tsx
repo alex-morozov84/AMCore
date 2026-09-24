@@ -2,82 +2,118 @@
 
 import { useSyncExternalStore } from 'react'
 
-import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/shared/ui/pagination'
 
-const KEY = 'amcore-audit-previous-v1'
-const subscribe = (notify: () => void): (() => void) => {
+const KEY = 'amcore-audit-pages-v2'
+const EVENT = 'audit-pages-change'
+type Trail = { scope: string; pages: string[] }
+
+function scopeOf(href: string): string {
+  const url = new URL(href, 'http://localhost')
+  url.searchParams.delete('cursor')
+  return `${url.pathname}?${url.searchParams.toString()}`
+}
+
+function readTrail(): Trail | null {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(KEY) ?? 'null') as Trail | null
+    return value && Array.isArray(value.pages) ? value : null
+  } catch {
+    return null
+  }
+}
+
+function writeTrail(trail: Trail) {
+  try {
+    sessionStorage.setItem(KEY, JSON.stringify(trail))
+    window.dispatchEvent(new Event(EVENT))
+  } catch {
+    /* Normal navigation works without session storage. */
+  }
+}
+
+function subscribe(notify: () => void): () => void {
+  window.addEventListener(EVENT, notify)
   window.addEventListener('popstate', notify)
-  return () => window.removeEventListener('popstate', notify)
+  return () => {
+    window.removeEventListener(EVENT, notify)
+    window.removeEventListener('popstate', notify)
+  }
 }
 
-interface AuditPagingProps {
-  nextHref: string | null
-  currentHref: string
-  older: string
-  previous: string
-  hasCursor: boolean
-}
-
-/** Previous is offered only after this tab deliberately followed the older link. */
 export function AuditPaging({
   nextHref,
   currentHref,
   older,
   previous,
   hasCursor,
-}: AuditPagingProps) {
-  const router = useRouteProgressRouter()
-  const canGoBack = useSyncExternalStore(
+}: {
+  nextHref: string | null
+  currentHref: string
+  older: string
+  previous: string
+  hasCursor: boolean
+}) {
+  const previousHref = useSyncExternalStore(
     subscribe,
     () => {
-      try {
-        const marker = JSON.parse(sessionStorage.getItem(KEY) ?? 'null') as {
-          next?: string
-          previous?: string
-        } | null
-        return !!hasCursor && marker?.next === currentHref
-      } catch {
-        return false
-      }
+      const trail = readTrail()
+      if (!hasCursor || trail?.scope !== scopeOf(currentHref)) return ''
+      const index = trail.pages.indexOf(currentHref)
+      return index > 0 ? trail.pages[index - 1] : ''
     },
-    () => false
+    () => ''
   )
+
   return (
-    <nav className="flex items-center justify-between gap-3">
-      {canGoBack ? (
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="rounded-md border border-border px-3 py-2"
-        >
-          {previous}
-        </button>
-      ) : (
-        <span />
-      )}
-      {nextHref ? (
-        <RouteProgressLink
-          prefetch={false}
-          href={nextHref}
-          onNavigate={() => {
-            try {
-              sessionStorage.setItem(
-                KEY,
-                JSON.stringify({
-                  next: nextHref,
-                  previous: currentHref,
+    <Pagination aria-label={`${previous} / ${older}`}>
+      <PaginationContent>
+        {previousHref && (
+          <PaginationItem>
+            <PaginationPrevious
+              label={previous}
+              prefetch={false}
+              href={previousHref}
+              onNavigate={() => {
+                const trail = readTrail()
+                if (trail)
+                  writeTrail({
+                    ...trail,
+                    pages: trail.pages.slice(0, trail.pages.indexOf(currentHref)),
+                  })
+              }}
+            />
+          </PaginationItem>
+        )}
+        {nextHref && (
+          <PaginationItem>
+            <PaginationNext
+              label={older}
+              prefetch={false}
+              href={nextHref}
+              onNavigate={() => {
+                const scope = scopeOf(currentHref)
+                const trail = readTrail()
+                const pages = trail?.scope === scope ? trail.pages : []
+                const index = pages.indexOf(currentHref)
+                writeTrail({
+                  scope,
+                  pages: [
+                    ...(index >= 0 ? pages.slice(0, index + 1) : [currentHref]),
+                    nextHref,
+                  ].slice(-100),
                 })
-              )
-            } catch {
-              /* navigation remains available without session storage */
-            }
-          }}
-          className="rounded-md border border-border px-3 py-2"
-        >
-          {older}
-        </RouteProgressLink>
-      ) : null}
-    </nav>
+              }}
+            />
+          </PaginationItem>
+        )}
+      </PaginationContent>
+    </Pagination>
   )
 }

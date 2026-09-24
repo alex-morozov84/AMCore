@@ -1,75 +1,122 @@
 'use client'
 
-import type { AuditCopy } from './audit-copy'
+import { useEffect, useState } from 'react'
 
-interface AuditDateRangeProps {
+import { Button } from '@/shared/ui/button'
+import { DateTimeRangePicker } from '@/shared/ui/date-time-range-picker'
+
+import { auditCalendarValues } from './audit-calendar-values'
+import type { AuditCopy } from './audit-copy'
+import { auditRangeError } from './audit-date-window'
+import { formatInputInstant, parseInputInstant, useAuditTimeZone } from './AuditTimeZone'
+
+interface Props {
   from: string
   to: string
   setFrom: (value: string) => void
   setTo: (value: string) => void
   copy: AuditCopy
+  locale: string
 }
 
-export function localTime(value: string | undefined): string {
-  if (!value) return ''
-  const date = new Date(value)
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 16)
+function selectedDate(value: string, mode: 'utc' | 'local'): Date | undefined {
+  const instant = parseInputInstant(value, mode)
+  return instant ? new Date(instant) : undefined
 }
 
-export function utcTime(value: string): string | undefined {
-  if (!value) return undefined
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
-}
+export function AuditDateRange({ from, to, setFrom, setTo, copy, locale }: Props) {
+  const { mode, zone } = useAuditTimeZone()
+  const [preset, setPreset] = useState<'day' | 'week' | null>(null)
+  const [current, setCurrent] = useState<Date | null>(null)
+  const calendarOpen = current !== null
+  useEffect(() => {
+    if (!calendarOpen) return
+    const timer = window.setInterval(() => setCurrent(new Date()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [calendarOpen])
+  const start = parseInputInstant(from, mode)
+  const end = parseInputInstant(to, mode)
+  const error = auditRangeError(start, end)
+  const errorText =
+    error === 'future' ? copy.futureRange : error === 'tooLong' ? copy.longRange : copy.invalidRange
 
-export function AuditDateRange({ from, to, setFrom, setTo, copy }: AuditDateRangeProps) {
   function chooseHours(hours: number) {
-    const end = new Date()
-    setTo(localTime(end.toISOString()))
-    setFrom(localTime(new Date(end.getTime() - hours * 60 * 60_000).toISOString()))
+    const now = Math.floor(Date.now() / 1000) * 1000
+    setTo(formatInputInstant(new Date(now).toISOString(), mode))
+    setFrom(formatInputInstant(new Date(now - hours * 60 * 60_000).toISOString(), mode))
+    setPreset(hours === 24 ? 'day' : 'week')
+  }
+
+  function chooseDates(startDate: Date, endDate: Date) {
+    const values = auditCalendarValues(startDate, endDate, from, to, mode)
+    setFrom(values.from)
+    setTo(values.to)
+    setPreset(null)
+  }
+
+  function changeTime(key: 'from' | 'to', time: string) {
+    setPreset(null)
+    const value = key === 'from' ? from : to
+    ;(key === 'from' ? setFrom : setTo)(`${value.slice(0, 10)}T${time}`)
   }
 
   return (
-    <fieldset className="space-y-3 rounded-md border border-border p-3">
+    <fieldset className="space-y-3 rounded-lg border border-border bg-surface-elevated p-3 shadow-md">
       <legend className="px-1 text-sm font-medium">{copy.customRange}</legend>
-      <div className="flex flex-wrap gap-2">
-        <button
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
           type="button"
+          size="sm"
+          variant={preset === 'day' ? 'secondary' : 'outline'}
+          aria-pressed={preset === 'day'}
           onClick={() => chooseHours(24)}
-          className="rounded-md border border-border px-3 py-1 text-sm"
         >
           {copy.recentDay}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          size="sm"
+          variant={preset === 'week' ? 'secondary' : 'outline'}
+          aria-pressed={preset === 'week'}
           onClick={() => chooseHours(7 * 24)}
-          className="rounded-md border border-border px-3 py-1 text-sm"
         >
           {copy.recentWeek}
-        </button>
+        </Button>
+        {preset && (
+          <span role="status" className="text-xs text-muted-foreground">
+            {copy.rangePending}
+          </span>
+        )}
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <label className="space-y-1 text-sm">
-          {copy.from}
-          <input
-            type="datetime-local"
-            value={from}
-            onChange={(event) => setFrom(event.target.value)}
-            className="block w-full rounded-md border border-input bg-background px-3 py-2"
-          />
-        </label>
-        <label className="space-y-1 text-sm">
-          {copy.to}
-          <input
-            type="datetime-local"
-            value={to}
-            onChange={(event) => setTo(event.target.value)}
-            className="block w-full rounded-md border border-input bg-background px-3 py-2"
-          />
-        </label>
-      </div>
-      <p className="text-xs text-muted-foreground">{copy.localTime}</p>
+      <DateTimeRangePicker
+        fromDate={selectedDate(from, mode)}
+        toDate={selectedDate(to, mode)}
+        fromTime={from.slice(11, 19)}
+        toTime={to.slice(11, 19)}
+        latestDate={current ?? undefined}
+        latestTime={
+          current ? formatInputInstant(current.toISOString(), mode).slice(11, 19) : undefined
+        }
+        onOpenChange={(open) => setCurrent(open ? new Date() : null)}
+        onDatesChange={chooseDates}
+        onTimeChange={changeTime}
+        timeZone={zone}
+        locale={locale}
+        labels={{
+          chooseDates: copy.chooseDates,
+          chooseEndDate: copy.chooseEndDate,
+          rangeSeparator: copy.rangeSeparator,
+          startTime: copy.startTime,
+          endTime: copy.endTime,
+        }}
+        invalid={!!error}
+      />
+      <p className="text-xs text-muted-foreground">{copy.rangeBounds}</p>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {errorText}
+        </p>
+      )}
     </fieldset>
   )
 }

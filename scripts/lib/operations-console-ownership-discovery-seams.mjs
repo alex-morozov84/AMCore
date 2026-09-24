@@ -19,7 +19,7 @@ export const operationsConsoleDiscoverySeams = [
     'README.md',
     {
       start: 'The optional [Operations Console](docs/operations-console/README.md)',
-      end: 'not a product backoffice or a catalog/content admin UI.',
+      end: 'catalog/content admin UI.',
     },
     undefined,
     { operationKey: 'readme-console' }
@@ -64,7 +64,7 @@ export const operationsConsoleDiscoverySeams = [
     'docs/README.md',
     block(
       '- **[Operations Console](operations-console/README.md)**',
-      'verification, and safe extension rules.'
+      'and safe extension rules.'
     ),
     undefined,
     { operationKey: 'docs-index-console' }

@@ -31,6 +31,25 @@ describe('admin audit wire contract', () => {
     }
   })
 
+  it('accepts a bounded action selection and explicit read-event policy', () => {
+    expect(
+      adminAuditQuerySchema.parse({
+        actions: 'admin.cleanup.executed,admin.audit_logs.viewed',
+        includeReadEvents: 'false',
+      })
+    ).toMatchObject({
+      actions: ['admin.cleanup.executed', 'admin.audit_logs.viewed'],
+      includeReadEvents: false,
+    })
+    for (const input of [
+      { action: 'admin.cleanup.executed', actions: 'admin.audit_logs.viewed' },
+      { actions: 'admin.cleanup.executed,admin.cleanup.executed' },
+      { actions: Array(11).fill('admin.cleanup.executed').join(',') },
+      { includeReadEvents: 'yes' },
+    ])
+      expect(adminAuditQuerySchema.safeParse(input).success).toBe(false)
+  })
+
   it('strips unlisted response fields at the wire boundary', () => {
     const result = adminAuditResponseSchema.parse({
       items: [

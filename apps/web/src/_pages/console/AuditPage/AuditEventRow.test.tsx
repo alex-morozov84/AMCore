@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { type AdminAuditResponse, AUDIT_ACTIONS } from '@amcore/shared'
+import { NextIntlClientProvider } from 'next-intl'
+import { type AdminAuditResponse, AUDIT_ACTIONS, DEFAULT_LOCALE } from '@amcore/shared'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -11,6 +12,7 @@ vi.mock('@/shared/ui/route-progress-link', () => ({
 
 import type { AuditCopy } from './audit-copy'
 import { AuditEventRow } from './AuditEventRow'
+import { AuditTimeZoneProvider } from './AuditTimeZone'
 
 const actions = Object.fromEntries(
   AUDIT_ACTIONS.map((code) => [code, code])
@@ -60,19 +62,21 @@ const item: AdminAuditResponse['items'][number] = {
   summary: {},
 }
 
+function renderRow(value = item) {
+  return render(
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
+      <AuditTimeZoneProvider>
+        <AuditEventRow item={value} baseHref="/admin/audit" query={{ limit: 25 }} copy={copy} />
+      </AuditTimeZoneProvider>
+    </NextIntlClientProvider>
+  )
+}
+
 describe('Audit event row', () => {
   it('shows current identity as current and keeps safe IDs filterable', () => {
-    render(
-      <AuditEventRow
-        item={item}
-        baseHref="/admin/audit"
-        query={{ limit: 25 }}
-        copy={copy}
-        locale="en"
-      />
-    )
+    renderRow()
     expect(screen.getByText('New Name')).toBeInTheDocument()
-    expect(screen.getByText('Current identity — may differ from event date')).toBeInTheDocument()
+    expect(screen.getAllByText('User')).toHaveLength(2)
     expect(screen.getByText('No current record')).toBeInTheDocument()
     expect(screen.queryByText('ID unavailable')).not.toBeInTheDocument()
     expect(screen.getByText('Event ID:')).toBeInTheDocument()
@@ -86,30 +90,17 @@ describe('Audit event row', () => {
   it('copies a displayed ID and reports success', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
-    render(
-      <AuditEventRow
-        item={item}
-        baseHref="/admin/audit"
-        query={{ limit: 25 }}
-        copy={copy}
-        locale="en"
-      />
-    )
+    renderRow()
     fireEvent.click(screen.getByRole('button', { name: 'Copy ID: user1' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('user1'))
-    expect(screen.getByText('Copied')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy ID: user1' })).toHaveAttribute(
+      'title',
+      'Copied'
+    )
   })
 
   it('labels a safe coded outcome so the value has meaning', () => {
-    render(
-      <AuditEventRow
-        item={{ ...item, action: 'ai.tool.invoked', summary: { outcome: 'success' } }}
-        baseHref="/admin/audit"
-        query={{ limit: 25 }}
-        copy={copy}
-        locale="en"
-      />
-    )
+    renderRow({ ...item, action: 'ai.tool.invoked', summary: { outcome: 'success' } })
     expect(screen.getByText('Outcome: success')).toBeInTheDocument()
   })
 })

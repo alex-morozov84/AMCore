@@ -17,6 +17,14 @@ export const adminAuditQuerySchema = z
     actorId: auditDisplayIdSchema.optional(),
     actorType: z.enum(['USER', 'API_KEY', 'SYSTEM']).optional(),
     action: auditActionCodeSchema.optional(),
+    actions: z
+      .string()
+      .min(3)
+      .max(969)
+      .transform((value) => value.split(','))
+      .pipe(z.array(auditActionCodeSchema).min(1).max(10))
+      .refine((values) => new Set(values).size === values.length)
+      .optional(),
     targetId: auditDisplayIdSchema.optional(),
     targetType: z
       .enum([
@@ -35,6 +43,10 @@ export const adminAuditQuerySchema = z
       ])
       .optional(),
     organizationId: auditDisplayIdSchema.optional(),
+    includeReadEvents: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
     from: utcTime.optional(),
     to: utcTime.optional(),
     limit: z
@@ -45,6 +57,7 @@ export const adminAuditQuerySchema = z
     cursor: z.string().min(1).max(512).optional(),
   })
   .strict()
+  .refine((value) => !(value.action && value.actions), { path: ['actions'] })
 
 export type AdminAuditQuery = z.infer<typeof adminAuditQuerySchema>
 

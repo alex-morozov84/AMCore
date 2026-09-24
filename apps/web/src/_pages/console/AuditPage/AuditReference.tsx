@@ -1,4 +1,5 @@
 import type { AdminAuditResponse } from '@amcore/shared'
+import { Filter } from 'lucide-react'
 
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
@@ -16,6 +17,7 @@ interface AuditReferenceProps {
   baseHref: string
   query: Parameters<typeof auditRowFilter>[1]
   copy: AuditCopy
+  compact?: boolean
 }
 
 export function AuditReference({
@@ -26,6 +28,7 @@ export function AuditReference({
   baseHref,
   query,
   copy,
+  compact = false,
 }: AuditReferenceProps) {
   const label =
     filterKey === 'actorId'
@@ -42,17 +45,68 @@ export function AuditReference({
           ? identity.slug
           : undefined
       : undefined
-  const typeLabel = type ? (copy.types[type] ?? type) : null
-  const display = name || secondary || typeLabel || id || copy.unknownId
+  const typeLabel = type ? (copy.types[type as keyof AuditCopy['types']] ?? type) : null
+  const display = name || secondary || (id || typeLabel ? '' : copy.emptyReference)
+  const badge = typeLabel ? (
+    <span className="inline-flex shrink-0 rounded border border-border px-1 text-[10px] font-normal text-muted-foreground">
+      {typeLabel}
+    </span>
+  ) : null
+  if (compact)
+    return (
+      <div className="min-w-0 text-xs">
+        {badge && <p>{badge}</p>}
+        {display && (
+          <p className="min-w-0 truncate font-medium" title={display}>
+            {display}
+          </p>
+        )}
+        {secondary && secondary !== display && (
+          <p className="truncate text-muted-foreground" title={secondary}>
+            {secondary}
+          </p>
+        )}
+        {identity?.status === 'not_found' && (
+          <span className="text-muted-foreground">{copy.noCurrentRecord}</span>
+        )}
+        {id && (
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="min-w-0 truncate font-console-mono text-muted-foreground" title={id}>
+              {id}
+            </span>
+            <CopyAuditId
+              id={id}
+              label={copy.copyId}
+              copied={copy.copied}
+              failed={copy.copyFailed}
+            />
+            <RouteProgressLink
+              prefetch={false}
+              href={auditRowFilter(baseHref, query, filterKey, id)}
+              aria-label={`${filterKey === 'actorId' ? copy.filterActor : filterKey === 'targetId' ? copy.filterTarget : copy.filterOrganization}: ${id}`}
+              title={
+                filterKey === 'actorId'
+                  ? copy.filterActor
+                  : filterKey === 'targetId'
+                    ? copy.filterTarget
+                    : copy.filterOrganization
+              }
+              className="inline-flex shrink-0 items-center gap-1 rounded p-1 text-muted-foreground hover:bg-muted focus-visible:outline-2"
+            >
+              <Filter aria-hidden size={14} />
+              <span>{copy.filter}</span>
+            </RouteProgressLink>
+          </div>
+        )}
+      </div>
+    )
   return (
     <div className="min-w-0 space-y-1">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="break-words text-sm font-medium">{display}</p>
+      {badge && <p>{badge}</p>}
+      {display && <p className="break-words text-sm font-medium">{display}</p>}
       {name && secondary && name !== secondary && (
         <p className="break-all text-xs text-muted-foreground">{secondary}</p>
-      )}
-      {identity?.status === 'current' && (
-        <p className="text-xs text-muted-foreground">{copy.currentIdentity}</p>
       )}
       {identity?.status === 'not_found' && (
         <p className="text-xs text-muted-foreground">{copy.noCurrentRecord}</p>
@@ -60,12 +114,9 @@ export function AuditReference({
       {identity?.status === 'current' && !name && !secondary && (
         <p className="text-xs text-muted-foreground">{copy.unavailableIdentity}</p>
       )}
-      {typeLabel && display !== typeLabel && (
-        <p className="text-xs text-muted-foreground">{typeLabel}</p>
-      )}
       {id && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          <span className="break-all font-console-mono">{id}</span>
+          <span className="break-all font-console-mono text-muted-foreground">{id}</span>
           <CopyAuditId id={id} label={copy.copyId} copied={copy.copied} failed={copy.copyFailed} />
           <RouteProgressLink
             prefetch={false}

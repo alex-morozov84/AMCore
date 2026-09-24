@@ -1,10 +1,13 @@
 import { type AdminAuditResponse, AUDIT_ACTIONS } from '@amcore/shared'
+import { Filter } from 'lucide-react'
 
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import type { AuditCopy } from './audit-copy'
+import { auditSummary } from './audit-summary'
 import { auditRowFilter } from './audit-url'
 import { AuditReference } from './AuditReference'
+import { AuditTimestamp } from './AuditTimestamp'
 import { CopyAuditId } from './CopyAuditId'
 
 type Item = AdminAuditResponse['items'][number]
@@ -14,64 +17,38 @@ interface RowProps {
   baseHref: string
   query: Parameters<typeof auditRowFilter>[1]
   copy: AuditCopy
-  locale: string
 }
 
-function summary(item: Item, copy: AuditCopy): string | null {
-  const values = item.summary
-  if (values.beforeSystemRole || values.afterSystemRole)
-    return [
-      values.beforeSystemRole && `${copy.summaryBeforeRole}: ${values.beforeSystemRole}`,
-      values.afterSystemRole && `${copy.summaryAfterRole}: ${values.afterSystemRole}`,
-    ]
-      .filter(Boolean)
-      .join(' | ')
-  if (values.count !== undefined) return `${copy.summaryCount}: ${values.count}`
-  const parts = [
-    values.decision && `${copy.summaryDecision}: ${values.decision}`,
-    values.reasonCode && `${copy.summaryReasonCode}: ${values.reasonCode}`,
-    values.outcome && `${copy.summaryOutcome}: ${values.outcome}`,
-  ].filter(Boolean)
-  return parts.length ? parts.join(' | ') : null
-}
-
-export function AuditEventRow({ item, baseHref, query, copy, locale }: RowProps) {
+export function AuditEventRow({ item, baseHref, query, copy }: RowProps) {
   const known = item.action && AUDIT_ACTIONS.some((code) => code === item.action)
   const actionLabel = known
     ? copy.actions[item.action as keyof AuditCopy['actions']]
     : (item.action ?? copy.unknownAction)
-  const timestamp = new Intl.DateTimeFormat(locale, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZoneName: 'short',
-  }).format(new Date(item.createdAt))
   return (
-    <li className="space-y-3 rounded-lg border border-border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <time dateTime={item.createdAt} className="text-sm font-medium">
-            {timestamp}
-          </time>
+    <li className="space-y-3 rounded-lg border border-border bg-card p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <p className="font-medium">{actionLabel}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            <AuditTimestamp value={item.createdAt} inline />
+          </p>
         </div>
         {item.action && (
           <RouteProgressLink
             prefetch={false}
             href={auditRowFilter(baseHref, query, 'action', item.action)}
-            className="text-xs underline underline-offset-2"
+            aria-label={`${copy.filterAction}: ${actionLabel}`}
+            title={copy.filterAction}
+            className="shrink-0 rounded-md border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2"
           >
-            {copy.filterAction}
+            <Filter aria-hidden size={16} />
           </RouteProgressLink>
         )}
       </div>
-      {summary(item, copy) && (
-        <p className="rounded-md bg-muted px-2 py-1 text-sm">{summary(item, copy)}</p>
+      {auditSummary(item, copy) && (
+        <p className="rounded-md bg-muted px-2 py-1 text-sm">{auditSummary(item, copy)}</p>
       )}
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
         <AuditReference
           id={item.actorId}
           type={item.actorType}
@@ -105,8 +82,11 @@ export function AuditEventRow({ item, baseHref, query, copy, locale }: RowProps)
         )}
       </div>
       {item.id && (
-        <p className="flex flex-wrap items-center gap-2 break-all border-t border-border pt-2 font-console-mono text-xs text-muted-foreground">
-          <span className="font-sans">{copy.eventId}:</span> {item.id}{' '}
+        <p className="flex min-w-0 items-center gap-1 border-t border-border pt-2 text-xs text-muted-foreground">
+          <span className="shrink-0">{copy.eventId}:</span>{' '}
+          <span className="truncate font-console-mono" title={item.id}>
+            {item.id}
+          </span>
           <CopyAuditId
             id={item.id}
             label={copy.copyId}

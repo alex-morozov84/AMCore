@@ -98,7 +98,7 @@ PATCH /api/v1/admin/users/:userId
 
 The Operations Console's Users panel is an authenticated management surface
 for this same endpoint, not a separate contract — see [its user
-guide](../operations-console/README.md#what-a-super-administrator-can-use-today)
+guide](../operations-console/users.md#change-a-users-system-role)
 for the confirmation/step-up/session-revocation behavior a browser operator
 sees. Both the API and the Console enforce the same self-change and
 last-`SUPER_ADMIN` guards described above.
