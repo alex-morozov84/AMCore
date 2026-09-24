@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Console-independent search primitives.** Adds a controlled, accessible
+  `SearchField` and an authoritative-state-aware debounced draft controller
+  for reuse by downstream URL-backed discovery screens even when the optional
+  Operations Console is removed. The Console now supplies its URL, sort/page
+  and navigation policy through a thin feature adapter; pending drafts cannot
+  later undo a sort, pagination or recovery-link navigation.
+
 - **Operations Console discovery — backend foundation.** `GET /admin/users`
   and `GET /admin/organizations` accept new optional `search`/`sortBy`/
   `sortOrder` query parameters: case-insensitive literal-contains search

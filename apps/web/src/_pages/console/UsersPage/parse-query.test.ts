@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { parsePage, parseSearch, parseSortBy, parseSortOrder } from './parse-query'
+import {
+  getUsersEffectiveSortOrder,
+  parsePage,
+  parseSearch,
+  parseSortBy,
+  parseSortOrder,
+} from './parse-query'
 
 describe('parseSortBy', () => {
   it('accepts every field the Users UI actually exposes a sort header for', () => {
@@ -62,5 +68,13 @@ describe('parseSortOrder', () => {
     expect(parseSortOrder('desc')).toBe('desc')
     expect(parseSortOrder('bogus')).toBeUndefined()
     expect(parseSortOrder(undefined)).toBeUndefined()
+  })
+})
+
+describe('getUsersEffectiveSortOrder', () => {
+  it('uses the visible column default unless the URL provides a direction', () => {
+    expect(getUsersEffectiveSortOrder('name')).toBe('asc')
+    expect(getUsersEffectiveSortOrder('lastLoginAt')).toBe('desc')
+    expect(getUsersEffectiveSortOrder('name', 'desc')).toBe('desc')
   })
 })

@@ -9,10 +9,10 @@ import {
 } from './lib/init-project-test-helpers.mjs'
 import { operationsConsoleOwnership } from './lib/operations-console-ownership.mjs'
 import { filesForFacts } from './lib/ownership-facts.mjs'
+import { assertSharedSearchRetained } from './lib/shared-search-scaffold-assertions.mjs'
 import { validateOwnership } from './lib/ownership-validate.mjs'
 
 const copies = []
-
 afterEach(() => copies.splice(0).forEach((copy) => copy.cleanup()))
 
 const copy = () => createCommittedCopy(copies)
@@ -68,6 +68,8 @@ describe('init-project --admin-console', () => {
     for (const rel of ownedPaths) {
       assert.equal(existsSync(path.join(root, rel)), false, rel)
     }
+    assert.equal(existsSync(path.join(root, 'apps/web/src/features/console-discovery')), false)
+    assertSharedSearchRetained(root)
     const nginx = readFileSync(path.join(root, 'docker/nginx/operations-console.conf'), 'utf8')
     assert.equal(nginx.includes('AMCORE_ADMIN_CONSOLE_PROXY'), false)
     for (const [rel, marker] of [
@@ -141,5 +143,7 @@ describe('init-project --admin-console', () => {
     assert.equal(webPackage.includes('test:storybook'), false)
     assert.equal(frontendIndex.includes('Operations Console shell'), false)
     assert.equal(frontendIndex.includes('| [Storybook]'), false)
+    assert.equal(existsSync(path.join(root, 'apps/web/src/features/console-discovery')), false)
+    assertSharedSearchRetained(root, { storybook: false })
   })
 })

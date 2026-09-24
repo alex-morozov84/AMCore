@@ -332,6 +332,14 @@ else needed the store:
 login/register/logout mutate it directly via `queryClient.setQueryData`/
 `queryClient.clear()` rather than an imperative store action.
 
+### Search
+
+Keep general FSD and Server/Client rules here. For choosing a search pattern,
+using the shared field and draft controller, building a URL-backed feature
+adapter, and testing navigation races, start with the dedicated
+[Frontend search guide](./search/README.md). The feature owns its query,
+result and navigation policy; shared primitives remain Console-independent.
+
 ## Relationship to backend/OpenAPI docs
 
 `docs/frontend/` documents **consumption patterns** — how the frontend calls
@@ -426,6 +434,8 @@ architectural structure.
 
 ## See also
 
+- [Frontend search](./search/README.md) — choosing and implementing search
+  patterns with the shared field and draft controller.
 - [Brand, theme, and design tokens](./brand-theme-and-tokens.md) — token
   architecture, light/dark/system modes, the no-flash mechanism, and the
   downstream rebrand checklist.

@@ -1,10 +1,13 @@
 import { getTranslations } from 'next-intl/server'
 import type { AdminUserSortField } from '@amcore/shared'
 
-import { buildDiscoveryHref, type DiscoverySortOrder } from '@/features/console-discovery'
+import {
+  buildDiscoveryHref,
+  DiscoveryNavigationLink,
+  type DiscoverySortOrder,
+} from '@/features/console-discovery'
 import { buttonVariants } from '@/shared/ui/button'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/shared/ui/empty'
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 export interface UsersOutOfRangeProps {
   totalPages: number
@@ -32,9 +35,9 @@ export async function UsersOutOfRange({
         <EmptyTitle>{t('usersPageOutOfRangeTitle')}</EmptyTitle>
         <EmptyDescription>{t('usersPageOutOfRangeDescription', { totalPages })}</EmptyDescription>
       </EmptyHeader>
-      <RouteProgressLink href={href} className={buttonVariants({ variant: 'outline' })}>
+      <DiscoveryNavigationLink href={href} className={buttonVariants({ variant: 'outline' })}>
         {t('usersPageOutOfRangeAction')}
-      </RouteProgressLink>
+      </DiscoveryNavigationLink>
     </Empty>
   )
 }

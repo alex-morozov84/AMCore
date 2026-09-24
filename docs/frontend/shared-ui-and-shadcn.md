@@ -39,9 +39,26 @@ for why.
 | `toast.tsx`                          | shadcn (Base UI), customized                | `Toaster`/`ToastClose` require a caller-provided `closeLabel` — the generated version hardcoded `aria-label="Close toast"` on every toast's close button; same fix pattern as `DialogContent`'s `closeLabel`, see [Hardcoded copy still slips in](#hardcoded-copy-still-slips-in).                                                                                                                                                        |
 | `spinner.tsx`                        | AMCore-authored                             | Not a shadcn generate. shadcn _does_ now ship an official `Spinner` under the same filename — see [Protected files](#protected-files-check-before-every-run).                                                                                                                                                                                                                                                                             |
 | `api-error-alert.tsx`                | AMCore-authored                             | Not a shadcn generate; built on `alert.tsx`, wired to `useApiError()`. See [Protected files](#protected-files-check-before-every-run).                                                                                                                                                                                                                                                                                                    |
+| `search-field.tsx`                   | AMCore-authored                             | Controlled text-search presentation with caller-supplied accessible copy, one custom clear action, and refocus after clear. It deliberately owns no debounce, URL, form, router, query name, or domain policy.                                                                                                                                                                                                                            |
 | `sidebar.tsx`                        | shadcn (Base UI), customized                | Added Track 9 for the dashboard app shell. `Sidebar` requires caller-provided `mobileTitle`/`mobileDescription`; `SidebarTrigger`/`SidebarRail` require a caller-provided `toggleLabel` — the generated version hardcoded all four as English text, same fix pattern as `DialogContent`'s `closeLabel`. Composition (`widgets/app-shell`) lives outside `shared/ui`, per [Architecture & conventions](./architecture-and-conventions.md). |
 | `sheet.tsx`                          | shadcn (Base UI), customized                | Pulled in as `sidebar.tsx`'s mobile-breakpoint dependency. `SheetContent` requires a caller-provided `closeLabel`, mirroring `dialog.tsx`.                                                                                                                                                                                                                                                                                                |
 | `tooltip.tsx`, `separator.tsx`       | shadcn (Base UI), stock                     | Pulled in as `sidebar.tsx` dependencies (`SidebarMenuButton`'s collapsed-state tooltip, `SidebarSeparator`). No customization needed.                                                                                                                                                                                                                                                                                                     |
+
+### Search field contract
+
+Import `SearchField` directly from `@/shared/ui/search-field`. It is controlled:
+pass `value`, `onValueChange` and `onClear`, plus caller-owned `label`,
+`placeholder` and `clearLabel`. It always renders `type="text"` so a browser's
+native search clear affordance cannot duplicate the component's consistent
+custom action. `maxLength` and `className` are optional presentation constraints.
+
+Keep behavior outside the primitive. A feature may compose it with
+`useDebouncedDraft` for URL-backed server discovery, but the field must not
+learn query parameter names, routing, normalization or domain semantics. Its
+co-located RTL tests cover its controlled/accessibility contract; its Storybook
+stories cover empty and populated clear/refocus states.
+For the full field API and feature-level recipes, see
+[Frontend search](./search/README.md).
 
 ## Base UI, not Radix
 
