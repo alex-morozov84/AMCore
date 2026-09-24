@@ -40,14 +40,14 @@
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",
     "@clack/prompts": "^1.8.1",
-    "@commitlint/cli": "^21.2.2",
-    "@commitlint/config-conventional": "^21.2.2",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@eslint/js": "^9.39.5",
     "eslint": "^9.39.5",
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
-    "prettier": "^3.9.6",
-    "turbo": "^2.10.12",
+    "prettier": "^3.9.8",
+    "turbo": "^2.11.2",
     "typescript": "^5.9.3",
     "yaml": "^2.9.1"
   },
