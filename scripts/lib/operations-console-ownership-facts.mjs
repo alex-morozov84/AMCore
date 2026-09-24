@@ -7,6 +7,7 @@ const roots = [
   'apps/web/src/app/[locale]/admin',
   'apps/web/src/app/api/console',
   'apps/web/src/_pages/console',
+  'apps/web/src/features/console-discovery',
   'apps/web/src/features/console-login',
   'apps/web/src/features/console-logout',
   'apps/web/src/shared/api/console',

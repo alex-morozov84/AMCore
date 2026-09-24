@@ -124,8 +124,12 @@ test('path-mode Organizations panel paginates real data with the Next/Previous l
   await page.goto('/en/admin/organizations')
   await expect(page.getByRole('cell', { name: lastOrgName })).toHaveCount(0)
 
+  await page.getByLabel(/search organizations/i).fill('uncommitted-page-draft')
   await page.getByRole('link', { name: /next/i }).click()
   await expect(page).toHaveURL(/[?&]page=2\b/)
+  await page.waitForTimeout(400)
+  await expect(page).not.toHaveURL(/[?&]search=/)
+  await expect(page.getByLabel(/search organizations/i)).toHaveValue('')
   await expect(page.getByRole('cell', { name: lastOrgName })).toBeVisible()
 
   await page.getByRole('link', { name: /previous/i }).click()

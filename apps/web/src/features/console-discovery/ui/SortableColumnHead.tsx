@@ -1,6 +1,5 @@
 import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react'
 
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import { TableHead } from '@/shared/ui/table'
 
 import {
@@ -10,6 +9,8 @@ import {
   type DiscoverySortOrder,
   toggleSortOrder,
 } from '../model/discovery-query'
+
+import { DiscoveryNavigationLink } from './DiscoveryNavigationLink'
 
 export interface SortableColumnHeadProps {
   baseHref: string
@@ -52,7 +53,7 @@ export function SortableColumnHead({
 
   return (
     <TableHead aria-sort={ariaSort} className={className}>
-      <RouteProgressLink
+      <DiscoveryNavigationLink
         href={href}
         aria-label={accessibleLabel}
         className="inline-flex items-center gap-1 hover:text-foreground"
@@ -72,7 +73,7 @@ export function SortableColumnHead({
             <ChevronDown className="size-3.5" />
           )}
         </span>
-      </RouteProgressLink>
+      </DiscoveryNavigationLink>
     </TableHead>
   )
 }

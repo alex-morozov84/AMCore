@@ -1,10 +1,13 @@
 import { getTranslations } from 'next-intl/server'
 import type { AdminUserSortField } from '@amcore/shared'
 
-import { buildDiscoveryHref, type DiscoverySortOrder } from '@/features/console-discovery'
+import {
+  buildDiscoveryHref,
+  DiscoveryNavigationLink,
+  type DiscoverySortOrder,
+} from '@/features/console-discovery'
 import { cn } from '@/shared/lib/utils'
 import { buttonVariants } from '@/shared/ui/button'
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 const MONO = 'font-console-mono'
 
@@ -46,9 +49,12 @@ export async function UsersPagination({
 
 function PageLink({ href, label }: { href: string | null; label: string }) {
   return href ? (
-    <RouteProgressLink href={href} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+    <DiscoveryNavigationLink
+      href={href}
+      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+    >
       {label}
-    </RouteProgressLink>
+    </DiscoveryNavigationLink>
   ) : (
     <span aria-hidden="true" />
   )

@@ -30,6 +30,23 @@ export const ORGANIZATIONS_SORTABLE_FIELDS = [
 
 export type OrganizationsSortableField = (typeof ORGANIZATIONS_SORTABLE_FIELDS)[number]
 
+export const ORGANIZATIONS_DEFAULT_SORT_ORDER: Record<
+  OrganizationsSortableField,
+  DiscoverySortOrder
+> = {
+  name: 'asc',
+  slug: 'asc',
+  createdAt: 'desc',
+  updatedAt: 'desc',
+}
+
+export function getOrganizationsEffectiveSortOrder(
+  sortBy: OrganizationsSortableField,
+  sortOrder?: DiscoverySortOrder
+) {
+  return sortOrder ?? ORGANIZATIONS_DEFAULT_SORT_ORDER[sortBy]
+}
+
 /** Fails closed to the default page on missing/malformed input, never NaN through to the fetch. */
 export function parsePage(raw: string | string[] | undefined): number {
   if (typeof raw !== 'string' || !/^[1-9]\d*$/.test(raw)) return PAGINATION.DEFAULT_PAGE

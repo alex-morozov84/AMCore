@@ -101,18 +101,14 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    should sit behind a `<Suspense>` at all — static chrome (a heading, a
    search box that only reads already-parsed `searchParams` props) belongs
    outside it, rendered by the page immediately. Users is the worked
-   example: `UsersPage` renders its `<h1>` and `SearchInput` directly, then
-   wraps only `UsersResults` (the component that calls `fetchConsoleUsers`)
-   in its own `<Suspense fallback={<UsersResultsSkeleton />}>` — nested
-   inside `UsersPageSkeleton`, which composes a heading/search placeholder
-   with that same `UsersResultsSkeleton` for `ConsolePageFrame`'s own outer
-   fallback (the cold/first-load case). Gating static chrome behind the
-   fetch instead, as a single async component that awaits before rendering
-   anything, means the heading and search box unmount and remount — losing
-   the search box's own in-progress typed value — on every search/sort/page
-   navigation, not just on first load; Organizations and Overview should
-   move to this same shape when next touched (not a requirement to do so
-   opportunistically outside their own PRs). A panel with any genuinely
+   example: `UsersPage` and `OrganizationsPage` render their `<h1>` and
+   `SearchInput` directly, then wrap only their async results component in a
+   results-specific `<Suspense>` — nested inside the full page skeleton used
+   by `ConsolePageFrame` for the cold/first-load case. Gating static chrome
+   behind the fetch instead, as a single async component that awaits before
+   rendering anything, means the heading and search box unmount and remount
+   — losing the search box's own in-progress typed value — on every
+   search/sort/page navigation, not just on first load. A panel with any genuinely
    **browser-initiated** call (a mutation, a client-side poll, anything a
    `'use client'` component fetches on its own after load, as opposed to
    just navigating) still needs its own handler under `app/api/console/**`,
@@ -122,24 +118,35 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    admission frame mounts chrome, never grants data access. A mutation
    reuses the session/origin/token-containment seam described above under
    "Ownership and security boundaries" rather than a new one-off proxy.
-6. **Reuse `features/console-discovery` for search/sort, don't reimplement
-   it per panel.** Users already solved debounced live search, sortable
-   column headers, and canonical
-   `?search=&sortBy=&sortOrder=` URL-building as a console-scoped
-   `features/console-discovery` slice — the same shape as the
-   `features/console-login`/`console-logout` precedent (`ui/` + `model/` +
-   a thin `index.ts` public API), not `shared` (not app-wide) and not
-   `_pages/console` (composition only, per this file's ownership rules
-   above). A future panel that lists, searches, or sorts anything (a queue,
-   an audit log, sessions, or any other tabular data) imports the
-   query-string builder, `SortableColumnHead`, and
-   `SearchInput` from there instead of rebuilding the same debounce/URL
-   plumbing again. Two UI details that look optional but were caught by
-   review and are not: every sortable-but-inactive header shows a neutral
-   sort icon (not just the active column), and a search field's custom
-   clear button uses `type="text"` (never `type="search"`, whose native
-   browser clear button would sit beside a custom one) and refocuses the
-   input after clearing.
+6. **Compose shared search primitives through `features/console-discovery`.**
+   The [frontend search guide](../frontend/search/README.md) documents the
+   reusable APIs and downstream composition; the rules below are Console-only.
+   `SearchField` and `useDebouncedDraft` are console-independent starter
+   capabilities under `shared/ui` and `shared/lib`; they remain available in
+   a fork that removes the optional Console. The Console slice is the thin
+   adapter that owns `search`/`sortBy`/`sortOrder`, trim and 255-character
+   policy, page-1 reset, canonical hrefs, route-progress navigation and
+   domain sort composition. Future Console panels import `SearchInput`,
+   `SortableColumnHead`, `DiscoverySearchBoundary` and discovery links from
+   that slice's public API rather than rebuilding the policy.
+
+   Place the search and results beneath one `DiscoverySearchBoundary` while
+   keeping only the async results under `<Suspense>`. Use
+   `DiscoveryNavigationLink` for every sort, pagination and out-of-range
+   recovery action: a real current-tab navigation discards an armed draft
+   before the link wins, while modifier/new-tab activation leaves this tab's
+   draft alone. Programmatic search uses App Router's last-navigation-wins
+   `replace()` behavior, so only the latest non-discarded search response is an
+   expected self echo. A different canonical Back/Forward view resyncs the field;
+   an exact identity still awaiting its own router echo is indistinguishable
+   from that echo and deliberately preserves the newer draft. The GET form
+   and real link hrefs remain the no-JavaScript fallback.
+
+   Two UI details remain mandatory: every sortable-but-inactive header shows
+   a neutral sort icon, and the shared field uses `type="text"` so its one
+   custom clear button is not duplicated by a browser-native search control;
+   clearing returns focus to the field.
+
 7. Use the existing graceful-degradation primitives for secondary data. Keep
    primary failures explicit and fail privileged actions closed.
 8. Add focused unit tests, Storybook/a11y states where applicable, and

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { parsePage, parseSearch, parseSortBy, parseSortOrder } from './parse-query'
+import {
+  getOrganizationsEffectiveSortOrder,
+  parsePage,
+  parseSearch,
+  parseSortBy,
+  parseSortOrder,
+} from './parse-query'
 
 describe('parseSortBy', () => {
   it('accepts every field the Organizations UI exposes a sort header for (the full backend set)', () => {
@@ -56,5 +62,13 @@ describe('parseSortOrder', () => {
     expect(parseSortOrder('desc')).toBe('desc')
     expect(parseSortOrder('bogus')).toBeUndefined()
     expect(parseSortOrder(undefined)).toBeUndefined()
+  })
+})
+
+describe('getOrganizationsEffectiveSortOrder', () => {
+  it('uses the visible column default unless the URL provides a direction', () => {
+    expect(getOrganizationsEffectiveSortOrder('slug')).toBe('asc')
+    expect(getOrganizationsEffectiveSortOrder('updatedAt')).toBe('desc')
+    expect(getOrganizationsEffectiveSortOrder('slug', 'desc')).toBe('desc')
   })
 })
