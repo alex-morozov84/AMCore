@@ -1,5 +1,35 @@
 import { sanitizeAuditMetadata } from './audit-log.metadata'
 
+describe('admin.audit_logs.viewed metadata', () => {
+  it('retains filter classes and bounded result count without query values', () => {
+    expect(
+      sanitizeAuditMetadata('admin.audit_logs.viewed', {
+        actor: true,
+        action: false,
+        target: false,
+        organization: true,
+        time: true,
+        resultCount: 2,
+        actorId: 'private-person',
+        cursor: 'private-cursor',
+      })
+    ).toEqual({
+      actor: true,
+      action: false,
+      target: false,
+      organization: true,
+      time: true,
+      resultCount: 2,
+    })
+    expect(
+      sanitizeAuditMetadata('admin.audit_logs.viewed', {
+        actor: 'private-person',
+        resultCount: 51,
+      })
+    ).toEqual({})
+  })
+})
+
 /**
  * Content-free-ness of the AI tool-loop + approval audit metadata (Track C — ADR-054, Arc E). The
  * per-action allowlist must (1) drop any non-declared key, and (2) drop even a declared field whose

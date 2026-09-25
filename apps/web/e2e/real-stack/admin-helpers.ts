@@ -34,6 +34,54 @@ export function setSystemRole(email: string, role: 'USER' | 'SUPER_ADMIN'): void
   )
 }
 
+export function countAuditViews(email: string): number {
+  const output = composeExec(
+    'postgres',
+    'psql',
+    '-U',
+    'amcore',
+    '-d',
+    'amcore',
+    '-t',
+    '-A',
+    '-c',
+    `SELECT count(*) FROM core.audit_log a JOIN core.users u ON u.id = a."actorId" ` +
+      `WHERE u."emailCanonical" = '${email}' AND a.action = 'admin.audit_logs.viewed';`
+  )
+  return Number(output.trim())
+}
+
+export function getUserId(email: string): string {
+  return composeExec(
+    'postgres',
+    'psql',
+    '-U',
+    'amcore',
+    '-d',
+    'amcore',
+    '-t',
+    '-A',
+    '-c',
+    `SELECT id FROM core.users WHERE "emailCanonical" = '${email}';`
+  ).trim()
+}
+
+export function createAuditProbe(email: string, marker: string, ageMinutes: number): void {
+  composeExec(
+    'postgres',
+    'psql',
+    '-U',
+    'amcore',
+    '-d',
+    'amcore',
+    '-c',
+    `INSERT INTO core.audit_log (id, "createdAt", "actorType", "actorId", action, category, metadata) ` +
+      `SELECT '${marker}', now() - interval '${ageMinutes} minutes', 'USER', id, ` +
+      `'admin.cleanup.executed', 'SECURITY', '{}'::jsonb FROM core.users ` +
+      `WHERE "emailCanonical" = '${email}';`
+  )
+}
+
 /**
  * Counts a user's live (non-revoked) backend session rows. A role change
  * deletes them outright, but an already-issued, still-time-valid access

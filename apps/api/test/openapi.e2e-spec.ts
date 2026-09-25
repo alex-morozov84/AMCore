@@ -71,6 +71,7 @@ const EXPECTED: Record<string, Expected> = {
   'post /auth/invites/accept': { status: '200', kind: 'json' },
   // admin
   'get /admin/access': { status: '204', kind: 'none' },
+  'get /admin/audit-logs': { status: '200', kind: 'json' },
   'get /admin/users': { status: '200', kind: 'json' },
   'patch /admin/users/{id}': { status: '200', kind: 'json' },
   'post /admin/cleanup': { status: '200', kind: 'json' },
@@ -160,6 +161,7 @@ describe('OpenAPI success surface (e2e)', () => {
   const EXCLUDED_PREFIXES = ['/health']
 
   beforeAll(async () => {
+    process.env.JWT_SECRET ??= 'openapi-e2e-secret-at-least-32-characters'
     context = await setupE2ETest()
     app = context.app
 
@@ -356,6 +358,72 @@ describe('OpenAPI success surface (e2e)', () => {
     // 503 here means the observation itself failed - distinct from the typed
     // 200 `readiness: 'not_ready'` response for an observed degraded instance.
     expect(operation?.responses).toHaveProperty('503')
+  })
+
+  it('documents the bounded bearer-only audit read without raw metadata', () => {
+    const operation = document.paths['/admin/audit-logs']?.get
+    expect(operation?.security).toEqual([{ bearer: [] }])
+    expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
+    for (const status of ['200', '400', '401', '403', '429', '500', '503']) {
+      expect(operation?.responses).toHaveProperty(status)
+    }
+    const parameters = (operation?.parameters ?? []) as Array<{
+      name: string
+      in: string
+      required?: boolean
+      schema?: { minimum?: number; maximum?: number; maxLength?: number }
+    }>
+    const params = new Map(parameters.map((p) => [p.name, p]))
+    for (const key of [
+      'actorId',
+      'actorType',
+      'action',
+      'actions',
+      'targetId',
+      'targetType',
+      'organizationId',
+      'includeReadEvents',
+      'from',
+      'to',
+      'limit',
+      'cursor',
+    ]) {
+      expect(params.get(key)).toMatchObject({ in: 'query', required: false })
+    }
+    expect(params.get('limit')?.schema).toMatchObject({ minimum: 1, maximum: 50 })
+    expect(params.get('cursor')?.schema).toMatchObject({ maxLength: 512 })
+    const response = operation?.responses?.['200'] as {
+      content?: { 'application/json'?: { schema?: { $ref?: string } } }
+    }
+    const ref = response.content?.['application/json']?.schema?.$ref
+    expect(ref).toBeDefined()
+    const visited = new Set<string>()
+    const forbidden = new Set(['metadata', 'ip', 'requestId', 'emailHash', 'pinoEvent'])
+    const missingRefs: string[] = []
+    const forbiddenKeys: string[] = []
+    const inspect = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return
+      if (Array.isArray(value)) {
+        value.forEach(inspect)
+        return
+      }
+      const node = value as Record<string, unknown>
+      if (typeof node.$ref === 'string' && !visited.has(node.$ref)) {
+        visited.add(node.$ref)
+        const referenced = document.components?.schemas?.[node.$ref.split('/').at(-1)!]
+        if (referenced) inspect(referenced)
+        else missingRefs.push(node.$ref)
+      }
+      if (node.properties && typeof node.properties === 'object') {
+        for (const key of Object.keys(node.properties)) {
+          if (forbidden.has(key)) forbiddenKeys.push(key)
+        }
+      }
+      Object.values(node).forEach(inspect)
+    }
+    inspect(response.content?.['application/json']?.schema)
+    expect(missingRefs).toEqual([])
+    expect(forbiddenKeys).toEqual([])
   })
 
   it('documents the admin discovery search/sortBy/sortOrder query contract on both list endpoints (ADR-082)', () => {

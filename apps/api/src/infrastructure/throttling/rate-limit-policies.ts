@@ -28,6 +28,8 @@ export const RATE_LIMIT_POLICIES = {
   PRIVILEGED_MUTATION: { rate: 20, per: 60_000, burst: 20 },
   /** Expensive, resource-intensive actions (e.g. bulk/admin operations). */
   EXPENSIVE_ACTION: { rate: 5, per: 60_000, burst: 5 },
+  /** Bounded audit reads also incur a durable audit write. */
+  AUDIT_READ: { rate: 30, per: 60_000, burst: 20 },
 } as const satisfies Record<string, RateLimitPolicy>
 
 /**

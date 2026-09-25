@@ -5,6 +5,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode, InfrastructureErrorCode, ResourceErrorCode } from '@amcore/shared'
 
+import { sanitizeRequestUrl } from '../../config/logging.config'
 import type { ErrorResponse } from '../types'
 
 import { Prisma } from '@/generated/prisma/client'
@@ -114,7 +115,7 @@ export class PrismaClientExceptionFilter implements ExceptionFilter {
       message,
       errorCode,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: sanitizeRequestUrl(request.url),
       method: request.method,
       correlationId: this.cls.getId(),
     }

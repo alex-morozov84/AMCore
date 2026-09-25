@@ -186,6 +186,24 @@ describe('AllExceptionsFilter', () => {
     )
   })
 
+  it.each([400, 500])('redacts audit query values in %i error paths', (status) => {
+    mockRequest.url = '/api/v1/admin/audit-logs?organizationId=secret-org&cursor=secret-cursor'
+    const error = status === 400 ? new HttpException('Invalid cursor', 400) : new Error('Failure')
+
+    filter.catch(error, mockHost)
+
+    const response = mockHttpAdapter.reply.mock.calls[0][1] as { path: string }
+    const context = (status === 400 ? mockLogger.warn : mockLogger.error).mock.calls[0]?.[0] as {
+      path?: string
+      req?: { url: string }
+    }
+    for (const path of [response.path, context.path ?? context.req?.url ?? '']) {
+      expect(path).not.toContain('secret-org')
+      expect(path).not.toContain('secret-cursor')
+      expect(new URL(path, 'http://test.invalid').searchParams.get('cursor')).toBe('[REDACTED]')
+    }
+  })
+
   it('should include stack trace in development', () => {
     const originalEnv = process.env.NODE_ENV
     process.env.NODE_ENV = 'development'

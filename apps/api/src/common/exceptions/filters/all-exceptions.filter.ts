@@ -4,6 +4,7 @@ import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
 import { REQUEST_BODY_LIMIT_BYTES } from '../../../bootstrap/configure-body-parser'
+import { sanitizeRequestUrl } from '../../config/logging.config'
 import { sanitizeHeaders } from '../../utils'
 import { PayloadTooLargeException } from '../domain'
 import type { ErrorResponse } from '../types'
@@ -43,7 +44,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message,
       errorCode,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: sanitizeRequestUrl(request.url),
       method: request.method,
       correlationId: this.cls.getId(),
     }
@@ -60,7 +61,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
           err: exception,
           req: {
             method: request.method,
-            url: request.url,
+            url: sanitizeRequestUrl(request.url),
             // Explicit source-side redaction. Pino's path-based redact still
             // applies on top, but does not silently fail if the log shape
             // changes or a new sensitive header is added later.
@@ -70,7 +71,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `Unhandled exception: ${message}`
       )
     } else {
-      this.logger.warn({ statusCode, path: request.url }, `Client error: ${message}`)
+      this.logger.warn(
+        { statusCode, path: sanitizeRequestUrl(request.url) },
+        `Client error: ${message}`
+      )
     }
 
     // Send response

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -18,11 +19,13 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
+import { ZodResponse, ZodValidationException } from 'nestjs-zod'
 
 import {
   ADMIN_ORGANIZATION_SORT_FIELDS,
   ADMIN_USER_SORT_FIELDS,
+  adminAuditQuerySchema,
+  type AdminAuditResponse,
   type AdminOrganizationListResponse,
   type AdminOverviewResponse,
   type AdminUserListResponse,
@@ -41,7 +44,9 @@ import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorato
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
+import { AdminAuditService } from './admin-audit.service'
 import { AdminOverviewService } from './admin-overview.service'
+import { AdminAuditResponseDto } from './dto/admin-audit.dto'
 import { AdminOrganizationListQueryDto } from './dto/admin-organization-list-query.dto'
 import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto'
 import { AdminOverviewResponseDto } from './dto/admin-overview-response.dto'
@@ -78,7 +83,8 @@ import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
-    private readonly overviewService: AdminOverviewService
+    private readonly overviewService: AdminOverviewService,
+    private readonly auditService: AdminAuditService
   ) {}
 
   @Get('access')
@@ -89,6 +95,82 @@ export class AdminController {
   @ApiResponse({ status: 403, description: 'SUPER_ADMIN required' })
   checkAccess(): undefined {
     return undefined
+  }
+
+  @Get('audit-logs')
+  @Header('Cache-Control', 'private, no-store')
+  @RateLimit(RATE_LIMIT_POLICIES.AUDIT_READ)
+  @ApiOperation({
+    summary: 'Browse redacted audit events — live SUPER_ADMIN bearer only',
+    description:
+      'Newest first within a fixed UTC [from,to) interval. Defaults to 7 days; maximum 31 days. ' +
+      'Current names are present-day data and may differ from the event date. ' +
+      'Each successful read is durably audited. Invalid or stale cursors require a cursor reset.',
+  })
+  @ApiQuery({ name: 'actorId', required: false, type: String, maxLength: 128 })
+  @ApiQuery({ name: 'actorType', required: false, enum: ['USER', 'API_KEY', 'SYSTEM'] })
+  @ApiQuery({ name: 'action', required: false, type: String, maxLength: 96 })
+  @ApiQuery({
+    name: 'actions',
+    required: false,
+    type: String,
+    maxLength: 969,
+    description:
+      'Comma-separated list of 1–10 exact action codes; OR semantics. Cannot combine with action.',
+  })
+  @ApiQuery({ name: 'targetId', required: false, type: String, maxLength: 128 })
+  @ApiQuery({ name: 'targetType', required: false, type: String })
+  @ApiQuery({ name: 'organizationId', required: false, type: String, maxLength: 128 })
+  @ApiQuery({
+    name: 'includeReadEvents',
+    required: false,
+    enum: ['true', 'false'],
+    description:
+      'Defaults to false; an explicit action or actions selection containing the audit-view code includes matching views',
+  })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    type: String,
+    description: 'UTC ISO lower bound, inclusive',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    type: String,
+    description: 'UTC ISO upper bound, exclusive; not in future',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 50, example: 25 })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    type: String,
+    maxLength: 512,
+    description: 'Private sealed cursor; requires the same explicit from/to and filters',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid/repeated query, range, or cursor; reset cursor',
+  })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
+  @ApiResponse({ status: 429, description: 'Audit read rate limit exceeded' })
+  @ApiResponse({ status: 500, description: 'Audit query or strict read-audit write failed' })
+  @ApiResponse({ status: 503, description: 'Audit dependency unavailable' })
+  @ZodResponse({
+    type: AdminAuditResponseDto,
+    status: 200,
+    description: 'Redacted events with safe present-day identity projection and opaque cursor',
+  })
+  listAuditLogs(
+    @CurrentUser() actor: RequestPrincipal,
+    @Query() rawQuery: Record<string, unknown>
+  ): Promise<AdminAuditResponse> {
+    // Parse once: the schema transforms action lists and booleans, while the
+    // global DTO pipe would re-parse its transformed output and reject it.
+    const parsed = adminAuditQuerySchema.safeParse(rawQuery)
+    if (!parsed.success) throw new ZodValidationException(parsed.error)
+    return this.auditService.list(parsed.data, actor)
   }
 
   @Get('users')

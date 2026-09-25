@@ -121,20 +121,21 @@ guarantee for your specific provider and plan tier. A provider that
 disallows it must fail the migration visibly; there is no supported
 fallback that silently serves search without the index it depends on.
 
-## Search terms in logs and browser history
+## Console URLs in browser history and logs
 
-A search term typed into the Users or Organizations panel is not treated
-as a secret, but it is real operator input (an email address, a name) and
-appears in more places than the panel itself:
+Users and Organizations searches put the entered name, email, or slug in the
+page URL. Audit URLs contain exact actor, target, and organization filter IDs
+and an encrypted page cursor. The cursor hides its internal anchor and contains
+no raw audit-row ID. Audit current-name lookup text is sent in a same-origin
+POST body and stays out of URL history. Treat all of these URL values as
+operator input that may reveal personal or organizational information:
 
 - **The browser address bar and history**, on whichever machine the
-  operator is using — search state lives in the URL by design (so a
-  console view can be reloaded, bookmarked, or shared). Avoid pasting a
-  console search URL into a chat or ticket if that matters for your
-  deployment.
-- **This API's own structured access logs** are redacted — a search term
-  is stripped from both the request's query object and its raw URL before
-  a line is ever written.
+  operator is using. These views can be reloaded, bookmarked, or shared;
+  review the URL before pasting it into a chat or ticket.
+- **This API's request access logs and exception path fields** redact search
+  terms and audit ID/cursor values in structured query and URL fields.
+  Error-response paths are redacted too.
 - **A reverse-proxy access log** (Caddy, nginx, or any edge proxy in
   front of either topology — **path mode and host mode alike**) is
   outside this application's runtime and is not redacted by the shipped

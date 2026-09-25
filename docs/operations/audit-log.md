@@ -13,7 +13,7 @@ Actions are a **closed, code-owned taxonomy**. Every action is a dotted
 `area.event` string in the `AUDIT_ACTIONS` tuple, which is the single source of
 truth and the `AuditAction` type — the recorder only accepts values from it:
 
-- source: [`core/audit/audit-log.actions.ts`](../../apps/api/src/core/audit/audit-log.actions.ts)
+- source: [`shared/constants/audit-actions.ts`](../../packages/shared/src/constants/audit-actions.ts)
 - per-action metadata allowlist: [`core/audit/audit-log.metadata.ts`](../../apps/api/src/core/audit/audit-log.metadata.ts)
 
 The current areas are `admin.*` (privileged maintenance and user administration),
@@ -31,6 +31,7 @@ The originating runtime Pino event name is preserved separately as
 Each row stores:
 
 - `id`, `createdAt`
+- `cursorKey` (internal random UUID used only to resume private browsing cursors)
 - `actorType`, `actorId`
 - `action`
 - `targetType`, `targetId`
@@ -93,7 +94,7 @@ Current examples:
 Recording a new privileged action is three steps plus a write-mode choice.
 
 **1. Add the action** to `AUDIT_ACTIONS` in
-[`audit-log.actions.ts`](../../apps/api/src/core/audit/audit-log.actions.ts) as a
+[`shared/constants/audit-actions.ts`](../../packages/shared/src/constants/audit-actions.ts) as a
 dotted `area.event` string. It joins the closed `AuditAction` union, so every
 call site is type-checked against it.
 
@@ -191,7 +192,49 @@ Current policy:
 
 ## Read Access
 
-AMCore does not ship an admin read endpoint yet.
+`GET /admin/audit-logs` serves the Operations Console's Audit panel. It
+requires a bearer session whose user is **currently** a `SUPER_ADMIN` in the
+database; API keys and organization roles do not grant access. Each successful
+read, including an empty result, awaits one `admin.audit_logs.viewed` write
+with `failOpen: false` before returning rows. If that write fails, no rows
+are served. Read events are hidden from the default browse result; the
+`includeReadEvents=true` query option reveals them. An explicit
+`action=admin.audit_logs.viewed` filter, or an `actions` selection containing
+that code, also returns them. This affects display, not recording or retention,
+and the option is bound into the cursor scope.
 
-When a read endpoint is added later, access to the audit log must itself be
-audited.
+The response is a deliberately small projection: time, action, safe IDs and
+types, category, selected coded outcome fields, and bounded **current**
+user/organization names plus user email or organization slug. Current identity
+may differ from the identity at event time. A missing present-day record leaves
+only its ID; this does not prove when or why the record disappeared. Raw
+`metadata`, `ip`, `requestId`, credential material, free text, stored names,
+scopes and session IDs are never returned. An unsafe old ID is displayed as
+unavailable, but its event stays in chronological order.
+
+Filters are exact actor, action, target and organization values in a UTC
+`[from,to)` interval. The first request defaults to the last seven days;
+the maximum span is 31 days and the upper bound cannot be in the future.
+`actions` accepts 1–10 distinct comma-separated action codes with OR
+semantics and cannot be combined with the single `action` parameter.
+Results are newest first, at most 50 per request (25 by default), with no
+exact count or arbitrary sort. Follow the sealed cursor for older events
+within the same fixed interval, or select an earlier interval. The cursor
+contains only an encrypted internal random UUID anchor, fixed interval and
+filter digest; it is bound to the operator and capped at 512 URL characters.
+An invalid or stale cursor returns 400 and the panel offers to restart the
+same filters. Responses use `Cache-Control: private, no-store`.
+
+Audit filter IDs and the cursor are removed from both the API's structured
+request query and raw URL logs. They still appear in the operator's browser
+history. Deployments that retain reverse-proxy access logs must omit or
+truncate Console query strings there as well; see [Console
+configuration](../operations-console/configuration.md#console-urls-in-browser-history-and-logs).
+
+The `cursorKey` migration adds a volatile UUID default and unique index to
+every existing audit row. It can rewrite and lock a large table. Rehearse
+`prisma migrate deploy` against a production-sized copy and schedule a
+maintenance window if necessary; do not disable the append-only trigger.
+The local PostgreSQL 18 rehearsal on 100,001 rows took 227 ms, preserved
+the trigger and yielded query probes below the 2-second statement timeout.
+That fixture does not predict a production table's lock time or workload.

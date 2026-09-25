@@ -23,8 +23,8 @@ export interface SearchInputProps {
  *
  * Navigation uses `router.replace()`, not `push()` (see the hook): an
  * intermediate keystroke never adds a history entry — see
- * `docs/operations-console/README.md` for exactly what that does and does
- * not guarantee about the Back button.
+ * `docs/frontend/search/navigation-and-verification.md` for the precise
+ * Back/Forward limits of URL-backed search.
  */
 export function SearchInput({
   label,

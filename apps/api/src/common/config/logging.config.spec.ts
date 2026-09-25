@@ -1,5 +1,6 @@
 import { Controller, Get, type INestApplication, RequestMethod } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
+import { createServer } from 'http'
 import type { ClsService } from 'nestjs-cls'
 import { LoggerModule } from 'nestjs-pino'
 import { PassThrough } from 'stream'
@@ -295,6 +296,61 @@ describe('createLoggingConfig', () => {
       expect(output).not.toContain(encodeURIComponent(SENTINEL))
       expect(output).toContain('[REDACTED]')
       expect(output).toContain('page=2')
+    })
+
+    it('redacts audit IDs and cursor through a real pino-http cycle', async () => {
+      const config = createLoggingConfig(clsServiceMock, 4096)
+      const { transport: _transport, ...options } = config.pinoHttp as Record<string, unknown>
+      const stream = new PassThrough()
+      let output = ''
+      stream.on('data', (chunk) => {
+        output += chunk.toString()
+      })
+      const createPinoHttp = require('pino-http') as (
+        options: object
+      ) => (req: import('http').IncomingMessage, res: import('http').ServerResponse) => void
+      const middleware = createPinoHttp({ ...options, stream })
+      const server = createServer((req, res) => {
+        middleware(req, res)
+        res.end('ok')
+      })
+      try {
+        const query = new URLSearchParams({
+          actorId: 'actor-secret-123',
+          targetId: 'target-secret-456',
+          organizationId: 'organization-secret-789',
+          cursor: 'cursor-secret-abc',
+          limit: '25',
+        })
+        await request(server).get(`/audit-probe?${query}`).expect(200)
+      } finally {
+        server.close()
+      }
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      for (const secret of [
+        'actor-secret-123',
+        'target-secret-456',
+        'organization-secret-789',
+        'cursor-secret-abc',
+      ]) {
+        expect(output).not.toContain(secret)
+      }
+      expect(output).toContain('limit=25')
+      const parsed = JSON.parse(output) as { req: { url: string } }
+      for (const key of ['actorId', 'targetId', 'organizationId', 'cursor']) {
+        expect(new URL(parsed.req.url, 'http://test.invalid').searchParams.get(key)).toBe(
+          '[REDACTED]'
+        )
+      }
+      const structured = runReqSerializer('/audit-probe', {
+        actorId: 'actor-secret-123',
+        targetId: 'target-secret-456',
+        organizationId: 'organization-secret-789',
+        cursor: 'cursor-secret-abc',
+      })
+      const structuredQuery = (JSON.parse(structured) as { req: { query: Record<string, string> } })
+        .req.query
+      expect(Object.values(structuredQuery)).toEqual(Array(4).fill('[REDACTED]'))
     })
 
     it('preserves the path and non-sensitive query keys in the sanitized url', () => {

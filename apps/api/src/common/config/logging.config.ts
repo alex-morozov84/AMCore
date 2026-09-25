@@ -19,7 +19,15 @@ export type TruncatedBody = {
  * Kept as one list so the two representations can't drift out of sync —
  * fixing only one of them still leaks the value through the other.
  */
-const SENSITIVE_QUERY_PARAMS = ['token', 'apiKey', 'search']
+const SENSITIVE_QUERY_PARAMS = [
+  'token',
+  'apiKey',
+  'search',
+  'actorId',
+  'targetId',
+  'organizationId',
+  'cursor',
+]
 
 /**
  * Replaces the value of every {@link SENSITIVE_QUERY_PARAMS} key in a
@@ -32,7 +40,7 @@ const SENSITIVE_QUERY_PARAMS = ['token', 'apiKey', 'search']
  * fixed dummy origin below; only `pathname`+`search` are ever read back out
  * of it, so that origin never actually appears in the result.
  */
-function sanitizeRequestUrl(url: unknown): string {
+export function sanitizeRequestUrl(url: unknown): string {
   if (typeof url !== 'string' || url.length === 0) return '[REDACTED]'
   try {
     const parsed = new URL(url, 'http://sanitize.invalid')
