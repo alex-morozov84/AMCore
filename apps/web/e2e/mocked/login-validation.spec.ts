@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import { expect, type Page, test } from '@playwright/test'
 
 const passwordHints = {
@@ -63,7 +64,7 @@ test('register form rejects a weak password without calling the BFF', async ({ p
 
   await page.goto('/en/register')
 
-  const input = await expectPasswordHint(page, 'en')
+  const input = await expectPasswordHint(page, DEFAULT_LOCALE)
 
   await page.getByRole('textbox', { name: /email/i }).fill('spike-e2e@example.com')
   // `registerSchema` requires min 8 chars + an uppercase + a digit.
@@ -76,6 +77,7 @@ test('register form rejects a weak password without calling the BFF', async ({ p
 })
 
 test('registration hint is localized in Russian', async ({ page }) => {
+  test.skip(!new Set<string>(SUPPORTED_LOCALES).has('ru'), 'Russian locale is not enabled')
   await page.goto('/ru/register')
   await expectPasswordHint(page, 'ru')
 })
@@ -90,7 +92,7 @@ test('reset form explains the password rule and rejects a weak password locally'
   })
 
   await page.goto(`/en/reset-password?token=${'a'.repeat(64)}`)
-  const input = await expectPasswordHint(page, 'en')
+  const input = await expectPasswordHint(page, DEFAULT_LOCALE)
   await input.fill('weak')
   await page.getByRole('button', { name: /reset password/i }).click()
 
@@ -100,6 +102,7 @@ test('reset form explains the password rule and rejects a weak password locally'
 })
 
 test('reset hint is localized in Russian and absent without a token', async ({ page }) => {
+  test.skip(!new Set<string>(SUPPORTED_LOCALES).has('ru'), 'Russian locale is not enabled')
   await page.goto(`/ru/reset-password?token=${'a'.repeat(64)}`)
   await expectPasswordHint(page, 'ru')
 
@@ -118,11 +121,11 @@ test('valid reset submission reaches the BFF and replaces the form on success', 
   })
 
   await page.goto(`/en/reset-password?token=${'a'.repeat(64)}`)
-  const input = await expectPasswordHint(page, 'en')
+  const input = await expectPasswordHint(page, DEFAULT_LOCALE)
   await input.fill('CorrectPassword1')
   await page.getByRole('button', { name: /reset password/i }).click()
 
   await expect(page.getByText(/your password has been reset/i)).toBeVisible()
-  await expect(page.getByText(passwordHints.en, { exact: true })).toHaveCount(0)
+  await expect(page.getByText(passwordHints[DEFAULT_LOCALE], { exact: true })).toHaveCount(0)
   expect(resetRequestSeen).toBe(true)
 })

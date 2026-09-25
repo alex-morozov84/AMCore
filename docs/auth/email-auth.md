@@ -46,9 +46,9 @@ curl -X POST https://api.amcore.dev/api/v1/auth/register \
 ```
 
 Registration passwords need at least 8 characters, one uppercase Latin letter
-(`A–Z`), and one digit (`0–9`). The `/en/register` and `/ru/register` forms
-show these requirements below the password field before submission. The same
-rule applies when setting a new password through the reset endpoint below.
+(`A–Z`), and one digit (`0–9`). The web registration form shows these
+requirements below the password field before submission. The same rule and
+hint apply when setting a new password through the reset flow below.
 
 `locale` is optional (`en` or `ru`). It sets the new user's interface/email
 language with this precedence:
