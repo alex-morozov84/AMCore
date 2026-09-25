@@ -100,6 +100,7 @@ Pure schema/lib contract tests for `packages/shared` live beside their source
 | Command                                 | Description                                                                                                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `pnpm --filter web test`                | All unit/component/integration tests (mocked infra)                                                                                                          |
+| `pnpm --filter web test:coverage`       | Unit tests with an informational V8 coverage report; see [`docs/frontend/testing.md`](docs/frontend/testing.md#commands)                                     |
 | `pnpm --filter web test:integration`    | Testcontainers-backed tests — real Redis (requires Docker), excluded from `pnpm test`                                                                        |
 | `pnpm --filter web storybook`           | Storybook component workshop dev server (`http://localhost:6006`)                                                                                            |
 | `pnpm --filter web build-storybook`     | Static Storybook build — cheap compile/broken-story smoke                                                                                                    |
