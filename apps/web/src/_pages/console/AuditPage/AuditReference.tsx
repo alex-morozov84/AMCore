@@ -1,10 +1,15 @@
 import type { AdminAuditResponse } from '@amcore/shared'
 import { Filter } from 'lucide-react'
 
+import {
+  getConsoleOrganizationDetailHref,
+  getConsoleUserDetailHref,
+} from '@/shared/lib/console-public-href'
+import { ConsoleContextLink } from '@/shared/ui/console-detail/ConsoleContextLink'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import type { AuditCopy } from './audit-copy'
-import { auditRowFilter } from './audit-url'
+import { auditHref, auditRowFilter } from './audit-url'
 import { CopyAuditId } from './CopyAuditId'
 
 type Item = AdminAuditResponse['items'][number]
@@ -46,7 +51,33 @@ export function AuditReference({
           : undefined
       : undefined
   const typeLabel = type ? (copy.types[type as keyof AuditCopy['types']] ?? type) : null
-  const display = name || secondary || (id || typeLabel ? '' : copy.emptyReference)
+  const display =
+    name ||
+    secondary ||
+    (identity?.status === 'current' && id) ||
+    (id || typeLabel ? '' : copy.emptyReference)
+  const source = auditHref(baseHref, query)
+  const detailHref =
+    identity?.status === 'current' && id
+      ? filterKey === 'organizationId' || type === 'ORGANIZATION'
+        ? getConsoleOrganizationDetailHref(id, source)
+        : type === 'USER'
+          ? getConsoleUserDetailHref(id, source)
+          : null
+      : null
+  const detailKey =
+    filterKey === 'organizationId' || type === 'ORGANIZATION' ? `organization:${id}` : `user:${id}`
+  const displayNode = detailHref ? (
+    <ConsoleContextLink
+      href={detailHref}
+      detailKey={detailKey}
+      className="underline-offset-2 hover:underline focus-visible:underline"
+    >
+      {display}
+    </ConsoleContextLink>
+  ) : (
+    display
+  )
   const badge = typeLabel ? (
     <span className="inline-flex shrink-0 rounded border border-border px-1 text-[10px] font-normal text-muted-foreground">
       {typeLabel}
@@ -58,7 +89,7 @@ export function AuditReference({
         {badge && <p>{badge}</p>}
         {display && (
           <p className="min-w-0 truncate font-medium" title={display}>
-            {display}
+            {displayNode}
           </p>
         )}
         {secondary && secondary !== display && (
@@ -104,7 +135,7 @@ export function AuditReference({
     <div className="min-w-0 space-y-1">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       {badge && <p>{badge}</p>}
-      {display && <p className="break-words text-sm font-medium">{display}</p>}
+      {display && <p className="break-words text-sm font-medium">{displayNode}</p>}
       {name && secondary && name !== secondary && (
         <p className="break-all text-xs text-muted-foreground">{secondary}</p>
       )}

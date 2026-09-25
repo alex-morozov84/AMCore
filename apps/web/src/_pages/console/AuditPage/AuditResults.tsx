@@ -11,7 +11,6 @@ import { AuditEventRow } from './AuditEventRow'
 import { AuditEventTable } from './AuditEventTable'
 import { AuditPaging } from './AuditPaging'
 import { AuditResultRegion } from './AuditResultRegion'
-import { AuditTimestamp } from './AuditTimestamp'
 
 interface AuditResultsProps {
   baseHref: string
@@ -62,10 +61,6 @@ export async function AuditResults({ baseHref, query, copy }: AuditResultsProps)
   )
   return (
     <AuditResultRegion readToken={crypto.randomUUID()} loading={copy.loading}>
-      <p className="text-sm text-muted-foreground">
-        {copy.from}: <AuditTimestamp value={data.from} inline /> · {copy.to}:{' '}
-        <AuditTimestamp value={data.to} inline />
-      </p>
       {data.items.some(
         (item) =>
           item.actorIdentity?.status === 'current' ||

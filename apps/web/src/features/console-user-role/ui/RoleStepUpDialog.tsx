@@ -16,7 +16,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
 import { Input } from '@/shared/ui/input'
 
-import type { StepUpPhase } from './use-user-role-change'
+import type { StepUpPhase } from '../model/use-user-role-change'
 
 interface RoleStepUpDialogProps {
   phase: StepUpPhase

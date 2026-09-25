@@ -66,6 +66,7 @@ export async function OrganizationsInventory({
     <>
       <OrganizationsTable
         organizations={response.data}
+        page={response.page}
         baseHref={baseHref}
         search={search}
         sortBy={sortBy}

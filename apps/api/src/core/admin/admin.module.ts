@@ -7,6 +7,7 @@ import { AuditModule } from '../audit'
 import { AdminController } from './admin.controller'
 import { AdminService } from './admin.service'
 import { AdminAuditService } from './admin-audit.service'
+import { AdminDetailService } from './admin-detail.service'
 import { AdminOverviewService } from './admin-overview.service'
 
 import { HealthModule } from '@/health'
@@ -19,6 +20,6 @@ import { HealthModule } from '@/health'
 @Module({
   imports: [PrismaModule, CleanupModule, AuditModule, HealthModule],
   controllers: [AdminController],
-  providers: [AdminService, AdminOverviewService, AdminAuditService],
+  providers: [AdminService, AdminDetailService, AdminOverviewService, AdminAuditService],
 })
 export class AdminModule {}

@@ -1,4 +1,6 @@
 import {
+  type AdminOrganizationDetailResponse,
+  adminOrganizationDetailResponseSchema,
   type AdminOrganizationListResponse,
   adminOrganizationListResponseSchema,
   type AdminOrganizationSortField,
@@ -18,6 +20,24 @@ export interface FetchConsoleOrganizationsParams {
   search?: string
   sortBy?: AdminOrganizationSortField
   sortOrder?: AdminSortOrder
+}
+
+export function fetchConsoleOrganizationDetail(
+  id: string,
+  page: number,
+  search?: string,
+  limit = PAGINATION.DEFAULT_LIMIT
+): Promise<DataOutcome<AdminOrganizationDetailResponse>> {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (search) query.set('search', search)
+  return fetchBackend(
+    `/api/v1/admin/organizations/${encodeURIComponent(id)}?${query}`,
+    adminOrganizationDetailResponseSchema,
+    {
+      auth: 'required',
+      tokenResolver: getConsoleAwareAccessToken,
+    }
+  )
 }
 
 /**

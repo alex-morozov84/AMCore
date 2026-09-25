@@ -26,8 +26,11 @@ import {
   ADMIN_USER_SORT_FIELDS,
   adminAuditQuerySchema,
   type AdminAuditResponse,
+  adminDetailIdSchema,
+  type AdminOrganizationDetailResponse,
   type AdminOrganizationListResponse,
   type AdminOverviewResponse,
+  type AdminUserDetailResponse,
   type AdminUserListResponse,
   type AdminUserResponse,
   AuthType,
@@ -45,8 +48,15 @@ import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
 import { AdminService } from './admin.service'
 import { AdminAuditService } from './admin-audit.service'
+import { AdminDetailService } from './admin-detail.service'
 import { AdminOverviewService } from './admin-overview.service'
 import { AdminAuditResponseDto } from './dto/admin-audit.dto'
+import {
+  AdminOrganizationDetailQueryDto,
+  AdminOrganizationDetailResponseDto,
+  AdminUserDetailQueryDto,
+  AdminUserDetailResponseDto,
+} from './dto/admin-detail.dto'
 import { AdminOrganizationListQueryDto } from './dto/admin-organization-list-query.dto'
 import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto'
 import { AdminOverviewResponseDto } from './dto/admin-overview-response.dto'
@@ -84,7 +94,8 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly overviewService: AdminOverviewService,
-    private readonly auditService: AdminAuditService
+    private readonly auditService: AdminAuditService,
+    private readonly detailService: AdminDetailService
   ) {}
 
   @Get('access')
@@ -209,6 +220,46 @@ export class AdminController {
     return this.adminService.findAllUsers(query)
   }
 
+  @Get('users/:id')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Inspect one user and paginated organization memberships — SUPER_ADMIN only',
+  })
+  @ApiParam({ name: 'id', description: 'User CUID or UUID' })
+  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION.MAX_LIMIT,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    maxLength: 255,
+    description: 'Case-insensitive literal-contains match over organization name or slug',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid user ID, pagination or search' })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
+  @ApiResponse({ status: 404, description: 'User no longer exists' })
+  @ApiResponse({ status: 503, description: 'Detail dependency unavailable' })
+  @ZodResponse({
+    type: AdminUserDetailResponseDto,
+    status: 200,
+    description: 'Safe user detail and bounded memberships',
+  })
+  findUserDetail(
+    @Param('id') id: string,
+    @Query() query: AdminUserDetailQueryDto
+  ): Promise<AdminUserDetailResponse> {
+    const parsed = adminDetailIdSchema.safeParse(id)
+    if (!parsed.success) throw new ZodValidationException(parsed.error)
+    return this.detailService.user(parsed.data, query)
+  }
+
   @Patch('users/:id')
   @ApiOperation({ summary: 'Update user system role — SUPER_ADMIN only' })
   @ApiParam({ name: 'id', description: 'Target user ID' })
@@ -297,6 +348,46 @@ export class AdminController {
     @Query() query: AdminOrganizationListQueryDto
   ): Promise<AdminOrganizationListResponse> {
     return this.adminService.findAllOrganizations(query)
+  }
+
+  @Get('organizations/:id')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Inspect one organization and searchable paginated members — SUPER_ADMIN only',
+  })
+  @ApiParam({ name: 'id', description: 'Organization CUID or UUID' })
+  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION.MAX_LIMIT,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    maxLength: 255,
+    description: 'Case-insensitive literal-contains match over member name or email',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid organization ID, pagination or search' })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
+  @ApiResponse({ status: 404, description: 'Organization no longer exists' })
+  @ApiResponse({ status: 503, description: 'Detail dependency unavailable' })
+  @ZodResponse({
+    type: AdminOrganizationDetailResponseDto,
+    status: 200,
+    description: 'Safe organization detail and bounded members',
+  })
+  findOrganizationDetail(
+    @Param('id') id: string,
+    @Query() query: AdminOrganizationDetailQueryDto
+  ): Promise<AdminOrganizationDetailResponse> {
+    const parsed = adminDetailIdSchema.safeParse(id)
+    if (!parsed.success) throw new ZodValidationException(parsed.error)
+    return this.detailService.organization(parsed.data, query)
   }
 
   @Get('overview')

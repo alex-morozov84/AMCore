@@ -7,6 +7,7 @@ import {
   SearchInput,
 } from '@/features/console-discovery'
 import { getConsoleOrganizationsHref } from '@/shared/lib/console-public-href'
+import { ConsoleRestorePosition } from '@/shared/ui/console-detail/ConsoleRestorePosition'
 
 import { OrganizationsResults } from './OrganizationsResults'
 import { OrganizationsResultsSkeleton } from './OrganizationsResultsSkeleton'
@@ -23,9 +24,8 @@ export interface OrganizationsPageProps {
 }
 
 /**
- * Searchable/sortable Organizations panel. Read-only — no detail view: the
- * backend has no per-organization endpoint, so the paginated list is the
- * whole contract. The heading and search box render immediately — only
+ * Searchable/sortable Organizations panel. The heading and search box render
+ * immediately; only
  * `OrganizationsResults` (the part that actually needs the backend fetch)
  * sits behind its own `<Suspense>`. Mirrors `UsersPage`/`UsersResults`
  * exactly; see that pair's own doc comments for the full rationale.
@@ -41,6 +41,7 @@ export async function OrganizationsPage({
   const baseHref = getConsoleOrganizationsHref()
   return (
     <section className="flex flex-col gap-4">
+      <ConsoleRestorePosition />
       <h1 className="text-3xl font-semibold tracking-tight">{t('organizations')}</h1>
       <DiscoverySearchBoundary
         baseHref={baseHref}

@@ -17,7 +17,10 @@ that the event has no value for that field.
 For a user or organization that still exists, the entry can show its **current**
 name, email, or slug. These details may have changed since the event. If the
 current record cannot be found, use the ID; the screen does not infer a
-historical name or deletion reason. Copy icons appear beside safe IDs. The
+historical name or deletion reason. Select a current user's or organization's
+name to open its detail page. A return link leads back to the filtered Audit
+view, and browser Back restores the clicked result and scroll position when
+that result is still present. Copy icons appear beside safe IDs. The
 event's own ID identifies its audit record and can be copied for a support or
 investigation reference; the screen has no event-ID search field.
 
@@ -45,8 +48,10 @@ over event contents.
 
 ## Choose the time zone and range
 
-The time-zone switch above the filters applies to every date and time on the
-screen. It starts at **UTC**; **Local time** uses your browser's time zone and
+The selected date range stays visible above the filters, including when the
+filter form is collapsed on a narrow screen. The time-zone switch above the
+filters applies to every date and time on the screen. It starts at **UTC**;
+**Local time** uses your browser's time zone and
 shows its current UTC offset. Switching zones changes how the same interval
 is displayed, not which events belong to it.
 
@@ -66,7 +71,10 @@ views** reveals events created by Audit browsing; those events are hidden by
 default, but every successful read is still recorded, even when no entries
 match. Empty intervals, unmatched filters, invalid page cursors, and service
 failures have distinct messages. An invalid cursor offers a restart with the
-same filters.
+same filters. No matching events means none in the selected range and filters;
+it does not rule out activity outside that interval. Links from user and
+organization detail pages use the last 31 days; choose an earlier interval to
+look further back.
 
 The URL contains exact filter IDs and the page cursor, but current-name lookup
 text stays out of it. Handle bookmarked or shared URLs accordingly. The
