@@ -36,3 +36,8 @@ test('register page has no axe violations', async ({ page }) => {
   await page.goto('/en/register')
   await expectNoAxeViolations(page)
 })
+
+test('reset password form has no axe violations', async ({ page }) => {
+  await page.goto(`/en/reset-password?token=${'a'.repeat(64)}`)
+  await expectNoAxeViolations(page)
+})

@@ -45,13 +45,13 @@ function outputs(locale) {
   return new Map(E2E_UI_SURFACES.map((surface) => [surface.path, apply(surface, locale)]))
 }
 
-test('AST-aware inventory fixes the bounded 59-expectation denominator', () => {
+test('AST-aware inventory fixes the bounded 60-expectation denominator', () => {
   const count = E2E_UI_SURFACES.reduce((total, surface) => {
     const model = parseStructuralModel(surface.path, source(surface.path))
     return total + e2eUiExpectationInventory(model, surface.namespaces).count
   }, 0)
   assert.equal(count, E2E_UI_EXPECTATION_DENOMINATOR)
-  assert.equal(count, 59)
+  assert.equal(count, 60)
 })
 
 test('EN is byte-identical and RU has only concrete selected-catalogue expectations', () => {
