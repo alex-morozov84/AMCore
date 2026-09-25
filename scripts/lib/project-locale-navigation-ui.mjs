@@ -1,6 +1,6 @@
 import ts from 'typescript'
 
-import { findUniqueNode, isVariableStatementNamed } from './path-algebra-ast-query.mjs'
+import { findUniqueNode, isImportOf, isVariableStatementNamed } from './path-algebra-ast-query.mjs'
 import { attachedJSDoc, uniqueFunction, uniqueImport } from './project-locale-ast-helpers.mjs'
 
 function names(node) {
@@ -64,6 +64,11 @@ export function rewriteNavigationAdapter(model, ctx) {
  */
 export function rewritePlainPathnameAdapter(model, ctx) {
   const localeImport = uniqueImport(model, '@/i18n/navigation', ctx)
+  const hasIntl = model.sourceFile.statements.some((node) => isImportOf(node, 'next-intl'))
+  if (!hasIntl) {
+    model.replaceNode(localeImport, "import { usePathname } from 'next/navigation'", ctx)
+    return
+  }
   const intlImport = uniqueImport(model, 'next-intl', ctx)
   model.replaceNode(
     intlImport,
