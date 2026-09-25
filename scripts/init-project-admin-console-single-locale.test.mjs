@@ -35,9 +35,18 @@ function assertSingleLocale(root, locale, { mode = 'path', slug = 'admin' } = {}
       existsSync(path.join(root, 'apps/web/src/shared/lib/admin-console.generated.ts')),
       false
     )
+    assert.equal(existsSync(path.join(root, 'apps/web/src/shared/ui/console-detail')), false)
     return
   }
   assert.equal(existsSync(path.join(root, `apps/web/src/app/${slug}`)), true)
+  for (const entity of ['users', 'organizations']) {
+    assert.equal(
+      existsSync(
+        path.join(root, 'apps/web/src/app', slug, '(protected)', entity, '[id]', 'page.tsx')
+      ),
+      true
+    )
+  }
   const config = readFileSync(
     path.join(root, 'apps/web/src/shared/lib/admin-console.generated.ts'),
     'utf8'

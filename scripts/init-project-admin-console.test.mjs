@@ -45,6 +45,22 @@ describe('init-project --admin-console', () => {
       )
       if (slug) {
         assert.equal(existsSync(path.join(root, 'apps/web/src/app/[locale]', slug)), true)
+        for (const entity of ['users', 'organizations']) {
+          assert.equal(
+            existsSync(
+              path.join(
+                root,
+                'apps/web/src/app/[locale]',
+                slug,
+                '(protected)',
+                entity,
+                '[id]',
+                'page.tsx'
+              )
+            ),
+            true
+          )
+        }
         const config = readFileSync(
           path.join(root, 'apps/web/src/shared/lib/admin-console.generated.ts'),
           'utf8'
@@ -66,6 +82,13 @@ describe('init-project --admin-console', () => {
     const ownedPaths = removableConsolePaths(root)
     applyProject(root, ['--admin-console=disabled'])
     for (const rel of ownedPaths) {
+      assert.equal(existsSync(path.join(root, rel)), false, rel)
+    }
+    for (const rel of [
+      'apps/web/src/features/console-user-role',
+      'apps/web/src/shared/ui/console-detail',
+      'apps/web/src/shared/lib/console-detail-url.ts',
+    ]) {
       assert.equal(existsSync(path.join(root, rel)), false, rel)
     }
     assert.equal(existsSync(path.join(root, 'apps/web/src/features/console-discovery')), false)
