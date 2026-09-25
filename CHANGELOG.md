@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Password requirements guidance.** Registration and password-reset forms now
+  show the existing length, uppercase Latin letter, and digit requirements
+  below the password field in English and Russian before submission.
+
 - **Console-independent search primitives.** Adds a controlled, accessible
   `SearchField` and an authoritative-state-aware debounced draft controller
   for reuse by downstream URL-backed discovery screens even when the optional

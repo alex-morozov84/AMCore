@@ -7,7 +7,15 @@ import { useLocalizedForm } from '@/shared/hooks'
 import { cn } from '@/shared/lib/utils'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button, buttonVariants } from '@/shared/ui/button'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/shared/ui/form'
 import { Input } from '@/shared/ui/input'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
@@ -83,6 +91,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
               <FormControl>
                 <Input type="password" {...field} />
               </FormControl>
+              <FormDescription>{t('passwordRequirements')}</FormDescription>
               <FormMessage />
             </FormItem>
           )}

@@ -39,11 +39,16 @@ curl -X POST https://api.amcore.dev/api/v1/auth/register \
   -H "Accept-Language: en" \
   -d '{
     "email": "alex@example.com",
-    "password": "my-secure-password",
+    "password": "ExamplePassword1",
     "name": "Alex",
     "locale": "en"
   }'
 ```
+
+Registration passwords need at least 8 characters, one uppercase Latin letter
+(`A–Z`), and one digit (`0–9`). The `/en/register` and `/ru/register` forms
+show these requirements below the password field before submission. The same
+rule applies when setting a new password through the reset endpoint below.
 
 `locale` is optional (`en` or `ru`). It sets the new user's interface/email
 language with this precedence:
@@ -99,7 +104,7 @@ curl -X POST https://api.amcore.dev/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "alex@example.com",
-    "password": "my-secure-password"
+    "password": "ExamplePassword1"
   }'
 ```
 
@@ -210,7 +215,7 @@ curl -X POST https://api.amcore.dev/api/v1/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{
     "token": "a3f8b2...",
-    "password": "my-new-secure-password"
+    "password": "NewExamplePassword1"
   }'
 ```
 

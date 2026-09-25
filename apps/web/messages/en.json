@@ -292,6 +292,7 @@
     "register": "Sign up",
     "email": "Email",
     "password": "Password",
+    "passwordRequirements": "Use at least 8 characters, including one uppercase Latin letter (A–Z) and one digit (0–9).",
     "name": "Name",
     "namePlaceholder": "Jane Doe",
     "forgotPassword": "Forgot your password?",

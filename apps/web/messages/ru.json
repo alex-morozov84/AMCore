@@ -292,6 +292,7 @@
     "register": "Регистрация",
     "email": "Email",
     "password": "Пароль",
+    "passwordRequirements": "Используйте не менее 8 символов, включая одну заглавную латинскую букву (A–Z) и одну цифру (0–9).",
     "name": "Имя",
     "namePlaceholder": "Иван Иванов",
     "forgotPassword": "Забыли пароль?",
