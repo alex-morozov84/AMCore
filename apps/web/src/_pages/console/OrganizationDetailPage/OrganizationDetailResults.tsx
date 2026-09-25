@@ -75,38 +75,39 @@ export async function OrganizationDetailResults({
           label={t('searchMembers')}
           placeholder={t('searchPlaceholder')}
           clearLabel={t('clearSearch')}
-        />
-        {memberCount === 0 ? (
-          <p className="rounded-lg border border-border p-4 text-muted-foreground">
-            {t('noMembers')}
-          </p>
-        ) : members.total === 0 ? (
-          <p className="rounded-lg border border-border p-4 text-muted-foreground">
-            {t('noMatches')}
-          </p>
-        ) : page > totalPages ? (
-          <p role="alert" className="rounded-lg border border-border p-4">
-            {t('outOfRange')}{' '}
-            <RouteProgressLink
-              prefetch={false}
-              href={detailPageHref(base, 1, returnTo ?? undefined, search)}
-              className="underline"
-            >
-              {t('firstPage')}
-            </RouteProgressLink>
-          </p>
-        ) : (
-          <>
-            <OrganizationMembers rows={members.data} />
-            <DetailPager
-              base={base}
-              page={page}
-              totalPages={totalPages}
-              returnTo={returnTo ?? undefined}
-              search={search}
-            />
-          </>
-        )}
+        >
+          {memberCount === 0 ? (
+            <p className="rounded-lg border border-border p-4 text-muted-foreground">
+              {t('noMembers')}
+            </p>
+          ) : members.total === 0 ? (
+            <p className="rounded-lg border border-border p-4 text-muted-foreground">
+              {t('noMatches')}
+            </p>
+          ) : page > totalPages ? (
+            <p role="alert" className="rounded-lg border border-border p-4">
+              {t('outOfRange')}{' '}
+              <RouteProgressLink
+                prefetch={false}
+                href={detailPageHref(base, 1, returnTo ?? undefined, search)}
+                className="underline"
+              >
+                {t('firstPage')}
+              </RouteProgressLink>
+            </p>
+          ) : (
+            <>
+              <OrganizationMembers rows={members.data} />
+              <DetailPager
+                base={base}
+                page={page}
+                totalPages={totalPages}
+                returnTo={returnTo ?? undefined}
+                search={search}
+              />
+            </>
+          )}
+        </DetailRelationSearch>
       </section>
       <nav aria-label={t('auditOrganization')} className="space-y-2">
         <RouteProgressLink

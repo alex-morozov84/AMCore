@@ -108,38 +108,39 @@ export async function UserDetailResults({
           label={t('searchOrganizations')}
           placeholder={t('searchOrganizationsPlaceholder')}
           clearLabel={t('clearOrganizationsSearch')}
-        />
-        {membershipCount === 0 ? (
-          <p className="rounded-lg border border-border p-4 text-muted-foreground">
-            {t('noMemberships')}
-          </p>
-        ) : memberships.total === 0 ? (
-          <p className="rounded-lg border border-border p-4 text-muted-foreground">
-            {t('noOrganizationMatches')}
-          </p>
-        ) : page > totalPages ? (
-          <p role="alert" className="rounded-lg border border-border p-4">
-            {t('outOfRange')}{' '}
-            <RouteProgressLink
-              prefetch={false}
-              href={detailPageHref(base, 1, returnTo ?? undefined, search)}
-              className="underline"
-            >
-              {t('firstPage')}
-            </RouteProgressLink>
-          </p>
-        ) : (
-          <>
-            <UserMemberships rows={memberships.data} />
-            <DetailPager
-              base={base}
-              page={page}
-              totalPages={totalPages}
-              returnTo={returnTo ?? undefined}
-              search={search}
-            />
-          </>
-        )}
+        >
+          {membershipCount === 0 ? (
+            <p className="rounded-lg border border-border p-4 text-muted-foreground">
+              {t('noMemberships')}
+            </p>
+          ) : memberships.total === 0 ? (
+            <p className="rounded-lg border border-border p-4 text-muted-foreground">
+              {t('noOrganizationMatches')}
+            </p>
+          ) : page > totalPages ? (
+            <p role="alert" className="rounded-lg border border-border p-4">
+              {t('outOfRange')}{' '}
+              <RouteProgressLink
+                prefetch={false}
+                href={detailPageHref(base, 1, returnTo ?? undefined, search)}
+                className="underline"
+              >
+                {t('firstPage')}
+              </RouteProgressLink>
+            </p>
+          ) : (
+            <>
+              <UserMemberships rows={memberships.data} />
+              <DetailPager
+                base={base}
+                page={page}
+                totalPages={totalPages}
+                returnTo={returnTo ?? undefined}
+                search={search}
+              />
+            </>
+          )}
+        </DetailRelationSearch>
       </section>
       <nav aria-label={tConsole('auditTitle')} className="space-y-2">
         <div className="flex flex-wrap gap-4 text-sm">

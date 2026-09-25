@@ -24,22 +24,31 @@ export function DetailResultsSkeleton({ searchable = false }: { searchable?: boo
       <section className="space-y-4">
         <Skeleton className="h-6 w-44" />
         {searchable && <Skeleton className="h-9 w-full" />}
-        <div className="hidden rounded-lg border border-border p-4 sm:block">
-          <Skeleton className="mb-4 h-5 w-full" />
-          {ROWS.map((row) => (
-            <Skeleton key={row} className="my-3 h-10 w-full" />
-          ))}
-        </div>
-        <div className="space-y-3 sm:hidden">
-          {ROWS.map((row) => (
-            <div key={row} className="space-y-2 rounded-lg border border-border p-4">
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-32" />
-            </div>
-          ))}
-        </div>
+        <DetailRelationRowsSkeleton />
       </section>
+    </div>
+  )
+}
+
+/** The list portion can also replace stale rows while a search or page loads. */
+export function DetailRelationRowsSkeleton() {
+  return (
+    <div aria-busy="true">
+      <div className="hidden rounded-lg border border-border p-4 sm:block">
+        <Skeleton className="mb-4 h-5 w-full" />
+        {ROWS.map((row) => (
+          <Skeleton key={row} className="my-3 h-10 w-full" />
+        ))}
+      </div>
+      <div className="space-y-3 sm:hidden">
+        {ROWS.map((row) => (
+          <div key={row} className="space-y-2 rounded-lg border border-border p-4">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

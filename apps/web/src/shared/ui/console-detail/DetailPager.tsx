@@ -3,7 +3,8 @@ import { getTranslations } from 'next-intl/server'
 import { detailPageHref } from '@/shared/lib/console-detail-url'
 import { cn } from '@/shared/lib/utils'
 import { buttonVariants } from '@/shared/ui/button'
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
+
+import { DetailRelationNavigationLink } from './DetailRelationSearch'
 
 export async function DetailPager({
   base,
@@ -27,13 +28,12 @@ export async function DetailPager({
       className="flex items-center justify-between gap-3 text-sm"
     >
       {page > 1 ? (
-        <RouteProgressLink
-          prefetch={false}
+        <DetailRelationNavigationLink
           href={link(page - 1)}
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
         >
           {t('paginationPrevious')}
-        </RouteProgressLink>
+        </DetailRelationNavigationLink>
       ) : (
         <span />
       )}
@@ -41,13 +41,12 @@ export async function DetailPager({
         {t('paginationStatus', { page, totalPages })}
       </span>
       {page < totalPages ? (
-        <RouteProgressLink
-          prefetch={false}
+        <DetailRelationNavigationLink
           href={link(page + 1)}
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
         >
           {t('paginationNext')}
-        </RouteProgressLink>
+        </DetailRelationNavigationLink>
       ) : (
         <span />
       )}
