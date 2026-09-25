@@ -164,6 +164,10 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    use the same debounced search field for organizations/members, and supply
    matching cold-page and relation-refresh skeletons. Their links from Users,
    Organizations and Audit carry a bounded same-Console return location.
+   Their relation search sits within the detail results boundary so it appears
+   only after the entity is found; the running-page check must confirm that a
+   search navigation preserves its draft and focus. This differs from the
+   inventory pages, whose search boxes stay outside the results boundary.
    Identity links save the clicked row and scroll position for same-tab return;
    restore only after fresh list/Audit results render. Modified clicks and
    direct bookmarks retain normal navigation. Detail-to-Audit links choose an
