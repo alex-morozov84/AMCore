@@ -369,7 +369,7 @@ prerequisite, then make one observable run of the affected check.
 | --------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `pnpm --filter web test`                | Unit + component + integration tests (watch mode)                                            |
 | `pnpm --filter web test:run`            | Same, single run                                                                             |
-| `pnpm --filter web test:coverage`       | Same, with a coverage report (informational, no gate)                                        |
+| `pnpm --filter web test:coverage`       | Unit-project run with a V8 coverage report (informational, no gate)                          |
 | `pnpm --filter web test:integration`    | Testcontainers-backed real-Redis tests (needs Docker)                                        |
 | `pnpm --filter web storybook`           | Storybook component workshop dev server (`http://localhost:6006`)                            |
 | `pnpm --filter web build-storybook`     | Static Storybook build — compile/broken-story smoke                                          |
@@ -377,6 +377,13 @@ prerequisite, then make one observable run of the affected check.
 | `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked lanes (auto-starts `next dev`)                             |
 | `pnpm --filter web test:e2e:real-stack` | Playwright real-stack lane — boot `docker compose --profile local-infra up -d --build` first |
 | `pnpm test:console-session-e2e`         | Isolated Compose + Playwright console HTTPS/cookie/Redis audience lane                       |
+
+On a clean checkout, run `pnpm --filter @amcore/shared build` before the
+direct web coverage command so Vitest can resolve the shared package. The
+coverage run prints a summary of statements, branches, functions and lines;
+open `apps/web/coverage/index.html` for file-level detail or read
+`apps/web/coverage/coverage-final.json` with a tool. These reports are
+informational: no percentage threshold determines whether the command passes.
 
 On a clean checkout, run `pnpm --filter @amcore/shared build` before either
 Playwright command. `apps/web` imports `@amcore/shared` through its built

@@ -111,8 +111,19 @@ describe('init-project --storybook=disabled (end-to-end against a real-repo copy
     assert.equal(existsSync(path.join(copy.root, 'apps/web/.storybook')), false)
     assert.deepEqual(globSync('apps/web/src/**/*.stories.tsx', { cwd: copy.root }), [])
 
-    const packageJson = readFileSync(path.join(copy.root, 'apps/web/package.json'), 'utf8')
-    assert.doesNotMatch(packageJson, /storybook/i)
+    const packageJson = JSON.parse(
+      readFileSync(path.join(copy.root, 'apps/web/package.json'), 'utf8')
+    )
+    assert.doesNotMatch(JSON.stringify(packageJson), /storybook/i)
+    assert.equal(packageJson.scripts['test:coverage'], 'vitest run --project=unit --coverage')
+    assert.equal(
+      packageJson.devDependencies['@vitest/coverage-v8'],
+      packageJson.devDependencies.vitest.replace(/^\^/, '')
+    )
+
+    const vitestConfig = readFileSync(path.join(copy.root, 'apps/web/vitest.config.ts'), 'utf8')
+    assert.match(vitestConfig, /name: 'unit'/)
+    assert.match(vitestConfig, /provider: 'v8'/)
 
     const context = readFileSync(path.join(copy.root, 'PROJECT_CONTEXT.md'), 'utf8')
     assert.match(context, /- \*\*frontend_storybook:\*\* disabled/)
