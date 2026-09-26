@@ -40,11 +40,11 @@ test('path-mode client navigation removes console chrome after a live denial', a
   await page.goto('/en/admin/users')
   await expect(page.getByRole('heading', { name: /users/i })).toBeVisible()
 
-  await page.getByRole('link', { name: /overview/i }).click()
+  await page.getByRole('link', { name: 'Overview', exact: true }).click()
   await expect(page).toHaveURL(/\/en\/admin\/?$/)
   setSystemRole(email, 'USER')
 
-  await page.getByRole('link', { name: /users/i }).click()
+  await page.getByRole('link', { name: 'Users', exact: true }).click()
   await expect(page.getByRole('heading', { name: /404|not found/i })).toBeVisible()
   await expect(page.getByRole('heading', { name: /users/i })).toHaveCount(0)
   await expect(page.locator('[data-console-shell="title"]')).toHaveCount(0)
@@ -63,7 +63,7 @@ test('path-mode client navigation retains the collapsed sidebar preference', asy
     .click()
   await expect(sidebar).toHaveAttribute('data-state', 'collapsed')
 
-  await page.getByRole('link', { name: /overview/i }).click()
+  await page.getByRole('link', { name: 'Overview', exact: true }).click()
   await expect(page).toHaveURL(/\/en\/admin\/?$/)
   await expect(page.locator('[data-slot="sidebar"]').first()).toHaveAttribute(
     'data-state',

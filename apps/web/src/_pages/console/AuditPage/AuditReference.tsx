@@ -71,7 +71,7 @@ export function AuditReference({
     <ConsoleContextLink
       href={detailHref}
       detailKey={detailKey}
-      className="underline-offset-2 hover:underline focus-visible:underline"
+      className="inline-flex min-h-6 items-center underline-offset-2 hover:underline focus-visible:underline"
     >
       {display}
     </ConsoleContextLink>
