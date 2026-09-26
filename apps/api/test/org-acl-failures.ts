@@ -42,6 +42,14 @@ export function aclFailureCases(fixture: () => AclFixture): void {
     }
     expect(armed).toBe(false)
     expect(await f.version()).toBe(old)
+    expect(
+      await f.prisma.memberRole.count({
+        where: {
+          roleId: f.role.id,
+          member: { userId: f.target.id, organizationId: f.org.id },
+        },
+      })
+    ).toBe(1)
     await f.read().expect(200)
   })
 

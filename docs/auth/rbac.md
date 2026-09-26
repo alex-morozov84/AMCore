@@ -147,8 +147,8 @@ The org creator automatically becomes its `ADMIN`.
 
 ### Built-in org roles
 
-A role is a named bundle of permissions. Three roles are seeded per org and
-cannot be deleted:
+A role is a named bundle of permissions. Three shared system roles are seeded
+and available to every organization; they cannot be deleted:
 
 | Role     | Permissions                                                                    |
 | -------- | ------------------------------------------------------------------------------ |
@@ -230,8 +230,9 @@ createContact(@Body() dto: CreateContactDto) { ... }
 **Manual check inside a service** — when the decision depends on the loaded row:
 
 ```typescript
-const ability = await this.abilityFactory.createForUser(userId, orgId)
-if (!ability.can('update', subject('Contact', { assignedToId: userId }))) {
+// principal is the authenticated RequestPrincipal supplied to the service.
+const ability = await this.abilityFactory.createForUser(principal)
+if (!ability.can('update', subject('Contact', { assignedToId: principal.sub }))) {
   throw new ForbiddenException()
 }
 ```
@@ -296,9 +297,10 @@ sees only their own — with zero branching in the service.
 
 ## Freshness & caching
 
-Every org-scoped JWT authorization reads the current organization `aclVersion`
-from the **primary database**, even when the permission payload is cached. API
-keys already read the current version during live membership admission.
+JWT authorization that uses organization permissions reads the current
+organization `aclVersion` from the **primary database**, even when the permission
+payload is cached. The `SUPER_ADMIN` bypass and personal ability remain unchanged.
+API keys already read the current version during live membership admission.
 
 ```
 Permissions cache key: auth:perm:v2:{orgId}:{userId}:{aclVersion}
@@ -331,19 +333,21 @@ ACL mutation commits. Old `auth:org:aclv:v1:{orgId}` Redis values are ignored.
 
 ### Failures and extension rules
 
-A missing organization fails with `404`; database failures propagate through the
-existing exception filter (`503` for recognized availability errors, `500` for
-unexpected failures). No cached version or JWT version is used on failure. A
-permission Redis read, lock or publication error also fails authorization; a
-completed database load alone is not an availability fallback. Existing shared
-Redis reconnect/queue behavior is unchanged, so this does not promise a bounded
+For JWT authorization using organization permissions, a missing organization
+fails with `404`; an API key fails live membership admission with `401`.
+Database failures propagate through the existing exception filter (`503` for
+recognized availability errors, `500` for unexpected failures). No cached
+version or JWT version is used on failure. A permission Redis read, lock or
+publication error also fails authorization; a completed database load alone is
+not an availability fallback. Existing shared Redis reconnect/queue behavior is
+unchanged, so this does not promise a bounded
 response time during every outage. No new authorization retry is introduced.
 
 When adding an ACL mutation, call `bumpAclVersionTx(orgId, tx)` inside the same
 transaction as the write. A standalone bump is insufficient for an ACL write.
-For shared system-role or permission-template changes, bump **every affected
-organization** transactionally. Raw SQL, migrations and external writers must
-honor the same rule; metadata-only changes that do not alter effective rules
+For shared organization system-role or permission-template changes, bump
+**every affected organization** transactionally. Raw SQL, migrations and external
+writers must honor the same rule; metadata-only changes that do not alter effective rules
 need no bump. Do not rely on post-commit invalidation for correctness.
 
 ### Deployment and rollback
@@ -363,8 +367,11 @@ warm org-scoped JWT authorization now requires a database round-trip.
 
 ## Managing roles, permissions & members
 
-All management routes require an org-context JWT (call `/switch` first) and the
-`ADMIN` role. See `/docs` for exact shapes; the semantics that matter:
+Role, permission and member management require matching organization context and
+`manage:Organization` permission. For JWTs, call `/switch` first. An `ADMIN` has
+this permission; a custom role can grant it too. Supported API keys use their
+bound organization and must also have a scope permitting the operation. See
+`/docs` for each route's credentials and exact shapes; the semantics that matter:
 
 - **Roles list** is paginated and ordered `isSystem DESC, name ASC` so system
   roles head the list.

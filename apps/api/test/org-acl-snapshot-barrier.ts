@@ -23,18 +23,22 @@ export function snapshotBarrier(prisma: PrismaService): ReturnType<typeof deferr
     return (async () => {
       const client = await connect()
       const query = client.query.bind(client)
+      const statements: string[] = []
+      let reader = false
       const wrapped = async (...args: unknown[]): Promise<QueryResult> => {
         const config = args[0] as string | { text: string }
         const text = typeof config === 'string' ? config : config.text
         const result = (await Reflect.apply(query, client, args)) as QueryResult
+        statements.push(text)
         if (armed && /SET TRANSACTION ISOLATION LEVEL REPEATABLE READ/i.test(text)) {
           armed = false
+          reader = true
           const show = await query('SHOW transaction_isolation')
           isolation = show.rows[0].transaction_isolation as string
           await query('SELECT 1')
-          sql.push(text, 'SHOW transaction_isolation', 'SELECT 1')
+          sql.push(...statements, 'SHOW transaction_isolation', 'SELECT 1')
           await gate.pause()
-        } else if (!armed) {
+        } else if (reader) {
           sql.push(text)
         }
         return result

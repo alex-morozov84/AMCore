@@ -108,7 +108,7 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
       expect(await f.version()).toBe(old + 1)
     } finally {
       gate.release()
-      await reader
+      expect([200, 403]).toContain(await reader)
     }
     await f.read().expect(403)
   })
@@ -129,11 +129,13 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
         .http('post', `${f.base}/roles/${f.role.id}/permissions`)
         .send({ action: 'delete', subject: 'User' })
         .expect(201)
+      expect(await f.version()).toBe(old + 2)
       barrier.release()
       const rules = await reader
       expect(barrier.getIsolation()).toBe('repeatable read')
       expect(rules.some((p) => p.action === 'manage')).toBe(true)
       expect(rules.some((p) => p.action === 'delete' && p.subject === 'User')).toBe(false)
+      expect(barrier.sql[0]).toBe('BEGIN')
       expect(barrier.sql.some((sql) => /org_members/.test(sql))).toBe(true)
       expect(barrier.sql.some((sql) => /COMMIT/.test(sql))).toBe(true)
     } finally {
@@ -182,12 +184,23 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
     await f.grant()
     await f.assign()
     await f.read().expect(200)
+    const created = await f
+      .http('post', '/api-keys')
+      .send({
+        name: 'Deletion fixture key',
+        organizationId: f.org.id,
+        scopes: ['manage:Organization'],
+      })
+      .expect(201)
+    const key = created.body.key as string
+    await f.http('get', `${f.base}/roles`, key).expect(200)
     const v = await f.version()
     await f.http('delete', `${f.base}/members/${f.target.id}`).expect(204)
     expect(await f.version()).toBe(v + 1)
     await f.read().expect(403)
     await f.http('delete', f.base).expect(204)
     await f.read().expect(404)
+    await f.http('get', `${f.base}/roles`, key).expect(401)
   })
 
   it('actual invitation acceptance/rejoin invalidates cached empty permissions', async () => {
