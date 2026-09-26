@@ -61,6 +61,7 @@ export const E2E_UI_SURFACES = Object.freeze([
   surface('apps/web/e2e/real-stack/app-shell.spec.ts', ['nav', 'sessions'], 5),
   surface('apps/web/e2e/real-stack/auth-email-link-flows.spec.ts', ['auth', 'errors'], 16),
   surface('apps/web/e2e/real-stack/csp-nonce.spec.ts', ['nav'], 1),
+  surface('apps/web/e2e/real-stack/credential-containment.spec.ts', ['auth'], 1),
   surface('apps/web/e2e/real-stack/login.spec.ts', ['auth', 'dashboard'], 2),
   surface('apps/web/e2e/real-stack/register-and-logout.spec.ts', ['auth', 'dashboard'], 2),
   surface('apps/web/e2e/real-stack/sessions.spec.ts', ['sessions'], 5),

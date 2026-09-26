@@ -37,6 +37,7 @@ const e2eVerification = [
   'apps/web/e2e/real-stack/app-shell.spec.ts',
   'apps/web/e2e/real-stack/auth-email-link-flows.spec.ts',
   'apps/web/e2e/real-stack/csp-nonce.spec.ts',
+  'apps/web/e2e/real-stack/credential-containment.spec.ts',
   'apps/web/e2e/real-stack/helpers.ts',
   'apps/web/e2e/real-stack/login.spec.ts',
   'apps/web/e2e/real-stack/register-and-logout.spec.ts',

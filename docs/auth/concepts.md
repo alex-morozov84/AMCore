@@ -68,8 +68,8 @@ This is `apps/api`'s own contract, for a direct API consumer (mobile app,
 script, or a custom frontend talking to the backend itself). The bundled
 `apps/web` frontend does **not** work this way — see
 [README → The 30-second mental model](./README.md#the-30-second-mental-model)
-for why: the browser there never holds either token, only an opaque BFF
-session cookie.
+for why: the browser uses an opaque BFF session cookie; backend tokens stay
+server-side apart from the documented temporary HttpOnly OAuth handoff.
 
 ```
 LOGIN

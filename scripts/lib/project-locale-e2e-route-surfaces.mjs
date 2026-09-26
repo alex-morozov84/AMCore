@@ -17,6 +17,7 @@ export const E2E_ROUTE_SURFACES = [
   ['apps/web/e2e/real-stack/app-shell.spec.ts', 3],
   ['apps/web/e2e/real-stack/auth-email-link-flows.spec.ts', 12],
   ['apps/web/e2e/real-stack/csp-nonce.spec.ts', 5],
+  ['apps/web/e2e/real-stack/credential-containment.spec.ts', 3],
   ['apps/web/e2e/real-stack/helpers.ts', 2],
   ['apps/web/e2e/real-stack/login.spec.ts', 3],
   ['apps/web/e2e/real-stack/register-and-logout.spec.ts', 2],
