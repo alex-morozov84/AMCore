@@ -183,5 +183,5 @@ vars are set.
 | Apple    | `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APPLE_CALLBACK_URL` |
 | Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CALLBACK_URL`                                                 |
 
-RBAC-specific tuning (`RBAC_ACLV_CACHE_TTL_MS`, Bull Board flags) is documented
-where it applies — see [RBAC](./rbac.md#freshness--caching).
+`RBAC_ACLV_CACHE_TTL_MS` is deprecated and ignored (default `0`; nonnegative
+integers still validate). See [RBAC freshness and deployment](./rbac.md#freshness--caching).

@@ -36,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in light/dark themes, including hover; Console operator initials use a
   readable foreground on their accent background.
 
+### Security
+
+- **Organization permission freshness.** Authorization reads the primary ACL
+  version and loads permission misses in a coherent database snapshot, preventing
+  stale version refills after role removal. Existing JWTs observe committed changes
+  on their next authorization lookup. Upgrade and drain all API instances before
+  relying on this guarantee; rollback restores the previous cache limitations.
+  `RBAC_ACLV_CACHE_TTL_MS` is deprecated and ignored.
+
 ## [0.10.0] - 2026-09-26
 
 ### Security

@@ -76,6 +76,30 @@ describe('AuthenticationGuard', () => {
     )
   })
 
+  it('propagates authority lookup failure without attaching ability or running policies', async () => {
+    const failure = new Error('primary unavailable')
+    const createForUser = jest.fn().mockRejectedValue(failure)
+    const policies = { canActivate: jest.fn() }
+    const request = { user: { sub: 'actor' }, ability: undefined }
+    const context = {
+      ...createContext(),
+      switchToHttp: () => ({ getRequest: () => request }),
+    } as unknown as ExecutionContext
+    jwtAuthGuard.canActivate.mockResolvedValue(true)
+    const candidate = new AuthenticationGuard(
+      reflector as unknown as Reflector,
+      jwtAuthGuard as unknown as JwtAuthGuard,
+      apiKeyGuard as unknown as ApiKeyGuard,
+      { createForUser } as unknown as AbilityFactory,
+      { canActivate: jest.fn() } as unknown as SystemRolesGuard,
+      policies as unknown as PoliciesGuard
+    )
+    await expect(candidate.canActivate(context)).rejects.toBe(failure)
+    expect(request.ability).toBeUndefined()
+    expect(policies.canActivate).not.toHaveBeenCalled()
+    expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+  })
+
   describe('AK-11: decision-class failures swallowed, infra propagates', () => {
     it('JWT throws UnauthorizedException → swallowed, chain falls through to ApiKey', async () => {
       jwtAuthGuard.canActivate.mockRejectedValueOnce(new HttpException('expired', 401))
