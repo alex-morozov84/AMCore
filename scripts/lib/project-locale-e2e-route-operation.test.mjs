@@ -50,7 +50,7 @@ function outputs(locale) {
   )
 }
 
-test('token-aware source inventory has the approved 105-reference denominator', () => {
+test('token-aware source inventory has the approved 108-reference denominator', () => {
   const retained = surfaces.reduce(
     (total, [pathname]) =>
       total + routeReferenceInventory(parseStructuralModel(pathname, source(pathname))).count,
@@ -62,7 +62,7 @@ test('token-aware source inventory has the approved 105-reference denominator', 
     0
   )
   assert.equal(retained + deleted, E2E_ROUTE_DENOMINATOR)
-  assert.equal(E2E_ROUTE_DENOMINATOR, 105)
+  assert.equal(E2E_ROUTE_DENOMINATOR, 108)
 })
 
 test('EN and RU retain shared verification with identical prefixless topology', () => {
@@ -83,6 +83,12 @@ test('root navigation assertions remain exact after removing the locale segment'
     const consoleSession = projected.get(
       'apps/web/e2e/console-real-stack/session-isolation.spec.ts'
     )
+    const containment = projected.get('apps/web/e2e/real-stack/credential-containment.spec.ts')
+    assert.equal([...containment.matchAll(/toHaveURL\('\/'\)/g)].length, 2)
+    assert.match(containment, /toHaveURL\(\/\\\/login\/\)/)
+    assert.equal([...containment.matchAll(/^test\(/gm)].length, 4)
+    assert.match(containment, /from '\.\/credential-containment\.helpers'/)
+    assert.doesNotMatch(containment, /test\.skip/)
     assert.match(sessions, /toHaveURL\('\/'\)/)
     assert.doesNotMatch(sessions, /toHaveURL\(\/\\\/\?\$\/\)/)
     assert.match(consoleSession, /toHaveURL\('https:\/\/app\.localhost\/'\)/)
