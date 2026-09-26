@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+
 import { resolveTrustedWebPeers } from '../src/common/utils/trusted-web-peer'
 import { AuditLogService } from '../src/core/audit'
 import { sessionCoordinationLockKey } from '../src/core/auth/session-lock-key'
@@ -126,11 +128,21 @@ describe('Admin sessions (e2e)', () => {
         })
         expect(rotated.id).not.toBe(previous.id)
         for (const [header, city] of [
-          ['ru', 'Лондон'],
-          ['en', 'London'],
-          ['xx', 'London'],
-          ['@@', 'London'],
-          ['', 'London'],
+          [
+            'ru',
+            (SUPPORTED_LOCALES as readonly string[]).includes('ru')
+              ? 'Лондон'
+              : { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE],
+          ],
+          [
+            'en',
+            (SUPPORTED_LOCALES as readonly string[]).includes('en')
+              ? 'London'
+              : { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE],
+          ],
+          ['xx', { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE]],
+          ['@@', { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE]],
+          ['', { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE]],
         ]) {
           const adminList = await request(app.getHttpServer())
             .get(`/admin/users/${userId}/sessions`)
@@ -168,7 +180,7 @@ describe('Admin sessions (e2e)', () => {
       const row = await prisma.session.findFirstOrThrow({ where: { userId: target.body.user.id } })
       expect(row.userAgent).toBeNull()
       expect(row.ipAddress).not.toBe('81.2.69.142')
-      expect(app.get(GeoIpService).resolve(row.ipAddress, 'en')).toBeNull()
+      expect(app.get(GeoIpService).resolve(row.ipAddress, DEFAULT_LOCALE)).toBeNull()
     })
   })
 

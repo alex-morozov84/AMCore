@@ -1,10 +1,11 @@
 # GeoIP Setup
 
 AMCore optionally resolves an approximate city/country for a session's stored
-IP address, shown on the Operations Console's user Sessions panel and the
-product's own Settings → Sessions page (see
-[Operations Console → Users § Manage sessions](../operations-console/users.md#manage-sessions)
-and [Sessions § Listing active sessions](../auth/sessions.md#listing-active-sessions)).
+IP address, shown on the product's own Settings → Sessions page (see
+[Sessions § Listing active sessions](../auth/sessions.md#listing-active-sessions)).
+
+The optional Console's user Sessions panel also shows this information; see
+[Operations Console → Users § Manage sessions](../operations-console/users.md#manage-sessions).
 It is enabled by default and always degrades gracefully: auth, session
 listing, and session revocation all work whether or not a database is
 configured, loaded, or current.
@@ -14,8 +15,8 @@ configured, loaded, or current.
 - **Provider:** [DB-IP City Lite](https://db-ip.com/db/lite.php) — a free,
   monthly-updated `.mmdb` file in the standard MaxMind DB binary format,
   licensed CC BY 4.0 (a visible attribution link to db-ip.com is required
-  wherever a resolved location is shown — both Console and Settings already
-  do this).
+  wherever a resolved location is shown — each shipped session view already
+  includes it).
 - **Reader:** the [`maxmind`](https://www.npmjs.com/package/maxmind) npm
   package (MIT), one long-lived reader per API/worker process — never opened
   per request. Every enabled process checks file identity/size/mtime every
@@ -77,7 +78,7 @@ for offline reader tests.
 - **Stale** (no successful update in over 45 days): the last good database
   keeps serving approximate labels rather than being hidden. Accuracy of stale data is not guaranteed. A bounded
   operator-facing warning is logged (`geoip.database_stale`); there is no
-  separate "stale" indicator shown to a Console/Settings viewer.
+  separate "stale" indicator shown to a session viewer.
 
 ## Privacy and scope
 

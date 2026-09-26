@@ -1,5 +1,7 @@
 import type { PinoLogger } from 'nestjs-pino'
 
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+
 import type { EnvService } from '../../env/env.service'
 
 import { GeoIpService } from './geoip.service'
@@ -40,7 +42,7 @@ describe('GeoIpService', () => {
   })
 
   it('resolves to null and does not throw when no reader has ever loaded', () => {
-    expect(service.resolve('203.0.0.1', 'en')).toBeNull()
+    expect(service.resolve('203.0.0.1', DEFAULT_LOCALE)).toBeNull()
     expect(service.currentBuildEpoch()).toBeNull()
   })
 
@@ -48,7 +50,7 @@ describe('GeoIpService', () => {
     openMock.mockRejectedValue(new Error('ENOENT'))
 
     await expect(service.onModuleInit()).resolves.toBeUndefined()
-    expect(service.resolve('203.0.0.1', 'en')).toBeNull()
+    expect(service.resolve('203.0.0.1', DEFAULT_LOCALE)).toBeNull()
   })
 
   it('skips loading entirely when GEOIP_ENABLED is false', async () => {
@@ -76,7 +78,7 @@ describe('GeoIpService', () => {
       openMock.mockRejectedValueOnce(new Error('temporary read failure'))
       openMock.mockResolvedValue(reader)
       await service.checkGeneration()
-      expect(service.resolve('81.2.69.142', 'en')).toEqual(
+      expect(service.resolve('81.2.69.142', DEFAULT_LOCALE)).toEqual(
         previousReader ? { city: 'London', countryCode: 'GB' } : null
       )
       const attempts = openMock.mock.calls.length
@@ -85,7 +87,10 @@ describe('GeoIpService', () => {
       now += 30_000
       await service.checkGeneration()
       expect(openMock).toHaveBeenCalledTimes(attempts + 1)
-      expect(service.resolve('81.2.69.142', 'en')).toEqual({ city: 'London', countryCode: 'GB' })
+      expect(service.resolve('81.2.69.142', DEFAULT_LOCALE)).toEqual({
+        city: 'London',
+        countryCode: 'GB',
+      })
       await service.checkGeneration()
       expect(openMock).toHaveBeenCalledTimes(attempts + 1)
       expect(logger.warn).toHaveBeenCalledTimes(1)
@@ -102,7 +107,7 @@ describe('GeoIpService', () => {
     await service.checkGeneration()
     expect(openMock).toHaveBeenCalledTimes(2)
     expect(logger.warn).toHaveBeenCalledTimes(1)
-    expect(service.resolve('81.2.69.142', 'en')).toBeNull()
+    expect(service.resolve('81.2.69.142', DEFAULT_LOCALE)).toBeNull()
   })
 
   describe('once a reader is loaded', () => {
@@ -121,7 +126,12 @@ describe('GeoIpService', () => {
       )
       await service.reload()
 
-      expect(service.resolve('203.0.0.1', 'ru')).toEqual({ city: 'Берлин', countryCode: 'DE' })
+      for (const locale of SUPPORTED_LOCALES) {
+        expect(service.resolve('203.0.0.1', locale)).toEqual({
+          city: { en: 'Berlin', ru: 'Берлин' }[locale],
+          countryCode: 'DE',
+        })
+      }
       expect(service.currentBuildEpoch()).toEqual(buildEpoch)
     })
 
@@ -131,7 +141,10 @@ describe('GeoIpService', () => {
       )
       await service.reload()
 
-      expect(service.resolve('203.0.0.1', 'ru')).toEqual({ city: 'Berlin', countryCode: 'DE' })
+      expect(service.resolve('203.0.0.1', DEFAULT_LOCALE)).toEqual({
+        city: 'Berlin',
+        countryCode: 'DE',
+      })
     })
 
     it('returns null for a private/reserved address without querying the reader', async () => {
@@ -139,7 +152,7 @@ describe('GeoIpService', () => {
       openMock.mockResolvedValue(fakeReader(get))
       await service.reload()
 
-      expect(service.resolve('10.0.0.5', 'en')).toBeNull()
+      expect(service.resolve('10.0.0.5', DEFAULT_LOCALE)).toBeNull()
       expect(get).not.toHaveBeenCalled()
     })
 
@@ -147,14 +160,14 @@ describe('GeoIpService', () => {
       openMock.mockResolvedValue(fakeReader(() => ({})))
       await service.reload()
 
-      expect(service.resolve(null, 'en')).toBeNull()
+      expect(service.resolve(null, DEFAULT_LOCALE)).toBeNull()
     })
 
     it('returns null when the database has no match for the address', async () => {
       openMock.mockResolvedValue(fakeReader(() => null))
       await service.reload()
 
-      expect(service.resolve('203.0.0.1', 'en')).toBeNull()
+      expect(service.resolve('203.0.0.1', DEFAULT_LOCALE)).toBeNull()
     })
 
     it('returns null when the reader throws (e.g. a corrupt/partial file)', async () => {
@@ -165,7 +178,7 @@ describe('GeoIpService', () => {
       )
       await service.reload()
 
-      expect(service.resolve('203.0.0.1', 'en')).toBeNull()
+      expect(service.resolve('203.0.0.1', DEFAULT_LOCALE)).toBeNull()
     })
   })
 })

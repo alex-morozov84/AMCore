@@ -4,8 +4,6 @@ import { cookies, headers } from 'next/headers'
 import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { getConsoleSessionEntry } from '@/shared/api/console/session'
-
 import { proxyToBackend } from './authenticated-proxy'
 import { getOptionalSessionEntry } from './dal'
 import { fakeVaultEntry } from './dal.test-helpers'
@@ -21,8 +19,6 @@ vi.mock('next-intl/server', () => ({ getLocale: vi.fn() }))
 vi.mock('@/i18n/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('./session-vault-store', () => ({ redisVaultStore: {} }))
 vi.mock('./session-lock', () => ({ redisVaultLock: {} }))
-vi.mock('@/shared/api/console/session-vault-store', () => ({ redisConsoleVaultStore: {} }))
-vi.mock('@/shared/api/console/session-lock', () => ({ redisConsoleVaultLock: {} }))
 // Execute the real request-bound transport handed to the protocol. Protocol's
 // locking/error behavior is covered separately by ensure-fresh-session tests.
 vi.mock('./ensure-fresh-session', () => ({
@@ -31,7 +27,7 @@ vi.mock('./ensure-fresh-session', () => ({
     deps: { upstreamRefresh: (token: string, signal: AbortSignal) => Promise<unknown> }
   ) => {
     await deps.upstreamRefresh('vault-credential', new AbortController().signal)
-    return { ...fakeVaultEntry(), audience: 'console' }
+    return fakeVaultEntry()
   },
 }))
 
@@ -44,7 +40,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-it.each(['product DAL', 'authenticated proxy', 'own sessions', 'console helper'])(
+it.each(['product DAL', 'authenticated proxy', 'own sessions'])(
   '%s refresh supplies current visitor headers',
   async (caller) => {
     const source = new Headers({
@@ -64,8 +60,7 @@ it.each(['product DAL', 'authenticated proxy', 'own sessions', 'console helper']
     const request = new Request('http://web/api/auth/sessions', { headers: source })
     if (caller === 'product DAL') await getOptionalSessionEntry()
     else if (caller === 'authenticated proxy') await proxyToBackend(request, ['users', 'me'])
-    else if (caller === 'own sessions') await handleGetSessions(request)
-    else await getConsoleSessionEntry()
+    else await handleGetSessions(request)
     const refresh = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/auth/refresh'))
     expect(refresh).toBeDefined()
     const forwarded = new Headers((refresh![1] as RequestInit).headers)

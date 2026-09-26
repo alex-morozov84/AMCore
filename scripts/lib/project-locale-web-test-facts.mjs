@@ -1,4 +1,4 @@
-import { localeContent } from './project-locale-fact-helpers.mjs'
+import { localeContent, localeDelete } from './project-locale-fact-helpers.mjs'
 
 const catalogueFixtures = [
   ['apps/web/src/shared/api/error-messages.test.ts', 'errors'],
@@ -16,6 +16,11 @@ const localeSuites = [
 
 export function buildLocaleWebTestFacts(locale) {
   return [
+    localeDelete('apps/web/src/entities/user/api/user-sessions-locale.test.tsx'),
+    localeDelete(
+      'apps/web/src/features/console-user-sessions/model/use-user-sessions.locale.test.tsx'
+    ),
+
     ...catalogueFixtures.map(([pathname, variant]) =>
       localeContent(pathname, 'locale.catalogue-fixture', locale, { variant })
     ),

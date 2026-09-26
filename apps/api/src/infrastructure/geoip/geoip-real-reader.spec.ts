@@ -4,6 +4,8 @@ import { join } from 'node:path'
 
 import type { PinoLogger } from 'nestjs-pino'
 
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+
 import type { EnvService } from '../../env/env.service'
 
 import { GeoIpService } from './geoip.service'
@@ -25,15 +27,26 @@ it('independent readers recover from missing boot, detect atomic generations and
     worker = new GeoIpService(env, logger)
   try {
     await Promise.all([api.onModuleInit(), worker.onModuleInit()])
-    expect(api.resolve('81.2.69.142', 'en')).toBeNull()
+    expect(api.resolve('81.2.69.142', DEFAULT_LOCALE)).toBeNull()
     await copyFile(fixture, join(dir, 'next'))
     await rename(join(dir, 'next'), path)
     await worker.checkGeneration()
-    expect(api.resolve('81.2.69.142', 'en')).toBeNull()
+    expect(api.resolve('81.2.69.142', DEFAULT_LOCALE)).toBeNull()
     await api.checkGeneration()
-    expect(api.resolve('81.2.69.142', 'en')).toEqual({ city: 'London', countryCode: 'GB' })
-    expect(api.resolve('::ffff:81.2.69.142', 'ru')).toEqual({ city: 'Лондон', countryCode: 'GB' })
-    expect(api.resolve('::ffff:5102:458e', 'en')).toEqual({ city: 'London', countryCode: 'GB' })
+    expect(api.resolve('81.2.69.142', DEFAULT_LOCALE)).toEqual({
+      city: { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE],
+      countryCode: 'GB',
+    })
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(api.resolve('::ffff:81.2.69.142', locale)).toEqual({
+        city: { en: 'London', ru: 'Лондон' }[locale],
+        countryCode: 'GB',
+      })
+    }
+    expect(api.resolve('::ffff:5102:458e', DEFAULT_LOCALE)).toEqual({
+      city: { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE],
+      countryCode: 'GB',
+    })
     for (const ip of [
       '::ffff:127.0.0.1',
       '0:0:0:0:0:ffff:7f00:1',
@@ -42,16 +55,19 @@ it('independent readers recover from missing boot, detect atomic generations and
       '2001:db8::1',
       'invalid:ip',
     ]) {
-      expect(api.resolve(ip, 'en')).toBeNull()
+      expect(api.resolve(ip, DEFAULT_LOCALE)).toBeNull()
     }
     const loads = jest.mocked(logger.info).mock.calls.length
-    for (let i = 0; i < 50; i++) api.resolve('81.2.69.142', 'en')
+    for (let i = 0; i < 50; i++) api.resolve('81.2.69.142', DEFAULT_LOCALE)
     await api.checkGeneration()
     expect(jest.mocked(logger.info).mock.calls).toHaveLength(loads)
     await writeFile(join(dir, 'bad'), 'invalid MMDB')
     await rename(join(dir, 'bad'), path)
     await api.checkGeneration()
-    expect(api.resolve('81.2.69.142', 'en')).toEqual({ city: 'London', countryCode: 'GB' })
+    expect(api.resolve('81.2.69.142', DEFAULT_LOCALE)).toEqual({
+      city: { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE],
+      countryCode: 'GB',
+    })
     const warnings = jest.mocked(logger.warn).mock.calls.length
     await api.checkGeneration()
     expect(jest.mocked(logger.warn).mock.calls).toHaveLength(warnings)

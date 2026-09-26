@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 import { GeoIpService } from '../../../src/infrastructure/geoip/geoip.service'
 
 const path = process.argv[2]!
@@ -7,8 +9,10 @@ const service = new GeoIpService(
 )
 void service
   .onModuleInit()
-  .then(() => process.send?.({ ready: true, location: service.resolve('81.2.69.142', 'ru') }))
+  .then(() =>
+    process.send?.({ ready: true, location: service.resolve('81.2.69.142', DEFAULT_LOCALE) })
+  )
 process.on('message', async () => {
   await service.checkGeneration()
-  process.send?.({ location: service.resolve('81.2.69.142', 'ru') })
+  process.send?.({ location: service.resolve('81.2.69.142', DEFAULT_LOCALE) })
 })

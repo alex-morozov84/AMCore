@@ -95,11 +95,14 @@ session vault — safe for a public read even when Redis is down;
 `'optional'`/`'required'` differ only in whether a genuinely logged-out
 caller proceeds anonymously or gets a `BackendAuthRequiredError`).
 `tokenResolver` overrides the product-session token source for a caller
-with its own isolated session domain — today only the Operations Console
-(ADR-081's host/path session split), via `shared/api/console/access-token.ts`'s
-`getConsoleAwareAccessToken`. Omit it for every ordinary product call; the
+with its own isolated session domain. Omit it for every ordinary product call; the
 default resolves the product session exactly as before, and a custom
 resolver never falls back to it, even when it resolves `null`.
+
+The optional Operations Console supplies this override through
+`shared/api/console/access-token.ts`'s `getConsoleAwareAccessToken`
+(ADR-081's host/path session split).
+
 `degradeSecondary()`/`resolvePrimary()` turn a
 `DataOutcome` into what a page actually renders — both are ordinary render
 branches, never a throw: a secondary section degrades silently (logged

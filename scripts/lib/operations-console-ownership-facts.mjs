@@ -11,6 +11,7 @@ const roots = [
   'apps/web/src/features/console-login',
   'apps/web/src/features/console-logout',
   'apps/web/src/features/console-user-role',
+  'apps/web/src/features/console-user-sessions',
   'apps/web/src/shared/api/console',
   'apps/web/src/shared/ui/console-detail',
   'apps/web/src/widgets/console-shell',
@@ -26,6 +27,8 @@ const sharedModules = [
   module('apps/web/src/shared/lib/console-public-api-path.ts', ['console-public-api-path.test.ts']),
   module('apps/web/src/shared/lib/console-public-href.ts', ['console-public-href.test.ts']),
   module('apps/web/src/shared/lib/console-detail-url.ts'),
+  module('apps/web/src/shared/lib/console-step-up-mutation.ts'),
+  module('apps/web/src/shared/ui/console-step-up-dialog.tsx'),
   module('apps/web/src/shared/lib/format-console-date-time.ts'),
   module('apps/web/src/shared/lib/require-super-admin.ts', ['require-super-admin.test.ts']),
 ]
@@ -53,6 +56,7 @@ const verification = [
   'apps/web/e2e/real-stack/admin-overview.spec.ts',
   'apps/web/e2e/real-stack/admin-users.spec.ts',
   'apps/web/e2e/real-stack/admin-users-role-management.spec.ts',
+  'apps/web/e2e/real-stack/admin-sessions.spec.ts',
 ].map((path) => one(path, { tags: ['verification:console'] }))
 
 const sharedModuleTests = sharedModules.flatMap((item) =>
@@ -87,7 +91,13 @@ export const operationsConsoleFacts = {
   roots,
   featureFiles: [],
   sharedModules: [...sharedModules, ...sharedApiModules],
-  sharedModuleTests: [...sharedModuleTests, ...sharedApiModuleTests],
+  sharedModuleTests: [
+    ...sharedModuleTests,
+    ...sharedApiModuleTests,
+    one('apps/web/src/shared/ui/console-step-up-dialog.test.tsx', {
+      module: 'apps/web/src/shared/ui/console-step-up-dialog.tsx',
+    }),
+  ],
   topology: ['docker-compose.console-host.yml', 'docker/caddy/Caddyfile.console-host'].map((path) =>
     one(path, { tags: ['topology:host'] })
   ),

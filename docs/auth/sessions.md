@@ -165,11 +165,12 @@ expired refresh tokens are not listed here.
 `ipAddress` via an optional local GeoIP database — `null` whenever GeoIP is
 disabled, the database has not loaded, the address is private/reserved, or
 there is no match. It never affects whether auth, listing, or revocation
-work. See [GeoIP setup](../operations/geoip-setup.md) for the operator side
-and [Operations Console → Users](../operations-console/users.md#manage-sessions)
-for the admin-facing view. `city` is resolved server-side in the caller's
+work. See [GeoIP setup](../operations/geoip-setup.md) for deployment guidance. `city` is resolved server-side in the caller's
 negotiated `Accept-Language` (falling back to English); a direct API client
 that wants a specific language sends that header explicitly.
+
+The optional Console also displays this metadata; see the
+[session presentation](../operations-console/users.md#manage-sessions).
 
 ---
 
@@ -210,10 +211,11 @@ vault-held refresh token. Product code should call the same-origin
 
 ## Admin session management
 
-A `SUPER_ADMIN` can view and revoke **another user's** sessions from the
-Operations Console (see
-[Operations Console → Users](../operations-console/users.md#manage-sessions)
-for the operator-facing walkthrough) or directly:
+A `SUPER_ADMIN` can view and revoke **another user's** sessions directly
+through the following API routes.
+
+The optional Console provides the same operations through its Sessions panel:
+[Operations Console → Users](../operations-console/users.md#manage-sessions).
 
 | Endpoint                                             | Purpose                                                                                                                                                                               |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

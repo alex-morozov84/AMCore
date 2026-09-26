@@ -68,9 +68,11 @@ find for something, that page is under-documented; please open an issue.
 | Understand the CI / repo-security workflow                                               | [`operations/ci-security.md`](operations/ci-security.md)                                                                          |
 | Review staged file/function sizes before a PR                                            | [`CONTRIBUTING.md` → Size review advisory](../CONTRIBUTING.md#size-review-advisory)                                               |
 
-For session management, see [own and admin API contracts](auth/sessions.md),
-[Console actions](operations-console/users.md#manage-sessions), and
+For session management, see [own and admin API contracts](auth/sessions.md) and
 [approximate-location setup and operation](operations/geoip-setup.md).
+
+The optional [Console actions](operations-console/users.md#manage-sessions)
+provide an operator interface for admin session management.
 
 ## Documentation map
 

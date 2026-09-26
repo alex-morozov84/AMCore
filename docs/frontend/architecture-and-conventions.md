@@ -309,18 +309,15 @@ model" below.
 | **Local client state** (UI-only, not persisted server-side) | Zustand        | none live currently — see below     |
 
 "Server state" above is deliberately split by who owns the fetch, not a
-single universal rule. A Server Component page (most of the Operations
-Console — overview/list/detail) fetches the backend directly under
-ADR-079's primary/secondary graceful-degradation contract; there is no
-TanStack Query involved in that path at all, and `router.refresh()` re-runs
-it. A **client interactive leaf** mounted inside such a page — one that owns
-its own pending/error/pagination/mutation UI without a full navigation, e.g.
-the User Detail page's Sessions card
-(`features/console-user-sessions/model/use-user-sessions.ts`) — uses
-TanStack Query instead, exactly like the rest of this table. Adding one such
-leaf to an otherwise server-rendered page is not a decision to convert that
-page, or the wider Console, to client-side data fetching; the two models are
-expected to coexist page-by-page and even within a single page.
+single universal rule. A Server Component page fetches the backend directly
+under ADR-079's primary/secondary graceful-degradation contract; there is no
+TanStack Query involved in that path, and `router.refresh()` re-runs it.
+A client interactive leaf that owns pending/error/pagination/mutation UI
+without full navigation uses TanStack Query instead. These models can
+coexist inside the same server-rendered page.
+
+The optional Console's User Detail page uses this split for its Sessions card
+(`features/console-user-sessions/model/use-user-sessions.ts`).
 
 Don't duplicate server state into a Zustand store "for convenience" — that's
 how the two fall out of sync. If a value needs to survive a page navigation

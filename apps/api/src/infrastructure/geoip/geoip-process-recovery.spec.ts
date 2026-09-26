@@ -4,6 +4,8 @@ import { copyFile, mkdtemp, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 it('a separate API-reader process recovers after an updater process publishes a shared file', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'amcore-geoip-process-'))
   const path = join(dir, 'live.mmdb')
@@ -26,7 +28,9 @@ it('a separate API-reader process recovers after an updater process publishes a 
     await rename(join(dir, 'next'), path)
     const response = once(child, 'message')
     child.send('poll')
-    expect((await response)[0]).toEqual({ location: { city: 'Лондон', countryCode: 'GB' } })
+    expect((await response)[0]).toEqual({
+      location: { city: { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE], countryCode: 'GB' },
+    })
   } finally {
     if (child.exitCode === null && child.signalCode === null) {
       const closed = once(child, 'exit')

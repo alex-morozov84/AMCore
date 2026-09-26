@@ -2,6 +2,7 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 
 import type { RequestPrincipal } from '@amcore/shared'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 
 import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions'
 import type { GeoIpService } from '../../infrastructure/geoip/geoip.service'
@@ -69,9 +70,9 @@ describe('AdminSessionsService', () => {
     it('throws NotFoundException when the target user does not exist', async () => {
       prisma.user.findUnique.mockResolvedValue(null)
 
-      await expect(service.list(targetUserId, { page: 1, limit: 20 }, 'en', actor)).rejects.toThrow(
-        NotFoundException
-      )
+      await expect(
+        service.list(targetUserId, { page: 1, limit: 20 }, DEFAULT_LOCALE, actor)
+      ).rejects.toThrow(NotFoundException)
       expect(prisma.session.findMany).not.toHaveBeenCalled()
     })
 
@@ -80,7 +81,7 @@ describe('AdminSessionsService', () => {
       prisma.$queryRaw.mockResolvedValue([{ rows: [activeSession], total: 1 }])
       geoIp.resolve.mockReturnValue({ city: 'Berlin', countryCode: 'DE' })
 
-      const result = await service.list(targetUserId, { page: 1, limit: 20 }, 'en', actor)
+      const result = await service.list(targetUserId, { page: 1, limit: 20 }, DEFAULT_LOCALE, actor)
 
       expect(prisma.$queryRaw).toHaveBeenCalled()
       expect(result.total).toBe(1)
@@ -95,14 +96,14 @@ describe('AdminSessionsService', () => {
           expiresAt: activeSession.expiresAt.toISOString(),
         },
       ])
-      expect(geoIp.resolve).toHaveBeenCalledWith(activeSession.ipAddress, 'en')
+      expect(geoIp.resolve).toHaveBeenCalledWith(activeSession.ipAddress, DEFAULT_LOCALE)
     })
 
     it('audits every successful read, including an empty page, with bounded metadata only', async () => {
       prisma.user.findUnique.mockResolvedValue({ id: targetUserId } as never)
       prisma.$queryRaw.mockResolvedValue([{ rows: [], total: 0 }])
 
-      const result = await service.list(targetUserId, { page: 1, limit: 20 }, 'en', actor)
+      const result = await service.list(targetUserId, { page: 1, limit: 20 }, DEFAULT_LOCALE, actor)
 
       expect(result.data).toEqual([])
       expect(auditLog.record).toHaveBeenCalledWith({

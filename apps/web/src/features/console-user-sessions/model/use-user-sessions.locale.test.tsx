@@ -1,5 +1,4 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { DEFAULT_LOCALE } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -11,8 +10,8 @@ import { useUserSessions } from './use-user-sessions'
 vi.mock('@/shared/api/console-api', () => ({ consoleApi: { getUserSessions: vi.fn() } }))
 afterEach(() => vi.clearAllMocks())
 
-it('transmits selected locale, never reuses other-user placeholders and retains paging', async () => {
-  const locale = DEFAULT_LOCALE
+it('transmits UI locale, never reuses other-user/locale placeholders and retains same-locale paging', async () => {
+  let locale: 'en' | 'ru' = 'ru'
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const response = { data: [], total: 25, page: 1, limit: 20 }
   vi.mocked(consoleApi.getUserSessions).mockResolvedValueOnce(response)
@@ -29,10 +28,14 @@ it('transmits selected locale, never reuses other-user placeholders and retains 
     wrapper: Wrapper,
   })
   await waitFor(() => expect(result.current.isSuccess).toBe(true))
-  expect(consoleApi.getUserSessions).toHaveBeenCalledWith('first', 1, 20, DEFAULT_LOCALE)
+  expect(consoleApi.getUserSessions).toHaveBeenCalledWith('first', 1, 20, 'ru')
   act(() => result.current.setPage(2))
   expect(result.current.data).toEqual(response)
   expect(result.current.isPlaceholderData).toBe(true)
+  locale = 'en'
+  rerender({ id: 'first' })
+  expect(result.current.data).toBeUndefined()
+  locale = 'ru'
   rerender({ id: 'second' })
   expect(result.current.data).toBeUndefined()
 })
