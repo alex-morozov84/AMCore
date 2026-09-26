@@ -359,13 +359,16 @@ of CORS/cookie problems for free, and it's what lets the browser hold only
 one opaque `amcore_session` cookie instead of a backend access token in any
 form.
 
-Three shapes of Route Handler cover the whole surface, all under
+The main Route Handler shapes live under
 `apps/web/src/app/api/`:
 
 - **Session-minting handlers** for auth-specific concerns that need the raw
   backend `refresh_token` server-side
   (`/api/auth/{login,register,logout}`, the OAuth init/callback/exchange
-  routes) — see `shared/api/bff/credential-auth-handler.ts`.
+  routes) — see `shared/api/bff/credential-auth-handler.ts`. OAuth briefly
+  relays a temporary HttpOnly refresh cookie, consumed by the locale callback;
+  see [OAuth](../auth/oauth.md). Dedicated session list/revoke handlers attach
+  the stored refresh cookie server-side as well.
 - **Public action handlers** for the four email-link auth flows
   (`/api/auth/{forgot-password,reset-password,verify-email,resend-verification}`)
   — `shared/api/bff/public-auth-action.ts`. These don't mint a session
@@ -373,9 +376,16 @@ Three shapes of Route Handler cover the whole surface, all under
   have **no** `amcore_session` cookie at all, which the generic catch-all
   below requires and 401s without.
 - **The generic catch-all** (`/api/[...path]`) for everything else that
-  _does_ have a session already: reads `amcore_session`, refreshes the
+  has a session and is safe to forward: reads `amcore_session`, refreshes the
   access token if needed (`ensureFreshSession`), and proxies to `apps/api`
   with `Authorization: Bearer` attached server-side.
+
+The catch-all rejects JWT issuance before reading a session or contacting the API:
+login/register/refresh/step-up, OAuth exchange and organization switch. It checks
+its effective upstream URL, including case and dot-segment resolution, rather
+than relying on dedicated handlers to shadow canonical paths. Authenticated JWT
+issuance still needs deliberate server consumption; see
+[Credential containment](./api-consumption.md#credential-containment).
 
 `apps/web/src/shared/api/http-client.ts` is the reference client for
 Client Components: same-origin relative paths (`fetch('/api' + path)`), no

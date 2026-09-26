@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **BFF credential containment.** Generic browser forwarding now rejects login,
+  registration, refresh, step-up, OAuth exchange and organization-switch JWT
+  responses, including effective URL aliases. Dedicated authentication handlers,
+  direct backend APIs, multipart uploads and SSE remain supported.
+
 ### Added
 
 - **Operations Console: user and organization details.** Full, bookmarkable

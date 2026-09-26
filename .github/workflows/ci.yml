@@ -554,6 +554,11 @@ jobs:
             sleep 2
           done
 
+      # Fresh E2E databases need the documented dev/demo system-role seed for
+      # direct organization creation; production migrations remain seed-free.
+      - name: Seed real-stack E2E fixtures
+        run: docker compose --profile local-infra run --rm --no-deps migrate ./node_modules/.bin/tsx prisma/seed.ts
+
       - name: Run real-stack E2E lane
         working-directory: apps/web
         run: pnpm test:e2e:real-stack

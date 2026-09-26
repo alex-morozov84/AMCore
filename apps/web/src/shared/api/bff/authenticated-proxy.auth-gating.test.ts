@@ -1,11 +1,13 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cookies } from 'next/headers'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { proxyToBackend } from './authenticated-proxy'
 import { makeRequest, mockCookieStore } from './authenticated-proxy.test-helpers'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionNotFoundError, SessionVaultUnavailableError } from './errors'
 import { isTrustedOrigin } from './origin-guard'
+import { upstreamRefresh } from './upstream-refresh'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
@@ -18,34 +20,49 @@ describe('proxyToBackend — session/CSRF gating and auth-failure classification
     vi.mocked(isTrustedOrigin).mockReturnValue(true)
   })
 
-  describe('token-bearing upstream paths', () => {
-    it.each([
-      ['auth', 'refresh'],
-      ['auth', 'step-up'],
-      ['auth', 'oauth', 'exchange'],
-    ])(
-      'rejects %s before checking origin or session (would leak a bearer token to the browser)',
-      async (...segments) => {
-        mockCookieStore(undefined)
+  afterEach(() => vi.unstubAllGlobals())
 
-        const response = await proxyToBackend(makeRequest(segments.join('/')), segments)
-
+  describe.each(['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE'])(
+    'credential denial for %s',
+    (method) => {
+      it.each([
+        ['auth', 'login'],
+        ['auth', 'register'],
+        ['auth', 'refresh'],
+        ['auth', 'step-up'],
+        ['auth', 'oauth', 'exchange'],
+        ['organizations', 'OrgID', 'switch'],
+        ['Organizations', 'x/y', 'SWITCH'],
+        ['Auth', 'LOGIN'],
+        ['x', '..', 'auth', 'login'],
+        ['auth', '.', 'login'],
+        ['..', 'v1', 'auth', 'login'],
+        ['auth', 'refresh', ''],
+      ])('rejects %j without any auth or upstream work', async (...segments) => {
+        vi.mocked(cookies).mockRejectedValue(new Error('vault unavailable'))
+        vi.mocked(ensureFreshSession).mockRejectedValue(new Error('vault unavailable'))
+        const fetchMock = vi.fn()
+        vi.stubGlobal('fetch', fetchMock)
+        const response = await proxyToBackend(makeRequest('probe?case=1', { method }), segments)
         expect(response.status).toBe(404)
+        expect(cookies).not.toHaveBeenCalled()
         expect(isTrustedOrigin).not.toHaveBeenCalled()
         expect(ensureFreshSession).not.toHaveBeenCalled()
-      }
-    )
+        expect(upstreamRefresh).not.toHaveBeenCalled()
+        expect(fetchMock).not.toHaveBeenCalled()
+      })
+    }
+  )
 
-    it('does not reject an ordinary path that merely starts with "auth"', async () => {
-      mockCookieStore(undefined)
-
-      const response = await proxyToBackend(makeRequest('auth/me'), ['auth', 'me'])
-
-      // Falls through to the ordinary "no session cookie" branch, not the
-      // token-bearing-path shortcut — proves the check is exact-path, not
-      // a prefix match that would over-block unrelated auth routes.
-      expect(response.status).toBe(401)
-    })
+  it.each([
+    ['auth', 'me'],
+    ['auth/login'],
+    ['auth', '%6cogin'],
+    ['organizations', 'id', 'switching'],
+  ])('does not broaden denial to %j', async (...segments) => {
+    mockCookieStore(undefined)
+    const response = await proxyToBackend(makeRequest('probe'), segments)
+    expect(response.status).toBe(401)
   })
 
   it('returns 401 when there is no session cookie, without touching ensureFreshSession', async () => {

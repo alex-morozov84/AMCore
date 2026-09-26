@@ -420,6 +420,51 @@ Playwright command. `apps/web` imports `@amcore/shared` through its built
 `dist/` export, and direct Playwright commands bypass turbo's `^build`
 dependency graph. The CI `web-e2e` job has this as an explicit step.
 
+## Credential containment regression
+
+`e2e/real-stack/credential-containment.spec.ts` runs in the normal real-stack
+lane and CI. It needs no local harness files and has no skip for unavailable
+infrastructure: configuration or connection errors fail the test. It covers
+safe UI register/login, JWT-route denial, method ownership, raw path variants,
+internal refresh and direct API organization switching.
+
+A fresh test database needs the documented dev/demo system-role seed before
+organization creation. After starting the reference stack, run:
+
+```bash
+docker compose --profile local-infra run --rm --no-deps migrate ./node_modules/.bin/tsx prisma/seed.ts
+pnpm --filter web test:e2e:real-stack credential-containment.spec.ts
+```
+
+The `web-e2e` workflow runs this seed explicitly before real-stack tests.
+Production migration remains `migrate deploy` without implicit seeding.
+
+The spec uses the Playwright config's web `baseURL`. Its Node helpers accept:
+
+| Test runner setting        | Reference-stack default        |
+| -------------------------- | ------------------------------ |
+| `E2E_CREDENTIAL_API_URL`   | `http://127.0.0.1:5002/api/v1` |
+| `E2E_CREDENTIAL_REDIS_URL` | `redis://127.0.0.1:6379/0`     |
+
+These test settings do not fall back to application `API_URL`, `REDIS_URL` or
+`.env`. For an isolated stack, set them in the Playwright runner environment,
+use a local config with its matching web `baseURL`, and align the stack's
+`FRONTEND_URL`, `CORS_ORIGIN` and `WEB_TRUSTED_ORIGINS` with that web origin.
+Replace published Compose ports rather than appending another port mapping;
+use project-scoped volumes/networks and never reuse an unrelated running server.
+
+The refresh helper captures the cookie from its own fresh browser context and
+checks that exact vault entry against the uniquely created test account. It
+atomically changes only `accessTokenExpiresAt`, preserving version and TTL with
+raw-value CAS and `SET XX KEEPTTL`. A mismatch or race fails. The next BFF read
+must perform actual refresh. It never scans or flushes Redis, touches Console
+sessions, or logs tokens. Secure loopback cookies are selected from the owned
+context by domain/path, since filtering cookies by an HTTP URL excludes them.
+
+Malformed percent encoding currently produces a Next framework decode failure:
+400 in dev or 500 in the standalone build. The regression checks rejection and
+absence of tokens; recognized generic JWT routes must still return exactly 404.
+
 ## Which layer should I add a test at?
 
 - Pure logic, a component with mocked collaborators → **unit/component**.

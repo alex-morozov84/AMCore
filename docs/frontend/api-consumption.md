@@ -21,8 +21,12 @@ authenticated proxy (`shared/api/bff/authenticated-proxy.ts`, mounted at
 which already covers a plain JSON call, a multipart upload, and an SSE
 stream.
 
-A dedicated route is worth adding for two distinct reasons, not one:
+A dedicated route is needed when:
 
+- **The backend returns login credentials.** The generic proxy denies JWT issuance
+  before origin, cookie, vault or upstream work, even for an existing session.
+  Dedicated handlers must consume those credentials on the server and return a
+  safe browser response. See [Credential containment](#credential-containment).
 - **The backend needs something the generic proxy can't forward.**
   `/auth/sessions*` needs the raw `refresh_token` cookie to identify the
   caller's own session, which the generic proxy never sees.
@@ -36,6 +40,37 @@ A dedicated route is worth adding for two distinct reasons, not one:
   (mints a session from the backend's `refresh_token`);
   `public-auth-action.ts` covers the latter four (forwards the backend's
   response verbatim, mints nothing — none of them authenticate anyone).
+
+## Credential containment
+
+The generic proxy returns 404 for these effective upstream paths under `/api/v1`:
+
+- `auth/login`, `auth/register`, `auth/refresh`, `auth/step-up`;
+- `auth/oauth/exchange`;
+- `organizations/:id/switch` (one nonempty organization-ID segment).
+
+The check covers all exported HTTP methods, static words regardless of case, and
+an optional trailing slash. It checks the same URL that is fetched, after URL
+construction resolves dot segments. It does not decode again, rewrite IDs or
+block unrelated paths by prefix. Request/response streams remain unbuffered.
+
+Canonical `/api/auth/login` and `/api/auth/register` select dedicated handlers
+and return `{ user }` plus an opaque session cookie. Unsupported methods belong
+to that selected handler and do not fall back to the generic proxy. Canonical
+`/api/auth/oauth/exchange` selects the OAuth provider route: POST returns 405;
+it is not a browser exchange endpoint. The locale OAuth callback performs the
+exchange server-side. Its existing temporary HttpOnly `refresh_token` cookie
+handoff is consumed and cleared; see [OAuth](../auth/oauth.md).
+
+Direct backend APIs remain available to authorized clients and server code.
+There is no generic browser organization-switch endpoint: a future product
+integration must consume its returned JWT server-side. API-key issuance is a
+separate, explicit one-time secret response and is unaffected by this JWT guard.
+
+When adding a backend JWT issuance route, update the classifier inventory and
+its early-rejection tests, and add a deliberate safe server handler if the
+browser needs the operation. Do not depend on dedicated-route precedence alone
+or add a response scanner that buffers uploads or SSE.
 
 ## Server Components: direct backend transport (ADR-079)
 

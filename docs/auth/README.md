@@ -47,7 +47,9 @@ tokens in a Redis session vault and attach `Authorization: Bearer ...`
 server-side. The only short exception is the OAuth callback handoff described in
 [OAuth](./oauth.md), where a temporary httpOnly `refresh_token` cookie is relayed
 onto the frontend origin and immediately consumed/deleted by
-`/{locale}/auth/callback`.
+`/{locale}/auth/callback`. Generic forwarding of JWT issuance, including
+organization switch, is denied; see
+[Credential containment](../frontend/api-consumption.md#credential-containment).
 
 When the optional Operations Console uses its separate host mode, it has a
 second, deliberately isolated BFF boundary: `__Host-amcore_console_session`
