@@ -40,6 +40,7 @@ describe('SessionsTable — current session row', () => {
             id: 'current',
             userAgent: 'Chrome',
             ipAddress: '1.1.1.1',
+            location: null,
             createdAt: '2026-01-01T00:00:00.000Z',
             current: true,
           },
@@ -47,6 +48,7 @@ describe('SessionsTable — current session row', () => {
             id: 'other',
             userAgent: 'Safari',
             ipAddress: '2.2.2.2',
+            location: null,
             createdAt: '2026-01-02T00:00:00.000Z',
             current: false,
           },
@@ -64,6 +66,9 @@ describe('SessionsTable — current session row', () => {
     // Exactly one row-actions trigger exists — the current row's cell
     // renders `null` instead of a DropdownMenuTrigger.
     expect(screen.getAllByRole('button', { name: 'Actions' })).toHaveLength(1)
-    expect(screen.getByText('This device')).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'This device' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'This device' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Latest token issued' })).toBeInTheDocument()
   })
 })

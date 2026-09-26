@@ -20,7 +20,9 @@ configured, loaded, or current.
   package (MIT), one long-lived reader per API/worker process — never opened
   per request. Every enabled process checks file identity/size/mtime every
   30 seconds, recovering after missing boot or atomic replacement without
-  a restart; an invalid replacement retains the last valid reader.
+  a restart; an invalid replacement retains the last valid reader. Failed
+  reads retry on later checks even if the file has not changed; warnings
+  are emitted once per failed file generation.
 - **Updater:** a daily scheduled check (`GeoIpUpdateService`), using the same
   `@Cron` + Redis-lock singleton pattern as the existing nightly session
   cleanup job — only the lock-winner replica actually downloads. It only

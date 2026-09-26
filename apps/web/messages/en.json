@@ -418,7 +418,7 @@
     "locationUnavailable": "Location unavailable",
     "locationAttribution": "Approximate location by <link>DB-IP.com</link>",
     "ipAddress": "IP address",
-    "createdAt": "Signed in",
+    "createdAt": "Latest token issued",
     "current": "This device",
     "actions": "Actions",
     "revoke": "Revoke",

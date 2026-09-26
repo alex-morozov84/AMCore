@@ -77,7 +77,7 @@ export function SessionsTable() {
         }),
         columnHelper.accessor('current', {
           id: 'currentBadge',
-          header: '',
+          header: () => <span className="sr-only">{t('current')}</span>,
           cell: (info) =>
             info.getValue() ? (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
@@ -87,6 +87,7 @@ export function SessionsTable() {
         }),
         columnHelper.display({
           id: 'actions',
+          header: () => <span className="sr-only">{t('actions')}</span>,
           cell: ({ row }) => <RowActions session={row.original} />,
         }),
       ]),

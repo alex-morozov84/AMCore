@@ -133,8 +133,8 @@ curl 'https://api.amcore.dev/api/v1/auth/sessions?page=1&limit=20' \
     {
       "id": "sess_abc123",
       "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36...",
-      "ipAddress": "192.168.1.1",
-      "location": { "city": "Berlin", "countryCode": "DE" },
+      "ipAddress": "81.2.69.142",
+      "location": { "city": "London", "countryCode": "GB" },
       "createdAt": "2024-03-20T10:00:00.000Z",
       "current": true
     },

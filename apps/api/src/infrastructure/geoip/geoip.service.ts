@@ -25,6 +25,8 @@ import { normalizeIpForGeoLookup } from './ip-normalize'
 export class GeoIpService implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof setInterval>
   private generation: string | null = null
+  private failedGeneration: string | null = null
+  private retryAt = 0
   private checking = false
   private reader: Reader<CityResponse> | null = null
 
@@ -53,9 +55,17 @@ export class GeoIpService implements OnModuleInit, OnModuleDestroy {
     try {
       const file = await stat(this.env.get('GEOIP_DB_PATH'))
       const signature = `${file.ino}:${file.size}:${file.mtimeMs}`
-      if (signature !== this.generation) {
+      if (signature === this.generation) return
+      if (signature === this.failedGeneration && Date.now() < this.retryAt) return
+      try {
+        await this.reload(false)
         this.generation = signature
-        await this.reload()
+        this.failedGeneration = null
+      } catch (err) {
+        // Retry transient read failures without repeating a warning for the same file.
+        if (signature !== this.failedGeneration) this.logLoadFailure(err)
+        this.failedGeneration = signature
+        this.retryAt = Date.now() + 30_000
       }
     } catch {
       // Missing/invalid replacements retain the last valid reader. reload logs failures.
@@ -65,7 +75,7 @@ export class GeoIpService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Loads (or replaces) the reader from the current `GEOIP_DB_PATH`. */
-  async reload(): Promise<void> {
+  async reload(logFailure = true): Promise<void> {
     const path = this.env.get('GEOIP_DB_PATH')
     try {
       const next = await open<CityResponse>(path)
@@ -75,12 +85,16 @@ export class GeoIpService implements OnModuleInit, OnModuleDestroy {
         'GeoIP database loaded'
       )
     } catch (err) {
-      this.logger.warn(
-        { event: 'geoip.reader_load_failed', err },
-        'GeoIP database not available — locations will be null until the next successful update'
-      )
+      if (logFailure) this.logLoadFailure(err)
       throw err
     }
+  }
+
+  private logLoadFailure(err: unknown): void {
+    this.logger.warn(
+      { event: 'geoip.reader_load_failed', err },
+      'GeoIP reload failed — retaining the last reader and retrying on the next generation check'
+    )
   }
 
   /** The build epoch of the currently loaded database, or `null` if none is loaded. */

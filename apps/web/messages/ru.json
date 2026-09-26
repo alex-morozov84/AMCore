@@ -418,7 +418,7 @@
     "locationUnavailable": "Локация недоступна",
     "locationAttribution": "Примерная локация: <link>DB-IP.com</link>",
     "ipAddress": "IP-адрес",
-    "createdAt": "Вход выполнен",
+    "createdAt": "Последний выданный токен",
     "current": "Это устройство",
     "actions": "Действия",
     "revoke": "Отозвать",

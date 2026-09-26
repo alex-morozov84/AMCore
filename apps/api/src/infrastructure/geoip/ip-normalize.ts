@@ -55,7 +55,8 @@ function isPrivateOrReservedIpv6(ip: string): boolean {
  * correctly excluded.
  */
 export function normalizeIpForGeoLookup(ip: string | null | undefined): string | null {
-  if (!ip || isIP(ip) === 0) return null
+  // Socket/OS zone identifiers are local scope, never a GeoIP lookup address.
+  if (!ip || ip.includes('%') || isIP(ip) === 0) return null
   if (isIP(ip) === 6) {
     const canonical = new URL(`http://[${ip}]`).hostname.slice(1, -1)
     const hex = /^::ffff:([a-f0-9]{1,4}):([a-f0-9]{1,4})$/i.exec(canonical)

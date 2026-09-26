@@ -5,17 +5,23 @@ import type { EnvService } from '../../env/env.service'
 import { GeoIpService } from './geoip.service'
 
 const openMock = jest.fn()
+const statMock = jest.fn()
 jest.mock('maxmind', () => ({ open: (...args: unknown[]) => openMock(...args) }))
+jest.mock('node:fs/promises', () => ({ stat: (...args: unknown[]) => statMock(...args) }))
 
 describe('GeoIpService', () => {
   let env: { get: jest.Mock }
   let logger: jest.Mocked<PinoLogger>
   let service: GeoIpService
 
-  afterEach(() => service.onModuleDestroy())
+  afterEach(() => {
+    service.onModuleDestroy()
+    jest.restoreAllMocks()
+  })
 
   beforeEach(() => {
     openMock.mockReset()
+    statMock.mockReset()
     env = {
       get: jest.fn((key: string) => {
         if (key === 'GEOIP_ENABLED') return true
@@ -51,6 +57,52 @@ describe('GeoIpService', () => {
     await service.onModuleInit()
 
     expect(openMock).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])(
+    'retries the unchanged generation after a transient open failure (previous reader: %s)',
+    async (previousReader) => {
+      let now = 100_000
+      jest.spyOn(Date, 'now').mockImplementation(() => now)
+      const reader = {
+        metadata: { buildEpoch: new Date('2026-09-01') },
+        get: () => ({ city: { names: { en: 'London' } }, country: { iso_code: 'GB' } }),
+      }
+      if (previousReader) {
+        openMock.mockResolvedValueOnce(reader)
+        await service.reload()
+      }
+      statMock.mockResolvedValue({ ino: 1, size: 100, mtimeMs: 1 })
+      openMock.mockRejectedValueOnce(new Error('temporary read failure'))
+      openMock.mockResolvedValue(reader)
+      await service.checkGeneration()
+      expect(service.resolve('81.2.69.142', 'en')).toEqual(
+        previousReader ? { city: 'London', countryCode: 'GB' } : null
+      )
+      const attempts = openMock.mock.calls.length
+      await service.checkGeneration()
+      expect(openMock).toHaveBeenCalledTimes(attempts)
+      now += 30_000
+      await service.checkGeneration()
+      expect(openMock).toHaveBeenCalledTimes(attempts + 1)
+      expect(service.resolve('81.2.69.142', 'en')).toEqual({ city: 'London', countryCode: 'GB' })
+      await service.checkGeneration()
+      expect(openMock).toHaveBeenCalledTimes(attempts + 1)
+      expect(logger.warn).toHaveBeenCalledTimes(1)
+    }
+  )
+
+  it('bounds repeated failed-generation warnings while continuing retries', async () => {
+    let now = 100_000
+    jest.spyOn(Date, 'now').mockImplementation(() => now)
+    statMock.mockResolvedValue({ ino: 1, size: 100, mtimeMs: 1 })
+    openMock.mockRejectedValue(new Error('invalid MMDB'))
+    await service.checkGeneration()
+    now += 30_000
+    await service.checkGeneration()
+    expect(openMock).toHaveBeenCalledTimes(2)
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+    expect(service.resolve('81.2.69.142', 'en')).toBeNull()
   })
 
   describe('once a reader is loaded', () => {

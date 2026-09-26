@@ -1,6 +1,12 @@
 import { normalizeIpForGeoLookup } from './ip-normalize'
 
 describe('normalizeIpForGeoLookup', () => {
+  it.each(['fe80::1%eth0', 'fe80::1%3', '2001:4860:4860::8888%eth0'])(
+    'excludes zone-scoped address %s without throwing',
+    (ip) => {
+      expect(normalizeIpForGeoLookup(ip)).toBeNull()
+    }
+  )
   it('normalizes an IPv4-mapped IPv6 public address before filtering', () => {
     expect(normalizeIpForGeoLookup('::ffff:8.8.8.8')).toBe('8.8.8.8')
   })
