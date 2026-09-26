@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-26
+
 ### Security
 
 - **BFF credential containment.** Generic browser forwarding now rejects login,
@@ -1878,7 +1880,8 @@ production-readiness work and the platform foundation built so far.
 
 ---
 
-[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.9.0...HEAD
+[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/alex-morozov84/AMCore/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/alex-morozov84/AMCore/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/alex-morozov84/AMCore/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/alex-morozov84/AMCore/compare/v0.6.0...v0.7.0
