@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express'
 
+import { DEFAULT_LOCALE, localePathPrefix } from '@amcore/shared'
+
 import { resolveTrustedWebPeers } from '../../../common/utils/trusted-web-peer'
 import type { EnvService } from '../../../env/env.service'
 
@@ -13,7 +15,7 @@ it.each(['google', 'apple'])(
   async (provider) => {
     const handleCallback = jest.fn().mockResolvedValue({
       mode: 'login',
-      user: { locale: 'en' },
+      user: { locale: DEFAULT_LOCALE },
       refreshToken: 'fixture-refresh',
       sessionId: 'session',
       accessClaims: { sub: 'user' },
@@ -63,6 +65,8 @@ it.each(['google', 'apple'])(
       'fixture-refresh',
       expect.objectContaining({ httpOnly: true })
     )
-    expect(res.redirect).toHaveBeenCalledWith('http://web.test/en/auth/callback?ticket=ticket')
+    expect(res.redirect).toHaveBeenCalledWith(
+      `http://web.test${localePathPrefix(DEFAULT_LOCALE)}/auth/callback?ticket=ticket`
+    )
   }
 )
