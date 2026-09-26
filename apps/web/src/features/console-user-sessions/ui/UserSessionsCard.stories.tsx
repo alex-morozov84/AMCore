@@ -1,6 +1,6 @@
 import type { AdminSession } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { delay, http, HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { UserSessionsCard } from './UserSessionsCard'
@@ -153,12 +153,45 @@ export const RevokeOne: Story = {
   },
 }
 
+// A response remains pending until the interaction explicitly releases it.
+// Each replay owns its requests; disposing an old run cannot release a new one.
+function createPageResponses() {
+  const requests: { page: number; released: boolean; release: () => void }[] = []
+  let disposed = false
+  return {
+    requests,
+    hold(page: number) {
+      if (disposed) return Promise.resolve()
+      return new Promise<void>((resolve) => {
+        const request = {
+          page,
+          released: false,
+          release() {
+            request.released = true
+            resolve()
+          },
+        }
+        requests.push(request)
+      })
+    },
+    dispose() {
+      disposed = true
+      requests.forEach((request) => request.release())
+    },
+  }
+}
+
+let activePageResponses: ReturnType<typeof createPageResponses> | undefined
+const RESPONSE_WAIT = { timeout: 5000 }
+
 export const IndependentPaginationAndRefresh: Story = {
   beforeEach({ msw }) {
+    const responses = createPageResponses()
+    activePageResponses = responses
     msw.use(
       http.get(SESSIONS_URL, async ({ request }) => {
         const page = Number(new URL(request.url).searchParams.get('page') ?? '1')
-        if (page === 2) await delay(800)
+        if (page === 2) await responses.hold(page)
         const data =
           page === 1
             ? Array.from({ length: 20 }, (_, i) => ({
@@ -169,22 +202,59 @@ export const IndependentPaginationAndRefresh: Story = {
         return HttpResponse.json({ data, total: 21, page, limit: 20 })
       })
     )
+    return () => {
+      responses.dispose()
+      if (activePageResponses === responses) activePageResponses = undefined
+    }
   },
   play: async ({ canvasElement }) => {
+    const responses = activePageResponses
+    if (!responses) throw new Error('Pagination response fixture was not initialized')
     const canvas = within(canvasElement)
     const initialUrl = canvasElement.ownerDocument.location.href
-    await waitFor(() => expect(canvas.getByText('Sessions (21 total)')).toBeInTheDocument())
-    await userEvent.click(canvas.getByRole('button', { name: 'Next' }))
-    expect(canvas.getByRole('button', { name: 'Refresh' })).toBeDisabled()
-    expect(canvas.getByRole('button', { name: 'Previous' })).toBeDisabled()
-    await waitFor(() => expect(firstMatch(canvas, 'Chrome on Windows')).toBeInTheDocument())
-    expect(canvas.getByRole('button', { name: 'Next' })).toBeDisabled()
-    expect(canvas.getByRole('button', { name: 'Previous' })).toBeEnabled()
-    expect(canvas.getByText('Sessions (21 total)')).toBeInTheDocument()
-    expect(canvasElement.ownerDocument.location.href).toBe(initialUrl)
-    await userEvent.click(canvas.getByRole('button', { name: 'Refresh' }))
-    expect(canvas.getByRole('button', { name: 'Refresh' })).toBeDisabled()
-    expect(firstMatch(canvas, 'Chrome on Windows')).toBeInTheDocument()
-    await waitFor(() => expect(canvas.getByRole('button', { name: 'Refresh' })).toBeEnabled())
+    try {
+      await waitFor(async () => {
+        await expect(canvas.getByText('Sessions (21 total)')).toBeInTheDocument()
+        await expect(canvas.getByRole('button', { name: 'Refresh' })).toBeEnabled()
+        await expect(canvas.getByRole('button', { name: 'Next' })).toBeEnabled()
+      }, RESPONSE_WAIT)
+      await userEvent.click(canvas.getByRole('button', { name: 'Next' }))
+      await waitFor(async () => {
+        await expect(responses.requests).toHaveLength(1)
+        await expect(responses.requests[0]).toMatchObject({ page: 2, released: false })
+        await expect(canvas.getByRole('button', { name: 'Refresh' })).toBeDisabled()
+        await expect(canvas.getByRole('button', { name: 'Previous' })).toBeDisabled()
+        await expect(canvas.queryAllByText('Chrome on Windows')).toHaveLength(0)
+      }, RESPONSE_WAIT)
+      responses.requests[0].release()
+      await waitFor(async () => {
+        await expect(firstMatch(canvas, 'Chrome on Windows')).toBeInTheDocument()
+        await expect(canvas.getByRole('button', { name: 'Refresh' })).toBeEnabled()
+        await expect(canvas.getByRole('button', { name: 'Next' })).toBeDisabled()
+        await expect(canvas.getByRole('button', { name: 'Previous' })).toBeEnabled()
+      }, RESPONSE_WAIT)
+      await expect(canvas.getByText('Sessions (21 total)')).toBeInTheDocument()
+      await expect(canvasElement.ownerDocument.location.href).toBe(initialUrl)
+      await userEvent.click(canvas.getByRole('button', { name: 'Refresh' }))
+      await waitFor(async () => {
+        await expect(responses.requests).toHaveLength(2)
+        await expect(responses.requests[1]).toMatchObject({ page: 2, released: false })
+        await expect(canvas.getByRole('button', { name: 'Refresh' })).toBeDisabled()
+        await expect(firstMatch(canvas, 'Chrome on Windows')).toBeInTheDocument()
+      }, RESPONSE_WAIT)
+      responses.requests[1].release()
+      await waitFor(async () => {
+        await expect(canvas.getByRole('button', { name: 'Refresh' })).toBeEnabled()
+        await expect(firstMatch(canvas, 'Chrome on Windows')).toBeInTheDocument()
+        await expect(canvas.getByRole('button', { name: 'Next' })).toBeDisabled()
+        await expect(canvas.getByRole('button', { name: 'Previous' })).toBeEnabled()
+      }, RESPONSE_WAIT)
+      await expect(responses.requests).toHaveLength(2)
+      await expect(responses.requests.every((request) => request.released)).toBe(true)
+      await expect(canvas.getByText('Sessions (21 total)')).toBeInTheDocument()
+      await expect(canvasElement.ownerDocument.location.href).toBe(initialUrl)
+    } finally {
+      responses.dispose()
+    }
   },
 }
