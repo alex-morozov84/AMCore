@@ -221,6 +221,41 @@ for the operator-facing walkthrough) or directly:
 | `DELETE /api/v1/admin/users/:id/sessions/:sessionId` | Revoke one session. `204` even if it was already inactive (idempotent); `404` if it never belonged to that user.                                                                      |
 | `DELETE /api/v1/admin/users/:id/sessions`            | Revoke every active session for that user. Always `204`, even with zero active sessions.                                                                                              |
 
+Each admin list item contains `sessionId`, nullable `userAgent`, `ipAddress`
+and `location`, nullable `lastAuthAt`, and ISO `createdAt`/`expiresAt` timestamps.
+`sessionId` stays stable across refresh rotation. `createdAt` is the current
+token generation's issue time; `lastAuthAt` is password/login authentication
+freshness, not last activity. There is no `current` flag in the admin view.
+Pagination defaults to page 1 / limit 20, with a maximum limit of 100; `total`
+counts active families across all pages. Reads use `Cache-Control: private,
+no-store`. Send `Accept-Language` for city localization:
+
+```bash
+curl 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions?page=1&limit=20' \
+  -H 'Authorization: Bearer <super-admin-access-token>' \
+  -H 'Accept-Language: en'
+```
+
+Use the returned admin `sessionId`, not a self-service row `id`, to revoke one:
+
+```bash
+curl -i -X DELETE 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions/<session-id-from-list>' \
+  -H 'Authorization: Bearer <super-admin-access-token>'
+
+curl -i -X DELETE 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions' \
+  -H 'Authorization: Bearer <super-admin-access-token>'
+```
+
+Both return `204` without a response body on success. A `403 STEP_UP_REQUIRED`
+requires re-authentication with the operator's own password at
+`POST /api/v1/auth/step-up`; direct API clients use its returned access token
+when retrying. OAuth-only accounts receive `STEP_UP_METHOD_UNAVAILABLE`.
+A `404` on revoke-one means the family is absent or does not belong to the
+target; invalid IDs/pagination return `400`, missing bearer credentials or
+API keys return `401`, insufficient system role returns `403`, and privileged
+mutation throttling can return `429`. Do not repeatedly retry a terminal
+freshness or authorization error.
+
 Both `DELETE` routes require step-up (a recently re-authenticated admin
 session) and reject a target equal to the admin's own account — an admin
 manages their own sessions through the self-service endpoints above, not
@@ -268,7 +303,8 @@ a fresh login.
 ## Step-up re-authentication
 
 Each session tracks when it was last authenticated (`lastAuthAt`). Destructive
-admin operations — `PATCH /admin/users/:id` and `POST /admin/cleanup` — require
+admin operations — system-role changes, admin session revocation and
+`POST /admin/cleanup` — require
 that timestamp to be recent (within `STEP_UP_MAX_AGE_SECONDS`, default 10
 minutes). If it is stale, the request is rejected with `403 STEP_UP_REQUIRED`.
 

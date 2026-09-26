@@ -7,12 +7,12 @@ their organization role.
 
 ## Contents
 
-| Screen                            | Use it to                                                                     |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| [Overview](overview.md)           | Check this API instance's readiness, dependencies, version, and process role. |
-| [Users](users.md)                 | Find users, inspect their details and memberships, and change system roles.   |
-| [Organizations](organizations.md) | Inspect organizations, members and their roles without changing them.         |
-| [Audit](audit.md)                 | Browse recent system events and narrow them by action, identity, or time.     |
+| Screen                            | Use it to                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| [Overview](overview.md)           | Check this API instance's readiness, dependencies, version, and process role.              |
+| [Users](users.md)                 | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |
+| [Organizations](organizations.md) | Inspect organizations, members and their roles without changing them.                      |
+| [Audit](audit.md)                 | Browse recent system events and narrow them by action, identity, or time.                  |
 
 The Console also has a [configuration and deployment guide](configuration.md)
 for operators who set it up and a [development guide](development.md) for teams

@@ -122,3 +122,17 @@ capture current request metadata. Password-login limiter addresses, global
 req.ip/TRUST_PROXY, audit, invite and step-up consumers remain unchanged.
 UA and location are descriptive data, never proof of a device or identity.
 No reliable backfill of historical Node UA/internal Docker IP is possible.
+
+## Diagnose unavailable locations
+
+| Symptom                                            | Check and action                                                                                                                                                                           |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Every location is unavailable in local development | Private peer IPs are expected without a sanitizing edge. Configure the verified BFF relay for a deployed visitor-IP signal; do not enable trust on a directly reachable web server.        |
+| Public stored IPs still have no location           | Check `GEOIP_ENABLED`, database path, and the shared volume in both API and worker. Look for `geoip.reader_loaded` or `geoip.reader_load_failed`; the API reader retries every 30 seconds. |
+| Worker cannot publish data                         | Check write permissions for the non-root worker user and the writable worker mount. Keep the API mount read-only. Retry with the manual command above after correction.                    |
+| Downloads fail or data stays old                   | Inspect `geoip.update_failed` and `schedule.geoip_update_*` events for provider, deadline, size, validation or lock failures. Auth/revoke remain available; the next daily check retries.  |
+| Only some API replicas show location               | Verify shared-file distribution and reader-load events on each replica. A single-host named volume does not distribute files between hosts.                                                |
+
+No location can be promised for every public IP. VPNs, proxies, provider coverage
+and edition age can all affect the result; an unavailable match is not evidence
+of an invalid session. Historical addresses are not reconstructed.
