@@ -174,6 +174,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Production web tabs check for a new build about every 30 seconds and on focus,
+  then fully refresh to stop obsolete custom Server Action timers. Drafts may
+  be lost and transient Action errors remain possible. Build identity survives
+  image promotion/rollback; unavailable signals do not cause rapid retries.
+- The service worker caches install icons only, preventing cached documents,
+  RSC and build assets from reviving an old application offline.
+
 - **Scaffolding verification pyramid.** The required full contract now uses
   six isolated, evidence-backed topology rows instead of eight overlapping
   install-bearing recipes, with one install and build command per row. The

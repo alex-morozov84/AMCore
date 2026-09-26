@@ -121,6 +121,70 @@ COMPOSE_PROFILES=local-infra docker compose config --quiet   # local
 COMPOSE_PROFILES=          docker compose config --quiet     # remote
 ```
 
+## Open tabs after a web deployment
+
+The production frontend checks `/api/deployment-version` on mount, roughly every
+30 seconds, and when focus or visibility returns. When the live build differs,
+it replaces the entire document once. This stops timers from the previous page,
+including custom downstream Server Action polling. Unsaved drafts can be lost.
+A request sent before detection can fail; mutations are never automatically replayed.
+A mutation already in flight may commit even if navigation interrupts its response;
+do not treat that interruption as proof that resubmission is safe.
+A downstream timer needs no special wrapper to benefit from document replacement.
+
+This supports replacing one live web version, including rollback. It does not
+keep old web containers or make an obsolete Action succeed against a new build.
+Tabs loaded before this protection shipped require an initial manual refresh.
+Malformed external `next-action` requests are outside this recovery mechanism.
+
+### Build identity
+
+`next build` generates a UUID unless `NEXT_DEPLOYMENT_ID` is supplied at build
+time. The identity is compiled into the server and client and used for Next's
+`deploymentId`. Runtime environment changes cannot change an image's identity.
+Replicas, promotion and rollback use the same image digest and therefore the
+same identity. Rebuilds generate a new identity; a cached identical artifact
+retains its existing one. If setting an explicit identity, use a new value for
+every different artifact (1–128 ASCII letters, digits, dots, underscores or
+hyphens). Reusing an identity hides a deployment from old tabs.
+
+For the Compose local-build path, `.env` can supply `NEXT_DEPLOYMENT_ID`; for a
+custom Docker build, use `--build-arg NEXT_DEPLOYMENT_ID=<unique-build-id>`.
+Leaving it unset is supported. Do not put secrets in this public identity.
+Promotion must pull the original digest rather than rebuilding for production.
+
+### Freshness and recovery limits
+
+Allow unauthenticated GET access to `/api/deployment-version` on every frontend
+host, including a separate Console host. It uses no session, database or Redis.
+Keep its `Cache-Control`, `CDN-Cache-Control` and `Surrogate-Control: no-store`
+headers; bypass CDN/proxy caching for this route. Full document requests must
+also reach the current build. Next's `?dpl=` asset suffix busts caches; it does
+not route to old builds or retain removed chunks. Mixed A/B replicas need an
+independently designed routing strategy and are outside this single-version flow.
+
+Each running tab makes at most one check at a time, with a five-second timeout.
+Offline, unavailable, invalid or stale signals do not trigger rapid retries.
+The tab tries again on its next ordinary check or focus return. A frozen tab
+cannot check until it resumes; browser scheduling prevents a strict wall-clock
+30-second guarantee. A signal that remains unavailable or stale cannot reveal
+a deployment, so stale timers may continue until freshness is restored.
+Downstream code that blocks document navigation or starves the JavaScript event
+loop can prevent recovery.
+
+The session guard permits at most three automatic replacements in five minutes
+and stops further attempts if replacement still loads the old document. Manual
+browser refresh recovers after the serving/cache problem is fixed. If browser
+session storage is blocked, automatic replacement is disabled to avoid loops.
+
+The bundled service worker caches only the two public install icons. Documents,
+RSC, API/version requests, Next assets and failed responses have no worker cache
+fallback. Offline navigation fails instead of loading an old application from
+worker storage. A custom downstream worker must preserve this freshness contract.
+
+See [production A/B verification](../frontend/testing.md#production-deployment-version-recovery)
+for the custom Action timer regression scenario.
+
 ## Production rollout via registry (image-pull path)
 
 `docker-compose.prod.yml` is a production overlay for the reference stack

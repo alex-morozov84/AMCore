@@ -223,8 +223,10 @@ per area), composed flat in `base.ts`, with cross-field logic in `refinements/`.
    (`# KEY=default`) for optional/advanced knobs. This is enforced —
    [`env-example-coverage.spec.ts`](../../apps/api/src/env/schema/env-example-coverage.spec.ts)
    **fails CI** if a schema key is undocumented, or a documented key is not a schema
-   key (only compose-only vars like `COMPOSE_*`/`MIGRATION_DATABASE_URL` and dynamic
-   `WEBHOOK_*_SECRET` are allow-listed).
+   key (explicit Compose/web keys, including the web build identity
+   `NEXT_DEPLOYMENT_ID`, and dynamic `WEBHOOK_*_SECRET` keys are allow-listed).
+   API test caching includes the root `.env.example` as an input, so changing
+   the example invalidates the cached coverage result.
 4. **Pass it to containers** that need it at runtime via `x-app-env` in
    [`docker-compose.yml`](../../docker-compose.yml).
 5. **Read it** type-safely through `EnvService.get('KEY')` — never `process.env`

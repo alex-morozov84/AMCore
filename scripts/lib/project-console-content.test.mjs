@@ -58,6 +58,15 @@ test('rewrites custom-slug proxy blocks while retaining asset handling', () => {
     assert.ok(after.includes(marker))
     assert.ok(after.includes('/panel'))
     assert.equal(after.includes('/admin'), false)
+    assert.ok(after.includes('/api/deployment-version'))
+    assert.ok(after.includes('/api/console/'))
+    assert.ok(
+      after.includes(
+        proxy === 'nginx'
+          ? 'location = /api/deployment-version {'
+          : '@deploymentVersion path /api/deployment-version'
+      )
+    )
   }
 })
 

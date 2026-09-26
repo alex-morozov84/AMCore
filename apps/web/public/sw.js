@@ -1,7 +1,7 @@
-const CACHE_NAME = 'amcore-v1'
+const CACHE_NAME = 'amcore-v2'
 
 // Assets to cache on install
-const STATIC_ASSETS = ['/', '/icons/icon-192x192.png', '/icons/icon-512x512.png']
+const STATIC_ASSETS = ['/icons/icon-192x192.png', '/icons/icon-512x512.png']
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
@@ -25,22 +25,25 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-// Fetch event - network first, fallback to cache
+// Only public install icons have an offline fallback. Documents, RSC, API and
+// Next build assets stay on the network so cached old code cannot revive a tab.
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return
 
-  // Skip API requests
-  if (event.request.url.includes('/api/')) return
+  const url = new URL(event.request.url)
+  if (url.origin !== self.location.origin || !STATIC_ASSETS.includes(url.pathname)) return
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
         // Clone response for caching
-        const responseClone = response.clone()
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseClone)
-        })
+        if (response.ok) {
+          const responseClone = response.clone()
+          event.waitUntil(
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone))
+          )
+        }
         return response
       })
       .catch(() => {

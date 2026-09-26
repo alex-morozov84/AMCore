@@ -79,6 +79,11 @@ multi-origin design before it can be added safely.
 
 ## Reference Caddy deployment
 
+The host-mode nginx and Caddy references forward the exact
+`/api/deployment-version` path directly to web, without the `/api/console/`
+rewrite. This public signal needs no Console session; ordinary Console API
+paths keep their existing rewrite. Preserve this exception in a custom edge.
+
 Point DNS for both names at the edge, set both public hosts, and explicitly
 enable the profiled edge service. Public Caddy deployments obtain TLS in the
 usual Caddy flow; nginx deployments must provide the certificate paths shown in

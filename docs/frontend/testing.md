@@ -23,6 +23,36 @@ No global coverage percentage gate. Confidence comes from the critical-path
 flow lists below being real and current, not a line-coverage number — the
 same "confidence over coverage" philosophy the backend test suite follows.
 
+## Production deployment version recovery
+
+From the repository root, with dependencies and Playwright Chromium installed:
+
+```bash
+node scripts/run-deployment-version-e2e.mjs
+```
+
+This separate, infrastructure-free production lane builds A and B sequentially
+in temporary copies, adds different real Server Actions and a custom 500 ms
+client timer that swallows failures, then switches one isolated proxy between
+standalone builds. It never adds fixture routes to your checkout. Builds and
+assertions are visible in the terminal; allow several minutes. Ports 3420–3422
+must be free; set `VERSION_E2E_PORT` to choose another consecutive trio. Servers
+and temporary copies are removed on normal completion or test failure.
+
+The gate checks A→B without/with a service worker, rollback B→A, repeated deploy,
+≤100 obsolete POST per transition, zero obsolete POST during the following
+minute, one document replacement, two-minute idle GET budget, invalid/503/stale/
+timed-out signals and recovery, stale HTML/manual refresh and the replacement
+cap. The timer uses neither a polling helper nor Action preflight. Unit tests
+cover request coalescing, cleanup and session guards separately.
+
+This lane does not prove a genuinely frozen/background browser or full-stack
+BFF authentication. Test real browser suspension and your CDN/custom worker on
+the deployment target; use the real-stack lane below for auth/session flows.
+The bundled worker caches only install icons; it must not serve old HTML, RSC,
+API/version responses or chunks as an offline application. See the
+[deployment contract](../operations/deployment.md#open-tabs-after-a-web-deployment).
+
 ## Unit and component tests
 
 Unchanged, already the largest layer (55+ files). Two established mocking

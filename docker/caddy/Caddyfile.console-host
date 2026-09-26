@@ -36,6 +36,13 @@
 		}
 	}
 
+	@deploymentVersion path /api/deployment-version
+	handle @deploymentVersion {
+		reverse_proxy web:3000 {
+			header_up Host {host}
+		}
+	}
+
 	@consoleApi path /api/*
 	handle @consoleApi {
 		uri replace /api/ /api/console/
