@@ -158,7 +158,7 @@ export const operationsConsoleDocSeams = [
     'docs/frontend/architecture-and-conventions.md',
     block(
       "The optional Console's User Detail page uses this split for its Sessions card",
-      '(`features/console-user-sessions/model/use-user-sessions.ts`).'
+      "fetches follow ADR-079's primary/secondary graceful-degradation contract."
     )
   ),
   ...operationsConsoleDiscoverySeams,
