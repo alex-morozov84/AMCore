@@ -9,7 +9,7 @@ import { useUserRoleChange } from '../model/use-user-role-change'
 import { UserRoleAction } from './UserRoleAction'
 
 vi.mock('../model/use-user-role-change', () => ({ useUserRoleChange: vi.fn() }))
-vi.mock('./RoleStepUpDialog', () => ({ RoleStepUpDialog: () => null }))
+vi.mock('@/shared/ui/console-step-up-dialog', () => ({ ConsoleStepUpDialog: () => null }))
 
 // Inline, English-only fixture of just the keys this component reads -
 // deliberately not the real catalogue (`messages/en.json`), which is a

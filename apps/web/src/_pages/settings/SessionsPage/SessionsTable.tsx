@@ -1,13 +1,15 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useLocale, useTranslations } from 'next-intl'
 import type { Session } from '@amcore/shared'
 import { createColumnHelper, type SortingState, useTable } from '@tanstack/react-table'
 
 import { useSessions } from '@/entities/user'
 import { RevokeSessionMenuItem } from '@/features/sessions-revoke'
-import { Button } from '@/shared/ui/button'
+import { formatSessionLocation, parseSessionDevice } from '@/shared/lib/format-session'
+import { useClampPage } from '@/shared/lib/use-clamp-page'
+import { PaginationButtons } from '@/shared/ui/pagination'
 import { RowActionsMenu } from '@/shared/ui/row-actions-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 
@@ -33,20 +35,41 @@ export function SessionsTable() {
   const t = useTranslations('sessions')
   const tCommon = useTranslations('common')
   const format = useFormatter()
+  const locale = useLocale()
   const [page, setPage] = useState(1)
   const [sorting, setSorting] = useState<SortingState>([])
-  const { data, isPending, isError } = useSessions(page, PAGE_SIZE)
+  const { data, isPending, isFetching, isError } = useSessions(page, PAGE_SIZE)
+  useClampPage(page, setPage, data?.total, PAGE_SIZE)
 
   const columns = useMemo(
     () =>
       columnHelper.columns([
         columnHelper.accessor('userAgent', {
           header: t('device'),
-          cell: (info) => info.getValue() ?? tCommon('notAvailable'),
+          // Parsed "Browser on OS" — never the raw userAgent as the primary
+          // label — reusing the same universal formatter the Console admin
+          // session panel uses.
+          cell: (info) => {
+            const { browser, os } = parseSessionDevice(info.getValue())
+            return browser && os
+              ? t('deviceLabel', { browser, os })
+              : (browser ?? os ?? t('deviceUnknown'))
+          },
         }),
         columnHelper.accessor('ipAddress', {
           header: t('ipAddress'),
-          cell: (info) => info.getValue() ?? tCommon('notAvailable'),
+          cell: (info) => {
+            const ip = info.getValue()
+            const location = formatSessionLocation(info.row.original.location, locale)
+            return (
+              <div className="space-y-0.5">
+                <p>{ip ?? tCommon('notAvailable')}</p>
+                <p className="text-xs text-muted-foreground">
+                  {location ?? t('locationUnavailable')}
+                </p>
+              </div>
+            )
+          },
         }),
         columnHelper.accessor('createdAt', {
           header: t('createdAt'),
@@ -67,7 +90,7 @@ export function SessionsTable() {
           cell: ({ row }) => <RowActions session={row.original} />,
         }),
       ]),
-    [t, tCommon, format]
+    [t, tCommon, format, locale]
   )
 
   const table = useTable({
@@ -84,7 +107,10 @@ export function SessionsTable() {
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-md border">
+      <div
+        aria-busy={isFetching}
+        className={`overflow-hidden rounded-md border transition-opacity ${isFetching ? 'opacity-60' : ''}`}
+      >
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -125,24 +151,27 @@ export function SessionsTable() {
         </Table>
       </div>
 
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage((current) => current - 1)}
-          disabled={page <= 1}
-        >
-          {t('previous')}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage((current) => current + 1)}
-          disabled={!data || page * PAGE_SIZE >= data.total}
-        >
-          {t('next')}
-        </Button>
-      </div>
+      {data?.data.some((session) => session.location !== null) && (
+        <p className="text-xs text-muted-foreground">
+          {t.rich('locationAttribution', {
+            link: (chunks) => (
+              <a href="https://db-ip.com" target="_blank" rel="noreferrer" className="underline">
+                {chunks}
+              </a>
+            ),
+          })}
+        </p>
+      )}
+
+      <PaginationButtons
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={data?.total ?? 0}
+        onPageChange={setPage}
+        previousLabel={t('previous')}
+        nextLabel={t('next')}
+        isFetching={isFetching}
+      />
     </div>
   )
 }

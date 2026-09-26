@@ -10,6 +10,15 @@ import en from '../../../../messages/en.json'
 import { SessionsTable } from './SessionsTable'
 
 vi.mock('@/entities/user', () => ({ useSessions: vi.fn() }))
+// `Pagination`'s href-based `PaginationLink` pulls in `@/i18n/navigation`
+// (next-intl's `createNavigation`), which fails to resolve `next/navigation`
+// under Vitest — same mock `route-progress-link.test.tsx` uses to sidestep
+// the same chain. Not exercised here (this page's pagination is the
+// button-based variant), but the module-level import still evaluates.
+vi.mock('@/i18n/navigation', () => ({
+  usePathname: () => '/',
+  Link: () => null,
+}))
 
 function renderTable() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })

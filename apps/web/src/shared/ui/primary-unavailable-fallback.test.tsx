@@ -70,4 +70,19 @@ describe('PrimaryUnavailableFallback', () => {
 
     expect(refresh).toHaveBeenCalledTimes(1)
   })
+
+  it('calls the provided onRetry instead of router.refresh() when given', async () => {
+    const user = userEvent.setup()
+    const onRetry = vi.fn()
+    render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <PrimaryUnavailableFallback reason="network" onRetry={onRetry} />
+      </NextIntlClientProvider>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(onRetry).toHaveBeenCalledTimes(1)
+    expect(refresh).not.toHaveBeenCalled()
+  })
 })

@@ -169,9 +169,20 @@ identical to pre-ADR-072 behavior; a request that never went through
 `WEB_TRUSTED_CLIENT_IP_HEADER` (which inbound header `apps/web` trusts) and
 `TRUSTED_WEB_PEERS` (which socket peer `apps/api` trusts) are independent
 knobs on independent trust boundaries, not one setting. `getClientIp()`/
-audit-log IP and the invite-abuse limiter are **not** wired to this — they
+audit-log IP and invite-abuse/password-login/step-up limiters are **not** wired to this — they
 remain scoped to `req.ip` exactly as before; extending them is a deliberate,
 separately-reviewed future decision, not an implicit side effect.
+
+Session metadata capture uses the same actual-peer validation for registration,
+password login, OAuth login callbacks and refresh. The BFF forwards descriptive
+UA and derives the internal IP claim from the configured edge header for each
+request, including all refresh entry points (product DAL, generic proxy, own
+sessions handler and console helper). It never copies an inbound internal claim.
+A missing UA is explicitly empty on transport and null in storage, avoiding
+Node fetch's default device label. Refresh metadata comes from the request that
+wins the vault lock; waiting requests reuse the resulting generation. Password
+login has a separate Session address field and retains its previous req.ip
+limiter contract. None of this metadata authorizes a request.
 
 The reference `docker-compose.yml` supports this: `api`'s published port
 binds to `127.0.0.1` by default (not `0.0.0.0`, ADR-072), so the only path

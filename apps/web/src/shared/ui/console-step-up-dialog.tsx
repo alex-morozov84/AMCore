@@ -4,7 +4,9 @@ import { useTranslations } from 'next-intl'
 import { type StepUpInput, stepUpSchema } from '@amcore/shared'
 
 import { useLocalizedForm } from '@/shared/hooks'
-import { Button } from '@/shared/ui/button'
+import type { StepUpPhase } from '@/shared/lib/console-step-up-mutation'
+
+import { Button } from './button'
 import {
   Dialog,
   DialogContent,
@@ -12,13 +14,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/shared/ui/dialog'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
-import { Input } from '@/shared/ui/input'
+} from './dialog'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './form'
+import { Input } from './input'
 
-import type { StepUpPhase } from '../model/use-user-role-change'
-
-interface RoleStepUpDialogProps {
+interface ConsoleStepUpDialogProps {
   phase: StepUpPhase
   isSubmitting: boolean
   onSubmit: (password: string) => void
@@ -26,20 +26,21 @@ interface RoleStepUpDialogProps {
 }
 
 /**
- * ADR-037 step-up re-entry, opened by `UserRoleAction` on `STEP_UP_REQUIRED`.
- * The frontend cannot know in advance whether an account has a password
- * (OAuth-only accounts do not), so this dialog always renders the form; a
- * `STEP_UP_METHOD_UNAVAILABLE`/repeat-`STEP_UP_REQUIRED` response is
- * "terminal" — resubmitting the same password cannot fix it, so the form is
- * replaced with the error and a close action instead of inviting another
- * attempt.
+ * ADR-037 step-up re-entry, opened by any Console destructive-action flow
+ * on `STEP_UP_REQUIRED` (originally `console-user-role`'s role change; also
+ * used by admin session revoke). The frontend cannot know in advance
+ * whether an account has a password (OAuth-only accounts do not), so this
+ * dialog always renders the form; a `STEP_UP_METHOD_UNAVAILABLE`/repeat-
+ * `STEP_UP_REQUIRED` response is "terminal" — resubmitting the same
+ * password cannot fix it, so the form is replaced with the error and a
+ * close action instead of inviting another attempt.
  */
-export function RoleStepUpDialog({
+export function ConsoleStepUpDialog({
   phase,
   isSubmitting,
   onSubmit,
   onClose,
-}: RoleStepUpDialogProps) {
+}: ConsoleStepUpDialogProps) {
   const t = useTranslations('console')
   const tCommon = useTranslations('common')
   const form = useLocalizedForm<StepUpInput>(stepUpSchema, { defaultValues: { password: '' } })
@@ -58,8 +59,8 @@ export function RoleStepUpDialog({
     >
       <DialogContent closeLabel={tCommon('close')}>
         <DialogHeader>
-          <DialogTitle>{t('usersStepUpTitle')}</DialogTitle>
-          <DialogDescription>{t('usersStepUpDescription')}</DialogDescription>
+          <DialogTitle>{t('stepUpTitle')}</DialogTitle>
+          <DialogDescription>{t('stepUpDescription')}</DialogDescription>
         </DialogHeader>
         {phase.kind === 'error' && (
           <p role="alert" className="text-sm text-destructive">
@@ -100,7 +101,7 @@ export function RoleStepUpDialog({
                   {tCommon('cancel')}
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {t('usersStepUpSubmit')}
+                  {t('stepUpSubmit')}
                 </Button>
               </DialogFooter>
             </form>

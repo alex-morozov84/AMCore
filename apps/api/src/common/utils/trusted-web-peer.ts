@@ -62,7 +62,8 @@ function addAddress(blockList: BlockList, token: string): void {
 /**
  * Parses `TRUSTED_WEB_PEERS` into a `net.BlockList` for verifying an inbound
  * request's *actual* socket peer is a trusted apps/web hop, before the
- * throttler guard trusts `AMCORE_CLIENT_IP_HEADER` (ADR-072). Returns `null`
+ * rate-limit tracker or Session metadata trusts the internal IP claim.
+ * Returns `null`
  * when unset/empty — disabled, the safe default under which the header is
  * never trusted regardless of value. Throws on an unrecognized token, the
  * same fail-loudly-on-typo discipline `TRUST_PROXY` uses (ADR-060).

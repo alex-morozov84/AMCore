@@ -2,6 +2,7 @@ import { getFormatter, getTranslations } from 'next-intl/server'
 import { adminDetailIdSchema } from '@amcore/shared'
 
 import { UserRoleAction } from '@/features/console-user-role'
+import { UserSessionsCard } from '@/features/console-user-sessions'
 import { getConsoleAwareUser } from '@/shared/api/console/access-token'
 import { fetchConsoleUserDetail } from '@/shared/api/console/users'
 import { detailPageHref } from '@/shared/lib/console-detail-url'
@@ -54,7 +55,9 @@ export async function UserDetailResults({
       <Card>
         <CardHeader className="gap-3 sm:grid-cols-[1fr_auto]">
           <div className="min-w-0 space-y-2">
-            <CardTitle className="text-xl">{user.name ?? user.email}</CardTitle>
+            <CardTitle as="h2" className="text-xl">
+              {user.name ?? user.email}
+            </CardTitle>
             <p className="break-all text-sm text-muted-foreground">{user.email}</p>
             <DetailId id={user.id} />
           </div>
@@ -142,6 +145,12 @@ export async function UserDetailResults({
           )}
         </DetailRelationSearch>
       </section>
+      <UserSessionsCard
+        key={user.id}
+        userId={user.id}
+        targetEmail={user.email}
+        isSelf={user.id === actor?.id}
+      />
       <nav aria-label={tConsole('auditTitle')} className="space-y-2">
         <div className="flex flex-wrap gap-4 text-sm">
           <RouteProgressLink

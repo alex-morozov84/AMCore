@@ -1,4 +1,9 @@
-import type { AdminUserResponse, SystemRole } from '@amcore/shared'
+import type {
+  AdminSessionsListResponse,
+  AdminUserResponse,
+  SupportedLocale,
+  SystemRole,
+} from '@amcore/shared'
 
 import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
 
@@ -22,4 +27,25 @@ export const consoleApi = {
    * `shared/api/console/step-up.ts`). */
   stepUp: (password: string): Promise<void> =>
     apiClient.post<void>(getConsolePublicApiPath('/auth/step-up'), { password }),
+
+  // `locale` is sent explicitly as `Accept-Language` for the same reason as
+  // `authApi.getSessions` — the BFF route isn't under `[locale]`.
+  getUserSessions: (
+    userId: string,
+    page: number,
+    limit: number,
+    locale: SupportedLocale
+  ): Promise<AdminSessionsListResponse> =>
+    apiClient.get<AdminSessionsListResponse>(
+      getConsolePublicApiPath(`/users/${userId}/sessions?page=${page}&limit=${limit}`),
+      { headers: { 'Accept-Language': locale } }
+    ),
+
+  revokeUserSession: (userId: string, sessionId: string): Promise<void> =>
+    apiClient.delete<void>(
+      getConsolePublicApiPath(`/users/${userId}/sessions/${encodeURIComponent(sessionId)}`)
+    ),
+
+  revokeAllUserSessions: (userId: string): Promise<void> =>
+    apiClient.delete<void>(getConsolePublicApiPath(`/users/${userId}/sessions`)),
 }

@@ -195,11 +195,27 @@ export const authResponseSchema = z.object({
 
 export type AuthResponse = z.infer<typeof authResponseSchema>
 
+/**
+ * Approximate IP-derived location. Nullable in every context: no
+ * GeoIP database configured/loaded, a private/reserved/unresolvable
+ * address, or no match in the database. `city` is resolved server-side in
+ * the requester's negotiated locale (city names only exist inside the
+ * GeoIP database's own multilingual data); `countryCode` is a narrow ISO
+ * 3166-1 alpha-2 code the client localizes itself.
+ */
+export const sessionLocationSchema = z.object({
+  city: z.string().nullable(),
+  countryCode: z.string().length(2).nullable(),
+})
+
+export type SessionLocation = z.infer<typeof sessionLocationSchema>
+
 /** Session info */
 export const sessionSchema = z.object({
   id: z.string(),
   userAgent: z.string().nullable(),
   ipAddress: z.string().nullable(),
+  location: sessionLocationSchema.nullable(),
   createdAt: z.iso.datetime(),
   current: z.boolean(),
 })

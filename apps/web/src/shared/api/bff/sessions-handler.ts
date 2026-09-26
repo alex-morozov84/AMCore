@@ -10,7 +10,7 @@ import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultLock } from './session-lock'
 import type { VaultEntry } from './session-vault.types'
 import { redisVaultStore } from './session-vault-store'
-import { upstreamRefresh } from './upstream-refresh'
+import { createUpstreamRefresh } from './upstream-refresh'
 
 import 'server-only'
 
@@ -37,18 +37,26 @@ async function getVaultEntryOrFailure(request: Request): Promise<VaultEntry | Re
     return await ensureFreshSession(sessionId, {
       store: redisVaultStore,
       lock: redisVaultLock,
-      upstreamRefresh,
+      upstreamRefresh: createUpstreamRefresh(request.headers),
     })
   } catch (error) {
     return authFailureResponse(request, error)
   }
 }
 
-function authHeaders(entry: VaultEntry): Headers {
-  return new Headers({
+/**
+ * `acceptLanguage` carries the viewer's active UI locale (used only for the
+ * approximate-location city name on `GET /auth/sessions` — display locale,
+ * never authorization); omitted entirely for the DELETE handlers, which
+ * have no locale-dependent response.
+ */
+function authHeaders(entry: VaultEntry, acceptLanguage?: string | null): Headers {
+  const headers = new Headers({
     Authorization: `Bearer ${entry.accessToken}`,
     Cookie: `${REFRESH_COOKIE_NAME}=${entry.refreshToken}`,
   })
+  if (acceptLanguage) headers.set('Accept-Language', acceptLanguage)
+  return headers
 }
 
 function relay(upstreamResponse: Response): Response {
@@ -66,7 +74,9 @@ export async function handleGetSessions(request: Request): Promise<Response> {
   const upstream = new URL(`${API_URL}/api/v1/auth/sessions`)
   upstream.search = new URL(request.url).search
 
-  const upstreamResponse = await fetch(upstream, { headers: authHeaders(entry) })
+  const upstreamResponse = await fetch(upstream, {
+    headers: authHeaders(entry, request.headers.get('accept-language')),
+  })
   return relay(upstreamResponse)
 }
 

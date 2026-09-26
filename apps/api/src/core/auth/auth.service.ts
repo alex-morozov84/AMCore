@@ -54,6 +54,10 @@ interface RequestInfo {
   acceptedLocale?: SupportedLocale
 }
 
+interface LoginRequestInfo extends RequestInfo {
+  sessionIpAddress: string | undefined
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -176,7 +180,7 @@ export class AuthService {
   }
 
   /** Login user */
-  async login(input: LoginInput, requestInfo: RequestInfo): Promise<AuthResult> {
+  async login(input: LoginInput, requestInfo: LoginRequestInfo): Promise<AuthResult> {
     const ip = requestInfo.ipAddress ?? ''
     const emailCanonical = this.emailIdentity.canonicalize(input.email)
 
@@ -222,7 +226,7 @@ export class AuthService {
     const { session, refreshToken } = await this.sessionService.createSession({
       userId: user.id,
       userAgent: requestInfo.userAgent,
-      ipAddress: requestInfo.ipAddress,
+      ipAddress: requestInfo.sessionIpAddress,
     })
 
     const accessToken = this.tokenService.generateAccessToken({

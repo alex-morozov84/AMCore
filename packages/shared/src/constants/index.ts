@@ -1,5 +1,5 @@
 // Constants public API
-export { AUDIT_ACTIONS, type AuditAction } from './audit-actions'
+export { AUDIT_ACTIONS, type AuditAction, HIDDEN_READ_AUDIT_ACTIONS } from './audit-actions'
 
 // Auth error codes (machine-readable, frontend translates via next-intl)
 export enum AuthErrorCode {

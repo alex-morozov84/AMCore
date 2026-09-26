@@ -1,12 +1,12 @@
 import { isFormPostProvider, relayOAuthCookies } from './oauth-cookie-relay'
+import { sessionMetadataHeaders } from './session-metadata-headers'
 
 import 'server-only'
 
 const API_URL = process.env.API_URL ?? 'http://localhost:5002'
 
 /**
- * OAuth init/callback proxy (ADR-068, Option B — see `ai/models-talk.md`
- * "Iteration 2, slice 4"). Unlike `authenticated-proxy.ts`, this is
+ * OAuth init/callback proxy (ADR-068). Unlike `authenticated-proxy.ts`, this is
  * deliberately unauthenticated and forwards the browser's own cookies
  * upstream rather than stripping them: the backend's callback handler reads
  * its `oauth_state`/`oauth_state_apple` binding-nonce cookie
@@ -28,7 +28,7 @@ async function fetchUpstream(request: Request, upstreamPath: string): Promise<Re
   upstream.search = new URL(request.url).search
 
   const hasBody = request.method === 'POST' && request.body !== null
-  const headers = new Headers()
+  const headers = new Headers(sessionMetadataHeaders(request.headers))
   const cookie = request.headers.get('cookie')
   if (cookie) headers.set('cookie', cookie)
   const acceptLanguage = request.headers.get('accept-language')

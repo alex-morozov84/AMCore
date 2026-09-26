@@ -8,7 +8,7 @@ import { handleOAuthExchange } from './oauth-exchange-handler'
 import { callUpstreamOAuthExchange, fetchCurrentUser, UpstreamOAuthError } from './upstream-oauth'
 
 vi.mock('server-only', () => ({}))
-vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
 vi.mock('./upstream-oauth', () => ({
   callUpstreamOAuthExchange: vi.fn(),
   fetchCurrentUser: vi.fn(),

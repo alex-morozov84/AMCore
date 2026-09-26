@@ -1,6 +1,7 @@
 import type { PinoLogger } from 'nestjs-pino'
 
 import { NotFoundException } from '../../common/exceptions'
+import { GeoIpService } from '../../infrastructure/geoip/geoip.service'
 
 import { SessionService } from './session.service'
 import { createMockContext, type MockContext, mockContextToPrisma } from './test-context'
@@ -65,8 +66,12 @@ describe('SessionService', () => {
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
 
+    const geoIp = {
+      resolve: jest.fn().mockReturnValue(null),
+    } as unknown as jest.Mocked<GeoIpService>
+
     const prisma = mockContextToPrisma(mockCtx)
-    sessionService = new SessionService(prisma, tokenService, mockLogger)
+    sessionService = new SessionService(prisma, tokenService, geoIp, mockLogger)
 
     mockCtx.prisma.$transaction.mockImplementation(async (callback: any) =>
       callback(mockCtx.prisma)
@@ -134,7 +139,7 @@ describe('SessionService', () => {
           userId: 'user-456',
           familyId: expect.any(String),
           refreshToken: hashedToken,
-          userAgent: undefined,
+          userAgent: null,
           ipAddress: undefined,
           expiresAt: expect.any(Date),
           lastAuthAt: expect.any(Date),
@@ -472,7 +477,7 @@ describe('SessionService', () => {
       mockCtx.prisma.session.findMany.mockResolvedValue(sessions)
       mockCtx.prisma.session.count.mockResolvedValue(2)
 
-      const result = await sessionService.getUserSessions('user-123', 'hash-1', 1, 20)
+      const result = await sessionService.getUserSessions('user-123', 'hash-1', 1, 20, 'en')
 
       expect(mockCtx.prisma.session.findMany).toHaveBeenCalledWith({
         where: {
@@ -497,7 +502,7 @@ describe('SessionService', () => {
       mockCtx.prisma.session.findMany.mockResolvedValue(sessions)
       mockCtx.prisma.session.count.mockResolvedValue(2)
 
-      const result = await sessionService.getUserSessions('user-123', undefined, 1, 20)
+      const result = await sessionService.getUserSessions('user-123', undefined, 1, 20, 'en')
 
       expect(result.data).toHaveLength(2)
       expect(result.data[0]!.current).toBe(false)
@@ -508,7 +513,13 @@ describe('SessionService', () => {
       mockCtx.prisma.session.findMany.mockResolvedValue([])
       mockCtx.prisma.session.count.mockResolvedValue(0)
 
-      const result = await sessionService.getUserSessions('user-no-sessions', undefined, 1, 20)
+      const result = await sessionService.getUserSessions(
+        'user-no-sessions',
+        undefined,
+        1,
+        20,
+        'en'
+      )
 
       expect(result.data).toEqual([])
       expect(result.total).toBe(0)
@@ -520,13 +531,14 @@ describe('SessionService', () => {
       mockCtx.prisma.session.findMany.mockResolvedValue([sessions[0]!])
       mockCtx.prisma.session.count.mockResolvedValue(1)
 
-      const result = await sessionService.getUserSessions('user-123', undefined, 1, 20)
+      const result = await sessionService.getUserSessions('user-123', undefined, 1, 20, 'en')
 
       expect(result.data[0]).toBeDefined()
       expect(result.data[0]!).toEqual({
         id: 'session-1',
         userAgent: 'Chrome',
         ipAddress: '192.168.1.1',
+        location: null,
         createdAt: sessions[0]!.createdAt.toISOString(),
         current: false,
       })
@@ -536,7 +548,7 @@ describe('SessionService', () => {
       mockCtx.prisma.session.findMany.mockResolvedValue(sessions)
       mockCtx.prisma.session.count.mockResolvedValue(2)
 
-      await sessionService.getUserSessions('user-123', undefined, 2, 10)
+      await sessionService.getUserSessions('user-123', undefined, 2, 10, 'en')
 
       expect(mockCtx.prisma.session.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

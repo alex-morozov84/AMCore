@@ -2,11 +2,13 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 import { randomBytes } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AuthErrorCode, type SessionsListResponse } from '@amcore/shared'
+import { AuthErrorCode, type SessionsListResponse, type SupportedLocale } from '@amcore/shared'
 
 import { AppException, NotFoundException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
+import { GeoIpService } from '../../infrastructure/geoip/geoip.service'
+import { acquireXactLock, PrismaService } from '../../prisma'
 
+import { sessionCoordinationLockKey } from './session-lock-key'
 import { TokenService } from './token.service'
 
 import type { Session, User } from '@/generated/prisma/client'
@@ -36,6 +38,7 @@ export class SessionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
+    private readonly geoIp: GeoIpService,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(SessionService.name)
@@ -52,7 +55,7 @@ export class SessionService {
         userId: params.userId,
         familyId: params.familyId ?? this.generateSessionFamilyId(),
         refreshToken: hashedToken,
-        userAgent: params.userAgent,
+        userAgent: params.userAgent || null,
         ipAddress: params.ipAddress,
         expiresAt,
         // OB-06b / ADR-037: a freshly created session is freshly authenticated
@@ -128,6 +131,26 @@ export class SessionService {
     const expiresAt = this.tokenService.getRefreshTokenExpiration()
 
     const sessionId = await this.prisma.$transaction(async (tx) => {
+      const lookup = await tx.session.findUnique({
+        where: { refreshToken: oldHashedToken },
+        select: { userId: true },
+      })
+      if (!lookup) {
+        throw new AppException(
+          'Invalid refresh token',
+          HttpStatus.UNAUTHORIZED,
+          AuthErrorCode.TOKEN_INVALID
+        )
+      }
+
+      // Serialize against a concurrent admin revoke-one/all on the
+      // SAME owning user before re-reading validity, so a rotation cannot
+      // insert a fresh child session after an admin's revoke has already
+      // enumerated/acted on the family it belongs to. Re-fetching `existing`
+      // below (rather than trusting `lookup`) also re-reads authoritative
+      // ownership/state from inside the lock, not from the pre-lock read.
+      await acquireXactLock(tx, sessionCoordinationLockKey(lookup.userId))
+
       const existing = await tx.session.findUnique({
         where: { refreshToken: oldHashedToken },
       })
@@ -207,7 +230,7 @@ export class SessionService {
           userId: params.userId,
           familyId: existing.familyId,
           refreshToken: hashedToken,
-          userAgent: params.userAgent,
+          userAgent: params.userAgent || null,
           ipAddress: params.ipAddress,
           expiresAt,
           // Carry forward, never renew: a silent refresh preserves the step-up
@@ -273,7 +296,8 @@ export class SessionService {
     userId: string,
     currentTokenHash: string | undefined,
     page: number,
-    limit: number
+    limit: number,
+    locale: SupportedLocale
   ): Promise<SessionsListResponse> {
     const where = { userId, revokedAt: null, expiresAt: { gt: new Date() } }
     const skip = (page - 1) * limit
@@ -292,6 +316,7 @@ export class SessionService {
         id: s.id,
         userAgent: s.userAgent,
         ipAddress: s.ipAddress,
+        location: this.geoIp.resolve(s.ipAddress, locale),
         createdAt: s.createdAt.toISOString(),
         current: s.refreshToken === currentTokenHash,
       })),

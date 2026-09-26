@@ -28,6 +28,11 @@ const auditResultCount: MetadataValueRule = (value) =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 50
     ? value
     : undefined
+/** Same shape as `auditResultCount`, bounded to `PAGINATION.MAX_LIMIT` (100) for admin list reads whose page size isn't capped at 50. */
+const boundedResultCount: MetadataValueRule = (value) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100
+    ? value
+    : undefined
 /** A bounded cuid-shaped id — runId, invocationId, approvalId (Arc E). */
 const aiId = boundedString(64, /^[a-z0-9]+$/)
 /** A bounded assistant slug — lowercase alnum + hyphen (Arc F). */
@@ -103,7 +108,9 @@ const specs: Record<AuditAction, MetadataSpec> = {
     resultCount: auditResultCount,
   },
   'admin.cleanup.executed': { counts: cleanupCounts },
+  'admin.user.session_revoked': { sessionId: true, count: true },
   'admin.user.sessions_revoked': { count: true, reason: true },
+  'admin.user.sessions_viewed': { page: true, limit: true, resultCount: boundedResultCount },
   'admin.user.system_role_changed': { afterSystemRole: true, beforeSystemRole: true },
   'ai.approval.approved': { ...aiApprovalContext, decision: aiCode },
   'ai.approval.expired': { ...aiApprovalContext, reasonCode: aiCode },

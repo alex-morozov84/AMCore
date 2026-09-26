@@ -4,9 +4,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { StepUpPhase } from '../model/use-user-role-change'
+import type { StepUpPhase } from '@/shared/lib/console-step-up-mutation'
 
-import { RoleStepUpDialog } from './RoleStepUpDialog'
+import { ConsoleStepUpDialog } from './console-step-up-dialog'
 
 // Inline, English-only fixture of just the keys this component reads -
 // deliberately not the real catalogue (`messages/en.json`), which is a
@@ -14,9 +14,9 @@ import { RoleStepUpDialog } from './RoleStepUpDialog'
 // has no reason to depend on.
 const messages = {
   console: {
-    usersStepUpTitle: 'Confirm your password',
-    usersStepUpDescription: 'This is a sensitive action. Re-enter your password to continue.',
-    usersStepUpSubmit: 'Confirm',
+    stepUpTitle: 'Confirm your password',
+    stepUpDescription: 'This is a sensitive action. Re-enter your password to continue.',
+    stepUpSubmit: 'Confirm',
     loginPassword: 'Password',
   },
   common: {
@@ -28,13 +28,18 @@ const messages = {
 function renderDialog(phase: StepUpPhase, onSubmit = vi.fn(), onClose = vi.fn()) {
   render(
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
-      <RoleStepUpDialog phase={phase} isSubmitting={false} onSubmit={onSubmit} onClose={onClose} />
+      <ConsoleStepUpDialog
+        phase={phase}
+        isSubmitting={false}
+        onSubmit={onSubmit}
+        onClose={onClose}
+      />
     </NextIntlClientProvider>
   )
   return { onSubmit, onClose }
 }
 
-describe('RoleStepUpDialog', () => {
+describe('ConsoleStepUpDialog', () => {
   it('renders nothing visible when closed', () => {
     renderDialog({ kind: 'closed' })
 

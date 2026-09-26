@@ -7,9 +7,9 @@ import { handleDeleteOtherSessions, handleDeleteSession } from './sessions-handl
 import { fakeVaultEntry, mockSessionCookie } from './sessions-handler.test-helpers'
 
 vi.mock('server-only', () => ({}))
-vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
 vi.mock('./ensure-fresh-session', () => ({ ensureFreshSession: vi.fn() }))
-vi.mock('./upstream-refresh', () => ({ upstreamRefresh: vi.fn() }))
+vi.mock('./upstream-refresh', () => ({ createUpstreamRefresh: vi.fn(() => vi.fn()) }))
 vi.mock('./origin-guard', () => ({ isTrustedOrigin: vi.fn() }))
 
 function makeRequest(): Request {

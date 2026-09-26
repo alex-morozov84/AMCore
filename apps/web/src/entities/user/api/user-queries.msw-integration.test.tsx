@@ -1,4 +1,5 @@
-import type { SessionsListResponse } from '@amcore/shared'
+import { NextIntlClientProvider } from 'next-intl'
+import { DEFAULT_LOCALE, type SessionsListResponse } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -19,7 +20,11 @@ import { useSessions } from './user-queries'
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </NextIntlClientProvider>
+  )
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -27,12 +32,14 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe('useSessions — MSW integration', () => {
-  it('sends page/limit as real query string params, not just as arguments a mock ignores', async () => {
+  it('sends page/limit as real query string params and the active locale as Accept-Language', async () => {
     let capturedUrl: URL | undefined
+    let capturedAcceptLanguage: string | null = null
 
     server.use(
       http.get('/api/auth/sessions', ({ request }) => {
         capturedUrl = new URL(request.url)
+        capturedAcceptLanguage = request.headers.get('accept-language')
         const body: SessionsListResponse = { data: [], total: 0, page: 3, limit: 5 }
         return HttpResponse.json(body)
       })
@@ -44,6 +51,7 @@ describe('useSessions — MSW integration', () => {
 
     expect(capturedUrl?.searchParams.get('page')).toBe('3')
     expect(capturedUrl?.searchParams.get('limit')).toBe('5')
+    expect(capturedAcceptLanguage).toBe(DEFAULT_LOCALE)
     expect(result.current.data).toEqual({ data: [], total: 0, page: 3, limit: 5 })
   })
 

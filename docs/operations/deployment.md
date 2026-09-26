@@ -464,8 +464,13 @@ disabled by default so a fresh checkout is unaffected:
   to stock `req.ip`, identical to before ADR-072.
 
 **Both must be set for either to have an effect.** `getClientIp()`/audit-log
-IP and the invite-abuse limiter are not wired to this relay — only the
-global throttler is. Full contract and current status:
+IP, invite-abuse, password-login and step-up limiters are not wired to
+this relay. Its consumers are the existing global throttler and Session
+metadata capture only. Credential register/login, OAuth login callbacks and
+refresh generations use a valid peer-verified claim for stored Session IP;
+otherwise they retain req.ip/socket fallback. Password-login check/consume/
+reset continue using the existing req.ip-derived address. Global req.ip and
+TRUST_PROXY remain unchanged. Full contract and current status:
 [`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
 "Client-IP relay to `apps/api`".
 

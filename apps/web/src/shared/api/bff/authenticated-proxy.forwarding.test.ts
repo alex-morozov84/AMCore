@@ -7,10 +7,10 @@ import { ensureFreshSession } from './ensure-fresh-session'
 import { isTrustedOrigin } from './origin-guard'
 
 vi.mock('server-only', () => ({}))
-vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
 vi.mock('./origin-guard', () => ({ isTrustedOrigin: vi.fn() }))
 vi.mock('./ensure-fresh-session', () => ({ ensureFreshSession: vi.fn() }))
-vi.mock('./upstream-refresh', () => ({ upstreamRefresh: vi.fn() }))
+vi.mock('./upstream-refresh', () => ({ createUpstreamRefresh: vi.fn(() => vi.fn()) }))
 
 describe('proxyToBackend — request/response forwarding once authenticated', () => {
   beforeEach(() => {

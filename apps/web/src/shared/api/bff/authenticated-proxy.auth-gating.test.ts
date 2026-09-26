@@ -10,10 +10,10 @@ import { isTrustedOrigin } from './origin-guard'
 import { upstreamRefresh } from './upstream-refresh'
 
 vi.mock('server-only', () => ({}))
-vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
 vi.mock('./origin-guard', () => ({ isTrustedOrigin: vi.fn() }))
 vi.mock('./ensure-fresh-session', () => ({ ensureFreshSession: vi.fn() }))
-vi.mock('./upstream-refresh', () => ({ upstreamRefresh: vi.fn() }))
+vi.mock('./upstream-refresh', () => ({ createUpstreamRefresh: vi.fn(() => vi.fn()) }))
 
 describe('proxyToBackend — session/CSRF gating and auth-failure classification', () => {
   beforeEach(() => {

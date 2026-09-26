@@ -1,12 +1,16 @@
 import * as argon2 from 'argon2'
+import type { Request, Response } from 'express'
 import type { PinoLogger } from 'nestjs-pino'
 
 import type { LoginInput, RegisterInput } from '@amcore/shared'
 import { AuthErrorCode } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
+import { resolveTrustedWebPeers } from '../../common/utils/trusted-web-peer'
+import type { EnvService } from '../../env/env.service'
 import type { AuditLogService } from '../audit'
 
+import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { EmailIdentityService } from './email-identity.service'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
@@ -467,7 +471,11 @@ describe('AuthService', () => {
       password: 'Password123',
     }
 
-    const requestInfo = { userAgent: 'Mozilla/5.0', ipAddress: '192.168.1.1' }
+    const requestInfo = {
+      userAgent: 'Mozilla/5.0',
+      ipAddress: '192.168.1.1',
+      sessionIpAddress: '192.168.1.1',
+    }
 
     it('should login user successfully', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
@@ -1040,6 +1048,79 @@ describe('AuthService', () => {
       mockEmailService.sendEmailVerificationEmail.mockRejectedValue(new Error('provider down'))
 
       await expect(authService.resendVerificationEmail(mockUser.email)).resolves.not.toThrow()
+    })
+  })
+  describe('login controller/service metadata boundary', () => {
+    it.each([
+      ['trusted', 'success'],
+      ['trusted', 'wrong-password'],
+      ['trusted', 'missing-user'],
+      ['trusted', 'missing-hash'],
+      ['disabled', 'success'],
+      ['disabled', 'wrong-password'],
+      ['untrusted', 'success'],
+      ['untrusted', 'wrong-password'],
+      ['trusted', 'limited'],
+      ['no-req-ip', 'success'],
+    ])('%s / %s preserves password limiter identity', async (trust, outcome) => {
+      mockEnvService.get.mockImplementation((key: string) =>
+        key === 'TRUSTED_WEB_PEERS' && trust !== 'disabled'
+          ? resolveTrustedWebPeers('172.20.0.5')
+          : undefined
+      )
+      const req = {
+        ip: trust === 'no-req-ip' ? undefined : '172.20.0.5',
+        socket: { remoteAddress: trust === 'untrusted' ? '172.20.0.6' : '172.20.0.5' },
+        headers: { 'user-agent': 'Visitor browser', 'x-amcore-client-ip': '8.8.8.8' },
+      } as unknown as Request
+      const controller = new AuthController(
+        authService,
+        {} as never,
+        mockSessionService,
+        mockTokenService,
+        mockEnvService as unknown as EnvService
+      )
+      mockCtx.prisma.user.findUnique.mockResolvedValue(
+        outcome === 'missing-user'
+          ? null
+          : { ...mockUser, passwordHash: outcome === 'missing-hash' ? null : mockUser.passwordHash }
+      )
+      ;(argon2.verify as jest.Mock).mockResolvedValue(outcome !== 'wrong-password')
+      mockSessionService.createSession.mockResolvedValue(
+        mockCreateSessionResult('refresh') as never
+      )
+      if (outcome === 'limited') mockLoginRateLimiter.check.mockRejectedValue(new Error('limited'))
+      const result = await controller
+        .login({ email: 'Test@Example.COM', password: 'Password123' }, req, {
+          cookie: jest.fn(),
+        } as unknown as Response)
+        .then(
+          () => 'success',
+          () => 'failure'
+        )
+      const success = outcome === 'success',
+        limited = outcome === 'limited'
+      const limiterIp = req.ip ?? ''
+      expect(result).toBe(success ? 'success' : 'failure')
+      expect(mockLoginRateLimiter.check.mock.calls).toEqual([['test@example.com', limiterIp]])
+      expect(mockLoginRateLimiter.reset.mock.calls).toEqual(
+        success ? [['test@example.com', limiterIp]] : []
+      )
+      expect(mockLoginRateLimiter.consume.mock.calls).toEqual(
+        !success && !limited ? [['test@example.com', limiterIp]] : []
+      )
+      const expectedSession = expect.objectContaining({
+        ipAddress: ['disabled', 'untrusted'].includes(trust) ? req.ip : '8.8.8.8',
+        userAgent: 'Visitor browser',
+      })
+      expect(mockSessionService.createSession.mock.calls).toEqual(
+        success ? [[expectedSession]] : []
+      )
+      expect(mockTokenService.generateAccessToken).toHaveBeenCalledTimes(success ? 1 : 0)
+      expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledTimes(limited ? 0 : 1)
+      expect(argon2.verify).toHaveBeenCalledTimes(
+        ['limited', 'missing-user', 'missing-hash'].includes(outcome) ? 0 : 1
+      )
     })
   })
 })

@@ -6,6 +6,7 @@ import { PassportModule } from '@nestjs/passport'
 import { EnvModule } from '../../env/env.module'
 import { EnvService } from '../../env/env.service'
 import { EmailModule } from '../../infrastructure/email'
+import { GeoipModule } from '../../infrastructure/geoip/geoip.module'
 import { MediaModule } from '../../infrastructure/media'
 import { PrismaModule } from '../../prisma'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
@@ -49,6 +50,7 @@ import { UserCacheService } from './user-cache.service'
     EmailModule,
     ApiKeysModule,
     AuditModule,
+    GeoipModule,
     MediaModule,
     NotificationsCoreModule,
     JwtModule.registerAsync({

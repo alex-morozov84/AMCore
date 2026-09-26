@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Operations Console: session viewer and revocation.** A `SUPER_ADMIN` can
+  view another user's active sessions from their detail page — device
+  (parsed, never a raw user-agent), approximate IP-based location, last
+  authenticated/latest-token-issued/expiry timestamps — and revoke one
+  session or all of them, gated by step-up re-authentication. Revoking blocks
+  future refresh immediately; an already issued access token can remain
+  valid until it expires. Approximate location is powered by an optional,
+  enabled-by-default local GeoIP database (DB-IP City Lite, MIT `maxmind`
+  reader, a daily self-updating job) and shared with the product's own
+  Settings → Sessions page, which now also shows a parsed device label and
+  location instead of a raw user-agent/bare IP. Every successful admin
+  session-list read is itself audited and hidden from Audit browsing by
+  default, matching the existing Audit-log read pattern.
+
+### Changed
+
+- Card titles now require an explicit semantic heading level. Console login,
+  user and organization details, and Sessions use headings matching their page
+  outline without changing their appearance.
+
 ## [0.10.0] - 2026-09-26
 
 ### Security
