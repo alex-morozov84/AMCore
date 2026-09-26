@@ -18,11 +18,12 @@ const catalogues = { en, ru } as const
 
 function renderFallback(
   reason: 'rate-limited' | 'timeout' | 'network' | 'upstream' = 'upstream',
-  locale: keyof typeof catalogues = 'en'
+  locale: keyof typeof catalogues = 'en',
+  onRetry?: () => void
 ) {
   return render(
     <NextIntlClientProvider locale={locale} messages={catalogues[locale]}>
-      <PrimaryUnavailableFallback reason={reason} />
+      <PrimaryUnavailableFallback reason={reason} onRetry={onRetry} />
     </NextIntlClientProvider>
   )
 }
@@ -69,5 +70,16 @@ describe('PrimaryUnavailableFallback', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls the provided onRetry instead of router.refresh() when given', async () => {
+    const user = userEvent.setup()
+    const onRetry = vi.fn()
+    renderFallback('network', 'en', onRetry)
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(onRetry).toHaveBeenCalledTimes(1)
+    expect(refresh).not.toHaveBeenCalled()
   })
 })

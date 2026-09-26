@@ -6,7 +6,7 @@ import { getCurrentVaultSession } from './current-session'
 import { FakeVaultStore, makeEntry } from './test-fakes'
 
 vi.mock('server-only', () => ({}))
-vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
 
 function mockCookieStore(sessionId: string | undefined) {
   vi.mocked(cookies).mockResolvedValue({

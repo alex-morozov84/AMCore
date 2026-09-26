@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import type { Locale } from 'next-intl'
 import { getLocale } from 'next-intl/server'
 import type { UserResponse } from '@amcore/shared'
@@ -12,7 +12,7 @@ import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultLock } from './session-lock'
 import type { VaultEntry } from './session-vault.types'
 import { redisVaultStore } from './session-vault-store'
-import { upstreamRefresh } from './upstream-refresh'
+import { createUpstreamRefresh } from './upstream-refresh'
 
 import 'server-only'
 
@@ -49,7 +49,7 @@ export const getOptionalSessionEntry = cache(async (): Promise<VaultEntry | null
     return await ensureFreshSession(sessionId, {
       store: redisVaultStore,
       lock: redisVaultLock,
-      upstreamRefresh,
+      upstreamRefresh: createUpstreamRefresh(await headers()),
     })
   } catch (error) {
     if (

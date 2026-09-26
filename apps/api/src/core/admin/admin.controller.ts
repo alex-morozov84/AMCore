@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -12,6 +14,7 @@ import {
 } from '@nestjs/common'
 import {
   ApiBearerAuth,
+  ApiHeader,
   ApiNoContentResponse,
   ApiOperation,
   ApiParam,
@@ -30,10 +33,13 @@ import {
   type AdminOrganizationDetailResponse,
   type AdminOrganizationListResponse,
   type AdminOverviewResponse,
+  adminSessionIdSchema,
+  type AdminSessionsListResponse,
   type AdminUserDetailResponse,
   type AdminUserListResponse,
   type AdminUserResponse,
   AuthType,
+  coerceSupportedLocale,
   PAGINATION,
   type RequestPrincipal,
   SystemRole,
@@ -50,6 +56,7 @@ import { AdminService } from './admin.service'
 import { AdminAuditService } from './admin-audit.service'
 import { AdminDetailService } from './admin-detail.service'
 import { AdminOverviewService } from './admin-overview.service'
+import { AdminSessionsService } from './admin-sessions.service'
 import { AdminAuditResponseDto } from './dto/admin-audit.dto'
 import {
   AdminOrganizationDetailQueryDto,
@@ -60,6 +67,7 @@ import {
 import { AdminOrganizationListQueryDto } from './dto/admin-organization-list-query.dto'
 import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto'
 import { AdminOverviewResponseDto } from './dto/admin-overview-response.dto'
+import { AdminSessionsListResponseDto, AdminSessionsQueryDto } from './dto/admin-session.dto'
 import { AdminUserListQueryDto } from './dto/admin-user-list-query.dto'
 import { AdminUserListResponseDto, AdminUserResponseDto } from './dto/admin-user-response.dto'
 import { CleanupResultDto } from './dto/cleanup-result.dto'
@@ -95,7 +103,8 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly overviewService: AdminOverviewService,
     private readonly auditService: AdminAuditService,
-    private readonly detailService: AdminDetailService
+    private readonly detailService: AdminDetailService,
+    private readonly sessionsService: AdminSessionsService
   ) {}
 
   @Get('access')
@@ -289,6 +298,119 @@ export class AdminController {
     @Body() dto: UpdateSystemRoleDto
   ): Promise<AdminUserResponse> {
     return this.adminService.updateUserSystemRole(id, dto.systemRole, actor)
+  }
+
+  @Get('users/:id/sessions')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: "List another user's active sessions — SUPER_ADMIN only",
+    description:
+      'Active (non-revoked, non-expired) sessions only, one per logical session family. ' +
+      'Each successful read is itself audited (bounded page/limit/result-count only), ' +
+      'hidden from Audit browsing by default.',
+  })
+  @ApiParam({ name: 'id', description: 'Target user CUID or UUID' })
+  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION.MAX_LIMIT,
+  })
+  @ApiHeader({
+    name: 'accept-language',
+    required: false,
+    description:
+      "Display locale for each session's approximate-location city name ('en'/'ru'); " +
+      'unsupported or absent falls back to en.',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid user ID or pagination' })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
+  @ApiResponse({ status: 404, description: 'User no longer exists' })
+  @ZodResponse({
+    type: AdminSessionsListResponseDto,
+    status: 200,
+    description: 'Paginated active sessions',
+  })
+  listUserSessions(
+    @CurrentUser() actor: RequestPrincipal,
+    @Param('id') id: string,
+    @Query() query: AdminSessionsQueryDto,
+    @Headers('accept-language') acceptLanguage: string | undefined
+  ): Promise<AdminSessionsListResponse> {
+    const userId = adminDetailIdSchema.safeParse(id)
+    if (!userId.success) throw new ZodValidationException(userId.error)
+    return this.sessionsService.list(
+      userId.data,
+      query,
+      coerceSupportedLocale(acceptLanguage),
+      actor
+    )
+  }
+
+  @Delete('users/:id/sessions/:sessionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Revoke one of another user's sessions — SUPER_ADMIN only" })
+  @ApiParam({ name: 'id', description: 'Target user CUID or UUID' })
+  @ApiParam({ name: 'sessionId', description: 'Opaque admin session identity (session family)' })
+  // OB-06b: destructive privileged op — require step-up freshness.
+  @RequireFreshAuth()
+  @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
+  @ApiNoContentResponse({ description: 'Session revoked (or already inactive — idempotent)' })
+  @ApiResponse({
+    status: 400,
+    description: 'BUSINESS_RULE_VIOLATION — cannot revoke your own session through this action',
+  })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'SUPER_ADMIN required, or STEP_UP_REQUIRED (session not recently re-authenticated)',
+  })
+  @ApiResponse({ status: 404, description: 'Session family absent or belongs to another user' })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded for this privileged operation' })
+  async revokeUserSession(
+    @CurrentUser() actor: RequestPrincipal,
+    @Param('id') id: string,
+    @Param('sessionId') sessionId: string
+  ): Promise<void> {
+    const userId = adminDetailIdSchema.safeParse(id)
+    if (!userId.success) throw new ZodValidationException(userId.error)
+    const familyId = adminSessionIdSchema.safeParse(sessionId)
+    if (!familyId.success) throw new ZodValidationException(familyId.error)
+    await this.sessionsService.revokeOne(userId.data, familyId.data, actor)
+  }
+
+  @Delete('users/:id/sessions')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Revoke all of another user's active sessions — SUPER_ADMIN only" })
+  @ApiParam({ name: 'id', description: 'Target user CUID or UUID' })
+  // OB-06b: destructive privileged op — require step-up freshness.
+  @RequireFreshAuth()
+  @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
+  @ApiNoContentResponse({
+    description: 'All active sessions revoked (204 even if none were active)',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'BUSINESS_RULE_VIOLATION — cannot revoke your own sessions through this action',
+  })
+  @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'SUPER_ADMIN required, or STEP_UP_REQUIRED (session not recently re-authenticated)',
+  })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded for this privileged operation' })
+  async revokeAllUserSessions(
+    @CurrentUser() actor: RequestPrincipal,
+    @Param('id') id: string
+  ): Promise<void> {
+    const userId = adminDetailIdSchema.safeParse(id)
+    if (!userId.success) throw new ZodValidationException(userId.error)
+    await this.sessionsService.revokeAll(userId.data, actor)
   }
 
   @Post('cleanup')

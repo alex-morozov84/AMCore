@@ -101,6 +101,9 @@ Already running? Reach for whichever concern below applies.
 - **[Idempotency](idempotency.md)** — the opt-in HTTP idempotency primitive for
   unsafe `POST`s: fingerprinting, replay semantics (first result wins, including
   `5xx`), and fail-open/closed behavior.
+- **[GeoIP setup](geoip-setup.md)** — the optional approximate-location lookup
+  behind the Console and Settings Sessions panels: provider, updater
+  scheduling, storage/topology, and missing/corrupt/stale behavior.
 
 Endpoint shapes live in the Swagger/OpenAPI document at `/docs`; these runbooks
 cover operation, not request/response schemas.

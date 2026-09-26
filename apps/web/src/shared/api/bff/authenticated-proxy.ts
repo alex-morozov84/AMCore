@@ -11,7 +11,7 @@ import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultLock } from './session-lock'
 import { redisVaultStore } from './session-vault-store'
 import { resolveTrustedClientIp } from './trusted-client-ip'
-import { upstreamRefresh } from './upstream-refresh'
+import { createUpstreamRefresh } from './upstream-refresh'
 
 import 'server-only'
 
@@ -49,7 +49,7 @@ export async function proxyToBackend(request: Request, pathSegments: string[]): 
     const session = await ensureFreshSession(sessionId, {
       store: redisVaultStore,
       lock: redisVaultLock,
-      upstreamRefresh,
+      upstreamRefresh: createUpstreamRefresh(request.headers),
     })
     accessToken = session.accessToken
   } catch (error) {

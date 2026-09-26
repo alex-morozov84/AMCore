@@ -4,6 +4,8 @@ export const LOCALE_ONLY_E2E_PATHS = [
 ]
 
 export const E2E_ROUTE_SURFACES = [
+  ['apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts', 6],
+  ['apps/web/e2e/console-real-stack/sessions.spec.ts', 6],
   ['apps/web/e2e/console-real-stack/session-isolation.spec.ts', 5],
   ['apps/web/e2e/mocked/accessibility.spec.ts', 4],
   ['apps/web/e2e/mocked/api-error-rendering.spec.ts', 1],

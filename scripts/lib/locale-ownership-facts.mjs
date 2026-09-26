@@ -47,6 +47,9 @@ const e2eVerification = [
 ].map((path) => one(path, { disposition: 'rewrite' }))
 
 const localeOnlyVerification = [
+  'apps/web/src/entities/user/api/user-sessions-locale.test.tsx',
+  'apps/web/src/features/console-user-sessions/model/use-user-sessions.locale.test.tsx',
+
   'apps/web/e2e/mocked/locale-redirect.spec.ts',
   'apps/web/e2e/real-stack/locale-persistence.spec.ts',
 ].map((path) => one(path, { disposition: 'delete' }))

@@ -88,7 +88,7 @@ describe('callUpstreamAuth', () => {
     await expect(callUpstreamAuth('/auth/login', {})).rejects.toThrow(/did not set/)
   })
 
-  it('forwards Accept-Language from the original browser request', async () => {
+  it('forwards browser locale and device metadata from the original request', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       fakeResponse({
         ok: true,
@@ -99,13 +99,14 @@ describe('callUpstreamAuth', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
     const originalRequest = new Request('http://next.internal/api/auth/register', {
-      headers: { 'accept-language': 'ru-RU,ru;q=0.9' },
+      headers: { 'accept-language': 'ru-RU,ru;q=0.9', 'user-agent': 'Browser device probe' },
     })
 
     await callUpstreamAuth('/auth/register', {}, originalRequest)
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect((init.headers as Record<string, string>)['Accept-Language']).toBe('ru-RU,ru;q=0.9')
+    expect((init.headers as Record<string, string>)['User-Agent']).toBe('Browser device probe')
   })
 
   it('omits Accept-Language when the original request has none', async () => {

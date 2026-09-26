@@ -13,9 +13,9 @@ import {
 } from './errors'
 
 vi.mock('server-only', () => ({}))
-vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
 vi.mock('./ensure-fresh-session', () => ({ ensureFreshSession: vi.fn() }))
-vi.mock('./upstream-refresh', () => ({ upstreamRefresh: vi.fn() }))
+vi.mock('./upstream-refresh', () => ({ createUpstreamRefresh: vi.fn(() => vi.fn()) }))
 vi.mock('next-intl/server', () => ({ getLocale: vi.fn().mockResolvedValue('en') }))
 vi.mock('@/i18n/navigation', () => ({ redirect: vi.fn() }))
 // `cache()` is per-request in real Next.js (fresh scope per render, via

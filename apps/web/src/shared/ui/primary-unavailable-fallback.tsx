@@ -27,6 +27,14 @@ export interface PrimaryUnavailableFallbackProps {
    *  this starter ships no automatic retry (FINAL PLAN §8), so a countdown
    *  built on it is a downstream product decision, not a default. */
   retryAfterMs?: number
+  /**
+   * Overrides the default `router.refresh()` retry action. `router.refresh()`
+   * re-runs a Server Component tree; it does not refetch a client-side
+   * TanStack Query, so a client interactive leaf using this same
+   * presentation for a failed Query passes its own `refetch` here instead.
+   * Server-rendered call sites omit this and keep the original behavior.
+   */
+  onRetry?: () => void
 }
 
 /**
@@ -42,7 +50,7 @@ export interface PrimaryUnavailableFallbackProps {
  * not `catchError`'s `retry()`, since there is no error boundary in this
  * path to recover from.
  */
-export function PrimaryUnavailableFallback({ reason }: PrimaryUnavailableFallbackProps) {
+export function PrimaryUnavailableFallback({ reason, onRetry }: PrimaryUnavailableFallbackProps) {
   const t = useTranslations('common')
   const router = useRouteProgressRouter()
 
@@ -51,7 +59,7 @@ export function PrimaryUnavailableFallback({ reason }: PrimaryUnavailableFallbac
       <AlertTriangle aria-hidden="true" />
       <AlertDescription className="gap-3">
         <span>{t(MESSAGE_KEYS[reason])}</span>
-        <Button size="sm" onClick={() => router.refresh()}>
+        <Button size="sm" onClick={onRetry ?? (() => router.refresh())}>
           <RefreshCw className="size-4" />
           {t('retry')}
         </Button>

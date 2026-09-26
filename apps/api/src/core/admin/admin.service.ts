@@ -20,12 +20,10 @@ import {
 import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { CleanupService } from '../../infrastructure/schedule/cleanup.service'
-import { PrismaService } from '../../prisma'
+import { acquireXactLock, PrismaService } from '../../prisma'
 import { AuditLogService } from '../audit'
 
 import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
-
-type PrismaTx = Prisma.TransactionClient
 
 /**
  * Prisma `select` allowlist for admin user responses (OA-07).
@@ -242,7 +240,7 @@ export class AdminService {
     }
 
     const { before, after, row } = await this.prisma.$transaction(async (tx) => {
-      await this.acquireXactLock(tx, 'system-role:SUPER_ADMIN')
+      await acquireXactLock(tx, 'system-role:SUPER_ADMIN')
 
       const target = await tx.user.findUnique({ where: { id }, select: ADMIN_USER_SELECT })
       if (!target) throw new NotFoundException('User', id)
@@ -406,16 +404,6 @@ export class AdminService {
         'Failed to revoke target sessions after system-role change'
       )
     }
-  }
-
-  /**
-   * Transaction-scoped advisory lock. Hashed via `hashtextextended` so
-   * any string namespace fits into Postgres `bigint`. `${key}` is
-   * always parameterized — never string-interpolated — so callers
-   * cannot accidentally inject SQL through a lock key.
-   */
-  private async acquireXactLock(tx: PrismaTx, key: string): Promise<void> {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0)::bigint)`
   }
 
   /**

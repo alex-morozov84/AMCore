@@ -35,6 +35,8 @@ export {
   type ResetPasswordInput,
   resetPasswordSchema,
   type Session,
+  type SessionLocation,
+  sessionLocationSchema,
   sessionSchema,
   type SessionsListResponse,
   sessionsListResponseSchema,
@@ -137,6 +139,17 @@ export {
   type AdminUserDetailResponse,
   adminUserDetailResponseSchema,
 } from './admin-detail'
+export {
+  type AdminSession,
+  adminSessionIdSchema,
+  adminSessionSchema,
+  type AdminSessionsListResponse,
+  adminSessionsListResponseSchema,
+  type AdminSessionsQuery,
+  adminSessionsQuerySchema,
+  type AdminSessionsRevokeResult,
+  adminSessionsRevokeResultSchema,
+} from './admin-session'
 
 // Pagination schemas
 export {

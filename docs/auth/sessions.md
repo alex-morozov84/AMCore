@@ -1,6 +1,8 @@
 # Sessions
 
-Every login creates a session — a record linking a user to a device. Sessions are how the system tracks who is logged in where.
+Every login starts an independent refresh-token family. Each Session row is
+one token generation with descriptive request metadata, not a verified device
+or an activity history.
 
 ---
 
@@ -30,7 +32,20 @@ in Redis and sends it to `apps/api` only on server-to-server calls. The session
 model below is still the backend source of truth; the difference is where the
 raw token lives in the bundled web client.
 
-One user can have many sessions (one per device). They're fully independent.
+One user can have many sessions. They're fully independent — a session is one
+login's refresh-token lineage, not "one per device": logging in twice on the
+same device (a second browser profile, an incognito window, a repeated
+manual login) creates a second, independent session, and a single browser
+session can itself later carry an approximate location alongside its device
+info (see [Listing active sessions](#listing-active-sessions)).
+
+UA/IP are captured on registration, login, OAuth login callback and each refresh
+generation. The bundled BFF preserves current visitor UA; missing UA is null.
+Stored IP uses an opt-in peer-verified visitor claim when configured, otherwise
+req.ip/socket fallback. See [GeoIP setup](../operations/geoip-setup.md#capturing-visitor-ip-through-the-bff).
+This does not change password-login rate-limit identity, global Express proxy
+trust, audit IP or authorization. Historical Node UA/internal peer IP is not
+backfilled; its original visitor metadata cannot be reconstructed reliably.
 
 ## Operations Console host mode
 
@@ -118,7 +133,8 @@ curl 'https://api.amcore.dev/api/v1/auth/sessions?page=1&limit=20' \
     {
       "id": "sess_abc123",
       "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36...",
-      "ipAddress": "192.168.1.1",
+      "ipAddress": "81.2.69.142",
+      "location": { "city": "London", "countryCode": "GB" },
       "createdAt": "2024-03-20T10:00:00.000Z",
       "current": true
     },
@@ -126,6 +142,7 @@ curl 'https://api.amcore.dev/api/v1/auth/sessions?page=1&limit=20' \
       "id": "sess_def456",
       "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)...",
       "ipAddress": "10.0.0.5",
+      "location": null,
       "createdAt": "2024-03-18T14:22:00.000Z",
       "current": false
     }
@@ -143,6 +160,17 @@ JWT alone. In `apps/web`, the dedicated BFF handler for
 `Cookie: refresh_token=<vault token>` on its server-to-server call. The generic
 `/api/[...path]` proxy intentionally never forwards browser cookies. Revoked or
 expired refresh tokens are not listed here.
+
+`location` is an approximate, nullable city/country derived from the stored
+`ipAddress` via an optional local GeoIP database — `null` whenever GeoIP is
+disabled, the database has not loaded, the address is private/reserved, or
+there is no match. It never affects whether auth, listing, or revocation
+work. See [GeoIP setup](../operations/geoip-setup.md) for deployment guidance. `city` is resolved server-side in the caller's
+negotiated `Accept-Language` (falling back to English); a direct API client
+that wants a specific language sends that header explicitly.
+
+The optional Console also displays this metadata; see the
+[session presentation](../operations-console/users.md#manage-sessions).
 
 ---
 
@@ -181,18 +209,89 @@ vault-held refresh token. Product code should call the same-origin
 
 ---
 
+## Admin session management
+
+A `SUPER_ADMIN` can view and revoke **another user's** sessions directly
+through the following API routes.
+
+The optional Console provides the same operations through its Sessions panel:
+[Operations Console → Users](../operations-console/users.md#manage-sessions).
+
+| Endpoint                                             | Purpose                                                                                                                                                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/admin/users/:id/sessions`               | Paginated active sessions for the target user. Same envelope shape as the self-service list, plus an opaque `sessionId` (never the physical row id or a token hash) in place of `id`. |
+| `DELETE /api/v1/admin/users/:id/sessions/:sessionId` | Revoke one session. `204` even if it was already inactive (idempotent); `404` if it never belonged to that user.                                                                      |
+| `DELETE /api/v1/admin/users/:id/sessions`            | Revoke every active session for that user. Always `204`, even with zero active sessions.                                                                                              |
+
+Each admin list item contains `sessionId`, nullable `userAgent`, `ipAddress`
+and `location`, nullable `lastAuthAt`, and ISO `createdAt`/`expiresAt` timestamps.
+`sessionId` stays stable across refresh rotation. `createdAt` is the current
+token generation's issue time; `lastAuthAt` is password/login authentication
+freshness, not last activity. There is no `current` flag in the admin view.
+Pagination defaults to page 1 / limit 20, with a maximum limit of 100; `total`
+counts active families across all pages. Reads use `Cache-Control: private,
+no-store`. Send `Accept-Language` for city localization:
+
+```bash
+curl 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions?page=1&limit=20' \
+  -H 'Authorization: Bearer <super-admin-access-token>' \
+  -H 'Accept-Language: en'
+```
+
+Use the returned admin `sessionId`, not a self-service row `id`, to revoke one:
+
+```bash
+curl -i -X DELETE 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions/<session-id-from-list>' \
+  -H 'Authorization: Bearer <super-admin-access-token>'
+
+curl -i -X DELETE 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions' \
+  -H 'Authorization: Bearer <super-admin-access-token>'
+```
+
+Both return `204` without a response body on success. A `403 STEP_UP_REQUIRED`
+requires re-authentication with the operator's own password at
+`POST /api/v1/auth/step-up`; direct API clients use its returned access token
+when retrying. OAuth-only accounts receive `STEP_UP_METHOD_UNAVAILABLE`.
+A `404` on revoke-one means the family is absent or does not belong to the
+target; invalid IDs/pagination return `400`, missing bearer credentials or
+API keys return `401`, insufficient system role returns `403`, and privileged
+mutation throttling can return `429`. Do not repeatedly retry a terminal
+freshness or authorization error.
+
+Both `DELETE` routes require step-up (a recently re-authenticated admin
+session) and reject a target equal to the admin's own account — an admin
+manages their own sessions through the self-service endpoints above, not
+these. Revoking blocks future refresh immediately; an access token already
+issued before the revoke can remain valid until its own expiry (default 15
+minutes, configurable via `JWT_ACCESS_EXPIRATION`) — the same residual-access
+caveat documented for [system-role changes](#when-sessions-are-automatically-invalidated).
+Every successful list read is itself audited (`admin.user.sessions_viewed`,
+bounded page/limit/result-count metadata only — no IP/user-agent/location
+values), hidden from Audit browsing by default the same way
+`admin.audit_logs.viewed` is; revoke actions are audited as
+`admin.user.session_revoked` / `admin.user.sessions_revoked`.
+
+This is a starter-owned recovery/security control, distinct from instant
+access-token invalidation (an already-issued access token is never
+force-expired) — that remains a separately tracked possible future
+enhancement, not part of this feature.
+
+---
+
 ## When sessions are automatically invalidated
 
 Sessions don't just expire — they can be invalidated by specific events:
 
-| Event                    | What gets invalidated                 |
-| ------------------------ | ------------------------------------- |
-| Password reset           | All sessions (every device signs out) |
-| Session revoked by user  | That specific session only            |
-| "Sign out everywhere"    | All sessions except current           |
-| Logout                   | Current session only                  |
-| System-role change       | All sessions of the affected user     |
-| Session expired (7 days) | Cleaned up by nightly job             |
+| Event                      | What gets invalidated                 |
+| -------------------------- | ------------------------------------- |
+| Password reset             | All sessions (every device signs out) |
+| Session revoked by user    | That specific session only            |
+| "Sign out everywhere"      | All sessions except current           |
+| Logout                     | Current session only                  |
+| System-role change         | All sessions of the affected user     |
+| Admin-revoked session      | That specific session only            |
+| Admin-revoked all sessions | All sessions of the target user       |
+| Session expired (7 days)   | Cleaned up by nightly job             |
 
 A **system-role change** (e.g. a `SUPER_ADMIN` promotion or demotion via the
 admin API) revokes **all** of the target user's sessions, so they must
@@ -206,7 +305,8 @@ a fresh login.
 ## Step-up re-authentication
 
 Each session tracks when it was last authenticated (`lastAuthAt`). Destructive
-admin operations — `PATCH /admin/users/:id` and `POST /admin/cleanup` — require
+admin operations — system-role changes, admin session revocation and
+`POST /admin/cleanup` — require
 that timestamp to be recent (within `STEP_UP_MAX_AGE_SECONDS`, default 10
 minutes). If it is stale, the request is rejected with `403 STEP_UP_REQUIRED`.
 

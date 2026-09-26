@@ -27,6 +27,21 @@ export const E2E_UI_PROFILES = Object.freeze({
     ['/sign in/i', '/войти/i'],
     ['/sign out/i', '/выйти/i'],
   ],
+  consoleSessions: [
+    ['/sessions \\(/i', '/сессии \\(/i'],
+    ['/Sessions \\(2 total\\)/i', '/Сессии \\(всего: 2\\)/i'],
+    ['/Sessions \\(1 total\\)/', '/Сессии \\(всего: 1\\)/'],
+    ['/actions for session/i', '/действия для сессии/i'],
+    ['/revoke session/i', '/отозвать сессию/i'],
+    ['/revoke all sessions/i', '/отозвать все сессии/i'],
+    ["'Revoke all sessions'", "'Отозвать все сессии'"],
+    ['/no active sessions/i', '/нет активных сессий/i'],
+    ["'No active sessions.'", "'Нет активных сессий.'"],
+    ['/confirm your password/i', '/подтвердите пароль/i'],
+    ['/confirm/i', '/подтвердить/i'],
+    ['/manage your own sessions/i', '/чтобы управлять своими сессиями/i'],
+    ["'Chrome on Windows'", "'Chrome на Windows'"],
+  ],
   dashboard: [
     ["'Welcome'", "'Добро пожаловать'"],
     ["'Welcome!'", "'Добро пожаловать!'"],
@@ -50,6 +65,12 @@ const surface = (path, namespaces, expectedReferences) => ({
 })
 
 export const E2E_UI_SURFACES = Object.freeze([
+  surface(
+    'apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts',
+    ['auth', 'consoleSessions'],
+    23
+  ),
+  surface('apps/web/e2e/console-real-stack/sessions.spec.ts', ['console', 'consoleSessions'], 10),
   surface('apps/web/e2e/console-real-stack/session-isolation.spec.ts', ['console'], 5),
   surface('apps/web/e2e/mocked/accessibility.spec.ts', ['auth'], 2),
   surface('apps/web/e2e/mocked/api-error-rendering.spec.ts', ['auth', 'common'], 3),

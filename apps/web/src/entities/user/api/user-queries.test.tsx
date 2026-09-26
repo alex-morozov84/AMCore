@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from 'next-intl'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -12,7 +14,11 @@ vi.mock('@/shared/api', () => ({
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </NextIntlClientProvider>
+  )
 }
 
 function wrapperWithCachedUser(avatarUrl: string | null) {
@@ -28,19 +34,21 @@ function wrapperWithCachedUser(avatarUrl: string | null) {
 
 describe('userKeys.sessions', () => {
   it('includes page and limit, so different pages get different cache entries', () => {
-    expect(userKeys.sessions(1, 20)).not.toEqual(userKeys.sessions(2, 20))
+    expect(userKeys.sessions(DEFAULT_LOCALE, 1, 20)).not.toEqual(
+      userKeys.sessions(DEFAULT_LOCALE, 2, 20)
+    )
   })
 })
 
 describe('useSessions', () => {
-  it('fetches the requested page/limit through authApi.getSessions', async () => {
+  it('fetches the requested page/limit through authApi.getSessions with the active locale', async () => {
     vi.mocked(authApi.getSessions).mockResolvedValue({ data: [], total: 0, page: 2, limit: 10 })
 
     const { result } = renderHook(() => useSessions(2, 10), { wrapper })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    expect(authApi.getSessions).toHaveBeenCalledWith(2, 10)
+    expect(authApi.getSessions).toHaveBeenCalledWith(2, 10, DEFAULT_LOCALE)
     expect(result.current.data).toEqual({ data: [], total: 0, page: 2, limit: 10 })
   })
 })

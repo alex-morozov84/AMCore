@@ -8,18 +8,18 @@ This guide covers everything — from "how do I log a user in" to "how do I rest
 
 ## What's included
 
-| Topic                                                 | What it covers                                                           |
-| ----------------------------------------------------- | ------------------------------------------------------------------------ |
-| [Concepts](./concepts.md)                             | How tokens, sessions, and the security model work                        |
-| [CSRF Posture](./csrf.md)                             | Which cookie surfaces exist and how CSRF is handled                      |
-| [Email Auth](./email-auth.md)                         | Register, login, password reset, email verification                      |
-| [OAuth](./oauth.md)                                   | Social login (Google, GitHub, Apple, Telegram) + account linking         |
-| [Sessions](./sessions.md)                             | Managing active sessions, token rotation, multi-device                   |
-| [RBAC](./rbac.md)                                     | System roles, organizations, permissions, CASL — the auth-z guide        |
-| [Invites](./invites.md)                               | Inviting people to an organization by email                              |
-| [API Keys](./api-keys.md)                             | Machine-to-machine access with scoped keys                               |
-| [Auth contracts](./reference.md)                      | Credential model, error codes, environment variables                     |
-| [Operations Console](../operations-console/README.md) | Separate `SUPER_ADMIN` control-plane admission and host session boundary |
+| Topic                                                 | What it covers                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [Concepts](./concepts.md)                             | How tokens, sessions, and the security model work                               |
+| [CSRF Posture](./csrf.md)                             | Which cookie surfaces exist and how CSRF is handled                             |
+| [Email Auth](./email-auth.md)                         | Register, login, password reset, email verification                             |
+| [OAuth](./oauth.md)                                   | Social login (Google, GitHub, Apple, Telegram) + account linking                |
+| [Sessions](./sessions.md)                             | Own/admin session listing and revocation, rotation, device/IP/location metadata |
+| [RBAC](./rbac.md)                                     | System roles, organizations, permissions, CASL — the auth-z guide               |
+| [Invites](./invites.md)                               | Inviting people to an organization by email                                     |
+| [API Keys](./api-keys.md)                             | Machine-to-machine access with scoped keys                                      |
+| [Auth contracts](./reference.md)                      | Credential model, error codes, environment variables                            |
+| [Operations Console](../operations-console/README.md) | Separate `SUPER_ADMIN` control-plane admission and host session boundary        |
 
 ---
 
@@ -68,7 +68,7 @@ routes; conversely, `amcore_session` cannot admit the console. See
 ```bash
 curl -X POST https://api.amcore.dev/api/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email": "alex@example.com", "password": "hunter2"}'
+  -d '{"email": "alex@example.com", "password": "Test1234Secure"}'
 ```
 
 Response:

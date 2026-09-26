@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
+import { expect, within } from 'storybook/test'
 
 import { Button } from './button'
 import {
@@ -20,10 +21,15 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByRole('heading', { level: 2, name: 'Account settings' })
+    ).toBeVisible()
+  },
   render: () => (
     <Card className="w-80">
       <CardHeader>
-        <CardTitle>Account settings</CardTitle>
+        <CardTitle as="h2">Account settings</CardTitle>
         <CardDescription>Update your profile and preferences.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -40,7 +46,7 @@ export const WithAction: Story = {
   render: () => (
     <Card className="w-80">
       <CardHeader>
-        <CardTitle>Active sessions</CardTitle>
+        <CardTitle as="h2">Active sessions</CardTitle>
         <CardDescription>Devices currently signed in.</CardDescription>
         <CardAction>
           <Button size="sm" variant="outline">
@@ -56,9 +62,13 @@ export const WithAction: Story = {
 }
 
 // `as="h1"` — the card IS the page's primary content and nothing else
-// provides a heading (the login/register card shape). See card.tsx's
-// CardTitle doc comment for the axe `page-has-heading-one` reasoning.
+// provides a heading (the login/register card shape).
 export const AsPageHeading: Story = {
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByRole('heading', { level: 1, name: 'Sign in' })
+    ).toBeVisible()
+  },
   render: () => (
     <Card className="w-80">
       <CardHeader>

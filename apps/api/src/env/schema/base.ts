@@ -4,6 +4,7 @@ import { aiEnv } from './ai.env'
 import { authEnv } from './auth.env'
 import { databaseEnv } from './database.env'
 import { emailEnv } from './email.env'
+import { geoipEnv } from './geoip.env'
 import { idempotencyEnv } from './idempotency.env'
 import { mediaEnv } from './media.env'
 import { oauthEnv } from './oauth.env'
@@ -37,6 +38,7 @@ export const envSections = {
   storage: storageEnv,
   media: mediaEnv,
   ai: aiEnv,
+  geoip: geoipEnv,
 } as const
 
 // One flat object — env vars stay flat; only their definitions are organized. The
@@ -58,6 +60,7 @@ export const envBaseSchema = z.object({
   ...storageEnv.shape,
   ...mediaEnv.shape,
   ...aiEnv.shape,
+  ...geoipEnv.shape,
 })
 
 export type EnvInput = z.infer<typeof envBaseSchema>

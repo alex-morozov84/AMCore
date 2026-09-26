@@ -1,3 +1,4 @@
+import { sessionMetadataHeaders } from './session-metadata-headers'
 import { extractCookieValue } from './set-cookie'
 
 import 'server-only'
@@ -30,6 +31,8 @@ export interface UpstreamAuthResult<TUser> {
  * Forwards `Accept-Language` from the original browser request so the
  * backend's registration-locale negotiation (`negotiateLocale`) sees the
  * real browser preference instead of always falling back to its default.
+ * Forwards the browser's User-Agent so credential-created sessions show
+ * the visitor's device instead of the server-side fetch identity.
  */
 export async function callUpstreamAuth<TUser>(
   path: string,
@@ -43,6 +46,7 @@ export async function callUpstreamAuth<TUser>(
     headers: {
       'Content-Type': 'application/json',
       ...(acceptLanguage ? { 'Accept-Language': acceptLanguage } : {}),
+      ...sessionMetadataHeaders(originalRequest?.headers ?? new Headers()),
     },
     body: JSON.stringify(body),
   })

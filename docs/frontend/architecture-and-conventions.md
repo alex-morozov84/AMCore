@@ -308,6 +308,18 @@ model" below.
 | **Server state** (data owned by the backend)                | TanStack Query | `entities/user/api/user-queries.ts` |
 | **Local client state** (UI-only, not persisted server-side) | Zustand        | none live currently — see below     |
 
+"Server state" above is deliberately split by who owns the fetch, not a
+single universal rule. A Server Component page can fetch the backend directly;
+there is no TanStack Query involved in that path, and `router.refresh()`
+re-runs it.
+A client interactive leaf that owns pending/error/pagination/mutation UI
+without full navigation uses TanStack Query instead. These models can
+coexist inside the same server-rendered page.
+
+The optional Console's User Detail page uses this split for its Sessions card
+(`features/console-user-sessions/model/use-user-sessions.ts`); its server-side
+fetches follow ADR-079's primary/secondary graceful-degradation contract.
+
 Don't duplicate server state into a Zustand store "for convenience" — that's
 how the two fall out of sync. If a value needs to survive a page navigation
 and isn't server data, it's a Zustand candidate; if it comes from the API,

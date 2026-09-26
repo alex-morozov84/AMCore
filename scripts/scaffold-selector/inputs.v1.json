@@ -69,6 +69,7 @@
           "docs/auth/sessions.md",
           "docs/frontend/README.md",
           "docs/frontend/architecture-and-conventions.md",
+          "docs/frontend/api-consumption.md",
           "docs/frontend/brand-theme-and-tokens.md",
           "docs/frontend/route-progress.md",
           "docs/frontend/server-rendered-resilience.md",
@@ -78,6 +79,7 @@
           "docs/operations/README.md",
           "docs/operations/ci-security.md",
           "docs/operations/deployment.md",
+          "docs/operations/geoip-setup.md",
           "docs/operations-console/development.md"
         ]
       },

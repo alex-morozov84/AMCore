@@ -10,7 +10,7 @@ export function ConsoleLoginPage() {
     <main className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{t('loginTitle')}</CardTitle>
+          <CardTitle as="h1">{t('loginTitle')}</CardTitle>
           <CardDescription>{t('loginDescription')}</CardDescription>
         </CardHeader>
         <CardContent>

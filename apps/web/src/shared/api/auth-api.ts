@@ -6,6 +6,7 @@ import type {
   ResendVerificationInput,
   ResetPasswordInput,
   SessionsListResponse,
+  SupportedLocale,
   UpdateProfileInput,
   UserResponse,
   VerifyEmailInput,
@@ -64,9 +65,18 @@ export const authApi = {
   // `/auth/sessions*` are dedicated Route Handlers, not the generic proxy —
   // the backend identifies the "current" session from the raw
   // `refresh_token` cookie, which the generic proxy never forwards. See
-  // `shared/api/bff/sessions-handler.ts`.
-  getSessions: (page: number, limit: number): Promise<SessionsListResponse> =>
-    apiClient.get<SessionsListResponse>(`/auth/sessions?page=${page}&limit=${limit}`),
+  // `shared/api/bff/sessions-handler.ts`. `locale` is sent explicitly as
+  // `Accept-Language` — the BFF route isn't under `[locale]`, so it cannot
+  // infer the active UI locale on its own, and the browser's own
+  // `Accept-Language` need not match the manually selected UI language.
+  getSessions: (
+    page: number,
+    limit: number,
+    locale: SupportedLocale
+  ): Promise<SessionsListResponse> =>
+    apiClient.get<SessionsListResponse>(`/auth/sessions?page=${page}&limit=${limit}`, {
+      headers: { 'Accept-Language': locale },
+    }),
 
   revokeSession: (sessionId: string): Promise<void> =>
     apiClient.delete<void>(`/auth/sessions/${encodeURIComponent(sessionId)}`),

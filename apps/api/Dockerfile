@@ -123,6 +123,13 @@ COPY --from=build --chown=nestjs:nodejs /prod/api ./
 # sigstore, CVE-2026-48815). Remove it rather than carry the CVE for nothing.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
+# GeoIP database directory (worker writes, api reads read-only), owned by the
+# non-root runtime user. A named Docker volume mounted here on first run
+# copies this directory's ownership from the image, so both services can use
+# it without a root init step; without this, an empty volume defaults to
+# root:root and the worker's downloader fails with EACCES.
+RUN mkdir -p /data/geoip && chown nestjs:nodejs /data/geoip
+
 USER nestjs
 
 EXPOSE 5002

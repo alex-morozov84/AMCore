@@ -302,6 +302,7 @@ describe('AuthController', () => {
       expect(authService.login).toHaveBeenCalledWith(loginDto, {
         userAgent: 'test-agent',
         ipAddress: '127.0.0.1',
+        sessionIpAddress: '127.0.0.1',
       })
       expect(mockResponse.cookie).toHaveBeenCalledWith('refresh_token', mockRefreshToken, {
         httpOnly: true,
@@ -487,6 +488,7 @@ describe('AuthController', () => {
           id: 'session-1',
           userAgent: 'test-agent',
           ipAddress: '127.0.0.1',
+          location: null,
           createdAt: '2025-01-27T10:00:00.000Z',
           current: true,
         },
@@ -494,6 +496,7 @@ describe('AuthController', () => {
           id: 'session-2',
           userAgent: 'mobile-agent',
           ipAddress: '192.168.1.1',
+          location: null,
           createdAt: '2025-01-26T10:00:00.000Z',
           current: false,
         },
@@ -513,14 +516,20 @@ describe('AuthController', () => {
       tokenService.hashRefreshToken.mockReturnValue('current-hashed-token')
       sessionService.getUserSessions.mockResolvedValue(mockEnvelope)
 
-      const result = await controller.sessions(mockUser.id, requestWithCookie, defaultPagination)
+      const result = await controller.sessions(
+        mockUser.id,
+        requestWithCookie,
+        defaultPagination,
+        undefined
+      )
 
       expect(tokenService.hashRefreshToken).toHaveBeenCalledWith(mockRefreshToken)
       expect(sessionService.getUserSessions).toHaveBeenCalledWith(
         mockUser.id,
         'current-hashed-token',
         1,
-        20
+        20,
+        'en'
       )
       expect(result).toEqual(mockEnvelope)
     })
@@ -528,11 +537,50 @@ describe('AuthController', () => {
     it('forwards undefined currentHash when no cookie', async () => {
       sessionService.getUserSessions.mockResolvedValue(mockEnvelope)
 
-      const result = await controller.sessions(mockUser.id, mockRequest, defaultPagination)
+      const result = await controller.sessions(
+        mockUser.id,
+        mockRequest,
+        defaultPagination,
+        undefined
+      )
 
       expect(tokenService.hashRefreshToken).not.toHaveBeenCalled()
-      expect(sessionService.getUserSessions).toHaveBeenCalledWith(mockUser.id, undefined, 1, 20)
+      expect(sessionService.getUserSessions).toHaveBeenCalledWith(
+        mockUser.id,
+        undefined,
+        1,
+        20,
+        'en'
+      )
       expect(result).toEqual(mockEnvelope)
+    })
+
+    it('negotiates a supported Accept-Language header into the session locale', async () => {
+      sessionService.getUserSessions.mockResolvedValue(mockEnvelope)
+
+      await controller.sessions(mockUser.id, mockRequest, defaultPagination, 'ru')
+
+      expect(sessionService.getUserSessions).toHaveBeenCalledWith(
+        mockUser.id,
+        undefined,
+        1,
+        20,
+        'ru'
+      )
+    })
+
+    it('falls back to en for an unsupported or malformed Accept-Language header', async () => {
+      sessionService.getUserSessions.mockResolvedValue(mockEnvelope)
+
+      await controller.sessions(mockUser.id, mockRequest, defaultPagination, 'fr-FR;q=0.9')
+
+      expect(sessionService.getUserSessions).toHaveBeenCalledWith(
+        mockUser.id,
+        undefined,
+        1,
+        20,
+        'en'
+      )
     })
   })
 

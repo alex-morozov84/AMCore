@@ -109,6 +109,58 @@ export const operationsConsoleDocSeams = [
       'coverage over real sections.'
     )
   ),
+  entry(
+    'console.sessions-location-link',
+    'docs/auth/sessions.md',
+    block(
+      'The optional Console also displays this metadata; see the',
+      '[session presentation](../operations-console/users.md#manage-sessions).'
+    ),
+    undefined,
+    { operationKey: 'console.sessions-doc' }
+  ),
+  entry(
+    'console.sessions-operator-link',
+    'docs/auth/sessions.md',
+    block(
+      'The optional Console provides the same operations through its Sessions panel:',
+      '[Operations Console → Users](../operations-console/users.md#manage-sessions).'
+    ),
+    undefined,
+    { operationKey: 'console.sessions-doc' }
+  ),
+  entry(
+    'console.geoip-operator-link',
+    'docs/operations/geoip-setup.md',
+    block(
+      "The optional Console's user Sessions panel also shows this information; see",
+      '[Operations Console → Users § Manage sessions](../operations-console/users.md#manage-sessions).'
+    )
+  ),
+  entry(
+    'console.docs-session-actions',
+    'docs/README.md',
+    block(
+      'The optional [Console actions](operations-console/users.md#manage-sessions)',
+      'provide an operator interface for admin session management.'
+    )
+  ),
+  entry(
+    'console.api-token-resolver-doc',
+    'docs/frontend/api-consumption.md',
+    block(
+      'The optional Operations Console supplies this override through',
+      "(ADR-081's host/path session split)."
+    )
+  ),
+  entry(
+    'console.query-state-doc',
+    'docs/frontend/architecture-and-conventions.md',
+    block(
+      "The optional Console's User Detail page uses this split for its Sessions card",
+      "fetches follow ADR-079's primary/secondary graceful-degradation contract."
+    )
+  ),
   ...operationsConsoleDiscoverySeams,
 ]
 import { operationsConsoleDiscoverySeams } from './operations-console-ownership-discovery-seams.mjs'

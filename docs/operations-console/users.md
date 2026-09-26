@@ -3,9 +3,9 @@
 [Operations Console](README.md) → Users
 
 Use **Users** to find a platform account, inspect its profile and organization
-memberships, or grant and remove `SUPER_ADMIN` access. The table shows email
-verification, system role, last sign-in, and creation and update times. The
-Console has no session viewer or account recovery control here.
+memberships, grant and remove `SUPER_ADMIN` access, or view and revoke their
+active sessions. The table shows email verification, system role, last
+sign-in, and creation and update times.
 
 ## Find a user
 
@@ -64,6 +64,37 @@ If the password is wrong, your account has no password, or the request fails,
 the role change does not complete. The Console shows an error and leaves the
 displayed role unchanged. See [system roles](../auth/rbac.md#layer-1--system-roles)
 for the authorization rules.
+
+## Manage sessions
+
+Every user's detail page has a **Sessions** card showing their active
+(non-revoked, non-expired) sessions — one row per login, with a
+browser-and-OS device label, an approximate location (when available), when
+it last re-authenticated, when its current token was issued, and when it
+expires.
+
+1. Open a user's detail page and find the **Sessions** card below their
+   organizations.
+2. To end one session, open its row menu and choose **Revoke session**;
+   confirm. To end every active session for that user at once, choose
+   **Revoke all sessions** in the card header.
+3. If asked, enter **your own password** to verify this sensitive action.
+
+Revoking blocks that session's future refresh immediately. An access token
+already issued before the revoke can remain valid until it expires (typically
+within minutes) — the user is not forced out mid-request, but cannot silently
+continue past that point. The Console cannot revoke your own sessions this
+way; opening your own detail page shows a note pointing to the product's own
+Settings → Sessions page instead.
+
+Device and location are best-effort and informational — a user-agent string
+can be spoofed, and a location is an approximate estimate from the stored IP
+address, never exact positioning. Neither is authorization evidence. A raw
+user-agent string is available behind an explicit disclosure on each row for
+diagnostics. Approximate location depends on an optional local GeoIP database
+([setup guide](../operations/geoip-setup.md)); when it is disabled, not yet
+loaded, or the address is private/reserved, the row shows "Location
+unavailable" instead — sessions remain fully visible and revocable either way.
 
 ## Empty and unavailable results
 

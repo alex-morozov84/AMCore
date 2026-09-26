@@ -5,12 +5,11 @@ import { useTranslations } from 'next-intl'
 import { type AdminUserResponse, SystemRole } from '@amcore/shared'
 
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
+import { ConsoleStepUpDialog } from '@/shared/ui/console-step-up-dialog'
 import { DropdownMenuItem } from '@/shared/ui/dropdown-menu'
 import { RowActionsMenu } from '@/shared/ui/row-actions-menu'
 
 import { useUserRoleChange } from '../model/use-user-role-change'
-
-import { RoleStepUpDialog } from './RoleStepUpDialog'
 
 interface UserRoleActionProps {
   user: Pick<AdminUserResponse, 'id' | 'systemRole'>
@@ -57,7 +56,7 @@ export function UserRoleAction({ user, isSelf }: UserRoleActionProps) {
         disabled={isSubmitting}
         onConfirm={() => void confirmRoleChange()}
       />
-      <RoleStepUpDialog
+      <ConsoleStepUpDialog
         phase={stepUp}
         isSubmitting={isSteppingUp}
         onSubmit={submitStepUp}

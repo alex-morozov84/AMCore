@@ -45,7 +45,9 @@ export async function OrganizationDetailResults({
     <div className="space-y-5">
       <Card>
         <CardHeader className="space-y-2">
-          <CardTitle className="text-xl">{organization.name}</CardTitle>
+          <CardTitle as="h2" className="text-xl">
+            {organization.name}
+          </CardTitle>
           <DetailId id={organization.id} />
         </CardHeader>
         <CardContent>

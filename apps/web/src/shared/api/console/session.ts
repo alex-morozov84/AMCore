@@ -1,12 +1,12 @@
 import { randomBytes } from 'node:crypto'
 
 import { cache } from 'react'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import type { UserResponse } from '@amcore/shared'
 
 import { ensureFreshSession } from '@/shared/api/bff/ensure-fresh-session'
 import type { VaultEntry } from '@/shared/api/bff/session-vault.types'
-import { upstreamRefresh } from '@/shared/api/bff/upstream-refresh'
+import { createUpstreamRefresh } from '@/shared/api/bff/upstream-refresh'
 import { ACCESS_TOKEN_LIFETIME_MS } from '@/shared/api/bff/vault-constants'
 
 import { CONSOLE_SESSION_COOKIE_NAME } from './session-cookie'
@@ -55,7 +55,7 @@ export const getConsoleSessionEntry = cache(async (): Promise<ConsoleVaultEntry 
   const entry = await ensureFreshSession(sessionId, {
     store: redisConsoleVaultStore,
     lock: redisConsoleVaultLock,
-    upstreamRefresh,
+    upstreamRefresh: createUpstreamRefresh(await headers()),
   })
   return isConsoleVaultEntry(entry) ? entry : null
 })

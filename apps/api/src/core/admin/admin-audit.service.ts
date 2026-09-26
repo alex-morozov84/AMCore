@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common'
 
-import type { AdminAuditQuery, AdminAuditResponse, RequestPrincipal } from '@amcore/shared'
+import {
+  type AdminAuditQuery,
+  type AdminAuditResponse,
+  HIDDEN_READ_AUDIT_ACTIONS,
+  type RequestPrincipal,
+} from '@amcore/shared'
 
 import { BadRequestException } from '../../common/exceptions'
 import { EnvService } from '../../env/env.service'
@@ -126,7 +131,7 @@ export class AdminAuditService {
               ? { in: query.actions }
               : query.includeReadEvents
                 ? undefined
-                : { not: 'admin.audit_logs.viewed' }),
+                : { notIn: [...HIDDEN_READ_AUDIT_ACTIONS] }),
           targetId: query.targetId,
           targetType: query.targetType,
           organizationId: query.organizationId,

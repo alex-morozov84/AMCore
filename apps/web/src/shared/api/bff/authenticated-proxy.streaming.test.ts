@@ -10,7 +10,7 @@ vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
 vi.mock('./origin-guard', () => ({ isTrustedOrigin: vi.fn() }))
 vi.mock('./ensure-fresh-session', () => ({ ensureFreshSession: vi.fn() }))
-vi.mock('./upstream-refresh', () => ({ upstreamRefresh: vi.fn() }))
+vi.mock('./upstream-refresh', () => ({ createUpstreamRefresh: vi.fn(() => vi.fn()) }))
 
 describe('proxy streaming remains transparent', () => {
   beforeEach(() => {

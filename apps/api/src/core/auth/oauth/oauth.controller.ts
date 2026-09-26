@@ -24,6 +24,7 @@ import {
 } from '@amcore/shared'
 
 import { AppException, NotFoundException } from '../../../common/exceptions'
+import { resolveSessionIpAddress } from '../../../common/utils/verified-visitor-ip'
 import { EnvService } from '../../../env/env.service'
 import { Auth } from '../decorators/auth.decorator'
 import { CurrentUser } from '../decorators/current-user.decorator'
@@ -181,7 +182,7 @@ export class OAuthController {
       browserNonce,
       {
         userAgent: req.headers['user-agent'],
-        ipAddress: req.ip,
+        ipAddress: resolveSessionIpAddress(req, this.env),
       },
       firstLoginName
     )

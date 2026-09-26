@@ -28,19 +28,15 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   )
 }
 
-/**
- * `as` defaults to `'div'` — most `Card`s sit inside a page that already has
- * its own heading elsewhere, and forcing a heading tag here would create a
- * duplicate/wrong-level one. Pass `as="h1"` when this `Card` **is** the
- * page's primary content and nothing else provides a heading (e.g. the
- * login/register cards) — an axe `page-has-heading-one` finding on exactly
- * that shape is what this option exists to fix.
+/** A card title is a heading. Callers choose its level to match the page
+ * outline: h1 for a standalone page, h2 for a section, h3 for a subsection.
+ * Requiring `as` prevents decorative div titles and accidental heading levels.
  */
 function CardTitle({
   className,
-  as: Component = 'div',
+  as: Component,
   ...props
-}: React.ComponentProps<'div'> & { as?: 'div' | 'h1' | 'h2' | 'h3' }) {
+}: React.ComponentProps<'h2'> & { as: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' }) {
   return (
     <Component
       data-slot="card-title"

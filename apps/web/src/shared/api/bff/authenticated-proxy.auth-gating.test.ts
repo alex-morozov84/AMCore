@@ -7,13 +7,13 @@ import { makeRequest, mockCookieStore } from './authenticated-proxy.test-helpers
 import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionNotFoundError, SessionVaultUnavailableError } from './errors'
 import { isTrustedOrigin } from './origin-guard'
-import { upstreamRefresh } from './upstream-refresh'
+import { createUpstreamRefresh } from './upstream-refresh'
 
 vi.mock('server-only', () => ({}))
-vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
 vi.mock('./origin-guard', () => ({ isTrustedOrigin: vi.fn() }))
 vi.mock('./ensure-fresh-session', () => ({ ensureFreshSession: vi.fn() }))
-vi.mock('./upstream-refresh', () => ({ upstreamRefresh: vi.fn() }))
+vi.mock('./upstream-refresh', () => ({ createUpstreamRefresh: vi.fn(() => vi.fn()) }))
 
 describe('proxyToBackend — session/CSRF gating and auth-failure classification', () => {
   beforeEach(() => {
@@ -48,7 +48,7 @@ describe('proxyToBackend — session/CSRF gating and auth-failure classification
         expect(cookies).not.toHaveBeenCalled()
         expect(isTrustedOrigin).not.toHaveBeenCalled()
         expect(ensureFreshSession).not.toHaveBeenCalled()
-        expect(upstreamRefresh).not.toHaveBeenCalled()
+        expect(createUpstreamRefresh).not.toHaveBeenCalled()
         expect(fetchMock).not.toHaveBeenCalled()
       })
     }

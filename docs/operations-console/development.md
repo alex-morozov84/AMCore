@@ -46,10 +46,13 @@ re-derive it from scratch:
   — treat it as a security bug, not a style preference, and add a regression
   test asserting the response body never contains `accessToken`/
   `refreshToken` for any such route.
-- **Step-up UX** for the user role change lives in
-  `features/console-user-role`, reused by the Users inventory and user detail
-  page. A future mutation should reuse that feature only when it has the same
-  role-change responsibility and authorization contract.
+- **Step-up UX** is shared by role changes and session revocation through
+  `shared/lib/console-step-up-mutation.ts` and
+  `shared/ui/console-step-up-dialog.tsx`. Each feature owns its mutation and
+  success handling; the shared hook performs password re-authentication and
+  exactly one retry, with terminal handling for repeated freshness rejection
+  or unavailable password step-up. Reuse these shared modules for the same
+  interaction contract; do not import a sibling feature's internals.
 
 This preserves the [step-up re-authentication
 boundary](../auth/sessions.md#step-up-re-authentication) for every future
@@ -61,6 +64,20 @@ automatically. A Console contribution to shared navigation, config, scripts,
 CI, or mixed docs must declare a narrow seam or structural operation. Novel
 unmarked semantics remain an explicit author/reviewer classification boundary;
 see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#optional-feature-extension-ownership).
+
+### Interactive session data inside a server-rendered page
+
+The User Detail Sessions card is an interactive client leaf. Its Query calls a
+fixed Console BFF list route, while the surrounding detail page and membership
+search keep server-rendered, URL-driven reads. `features/console-user-sessions`
+shows how to key data by target user, UI locale and local page; retain previous
+rows only for paging within the same target/locale. Its retry button refetches
+that Query, and revocation invalidates every page/locale for the target.
+
+Reuse `shared/ui/pagination.tsx`'s `PaginationButtons` for local Previous/Next
+paging and `shared/lib/format-session.ts` for descriptive device/location
+presentation. API sessionId is a family identity that survives rotation; never
+replace it with a token hash or infer authorization from the displayed device.
 
 ## Add a functional panel
 

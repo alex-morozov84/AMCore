@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -21,6 +22,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiCookieAuth,
+  ApiHeader,
   ApiNoContentResponse,
   ApiOperation,
   ApiQuery,
@@ -34,6 +36,7 @@ import {
   type AuthResponse,
   AuthType,
   type AvatarResponse,
+  coerceSupportedLocale,
   type MessageResponse,
   PAGINATION,
   type ProfileResponse,
@@ -43,6 +46,7 @@ import {
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
+import { resolveSessionIpAddress } from '../../common/utils/verified-visitor-ip'
 import { EnvService } from '../../env/env.service'
 
 import { AuthService } from './auth.service'
@@ -120,7 +124,7 @@ export class AuthController {
   ): Promise<AuthResponse> {
     const result = await this.authService.register(dto, {
       userAgent: req.headers['user-agent'],
-      ipAddress: req.ip,
+      ipAddress: resolveSessionIpAddress(req, this.env),
       acceptedLocale: negotiateLocale(req),
     })
 
@@ -144,6 +148,7 @@ export class AuthController {
     const result = await this.authService.login(dto, {
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
+      sessionIpAddress: resolveSessionIpAddress(req, this.env),
     })
 
     res.cookie('refresh_token', result.refreshToken, this.cookieOptions)
@@ -192,7 +197,7 @@ export class AuthController {
       await this.sessionService.rotateRefreshToken(refreshTokenHash, {
         userId: user.id,
         userAgent: req.headers['user-agent'],
-        ipAddress: req.ip,
+        ipAddress: resolveSessionIpAddress(req, this.env),
       })
 
     // Generate new access token with current system role (org context not preserved — use /switch).
@@ -336,11 +341,19 @@ export class AuthController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
+  @ApiHeader({
+    name: 'accept-language',
+    required: false,
+    description:
+      "Display locale for each session's approximate-location city name ('en'/'ru'); " +
+      'unsupported or absent falls back to en. Never used for authorization.',
+  })
   @ZodResponse({ type: SessionsListResponseDto, status: 200, description: 'Active sessions' })
   async sessions(
     @CurrentUser('sub') userId: string,
     @Req() req: Request,
-    @Query() pagination: PaginationQueryDto
+    @Query() pagination: PaginationQueryDto,
+    @Headers('accept-language') acceptLanguage: string | undefined
   ): Promise<SessionsListResponse> {
     const refreshToken = req.cookies?.refresh_token
     const currentHash = refreshToken ? this.tokenService.hashRefreshToken(refreshToken) : undefined
@@ -349,7 +362,8 @@ export class AuthController {
       userId,
       currentHash,
       pagination.page,
-      pagination.limit
+      pagination.limit,
+      coerceSupportedLocale(acceptLanguage)
     )
   }
 

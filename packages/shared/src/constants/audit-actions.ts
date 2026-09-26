@@ -2,7 +2,9 @@
 export const AUDIT_ACTIONS = [
   'admin.audit_logs.viewed',
   'admin.cleanup.executed',
+  'admin.user.session_revoked',
   'admin.user.sessions_revoked',
+  'admin.user.sessions_viewed',
   'admin.user.system_role_changed',
   'ai.approval.approved',
   'ai.approval.expired',
@@ -32,3 +34,16 @@ export const AUDIT_ACTIONS = [
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
+
+/**
+ * Read-only "viewing sensitive data" actions, hidden from Audit browsing
+ * by default (ADR-083's precedent): a successful privileged read is
+ * itself audited so the read is not invisible, but surfacing every routine
+ * read alongside actual mutations would drown out the events an operator
+ * usually wants. `includeReadEvents=true` (or an explicit `action`/`actions`
+ * filter naming one of these codes) opts back in.
+ */
+export const HIDDEN_READ_AUDIT_ACTIONS: readonly AuditAction[] = [
+  'admin.audit_logs.viewed',
+  'admin.user.sessions_viewed',
+]
