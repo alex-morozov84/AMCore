@@ -1,9 +1,8 @@
 import { type Browser, expect, type Page, test } from '@playwright/test'
 
-import { expectNoAxeViolations, waitForAnimationsToFinish } from '../shared/axe'
-
-import { ageSessionLastAuthAt, countLiveSessions, setSystemRole } from './admin-helpers'
-import { registerViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
+import { expectNoAxeViolations, waitForAnimationsToFinish } from '../../shared/axe'
+import { ageSessionLastAuthAt, countLiveSessions, setSystemRole } from '../admin-helpers'
+import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../helpers'
 
 async function signInAsPathAdmin(page: Page, email: string) {
   // Called twice per test with the same email (create, then log back in

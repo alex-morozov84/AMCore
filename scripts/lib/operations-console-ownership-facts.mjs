@@ -16,6 +16,7 @@ const roots = [
   'apps/web/src/shared/ui/console-detail',
   'apps/web/src/widgets/console-shell',
   'apps/web/e2e/console-real-stack',
+  'apps/web/e2e/real-stack/admin-sessions',
   'docs/operations-console',
 ].map(dir)
 
@@ -56,7 +57,6 @@ const verification = [
   'apps/web/e2e/real-stack/admin-overview.spec.ts',
   'apps/web/e2e/real-stack/admin-users.spec.ts',
   'apps/web/e2e/real-stack/admin-users-role-management.spec.ts',
-  'apps/web/e2e/real-stack/admin-sessions.spec.ts',
 ].map((path) => one(path, { tags: ['verification:console'] }))
 
 const sharedModuleTests = sharedModules.flatMap((item) =>

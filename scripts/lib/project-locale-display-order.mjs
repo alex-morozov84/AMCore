@@ -9,7 +9,7 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/e2e/real-stack/locale-persistence.spec.ts',
   'apps/web/e2e/console-real-stack/session-isolation.spec.ts',
   'apps/web/e2e/console-real-stack/sessions.spec.ts',
-  'apps/web/e2e/real-stack/admin-sessions.spec.ts',
+  'apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts',
   'apps/web/e2e/mocked/accessibility.spec.ts',
   'apps/web/e2e/mocked/api-error-rendering.spec.ts',
   'apps/web/e2e/mocked/csp-nonce.spec.ts',

@@ -36,7 +36,7 @@ test('reports every stale Console exact count together', () => {
     'admin-console': 'disabled',
   })
   assertExactScaffoldCounts([
-    { name: 'console roots', expected: 13, actual: operationsConsoleOwnership.facts.roots.length },
+    { name: 'console roots', expected: 14, actual: operationsConsoleOwnership.facts.roots.length },
     {
       name: 'console disabled deletes',
       expected: 46,

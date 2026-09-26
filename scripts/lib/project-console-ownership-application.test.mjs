@@ -37,7 +37,7 @@ test('disabled projection applies once and passes the residual scan', () =>
       'apps/web/src/shared/ui/console-step-up-dialog.tsx',
       'apps/web/src/shared/ui/console-step-up-dialog.test.tsx',
       'apps/web/src/shared/api/console/session-metadata.test.ts',
-      'apps/web/e2e/real-stack/admin-sessions.spec.ts',
+      'apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts',
     ])
       assert.equal(existsSync(path.join(root, file)), false, file)
     for (const file of [
