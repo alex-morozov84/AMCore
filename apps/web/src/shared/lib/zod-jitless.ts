@@ -7,7 +7,7 @@ import 'client-only'
  * validator compiler in the browser. Zod's own internal capability probe
  * (`zod/v4/core/util.js`) calls `Function("")` to detect whether dynamic
  * code construction is available — a genuine `script-src` violation under
- * Track 3's nonce-based CSP (`ai/models-talk.md` FINAL PLAN §3), confirmed
+ * the application's nonce-based CSP, confirmed
  * empirically against the real production build (`e2e/real-stack/csp-nonce.spec.ts`):
  * absent under `next dev` (which already ships `'unsafe-eval'`), present
  * and reproducible in the standalone server.
@@ -24,7 +24,7 @@ import 'client-only'
  *
  * Import this once, as early as possible in the client bundle (currently:
  * the top of `app/[locale]/providers.tsx`, the first Client Component
- * boundary every route mounts) — before any schema's first `.parse()` call
- * in the browser.
+ * boundary every route mounts) — before imported modules construct schemas
+ * in the browser, because object construction itself can trigger the probe.
  */
 config({ jitless: true })

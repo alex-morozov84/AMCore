@@ -61,6 +61,8 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // docker-compose.yml only: the host interface for apps/web's published
   // development port, consumed by Compose rather than either app schema.
   'WEB_PUBLISH_HOST',
+  // Web build identity, passed through Compose build args; not API runtime env.
+  'NEXT_DEPLOYMENT_ID',
   // apps/web-only (Track 3, ai/models-talk.md FINAL PLAN §3): the browser
   // Content-Security-Policy mode (report-only/enforce), read directly via
   // `process.env` in apps/web (no EnvService there) — same reasoning as

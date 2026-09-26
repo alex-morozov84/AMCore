@@ -11,14 +11,21 @@ async function open(browser, state, port, worker, poll = true) {
   const context = await browser.newContext({ serviceWorkers: worker })
   const page = await context.newPage()
   const errors = []
+  const violations = []
   page.on('pageerror', (error) => errors.push(error.message))
+  await page.exposeFunction('reportDeploymentCsp', (value) => violations.push(value))
+  await page.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (event) => {
+      window.reportDeploymentCsp(`${event.violatedDirective}: ${event.blockedURI}`)
+    })
+  })
   await page.goto(`http://127.0.0.1:${port}${route}?poll=${Number(poll)}`)
   if (worker === 'allow') {
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller))
     await page.reload()
   }
   await page.waitForTimeout(500)
-  return { context, page, errors }
+  return { context, page, errors, violations }
 }
 
 async function transition(tab, state, port, target, observe = 60_000) {
@@ -37,6 +44,7 @@ async function transition(tab, state, port, target, observe = 60_000) {
   assert.equal(state.records.filter((r) => r.method === 'POST' && r.id === old).length, 0)
   assert.equal(count(state, 'GET', route), 0)
   assert.deepEqual(tab.errors, [])
+  assert.deepEqual(tab.violations, [])
   console.log(
     JSON.stringify({
       target,
