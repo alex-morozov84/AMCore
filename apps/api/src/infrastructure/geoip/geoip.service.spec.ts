@@ -141,10 +141,12 @@ describe('GeoIpService', () => {
       )
       await service.reload()
 
-      expect(service.resolve('203.0.0.1', DEFAULT_LOCALE)).toEqual({
-        city: 'Berlin',
-        countryCode: 'DE',
-      })
+      for (const locale of SUPPORTED_LOCALES) {
+        expect(service.resolve('203.0.0.1', locale)).toEqual({
+          city: 'Berlin',
+          countryCode: 'DE',
+        })
+      }
     })
 
     it('returns null for a private/reserved address without querying the reader', async () => {
