@@ -97,16 +97,17 @@ Pure schema/lib contract tests for `packages/shared` live beside their source
 
 ### Web-specific test commands
 
-| Command                                 | Description                                                                                                                                                  |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm --filter web test`                | All unit/component/integration tests (mocked infra)                                                                                                          |
-| `pnpm --filter web test:coverage`       | Unit tests with an informational V8 coverage report; see [`docs/frontend/testing.md`](docs/frontend/testing.md#commands)                                     |
-| `pnpm --filter web test:integration`    | Testcontainers-backed tests — real Redis (requires Docker), excluded from `pnpm test`                                                                        |
-| `pnpm --filter web storybook`           | Storybook component workshop dev server (`http://localhost:6006`)                                                                                            |
-| `pnpm --filter web build-storybook`     | Static Storybook build — cheap compile/broken-story smoke                                                                                                    |
-| `pnpm --filter web test:storybook`      | Storybook interaction + accessibility gate (browser-mode Vitest/Playwright Chromium)                                                                         |
-| `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked E2E lanes (auto-starts `next dev`)                                                                                         |
-| `pnpm --filter web test:e2e:real-stack` | Playwright real-stack E2E lane — boot `docker compose --profile local-infra up -d --build` first, see [`docs/frontend/testing.md`](docs/frontend/testing.md) |
+| Command                                       | Description                                                                                                                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm --filter web test`                      | All unit/component/integration tests (mocked infra)                                                                                                                |
+| `pnpm --filter web test:coverage`             | Unit tests with an informational V8 coverage report; see [`docs/frontend/testing.md`](docs/frontend/testing.md#commands)                                           |
+| `pnpm --filter web test:integration`          | Testcontainers-backed tests — real Redis (requires Docker), excluded from `pnpm test`                                                                              |
+| `pnpm --filter web storybook`                 | Storybook component workshop dev server (`http://localhost:6006`)                                                                                                  |
+| `pnpm --filter web build-storybook`           | Static Storybook build — cheap compile/broken-story smoke                                                                                                          |
+| `pnpm --filter web test:storybook`            | Storybook interaction + accessibility gate (browser-mode Vitest/Playwright Chromium)                                                                               |
+| `node scripts/run-deployment-version-e2e.mjs` | Isolated production A/B recovery with a custom Server Action timer; see [deployment verification](docs/frontend/testing.md#production-deployment-version-recovery) |
+| `pnpm --filter web test:e2e`                  | Playwright mocked + server-mocked E2E lanes (auto-starts `next dev`)                                                                                               |
+| `pnpm --filter web test:e2e:real-stack`       | Playwright real-stack E2E lane — boot `docker compose --profile local-infra up -d --build` first, see [`docs/frontend/testing.md`](docs/frontend/testing.md)       |
 
 On a clean checkout, build the shared package before running Playwright or
 Storybook's browser test runner directly: `pnpm --filter @amcore/shared build`.

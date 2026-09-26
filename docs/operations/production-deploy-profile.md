@@ -18,6 +18,14 @@ adopt a professional path deliberately, not because upstream AMCore publishes
 images or deploys anywhere today. If that changes, it will be called out
 explicitly in `CHANGELOG.md` and this doc.
 
+## Open browser tabs
+
+The production web build includes automatic document replacement after a new
+build is detected. Keep the build identity with the image digest through
+promotion and rollback; do not assign a new identity at container startup.
+See [open tabs after a deployment](deployment.md#open-tabs-after-a-web-deployment)
+for draft loss, transient Action failures, endpoint freshness and browser limits.
+
 ## Who this is for
 
 Two deploy paths are equally first-class in AMCore, and neither is "the

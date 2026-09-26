@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { QueryProvider } from '@/shared/api'
+import { DeploymentVersionCheck } from '@/shared/lib/deployment-version/DeploymentVersionCheck'
 import { PWAProvider } from '@/shared/pwa'
 import { ThemeProvider } from '@/shared/store'
 import { Toaster } from '@/shared/ui/toast'
@@ -23,6 +24,7 @@ export function Providers({ children, nonce }: ProvidersProps) {
 
   return (
     <ThemeProvider>
+      <DeploymentVersionCheck />
       <QueryProvider nonce={nonce}>
         <PWAProvider>{children}</PWAProvider>
         <Toaster closeLabel={t('close')} />

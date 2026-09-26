@@ -1,11 +1,30 @@
+import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
+import { z } from 'zod'
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
+const deploymentVersion = process.env.NEXT_DEPLOYMENT_ID || randomUUID()
+if (
+  !z
+    .string()
+    .min(1)
+    .max(128)
+    .regex(/^[a-zA-Z0-9._-]+$/)
+    .safeParse(deploymentVersion).success
+) {
+  throw new Error(
+    'NEXT_DEPLOYMENT_ID must contain 1–128 letters, digits, dots, underscores or hyphens'
+  )
+}
 
 const nextConfig: NextConfig = {
+  deploymentId: deploymentVersion,
+  // Compiled into both server and client; runtime environment cannot change
+  // the identity of an already-built artifact.
+  env: { NEXT_PUBLIC_DEPLOYMENT_VERSION: deploymentVersion },
   // Standalone output for Docker
   output: 'standalone',
 

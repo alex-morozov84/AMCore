@@ -33,6 +33,8 @@ COPY apps/web ./apps/web
 RUN pnpm --filter @amcore/shared build
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_DEPLOYMENT_ID
+ENV NEXT_DEPLOYMENT_ID=${NEXT_DEPLOYMENT_ID}
 RUN pnpm --filter web build
 
 # ===========================================

@@ -252,6 +252,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_DEPLOYMENT_ID: ${NEXT_DEPLOYMENT_ID:-}
     ports:
       - '${WEB_PUBLISH_HOST:-127.0.0.1}:3000:3000'
     environment:
