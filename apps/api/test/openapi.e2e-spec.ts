@@ -73,9 +73,11 @@ const EXPECTED: Record<string, Expected> = {
   'get /admin/access': { status: '204', kind: 'none' },
   'get /admin/audit-logs': { status: '200', kind: 'json' },
   'get /admin/users': { status: '200', kind: 'json' },
+  'get /admin/users/{id}': { status: '200', kind: 'json' },
   'patch /admin/users/{id}': { status: '200', kind: 'json' },
   'post /admin/cleanup': { status: '200', kind: 'json' },
   'get /admin/organizations': { status: '200', kind: 'json' },
+  'get /admin/organizations/{id}': { status: '200', kind: 'json' },
   'get /admin/overview': { status: '200', kind: 'json' },
   // api-keys
   'post /api-keys': { status: '201', kind: 'json' },
@@ -485,6 +487,30 @@ describe('OpenAPI success surface (e2e)', () => {
     }
 
     expect(violations).toEqual([])
+  })
+
+  it('documents both admin detail searches and their guarded response contract', () => {
+    for (const path of ['/admin/users/{id}', '/admin/organizations/{id}']) {
+      const operation = document.paths[path]?.get as {
+        parameters?: Array<{
+          name: string
+          in: string
+          required?: boolean
+          schema?: { maxLength?: number }
+        }>
+        responses?: Record<string, unknown>
+      }
+      const parameters = new Map(operation.parameters?.map((param) => [param.name, param]))
+      expect(parameters.get('id')).toMatchObject({ in: 'path', required: true })
+      expect(parameters.get('search')).toMatchObject({
+        in: 'query',
+        required: false,
+        schema: { maxLength: 255 },
+      })
+      for (const status of ['200', '400', '401', '403', '404', '503']) {
+        expect(operation.responses?.[status]).toBeDefined()
+      }
+    }
   })
 
   it('documents a multipart/form-data request body with a binary file field for both upload operations', () => {

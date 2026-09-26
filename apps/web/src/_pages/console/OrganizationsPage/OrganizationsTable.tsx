@@ -2,6 +2,7 @@ import { getFormatter, getTranslations } from 'next-intl/server'
 import type { AdminOrganizationResponse } from '@amcore/shared'
 
 import {
+  buildDiscoveryHref,
   type DiscoveryQueryState,
   type DiscoverySortOrder,
   SortableColumnHead,
@@ -16,6 +17,7 @@ const MONO = 'font-console-mono'
 
 export interface OrganizationsTableProps {
   organizations: AdminOrganizationResponse[]
+  page: number
   baseHref: string
   search?: string
   sortBy: OrganizationsSortableField
@@ -24,6 +26,7 @@ export interface OrganizationsTableProps {
 
 export async function OrganizationsTable({
   organizations,
+  page,
   baseHref,
   search,
   sortBy,
@@ -36,6 +39,7 @@ export async function OrganizationsTable({
     sortBy,
     sortOrder,
   }
+  const returnTo = buildDiscoveryHref(baseHref, { page, search, sortBy, sortOrder })
 
   function accessibleSortLabel(
     column: OrganizationsSortableField,
@@ -114,7 +118,12 @@ export async function OrganizationsTable({
         </TableHeader>
         <TableBody>
           {organizations.map((organization) => (
-            <OrganizationRow key={organization.id} organization={organization} format={format} />
+            <OrganizationRow
+              key={organization.id}
+              organization={organization}
+              format={format}
+              returnTo={returnTo}
+            />
           ))}
         </TableBody>
       </Table>

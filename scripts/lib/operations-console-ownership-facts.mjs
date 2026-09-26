@@ -10,7 +10,9 @@ const roots = [
   'apps/web/src/features/console-discovery',
   'apps/web/src/features/console-login',
   'apps/web/src/features/console-logout',
+  'apps/web/src/features/console-user-role',
   'apps/web/src/shared/api/console',
+  'apps/web/src/shared/ui/console-detail',
   'apps/web/src/widgets/console-shell',
   'apps/web/e2e/console-real-stack',
   'docs/operations-console',
@@ -23,6 +25,7 @@ const sharedModules = [
   module('apps/web/src/shared/lib/console-host-guard.ts', ['console-host-guard.test.ts']),
   module('apps/web/src/shared/lib/console-public-api-path.ts', ['console-public-api-path.test.ts']),
   module('apps/web/src/shared/lib/console-public-href.ts', ['console-public-href.test.ts']),
+  module('apps/web/src/shared/lib/console-detail-url.ts'),
   module('apps/web/src/shared/lib/format-console-date-time.ts'),
   module('apps/web/src/shared/lib/require-super-admin.ts', ['require-super-admin.test.ts']),
 ]

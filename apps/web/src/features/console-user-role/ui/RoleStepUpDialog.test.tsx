@@ -4,8 +4,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { StepUpPhase } from '../model/use-user-role-change'
+
 import { RoleStepUpDialog } from './RoleStepUpDialog'
-import type { StepUpPhase } from './use-user-role-change'
 
 // Inline, English-only fixture of just the keys this component reads -
 // deliberately not the real catalogue (`messages/en.json`), which is a

@@ -10,6 +10,8 @@ vi.mock('@/shared/ui/route-progress-link', () => ({
   ),
 }))
 
+vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/admin/audit' }))
+
 import type { AuditCopy } from './audit-copy'
 import { AuditEventRow } from './AuditEventRow'
 import { AuditTimeZoneProvider } from './AuditTimeZone'

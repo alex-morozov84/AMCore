@@ -29,7 +29,7 @@ export const SingleItem: Story = {
 }
 
 // Mirrors the other reference consumer —
-// _pages/console/UsersPage/UserRoleAction.tsx — a menu that will hold a
+// features/console-user-role/ui/UserRoleAction.tsx — a menu that will hold a
 // second item once a future console slice adds one, without touching the
 // table's column width.
 export const MultipleItems: Story = {

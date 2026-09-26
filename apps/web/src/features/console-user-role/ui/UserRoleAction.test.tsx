@@ -4,10 +4,11 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useUserRoleChange } from './use-user-role-change'
+import { useUserRoleChange } from '../model/use-user-role-change'
+
 import { UserRoleAction } from './UserRoleAction'
 
-vi.mock('./use-user-role-change', () => ({ useUserRoleChange: vi.fn() }))
+vi.mock('../model/use-user-role-change', () => ({ useUserRoleChange: vi.fn() }))
 vi.mock('./RoleStepUpDialog', () => ({ RoleStepUpDialog: () => null }))
 
 // Inline, English-only fixture of just the keys this component reads -

@@ -46,10 +46,10 @@ re-derive it from scratch:
   — treat it as a security bug, not a style preference, and add a regression
   test asserting the response body never contains `accessToken`/
   `refreshToken` for any such route.
-- **Step-up UX** stays a local, cohesive component beside the page that needs
-  it (see `_pages/console/UsersPage/RoleStepUpDialog.tsx`) until a second
-  console mutation needs the identical dialog — do not pre-emptively promote
-  it to a shared/cross-slice widget before that second real consumer exists.
+- **Step-up UX** for the user role change lives in
+  `features/console-user-role`, reused by the Users inventory and user detail
+  page. A future mutation should reuse that feature only when it has the same
+  role-change responsibility and authorization contract.
 
 This preserves the [step-up re-authentication
 boundary](../auth/sessions.md#step-up-re-authentication) for every future
@@ -157,6 +157,22 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
    not create a privileged read-audit event. T002's discovery URL and numbered
    page contract do not apply to Audit; its generic field may be reused only
    where the interaction contract matches.
+
+   User and organization detail pages use separate backend `GET` endpoints and
+   the console-aware server token, with no browser read proxy. They keep the
+   heading and contextual return link outside relation refresh boundaries,
+   use the same debounced search field for organizations/members, and supply
+   matching cold-page and relation-refresh skeletons. Their links from Users,
+   Organizations and Audit carry a bounded same-Console return location.
+   Their relation search sits within the detail results boundary so it appears
+   only after the entity is found; the running-page check must confirm that a
+   search navigation preserves its draft and focus. This differs from the
+   inventory pages, whose search boxes stay outside the results boundary.
+   Identity links save the clicked row and scroll position for same-tab return;
+   restore only after fresh list/Audit results render. Modified clicks and
+   direct bookmarks retain normal navigation. Detail-to-Audit links choose an
+   explicit 31-day interval and explain its scope. Do not turn an empty Audit
+   result into a claim about older activity.
 
 7. Use the existing graceful-degradation primitives for secondary data. Keep
    primary failures explicit and fail privileged actions closed.

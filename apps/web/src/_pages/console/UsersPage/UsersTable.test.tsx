@@ -19,7 +19,7 @@ vi.mock('@/shared/api/console/access-token', () => ({
 }))
 // The role-promote/demote action has its own dedicated coverage; stubbed
 // here so this file only exercises the sortable headers this table adds.
-vi.mock('./UserRoleAction', () => ({ UserRoleAction: () => <div /> }))
+vi.mock('@/features/console-user-role', () => ({ UserRoleAction: () => <div /> }))
 vi.mock('next-intl/server', () => ({
   getFormatter: vi.fn().mockResolvedValue({ dateTime: () => 'Sep 21, 2026, 10:00 AM' }),
   getTranslations: vi.fn().mockResolvedValue((key: string, values?: Record<string, string>) => {
@@ -66,6 +66,7 @@ const user: AdminUserResponse = {
 async function renderTable(overrides: Partial<UsersTableProps> = {}) {
   const table = await UsersTable({
     users: [user],
+    page: 1,
     baseHref: '/en/admin/users',
     sortBy: 'createdAt',
     ...overrides,

@@ -24,3 +24,19 @@ test('plain pathname projection keeps external imports in one sorted group', () 
     assert.doesNotMatch(projected, /@\/i18n\/navigation/)
   }
 })
+
+test('plain pathname projection supports detail links without next-intl', () => {
+  const facts = buildLocaleNavigationFacts('en')
+  for (const pathname of [
+    'apps/web/src/shared/ui/console-detail/ConsoleContextLink.tsx',
+    'apps/web/src/shared/ui/console-detail/ConsoleRestorePosition.tsx',
+  ]) {
+    const projected = materializeProjectContentPath(
+      process.cwd(),
+      pathname,
+      facts.filter((fact) => fact.path === pathname)
+    ).after
+    assert.match(projected, /import \{ usePathname \} from 'next\/navigation'/)
+    assert.doesNotMatch(projected, /@\/i18n\/navigation/)
+  }
+})

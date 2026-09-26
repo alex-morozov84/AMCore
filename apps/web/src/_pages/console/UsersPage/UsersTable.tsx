@@ -2,6 +2,7 @@ import { getFormatter, getTranslations } from 'next-intl/server'
 import type { AdminUserResponse, AdminUserSortField } from '@amcore/shared'
 
 import {
+  buildDiscoveryHref,
   type DiscoveryQueryState,
   type DiscoverySortOrder,
   SortableColumnHead,
@@ -17,13 +18,21 @@ const MONO = 'font-console-mono'
 
 export interface UsersTableProps {
   users: AdminUserResponse[]
+  page: number
   baseHref: string
   search?: string
   sortBy: AdminUserSortField
   sortOrder?: DiscoverySortOrder
 }
 
-export async function UsersTable({ users, baseHref, search, sortBy, sortOrder }: UsersTableProps) {
+export async function UsersTable({
+  users,
+  page,
+  baseHref,
+  search,
+  sortBy,
+  sortOrder,
+}: UsersTableProps) {
   const t = await getTranslations('console')
   const format = await getFormatter()
   // The signed-in operator's own row never gets a role action (server also
@@ -35,6 +44,7 @@ export async function UsersTable({ users, baseHref, search, sortBy, sortOrder }:
     sortBy,
     sortOrder,
   }
+  const returnTo = buildDiscoveryHref(baseHref, { page, search, sortBy, sortOrder })
 
   function accessibleSortLabel(
     column: UsersSortableField,
@@ -119,6 +129,7 @@ export async function UsersTable({ users, baseHref, search, sortBy, sortOrder }:
             <UserRow
               key={user.id}
               user={user}
+              returnTo={returnTo}
               format={format}
               t={t}
               isSelf={user.id === operator?.id}

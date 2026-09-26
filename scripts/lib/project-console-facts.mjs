@@ -51,7 +51,7 @@ function seamFacts(disposition, omittedPath) {
 function routeMoves(slug) {
   const source = 'apps/web/src/app/[locale]/admin'
   const target = `apps/web/src/app/${slug}`
-  const plain = ['layout.tsx', '(protected)/layout.tsx', '(protected)/page.tsx']
+  const plain = ['layout.tsx', '(protected)']
   return [
     ...plain.map((relative) => move(`${source}/${relative}`, `${target}/${relative}`)),
     move(`${source}/(auth)/login/page.tsx`, `${target}/(auth)/login/page.tsx`),

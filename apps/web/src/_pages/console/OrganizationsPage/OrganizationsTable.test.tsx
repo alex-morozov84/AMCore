@@ -45,6 +45,7 @@ const organization: AdminOrganizationResponse = {
 async function renderTable(overrides: Partial<OrganizationsTableProps> = {}) {
   const table = await OrganizationsTable({
     organizations: [organization],
+    page: 1,
     baseHref: '/en/admin/organizations',
     sortBy: 'createdAt',
     ...overrides,

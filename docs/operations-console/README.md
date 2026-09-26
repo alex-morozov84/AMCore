@@ -10,8 +10,8 @@ their organization role.
 | Screen                            | Use it to                                                                     |
 | --------------------------------- | ----------------------------------------------------------------------------- |
 | [Overview](overview.md)           | Check this API instance's readiness, dependencies, version, and process role. |
-| [Users](users.md)                 | Find platform users and change their system role.                             |
-| [Organizations](organizations.md) | Find and inspect organizations without changing them.                         |
+| [Users](users.md)                 | Find users, inspect their details and memberships, and change system roles.   |
+| [Organizations](organizations.md) | Inspect organizations, members and their roles without changing them.         |
 | [Audit](audit.md)                 | Browse recent system events and narrow them by action, identity, or time.     |
 
 The Console also has a [configuration and deployment guide](configuration.md)
@@ -47,6 +47,7 @@ session and routing details.
 
 ## Scope
 
-The Console currently has the four screens above. It has no metrics, queues,
-or AI control panels. Product administration belongs in a separate area with
-its own roles and permissions.
+The Console has the four areas above, with full user and organization detail
+pages accessible from the lists and from current identities in Audit. It has
+no metrics, queues, or AI control panels. Product administration belongs in a
+separate area with its own roles and permissions.

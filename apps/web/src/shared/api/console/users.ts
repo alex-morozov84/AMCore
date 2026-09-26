@@ -1,5 +1,7 @@
 import {
   type AdminSortOrder,
+  type AdminUserDetailResponse,
+  adminUserDetailResponseSchema,
   type AdminUserListResponse,
   adminUserListResponseSchema,
   type AdminUserSortField,
@@ -18,6 +20,24 @@ export interface FetchConsoleUsersParams {
   search?: string
   sortBy?: AdminUserSortField
   sortOrder?: AdminSortOrder
+}
+
+export function fetchConsoleUserDetail(
+  id: string,
+  page: number,
+  search?: string,
+  limit = PAGINATION.DEFAULT_LIMIT
+): Promise<DataOutcome<AdminUserDetailResponse>> {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (search) query.set('search', search)
+  return fetchBackend(
+    `/api/v1/admin/users/${encodeURIComponent(id)}?${query}`,
+    adminUserDetailResponseSchema,
+    {
+      auth: 'required',
+      tokenResolver: getConsoleAwareAccessToken,
+    }
+  )
 }
 
 /**

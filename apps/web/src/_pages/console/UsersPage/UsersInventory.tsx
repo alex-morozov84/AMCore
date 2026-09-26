@@ -61,6 +61,7 @@ export async function UsersInventory({
     <>
       <UsersTable
         users={response.data}
+        page={response.page}
         baseHref={baseHref}
         search={search}
         sortBy={sortBy}

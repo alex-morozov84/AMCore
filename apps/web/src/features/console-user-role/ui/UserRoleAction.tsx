@@ -8,8 +8,9 @@ import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
 import { DropdownMenuItem } from '@/shared/ui/dropdown-menu'
 import { RowActionsMenu } from '@/shared/ui/row-actions-menu'
 
+import { useUserRoleChange } from '../model/use-user-role-change'
+
 import { RoleStepUpDialog } from './RoleStepUpDialog'
-import { useUserRoleChange } from './use-user-role-change'
 
 interface UserRoleActionProps {
   user: Pick<AdminUserResponse, 'id' | 'systemRole'>

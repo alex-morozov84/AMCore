@@ -126,6 +126,17 @@ export {
   auditSummarySchema,
   auditUserIdentitySchema,
 } from './admin-audit'
+export {
+  adminDetailIdSchema,
+  type AdminOrganizationDetailQuery,
+  adminOrganizationDetailQuerySchema,
+  type AdminOrganizationDetailResponse,
+  adminOrganizationDetailResponseSchema,
+  type AdminUserDetailQuery,
+  adminUserDetailQuerySchema,
+  type AdminUserDetailResponse,
+  adminUserDetailResponseSchema,
+} from './admin-detail'
 
 // Pagination schemas
 export {

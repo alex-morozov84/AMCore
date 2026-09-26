@@ -1,11 +1,12 @@
 import type { getFormatter, getTranslations } from 'next-intl/server'
 import type { AdminUserResponse } from '@amcore/shared'
 
+import { UserRoleAction } from '@/features/console-user-role'
+import { getConsoleUserDetailHref } from '@/shared/lib/console-public-href'
 import { formatConsoleDate, formatConsoleTime } from '@/shared/lib/format-console-date-time'
 import { cn } from '@/shared/lib/utils'
+import { ConsoleContextLink } from '@/shared/ui/console-detail/ConsoleContextLink'
 import { TableCell, TableRow } from '@/shared/ui/table'
-
-import { UserRoleAction } from './UserRoleAction'
 
 const MONO = 'font-console-mono'
 
@@ -14,13 +15,20 @@ export interface UserRowProps {
   format: Awaited<ReturnType<typeof getFormatter>>
   t: Awaited<ReturnType<typeof getTranslations>>
   isSelf: boolean
+  returnTo?: string
 }
 
-export function UserRow({ user, format, t, isSelf }: UserRowProps) {
+export function UserRow({ user, format, t, isSelf, returnTo }: UserRowProps) {
   return (
     <TableRow className="border-line-soft">
       <TableCell>
-        <p className="font-medium">{user.name ?? user.email}</p>
+        <ConsoleContextLink
+          href={getConsoleUserDetailHref(user.id, returnTo)}
+          detailKey={`user:${user.id}`}
+          className="font-medium underline-offset-2 hover:underline focus-visible:underline"
+        >
+          {user.name ?? user.email}
+        </ConsoleContextLink>
         {user.name && <p className={cn(MONO, 'text-xs text-foreground-muted')}>{user.email}</p>}
       </TableCell>
       <TableCell>{t(user.emailVerified ? 'usersEmailVerified' : 'usersEmailUnverified')}</TableCell>

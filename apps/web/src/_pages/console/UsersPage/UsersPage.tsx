@@ -7,6 +7,7 @@ import {
   SearchInput,
 } from '@/features/console-discovery'
 import { getConsoleUsersHref } from '@/shared/lib/console-public-href'
+import { ConsoleRestorePosition } from '@/shared/ui/console-detail/ConsoleRestorePosition'
 
 import { getUsersEffectiveSortOrder, type UsersSortableField } from './parse-query'
 import { UsersResults } from './UsersResults'
@@ -40,6 +41,7 @@ export async function UsersPage({
   const baseHref = getConsoleUsersHref()
   return (
     <section className="flex flex-col gap-4">
+      <ConsoleRestorePosition />
       <h1 className="text-3xl font-semibold tracking-tight">{t('users')}</h1>
       <DiscoverySearchBoundary
         baseHref={baseHref}

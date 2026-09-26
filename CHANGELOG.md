@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operations Console: user and organization details.** Full, bookmarkable
+  pages show safe account and organization facts, roles, and bounded, searchable
+  membership lists. User role changes reuse the existing guarded action.
+  Inventory and Audit identity links preserve their source view and scroll
+  position on return. Detail-to-Audit links select and explain the last 31
+  days; Audit keeps the chosen range visible and qualifies empty results.
+  Both detail pages include initial and relation-refresh skeletons.
+
 - **Password requirements guidance.** Registration and password-reset forms now
   show the existing length, uppercase Latin letter, and digit requirements
   below the password field in English and Russian before submission.

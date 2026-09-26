@@ -123,6 +123,7 @@ test('Audit navigation is deliberate, read-audited and fresh on history travel',
 test('Audit event and name journeys keep filters useful', async ({ page }) => {
   const email = uniqueEmail('audit-journey')
   await registerViaUi(page, email)
+  await expect(page).toHaveURL(/\/en\/?$/)
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await loginViaUi(page, email)
@@ -152,9 +153,11 @@ test('Audit event and name journeys keep filters useful', async ({ page }) => {
   const today = new Date()
   const isoDay = (offset: number) =>
     new Date(today.getTime() + offset * 86_400_000).toISOString().slice(0, 10)
-  await expect(page.locator(`[data-day="${isoDay(1)}"] button`)).toBeDisabled()
-  await page.locator(`[data-day="${isoDay(-1)}"] button`).click()
-  await page.locator(`[data-day="${isoDay(0)}"] button`).click()
+  const calendarDay = (offset: number) =>
+    page.locator(`[data-day="${isoDay(offset)}"]:not([data-outside]) button`)
+  await expect(calendarDay(1)).toBeDisabled()
+  await calendarDay(-1).click()
+  await calendarDay(0).click()
   await expect(page.getByRole('button', { name: 'Choose dates' })).toHaveAttribute(
     'aria-label',
     /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/
