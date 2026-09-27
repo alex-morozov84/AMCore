@@ -189,10 +189,8 @@ export class OrganizationsService {
    * `MemberService` / `RoleService` must use {@link bumpAclVersionTx}
    * so the bump rolls back with the mutation.
    *
-   * Post-commit cache invalidation runs after the DB update. If Redis
-   * invalidation fails, `OrgAclVersionService` records an error-level
-   * freshness incident but does not turn a committed DB mutation into
-   * a false client failure.
+   * Current ACL authority is read from the primary database. The retained
+   * post-update invalidation seam is a compatibility no-op.
    */
   async bumpAclVersion(orgId: string): Promise<void> {
     await this.prisma.organization.update({
@@ -215,13 +213,8 @@ export class OrganizationsService {
    * cache version and the DB ACL state can no longer drift on
    * transient DB failures.
    *
-   * Cache invalidation (OA-04) is the caller's job: call
-   * `OrgAclVersionService.invalidate(orgId)` after the surrounding
-   * `$transaction` commits successfully. Doing the Redis `DEL` inside
-   * the transaction would mix non-transactional I/O into the unit of
-   * work — a rollback would not undo it, breaking the freshness
-   * contract in the opposite direction (cache emptied for an
-   * un-applied bump).
+   * No post-commit publication is required for freshness. Existing callers
+   * may retain the compatibility no-op invalidate call after commit.
    */
   async bumpAclVersionTx(orgId: string, tx: PrismaTx): Promise<void> {
     await tx.organization.update({

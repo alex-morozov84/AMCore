@@ -122,6 +122,7 @@ describe('PermissionsCacheService', () => {
     redis = module.get(REDIS_CLIENT)
     lock = module.get(RedisLockService)
     prisma = module.get<PrismaService>(PrismaService)
+    prisma.$transaction = jest.fn().mockImplementation((load) => load(prisma))
 
     jest
       .spyOn(service as unknown as { sleep: (ms: number) => Promise<void> }, 'sleep')
@@ -134,6 +135,31 @@ describe('PermissionsCacheService', () => {
   })
 
   describe('getPermissions', () => {
+    it('loads all permission relations through a RepeatableRead transaction on a miss', async () => {
+      redis.get.mockResolvedValue(null)
+      lock.acquire.mockResolvedValue('owned')
+      jest.spyOn(prisma.orgMember, 'findUnique').mockResolvedValueOnce(mockMember as never)
+      await service.getPermissions('user-1', 'org-1', 5)
+      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: 'RepeatableRead',
+      })
+      expect(redis.set).toHaveBeenCalledWith(
+        'auth:perm:v2:org-1:user-1:5',
+        JSON.stringify(mockPermissions),
+        expect.any(Object)
+      )
+    })
+
+    it('never publishes a permission result when the read transaction fails', async () => {
+      redis.get.mockResolvedValue(null)
+      lock.acquire.mockResolvedValue('owned')
+      const failure = new Error('snapshot failed')
+      jest.spyOn(prisma, '$transaction').mockRejectedValueOnce(failure)
+      await expect(service.getPermissions('user-1', 'org-1', 5)).rejects.toBe(failure)
+      expect(redis.set).not.toHaveBeenCalled()
+      expect(lock.release).toHaveBeenCalledWith('auth:lock:perm:v2:org-1:user-1', 'owned')
+    })
+
     it('should return cached permissions on cache hit', async () => {
       redis.get.mockResolvedValueOnce(JSON.stringify(mockPermissions))
 

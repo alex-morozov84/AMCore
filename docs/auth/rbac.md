@@ -147,8 +147,8 @@ The org creator automatically becomes its `ADMIN`.
 
 ### Built-in org roles
 
-A role is a named bundle of permissions. Three roles are seeded per org and
-cannot be deleted:
+A role is a named bundle of permissions. Three shared system roles are seeded
+and available to every organization; they cannot be deleted:
 
 | Role     | Permissions                                                                    |
 | -------- | ------------------------------------------------------------------------------ |
@@ -230,8 +230,9 @@ createContact(@Body() dto: CreateContactDto) { ... }
 **Manual check inside a service** — when the decision depends on the loaded row:
 
 ```typescript
-const ability = await this.abilityFactory.createForUser(userId, orgId)
-if (!ability.can('update', subject('Contact', { assignedToId: userId }))) {
+// principal is the authenticated RequestPrincipal supplied to the service.
+const ability = await this.abilityFactory.createForUser(principal)
+if (!ability.can('update', subject('Contact', { assignedToId: principal.sub }))) {
   throw new ForbiddenException()
 }
 ```
@@ -296,57 +297,81 @@ sees only their own — with zero branching in the service.
 
 ## Freshness & caching
 
-Org permissions are cached in Redis with version-based invalidation so most
-requests avoid a database round-trip.
+JWT authorization that uses organization permissions reads the current
+organization `aclVersion` from the **primary database**, even when the permission
+payload is cached. The `SUPER_ADMIN` bypass and personal ability remain unchanged.
+API keys already read the current version during live membership admission.
 
 ```
-Current org ACL version:  auth:org:aclv:v1:{orgId}
-Permissions cache key:     auth:perm:v2:{orgId}:{userId}:{aclVersion}
-Permissions TTL:           1 hour
+Permissions cache key: auth:perm:v2:{orgId}:{userId}:{aclVersion}
+Permissions TTL:       1 hour
 ```
 
-When an admin mutates memberships, roles, or permissions, the ACL change **and**
-the organization's `aclVersion` increment commit in the **same database
-transaction**. After that commit the server invalidates the cached current ACL
-version. On the caller's next org-scoped request, the backend reads the current
-`aclVersion`, keys the permission cache with it, misses the stale entry, and
-loads fresh permissions.
+An ACL mutation and its organization's version increment must commit in the
+**same database transaction**. The first authorization lookup that starts after
+that commit selects the new version, so the same JWT immediately observes role
+or permission removal; no sign-out or token refresh is required. A request whose
+lookup overlaps the mutation may finish with the previously admitted rights.
+This does not cancel in-flight handlers or enforce a second check at commit.
 
-**Effect: permission changes take effect on the _next request_ — no sign-out
-required.**
+On a cache miss, membership, roles and permissions are loaded together in a
+PostgreSQL `REPEATABLE READ` transaction. This prevents mixing relationship rows
+from different committed states. The version is a cache-selection fence, not an
+exact snapshot revision: an overlapping fill may contain newer coherent rules
+under an older key. Later lookups select the newer key regardless. Empty rule
+sets are cached too. Existing role filtering and permission ordering remain in
+effect; this mechanism does not redefine authorization semantics.
 
 ### The JWT `aclVersion` is not trusted
 
-The JWT embeds `aclVersion` at login/refresh time, but authorization **does not
-trust that value**. It uses the token's org context to read the _current_
-server-side `aclVersion` before building the ability:
+The JWT's embedded version is a login/refresh snapshot, never the authorization
+source. For example, a JWT carrying version 3 selects version 4 after an admin's
+ACL mutation commits. Old `auth:org:aclv:v1:{orgId}` Redis values are ignored.
+`RBAC_ACLV_CACHE_TTL_MS` is deprecated: it still accepts nonnegative integers
+(default `0`), but **both zero and positive values are ignored**.
+`OrgAclVersionService.invalidate()` remains a compatibility no-op.
 
-```
-Login             → JWT aclVersion: 3
-Admin edits perms → org.aclVersion becomes 4
-Next request      → JWT still says 3 → backend reads current 4 → cache miss → fresh load
-```
+### Failures and extension rules
 
-The embedded value is a debug/snapshot only; the next refresh cycle re-embeds
-the newer version.
+For JWT authorization using organization permissions, a missing organization
+fails with `404`; an API key fails live membership admission with `401`.
+Database failures propagate through the existing exception filter (`503` for
+recognized availability errors, `500` for unexpected failures). No cached
+version or JWT version is used on failure. A permission Redis read, lock or
+publication error also fails authorization; a completed database load alone is
+not an availability fallback. Existing shared Redis reconnect/queue behavior is
+unchanged, so this does not promise a bounded
+response time during every outage. No new authorization retry is introduced.
 
-### Redis fallback caveat
+When adding an ACL mutation, call `bumpAclVersionTx(orgId, tx)` inside the same
+transaction as the write. A standalone bump is insufficient for an ACL write.
+For shared organization system-role or permission-template changes, bump
+**every affected organization** transactionally. Raw SQL, migrations and external
+writers must honor the same rule; metadata-only changes that do not alter effective rules
+need no bump. Do not rely on post-commit invalidation for correctness.
 
-If Redis cannot be **read**, the server falls back to the database for the
-current `aclVersion` — decisions stay correct, just uncached. If post-commit
-Redis **invalidation** fails, the mutation remains committed and the server
-records an error-level incident with metric `auth.rbac.aclv_invalidate_failure`
-— monitor this in production. By default the ACL-version cache has no TTL and
-relies on explicit invalidation; setting `RBAC_ACLV_CACHE_TTL_MS` enables a
-bounded fallback where a stale decision can persist up to that TTL if
-invalidation fails.
+### Deployment and rollback
+
+Upgrade **all API instances** and drain old instances, including their in-flight
+requests, before relying on this freshness guarantee. Mixed-version operation is
+unsupported for the guarantee: new mutations no longer invalidate the version
+cache used by old readers. No cache scan, flush or namespace migration is needed.
+New fills are coherent snapshots; historical permission payloads are not certified
+as coherent. If every payload must originate from the new loader, allow the full
+one-hour TTL to elapse after the old processes are drained. Rollback restores the
+old cache limitations; retaining the deprecated environment variable does not
+preserve the repaired guarantee. Monitor primary database load and pool pressure:
+warm org-scoped JWT authorization now requires a database round-trip.
 
 ---
 
 ## Managing roles, permissions & members
 
-All management routes require an org-context JWT (call `/switch` first) and the
-`ADMIN` role. See `/docs` for exact shapes; the semantics that matter:
+Role, permission and member management require matching organization context and
+`manage:Organization` permission. For JWTs, call `/switch` first. An `ADMIN` has
+this permission; a custom role can grant it too. Supported API keys use their
+bound organization and must also have a scope permitting the operation. See
+`/docs` for each route's credentials and exact shapes; the semantics that matter:
 
 - **Roles list** is paginated and ordered `isSystem DESC, name ASC` so system
   roles head the list.
