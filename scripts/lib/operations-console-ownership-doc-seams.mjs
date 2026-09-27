@@ -170,6 +170,15 @@ export const operationsConsoleDocSeams = [
     ),
     ['admin-sessions/readability.spec.ts']
   ),
+  entry(
+    'console.audit-history-guide',
+    'docs/operations/audit-log.md',
+    block(
+      'With the optional Console, filter IDs and the cursor still appear in the',
+      'configuration](../operations-console/configuration.md#console-urls-in-browser-history-and-logs).'
+    ),
+    ['../operations-console/configuration.md']
+  ),
   ...operationsConsoleDiscoverySeams,
 ]
 import { operationsConsoleDiscoverySeams } from './operations-console-ownership-discovery-seams.mjs'

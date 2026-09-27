@@ -31,6 +31,12 @@ test('disabled Console docs retain Settings pending proof and its runnable comma
   assert.doesNotMatch(after, /admin-sessions\/readability|actual initials on the composited/)
 })
 
+test('disabled Console docs preserve API audit redaction without a dead guide link', () => {
+  const after = materialize('docs/operations/audit-log.md', 'console.audit-history-guide')
+  assert.match(after, /request query and raw URL logs/)
+  assert.doesNotMatch(after, /operations-console\/configuration|With the optional Console/)
+})
+
 test('treats the Console guide as a whole-feature root instead of shared content', () => {
   const pathname = 'docs/operations-console/README.md'
   assert.throws(

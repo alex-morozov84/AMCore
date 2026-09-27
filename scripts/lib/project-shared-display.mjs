@@ -43,6 +43,8 @@ const summaries = {
   'storybook.docs-route-progress':
     'route-progress.md: remove the deleted Storybook visual-phase reference',
   'storybook.gitignore': 'apps/web/.gitignore: remove Storybook-only output ignores',
+  'console.audit-history-guide':
+    'audit-log.md: remove the optional Console browser-history guide link',
   'console.sessions-readability-guide':
     'testing.md: remove Console-only refetch guidance and command',
   'architecture-console': 'remove the Operations Console FSD section',
