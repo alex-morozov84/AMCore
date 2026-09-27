@@ -161,6 +161,33 @@ export const operationsConsoleDocSeams = [
       "fetches follow ADR-079's primary/secondary graceful-degradation contract."
     )
   ),
+  entry(
+    'console.sessions-readability-guide',
+    'docs/frontend/testing.md',
+    block(
+      'When the optional Console is enabled, its retained-refetch tests cover desktop',
+      'Use the same isolated-stack configuration for these Console checks.'
+    ),
+    ['admin-sessions/readability.spec.ts']
+  ),
+  entry(
+    'console.audit-history-guide',
+    'docs/operations/audit-log.md',
+    block(
+      'With the optional Console, filter IDs and the cursor still appear in the',
+      'configuration](../operations-console/configuration.md#console-urls-in-browser-history-and-logs).'
+    ),
+    ['../operations-console/configuration.md']
+  ),
+  entry(
+    'console.rbac-user-guide',
+    'docs/auth/rbac.md',
+    block(
+      "The Operations Console's Users panel is an authenticated management surface",
+      'last-`SUPER_ADMIN` guards described above.'
+    ),
+    ['../operations-console/users.md']
+  ),
   ...operationsConsoleDiscoverySeams,
 ]
 import { operationsConsoleDiscoverySeams } from './operations-console-ownership-discovery-seams.mjs'

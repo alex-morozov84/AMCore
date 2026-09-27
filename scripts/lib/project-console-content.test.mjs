@@ -24,6 +24,19 @@ test('removes a mixed-document Console block and preserves surrounding content',
   assert.ok(after.includes('## Quick start'))
 })
 
+test('disabled Console docs retain Settings pending proof and its runnable command', () => {
+  const after = materialize('docs/frontend/testing.md', 'console.sessions-readability-guide')
+  assert.match(after, /Settings covers both themes/)
+  assert.match(after, /sessions-readability\.spec\.ts/)
+  assert.doesNotMatch(after, /admin-sessions\/readability|actual initials on the composited/)
+})
+
+test('disabled Console docs preserve API audit redaction without a dead guide link', () => {
+  const after = materialize('docs/operations/audit-log.md', 'console.audit-history-guide')
+  assert.match(after, /request query and raw URL logs/)
+  assert.doesNotMatch(after, /operations-console\/configuration|With the optional Console/)
+})
+
 test('treats the Console guide as a whole-feature root instead of shared content', () => {
   const pathname = 'docs/operations-console/README.md'
   assert.throws(

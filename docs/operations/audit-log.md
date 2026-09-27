@@ -226,9 +226,11 @@ An invalid or stale cursor returns 400 and the panel offers to restart the
 same filters. Responses use `Cache-Control: private, no-store`.
 
 Audit filter IDs and the cursor are removed from both the API's structured
-request query and raw URL logs. They still appear in the operator's browser
-history. Deployments that retain reverse-proxy access logs must omit or
-truncate Console query strings there as well; see [Console
+request query and raw URL logs.
+
+With the optional Console, filter IDs and the cursor still appear in the
+operator's browser history. Deployments that retain reverse-proxy access logs
+must omit or truncate Console query strings there as well; see [Console
 configuration](../operations-console/configuration.md#console-urls-in-browser-history-and-logs).
 
 The `cursorKey` migration adds a volatile UUID default and unique index to

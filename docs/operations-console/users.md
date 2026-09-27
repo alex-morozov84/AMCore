@@ -73,6 +73,10 @@ browser-and-OS device label, an approximate location (when available), when
 it last re-authenticated, when its current token was issued, and when it
 expires.
 
+Use **Refresh** to reload the Sessions card. Existing rows remain readable
+while the request is pending; the refresh button shows a spinner and is disabled
+until completion. Session controls keep their existing loading guards.
+
 1. Open a user's detail page and find the **Sessions** card below their
    organizations.
 2. To end one session, open its row menu and choose **Revoke session**;

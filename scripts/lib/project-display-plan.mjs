@@ -14,6 +14,7 @@ const combinedOrder = [
   'apps/web/package.json',
   'docs/frontend/architecture-and-conventions.md',
   'docs/frontend/brand-theme-and-tokens.md',
+  'docs/frontend/testing.md',
   'docs/frontend/README.md',
   'AGENTS.md',
   'README.md',
@@ -97,14 +98,26 @@ function insertConsole(plan, root, singles) {
       plan,
       root,
       brandPath,
-      take(singles, 'docs/frontend/architecture-and-conventions.md', 'docs/frontend/README.md')
+      take(
+        singles,
+        'docs/frontend/architecture-and-conventions.md',
+        'docs/frontend/README.md',
+        'docs/frontend/testing.md'
+      )
     )
   }
   insertTarget(
     plan,
     root,
     'docs/operations/README.md',
-    take(singles, 'AGENTS.md', 'README.md', 'docs/README.md')
+    take(
+      singles,
+      'AGENTS.md',
+      'README.md',
+      'docs/README.md',
+      'docs/operations/audit-log.md',
+      'docs/auth/rbac.md'
+    )
   )
   if (context && !enabled)
     insertProvider(plan, 'console', false, take(singles, 'PROJECT_CONTEXT.md'))

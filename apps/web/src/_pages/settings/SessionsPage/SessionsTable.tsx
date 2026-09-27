@@ -108,10 +108,7 @@ export function SessionsTable() {
 
   return (
     <div className="space-y-4">
-      <div
-        aria-busy={isFetching}
-        className={`overflow-hidden rounded-md border transition-opacity ${isFetching ? 'opacity-60' : ''}`}
-      >
+      <div aria-busy={isFetching} className="overflow-hidden rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

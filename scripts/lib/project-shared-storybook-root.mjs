@@ -43,9 +43,9 @@ for where a shared schema's own test belongs, and
 [\`docs/frontend/testing.md\`](docs/frontend/testing.md) for the frontend test
 taxonomy and command choices.
 `
-const A11Y_BEFORE = `| **Accessibility (a11y)** | ✅ Shipped      | WCAG AA contrast enforced by a dependency-free test on the shipped token CSS, \`@axe-core/playwright\` WCAG A/AA scans on real pages, and a CI-gating Storybook a11y check per component                         |
+const A11Y_BEFORE = `| **Accessibility (a11y)** | ✅ Shipped      | Solid token-pair contrast tests, browser checks of destructive-button normal/hover states, real-page WCAG A/AA scans including retained Sessions refetch, and CI-gating Storybook a11y checks                  |
 `
-const A11Y_AFTER = `| **Accessibility (a11y)** | ✅ Shipped      | WCAG AA contrast enforced by a dependency-free test on the shipped token CSS, \`@axe-core/playwright\` WCAG A/AA scans on real pages                                                          |
+const A11Y_AFTER = `| **Accessibility (a11y)** | ✅ Shipped      | Solid token-pair contrast tests, real-page WCAG A/AA scans including retained Sessions refetch                                                                                                                 |
 `
 const WORKSHOP_ROW = `| **Component workshop**   | ✅ Shipped      | Storybook wired to the same MSW/theme/i18n stack as the real app; every story doubles as a Vitest test with a CI-gating axe check                                                                              |
 `

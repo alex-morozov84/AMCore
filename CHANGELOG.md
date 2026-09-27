@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   user and organization details, and Sessions use headings matching their page
   outline without changing their appearance.
 
+### Fixed
+
+- Session rows in Settings and Operations Console remain readable during
+  refresh. Destructive buttons and confirmation actions retain text contrast
+  in light/dark themes, including hover; Console operator initials use a
+  readable foreground on their accent background.
+
 ## [0.10.0] - 2026-09-26
 
 ### Security

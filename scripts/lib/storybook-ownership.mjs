@@ -1,3 +1,4 @@
+import { storybookContrastSeams } from './storybook-ownership-contrast-seams.mjs'
 import { defineOwnershipManifest } from './ownership-manifest.mjs'
 import { storybookAgentsSeams } from './storybook-ownership-agents-seams.mjs'
 import { storybookContributingSeams } from './storybook-ownership-contributing-seams.mjs'
@@ -45,6 +46,7 @@ export const storybookOwnership = defineOwnershipManifest({
     ...storybookCoreSeams,
     ...storybookIndexSeams,
     ...storybookGeneralDocSeams,
+    ...storybookContrastSeams,
     ...storybookAgentsSeams,
     ...storybookContributingSeams,
     ...storybookTestingSeams,

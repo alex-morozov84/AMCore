@@ -15,11 +15,9 @@ const buttonVariants = cva(
           'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
         ghost:
           'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50',
-        // Solid fill + --destructive-foreground token, kept from PR1 (#294)
-        // rather than Nova's own soft/tinted destructive style — see
-        // ai/models-talk.md Track 5, D4.
+        // Opaque fills keep text contrast independent of the underlying surface.
         destructive:
-          'bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
+          'bg-destructive text-destructive-foreground hover:bg-[color-mix(in_oklch,var(--destructive),var(--foreground)_10%)] focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {

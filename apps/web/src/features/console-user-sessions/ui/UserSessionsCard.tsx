@@ -136,7 +136,7 @@ export function UserSessionsCard({ userId, targetEmail, isSelf }: UserSessionsCa
           <>
             <div
               aria-busy={isFetching}
-              className={`hidden rounded-lg border border-border bg-surface-elevated shadow-md transition-opacity sm:block ${isFetching ? 'opacity-60' : ''}`}
+              className="hidden rounded-lg border border-border bg-surface-elevated shadow-md sm:block"
             >
               <Table className="table-fixed">
                 <TableHeader>
@@ -167,10 +167,7 @@ export function UserSessionsCard({ userId, targetEmail, isSelf }: UserSessionsCa
                 </TableBody>
               </Table>
             </div>
-            <ul
-              aria-busy={isFetching}
-              className={`space-y-3 transition-opacity sm:hidden ${isFetching ? 'opacity-60' : ''}`}
-            >
+            <ul aria-busy={isFetching} className="space-y-3 sm:hidden">
               {rows.map((row) => (
                 <SessionMobileCard
                   key={row.sessionId}

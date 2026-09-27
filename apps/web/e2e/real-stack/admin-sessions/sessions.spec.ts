@@ -3,6 +3,7 @@ import { type Browser, expect, type Page, test } from '@playwright/test'
 import { expectNoAxeViolations, waitForAnimationsToFinish } from '../../shared/axe'
 import { ageSessionLastAuthAt, countLiveSessions, setSystemRole } from '../admin-helpers'
 import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../helpers'
+import { waitForSessionTransitions } from '../sessions-readability'
 
 async function signInAsPathAdmin(page: Page, email: string) {
   // Called twice per test with the same email (create, then log back in
@@ -193,10 +194,20 @@ test('the Sessions card has no axe violations, populated or empty', async ({ pag
   await signInAsPathAdmin(page, adminEmail)
 
   await openTargetDetail(page, targetEmail)
+  await expect(page.getByRole('heading', { name: 'Sessions (2 total)' })).toBeVisible()
+  await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(2)
+  await expect(page.locator('[aria-busy]:visible')).toHaveAttribute('aria-busy', 'false')
+  await expect(page.getByRole('button', { name: /revoke all sessions/i })).toBeEnabled()
+  await waitForSessionTransitions(
+    page.locator('[data-slot="card"]').filter({
+      has: page.getByRole('heading', { name: 'Sessions (2 total)' }),
+    })
+  )
   await expectNoAxeViolations(page)
 
   await page.getByRole('button', { name: /revoke all sessions/i }).click()
   await waitForAnimationsToFinish(page, '[data-slot="alert-dialog-content"]')
+  await waitForSessionTransitions(page.getByRole('alertdialog'))
   await expectNoAxeViolations(page)
   await page
     .getByRole('alertdialog')
@@ -204,5 +215,6 @@ test('the Sessions card has no axe violations, populated or empty', async ({ pag
     .click()
   await expect(page.getByText(/no active sessions/i)).toBeVisible()
   await expect(page.getByRole('alertdialog', { includeHidden: true })).toHaveCount(0)
+  await waitForSessionTransitions(page.getByRole('button', { name: /revoke all sessions/i }))
   await expectNoAxeViolations(page)
 })

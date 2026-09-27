@@ -274,6 +274,44 @@ await waitForAnimationsToFinish(page, '[data-slot="dropdown-menu-content"]')
 await expectNoAxeViolations(page)
 ```
 
+**Session scans distinguish readiness from retained content.** For a settled
+scan, first assert the expected rows/current-session badge, `aria-busy="false"`
+and the relevant enabled controls. The Sessions-local
+`waitForSessionTransitions()` observes finite animations on the tested surface
+and its descendants; it excludes infinite animations such as a refresh
+spinner. Waiting for a spinner to stop is not a valid pending-state
+check.
+
+The real-stack retained-refetch regressions hold an actual authenticated list
+response without changing its data. Before releasing it, they assert preserved
+row content and counts, `aria-busy="true"` and the existing control feedback,
+then run the full-page axe scan while the response is still held. After release,
+they assert the settled content and scan again. Settings covers both themes. Release and join held
+requests, unregister handlers and close additional contexts in `finally`.
+Auth, cookies and persistence remain real in this lane.
+
+With an isolated local stack running and seeded, run the scoped regressions:
+
+```bash
+pnpm --filter web exec playwright test --config playwright.real-stack.config.ts sessions-readability.spec.ts
+```
+
+The default config targets localhost:3000. For another isolated stack, use a
+local config overriding `use.baseURL` while preserving the existing projects
+and worker/retry policy. Set `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE` and
+`COMPOSE_ENV_FILES` to that same local stack so SQL helpers cannot target a
+different project. Use only that stack's local database configuration.
+
+When the optional Console is enabled, its retained-refetch tests cover desktop
+and mobile in both themes, with the existing refresh spinner and control guards.
+They also check the actual initials on the composited header background:
+
+```bash
+pnpm --filter web exec playwright test --config playwright.real-stack.config.ts admin-sessions/readability.spec.ts
+```
+
+Use the same isolated-stack configuration for these Console checks.
+
 **This is partial WCAG coverage, not a compliance pass.** Automated
 scanning is well-documented as catching roughly half of real issues
 (contrast, missing labels, landmark/ARIA misuse — not things like "does

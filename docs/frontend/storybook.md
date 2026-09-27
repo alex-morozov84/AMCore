@@ -139,6 +139,27 @@ catch different things, and Storybook's own default ruleset disables the
 `region` rule specifically to avoid false positives at component-isolation
 granularity that wouldn't apply to a full page.
 
+`shared/ui/button-contrast.stories.tsx` tests the actual destructive Button
+and confirmation action on body/card/popover surfaces in light and dark.
+Each theme/surface case checks normal and hover separately. In the Vitest
+browser runner it moves the real pointer, verifies `:hover`, waits for finite
+transitions and requires an actual passing color-contrast node as well as no
+violations. The temporary root theme is restored in `finally`. The standalone
+Storybook preview remains interactive; the trusted-pointer assertions run in
+the Vitest browser lane:
+
+```bash
+pnpm --filter web exec vitest run --project=storybook src/shared/ui/button-contrast.stories.tsx
+```
+
+For asynchronous stories, hold the response with a story-local release gate
+rather than sleeping for an assumed request duration. Give each replay its own
+gate, assert pending content before release and settled content afterward, and
+release outstanding requests on interaction failure and lifecycle cleanup.
+The Sessions pagination/refresh story follows this pattern. Isolated stories
+use MSW; [real-stack checks](./testing.md#accessibility) separately prove the
+pending and settled states through actual auth and persistence.
+
 A per-story `'todo'` override is for a real, tracked gap — not a way to
 silence a violation you haven't investigated.
 
