@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 
-import { countLiveSessions } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 import { holdSessionRefetch, waitForSessionTransitions } from './sessions-readability'
 
@@ -41,7 +40,9 @@ for (const theme of ['light', 'dark']) {
         await expect(wrapper).toHaveAttribute('aria-busy', 'false')
         await expect(rows).toHaveCount(1)
         await expect(page.locator('tbody').getByText('This device', { exact: true })).toBeVisible()
-        expect(countLiveSessions(email)).toBe(1)
+        const persisted = await page.request.get('/api/auth/sessions?page=1&limit=20')
+        expect(persisted.ok()).toBe(true)
+        expect((await persisted.json()).total).toBe(1)
         await waitForSessionTransitions(wrapper)
         await expectNoAxeViolations(page)
       } finally {
