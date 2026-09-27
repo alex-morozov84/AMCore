@@ -26,6 +26,8 @@ export const E2E_ROUTE_SURFACES = [
   ['apps/web/e2e/real-stack/require-session-redirect.spec.ts', 4],
   ['apps/web/e2e/real-stack/sessions.spec.ts', 3],
   ['apps/web/e2e/server-mocked/oauth-visibility.spec.ts', 2],
+  ['apps/web/e2e/real-stack/admin-sessions/readability.spec.ts', 3],
+  ['apps/web/e2e/real-stack/sessions-readability.spec.ts', 3],
 ]
 
 export const OAUTH_E2E_ROUTE_SURFACE = ['apps/api/test/oauth.e2e-spec.ts', 10]

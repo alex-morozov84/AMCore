@@ -28,6 +28,8 @@ export const E2E_UI_PROFILES = Object.freeze({
     ['/sign out/i', '/выйти/i'],
   ],
   consoleSessions: [
+    ["'Sessions (2 total)'", "'Сессии (всего: 2)'"],
+    ["'Refresh'", "'Обновить'"],
     ['/sessions \\(/i', '/сессии \\(/i'],
     ['/Sessions \\(2 total\\)/i', '/Сессии \\(всего: 2\\)/i'],
     ['/Sessions \\(1 total\\)/', '/Сессии \\(всего: 1\\)/'],
@@ -52,6 +54,7 @@ export const E2E_UI_PROFILES = Object.freeze({
     ["'Navigation'", "'Навигация'"],
   ],
   sessions: [
+    ["'This device'", "'Это устройство'"],
     ["'Active sessions'", "'Активные сессии'"],
     ['/actions/i', '/действия/i'],
     ['/revoke/i', '/отозвать/i'],
@@ -68,7 +71,7 @@ export const E2E_UI_SURFACES = Object.freeze([
   surface(
     'apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts',
     ['auth', 'consoleSessions'],
-    23
+    27
   ),
   surface('apps/web/e2e/console-real-stack/sessions.spec.ts', ['console', 'consoleSessions'], 10),
   surface('apps/web/e2e/console-real-stack/session-isolation.spec.ts', ['console'], 5),
@@ -78,7 +81,7 @@ export const E2E_UI_SURFACES = Object.freeze([
   surface('apps/web/e2e/mocked/route-progress-bar.spec.ts', ['auth'], 5),
   surface('apps/web/e2e/server-mocked/oauth-visibility.spec.ts', ['auth'], 2),
   surface('apps/web/e2e/real-stack/helpers.ts', ['auth'], 5),
-  surface('apps/web/e2e/real-stack/accessibility.spec.ts', ['sessions'], 2),
+  surface('apps/web/e2e/real-stack/accessibility.spec.ts', ['sessions'], 4),
   surface('apps/web/e2e/real-stack/app-shell.spec.ts', ['nav', 'sessions'], 5),
   surface('apps/web/e2e/real-stack/auth-email-link-flows.spec.ts', ['auth', 'errors'], 16),
   surface('apps/web/e2e/real-stack/csp-nonce.spec.ts', ['nav'], 1),
@@ -86,6 +89,8 @@ export const E2E_UI_SURFACES = Object.freeze([
   surface('apps/web/e2e/real-stack/login.spec.ts', ['auth', 'dashboard'], 2),
   surface('apps/web/e2e/real-stack/register-and-logout.spec.ts', ['auth', 'dashboard'], 2),
   surface('apps/web/e2e/real-stack/sessions.spec.ts', ['sessions'], 5),
+  surface('apps/web/e2e/real-stack/admin-sessions/readability.spec.ts', ['consoleSessions'], 4),
+  surface('apps/web/e2e/real-stack/sessions-readability.spec.ts', ['sessions'], 5),
 ])
 
 export const E2E_UI_EXPECTATION_DENOMINATOR = E2E_UI_SURFACES.reduce(
