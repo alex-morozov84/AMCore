@@ -110,7 +110,14 @@ function insertConsole(plan, root, singles) {
     plan,
     root,
     'docs/operations/README.md',
-    take(singles, 'AGENTS.md', 'README.md', 'docs/README.md', 'docs/operations/audit-log.md')
+    take(
+      singles,
+      'AGENTS.md',
+      'README.md',
+      'docs/README.md',
+      'docs/operations/audit-log.md',
+      'docs/auth/rbac.md'
+    )
   )
   if (context && !enabled)
     insertProvider(plan, 'console', false, take(singles, 'PROJECT_CONTEXT.md'))

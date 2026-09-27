@@ -179,6 +179,15 @@ export const operationsConsoleDocSeams = [
     ),
     ['../operations-console/configuration.md']
   ),
+  entry(
+    'console.rbac-user-guide',
+    'docs/auth/rbac.md',
+    block(
+      "The Operations Console's Users panel is an authenticated management surface",
+      'last-`SUPER_ADMIN` guards described above.'
+    ),
+    ['../operations-console/users.md']
+  ),
   ...operationsConsoleDiscoverySeams,
 ]
 import { operationsConsoleDiscoverySeams } from './operations-console-ownership-discovery-seams.mjs'
