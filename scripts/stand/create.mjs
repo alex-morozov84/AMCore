@@ -38,7 +38,7 @@ export async function create(id, purpose, topology, mocked = false) {
   const m = {
     version: 1,
     ...choices,
-    fixtureVersion: 1,
+    fixtureVersion: 2,
     mocked,
     id,
     uuid,

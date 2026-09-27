@@ -13,15 +13,19 @@ export async function list() {
     }
   }
   const current = await engine()
+  for (const kind of ['container', 'network', 'volume']) await listResources(current, kind)
+}
+
+async function listResources(current, kind) {
   const ids = (
     await run(
       'docker',
       [
         '--context',
         current.context,
-        'container',
+        kind,
         'ls',
-        '-aq',
+        kind === 'container' ? '-aq' : '-q',
         '--filter',
         'label=org.amcore.stand',
       ],
@@ -33,18 +37,20 @@ export async function list() {
     .filter(Boolean)
   for (const id of ids) {
     const [c] = JSON.parse(
-      await run('docker', ['--context', current.context, 'container', 'inspect', id], {
+      await run('docker', ['--context', current.context, kind, 'inspect', id], {
         capture: true,
       })
     )
-    const tags = c.Config.Labels
+    const tags = c.Config?.Labels ?? c.Labels ?? {}
     const path = tags['org.amcore.worktree']
-    const exists = await access(path).then(
-      () => true,
-      () => false
-    )
+    const exists =
+      typeof path === 'string' &&
+      (await access(path).then(
+        () => true,
+        () => false
+      ))
     console.log(
-      `${tags['org.amcore.stand']}: ${c.State.Status}, ${exists ? 'source present' : 'orphan source missing'}, ${id}`
+      `${tags['org.amcore.stand']}: ${kind} ${c.State?.Status ?? ''}, ${exists ? 'source present' : 'orphan source missing'}, ${id}`
     )
   }
 }

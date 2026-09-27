@@ -34,7 +34,7 @@ test('snapshot excludes secrets/runtime even if tracked', () => {
     'apps/web/.env.test',
     '.worktrees/a/x',
     '.amcore/source/x',
-    'ai/README.md',
+    'ai/private-input.txt',
     'apps/web/.next/a',
     'tls/root.key',
   ])

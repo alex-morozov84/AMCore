@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { randomUUID, createHash } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, access } from 'node:fs/promises'
 import { root, stateRoot } from './state.mjs'
 import { snapshot } from './snapshot.mjs'
 import { run, cleanEnvironment, stopChildren } from './process.mjs'
@@ -61,7 +61,7 @@ try {
     assert.equal(m.testOutcome, 'passed')
     assert.equal(m.engine, undefined)
     await readFile(`${m.worktree}/.amcore/stands/same-id/report/index.html`)
-    await readFile(`${m.snapshot}/apps/web/.next/build-manifest.json`)
+    await access(`${m.snapshot}/apps/web/.next/dev`)
   }
   assert.equal(hits, 0)
   assert.equal(createHash('sha256').update(payload).digest('hex'), digest)
@@ -90,6 +90,18 @@ try {
   )
 } finally {
   await stopChildren()
+  await writeFile(
+    `${dir}/sentinel.json`,
+    JSON.stringify(
+      {
+        hits,
+        digest,
+        payloadUnchanged: createHash('sha256').update(payload).digest('hex') === digest,
+      },
+      null,
+      2
+    )
+  )
   sentinel.closeAllConnections()
   await new Promise((resolve) => sentinel.close(resolve))
   // Keep isolated reports/evidence for review; all server children are awaited.

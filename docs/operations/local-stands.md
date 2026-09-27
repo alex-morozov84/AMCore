@@ -15,6 +15,9 @@ stack retains its separate version floor. Install Playwright Chromium with
 necessary for Docker, network installs, browser processes and local listening
 ports. Keep long runs in a foreground terminal with visible output.
 
+`pnpm test:stands` checks isolation and recovery. Narrow a risk with
+`pnpm test:stands --test-name-pattern="startup"`; options reach the Node runner.
+
 | Goal                                 | Command                                      | Data lifetime                                           |
 | ------------------------------------ | -------------------------------------------- | ------------------------------------------------------- |
 | Develop against local infrastructure | `pnpm stand up`                              | Persistent preview data                                 |
@@ -23,7 +26,7 @@ ports. Keep long runs in a foreground terminal with visible output.
 | Full product/browser stack           | `pnpm stand e2e --lane real-stack`           | Fresh disposable database                               |
 | HTTPS Console host stack             | `pnpm stand e2e --lane console-real-stack`   | Fresh disposable host-mode database                     |
 | Inspect selected preview             | `pnpm stand status`                          | Read-only                                               |
-| List local records                   | `pnpm stand list`                            | Read-only                                               |
+| List records and labelled resources  | `pnpm stand list`                            | Read-only, includes missing-source orphans              |
 | Stop preview                         | `pnpm stand down`                            | Retains named volumes                                   |
 | Delete preview data explicitly       | `pnpm stand down --purge`                    | Deletes only proved-owned resources                     |
 | Recover interrupted run              | `pnpm stand recover --id <stand-id> --purge` | Requires stopped children and resource ownership        |
@@ -46,6 +49,12 @@ these managed lanes.
 
 ## What an agent gives the reviewer
 
+Manual preview always uses `demo.user@preview.amcore.test` (USER) and
+`demo.super-admin@preview.amcore.test` (SUPER_ADMIN when enabled), with the public
+demo password `Demo!AMCore2026`. Recreating the stand preserves these credentials.
+Tests that need unique users or password changes create separate test accounts;
+technical DB/JWT secrets remain random. Production never seeds these accounts.
+
 After `preview`, provide the printed localized URL, login/password for each role,
 source hash and the concrete scenario to inspect. Accounts are registered through
 the real API, roles are assigned only to those accounts, and browser login/access
@@ -53,13 +62,15 @@ is verified. Keep the stand running until acceptance or explicitly scoped cleanu
 `--profile user` prepares only USER; `--profile organization` additionally creates
 an organization owned by USER with its organization ADMIN membership. The default
 also prepares SUPER_ADMIN when the Console feature is enabled.
-Do not put passwords, tokens or generated manifests in commits or shared reports.
+Do not put generated technical secrets, tokens or manifests in commits or shared
+reports; the deliberately public demo credentials above are a separate contract.
 
 Runtime records and source snapshots live under ignored `.amcore/stands/` with
 private permissions. Source admission uses tracked build inputs plus nonignored
 untracked source, excluding `.env*` except `.env.example`, secrets, other worktrees,
-dependencies and generated runtime output. Source symlinks are refused; replace a required public build input with an ordinary
-file rather than dereferencing private/foreign files. Refresh rebuilds from
+dependencies and generated runtime output. Source symlinks are refused; replace a
+required public build input with an ordinary file rather than dereferencing
+private/foreign files. Refresh rebuilds from
 current source while retaining preview data. Unexpected account/role state fails
 instead of silently resetting the reviewer's scenario.
 
@@ -91,8 +102,9 @@ or reused PID or possible surviving child; inspect the recorded processes before
 retrying. Do not remove a lease merely because it is old. If the original worktree
 is missing, preserve/restore its private record under a surviving checkout and use
 `down --id <stand-id> --orphan --purge`; this path refuses live worktrees and
-unfinished test leases, and proves physical resources before deleting them. Cleanup failure retains
-the record; status and diagnostics distinguish failure from successful disposal.
+unfinished test leases, and proves physical resources before deleting them.
+Cleanup failure retains the record; status and diagnostics distinguish failure
+from successful disposal.
 
 ## Origins, local HTTPS and transport
 
@@ -145,3 +157,15 @@ docker compose --project-directory . -f docker/compose/dev.yml up -d
 
 Production/BYO/backup/observability instructions remain in their existing guides;
 managed local commands do not replace those deployment contracts.
+
+## Closeout before removing a checkout
+
+Run `pnpm stand closeout` in the task checkout before deleting its worktree. It
+purges every proved-owned local stand, verifies that labelled containers, networks
+and volumes are gone, and checks for surviving processes. Also verify any external
+fixture checkout recorded by the task's specialized proofs. Never delete the
+worktree or its recovery records after a failure: closeout is incomplete until
+resource/process removal is proved. Retaining a stand requires an explicit owner
+decision recorded with its identity, reason and responsible person; retain the
+needed source/recovery location too. Preview remains available during acceptance,
+then the default closeout removes it.

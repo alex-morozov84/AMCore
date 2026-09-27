@@ -49,6 +49,26 @@ export function createOrganization(name: string, slug: string, createdAt?: Date)
     { id: randomUUID(), name, slug, created: createdAt?.toISOString() ?? '' }
   )
 }
+export function createOrganizationsForPagination(marker: number): void {
+  const records = [
+    {
+      id: randomUUID(),
+      name: `Page2 Marker Org ${marker}`,
+      slug: `pagination-marker-${marker}`,
+      age: 0,
+    },
+    ...Array.from({ length: 20 }, (_, i) => ({
+      id: randomUUID(),
+      name: `Pagination Filler ${marker}-${i}`,
+      slug: `pagination-filler-${marker}-${i}`,
+      age: i + 1,
+    })),
+  ]
+  guardedSql(
+    `INSERT INTO core.organizations (id, name, slug, "createdAt", "updatedAt") SELECT id, name, slug, now() + (age * interval '1 second'), now() FROM jsonb_to_recordset(:'records'::jsonb) AS r(id text, name text, slug text, age int);`,
+    { records: JSON.stringify(records) }
+  )
+}
 export function createNamedUser(email: string, name: string, createdAt: Date): void {
   guardedSql(
     `INSERT INTO core.users (id, email, "emailCanonical", name, "createdAt", "updatedAt") VALUES (:'id', :'email', :'email', :'name', :'created'::timestamptz, now());`,

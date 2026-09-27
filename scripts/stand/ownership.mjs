@@ -160,6 +160,15 @@ export async function sql(m, query, check = true, variables = {}) {
 export async function cleanup(m, purge) {
   await assertNoSurvivors(m)
   await discover(m)
+  for (const id of m.resources.network) {
+    const network = await inspect(m, 'network', id)
+    if (
+      Object.keys(network.Containers ?? {}).some(
+        (container) => !m.resources.container.includes(container)
+      )
+    )
+      throw new Error('Foreign attachment refuses resource removal')
+  }
   for (const kind of ['container', 'network', ...(purge ? ['volume'] : [])]) {
     for (const id of m.resources[kind]) {
       const item = await inspect(m, kind, id)
@@ -169,6 +178,11 @@ export async function cleanup(m, purge) {
       await docker(m, [kind, 'rm', ...(kind === 'container' ? ['-f'] : []), id])
     }
   }
+  const remaining = await discover(m, false)
+  if (remaining.container.length || remaining.network.length || (purge && remaining.volume.length))
+    throw new Error('Owned resource removal could not be verified')
+  await assertNoSurvivors(m)
+  m.resources = remaining
   m.state = purge ? 'purged' : 'stopped'
   await save(m)
 }

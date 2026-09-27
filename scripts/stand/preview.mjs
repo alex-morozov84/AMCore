@@ -1,5 +1,7 @@
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import { mkdir } from 'node:fs/promises'
+import { cleanEnvironment } from './process.mjs'
 import { dataAdmission, sql } from './ownership.mjs'
 import { relay } from './relay.mjs'
 import { save } from './state.mjs'
@@ -11,6 +13,8 @@ export async function preview(m, profile = 'default') {
   await dataAdmission(m)
   const require = createRequire(join(m.worktree, 'apps/web/package.json'))
   const { chromium, request } = require('@playwright/test')
+  const tmp = `${m.worktree}/.amcore/stands/${m.id}/tmp`
+  await mkdir(tmp, { recursive: true, mode: 0o700 })
   const proxy = await relay(Object.values(m.origins))
   let api, browser
   try {
@@ -21,10 +25,11 @@ export async function preview(m, profile = 'default') {
     })
     browser = await chromium.launch({
       proxy: { server: proxy.url },
+      env: cleanEnvironment({ TMPDIR: tmp }),
       args: ['--proxy-bypass-list=<-loopback>'],
     })
     await fixtureAccounts(m, api, profile)
-    if (profile === 'organization' && !m.organization) {
+    if (profile === 'organization') {
       const { organizationFixture } = await import('./organization-fixture.mjs')
       await organizationFixture(m, api)
     }

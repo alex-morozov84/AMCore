@@ -23,7 +23,7 @@ for (const signal of ['SIGINT', 'SIGTERM'])
 async function execute() {
   if (action === 'help') {
     console.log(
-      'pnpm stand up|preview|e2e|status|list|down|recover [--id ID] [--purge]\ne2e --lane mocked|real-stack|console-real-stack\nManaged local stands; never owner .env. Native pnpm dev is outside these guards.'
+      'pnpm stand up|preview|e2e|status|list|down|recover|closeout [--id ID] [--purge]\ne2e --lane mocked|real-stack|console-real-stack\nManaged local stands; never owner .env. Native pnpm dev is outside these guards.'
     )
     return
   }
@@ -47,6 +47,11 @@ async function execute() {
         2
       )
     )
+    return
+  }
+  if (action === 'closeout') {
+    const { closeout } = await import('./stand/closeout.mjs')
+    await closeout()
     return
   }
   if (action === 'recover') {

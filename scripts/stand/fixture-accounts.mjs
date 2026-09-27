@@ -1,17 +1,23 @@
-import { randomBytes } from 'node:crypto'
 import { sql } from './ownership.mjs'
 import { save } from './state.mjs'
+import { DEMO_EMAILS, DEMO_PASSWORD } from './demo-credentials.mjs'
 
 export async function fixtureAccounts(m, api, profile) {
   m.accounts ??= []
+  await retainLegacyAccounts(m)
+  m.fixtureVersion = 2
   const roles = ['USER', ...(m.consoleEnabled && profile !== 'user' ? ['SUPER_ADMIN'] : [])]
   for (const role of roles) {
     let account = m.accounts.find((a) => a.role === role)
+    if (account && account.email !== DEMO_EMAILS[role])
+      throw new Error('Demo account identity changed; adoption refused')
+    if (account && account.password !== DEMO_PASSWORD)
+      throw new Error('Demo credential record changed; reset refused')
     if (account && !account.pending) continue
     if (!account) {
       account = {
-        email: `${role.toLowerCase()}-${m.uuid}@preview.amcore.test`,
-        password: `Preview!Aa1${randomBytes(18).toString('hex')}`,
+        email: DEMO_EMAILS[role],
+        password: DEMO_PASSWORD,
         role,
         pending: true,
       }
@@ -34,6 +40,8 @@ async function completeAccount(m, api, account) {
       throw new Error(`Preview registration failed (${response.status()})`)
     id = (await response.json()).user?.id
   } else {
+    if (!account.id || account.id !== id)
+      throw new Error('Unrecorded demo account exists; adoption/role assignment refused')
     const login = await api.post('/api/v1/auth/login', {
       data: { email: account.email, password: account.password },
     })
@@ -57,4 +65,25 @@ async function completeAccount(m, api, account) {
   )
   delete account.pending
   await save(m)
+}
+
+async function retainLegacyAccounts(m) {
+  const legacy = m.accounts.filter((a) => a.email !== DEMO_EMAILS[a.role])
+  for (const account of legacy) {
+    if (account.email !== `${account.role.toLowerCase()}-${m.uuid}@preview.amcore.test`)
+      throw new Error('Unexpected demo account identity; adoption/reset refused')
+    const actual = await sql(
+      m,
+      `SELECT id || ':' || "systemRole" FROM core.users WHERE "emailCanonical" = :'email';`,
+      true,
+      { email: account.email }
+    )
+    if (actual.trim() !== `${account.id}:${account.role}`)
+      throw new Error('Legacy demo account ownership changed; migration refused')
+  }
+  if (legacy.length) {
+    m.legacyAccounts = [...(m.legacyAccounts ?? []), ...legacy]
+    m.accounts = m.accounts.filter((a) => !legacy.includes(a))
+    await save(m)
+  }
 }
