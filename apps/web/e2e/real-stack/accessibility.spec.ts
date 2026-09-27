@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 import { expectNoAxeViolations, waitForAnimationsToFinish } from '../shared/axe'
 
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
+import { waitForSessionTransitions } from './sessions-readability'
 
 /**
  * Automated WCAG A/AA scans (Track 7 FINAL PLAN §5) on the pages that
@@ -26,22 +27,32 @@ test('the sessions page has no axe violations, including with the row-actions me
   await expect(page).toHaveURL(/\/en\/?$/)
 
   await page.goto('/en/settings/sessions')
-  await expect(page.getByRole('table')).toBeVisible()
+  await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(1)
+  await expect(page.locator('tbody').getByText('This device', { exact: true })).toBeVisible()
+  await expect(page.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
+  await waitForSessionTransitions(page.locator('[aria-busy]'))
   await expectNoAxeViolations(page)
 
   // A second real session so a row-actions menu exists to open — the
   // current session never renders one (`SessionsTable.tsx`).
   const otherContext = await browser.newContext()
-  const otherPage = await otherContext.newPage()
-  await loginViaUi(otherPage, email)
-  await expect(otherPage).toHaveURL(/\/en\/?$/)
+  try {
+    const otherPage = await otherContext.newPage()
+    await loginViaUi(otherPage, email)
+    await expect(otherPage).toHaveURL(/\/en\/?$/)
 
-  await page.reload()
-  await page.getByRole('button', { name: /actions/i }).click()
-  await page.getByRole('menuitem', { name: /revoke/i }).waitFor()
-  await waitForAnimationsToFinish(page, '[data-slot="dropdown-menu-content"]')
+    await page.reload()
+    await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(2)
+    await expect(page.locator('tbody').getByText('This device', { exact: true })).toBeVisible()
+    await expect(page.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
+    await waitForSessionTransitions(page.locator('[aria-busy]'))
+    await page.getByRole('button', { name: /actions/i }).click()
+    await page.getByRole('menuitem', { name: /revoke/i }).waitFor()
+    await waitForAnimationsToFinish(page, '[data-slot="dropdown-menu-content"]')
+    await waitForSessionTransitions(page.getByRole('menu'))
 
-  await expectNoAxeViolations(page)
-
-  await otherContext.close()
+    await expectNoAxeViolations(page)
+  } finally {
+    await otherContext.close()
+  }
 })

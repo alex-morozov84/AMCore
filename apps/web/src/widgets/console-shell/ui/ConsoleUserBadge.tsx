@@ -17,7 +17,7 @@ export function ConsoleUserBadge({ user }: { user: UserResponse | null }) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="flex size-7 items-center justify-center rounded-md bg-console-accent/8 font-console-mono text-xs font-bold text-console-accent">
+      <span className="flex size-7 items-center justify-center rounded-md bg-console-accent/8 font-console-mono text-xs font-bold text-foreground">
         {initialsFor(user)}
       </span>
       <span className="hidden flex-col leading-tight sm:flex">

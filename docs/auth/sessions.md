@@ -169,6 +169,10 @@ work. See [GeoIP setup](../operations/geoip-setup.md) for deployment guidance. `
 negotiated `Accept-Language` (falling back to English); a direct API client
 that wants a specific language sends that header explicitly.
 
+Settings keeps the existing session rows readable while refreshing its list
+after a revocation. The table exposes `aria-busy` while the request is pending;
+the result updates when the request completes.
+
 The optional Console also displays this metadata; see the
 [session presentation](../operations-console/users.md#manage-sessions).
 

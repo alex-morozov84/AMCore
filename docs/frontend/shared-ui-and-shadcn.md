@@ -186,7 +186,17 @@ files" rule misses; these two are named explicitly for that reason.
 
 `button.tsx` isn't on this list but deserves the same care: some registry
 items (`alert-dialog`, at least) declare it as a dependency and try to
-regenerate it. Always check the write list before confirming.
+regenerate it. Always check the write list before confirming. Preserve its
+opaque destructive fill and semantic hover mixture, and run the actual
+normal/hover component contrast checks after changing that variant:
+
+```bash
+pnpm --filter web exec vitest run --project=storybook src/shared/ui/button-contrast.stories.tsx
+```
+
+These browser checks cover both themes, body/card/popover backgrounds and
+confirmation actions. They supplement solid-token checks rather than replace
+them; a named token can still fail contrast when opacity or compositing changes.
 
 ## Token changes stay surgical
 
@@ -200,7 +210,7 @@ preset switch touches this file wholesale — see the chart-color and
    whole generated block.
 2. Run the contrast suite:
    ```bash
-   pnpm --filter web test:run -- src/shared/lib/theme.test.ts
+   pnpm --filter web exec vitest run --project=unit src/shared/lib/theme.test.ts
    ```
 3. If you're adding a new `-foreground` pairing (as `--destructive-foreground`
    was, closing a real gap where every other semantic color already had one),

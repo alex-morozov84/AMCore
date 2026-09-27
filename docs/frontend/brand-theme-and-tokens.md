@@ -400,15 +400,20 @@ ownership, projection, verification, and documentation contract.
   `var(--token)` — while `globals.css` is exempt, since it is where the tokens
   are declared. Full detail:
   [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md#styling-the-palette-is-a-source-tokens-are-the-public-api).
-- **Contrast.** <a id="contrast"></a>Every shipped token pair
-  (`background`/`foreground`, `card`/`card-foreground`, `primary`/
-  `primary-foreground`, the status `-soft`/solid pairs, etc.) must clear
-  WCAG AA — 4.5:1 for normal text. This is enforced by a small,
-  dependency-free test (`shared/lib/theme.test.ts`) that parses the actual
-  `globals.css` values (not a hand-copied palette, which could silently
-  drift) and checks them with the standard sRGB relative-luminance formula
-  (`shared/lib/contrast.ts`). If you change a token's color, that test will
-  tell you if you broke contrast.
+- **Contrast.** <a id="contrast"></a>Normal text must meet WCAG AA's
+  4.5:1 threshold. `shared/lib/theme.test.ts` checks the solid semantic token
+  pairs listed in that test against the actual `globals.css` values using
+  the sRGB relative-luminance formula (`shared/lib/contrast.ts`). This checks
+  token pairs, not every component's rendered colors: opacity, translucent
+  backgrounds, hover mixtures and pending states need browser proof.
+  Token-only lint does not calculate contrast.
+- The shared destructive Button uses opaque `bg-destructive` with
+  `text-destructive-foreground`. Its hover fill mixes `var(--destructive)`
+  with 10% of the ordinary `var(--foreground)` in OKLCH, without adding
+  transparency. The browser [Storybook checks](./storybook.md#accessibility-gate-and-how-it-relates-to-the-testing-pyramid)
+  cover normal/hover text on body, card and popover surfaces and the actual
+  confirmation action in both themes. Preserve those checks when changing
+  the variant; a passing solid-token check alone is insufficient.
 - Status colors intentionally use a **darker shade than the "obvious" bright
   version** in light mode (e.g. `success` is a darker green, not the
   brightest one) specifically so the `-soft` pastel-background pairing
