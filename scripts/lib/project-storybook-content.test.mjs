@@ -79,6 +79,21 @@ describe('Storybook structural content', () => {
     assert.doesNotMatch(after, /path in Storybook instead|test:storybook/)
   })
 
+  test('disabled docs retain contrast guidance without unavailable story commands', () => {
+    const root = fixture()
+    for (const [pathname, operationKey] of [
+      ['docs/frontend/shared-ui-and-shadcn.md', 'storybook.docs-shared-ui'],
+      ['docs/frontend/brand-theme-and-tokens.md', 'storybook.docs-brand'],
+    ]) {
+      const { after } = materializeProjectContentPath(root, pathname, [
+        fact(pathname, operationKey),
+      ])
+      assert.match(after, /opaque destructive|shared destructive Button/)
+      assert.doesNotMatch(after, /button-contrast\.stories|--project=storybook|\.\/storybook\.md/)
+      assert.match(after, /normal\/hover/)
+    }
+  })
+
   test('documentation anchors fail closed when missing or duplicated', () => {
     const root = fixture()
     const pathname = 'docs/frontend/testing.md'

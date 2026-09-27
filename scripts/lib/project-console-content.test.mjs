@@ -24,6 +24,13 @@ test('removes a mixed-document Console block and preserves surrounding content',
   assert.ok(after.includes('## Quick start'))
 })
 
+test('disabled Console docs retain Settings pending proof and its runnable command', () => {
+  const after = materialize('docs/frontend/testing.md', 'console.sessions-readability-guide')
+  assert.match(after, /Settings covers both themes/)
+  assert.match(after, /sessions-readability\.spec\.ts/)
+  assert.doesNotMatch(after, /admin-sessions\/readability|actual initials on the composited/)
+})
+
 test('treats the Console guide as a whole-feature root instead of shared content', () => {
   const pathname = 'docs/operations-console/README.md'
   assert.throws(

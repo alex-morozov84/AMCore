@@ -14,6 +14,7 @@ const combinedOrder = [
   'apps/web/package.json',
   'docs/frontend/architecture-and-conventions.md',
   'docs/frontend/brand-theme-and-tokens.md',
+  'docs/frontend/testing.md',
   'docs/frontend/README.md',
   'AGENTS.md',
   'README.md',
@@ -97,7 +98,12 @@ function insertConsole(plan, root, singles) {
       plan,
       root,
       brandPath,
-      take(singles, 'docs/frontend/architecture-and-conventions.md', 'docs/frontend/README.md')
+      take(
+        singles,
+        'docs/frontend/architecture-and-conventions.md',
+        'docs/frontend/README.md',
+        'docs/frontend/testing.md'
+      )
     )
   }
   insertTarget(

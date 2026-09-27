@@ -161,6 +161,15 @@ export const operationsConsoleDocSeams = [
       "fetches follow ADR-079's primary/secondary graceful-degradation contract."
     )
   ),
+  entry(
+    'console.sessions-readability-guide',
+    'docs/frontend/testing.md',
+    block(
+      'When the optional Console is enabled, its retained-refetch tests cover desktop',
+      'Use the same isolated-stack configuration for these Console checks.'
+    ),
+    ['admin-sessions/readability.spec.ts']
+  ),
   ...operationsConsoleDiscoverySeams,
 ]
 import { operationsConsoleDiscoverySeams } from './operations-console-ownership-discovery-seams.mjs'
