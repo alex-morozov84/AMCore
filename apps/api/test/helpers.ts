@@ -157,6 +157,10 @@ export async function setupE2ETest(
     env: { ...process.env, E2E_DATABASE_URL: databaseUrl },
   })
 
+  // Match supertest's IPv4 destination and keep one listener for the fixture.
+  // Its implicit listen/close cycle can deliver responses outside this server.
+  await app.listen(0, '127.0.0.1')
+
   return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
 }
 

@@ -20,6 +20,8 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
     await teardownE2ETest(context)
   }, 120000)
   beforeEach(async () => {
+    // Scenarios share handler/IP buckets; reset admission state, not ACL caches.
+    await context.throttlerStorage.reset()
     f = await aclFixture(context)
   })
   afterEach(() => {
