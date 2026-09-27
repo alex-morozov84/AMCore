@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Managed isolated local development, prepared account previews and browser-test
+  stands with explicit target ownership, loopback ports and scoped cleanup.
+
+### Changed
+
+- Grouped optional Compose overlays and test fixtures under `docker/compose/`
+  and `docker/testing/`, retaining the root reference stack.
+
+### Added
+
 - **Operations Console: session viewer and revocation.** A `SUPER_ADMIN` can
   view another user's active sessions from their detail page — device
   (parsed, never a raw user-agent), approximate IP-based location, last

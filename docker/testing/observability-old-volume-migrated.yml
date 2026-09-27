@@ -1,6 +1,6 @@
 # AMCore — old-volume migration smoke, PHASE B (observability-contract live
 # tier). Same COMPOSE_PROJECT_NAME and the same `grafana_data` volume as
-# phase A (docker-compose.observability-contract.old-volume.yml), but this
+# phase A (docker/testing/observability-old-volume.yml), but this
 # file overrides nothing about provisioning — it lets docker-compose.yml's
 # own real, shipped `docker/monitoring/grafana/provisioning/` (fixed uid +
 # deleteDatasources) apply, proving a volume seeded under the legacy

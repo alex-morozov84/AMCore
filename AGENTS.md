@@ -1,5 +1,7 @@
 # AGENTS.md
 
+[Agent development, owner previews and Playwright](docs/operations/local-stands.md). Agents use managed commands for local DB writes and previews.
+
 Guidance for AI coding agents (and humans) working in this repository. Any agent
 should read this first — it is the cross-tool standard ([agents.md](https://agents.md)).
 Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.

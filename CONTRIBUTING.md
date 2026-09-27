@@ -1,5 +1,7 @@
 # Contributing to AMCore
 
+[Managed local stands and browser tests](docs/operations/local-stands.md). Agents use managed commands for local DB writes and previews.
+
 Thanks for your interest in contributing. This document explains how to set up the project and submit changes.
 
 ## Getting Started

@@ -35,7 +35,9 @@
     "prepare": "husky",
     "init:brand": "node scripts/init-brand.mjs",
     "init:project": "node scripts/init-project.mjs",
-    "measure:scaffold": "node scripts/measure/run-baseline.mjs"
+    "measure:scaffold": "node scripts/measure/run-baseline.mjs",
+    "stand": "node scripts/stand.mjs",
+    "test:stands": "node --test scripts/stand/*.test.mjs"
   },
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",

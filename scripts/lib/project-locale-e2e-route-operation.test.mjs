@@ -91,7 +91,8 @@ test('root navigation assertions remain exact after removing the locale segment'
     assert.doesNotMatch(containment, /test\.skip/)
     assert.match(sessions, /toHaveURL\('\/'\)/)
     assert.doesNotMatch(sessions, /toHaveURL\(\/\\\/\?\$\/\)/)
-    assert.match(consoleSession, /toHaveURL\('https:\/\/app\.localhost\/'\)/)
+    assert.match(consoleSession, /toHaveURL\(\s*standTarget\.origins\.product \+ '\/'\s*\)/)
+    assert.match(consoleSession, /toHaveURL\(\s*standTarget\.origins\.console \+ '\/'\s*\)/)
   }
 })
 

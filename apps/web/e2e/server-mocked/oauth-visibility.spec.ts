@@ -21,7 +21,7 @@ test('shows the Google entry point when the backend reports it configured', asyn
   msw,
 }) => {
   msw.use(
-    http.get('http://localhost:5002/api/v1/auth/oauth/providers', () =>
+    http.get('http://api.mocked.invalid/api/v1/auth/oauth/providers', () =>
       HttpResponse.json({ providers: ['google'] })
     )
   )
@@ -32,7 +32,7 @@ test('shows the Google entry point when the backend reports it configured', asyn
 
 test('hides the Google entry point when no provider is configured', async ({ page, msw }) => {
   msw.use(
-    http.get('http://localhost:5002/api/v1/auth/oauth/providers', () =>
+    http.get('http://api.mocked.invalid/api/v1/auth/oauth/providers', () =>
       HttpResponse.json({ providers: [] })
     )
   )

@@ -1,4 +1,4 @@
-# Explicit product-web path-mode edge config. Select it with docker-compose.web.yml.
+# Explicit product-web path-mode edge config. Select it with docker/compose/web.yml.
 {
 	email {$CADDY_EMAIL}
 }

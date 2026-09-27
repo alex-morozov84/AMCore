@@ -188,6 +188,24 @@ export const operationsConsoleDocSeams = [
     ),
     ['../operations-console/users.md']
   ),
+  entry(
+    'console.stand-commands',
+    'docs/operations/local-stands.md',
+    block(
+      '<!-- AMCORE_CONSOLE_STAND_COMMANDS_START -->',
+      '<!-- AMCORE_CONSOLE_STAND_COMMANDS_END -->'
+    ),
+    ['test:e2e:console-real-stack']
+  ),
+  entry(
+    'console.stand-origin',
+    'docs/operations/local-stands.md',
+    block('<!-- AMCORE_CONSOLE_STAND_ORIGIN_START -->', '<!-- AMCORE_CONSOLE_STAND_ORIGIN_END -->'),
+    ['ADMIN_CONSOLE_HOSTNAME', 'ADMIN_CONSOLE_ORIGIN']
+  ),
+  entry('console.stand-table', 'docs/operations/local-stands.md', {
+    text: '| HTTPS Console host stack',
+  }),
   ...operationsConsoleDiscoverySeams,
 ]
 import { operationsConsoleDiscoverySeams } from './operations-console-ownership-discovery-seams.mjs'

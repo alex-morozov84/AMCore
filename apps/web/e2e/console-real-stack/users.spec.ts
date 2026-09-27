@@ -1,3 +1,6 @@
+import { activeTarget } from '../support/managed-target.mjs'
+
+const standTarget = activeTarget()
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
@@ -7,7 +10,7 @@ import { setSystemRole } from './helpers'
 test('host-mode Users inventory uses only the isolated console session', async ({ browser }) => {
   const email = uniqueEmail('console-users')
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const productPage = await product.newPage()
@@ -15,7 +18,7 @@ test('host-mode Users inventory uses only the isolated console session', async (
   setSystemRole(email, 'SUPER_ADMIN')
 
   const console = await browser.newContext({
-    baseURL: 'https://console.localhost',
+    baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
@@ -23,7 +26,9 @@ test('host-mode Users inventory uses only the isolated console session', async (
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/password/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
+  await expect(consolePage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+  )
 
   const requestsWithAuthHeader: string[] = []
   consolePage.on('request', (request) => {
@@ -38,3 +43,7 @@ test('host-mode Users inventory uses only the isolated console session', async (
   await product.close()
   await console.close()
 })
+
+function escapeOrigin(origin: string): string {
+  return origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

@@ -40,19 +40,39 @@ const ROOT_URL_ASSERTIONS = new Map([
   [String.raw`/https:\/\/app\.localhost\/en\/?$/`, "'https://app.localhost/'"],
 ])
 
+function managedRoot(argument) {
+  if (
+    !ts.isNewExpression(argument) ||
+    argument.expression.getText() !== 'RegExp' ||
+    argument.arguments?.length !== 1
+  )
+    return undefined
+  const source = argument.arguments[0].getText().replace(/\s+/g, '')
+  return ['product', 'console'].find(
+    (key) => source === `'^'+escapeOrigin(standTarget.origins.${key})+'/en/?$'`
+  )
+}
+
 function rewriteExactRootAssertions(model, ctx) {
   const matches = findAllNodes(model, (node) => {
     if (!ts.isCallExpression(node) || node.arguments.length !== 1) return false
     const [argument] = node.arguments
     return (
       node.expression.getText().endsWith('.toHaveURL') &&
-      ts.isRegularExpressionLiteral(argument) &&
-      ROOT_URL_ASSERTIONS.has(argument.getText())
+      ((ts.isRegularExpressionLiteral(argument) && ROOT_URL_ASSERTIONS.has(argument.getText())) ||
+        Boolean(managedRoot(argument)))
     )
   })
   for (const call of matches) {
     const [argument] = call.arguments
-    model.replaceNode(argument, ROOT_URL_ASSERTIONS.get(argument.getText()), ctx)
+    const managed = managedRoot(argument)
+    model.replaceNode(
+      argument,
+      managed
+        ? `standTarget.origins.${managed} + '/'`
+        : ROOT_URL_ASSERTIONS.get(argument.getText()),
+      ctx
+    )
   }
   return matches.map((call) => call.arguments[0])
 }

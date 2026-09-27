@@ -11,6 +11,7 @@ const originalMode = ADMIN_CONSOLE_CONFIG.mode
 
 afterEach(() => {
   mutableConfig.mode = originalMode
+  delete process.env.ADMIN_CONSOLE_ORIGIN
   delete process.env.ADMIN_CONSOLE_HOSTNAME
 })
 
@@ -46,4 +47,35 @@ describe('isTrustedConsoleOrigin', () => {
 
     expect(isTrustedConsoleOrigin(new Request('https://console.example.test'))).toBe(false)
   })
+})
+
+it('requires exact configured port and accepts its referer', () => {
+  mutableConfig.mode = 'host'
+  process.env.ADMIN_CONSOLE_HOSTNAME = 'console.example.test'
+  process.env.ADMIN_CONSOLE_ORIGIN = 'https://console.example.test:8443'
+  for (const origin of [
+    'https://console.example.test',
+    'https://console.example.test:9443',
+    'https://app.example.test:8443',
+  ]) {
+    expect(
+      isTrustedConsoleOrigin(
+        new Request('https://console.example.test:8443', { headers: { origin } })
+      )
+    ).toBe(false)
+  }
+  expect(
+    isTrustedConsoleOrigin(
+      new Request('https://console.example.test:8443', {
+        headers: { origin: process.env.ADMIN_CONSOLE_ORIGIN },
+      })
+    )
+  ).toBe(true)
+  expect(
+    isTrustedConsoleOrigin(
+      new Request('https://console.example.test:8443', {
+        headers: { referer: process.env.ADMIN_CONSOLE_ORIGIN + '/en' },
+      })
+    )
+  ).toBe(true)
 })

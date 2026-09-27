@@ -1,3 +1,6 @@
+import { activeTarget } from '../support/managed-target.mjs'
+
+const standTarget = activeTarget()
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
@@ -9,16 +12,18 @@ test('host-mode Overview panel renders real readiness, version and process role,
 }) => {
   const email = uniqueEmail('console-overview')
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
-  await expect(productPage).toHaveURL(/https:\/\/app\.localhost\/en\/?$/)
+  await expect(productPage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+  )
   setSystemRole(email, 'SUPER_ADMIN')
 
   const console = await browser.newContext({
-    baseURL: 'https://console.localhost',
+    baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
@@ -26,7 +31,9 @@ test('host-mode Overview panel renders real readiness, version and process role,
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/password/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
+  await expect(consolePage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+  )
 
   const requestsWithAuthHeader: string[] = []
   consolePage.on('request', (request) => {
@@ -54,7 +61,7 @@ test('host-mode Overview panel denies a demoted session with a live re-check, no
 }) => {
   const email = uniqueEmail('console-overview-denied')
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const productPage = await product.newPage()
@@ -62,7 +69,7 @@ test('host-mode Overview panel denies a demoted session with a live re-check, no
   setSystemRole(email, 'SUPER_ADMIN')
 
   const console = await browser.newContext({
-    baseURL: 'https://console.localhost',
+    baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
@@ -70,7 +77,9 @@ test('host-mode Overview panel denies a demoted session with a live re-check, no
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/password/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
+  await expect(consolePage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+  )
 
   setSystemRole(email, 'USER')
   const response = await consolePage.goto('/en')
@@ -85,7 +94,7 @@ test('host-mode Overview locale switcher stays on the console host and switches 
 }) => {
   const email = uniqueEmail('console-overview-locale')
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const productPage = await product.newPage()
@@ -93,7 +102,7 @@ test('host-mode Overview locale switcher stays on the console host and switches 
   setSystemRole(email, 'SUPER_ADMIN')
 
   const console = await browser.newContext({
-    baseURL: 'https://console.localhost',
+    baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
@@ -101,12 +110,20 @@ test('host-mode Overview locale switcher stays on the console host and switches 
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/password/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
+  await expect(consolePage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+  )
 
   await consolePage.getByRole('combobox', { name: /language/i }).selectOption('ru')
-  await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/ru\/?$/)
+  await expect(consolePage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/ru/?$')
+  )
   await expect(consolePage.getByRole('heading', { name: 'Операционная консоль' })).toBeVisible()
 
   await product.close()
   await console.close()
 })
+
+function escapeOrigin(origin: string): string {
+  return origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

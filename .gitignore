@@ -72,3 +72,9 @@ generated/
 tmp/
 temp/
 *.tmp
+
+# Managed local runtimes and source snapshots
+.amcore/
+.worktrees/
+playwright-report*/
+test-results*/

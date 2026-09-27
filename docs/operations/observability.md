@@ -44,7 +44,7 @@ redaction is needed, only the surplus field's removal.
 ## Log Shipping (Non-Goal)
 
 AMCore deliberately does not ship a log-shipping/aggregation layer. Structured
-Pino JSON goes to each container's stdout only; `docker-compose.prod.yml`'s
+Pino JSON goes to each container's stdout only; `docker/compose/prod.yml`'s
 shared `x-logging` block rotates it via Docker's own `local` driver
 (`COMPOSE_LOG_DRIVER`, default `local` — the only other accepted value is
 `json-file`; anything else, e.g. `syslog`/`journald`, uses different option
@@ -366,7 +366,7 @@ Prometheus + Grafana + Alertmanager stack that scrapes **this repo's own**
 `api`/`worker` containers over the real, authenticated `/api/v1/metrics`
 path above — it exists to prove the metric surface, alert rules, and
 dashboards this repo ships actually work, before a fork wires its own
-production monitoring stack. It is never part of `docker-compose.prod.yml`
+production monitoring stack. It is never part of `docker/compose/prod.yml`
 and is not itself a production monitoring stack.
 
 ```bash

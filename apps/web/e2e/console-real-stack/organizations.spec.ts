@@ -1,3 +1,6 @@
+import { activeTarget } from '../support/managed-target.mjs'
+
+const standTarget = activeTarget()
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
@@ -9,12 +12,14 @@ test('host-mode Organizations panel renders real data via the console session, w
 }) => {
   const email = uniqueEmail('console-orgs')
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
-  await expect(productPage).toHaveURL(/https:\/\/app\.localhost\/en\/?$/)
+  await expect(productPage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+  )
   setSystemRole(email, 'SUPER_ADMIN')
 
   const orgName = `E2E Org ${Date.now()}`
@@ -22,7 +27,7 @@ test('host-mode Organizations panel renders real data via the console session, w
   createOrganization(orgName, orgSlug)
 
   const console = await browser.newContext({
-    baseURL: 'https://console.localhost',
+    baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
@@ -30,7 +35,9 @@ test('host-mode Organizations panel renders real data via the console session, w
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/password/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
+  await expect(consolePage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+  )
 
   const requestsWithAuthHeader: string[] = []
   consolePage.on('request', (request) => {
@@ -55,7 +62,7 @@ test('host-mode Organizations panel denies a demoted session with a live re-chec
 }) => {
   const email = uniqueEmail('console-orgs-denied')
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const productPage = await product.newPage()
@@ -63,7 +70,7 @@ test('host-mode Organizations panel denies a demoted session with a live re-chec
   setSystemRole(email, 'SUPER_ADMIN')
 
   const console = await browser.newContext({
-    baseURL: 'https://console.localhost',
+    baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
@@ -71,7 +78,9 @@ test('host-mode Organizations panel denies a demoted session with a live re-chec
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/password/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
+  await expect(consolePage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+  )
 
   setSystemRole(email, 'USER')
   const response = await consolePage.goto('/en/organizations')
@@ -86,7 +95,7 @@ test('the admin route is denied on the product host even for a real SUPER_ADMIN 
 }) => {
   const email = uniqueEmail('console-orgs-wronghost')
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const productPage = await product.newPage()
@@ -102,3 +111,7 @@ test('the admin route is denied on the product host even for a real SUPER_ADMIN 
 
   await product.close()
 })
+
+function escapeOrigin(origin: string): string {
+  return origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

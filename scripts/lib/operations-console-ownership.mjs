@@ -29,6 +29,7 @@ export const operationsConsoleOwnership = defineOwnershipManifest({
     'getConsoleOverviewHref',
     '--console-accent',
     'ADMIN_CONSOLE_HOSTNAME',
+    'ADMIN_CONSOLE_ORIGIN',
     '__Host-amcore_console_session',
     'web:console-session:v1',
     'test:e2e:console-real-stack',

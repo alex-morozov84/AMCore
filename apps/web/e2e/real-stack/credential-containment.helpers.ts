@@ -1,7 +1,7 @@
-import { request as httpRequest } from 'node:http'
-import { request as httpsRequest } from 'node:https'
-
 import { createClient } from '@redis/client'
+
+import { activeTarget } from '../support/managed-target.mjs'
+import { rawOwnedRequest } from '../support/raw-target.mjs'
 
 interface TestUser {
   id: string
@@ -14,26 +14,11 @@ interface Entry {
   userSnapshot: TestUser
 }
 
-function endpoint(name: string, fallback: string, protocols: string[]): string {
-  const url = new URL(process.env[name] ?? fallback)
-  if (!protocols.includes(url.protocol) || url.hash)
-    throw new Error('Invalid credential test endpoint')
-  if (
-    name.endsWith('API_URL') &&
-    (url.username || url.password || url.pathname !== '/api/v1' || url.search)
-  ) {
-    throw new Error('Invalid credential test API endpoint')
-  }
-  return url.toString().replace(/\/$/, '')
-}
-
 export async function directApi(path: string, body?: object, token?: string) {
-  const root = endpoint('E2E_CREDENTIAL_API_URL', 'http://127.0.0.1:5002/api/v1', [
-    'http:',
-    'https:',
-  ])
+  const root = `http://127.0.0.1:${activeTarget().ports.api}/api/v1`
   const response = await fetch(`${root}/${path}`, {
     method: body ? 'POST' : 'GET',
+    redirect: 'error',
     headers: {
       'content-type': 'application/json',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -75,10 +60,7 @@ export async function proveOwnedRefresh(
   if (!/^[A-Za-z0-9_-]{43}$/.test(sessionCookie) || !user.email.endsWith('@e2e.amcore.test')) {
     throw new Error('Not a test-created session')
   }
-  const url = endpoint('E2E_CREDENTIAL_REDIS_URL', 'redis://127.0.0.1:6379/0', [
-    'redis:',
-    'rediss:',
-  ])
+  const url = `redis://127.0.0.1:${activeTarget().ports.redis}/0`
   const client = createClient({ url, socket: { reconnectStrategy: false, connectTimeout: 5000 } })
   client.on('error', () => {}) // No credentials or raw records in runner diagnostics.
   try {
@@ -120,26 +102,5 @@ export async function proveOwnedRefresh(
 
 /** Raw path avoids Request/URL normalization before Next sees dot/encoding probes. */
 export async function rawWebRequest(baseURL: string, path: string) {
-  const origin = new URL(baseURL)
-  const request = origin.protocol === 'https:' ? httpsRequest : httpRequest
-  return new Promise<{ status: number; body: string }>((resolve, reject) => {
-    const req = request(
-      {
-        hostname: origin.hostname,
-        port: origin.port,
-        path,
-        method: 'POST',
-        headers: { origin: origin.origin },
-      },
-      (response) => {
-        let body = ''
-        response.on('data', (chunk) => {
-          body += chunk
-        })
-        response.on('end', () => resolve({ status: response.statusCode!, body }))
-      }
-    )
-    req.on('error', () => reject(new Error('Raw credential dispatch failed')))
-    req.end()
-  })
+  return rawOwnedRequest(activeTarget(), baseURL, path)
 }

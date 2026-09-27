@@ -1,19 +1,15 @@
-import { execFileSync } from 'node:child_process'
+import { activeTarget } from '../support/managed-target.mjs'
 
+const standTarget = activeTarget()
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import { guardedExec, guardedSql } from '../support/managed-target.mjs'
 
 import { ageSessionLastAuthAt, setSystemRole } from './helpers'
 
-const project = process.env.CONSOLE_E2E_PROJECT ?? 'amcore-console-e2e'
 function exec(service: string, args: string[]): string {
-  return execFileSync('docker', ['compose', '-p', project, 'exec', '-T', service, ...args], {
-    encoding: 'utf8',
-  }).trim()
-}
-function sql(query: string): string {
-  return exec('postgres', ['psql', '-X', '-U', 'amcore', '-d', 'amcore', '-t', '-A', '-c', query])
+  return guardedExec(service, ...args).trim()
 }
 
 test('host session helper preserves current UA on actual vault rotation; Sessions revoke requires step-up', async ({
@@ -22,7 +18,7 @@ test('host session helper preserves current UA on actual vault rotation; Session
   const email = uniqueEmail('host-sessions-admin'),
     target = uniqueEmail('host-sessions-target')
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const productPage = await product.newPage()
@@ -33,7 +29,7 @@ test('host session helper preserves current UA on actual vault rotation; Session
   await expect(productPage).toHaveURL(/\/en\/?$/)
   setSystemRole(email, 'SUPER_ADMIN')
   const admin = await browser.newContext({
-    baseURL: 'https://console.localhost',
+    baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const page = await admin.newPage()
@@ -41,7 +37,9 @@ test('host session helper preserves current UA on actual vault rotation; Session
   await page.getByLabel(/email/i).fill(email)
   await page.getByLabel(/password/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
-  await expect(page).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
+  await expect(page).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+  )
   await page.waitForLoadState('networkidle')
   ageSessionLastAuthAt(email)
   const sid = (await admin.cookies()).find(
@@ -58,15 +56,18 @@ test('host session helper preserves current UA on actual vault rotation; Session
       key,
     ])
   ).toBe('1')
-  const targetId = sql(`SELECT id FROM core.users WHERE "emailCanonical"='${target}';`)
+  const targetId = guardedSql(`SELECT id FROM core.users WHERE "emailCanonical" = :'email';`, {
+    email: target,
+  }).trim()
   const refreshed = await admin.request.get(`/en/users/${targetId}`, {
     headers: { 'User-Agent': ua },
   })
   expect(refreshed.status()).toBe(200)
   expect(
-    sql(
-      `SELECT s."userAgent" FROM core.sessions s JOIN core.users u ON u.id=s."userId" WHERE u."emailCanonical"='${email}' AND s."revokedAt" IS NULL ORDER BY s."createdAt" DESC LIMIT 1;`
-    )
+    guardedSql(
+      `SELECT s."userAgent" FROM core.sessions s JOIN core.users u ON u.id=s."userId" WHERE u."emailCanonical" = :'email' AND s."revokedAt" IS NULL ORDER BY s."createdAt" DESC LIMIT 1;`,
+      { email }
+    ).trim()
   ).toBe(ua)
   await page.goto(`/en/users/${targetId}`)
   await expect(page.getByRole('heading', { level: 2, name: /Sessions \(1 total\)/ })).toBeVisible()
@@ -88,3 +89,7 @@ test('host session helper preserves current UA on actual vault rotation; Session
   await admin.close()
   await product.close()
 })
+
+function escapeOrigin(origin: string): string {
+  return origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

@@ -23,7 +23,7 @@
 #
 # Optional bundled monitoring (COMPOSE_PROFILES=...,monitoring): a dev-only
 # Prometheus + Grafana + Alertmanager harness that scrapes THIS stack's real
-# api/worker metrics — never part of docker-compose.prod.yml, never a
+# api/worker metrics — never part of docker/compose/prod.yml, never a
 # production monitoring stack. Requires METRICS_AUTH_TOKEN and
 # GF_SECURITY_ADMIN_PASSWORD set in .env (compose refuses to start `prometheus`/
 # `grafana` otherwise — no insecure default). See
@@ -37,8 +37,8 @@
 # shipped in Compose v2.6.0, 2022-05-30). Production hardening (sslmode, S3,
 # real JWT secret >= 32 chars) is documented in docs/operations/deployment.md.
 #
-# Production image-pull rollout: apply docker-compose.prod.yml on top of this
-# file (`-f docker-compose.yml -f docker-compose.prod.yml`) to pin api/worker/
+# Production image-pull rollout: apply docker/compose/prod.yml on top of this
+# file (`-f docker-compose.yml -f docker/compose/prod.yml`) to pin api/worker/
 # web/migrate to immutable registry digests instead of building locally, add
 # restart policies, and bound/rotate container logs. See deployment.md →
 # "Production rollout via registry (image-pull path)".
@@ -292,6 +292,7 @@ services:
       # .env.example for the full contract.
       WEB_CSP_MODE: ${WEB_CSP_MODE:-}
       ADMIN_CONSOLE_HOSTNAME: ${ADMIN_CONSOLE_HOSTNAME:-}
+      ADMIN_CONSOLE_ORIGIN: ${ADMIN_CONSOLE_ORIGIN:-}
     depends_on:
       api:
         condition: service_healthy
@@ -405,7 +406,7 @@ services:
   # metric surface, alert rules, and dashboards this repo ships actually work
   # against THIS stack's real api/worker, before a fork wires its own
   # production Prometheus/Grafana/Alertmanager (this profile is never applied
-  # by docker-compose.prod.yml, never a production stack of its own). All
+  # by docker/compose/prod.yml, never a production stack of its own). All
   # three ports are loopback-only, unlike postgres/redis above — ADR-072
   # precedent extended here because Grafana is a web UI, not a bare data
   # port. See docs/operations/observability.md → "Local Verification

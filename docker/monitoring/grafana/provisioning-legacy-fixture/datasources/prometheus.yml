@@ -3,7 +3,7 @@
 # `docker/monitoring/grafana/provisioning/datasources/prometheus.yml`'s own
 # header comment for the incident this fixed). Used only by the
 # observability-contract live tier's old-volume migration smoke
-# (docker-compose.observability-contract.old-volume.yml, phase A) to prove a
+# (docker/testing/observability-old-volume.yml, phase A) to prove a
 # `grafana_data` volume created under this old provisioning migrates cleanly
 # once the real, fixed provisioning replaces it. Never mounted by the normal
 # `monitoring` compose profile.

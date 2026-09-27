@@ -111,9 +111,15 @@ const definitions = new Map([
   [
     'console.compose-env',
     {
-      claims: () => [absent('yaml:services.web.environment.ADMIN_CONSOLE_HOSTNAME')],
+      claims: () =>
+        ['ADMIN_CONSOLE_HOSTNAME', 'ADMIN_CONSOLE_ORIGIN'].map((key) =>
+          absent(`yaml:services.web.environment.${key}`)
+        ),
       apply: (text) =>
-        replaceExactBlock(text, '      ADMIN_CONSOLE_HOSTNAME: ${ADMIN_CONSOLE_HOSTNAME:-}\n', ''),
+        ['ADMIN_CONSOLE_HOSTNAME', 'ADMIN_CONSOLE_ORIGIN'].reduce(
+          (source, key) => replaceExactBlock(source, `      ${key}: \${${key}:-}\n`, ''),
+          text
+        ),
     },
   ],
 ])

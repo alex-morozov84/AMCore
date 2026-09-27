@@ -42,7 +42,7 @@ const sharedApiModules = [module('apps/web/src/shared/api/console-api.ts', ['con
 
 const verification = [
   'apps/web/playwright.console-real-stack.config.ts',
-  'docker-compose.console-session-e2e.yml',
+  'docker/testing/console-session-e2e.yml',
   'scripts/run-console-session-e2e.mjs',
   'scripts/run-console-single-locale-proxy-smoke.mjs',
   // Path-mode console e2e coverage - lives under the general `e2e/real-stack`
@@ -98,7 +98,7 @@ export const operationsConsoleFacts = {
       module: 'apps/web/src/shared/ui/console-step-up-dialog.tsx',
     }),
   ],
-  topology: ['docker-compose.console-host.yml', 'docker/caddy/Caddyfile.console-host'].map((path) =>
+  topology: ['docker/compose/console-host.yml', 'docker/caddy/Caddyfile.console-host'].map((path) =>
     one(path, { tags: ['topology:host'] })
   ),
   verification,
@@ -116,8 +116,8 @@ export const operationsConsoleSurfaceRoots = [
   'docs',
   'docker',
   'docker-compose.yml',
-  'docker-compose.console-host.yml',
-  'docker-compose.console-session-e2e.yml',
+  'docker/compose/console-host.yml',
+  'docker/testing/console-session-e2e.yml',
   '.env.example',
   'AGENTS.md',
   'README.md',
