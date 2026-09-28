@@ -35,8 +35,10 @@ export function composeArguments(m) {
     '-f',
     `${m.snapshot}/docker-compose.yml`,
   ]
+  // AMCORE_CONSOLE_HOST_OVERLAY_START
   if (m.topology === 'host')
     args.push('--profile', 'edge', '-f', `${m.snapshot}/docker/compose/console-host.yml`)
+  // AMCORE_CONSOLE_HOST_OVERLAY_END
   return [...args, '-f', m.overlay]
 }
 export function compose(m, args, options = {}) {

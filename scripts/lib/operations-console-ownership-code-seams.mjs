@@ -71,8 +71,14 @@ export const operationsConsoleCodeSeams = [
     'console.test-script',
     'apps/web/package.json',
     'config-field',
-    { jsonPath: ['scripts', 'test:e2e:console-real-stack'] },
-    ['test:e2e:console-real-stack'],
+    {
+      jsonPath: ['scripts', 'test:e2e:console-real-stack'],
+      identifiers: [
+        'test:e2e:console-real-stack',
+        'node ../../scripts/stand.mjs e2e --lane console-real-stack',
+      ],
+    },
+    ['test:e2e:console-real-stack', 'console-real-stack'],
     { operationKey: 'package-console' }
   ),
   seam(

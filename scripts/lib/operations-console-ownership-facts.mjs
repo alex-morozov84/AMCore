@@ -43,6 +43,8 @@ const sharedApiModules = [module('apps/web/src/shared/api/console-api.ts', ['con
 const verification = [
   'apps/web/playwright.console-real-stack.config.ts',
   'docker/testing/console-session-e2e.yml',
+  'scripts/stand/proxy-smoke.mjs',
+  'scripts/stand/wrapper-cancellation.test.mjs',
   'scripts/run-console-session-e2e.mjs',
   'scripts/run-console-single-locale-proxy-smoke.mjs',
   // Path-mode console e2e coverage - lives under the general `e2e/real-stack`
@@ -124,4 +126,6 @@ export const operationsConsoleSurfaceRoots = [
   'PROJECT_CONTEXT.md',
   'scripts/run-console-session-e2e.mjs',
   'scripts/run-console-single-locale-proxy-smoke.mjs',
+  'scripts/stand.mjs',
+  'scripts/stand',
 ]

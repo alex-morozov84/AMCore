@@ -1,3 +1,4 @@
+import { operationsConsoleStandSeams } from './operations-console-stand-seams.mjs'
 import { operationsConsoleCodeSeams } from './operations-console-ownership-code-seams.mjs'
 import { operationsConsoleDocSeams } from './operations-console-ownership-doc-seams.mjs'
 import {
@@ -19,6 +20,7 @@ export const operationsConsoleOwnership = defineOwnershipManifest({
     'apps/web/src/**/*.test.tsx',
     'apps/web/e2e/**/*.spec.ts',
     'apps/web/src/**/*.stories.tsx',
+    'scripts/stand/*.test.mjs',
   ],
   monitoredIdentifiers: [
     'ADMIN_CONSOLE_CONFIG',
@@ -33,8 +35,13 @@ export const operationsConsoleOwnership = defineOwnershipManifest({
     '__Host-amcore_console_session',
     'web:console-session:v1',
     'test:e2e:console-real-stack',
+    'console-real-stack',
     '@/widgets/console-shell',
   ],
   facts: operationsConsoleFacts,
-  seams: [...operationsConsoleCodeSeams, ...operationsConsoleDocSeams],
+  seams: [
+    ...operationsConsoleCodeSeams,
+    ...operationsConsoleDocSeams,
+    ...operationsConsoleStandSeams,
+  ],
 })

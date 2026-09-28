@@ -38,10 +38,13 @@ export async function configuration(m) {
       API_URL: 'http://api:5002',
       REDIS_URL: 'redis://redis:6379',
       WEB_TRUSTED_ORIGINS: m.origins.product,
+      // AMCORE_CONSOLE_WEB_ENV_START
       ADMIN_CONSOLE_HOSTNAME: m.hostnames.console ?? '',
       ADMIN_CONSOLE_ORIGIN: m.origins.console ?? '',
+      // AMCORE_CONSOLE_WEB_ENV_END
     },
   }
+  // AMCORE_CONSOLE_CADDY_ENV_START
   if (m.topology === 'host')
     environments.caddy = {
       CADDY_DOMAIN: m.hostnames.api,
@@ -49,6 +52,7 @@ export async function configuration(m) {
       ADMIN_CONSOLE_HOSTNAME: m.hostnames.console,
       CADDY_EMAIL: 'stand@example.invalid',
     }
+  // AMCORE_CONSOLE_CADDY_ENV_END
   const ports = {
     postgres: [],
     redis: [`127.0.0.1:${m.ports.redis}:6379`],
@@ -77,11 +81,16 @@ export async function configuration(m) {
   })
   m.envFile = join(directory(m.id), 'compose.env')
   m.overlay = join(directory(m.id), 'managed.yml')
-  await writeFile(
-    m.envFile,
-    `COMPOSE_PROFILES=\nCADDY_WEB_DOMAIN=${m.hostnames.product}\nADMIN_CONSOLE_HOSTNAME=${m.topology === 'host' ? m.hostnames.console : ''}\nCADDY_DOMAIN=${m.hostnames.api}\nCADDY_EMAIL=stand@example.invalid\n`,
-    { mode: 0o600 }
-  )
+  const envLines = [
+    'COMPOSE_PROFILES=',
+    `CADDY_WEB_DOMAIN=${m.hostnames.product}`,
+    // AMCORE_CONSOLE_COMPOSE_ENV_START
+    `ADMIN_CONSOLE_HOSTNAME=${m.topology === 'host' ? m.hostnames.console : ''}`,
+    // AMCORE_CONSOLE_COMPOSE_ENV_END
+    `CADDY_DOMAIN=${m.hostnames.api}`,
+    'CADDY_EMAIL=stand@example.invalid',
+  ]
+  await writeFile(m.envFile, envLines.join('\n') + '\n', { mode: 0o600 })
   await writeFile(m.overlay, yaml, { mode: 0o600 })
   m.services = Object.keys(environments)
   const rendered = await compose(m, ['config', '--format', 'json'], { capture: true })

@@ -1,7 +1,9 @@
 import { projectChoices } from './project.mjs'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { join } from 'node:path'
+// AMCORE_CONSOLE_HOST_IMPORTS_START
 import { readFile, writeFile } from 'node:fs/promises'
+// AMCORE_CONSOLE_HOST_IMPORTS_END
 import { root, directory, save } from './state.mjs'
 import { snapshot } from './snapshot.mjs'
 import { allocate } from './ports.mjs'
@@ -59,6 +61,7 @@ export async function create(id, purpose, topology, mocked = false) {
   }
   await save(m)
   m.sourceHash = await snapshot(root, m.snapshot)
+  // AMCORE_CONSOLE_HOST_SNAPSHOT_START
   if (topology === 'host') {
     const path = join(m.snapshot, 'apps/web/src/shared/lib/admin-console.generated.ts')
     const content = await readFile(path, 'utf8')
@@ -66,6 +69,7 @@ export async function create(id, purpose, topology, mocked = false) {
       throw new Error('Console host lane unavailable in this fork')
     await writeFile(path, content.replace("mode: 'path'", "mode: 'host'"))
   }
+  // AMCORE_CONSOLE_HOST_SNAPSHOT_END
   await save(m)
   return m
 }

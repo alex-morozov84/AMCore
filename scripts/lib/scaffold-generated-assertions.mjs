@@ -1,3 +1,4 @@
+import { assertManagedStandProjection } from './scaffold-managed-stand-assertions.mjs'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -77,4 +78,5 @@ export async function assertGeneratedScaffold(root, scenario) {
   assertRouteProgress(root, scenario)
   assertConsole(root, scenario)
   await assertSingleLocaleUrl(root, scenario)
+  if (scenario.factors) await assertManagedStandProjection(root, scenario)
 }

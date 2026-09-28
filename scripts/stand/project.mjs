@@ -12,6 +12,7 @@ export async function projectChoices(root) {
   return {
     consoleEnabled: field('admin_console') === 'enabled',
     consoleSlug: field('admin_console_slug') ?? 'admin',
+    baseLocale: field('base_locale') ?? 'en',
     localePrefix: field('i18n_mode') === 'single' ? '' : `/${field('base_locale') ?? 'en'}`,
     topology: field('admin_console_mode') === 'host' ? 'host' : 'path',
     branch:

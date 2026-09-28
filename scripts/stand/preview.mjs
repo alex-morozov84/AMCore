@@ -1,3 +1,4 @@
+import { previewLabels } from './preview-labels.mjs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -11,6 +12,7 @@ export async function preview(m, profile = 'default') {
   if (!['default', 'user', 'organization'].includes(profile))
     throw new Error('Unknown fixture profile')
   await dataAdmission(m)
+  const labels = await previewLabels(m)
   const require = createRequire(join(m.worktree, 'apps/web/package.json'))
   const { chromium, request } = require('@playwright/test')
   const tmp = `${m.worktree}/.amcore/stands/${m.id}/tmp`
@@ -49,10 +51,11 @@ export async function preview(m, profile = 'default') {
       try {
         const page = await context.newPage()
         await page.goto(`${m.localePrefix}/login`)
-        await page.getByLabel(/email/i).fill(account.email)
-        await page.getByLabel(/^password$/i).fill(account.password)
-        await page.getByRole('button', { name: /^sign in$/i }).click()
+        await page.getByLabel(labels.product.email, { exact: true }).fill(account.email)
+        await page.getByLabel(labels.product.password, { exact: true }).fill(account.password)
+        await page.getByRole('button', { name: labels.product.submit, exact: true }).click()
         await page.waitForURL(`${m.origins.product}${m.localePrefix}`)
+        // AMCORE_CONSOLE_PREVIEW_ACCESS_START
         if (account.role === 'SUPER_ADMIN') {
           await page.goto(
             m.origins.console
@@ -61,13 +64,14 @@ export async function preview(m, profile = 'default') {
           )
           // Host-mode needs its own login cookie; product auth is not Console auth.
           if (page.url().includes('/login')) {
-            await page.getByLabel(/email/i).fill(account.email)
-            await page.getByLabel(/^password$/i).fill(account.password)
-            await page.getByRole('button', { name: /^sign in$/i }).click()
+            await page.getByLabel(labels.console.email, { exact: true }).fill(account.email)
+            await page.getByLabel(labels.console.password, { exact: true }).fill(account.password)
+            await page.getByRole('button', { name: labels.console.submit, exact: true }).click()
             await page.waitForURL(`${m.origins.console}${m.localePrefix}`)
           }
           if (page.url().includes('/login')) throw new Error('Admin preview access not proved')
         }
+        // AMCORE_CONSOLE_PREVIEW_ACCESS_END
         await page.screenshot({
           path: `${m.worktree}/.amcore/stands/${m.id}/preview-${account.role}.png`,
         })
@@ -81,9 +85,11 @@ export async function preview(m, profile = 'default') {
       `Stand: ${m.id}\nBranch: ${m.branch}\nSource: ${m.sourceHash}\nURL: ${m.origins.product}${m.localePrefix}`
     )
     for (const a of m.accounts) console.log(`${a.role}: ${a.email}\nPassword: ${a.password}`)
-    console.log(
-      `Scenario: login, inspect current changes and Console access. Stop: pnpm stand down --id ${m.id}`
-    )
+    let scenario = 'login, inspect current changes'
+    // AMCORE_CONSOLE_PREVIEW_SCENARIO_START
+    scenario += ' and Console access'
+    // AMCORE_CONSOLE_PREVIEW_SCENARIO_END
+    console.log(`Scenario: ${scenario}. Stop: pnpm stand down --id ${m.id}`)
   } finally {
     if (browser) await browser.close()
     if (api) await api.dispose()

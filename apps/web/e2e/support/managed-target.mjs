@@ -17,8 +17,12 @@ export function activeTarget() {
 }
 export function testOptions() {
   const m = activeTarget()
+  let baseURL = m.origins.product
+  // AMCORE_CONSOLE_TARGET_ORIGIN_START
+  if (m.lane === 'console-real-stack') baseURL = m.origins.console
+  // AMCORE_CONSOLE_TARGET_ORIGIN_END
   return {
-    baseURL: m.lane === 'console-real-stack' ? m.origins.console : m.origins.product,
+    baseURL,
     proxy: { server: m.relay },
     launchOptions: { proxy: { server: m.relay }, args: ['--proxy-bypass-list=<-loopback>'] },
     ignoreHTTPSErrors: m.topology === 'host',

@@ -11,6 +11,12 @@ import { stopChildren, setJournal, requestCancellation, allowCleanup } from './s
 const [action = 'help', ...args] = process.argv.slice(2)
 const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : fallback)
 const lane = value('--lane', 'real-stack')
+const lanes = ['mocked', 'real-stack']
+let topology
+// AMCORE_CONSOLE_LANES_START
+lanes.push('console-real-stack')
+if (lane === 'console-real-stack') topology = 'host'
+// AMCORE_CONSOLE_LANES_END
 const id = value('--id', action === 'e2e' ? `e2e-${randomUUID()}` : 'preview')
 let interrupted = false
 for (const signal of ['SIGINT', 'SIGTERM'])
@@ -27,7 +33,7 @@ for (const signal of ['SIGINT', 'SIGTERM'])
 async function execute() {
   if (action === 'help') {
     console.log(
-      'pnpm stand up|preview|e2e|status|list|down|recover|closeout [--id ID] [--purge]\ne2e --lane mocked|real-stack|console-real-stack\nManaged local stands; never owner .env. Native pnpm dev is outside these guards.'
+      `pnpm stand up|preview|e2e|status|list|down|recover|closeout [--id ID] [--purge]\ne2e --lane ${lanes.join('|')}\nManaged local stands; never owner .env. Native pnpm dev is outside these guards.`
     )
     return
   }
@@ -64,9 +70,10 @@ async function execute() {
     return
   }
   if (!['up', 'preview', 'e2e', 'down'].includes(action)) throw new Error('Unknown stand action')
-  if (!['mocked', 'real-stack', 'console-real-stack'].includes(lane))
-    throw new Error('Unknown lane')
+  if (!lanes.includes(lane)) throw new Error('Unknown lane')
   if (action !== 'e2e' && lane === 'mocked') throw new Error('Mocked lane is e2e-only')
+  if (args.includes('--proxy-smoke') && topology !== 'host')
+    throw new Error('Proxy smoke unavailable in this fork')
   const held = await lease(id, action)
   setJournal(`${root}/.amcore/stands/${id}/lease/children.json`)
   let m
@@ -86,7 +93,7 @@ async function execute() {
         throw new Error('E2E cannot mutate a preview stand')
       if (action !== 'e2e' && existing.purpose !== 'preview')
         throw new Error('Preview requires a preview-purpose stand')
-      if (action === 'e2e' && (existing.topology === 'host') !== (lane === 'console-real-stack'))
+      if (action === 'e2e' && (existing.topology === 'host') !== (topology === 'host'))
         throw new Error('E2E topology does not match selected lane')
       if (existing.state === 'purged') throw new Error('Purged ID; select a fresh stand ID')
       m = existing
@@ -97,7 +104,7 @@ async function execute() {
       m = await create(
         id,
         action === 'e2e' ? 'e2e' : 'preview',
-        lane === 'console-real-stack' ? 'host' : undefined,
+        topology,
         action === 'e2e' && lane === 'mocked'
       )
     if (lane !== 'mocked') await boot(m, !existing)
@@ -106,11 +113,16 @@ async function execute() {
       const extra = args.includes('--') ? args.slice(args.indexOf('--') + 1) : []
       if (extra.some((arg) => /^(--config|--output|--global)/.test(arg)))
         throw new Error('Managed configuration cannot be overridden')
+      let handled = false
+      // AMCORE_CONSOLE_PROXY_SMOKE_START
       if (args.includes('--proxy-smoke')) {
         if (lane !== 'console-real-stack') throw new Error('Proxy smoke requires host lane')
         const { proxySmoke } = await import('./stand/proxy-smoke.mjs')
         await proxySmoke(m)
-      } else await test(m, lane, held.token, extra)
+        handled = true
+      }
+      // AMCORE_CONSOLE_PROXY_SMOKE_END
+      if (!handled) await test(m, lane, held.token, extra)
     } else if (action === 'preview') {
       const { preview } = await import('./stand/preview.mjs')
       await preview(m, value('--profile', 'default'))

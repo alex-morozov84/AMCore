@@ -52,6 +52,7 @@ these managed lanes.
 Manual preview always uses `demo.user@preview.amcore.test` (USER) and
 `demo.super-admin@preview.amcore.test` (SUPER_ADMIN when enabled), with the public
 demo password `Demo!AMCore2026`. Recreating the stand preserves these credentials.
+Preview login checks use the checkout's base-locale catalogue.
 Tests that need unique users or password changes create separate test accounts;
 technical DB/JWT secrets remain random. Production never seeds these accounts.
 
@@ -60,8 +61,12 @@ source hash and the concrete scenario to inspect. Accounts are registered throug
 the real API, roles are assigned only to those accounts, and browser login/access
 is verified. Keep the stand running until acceptance or explicitly scoped cleanup.
 `--profile user` prepares only USER; `--profile organization` additionally creates
-an organization owned by USER with its organization ADMIN membership. The default
-also prepares SUPER_ADMIN when the Console feature is enabled.
+an organization owned by USER with its organization ADMIN membership.
+<!-- AMCORE_CONSOLE_STAND_PROFILE_START -->
+
+The default also prepares SUPER_ADMIN when the Console feature is enabled.
+<!-- AMCORE_CONSOLE_STAND_PROFILE_END -->
+
 Do not put generated technical secrets, tokens or manifests in commits or shared
 reports; the deliberately public demo credentials above are a separate contract.
 
