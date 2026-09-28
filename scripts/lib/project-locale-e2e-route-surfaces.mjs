@@ -12,7 +12,7 @@ export const E2E_ROUTE_SURFACES = [
   ['apps/web/e2e/mocked/csp-nonce.spec.ts', 8],
   ['apps/web/e2e/mocked/csp-report-endpoint.spec.ts', 2],
   ['apps/web/e2e/mocked/login-validation.spec.ts', 7],
-  ['apps/web/e2e/mocked/route-progress-bar.spec.ts', 15, 1],
+  ['apps/web/e2e/mocked/route-progress-bar.spec.ts', 16, 1],
   ['apps/web/e2e/mocked/security-headers.spec.ts', 1],
   ['apps/web/e2e/mocked/theme-persistence.spec.ts', 3],
   ['apps/web/e2e/real-stack/accessibility.spec.ts', 4],
