@@ -368,6 +368,17 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(violations).toEqual([])
   })
 
+  it('documents parent-bounded switch without deprecation or key authentication', () => {
+    const operation = document.paths['/organizations/{id}/switch']?.post
+    expect(operation?.security).toEqual([{ bearer: [] }])
+    expect(operation?.description).toContain('expires no later than its parent')
+    expect(operation?.description).toContain('between organizations remains supported')
+    expect(operation?.deprecated).not.toBe(true)
+    expect(operation?.responses).toHaveProperty('200')
+    expect(operation?.responses).toHaveProperty('401')
+    expect(operation?.responses).toHaveProperty('403')
+  })
+
   it('documents the bearer-only, no-content Operations Console access probe', () => {
     const operation = document.paths['/admin/access']?.get
     const noContentResponse = operation?.responses?.['204'] as { content?: unknown } | undefined

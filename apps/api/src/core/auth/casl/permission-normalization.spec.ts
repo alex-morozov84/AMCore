@@ -2,6 +2,8 @@ import { subject } from '@casl/ability'
 
 import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
 
+import { admissionForTest } from '../__tests__/privileged-admission.fixture'
+
 import { AbilityFactory } from './ability.factory'
 import {
   type AbilityPermission,
@@ -45,7 +47,9 @@ describe('total owner normalization', () => {
         ['manage:Organization', 'update:Organization'],
         ['update:Organization', 'manage:Organization', 'update:Organization'],
       ]) {
-        const ability = await factory(rules).createForUser({ ...actor, type: 'api_key', scopes })
+        const ability = await factory(rules).createForUser(
+          await admissionForTest({ ...actor, type: 'api_key', scopes })
+        )
         const org = subject('Organization', { id: 'org', name: 'Name' } as never)
         expect(ability.can(Action.Update, org, 'name')).toBe(false)
         expect(ability.can(Action.Update, org, 'slug')).toBe(true)
@@ -70,7 +74,9 @@ describe('total owner normalization', () => {
     rule({ conditions: { id: '${user.misspelled}' } }),
   ])('fails the entire payload before unrelated scopes can hide corruption', async (invalid) => {
     await expect(
-      factory([rule(), invalid]).createForUser({ ...actor, type: 'api_key', scopes: ['read:User'] })
+      factory([rule(), invalid]).createForUser(
+        await admissionForTest({ ...actor, type: 'api_key', scopes: ['read:User'] })
+      )
     ).rejects.toThrow()
   })
 
@@ -83,20 +89,24 @@ describe('total owner normalization', () => {
 
   it('computes owner trust before scope narrowing and requires exact team scope', async () => {
     const team = rule({ subject: Subject.TeamAccess })
-    expect((await factory([team]).createAuthorizationContext(actor)).teamAccess.ownerTrusted).toBe(
-      true
-    )
+    expect(
+      (await factory([team]).createAuthorizationContext(await admissionForTest(actor))).teamAccess
+        .ownerTrusted
+    ).toBe(true)
     for (const scope of ['manage:Organization', 'read:TeamAccess']) {
-      const context = await factory([team]).createAuthorizationContext({
-        ...actor,
-        type: 'api_key',
-        scopes: [scope],
-      })
+      const context = await factory([team]).createAuthorizationContext(
+        await admissionForTest({
+          ...actor,
+          type: 'api_key',
+          scopes: [scope],
+        })
+      )
       expect(context.teamAccess.credentialTrusted).toBe(false)
     }
     const key = { ...actor, type: 'api_key' as const, scopes: ['manage:TeamAccess'] }
     expect(
-      (await factory([team]).createAuthorizationContext(key)).teamAccess.credentialTrusted
+      (await factory([team]).createAuthorizationContext(await admissionForTest(key))).teamAccess
+        .credentialTrusted
     ).toBe(true)
     const roleDeny = rule({
       id: 'role-deny',
@@ -107,17 +117,19 @@ describe('total owner normalization', () => {
       conditions: { id: 'impossible' },
     })
     expect(
-      (await factory([team, roleDeny]).createAuthorizationContext(key)).teamAccess.ownerTrusted
+      (await factory([team, roleDeny]).createAuthorizationContext(await admissionForTest(key)))
+        .teamAccess.ownerTrusted
     ).toBe(false)
     expect(
       (
         await factory([team, rule({ id: 'org-deny', inverted: true })]).createAuthorizationContext(
-          key
+          await admissionForTest(key)
         )
       ).teamAccess.ownerTrusted
     ).toBe(true)
     expect(
-      (await factory([rule()]).createAuthorizationContext(actor)).teamAccess.ownerTrusted
+      (await factory([rule()]).createAuthorizationContext(await admissionForTest(actor))).teamAccess
+        .ownerTrusted
     ).toBe(false)
   })
   it('JSON epoch DateTime conditions parse and distinguish actual Date facts', async () => {
@@ -128,7 +140,7 @@ describe('total owner normalization', () => {
       inverted: true,
       conditions: JSON.parse(JSON.stringify({ updatedAt: { gt: epoch } })),
     })
-    const ability = await factory([rule(), deny]).createForUser(actor)
+    const ability = await factory([rule(), deny]).createForUser(await admissionForTest(actor))
     const before = subject('Organization', { id: 'org', updatedAt: new Date(epoch) } as never)
     const after = subject('Organization', { id: 'org', updatedAt: new Date(epoch + 1) } as never)
     expect(ability.can(Action.Update, before, 'name')).toBe(true)

@@ -422,6 +422,38 @@ describe('AI human takeover lifecycle (e2e)', () => {
         .expect(401)
     })
 
+    it('direct demotion blocks stale privileged AI access without session or cache cleanup', async () => {
+      const owner = await registerHttp('demotion-owner@example.com')
+      const conversationId = await createConversation(owner.userId)
+      const admin = await registerHttp('demotion-operator@example.com')
+      const token = await promoteSuperAdmin(admin.userId, 'demotion-operator@example.com')
+      await request(server())
+        .get(`/ai/conversations/${conversationId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('x-amcore-operator-reason', 'SUP-DEMOTION')
+        .expect(200)
+      await prisma.user.update({
+        where: { id: admin.userId },
+        data: { systemRole: SystemRole.User },
+      })
+      const before = await prisma.aiConversation.findUniqueOrThrow({
+        where: { id: conversationId },
+      })
+      await request(server())
+        .get(`/ai/conversations/${conversationId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('x-amcore-operator-reason', 'SUP-DEMOTION')
+        .expect(404)
+      await request(server())
+        .post(`/ai/conversations/${conversationId}/takeover`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ reason: 'SUP-DEMOTION' })
+        .expect(404)
+      expect(
+        await prisma.aiConversation.findUniqueOrThrow({ where: { id: conversationId } })
+      ).toEqual(before)
+    })
+
     it('cross-user SUPER_ADMIN with a STALE session → 403 STEP_UP_REQUIRED', async () => {
       const owner = await registerHttp('owner-a@example.com')
       const conversationId = await createConversation(owner.userId)

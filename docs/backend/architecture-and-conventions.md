@@ -398,3 +398,20 @@ Commands are in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#api-specific-test-comm
 - Idempotency, webhooks, observability, audit log — [`docs/operations/`](../operations/)
 - Workflow, commit format, test commands — [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
 - Code conventions — [`AGENTS.md`](../../AGENTS.md)
+
+## Privileged admission before authorization
+
+The global AuthenticationGuard authenticates, resolves current privilege, builds
+one CASL/TeamAccess context and runs policy guards. Every privileged JWT claim
+requires primary-role authority even on routes without SystemRoles metadata.
+Downstream handlers/services receive the effective request.user; original claims
+remain in API-only request-local admission evidence. Do not reread the claim to
+recover a platform bypass or build AbilityFactory inputs from an unverified token.
+AbilityFactory requires a PrivilegedAdmission result, not a raw RequestPrincipal.
+SystemRoles checks original claim and current role using that same evidence.
+API keys reuse the live owner role obtained by their existing authentication.
+FreshAuth's session/reason requirements remain separate. See [RBAC](../auth/rbac.md).
+
+Organization exchange uses TokenService.generateDerivedAccessToken with the verified
+parent expiry; ordinary login/refresh/step-up uses generateAccessToken. Do not use
+ordinary issuance for `/switch`: repeated exchanges must not extend residual access.

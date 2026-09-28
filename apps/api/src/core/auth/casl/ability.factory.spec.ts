@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 
 import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
 
+import { admissionForTest } from '../__tests__/privileged-admission.fixture'
 import { OrgAclVersionService } from '../org-acl-version.service'
 import { PermissionsCacheService } from '../permissions-cache.service'
 
@@ -73,7 +74,7 @@ describe('AbilityFactory', () => {
         systemRole: SystemRole.SuperAdmin,
       }
 
-      const ability = await factory.createForUser(principal)
+      const ability = await factory.createForUser(await admissionForTest(principal))
 
       expect(ability.can(Action.Manage, Subject.All)).toBe(true)
       expect(ability.can(Action.Delete, Subject.User)).toBe(true)
@@ -105,7 +106,7 @@ describe('AbilityFactory', () => {
           scopes: ['read:User'],
         }
 
-        const ability = await factory.createForUser(principal)
+        const ability = await factory.createForUser(await admissionForTest(principal))
 
         expect(ability.can(Action.Read, Subject.User)).toBe(true)
         expect(ability.can(Action.Create, Subject.Organization)).toBe(false)
@@ -125,7 +126,7 @@ describe('AbilityFactory', () => {
           scopes: [],
         }
 
-        const ability = await factory.createForUser(principal)
+        const ability = await factory.createForUser(await admissionForTest(principal))
 
         expect(ability.can(Action.Read, Subject.User)).toBe(false)
         expect(ability.can(Action.Manage, Subject.All)).toBe(false)
@@ -148,7 +149,7 @@ describe('AbilityFactory', () => {
           scopes: ['manage:all'],
         }
 
-        const ability = await factory.createForUser(principal)
+        const ability = await factory.createForUser(await admissionForTest(principal))
 
         expect(ability.can(Action.Manage, Subject.All)).toBe(false)
         expect(ability.can(Action.Delete, Subject.User)).toBe(false)
@@ -170,7 +171,7 @@ describe('AbilityFactory', () => {
           scopes: ['read:all'],
         }
 
-        const ability = await factory.createForUser(principal)
+        const ability = await factory.createForUser(await admissionForTest(principal))
 
         expect(ability.can(Action.Read, Subject.User)).toBe(true)
         expect(ability.can(Action.Read, Subject.Organization)).toBe(true)
@@ -189,7 +190,7 @@ describe('AbilityFactory', () => {
           scopes: ['manage:Organization'],
         }
 
-        const ability = await factory.createForUser(principal)
+        const ability = await factory.createForUser(await admissionForTest(principal))
 
         expect(ability.can(Action.Read, Subject.Organization)).toBe(true)
         expect(ability.can(Action.Update, Subject.Organization)).toBe(true)
@@ -212,7 +213,9 @@ describe('AbilityFactory', () => {
           scopes: ['read:User'],
         }
 
-        await expect(factory.createForUser(principal)).rejects.toThrow(/ADR-033/)
+        await expect(factory.createForUser(await admissionForTest(principal))).rejects.toThrow(
+          /ADR-033/
+        )
         expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
       })
 
@@ -228,7 +231,7 @@ describe('AbilityFactory', () => {
           scopes: ['read:User:extra', ':User', 'read:', ''],
         }
 
-        const ability = await factory.createForUser(principal)
+        const ability = await factory.createForUser(await admissionForTest(principal))
 
         expect(ability.can(Action.Read, Subject.User)).toBe(false)
       })
@@ -274,7 +277,9 @@ describe('AbilityFactory', () => {
           },
         ] as any)
 
-        const ability = await factory.createForUser(principalOf(['read:User']))
+        const ability = await factory.createForUser(
+          await admissionForTest(principalOf(['read:User']))
+        )
 
         expect(ability.can(Action.Read, Subject.User)).toBe(true)
         expect(ability.can(Action.Read, Subject.Organization)).toBe(false)
@@ -294,7 +299,9 @@ describe('AbilityFactory', () => {
           },
         ] as any)
 
-        const ability = await factory.createForUser(principalOf(['read:Organization']))
+        const ability = await factory.createForUser(
+          await admissionForTest(principalOf(['read:Organization']))
+        )
 
         expect(ability.can(Action.Read, Subject.Organization)).toBe(true)
         expect(ability.can(Action.Update, Subject.Organization)).toBe(false)
@@ -314,7 +321,9 @@ describe('AbilityFactory', () => {
           },
         ] as any)
 
-        const ability = await factory.createForUser(principalOf(['manage:User']))
+        const ability = await factory.createForUser(
+          await admissionForTest(principalOf(['manage:User']))
+        )
 
         expect(ability.can(Action.Read, Subject.User)).toBe(true)
         expect(ability.can(Action.Update, Subject.User)).toBe(false)
@@ -334,7 +343,9 @@ describe('AbilityFactory', () => {
           },
         ] as any)
 
-        const ability = await factory.createForUser(principalOf(['manage:User']))
+        const ability = await factory.createForUser(
+          await admissionForTest(principalOf(['manage:User']))
+        )
 
         expect(ability.can(Action.Read, Subject.User)).toBe(true)
         expect(ability.can(Action.Update, Subject.User)).toBe(true)
@@ -355,7 +366,9 @@ describe('AbilityFactory', () => {
           },
         ] as any)
 
-        const ability = await factory.createForUser(principalOf(['delete:User']))
+        const ability = await factory.createForUser(
+          await admissionForTest(principalOf(['delete:User']))
+        )
 
         expect(ability.can(Action.Delete, Subject.User)).toBe(false)
         expect(ability.can(Action.Read, Subject.User)).toBe(false)
@@ -383,7 +396,9 @@ describe('AbilityFactory', () => {
           },
         ] as any)
 
-        const ability = await factory.createForUser(principalOf(['manage:User']))
+        const ability = await factory.createForUser(
+          await admissionForTest(principalOf(['manage:User']))
+        )
 
         expect(ability.can(Action.Read, Subject.User)).toBe(true)
         expect(ability.can(Action.Update, Subject.User)).toBe(true)
@@ -413,7 +428,7 @@ describe('AbilityFactory', () => {
           scopes: ['manage:User'],
         }
 
-        const ability = await factory.createForUser(principal)
+        const ability = await factory.createForUser(await admissionForTest(principal))
 
         // Conditions interpolated → can only update own user.
         expect(ability.can(Action.Update, subject('User', { id: 'user-1' } as any))).toBe(true)
@@ -433,7 +448,9 @@ describe('AbilityFactory', () => {
           },
         ] as any)
 
-        const ability = await factory.createForUser(principalOf(['manage:all']))
+        const ability = await factory.createForUser(
+          await admissionForTest(principalOf(['manage:all']))
+        )
 
         expect(ability.can(Action.Read, Subject.User)).toBe(false)
         expect(ability.can(Action.Manage, Subject.All)).toBe(false)
@@ -447,7 +464,7 @@ describe('AbilityFactory', () => {
         systemRole: SystemRole.User,
       }
 
-      const ability = await factory.createForUser(principal)
+      const ability = await factory.createForUser(await admissionForTest(principal))
 
       expect(ability.can(Action.Read, Subject.User)).toBe(true)
       expect(ability.can(Action.Update, Subject.User)).toBe(true)
@@ -468,7 +485,9 @@ describe('AbilityFactory', () => {
         scopes: ['read:User'],
       }
 
-      await expect(factory.createForUser(principal)).rejects.toThrow(/ADR-033/)
+      await expect(factory.createForUser(await admissionForTest(principal))).rejects.toThrow(
+        /ADR-033/
+      )
       expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
     })
 
@@ -483,7 +502,7 @@ describe('AbilityFactory', () => {
       orgAclVersion.getCurrent.mockResolvedValueOnce(0)
       permissionsCache.getPermissions.mockResolvedValue([])
 
-      await factory.createForUser(principal)
+      await factory.createForUser(await admissionForTest(principal))
 
       expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
       expect(permissionsCache.getPermissions).toHaveBeenCalledWith('user-1', 'org-1', 0)
@@ -501,7 +520,7 @@ describe('AbilityFactory', () => {
       orgAclVersion.getCurrent.mockResolvedValueOnce(4)
       permissionsCache.getPermissions.mockResolvedValueOnce(mockPermissions as any)
 
-      const ability = await factory.createForUser(principal)
+      const ability = await factory.createForUser(await admissionForTest(principal))
 
       expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
       expect(permissionsCache.getPermissions).toHaveBeenCalledWith('user-1', 'org-1', 4)
@@ -520,7 +539,7 @@ describe('AbilityFactory', () => {
 
       permissionsCache.getPermissions.mockResolvedValueOnce(mockPermissions as any)
 
-      const ability = await factory.createForUser(principal)
+      const ability = await factory.createForUser(await admissionForTest(principal))
 
       // Permission has condition: { id: '${user.sub}' } → interpolated to { id: 'user-123' }.
       // Object-level checks (not just the class-level check below) prove the interpolated
@@ -553,7 +572,7 @@ describe('AbilityFactory', () => {
         aclVersion: 5,
       }
 
-      const ability = await factory.createForUser(principal)
+      const ability = await factory.createForUser(await admissionForTest(principal))
 
       // An empty conditions object must not accidentally deny everything — it must behave
       // exactly like no conditions at all (matches any User record).
@@ -584,7 +603,7 @@ describe('AbilityFactory', () => {
 
       permissionsCache.getPermissions.mockResolvedValueOnce(deniedPermission as any)
 
-      const ability = await factory.createForUser(principal)
+      const ability = await factory.createForUser(await admissionForTest(principal))
 
       expect(ability.can(Action.Delete, Subject.User)).toBe(false)
       expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
@@ -602,7 +621,7 @@ describe('AbilityFactory', () => {
 
       permissionsCache.getPermissions.mockResolvedValueOnce(mockPermissions as any)
 
-      const ability = await factory.createForUser(principal)
+      const ability = await factory.createForUser(await admissionForTest(principal))
 
       // Should have read:User (in scopes + in permissions)
       expect(ability.can(Action.Read, Subject.User)).toBe(true)
@@ -623,7 +642,7 @@ describe('AbilityFactory', () => {
 
       permissionsCache.getPermissions.mockResolvedValueOnce(mockPermissions as any)
 
-      const ability = await factory.createForUser(principal)
+      const ability = await factory.createForUser(await admissionForTest(principal))
 
       expect(orgAclVersion.getCurrent).toHaveBeenCalledWith('org-1')
       expect(ability.can(Action.Read, Subject.User)).toBe(true)

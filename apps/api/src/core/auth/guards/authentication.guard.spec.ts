@@ -6,6 +6,7 @@ import { AuthErrorCode, AuthType } from '@amcore/shared'
 import { AppException } from '../../../common/exceptions'
 import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
 import { AbilityFactory } from '../casl/ability.factory'
+import { PrivilegedAdmissionService } from '../privileged-admission.service'
 
 import { AuthenticationGuard } from './authentication.guard'
 import { JwtAuthGuard } from './jwt-auth.guard'
@@ -72,9 +73,12 @@ describe('AuthenticationGuard', () => {
       // because every test below either succeeds or throws inside step 3
       // (the auth chain), before the authz stage runs.
       {} as unknown as AbilityFactory,
-      {} as unknown as SystemRolesGuard,
+      { requiredRoles: () => [] } as unknown as SystemRolesGuard,
       {} as unknown as PoliciesGuard,
-      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as TeamAccessGuard
+      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as TeamAccessGuard,
+      {
+        resolve: async (principal: any) => ({ principal, authenticated: principal }),
+      } as unknown as PrivilegedAdmissionService
     )
   })
 
@@ -93,9 +97,12 @@ describe('AuthenticationGuard', () => {
       jwtAuthGuard as unknown as JwtAuthGuard,
       apiKeyGuard as unknown as ApiKeyGuard,
       { createAuthorizationContext } as unknown as AbilityFactory,
-      { canActivate: jest.fn() } as unknown as SystemRolesGuard,
+      { requiredRoles: () => [], canActivate: jest.fn() } as unknown as SystemRolesGuard,
       policies as unknown as PoliciesGuard,
-      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as TeamAccessGuard
+      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as TeamAccessGuard,
+      {
+        resolve: async (principal: any) => ({ principal, authenticated: principal }),
+      } as unknown as PrivilegedAdmissionService
     )
     await expect(candidate.canActivate(context)).rejects.toBe(failure)
     expect(request.ability).toBeUndefined()
@@ -119,9 +126,15 @@ describe('AuthenticationGuard', () => {
       { canActivate: jest.fn().mockResolvedValue(true) } as unknown as JwtAuthGuard,
       keyGuard as unknown as ApiKeyGuard,
       contextFactory as unknown as AbilityFactory,
-      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as SystemRolesGuard,
+      {
+        requiredRoles: () => [],
+        canActivate: jest.fn().mockResolvedValue(true),
+      } as unknown as SystemRolesGuard,
       { canActivate: jest.fn().mockResolvedValue(true) } as unknown as PoliciesGuard,
-      { canActivate: jest.fn().mockRejectedValue(denied) } as unknown as TeamAccessGuard
+      { canActivate: jest.fn().mockRejectedValue(denied) } as unknown as TeamAccessGuard,
+      {
+        resolve: async (principal: any) => ({ principal, authenticated: principal }),
+      } as unknown as PrivilegedAdmissionService
     )
     await expect(candidate.canActivate(ctx)).rejects.toBe(denied)
     expect(contextFactory.createAuthorizationContext).toHaveBeenCalledTimes(1)

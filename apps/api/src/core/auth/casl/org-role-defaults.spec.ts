@@ -9,6 +9,8 @@ import {
   userResponseSchema,
 } from '@amcore/shared'
 
+import { admissionForTest } from '../__tests__/privileged-admission.fixture'
+
 import { AbilityFactory } from './ability.factory'
 import {
   ORG_DEFAULT_PERMISSIONS,
@@ -30,13 +32,15 @@ it('defaults are closed on resources and fields for every ordinary template', as
       } as never,
       { getCurrent: async () => 1 } as never
     )
-    const context = await factory.createAuthorizationContext({
-      type: 'jwt',
-      sub: 'self',
-      systemRole: SystemRole.User,
-      organizationId: 'org',
-      aclVersion: 1,
-    })
+    const context = await factory.createAuthorizationContext(
+      await admissionForTest({
+        type: 'jwt',
+        sub: 'self',
+        systemRole: SystemRole.User,
+        organizationId: 'org',
+        aclVersion: 1,
+      })
+    )
     const ability = context.ability
     expect(ability.can(Action.Read, 'FutureDomain' as never)).toBe(false)
     expect(ability.can(Action.Read, Subject.Role)).toBe(false)

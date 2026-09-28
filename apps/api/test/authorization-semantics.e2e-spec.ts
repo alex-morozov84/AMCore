@@ -4,6 +4,7 @@ import request from 'supertest'
 
 import { SystemRole } from '@amcore/shared'
 
+import { admissionForTest } from '../src/core/auth/__tests__/privileged-admission.fixture'
 import { AbilityFactory } from '../src/core/auth/casl/ability.factory'
 import { ORG_READ_FIELDS } from '../src/core/auth/casl/org-role-defaults'
 import { Prisma } from '../src/generated/prisma/client'
@@ -130,13 +131,15 @@ describe('Explicit organization authorization (real HTTP/Postgres/Redis)', () =>
       const factory = context.app.get(AbilityFactory)
       // Full owner parsing happens in the HTTP factory; no in-memory Date-valued substitute.
       await expect(
-        factory.createForUser({
-          type: 'jwt',
-          sub: userId,
-          organizationId: orgId,
-          aclVersion: 0,
-          systemRole: SystemRole.User,
-        })
+        factory.createForUser(
+          await admissionForTest({
+            type: 'jwt',
+            sub: userId,
+            organizationId: orgId,
+            aclVersion: 0,
+            systemRole: SystemRole.User,
+          })
+        )
       ).resolves.toBeDefined()
       const result = await http()
         .patch(`/organizations/${orgId}`)

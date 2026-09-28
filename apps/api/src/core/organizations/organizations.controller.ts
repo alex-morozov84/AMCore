@@ -221,24 +221,34 @@ export class OrganizationsController {
   @Post(':id/switch')
   @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
   @Auth(AuthType.Bearer)
-  @ApiOperation({ summary: 'Get new JWT with this organization context — must be a member' })
+  @ApiOperation({
+    summary: 'Get JWT with this organization context — must be a member',
+    description:
+      'The derived token expires no later than its parent. Repeated exchanges do not renew access. Membership-checked exchange between organizations remains supported.',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'UNAUTHORIZED: invalid credential or missing/elapsed parent expiry',
+  })
   @ZodResponse({ type: SwitchOrgResponseDto, status: 200, description: 'Org-context access token' })
   async switchOrganization(
     @Param('id') orgId: string,
     @CurrentUser() user: RequestPrincipal
   ): Promise<SwitchOrgResponse> {
     const { aclVersion } = await this.orgsService.getForSwitch(orgId, user.sub)
-    const accessToken = this.tokenService.generateAccessToken({
-      sub: user.sub,
-      email: user.email ?? '',
-      systemRole: user.systemRole,
-      organizationId: orgId,
-      aclVersion,
-      // Preserve the session id so an org-context token keeps step-up
-      // capability (OB-06b) — without it a switched token looks legacy and
-      // fails closed on @RequireFreshAuth routes.
-      sid: user.sid,
-    })
+    const accessToken = this.tokenService.generateDerivedAccessToken(
+      {
+        sub: user.sub,
+        email: user.email ?? '',
+        systemRole: user.systemRole,
+        organizationId: orgId,
+        aclVersion,
+        // Preserve the session id so an org-context token keeps step-up
+        // capability (OB-06b) — without it a switched token looks legacy and
+        // fails closed on @RequireFreshAuth routes.
+        sid: user.sid,
+      },
+      user.exp
+    )
     return { accessToken }
   }
 }

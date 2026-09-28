@@ -1,6 +1,10 @@
 import type { INestApplication } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import request from 'supertest'
 
+import { SystemRole } from '@amcore/shared'
+
+import { PrivilegedRoleService } from '../src/core/auth/privileged-role.service'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -42,6 +46,90 @@ describe('Organizations (e2e)', () => {
       .expect(201)
     return res.body.accessToken as string
   }
+
+  describe('current privileged admission before tenant bypasses', () => {
+    it('demotion closes ordinary row-lock and TeamAccess bypasses without session/cache cleanup', async () => {
+      const actorToken = await registerAndLogin('privilege@example.com')
+      const ownerToken = await registerAndLogin('foreign@example.com')
+      const jwt = app.get(JwtService)
+      const actor = jwt.verify(actorToken)
+      const own = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${actorToken}`)
+        .send({ name: 'Owned' })
+        .expect(201)
+      const foreign = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: 'Foreign' })
+        .expect(201)
+      await prisma.user.update({
+        where: { id: actor.sub },
+        data: { systemRole: SystemRole.SuperAdmin },
+      })
+      // Old USER claim cannot elevate merely because primary now says SUPER_ADMIN.
+      await request(app.getHttpServer())
+        .get('/admin/access')
+        .set('Authorization', `Bearer ${actorToken}`)
+        .expect(403)
+      const stale = jwt.sign({
+        sub: actor.sub,
+        email: actor.email,
+        sid: actor.sid,
+        systemRole: SystemRole.SuperAdmin,
+        organizationId: foreign.body.id,
+        aclVersion: 0,
+      })
+      await request(app.getHttpServer())
+        .get(`/organizations/${foreign.body.id}/roles`)
+        .set('Authorization', `Bearer ${stale}`)
+        .expect(200)
+      await request(app.getHttpServer())
+        .patch(`/organizations/${foreign.body.id}`)
+        .set('Authorization', `Bearer ${stale}`)
+        .send({ name: 'Live platform write' })
+        .expect(200)
+      await prisma.user.update({ where: { id: actor.sub }, data: { systemRole: SystemRole.User } })
+      const before = await prisma.organization.findUniqueOrThrow({ where: { id: foreign.body.id } })
+      await request(app.getHttpServer())
+        .get(`/organizations/${foreign.body.id}/roles`)
+        .set('Authorization', `Bearer ${stale}`)
+        .expect(403)
+      await request(app.getHttpServer())
+        .patch(`/organizations/${foreign.body.id}`)
+        .set('Authorization', `Bearer ${stale}`)
+        .send({ name: 'Must not write' })
+        .expect(403)
+      const after = await prisma.organization.findUniqueOrThrow({ where: { id: foreign.body.id } })
+      expect(after).toEqual(before)
+      await request(app.getHttpServer())
+        .get('/admin/access')
+        .set('Authorization', `Bearer ${stale}`)
+        .expect(403)
+      const derived = await request(app.getHttpServer())
+        .post(`/organizations/${own.body.id}/switch`)
+        .set('Authorization', `Bearer ${stale}`)
+        .expect(200)
+      expect(jwt.verify(derived.body.accessToken).systemRole).toBe(SystemRole.User)
+      const roles = app.get(PrivilegedRoleService)
+      const lookup = roles.getCurrentSystemRole
+      roles.getCurrentSystemRole = async () => {
+        throw new Error('primary unavailable')
+      }
+      try {
+        await request(app.getHttpServer())
+          .patch(`/organizations/${foreign.body.id}`)
+          .set('Authorization', `Bearer ${stale}`)
+          .send({ name: 'Outage write' })
+          .expect(500)
+        expect(
+          await prisma.organization.findUniqueOrThrow({ where: { id: foreign.body.id } })
+        ).toEqual(before)
+      } finally {
+        roles.getCurrentSystemRole = lookup
+      }
+    })
+  })
 
   describe('POST /organizations', () => {
     it('creates org and returns it', async () => {
@@ -109,6 +197,45 @@ describe('Organizations (e2e)', () => {
       const originalSid = decodeSid(token)
       expect(originalSid).toBeDefined()
       expect(decodeSid(switchRes.body.accessToken)).toBe(originalSid)
+    })
+
+    it('bounds recursive A-to-B exchanges by the authenticated parent expiry', async () => {
+      const parent = await registerAndLogin('exchange@example.com')
+      const jwt = app.get(JwtService)
+      const original = jwt.verify(parent)
+      const orgs = []
+      for (const name of ['Organization A', 'Organization B']) {
+        const res = await request(app.getHttpServer())
+          .post('/organizations')
+          .set('Authorization', `Bearer ${parent}`)
+          .send({ name })
+          .expect(201)
+        orgs.push(res.body.id)
+      }
+      const exp = Math.floor(Date.now() / 1000) + 60
+      let token = jwt.sign(
+        {
+          sub: original.sub,
+          email: original.email,
+          systemRole: original.systemRole,
+          sid: original.sid,
+        },
+        { expiresIn: 60 }
+      )
+      const parentExp = jwt.verify(token).exp
+      expect(parentExp).toBeGreaterThanOrEqual(exp)
+      for (const orgId of [orgs[0], orgs[1], orgs[0]]) {
+        const res = await request(app.getHttpServer())
+          .post(`/organizations/${orgId}/switch`)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200)
+        token = res.body.accessToken
+        expect(jwt.verify(token)).toMatchObject({
+          exp: parentExp,
+          organizationId: orgId,
+          sid: original.sid,
+        })
+      }
     })
 
     it('returns 403 when user is not a member', async () => {

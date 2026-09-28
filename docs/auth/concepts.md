@@ -33,7 +33,10 @@ Decoded, it looks like:
 ```
 
 The token carries the signed claims, while the user lookup rejects tokens whose
-user no longer exists.
+user no longer exists. Every privileged JWT claim also requires a primary-role
+check before authorization; ordinary user-cache lookup is not privileged authority.
+Organization `/switch` derives a token bounded by its parent's expiry and cannot
+renew access, including through repeated exchanges. See [RBAC](./rbac.md).
 
 ### Refresh token (opaque)
 
