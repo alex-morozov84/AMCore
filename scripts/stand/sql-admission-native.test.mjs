@@ -21,6 +21,7 @@ import {
   waitForQuery,
   refusedWrite,
   redisCommand,
+  fixtureGate,
 } from './sql-admission-proof-helpers.mjs'
 
 const poisoned = {
@@ -196,26 +197,32 @@ test('SQL admission contract native proof pack', async (t) => {
     await t.test(
       'later marker change waits for compatible marker lock and valid fixture commits',
       async () => {
+        const releaseGate = await fixtureGate(m)
         const fixture = fixtureCommand(
           m,
-          'SELECT pg_sleep(2); UPDATE public.admission_probe SET value=2;'
+          'SELECT pg_advisory_xact_lock(0); UPDATE public.admission_probe SET value=2;'
         )
         const settledFixture = fixture.catch((error) => error)
         let update
         try {
-          await waitForQuery(m, "query LIKE 'SELECT pg_sleep(2)%'")
+          await waitForQuery(
+            m,
+            "wait_event_type='Lock' AND query LIKE 'SELECT pg_advisory_xact_lock(0)%'"
+          )
           update = adminSql(m, "UPDATE stand_meta.identity SET uuid='wrong-marker';")
           const settledUpdate = update.catch((error) => error)
           await waitForQuery(
             m,
             "wait_event_type='Lock' AND query LIKE 'UPDATE stand_meta.identity%'"
           )
+          await releaseGate()
           const output = await settledFixture
           assert.equal(typeof output, 'string')
           assert.match(output, /UPDATE 1/)
           assert.equal(typeof (await settledUpdate), 'string')
           assert.equal((await adminSql(m, 'SELECT value FROM public.admission_probe;')).trim(), '2')
         } finally {
+          await releaseGate()
           await settledFixture
           if (update) await update.catch(() => {})
           await adminSql(

@@ -34,6 +34,9 @@ ports. Keep long runs in a foreground terminal with visible output.
 `--id <stand-id>` selects a recorded identity, never an arbitrary URL or Compose
 project. Default preview ID is `preview` within this checkout; e2e uses a fresh ID.
 E2E refuses preview-purpose IDs so tests cannot change acceptance data.
+`list` is diagnostic: resources removed concurrently after enumeration are skipped;
+Docker connection or permission failures are still reported. Listing grants no
+ownership or cleanup permission.
 Scoped tests use `pnpm stand e2e --lane real-stack -- credential-containment.spec.ts`.
 Low-level Playwright configs require an active supervisor lease; overriding
 baseURL/project/environment does not authorize an external target.

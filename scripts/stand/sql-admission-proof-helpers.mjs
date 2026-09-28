@@ -7,6 +7,28 @@ import { directory } from './state.mjs'
 export const adminSql = (m, query) =>
   withDockerEngine(m, (execute) => execute(psqlArguments(m), { capture: true, input: query }))
 export const rawLocalSql = localSql
+export async function fixtureGate(m) {
+  const name = `admission-gate-${m.uuid}`
+  const holding = adminSql(
+    m,
+    `SET application_name='${name}'; SELECT pg_advisory_lock(0); SELECT pg_sleep(2147483647);`
+  ).catch((error) => error)
+  const release = async () => {
+    await adminSql(
+      m,
+      `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+       WHERE datname=current_database() AND application_name='${name}' AND pid<>pg_backend_pid();`
+    )
+    await holding
+  }
+  try {
+    await waitForQuery(m, `application_name='${name}' AND wait_event='PgSleep'`)
+    return release
+  } catch (error) {
+    await release()
+    throw error
+  }
+}
 export function fixtureCommand(m, query, variables = {}, extra = {}) {
   return run(
     process.execPath,

@@ -16,9 +16,9 @@ export async function list() {
   for (const kind of ['container', 'network', 'volume']) await listResources(current, kind)
 }
 
-async function listResources(current, kind) {
+export async function listResources(current, kind, execute = run) {
   const ids = (
-    await run(
+    await execute(
       'docker',
       [
         '--context',
@@ -36,11 +36,8 @@ async function listResources(current, kind) {
     .split('\n')
     .filter(Boolean)
   for (const id of ids) {
-    const [c] = JSON.parse(
-      await run('docker', ['--context', current.context, kind, 'inspect', id], {
-        capture: true,
-      })
-    )
+    const c = await inspectListedResource(current, kind, id, execute)
+    if (!c) continue
     const tags = c.Config?.Labels ?? c.Labels ?? {}
     const path = tags['org.amcore.worktree']
     const exists =
@@ -52,5 +49,23 @@ async function listResources(current, kind) {
     console.log(
       `${tags['org.amcore.stand']}: ${kind} ${c.State?.Status ?? ''}, ${exists ? 'source present' : 'orphan source missing'}, ${id}`
     )
+  }
+}
+
+async function inspectListedResource(current, kind, id, execute) {
+  try {
+    const [resource] = JSON.parse(
+      await execute('docker', ['--context', current.context, kind, 'inspect', id], {
+        capture: true,
+      })
+    )
+    return resource
+  } catch (error) {
+    // Listing grants no ownership: another stand may remove a row after ls.
+    if (
+      /No such (?:object|container|network|volume)|network .* not found/i.test(error.stderr ?? '')
+    )
+      return undefined
+    throw error
   }
 }
