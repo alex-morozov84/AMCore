@@ -1,4 +1,5 @@
 import { run } from './process.mjs'
+import { withPinnedEngine } from './docker-session.mjs'
 
 export async function engine() {
   const context = (await run('docker', ['context', 'show'], { capture: true })).trim()
@@ -15,11 +16,11 @@ export async function engine() {
   }
   return { context, endpoint }
 }
-export async function docker(m, args, options = {}) {
-  const current = await engine()
-  if (JSON.stringify(current) !== JSON.stringify(m.engine))
-    throw new Error('Docker engine identity changed')
-  return run('docker', ['--context', m.engine.context, ...args], options)
+export function withDockerEngine(m, action) {
+  return withPinnedEngine(m.engine, action, { prove: engine, run })
+}
+export function docker(m, args, options = {}) {
+  return withDockerEngine(m, (execute) => execute(args, options))
 }
 export function composeArguments(m) {
   const args = [

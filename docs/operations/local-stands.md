@@ -47,6 +47,13 @@ these managed lanes.
 `pnpm test:console-session-e2e` remains its entry point.
 <!-- AMCORE_CONSOLE_STAND_COMMANDS_END -->
 
+Each fixture command receives a fresh admission: the runner verifies the local
+Docker engine, configuration, live resource identities and ownership, environment,
+networks, mounts, ports, images and database marker. Inspections are batched per
+resource kind and reused only within that admission; there is no cache across
+fixture commands. Commands use the proved Unix socket directly so retargeting a
+Docker context cannot redirect an admitted operation.
+
 ## What an agent gives the reviewer
 
 Manual preview always uses `demo.user@preview.amcore.test` (USER) and
