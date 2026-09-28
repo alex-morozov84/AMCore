@@ -37,7 +37,9 @@ test('controller crash keeps exited-leader descendant journal and recovery refus
       const entries = JSON.parse(
         await readFile(`${dir}/lease/children.json`, 'utf8').catch(() => '[]')
       )
-      if (entries[0]?.members?.length > 1) {
+      const worker =
+        m && Number(await readFile(`${m.snapshot}/worker.pid`, 'utf8').catch(() => '0'))
+      if (worker && entries[0]?.members?.some((member) => member.pid === worker)) {
         group = entries[0]
         break
       }

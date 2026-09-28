@@ -1,6 +1,7 @@
 import { writeFileSync, renameSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { processTable, observeGroup, observeTree } from './process-groups.mjs'
+import { setRetirementJournal } from './retirement-audit.mjs'
 
 const allowed = ['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL', 'TERM', 'CI']
 export function cleanEnvironment(extra = {}, source = process.env) {
@@ -25,6 +26,7 @@ export const allowCleanup = () => {
 }
 export function setJournal(path) {
   journal = path
+  setRetirementJournal(path)
 }
 function recordChildren() {
   if (!journal) return
@@ -36,12 +38,15 @@ function recordChildren() {
         pid: c.pid,
         cwd: c.standCwd,
         started: c.standStarted,
+        leaderBirth: c.standLeaderStarted,
+        absent: c.standGroupAbsent,
         members: c.standMembers,
         closed: c.standClosed,
         proofError: c.standProofError,
         groups: c.standDetached?.map((group) => ({
           pid: group.pid,
           started: group.started,
+          leaderBirth: group.leaderBirth,
           members: group.standMembers,
         })),
       }))

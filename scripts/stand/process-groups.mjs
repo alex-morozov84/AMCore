@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process'
+import { assertGenerationAbsent } from './process-identity.mjs'
+import { recordRetirement } from './retirement-audit.mjs'
 
 export function processTable() {
   const result = spawnSync('ps', ['-axo', 'pid=,ppid=,pgid=,uid=,lstart=,command='], {
@@ -31,8 +33,17 @@ export function processTable() {
 }
 
 export function observeGroup(child, rows = processTable()) {
+  if (child.standGroupAbsent) return false
   const members = rows.filter((row) => row.pgid === child.pid)
-  if (!members.length) return false
+  if (!members.length) {
+    assertGenerationAbsent(
+      { ...child, started: child.started ?? child.standStarted ?? 'tracked' },
+      rows
+    )
+    child.standGroupAbsent = true
+    recordRetirement(child)
+    return false
+  }
   const proved = child.standMembers?.some((known) =>
     members.some((row) => row.pid === known.pid && row.started === known.started)
   )
@@ -42,17 +53,13 @@ export function observeGroup(child, rows = processTable()) {
 }
 
 export function assertGroupsAbsent(recorded, rows = processTable()) {
-  for (const child of recorded.flatMap((entry) => [entry, ...(entry.groups ?? [])])) {
-    if (!Number.isInteger(child.pid) || child.pid <= 1 || !child.started)
-      throw new Error('Incomplete child recovery identity')
-    if (rows.some((row) => row.pgid === child.pid || row.pid === child.pid))
-      throw new Error('Recorded child/process group alive or reused; recovery/removal refused')
-  }
+  for (const child of recorded.flatMap((entry) => [entry, ...(entry.groups ?? [])]))
+    assertGenerationAbsent(child, rows)
 }
 
 export function observeTree(child, rows = processTable()) {
   child.standDetached ??= []
-  const groups = [child, ...child.standDetached]
+  const groups = [...(child.standGroupAbsent ? [] : [child]), ...child.standDetached]
   const owned = new Set(
     groups.flatMap((group) =>
       (group.standMembers ?? []).flatMap((known) =>
@@ -76,7 +83,8 @@ export function observeTree(child, rows = processTable()) {
       throw new Error('Descendant joined an unproved process group; retain recovery')
     const group = {
       pid: row.pgid,
-      started: row.started,
+      started: rows.find((leader) => leader.pid === row.pgid).started,
+      leaderBirth: rows.find((leader) => leader.pid === row.pgid).started,
       standMembers: [{ pid: row.pid, started: row.started }],
     }
     child.standDetached.push(group)
@@ -86,5 +94,6 @@ export function observeTree(child, rows = processTable()) {
   for (const group of groups) {
     if (observeGroup(group, rows)) alive = true
   }
+  child.standDetached = child.standDetached.filter((group) => !group.standGroupAbsent)
   return alive
 }

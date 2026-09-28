@@ -109,11 +109,15 @@ cancellation only to their managed runner and await its graceful cleanup;
 they retain their own lease and child journal when verification fails.
 The wrapper record also names its runner's recovery manifest; wrapper recovery
 or closeout refuses an unfinished runner, including one in an external fixture.
-The journal retains groups until their absence is verified; signalling requires
-a live member's recorded PID and birth identity. Unproved identity, a surviving
-group or forced termination preserves recovery and makes cleanup incomplete.
-Recovery refuses any live or reused recorded PID/group; inspect the recorded
-processes before retrying. Do not remove a lease merely because it is old. If the
+Active groups retire only after a complete process census proves their absence;
+a bounded count/digest audit records those retirements. Signalling requires a live
+member's recorded PID and birth identity. Recovery refuses surviving recorded
+members and ambiguous group identities. A foreign leader with the same numeric
+ID is distinguishable only with a different recorded leader birth; it is never
+adopted or signalled. New leases also record the supervisor birth. Legacy leases
+with a live numeric occupant but no supervisor birth still refuse recovery.
+Successful recovery archives the original lease/journal before replacing it;
+failed proof preserves resources and makes cleanup incomplete. Do not remove a lease merely because it is old. If the
 original worktree
 is missing, preserve/restore its private record under a surviving checkout and use
 `down --id <stand-id> --orphan --purge`; this path refuses live worktrees and

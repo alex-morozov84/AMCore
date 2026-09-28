@@ -1,6 +1,7 @@
 import { lstat, mkdir, readFile, rename, writeFile, rm, access } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { processTable } from './process-groups.mjs'
 
 export const root = resolve(import.meta.dirname, '../..')
 export const stateRoot = join(root, '.amcore/stands')
@@ -80,6 +81,7 @@ export async function lease(id, operation) {
     )
     if (recovering) throw new Error('Stand recovery in progress; mutation refused')
   }
+  const birth = processTable().find((row) => row.pid === process.pid).started
   const lock = join(directory(id), 'lease')
   try {
     await mkdir(lock, { mode: 0o700 })
@@ -91,6 +93,7 @@ export async function lease(id, operation) {
     join(lock, 'owner.json'),
     JSON.stringify({
       pid: process.pid,
+      birth,
       token,
       operation,
       started: new Date().toISOString(),

@@ -69,6 +69,12 @@ for (const detached of [false, true])
         JSON.parse(await readFile(`${directory(id)}/lease/children.json`, 'utf8')),
         []
       )
+      const audit = JSON.parse(
+        await readFile(`${directory(id)}/lease/children.json.retired.json`, 'utf8')
+      )
+      assert.ok(audit.count >= 1)
+      assert.match(audit.digest, /^[a-f0-9]{64}$/)
+      assert.ok(audit.lastAbsentAt)
       process.kill(foreign.pid, 0)
       await closeoutStand(m)
       assert.ok((await load(id)).closeout.verifiedAt)
