@@ -36,6 +36,8 @@ export async function registerViaUi(
   await page.getByRole('textbox', { name: /email/i }).fill(email)
   await page.getByLabel(/password/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign up/i }).click()
+  // Callers may immediately close this context or assign a role to the new account.
+  await page.waitForURL(/\/en\/?$/)
 }
 
 export async function loginViaUi(page: Page, email: string): Promise<void> {
