@@ -1,3 +1,6 @@
+import { activeTarget } from '../support/managed-target.mjs'
+
+const standTarget = activeTarget()
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
@@ -9,19 +12,23 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
 }) => {
   const email = uniqueEmail('console-session')
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
-  await expect(productPage).toHaveURL(/https:\/\/app\.localhost\/en\/?$/)
+  await expect(productPage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+  )
 
   const console = await browser.newContext({
-    baseURL: 'https://console.localhost',
+    baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
-  const productSessionConsoleAttempt = await productPage.request.get('https://console.localhost/en')
+  const productSessionConsoleAttempt = await productPage.request.get(
+    `${standTarget.origins.console}/en`
+  )
   expect(productSessionConsoleAttempt.status()).toBe(404)
 
   await consolePage.goto('/en/login')
@@ -36,15 +43,17 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
     consolePage.getByRole('button', { name: /sign in/i }).click(),
   ])
   expect(deniedLogin.status()).toBe(403)
-  expect(await console.cookies('https://console.localhost')).not.toContainEqual(
+  expect(await console.cookies(`${standTarget.origins.console}`)).not.toContainEqual(
     expect.objectContaining({ name: '__Host-amcore_console_session' })
   )
 
   setSystemRole(email, 'SUPER_ADMIN')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
-  await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
+  await expect(consolePage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+  )
 
-  const cookies = await console.cookies('https://console.localhost')
+  const cookies = await console.cookies(`${standTarget.origins.console}`)
   expect(cookies).toContainEqual(
     expect.objectContaining({
       name: '__Host-amcore_console_session',
@@ -59,12 +68,14 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
   expect(redisEntry(productEntries[0])).not.toHaveProperty('audience')
   expect(redisEntry(consoleEntries[0])).toMatchObject({ audience: 'console' })
 
-  const productSessionAttempt = await consolePage.request.get('https://app.localhost/api/auth/me')
+  const productSessionAttempt = await consolePage.request.get(
+    `${standTarget.origins.product}/api/auth/me`
+  )
   expect(productSessionAttempt.status()).toBe(401)
   const crossOriginLogout = await productPage.request.post(
-    'https://console.localhost/api/auth/logout',
+    `${standTarget.origins.console}/api/auth/logout`,
     {
-      headers: { Origin: 'https://app.localhost' },
+      headers: { Origin: `${standTarget.origins.product}` },
     }
   )
   expect(crossOriginLogout.status()).toBe(403)
@@ -73,7 +84,9 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
   const demotedAccess = await consolePage.request.get('/api/access')
   expect(demotedAccess.status()).toBe(403)
   await consolePage.getByRole('button', { name: /sign out/i }).click()
-  await expect(consolePage).toHaveURL(/https:\/\/console\.localhost\/en\/login$/)
+  await expect(consolePage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/login$')
+  )
 
   const loggedOutAccess = await consolePage.request.get('/api/access')
   expect(loggedOutAccess.status()).toBe(401)
@@ -81,3 +94,7 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
   await product.close()
   await console.close()
 })
+
+function escapeOrigin(origin: string): string {
+  return origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { activeTarget } from '../support/managed-target.mjs'
 
 import {
   countAuditViews,
@@ -15,7 +16,7 @@ import {
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 
 test.use({
-  baseURL: process.env.T003_WEB_BASE_URL ?? 'http://localhost:3000',
+  baseURL: activeTarget().origins.product,
   timezoneId: 'Europe/Moscow',
 })
 

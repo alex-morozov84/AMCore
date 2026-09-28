@@ -1,3 +1,6 @@
+import { activeTarget } from '../support/managed-target.mjs'
+
+const standTarget = activeTarget()
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test'
 
 import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
@@ -6,12 +9,14 @@ import { ageSessionLastAuthAt, countLiveSessions, setSystemRole } from './helper
 
 async function registerOnProduct(browser: Browser, email: string): Promise<void> {
   const product = await browser.newContext({
-    baseURL: 'https://app.localhost',
+    baseURL: `${standTarget.origins.product}`,
     ignoreHTTPSErrors: true,
   })
   const page = await product.newPage()
   await registerViaUi(page, email)
-  await expect(page).toHaveURL(/https:\/\/app\.localhost\/en\/?$/)
+  await expect(page).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+  )
   await product.close()
 }
 
@@ -20,7 +25,7 @@ async function signInToConsole(
   email: string
 ): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({
-    baseURL: 'https://console.localhost',
+    baseURL: `${standTarget.origins.console}`,
     ignoreHTTPSErrors: true,
   })
   const page = await context.newPage()
@@ -28,7 +33,9 @@ async function signInToConsole(
   await page.getByLabel(/email/i).fill(email)
   await page.getByLabel(/password/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
-  await expect(page).toHaveURL(/https:\/\/console\.localhost\/en\/?$/)
+  await expect(page).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
+  )
   return { context, page }
 }
 
@@ -131,3 +138,7 @@ test('host-mode: self-row never offers a role action', async ({ browser }) => {
 
   await admin.context.close()
 })
+
+function escapeOrigin(origin: string): string {
+  return origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

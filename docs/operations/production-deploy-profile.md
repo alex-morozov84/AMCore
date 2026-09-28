@@ -202,7 +202,7 @@ automation.
 
 - [Deployment & migrations](deployment.md) — the branch/release/environment
   model this contract extends, the one-shot migration contract, process
-  roles, TLS/reverse-proxy setup, and the `docker-compose.prod.yml`
+  roles, TLS/reverse-proxy setup, and the `docker/compose/prod.yml`
   image-pull rollout (immutable digest pinning, restart policies, log
   rotation, and honest zero/low-downtime guidance).
 - [Database role separation](database-role-separation.md) — the

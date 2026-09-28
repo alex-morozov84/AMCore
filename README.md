@@ -1,5 +1,7 @@
 # AMCore
 
+[Managed local development, prepared previews and browser tests](docs/operations/local-stands.md). Agents use managed commands for local DB writes and previews.
+
 > Production-oriented NestJS application starter for secure, modular products.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](LICENSE)
@@ -118,7 +120,7 @@ amcore/
 ```
 
 Root also carries `docker-compose.yml` (the reference full stack) and
-`docker-compose.prod.yml` (the production image-pull overlay applied on top of
+`docker/compose/prod.yml` (the production image-pull overlay applied on top of
 it) — see [Going to production](#going-to-production).
 
 ## What's Built
@@ -155,7 +157,7 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | Production operations               | [`docs/operations/`](docs/operations/README.md) — deployment, observability, CI security                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Observability / metrics & alerting  | [`docs/operations/observability.md`](docs/operations/observability.md) — Prometheus metric families, an optional Grafana/Alertmanager dev harness, shipped alert rules with an off-by-default SLO burn-rate layer, per-category [runbooks](docs/operations/runbooks/), a safe extension recipe, and a static + live CI contract that proves the metric↔alert↔dashboard↔runbook chain stays correct                                                                                                                                                               |
 | Production deploy profile           | [`docs/operations/production-deploy-profile.md`](docs/operations/production-deploy-profile.md) — build-once/promote-by-digest contract, `staging`/`production` GitHub Environments setup, and the secrets/variables checklist                                                                                                                                                                                                                                                                                                                                    |
-| VPS/Compose production overlay      | [`docs/operations/deployment.md`](docs/operations/deployment.md#production-rollout-via-registry-image-pull-path) — `docker-compose.prod.yml`: immutable digest pinning, restart policies, bounded/rotating logs, and honest zero/low-downtime rollout guidance                                                                                                                                                                                                                                                                                                   |
+| VPS/Compose production overlay      | [`docs/operations/deployment.md`](docs/operations/deployment.md#production-rollout-via-registry-image-pull-path) — `docker/compose/prod.yml`: immutable digest pinning, restart policies, bounded/rotating logs, and honest zero/low-downtime rollout guidance                                                                                                                                                                                                                                                                                                   |
 | Open tabs after web deployments     | [Deployment recovery](docs/operations/deployment.md#open-tabs-after-a-web-deployment) — automatic refresh, immutable build identity, draft loss and freshness requirements                                                                                                                                                                                                                                                                                                                                                                                       |
 | TLS / reverse proxy                 | [`docs/operations/deployment.md`](docs/operations/deployment.md) — bring-your-own proxy (nginx example) or the optional bundled Caddy `edge` compose profile                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Rate limiting / BFF client identity | [`docs/backend/architecture-and-conventions.md#cross-cutting-decision-points`](docs/backend/architecture-and-conventions.md#cross-cutting-decision-points), [`docs/operations/deployment.md`](docs/operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy), [`docs/frontend/api-consumption.md`](docs/frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073) — Redis-backed GCRA global rate limiting with burst tolerance, opt-in verified BFF client-IP relay, and frontend `Retry-After` handling |
@@ -250,7 +252,7 @@ and each states plainly what it does **not** give you.
    A non-active workflow template implementing it ships at
    [`.github/workflows/deploy-template.yml`](.github/workflows/deploy-template.yml).
 2. **[VPS/Compose rollout](docs/operations/deployment.md#production-rollout-via-registry-image-pull-path)** —
-   apply `docker-compose.prod.yml` over the base file to pin every service to an
+   apply `docker/compose/prod.yml` over the base file to pin every service to an
    immutable digest, add restart policies, and bound container logs. The same
    page covers TLS/reverse proxy, process roles, the one-shot migration
    contract, and [what "zero-downtime" honestly

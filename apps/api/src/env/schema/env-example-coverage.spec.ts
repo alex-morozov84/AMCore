@@ -42,6 +42,7 @@ const COMPOSE_ONLY_ALLOW = new Set([
   'CADDY_EMAIL',
   'CADDY_WEB_DOMAIN',
   'ADMIN_CONSOLE_HOSTNAME',
+  'ADMIN_CONSOLE_ORIGIN',
   // Optional bundled `backup`/`restore` profiles — consumed by the `backup`
   // compose service's own environment, not the app's env schema.
   'BACKUP_INTERVAL_SECONDS',
@@ -68,7 +69,7 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // `process.env` in apps/web (no EnvService there) — same reasoning as
   // WEB_TRUSTED_ORIGINS above.
   'WEB_CSP_MODE',
-  // docker-compose.prod.yml only (production deploy profile track): which
+  // docker/compose/prod.yml only (production deploy profile track): which
   // promoted image digest each service pulls, and the bounded/rotating log
   // driver options — consumed by the production overlay's own
   // interpolation, not the app's env schema at all.

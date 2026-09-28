@@ -1,0 +1,34 @@
+const entry = (path, key) => ({
+  id: `console.stand.${path}.${key.toLowerCase().replaceAll('_', '-')}`,
+  path,
+  kind: 'file',
+  cardinality: 'one',
+  seamKind: 'owned-block',
+  selector: { start: `// AMCORE_CONSOLE_${key}_START`, end: `// AMCORE_CONSOLE_${key}_END` },
+  detectors: [
+    'ADMIN_CONSOLE_HOSTNAME',
+    'ADMIN_CONSOLE_ORIGIN',
+    'console-real-stack',
+    'feature-import',
+  ],
+  disposition: 'remove',
+  operationKey: `console.stand.${path}`,
+})
+
+export const operationsConsoleStandSeams = [
+  entry('scripts/stand.mjs', 'LANES'),
+  entry('scripts/stand.mjs', 'PROXY_SMOKE'),
+  entry('scripts/stand/create.mjs', 'HOST_IMPORTS'),
+  entry('scripts/stand/create.mjs', 'HOST_SNAPSHOT'),
+  entry('scripts/stand/refresh.mjs', 'HOST_IMPORTS'),
+  entry('scripts/stand/refresh.mjs', 'HOST_SNAPSHOT'),
+  entry('scripts/stand/config.mjs', 'WEB_ENV'),
+  entry('scripts/stand/config.mjs', 'CADDY_ENV'),
+  entry('scripts/stand/config.mjs', 'COMPOSE_ENV'),
+  entry('scripts/stand/docker.mjs', 'HOST_OVERLAY'),
+  entry('scripts/stand/mock-environment.mjs', 'MOCK_ENV'),
+  entry('scripts/stand/preview.mjs', 'PREVIEW_ACCESS'),
+  entry('scripts/stand/preview-labels.mjs', 'PREVIEW_LABELS'),
+  entry('scripts/stand/preview.mjs', 'PREVIEW_SCENARIO'),
+  entry('apps/web/e2e/support/managed-target.mjs', 'TARGET_ORIGIN'),
+]

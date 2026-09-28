@@ -1,5 +1,5 @@
 # Development compose - infrastructure only
-# Usage: docker compose -f docker-compose.dev.yml up -d
+# Usage (from checkout root): docker compose --project-directory . -f docker/compose/dev.yml up -d
 
 services:
   # postgres:

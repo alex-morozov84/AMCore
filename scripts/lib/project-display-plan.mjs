@@ -15,6 +15,7 @@ const combinedOrder = [
   'docs/frontend/architecture-and-conventions.md',
   'docs/frontend/brand-theme-and-tokens.md',
   'docs/frontend/testing.md',
+  'docs/operations/local-stands.md',
   'docs/frontend/README.md',
   'AGENTS.md',
   'README.md',

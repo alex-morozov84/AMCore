@@ -51,7 +51,7 @@ profiled edge service:
 ```bash
 CADDY_WEB_DOMAIN="app.example.com" \
 docker compose --profile edge \
-  -f docker-compose.yml -f docker-compose.web.yml up -d
+  -f docker-compose.yml -f docker/compose/web.yml up -d
 ```
 
 The console is then available under the selected localized or single-locale
@@ -93,7 +93,7 @@ the reference file.
 CADDY_WEB_DOMAIN="app.example.com" \
 ADMIN_CONSOLE_HOSTNAME="console.example.com" \
 docker compose --profile edge \
-  -f docker-compose.yml -f docker-compose.console-host.yml up -d
+  -f docker-compose.yml -f docker/compose/console-host.yml up -d
 ```
 
 The base Caddy profile is API-only. Only the host override mounts the console

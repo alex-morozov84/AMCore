@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+import { activeTarget, outputPaths, testOptions } from './e2e/support/managed-target.mjs'
+
 /**
  * Track 7 FINAL PLAN (`ai/models-talk.md`) splits E2E into lanes with
  * different infra costs, each its own Playwright project:
@@ -17,15 +19,17 @@ import { defineConfig, devices } from '@playwright/test'
  * inert for every plain `mocked`-lane test). `real-stack` (PR4) still lands
  * separately: it targets a different, full-infra server entirely.
  */
+const target = activeTarget()
+
 export default defineConfig({
+  ...outputPaths(),
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:3002',
+    ...testOptions(),
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     // AMCore ships a real PWA service worker (`public/sw.js`) — left
@@ -47,9 +51,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3002',
-    reuseExistingServer: !process.env.CI,
+    command: `pnpm exec next dev --hostname 127.0.0.1 --port ${target.ports.web}`,
+    url: target.origins.product,
+    reuseExistingServer: false,
+    gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
     timeout: 120_000,
     env: {
       PLAYWRIGHT_TEST_PROXY: 'true',

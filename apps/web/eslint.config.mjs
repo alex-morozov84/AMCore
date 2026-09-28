@@ -176,6 +176,12 @@ export default [
     ...js.configs.recommended,
   },
 
+  {
+    name: 'project/managed-test-transport',
+    files: ['e2e/support/*.mjs'],
+    languageOptions: { globals: { process: 'readonly' } },
+  },
+
   // TypeScript rules
   ...tseslint.configs.recommended.map((config) => ({
     ...config,

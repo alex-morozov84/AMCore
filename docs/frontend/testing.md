@@ -157,23 +157,19 @@ navigation, a modifier-click exclusion, and reduced motion (see
 [Top route progress bar](./route-progress.md)).
 
 ```bash
-pnpm --filter @amcore/shared build    # needed on a clean checkout before direct Playwright runs
-pnpm --filter web test:e2e            # runs both "mocked" and "server-mocked" projects
+pnpm --filter web test:e2e # both mocked projects; no Docker
 ```
+
+Managed startup isolates source/env/output and never reuses another checkout.
+See [local stands](../operations/local-stands.md) for targeting and recovery.
 
 ### Real-stack lane (`apps/web/e2e/real-stack/`)
 
-Targets `docker-compose.yml`'s `local-infra` profile (real Postgres, Redis,
-standalone `apps/web`, real `apps/api`) booted **externally** — a separate
-`playwright.real-stack.config.ts` with no `webServer` of its own, so it
-never tries to start or reuse-detect against the unrelated `next dev`
-server the mocked lane uses.
+The managed runner provisions fresh Docker Postgres/Redis/API/web, migrates and
+seeds its own database, then runs Playwright and scoped cleanup:
 
 ```bash
-pnpm --filter @amcore/shared build
-docker compose --profile local-infra up -d --build
-pnpm --filter web test:e2e:real-stack
-docker compose down -v
+pnpm stand e2e --lane real-stack
 ```
 
 Current flows: register → authenticated landing → logout; login with real
@@ -290,24 +286,21 @@ they assert the settled content and scan again. Settings covers both themes. Rel
 requests, unregister handlers and close additional contexts in `finally`.
 Auth, cookies and persistence remain real in this lane.
 
-With an isolated local stack running and seeded, run the scoped regressions:
+Run the scoped regressions through the same managed target:
 
 ```bash
-pnpm --filter web exec playwright test --config playwright.real-stack.config.ts sessions-readability.spec.ts
+pnpm stand e2e --lane real-stack -- sessions-readability.spec.ts
 ```
 
-The default config targets localhost:3000. For another isolated stack, use a
-local config overriding `use.baseURL` while preserving the existing projects
-and worker/retry policy. Set `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE` and
-`COMPOSE_ENV_FILES` to that same local stack so SQL helpers cannot target a
-different project. Use only that stack's local database configuration.
+See [local stands](../operations/local-stands.md); arbitrary baseURL/Compose
+selector overrides are no longer supported by low-level real-stack helpers.
 
 When the optional Console is enabled, its retained-refetch tests cover desktop
 and mobile in both themes, with the existing refresh spinner and control guards.
 They also check the actual initials on the composited header background:
 
 ```bash
-pnpm --filter web exec playwright test --config playwright.real-stack.config.ts admin-sessions/readability.spec.ts
+pnpm stand e2e --lane real-stack -- admin-sessions/readability.spec.ts
 ```
 
 Use the same isolated-stack configuration for these Console checks.
@@ -433,18 +426,18 @@ prerequisite, then make one observable run of the affected check.
 
 ## Commands
 
-| Command                                 | What it runs                                                                                 |
-| --------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `pnpm --filter web test`                | Unit + component + integration tests (watch mode)                                            |
-| `pnpm --filter web test:run`            | Same, single run                                                                             |
-| `pnpm --filter web test:coverage`       | Unit-project run with a V8 coverage report (informational, no gate)                          |
-| `pnpm --filter web test:integration`    | Testcontainers-backed real-Redis tests (needs Docker)                                        |
-| `pnpm --filter web storybook`           | Storybook component workshop dev server (`http://localhost:6006`)                            |
-| `pnpm --filter web build-storybook`     | Static Storybook build — compile/broken-story smoke                                          |
-| `pnpm --filter web test:storybook`      | Storybook interaction + accessibility gate (browser-mode Vitest/Playwright Chromium)         |
-| `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked lanes (auto-starts `next dev`)                             |
-| `pnpm --filter web test:e2e:real-stack` | Playwright real-stack lane — boot `docker compose --profile local-infra up -d --build` first |
-| `pnpm test:console-session-e2e`         | Isolated Compose + Playwright console HTTPS/cookie/Redis audience lane                       |
+| Command                                 | What it runs                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `pnpm --filter web test`                | Unit + component + integration tests (watch mode)                                    |
+| `pnpm --filter web test:run`            | Same, single run                                                                     |
+| `pnpm --filter web test:coverage`       | Unit-project run with a V8 coverage report (informational, no gate)                  |
+| `pnpm --filter web test:integration`    | Testcontainers-backed real-Redis tests (needs Docker)                                |
+| `pnpm --filter web storybook`           | Storybook component workshop dev server (`http://localhost:6006`)                    |
+| `pnpm --filter web build-storybook`     | Static Storybook build — compile/broken-story smoke                                  |
+| `pnpm --filter web test:storybook`      | Storybook interaction + accessibility gate (browser-mode Vitest/Playwright Chromium) |
+| `pnpm --filter web test:e2e`            | Playwright mocked + server-mocked lanes (auto-starts `next dev`)                     |
+| `pnpm --filter web test:e2e:real-stack` | Playwright real-stack lane — managed isolated Docker startup and cleanup             |
+| `pnpm test:console-session-e2e`         | Isolated Compose + Playwright console HTTPS/cookie/Redis audience lane               |
 
 On a clean checkout, run `pnpm --filter @amcore/shared build` before the
 direct web coverage command so Vitest can resolve the shared package. The
@@ -453,10 +446,8 @@ open `apps/web/coverage/index.html` for file-level detail or read
 `apps/web/coverage/coverage-final.json` with a tool. These reports are
 informational: no percentage threshold determines whether the command passes.
 
-On a clean checkout, run `pnpm --filter @amcore/shared build` before either
-Playwright command. `apps/web` imports `@amcore/shared` through its built
-`dist/` export, and direct Playwright commands bypass turbo's `^build`
-dependency graph. The CI `web-e2e` job has this as an explicit step.
+The Playwright commands above prepare their own isolated runtime; see
+[local stands](../operations/local-stands.md) for prerequisites and lifecycle.
 
 ## Credential containment regression
 
@@ -466,42 +457,16 @@ infrastructure: configuration or connection errors fail the test. It covers
 safe UI register/login, JWT-route denial, method ownership, raw path variants,
 internal refresh and direct API organization switching.
 
-A fresh test database needs the documented dev/demo system-role seed before
-organization creation. After starting the reference stack, run:
+The managed runner seeds its own fresh test database before organization creation.
+Production migrations remain seed-free. Run a scoped check with:
 
 ```bash
-docker compose --profile local-infra run --rm --no-deps migrate ./node_modules/.bin/tsx prisma/seed.ts
-pnpm --filter web test:e2e:real-stack credential-containment.spec.ts
+pnpm stand e2e --lane real-stack -- credential-containment.spec.ts
 ```
 
-The `web-e2e` workflow runs this seed explicitly before real-stack tests.
-Production migration remains `migrate deploy` without implicit seeding.
-
-The spec uses the Playwright config's web `baseURL`. Its Node helpers accept:
-
-| Test runner setting        | Reference-stack default        |
-| -------------------------- | ------------------------------ |
-| `E2E_CREDENTIAL_API_URL`   | `http://127.0.0.1:5002/api/v1` |
-| `E2E_CREDENTIAL_REDIS_URL` | `redis://127.0.0.1:6379/0`     |
-
-These test settings do not fall back to application `API_URL`, `REDIS_URL` or
-`.env`. For an isolated stack, set them in the Playwright runner environment,
-use a local config with its matching web `baseURL`, and align the stack's
-`FRONTEND_URL`, `CORS_ORIGIN` and `WEB_TRUSTED_ORIGINS` with that web origin.
-Replace published Compose ports rather than appending another port mapping;
-use project-scoped volumes/networks and never reuse an unrelated running server.
-
-The refresh helper captures the cookie from its own fresh browser context and
-checks that exact vault entry against the uniquely created test account. It
-atomically changes only `accessTokenExpiresAt`, preserving version and TTL with
-raw-value CAS and `SET XX KEEPTTL`. A mismatch or race fails. The next BFF read
-must perform actual refresh. It never scans or flushes Redis, touches Console
-sessions, or logs tokens. Secure loopback cookies are selected from the owned
-context by domain/path, since filtering cookies by an HTTP URL excludes them.
-
-Malformed percent encoding currently produces a Next framework decode failure:
-400 in dev or 500 in the standalone build. The regression checks rejection and
-absence of tokens; recognized generic JWT routes must still return exactly 404.
+Web/API/SQL/Redis helpers derive one admitted target from the active run manifest;
+there are no independent endpoint overrides. See
+[local stands](../operations/local-stands.md) for lifetime and transport.
 
 ## Which layer should I add a test at?
 

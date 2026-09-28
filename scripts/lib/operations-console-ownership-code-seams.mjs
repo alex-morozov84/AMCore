@@ -71,8 +71,14 @@ export const operationsConsoleCodeSeams = [
     'console.test-script',
     'apps/web/package.json',
     'config-field',
-    { jsonPath: ['scripts', 'test:e2e:console-real-stack'] },
-    ['test:e2e:console-real-stack'],
+    {
+      jsonPath: ['scripts', 'test:e2e:console-real-stack'],
+      identifiers: [
+        'test:e2e:console-real-stack',
+        'node ../../scripts/stand.mjs e2e --lane console-real-stack',
+      ],
+    },
+    ['test:e2e:console-real-stack', 'console-real-stack'],
     { operationKey: 'package-console' }
   ),
   seam(
@@ -81,9 +87,9 @@ export const operationsConsoleCodeSeams = [
     'owned-block',
     {
       start: '# For console host mode',
-      end: '# ADMIN_CONSOLE_HOSTNAME="console.example.com"',
+      end: 'ADMIN_CONSOLE_ORIGIN=',
     },
-    ['ADMIN_CONSOLE_HOSTNAME']
+    ['ADMIN_CONSOLE_HOSTNAME', 'ADMIN_CONSOLE_ORIGIN']
   ),
   seam(
     'console.compose-env',
@@ -91,6 +97,14 @@ export const operationsConsoleCodeSeams = [
     'structural-operation',
     { text: 'ADMIN_CONSOLE_HOSTNAME: ${ADMIN_CONSOLE_HOSTNAME:-}' },
     ['ADMIN_CONSOLE_HOSTNAME']
+  ),
+  seam(
+    'console.compose-origin',
+    'docker-compose.yml',
+    'structural-operation',
+    { text: 'ADMIN_CONSOLE_ORIGIN: ${ADMIN_CONSOLE_ORIGIN:-}' },
+    ['ADMIN_CONSOLE_ORIGIN'],
+    { operationKey: 'console.compose-env' }
   ),
   seam(
     'console.context',

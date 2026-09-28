@@ -1,5 +1,7 @@
 # Operations
 
+[Local development, previews and browser tests](local-stands.md). Agents use managed commands for local DB writes and previews.
+
 Runbooks and contracts for deploying, running, and operating AMCore in
 production.
 
@@ -10,7 +12,7 @@ each one assumes the previous is done:
    build-once/promote-by-digest contract and the GitHub Environments/secrets
    checklist everything else assumes.
 2. [Deployment & migrations](deployment.md#production-rollout-via-registry-image-pull-path) —
-   the `docker-compose.prod.yml` overlay, TLS/reverse proxy, process roles, and
+   the `docker/compose/prod.yml` overlay, TLS/reverse proxy, process roles, and
    the migration contract.
 3. [Database role separation](database-role-separation.md) — a migrator role
    distinct from the app's runtime role.
@@ -30,7 +32,7 @@ Already running? Reach for whichever concern below applies.
   rate limiter tell visitors apart (`WEB_TRUSTED_CLIENT_IP_HEADER` +
   `TRUSTED_WEB_PEERS`), the Redis-backed GCRA rate limiter's production
   assumptions, the Redis queue profile, database pool sizing,
-  SSE-behind-a-proxy guidance, and the `docker-compose.prod.yml` image-pull
+  SSE-behind-a-proxy guidance, and the `docker/compose/prod.yml` image-pull
   rollout (immutable digests, restart policies, log rotation, honest
   zero/low-downtime guidance).
 - **[Operations Console](../operations-console/README.md)** — optional

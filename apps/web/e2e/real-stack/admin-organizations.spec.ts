@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test'
 
-import { createOrganization, setSystemRole } from './admin-helpers'
+import {
+  createOrganization,
+  createOrganizationsForPagination,
+  setSystemRole,
+} from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 
 /**
@@ -116,10 +120,7 @@ test('path-mode Organizations panel paginates real data with the Next/Previous l
   // first, then 20 newer rows that outrank it in the descending sort, so it
   // reliably lands on page 2 regardless of any leftover rows from earlier
   // tests in this file (those are older still and only sink further).
-  createOrganization(lastOrgName, `pagination-marker-${marker}`)
-  for (let i = 0; i < 20; i += 1) {
-    createOrganization(`Pagination Filler ${marker}-${i}`, `pagination-filler-${marker}-${i}`)
-  }
+  createOrganizationsForPagination(marker)
 
   await page.goto('/en/admin/organizations')
   await expect(page.getByRole('cell', { name: lastOrgName })).toHaveCount(0)

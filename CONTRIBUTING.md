@@ -1,5 +1,7 @@
 # Contributing to AMCore
 
+[Managed local stands and browser tests](docs/operations/local-stands.md). Agents use managed commands for local DB writes and previews.
+
 Thanks for your interest in contributing. This document explains how to set up the project and submit changes.
 
 ## Getting Started
@@ -107,12 +109,13 @@ Pure schema/lib contract tests for `packages/shared` live beside their source
 | `pnpm --filter web test:storybook`            | Storybook interaction + accessibility gate (browser-mode Vitest/Playwright Chromium)                                                                               |
 | `node scripts/run-deployment-version-e2e.mjs` | Isolated production A/B recovery with a custom Server Action timer; see [deployment verification](docs/frontend/testing.md#production-deployment-version-recovery) |
 | `pnpm --filter web test:e2e`                  | Playwright mocked + server-mocked E2E lanes (auto-starts `next dev`)                                                                                               |
-| `pnpm --filter web test:e2e:real-stack`       | Playwright real-stack E2E lane — boot `docker compose --profile local-infra up -d --build` first, see [`docs/frontend/testing.md`](docs/frontend/testing.md)       |
+| `pnpm --filter web test:e2e:real-stack`       | Playwright real-stack E2E lane — managed isolated startup and cleanup; see [local stands](docs/operations/local-stands.md)                                         |
 
-On a clean checkout, build the shared package before running Playwright or
-Storybook's browser test runner directly: `pnpm --filter @amcore/shared build`.
-The CI `web-e2e` and `storybook` jobs do this explicitly; turbo does it
-automatically for `pnpm test`, `pnpm lint`, and `pnpm typecheck`.
+On a clean checkout, build the shared package before running Storybook's browser
+test runner directly: `pnpm --filter @amcore/shared build`. The CI `storybook`
+job does this explicitly; turbo does it automatically for `pnpm test`,
+`pnpm lint`, and `pnpm typecheck`. Managed Playwright commands prepare their own
+isolated runtime; see [local stands](docs/operations/local-stands.md).
 
 ## Commit Messages
 

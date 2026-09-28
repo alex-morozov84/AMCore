@@ -62,6 +62,8 @@ const combined = {
   'docs/frontend/README.md':
     'docs/frontend/README.md: remove Storybook and console-only index entries',
   'docs/frontend/testing.md': 'testing.md: remove Storybook and Console-only verification guidance',
+  'docs/operations/local-stands.md':
+    'local-stands.md: remove Console-only commands and origin guidance',
   'docs/frontend/architecture-and-conventions.md':
     'architecture-and-conventions.md: remove Storybook and console-only documentation',
   'AGENTS.md': 'AGENTS.md: remove Storybook and console-only guidance',

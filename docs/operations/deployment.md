@@ -187,7 +187,7 @@ for the custom Action timer regression scenario.
 
 ## Production rollout via registry (image-pull path)
 
-`docker-compose.prod.yml` is a production overlay for the reference stack
+`docker/compose/prod.yml` is a production overlay for the reference stack
 above: it replaces each service's local `build:` with an `image:` pinned to
 an immutable digest a registry + digest promotion pipeline already published
 (see [Production deploy profile](production-deploy-profile.md)), adds an
@@ -200,9 +200,9 @@ export COMPOSE_API_IMAGE="ghcr.io/<org>/<repo>/api@sha256:..."
 export COMPOSE_API_MIGRATOR_IMAGE="ghcr.io/<org>/<repo>/api-migrator@sha256:..."
 export COMPOSE_WEB_IMAGE="ghcr.io/<org>/<repo>/web@sha256:..."
 
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps api worker web
+docker compose -f docker-compose.yml -f docker/compose/prod.yml pull
+docker compose -f docker-compose.yml -f docker/compose/prod.yml run --rm migrate
+docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api worker web
 ```
 
 `pull` fails loudly if a digest is missing or unreachable — it never falls
@@ -610,7 +610,7 @@ existing edge contract. Select product-web path mode explicitly when needed:
 ```bash
 CADDY_WEB_DOMAIN="app.example.com" \
 docker compose --profile edge \
-  -f docker-compose.yml -f docker-compose.web.yml up -d
+  -f docker-compose.yml -f docker/compose/web.yml up -d
 ```
 
 `docker/caddy/Caddyfile.web` fronts the product web host but creates no
@@ -628,7 +628,7 @@ configuration explicitly and set both hostnames:
 CADDY_WEB_DOMAIN="app.example.com" \
 ADMIN_CONSOLE_HOSTNAME="console.example.com" \
 docker compose --profile edge \
-  -f docker-compose.yml -f docker-compose.console-host.yml up -d
+  -f docker-compose.yml -f docker/compose/console-host.yml up -d
 ```
 
 The override mounts `docker/caddy/Caddyfile.console-host`; it is the only

@@ -123,8 +123,19 @@ test('reduced motion uses neither crawl animation nor completion transition', as
   await expect(bar).toBeVisible()
   await expect(bar).toHaveCSS('animation-name', 'none')
 
+  // Capture the real 200ms completion phase before releasing the request.
+  // Polling can miss that phase between browser commands.
+  await bar.evaluate((element) => {
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute('data-phase') !== 'completing') return
+      document.documentElement.dataset.observedCompletion =
+        getComputedStyle(element).getPropertyValue('transition-duration')
+      observer.disconnect()
+    })
+    observer.observe(element, { attributes: true, attributeFilter: ['data-phase'] })
+  })
   releaseRoute()
-  await expect(bar).toHaveAttribute('data-phase', 'completing')
-  await expect(bar).toHaveCSS('transition-duration', '0s')
+  await page.waitForURL(/\/en\/forgot-password$/)
+  await expect(page.locator('html')).toHaveAttribute('data-observed-completion', '0s')
   await expect(bar).toBeHidden()
 })

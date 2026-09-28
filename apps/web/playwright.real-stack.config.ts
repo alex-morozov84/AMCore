@@ -1,24 +1,20 @@
 import { defineConfig, devices } from '@playwright/test'
 
-/**
- * Track 7 FINAL PLAN §4 (`ai/models-talk.md`) — the real-stack lane, the
- * only one that proves auth/BFF/cookies/Redis/App Router end to end. A
- * separate config file, not a second project in `playwright.config.ts`:
- * this lane targets `docker-compose.yml`'s `local-infra` profile (real
- * Postgres, Redis, standalone `apps/web`, real `apps/api`, port 3000),
- * booted externally (`pnpm test:e2e:real-stack` / the `web-e2e` CI job) —
- * not something Playwright's own `webServer` should ever try to start or
- * reuse-detect against the unrelated `next dev` server on port 3002.
- */
+import { outputPaths, testOptions } from './e2e/support/managed-target.mjs'
+
+// The managed runner provisions a fresh local Docker stack and owns its cleanup.
+// Playwright never reuses an unrelated development server.
 export default defineConfig({
+  ...outputPaths(),
   testDir: './e2e/real-stack',
   fullyParallel: false,
+  // Fixture writes include live ownership/marker checks; browser assertions keep their own limits.
+  timeout: 120_000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report-real-stack' }]],
   use: {
-    baseURL: 'http://localhost:3000',
+    ...testOptions(),
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     serviceWorkers: 'block',

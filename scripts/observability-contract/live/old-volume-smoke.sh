@@ -37,7 +37,7 @@ wait_for_datasources() {
 
 echo "old-volume-smoke: phase A — legacy no-uid provisioning" >&2
 docker compose --profile monitoring \
-  -f docker-compose.yml -f docker-compose.observability-contract.old-volume.yml \
+  -f docker-compose.yml -f docker/testing/observability-old-volume.yml \
   up -d --no-deps grafana
 wait_for_datasources
 if ! grep -q '"name": *"Prometheus"' /tmp/obs-contract-datasources.json; then
@@ -53,7 +53,7 @@ echo "old-volume-smoke: phase B — real shipped provisioning, same volume" >&2
 docker compose -p "$COMPOSE_PROJECT_NAME" stop grafana
 docker compose -p "$COMPOSE_PROJECT_NAME" rm -f grafana
 docker compose --profile monitoring \
-  -f docker-compose.yml -f docker-compose.observability-contract.old-volume.migrated.yml \
+  -f docker-compose.yml -f docker/testing/observability-old-volume-migrated.yml \
   up -d --no-deps grafana
 wait_for_datasources
 

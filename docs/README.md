@@ -1,5 +1,7 @@
 # AMCore Documentation
 
+[Local development, previews and browser tests](operations/local-stands.md). Agents use managed commands for local DB writes and previews.
+
 The documentation map. The root [`README.md`](../README.md) is the project
 overview and quick start; **this page routes you to the right guide by intent**.
 Endpoint shapes (paths, request/response bodies, status codes) are **not** kept
@@ -145,7 +147,7 @@ provide an operator interface for admin session management.
 - **[Operations](operations/README.md)** — deployment, migrations, process
   roles, TLS/reverse-proxy setup (nginx or the optional bundled Caddy
   profile), the production deploy profile (build-once/promote-by-digest,
-  GitHub Environments), the `docker-compose.prod.yml` image-pull production
+  GitHub Environments), the `docker/compose/prod.yml` image-pull production
   overlay (immutable digests, restart policies, log rotation), Postgres
   backup/restore, PostgreSQL major-version upgrades, production database
   role separation, secret rotation,

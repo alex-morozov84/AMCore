@@ -19,3 +19,8 @@ apps/web/test-results/
 # IDE
 .idea/
 .vscode/
+
+# Private local stand artifacts and parallel checkouts
+.amcore/
+.worktrees/
+ai/

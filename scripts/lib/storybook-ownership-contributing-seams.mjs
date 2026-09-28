@@ -36,14 +36,10 @@ export const storybookContributingSeams = [
   owned(
     'storybook.contributing-build-note',
     block(
-      'On a clean checkout, build the shared package before running Playwright or',
-      'automatically for `pnpm test`, `pnpm lint`, and `pnpm typecheck`.',
+      "On a clean checkout, build the shared package before running Storybook's browser",
+      '`pnpm lint`, and `pnpm typecheck`. Managed Playwright commands prepare their own',
       {
-        replacement:
-          'On a clean checkout, build the shared package before running Playwright\n' +
-          'directly: `pnpm --filter @amcore/shared build`. The CI `web-e2e` job does\n' +
-          'this explicitly; turbo does it automatically for `pnpm test`, `pnpm lint`,\n' +
-          'and `pnpm typecheck`.\n',
+        replacement: 'Managed Playwright commands prepare their own\n',
       }
     )
   ),

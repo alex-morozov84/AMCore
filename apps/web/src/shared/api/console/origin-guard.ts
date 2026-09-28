@@ -1,4 +1,4 @@
-import { getConsoleHostname } from '@/shared/lib/admin-console-config'
+import { getConsoleOrigin } from '@/shared/lib/admin-console-config'
 
 import 'server-only'
 
@@ -14,6 +14,6 @@ function requestOrigin(request: Request): string | null {
 
 /** Console cookie mutations accept only the configured HTTPS console origin. */
 export function isTrustedConsoleOrigin(request: Request): boolean {
-  const hostname = getConsoleHostname()
-  return requestOrigin(request) === `https://${hostname}`
+  const origin = getConsoleOrigin()
+  return origin !== undefined && requestOrigin(request) === origin
 }

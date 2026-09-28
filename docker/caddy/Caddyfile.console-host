@@ -1,4 +1,4 @@
-# Explicit host-mode edge config. Select it only with docker-compose.console-host.yml.
+# Explicit host-mode edge config. Select it only with docker/compose/console-host.yml.
 {
 	email {$CADDY_EMAIL}
 }

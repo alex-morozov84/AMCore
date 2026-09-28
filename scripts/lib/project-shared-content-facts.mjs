@@ -10,6 +10,7 @@ export const SHARED_CONTENT_PATHS = Object.freeze([
     'docs/README.md',
     'docs/frontend/README.md',
     'docs/frontend/architecture-and-conventions.md',
+    'docs/operations/local-stands.md',
     'apps/web/messages/en.json',
     'apps/web/messages/ru.json',
     ...STORYBOOK_CONTENT_PATHS,
