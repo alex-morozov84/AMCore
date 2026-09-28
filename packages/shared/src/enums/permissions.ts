@@ -14,5 +14,6 @@ export enum Subject {
   Organization = 'Organization',
   Role = 'Role',
   Permission = 'Permission',
+  TeamAccess = 'TeamAccess', // explicit full team policy authority
   All = 'all', // wildcard: all subjects
 }

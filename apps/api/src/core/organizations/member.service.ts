@@ -12,6 +12,7 @@ import { PrismaService } from '../../prisma'
 
 import { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
+import { getSystemRoleId } from './system-role'
 
 import type { Prisma } from '@/generated/prisma/client'
 
@@ -180,11 +181,6 @@ export class MemberService {
     name: 'ADMIN',
     db: PrismaService | PrismaTx = this.prisma
   ): Promise<string> {
-    const role = await db.role.findFirst({
-      where: { name, isSystem: true, organizationId: null },
-      select: { id: true },
-    })
-    if (!role) throw new Error(`System ${name} role not found. Run: pnpm --filter api prisma:seed`)
-    return role.id
+    return getSystemRoleId(db, name)
   }
 }

@@ -1,26 +1,27 @@
 import { randomBytes } from 'node:crypto'
 
-import { HttpStatus, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 
 import {
   Action,
   type OrganizationListResponse,
   type OrgResponse,
   type RequestPrincipal,
-  Subject,
 } from '@amcore/shared'
 
-import {
-  AppException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-} from '../../common/exceptions'
+import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 import type { AppAbility } from '../auth/casl/ability.factory'
+import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults'
 import { OrgAclVersionService } from '../auth/org-acl-version.service'
 
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
+import {
+  assertOrganizationAction,
+  assertOrganizationResponse,
+  lockOrganization,
+} from './organization-authorization'
+import { getSystemRoleId } from './system-role'
 
 import type { Organization, Prisma } from '@/generated/prisma/client'
 
@@ -41,21 +42,12 @@ export class OrganizationsService {
       if (existing) throw new ConflictException(`Slug '${slug}' is already taken`)
     }
 
-    const adminRole = await this.prisma.role.findFirst({
-      where: { name: 'ADMIN', isSystem: true, organizationId: null },
-    })
-    if (!adminRole) {
-      throw new AppException(
-        'System roles not initialized. Run: pnpm --filter api prisma:seed',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'SYSTEM_NOT_INITIALIZED'
-      )
-    }
+    const adminRoleId = await getSystemRoleId(this.prisma, 'ADMIN')
 
     return this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({ data: { name: dto.name, slug } })
       const member = await tx.orgMember.create({ data: { userId, organizationId: org.id } })
-      await tx.memberRole.create({ data: { memberId: member.id, roleId: adminRole.id } })
+      await tx.memberRole.create({ data: { memberId: member.id, roleId: adminRoleId } })
       return this.toOrgResponse(org)
     })
   }
@@ -116,19 +108,6 @@ export class OrganizationsService {
           'API key is bound to a different organization and cannot read this one'
         )
       }
-      // userPerms ∩ scopes invariant (ADR-033). The ability was built
-      // by AbilityFactory from `permsInBoundOrg ∩ apiKey.scopes`, so a
-      // key with `read:User` produces no rule on Organization and
-      // `can(Read, Organization)` is false. This is what blocks a
-      // narrowly-scoped key from reading the org record even within
-      // its own bound org. JWT principals are NOT checked here:
-      // without org-context their ability is the personal empty
-      // ability, and applying the same check would break the
-      // "browse-before-switch" UI flow that OA-03 deliberately
-      // preserves.
-      if (!ability.can(Action.Read, Subject.Organization)) {
-        throw new ForbiddenException('API key scope does not allow reading this organization')
-      }
     }
 
     const [org, member] = await Promise.all([
@@ -145,30 +124,48 @@ export class OrganizationsService {
     // caller has already authenticated as a key bound to a different
     // org.
     if (!org || !member) throw new NotFoundException('Organization', id)
+    if (principal.type === 'api_key') assertOrganizationResponse(ability, org)
     return this.toOrgResponse(org)
   }
 
   async update(
     id: string,
     principal: RequestPrincipal,
-    dto: UpdateOrganizationDto
+    dto: UpdateOrganizationDto,
+    ability: AppAbility
   ): Promise<OrgResponse> {
     this.assertOrgContext(principal, id)
-
-    if (dto.slug) {
-      const existing = await this.prisma.organization.findFirst({
-        where: { slug: dto.slug, id: { not: id } },
-      })
-      if (existing) throw new ConflictException(`Slug '${dto.slug}' is already taken`)
-    }
-
-    const org = await this.prisma.organization.update({ where: { id }, data: dto })
+    const org = await this.prisma.$transaction(async (tx) => {
+      const before = await lockOrganization(tx, id, principal)
+      const fields = Object.keys(dto).filter(
+        (field) => dto[field as keyof UpdateOrganizationDto] !== undefined
+      )
+      assertOrganizationAction(ability, Action.Update, before, fields)
+      if (fields.length === 0) {
+        assertOrganizationResponse(ability, before)
+        return before
+      }
+      if (dto.slug) {
+        const conflict = await tx.organization.findFirst({
+          where: { slug: dto.slug, id: { not: id } },
+        })
+        if (conflict) throw new ConflictException(`Slug '${dto.slug}' is already taken`)
+      }
+      const after = await tx.organization.update({ where: { id }, data: dto })
+      assertOrganizationAction(ability, Action.Update, after, fields)
+      assertOrganizationResponse(ability, after)
+      return after
+    })
     return this.toOrgResponse(org)
   }
 
-  async remove(id: string, principal: RequestPrincipal): Promise<void> {
+  async remove(id: string, principal: RequestPrincipal, ability: AppAbility): Promise<void> {
     this.assertOrgContext(principal, id)
-    await this.prisma.organization.delete({ where: { id } })
+    await this.prisma.$transaction(async (tx) => {
+      const org = await lockOrganization(tx, id, principal)
+      assertOrganizationAction(ability, Action.Delete, org, ORG_READ_FIELDS)
+      await tx.organization.delete({ where: { id } })
+    })
   }
 
   /** Returns org data needed to generate a new JWT with this org's context */
@@ -189,10 +186,8 @@ export class OrganizationsService {
    * `MemberService` / `RoleService` must use {@link bumpAclVersionTx}
    * so the bump rolls back with the mutation.
    *
-   * Post-commit cache invalidation runs after the DB update. If Redis
-   * invalidation fails, `OrgAclVersionService` records an error-level
-   * freshness incident but does not turn a committed DB mutation into
-   * a false client failure.
+   * Current ACL authority is read from the primary database. The retained
+   * post-update invalidation seam is a compatibility no-op.
    */
   async bumpAclVersion(orgId: string): Promise<void> {
     await this.prisma.organization.update({
@@ -215,13 +210,8 @@ export class OrganizationsService {
    * cache version and the DB ACL state can no longer drift on
    * transient DB failures.
    *
-   * Cache invalidation (OA-04) is the caller's job: call
-   * `OrgAclVersionService.invalidate(orgId)` after the surrounding
-   * `$transaction` commits successfully. Doing the Redis `DEL` inside
-   * the transaction would mix non-transactional I/O into the unit of
-   * work — a rollback would not undo it, breaking the freshness
-   * contract in the opposite direction (cache emptied for an
-   * un-applied bump).
+   * No post-commit publication is required for freshness. Existing callers
+   * may retain the compatibility no-op invalidate call after commit.
    */
   async bumpAclVersionTx(orgId: string, tx: PrismaTx): Promise<void> {
     await tx.organization.update({

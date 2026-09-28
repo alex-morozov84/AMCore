@@ -15,6 +15,9 @@ test('host-mode Users inventory uses only the isolated console session', async (
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email, { name: 'Console Inventory User' })
+  await expect(productPage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+  )
   setSystemRole(email, 'SUPER_ADMIN')
 
   const console = await browser.newContext({

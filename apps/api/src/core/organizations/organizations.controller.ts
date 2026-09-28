@@ -12,31 +12,32 @@ import {
 } from '@nestjs/common'
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOperation,
   ApiQuery,
   ApiSecurity,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
-  Action,
   AuthType,
   type OrganizationListResponse,
   type OrgResponse,
   PAGINATION,
   type RequestPrincipal,
-  Subject,
   type SwitchOrgResponse,
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import type { AppAbility } from '../auth/casl/ability.factory'
 import { Auth } from '../auth/decorators/auth.decorator'
-import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentAbility } from '../auth/decorators/current-ability.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
 import { TokenService } from '../auth/token.service'
 
 import {
@@ -72,6 +73,7 @@ import { OrganizationsService } from './organizations.service'
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or invalid accepted credential' })
 @Controller('organizations')
 @Auth(AuthType.Bearer, AuthType.ApiKey)
 export class OrganizationsController {
@@ -138,7 +140,7 @@ export class OrganizationsController {
   /**
    * OA-03: dual-auth, but API keys are constrained on two axes
    * (`principal.organizationId === :id` AND
-   * `ability.can(Read, Organization)`). The first axis is the
+   * `read` on the actual organization and every returned field). The first axis is the
    * bound-org boundary; the second is the `userPerms ∩ scopes`
    * invariant from ADR-033 — a scoped key with e.g. `read:User` must
    * not be able to read the org record. JWT principals follow the
@@ -150,8 +152,14 @@ export class OrganizationsController {
    * service so the rule sits next to the business logic.
    */
   @Get(':id')
+  @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
+  @ApiNotFoundResponse({ description: 'Organization missing or caller is not a member' })
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Get organization details (must be a member)' })
+  @ApiOperation({
+    summary: 'Get organization details (must be a member)',
+    description:
+      'JWT: membership-based discovery without switching organization context. API key: bound organization, actual record conditions and read permission for all six response fields; partial grants return 403.',
+  })
   @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Organization details' })
   findOne(
     @Param('id') id: string,
@@ -162,26 +170,40 @@ export class OrganizationsController {
   }
 
   @Patch(':id')
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
+  @ApiNotFoundResponse({ description: 'Organization missing' })
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Update organization — ADMIN only, requires org context in JWT' })
+  @ApiOperation({
+    summary:
+      'Update permitted organization fields — bound org context and full response read required',
+  })
   @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Updated organization' })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateOrganizationDto,
-    @CurrentUser() principal: RequestPrincipal
+    @CurrentUser() principal: RequestPrincipal,
+    @CurrentAbility() ability: AppAbility
   ): Promise<OrgResponse> {
-    return this.orgsService.update(id, principal, dto)
+    return this.orgsService.update(id, principal, dto, ability)
   }
 
   @Delete(':id')
+  @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
+  @ApiNotFoundResponse({ description: 'Organization missing' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('id')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Delete organization — ADMIN only, requires org context in JWT' })
+  @ApiOperation({
+    summary:
+      'Delete organization — full TeamAccess and delete on every organization field required',
+  })
   @ApiNoContentResponse({ description: 'Organization deleted' })
-  remove(@Param('id') id: string, @CurrentUser() principal: RequestPrincipal): Promise<void> {
-    return this.orgsService.remove(id, principal)
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() principal: RequestPrincipal,
+    @CurrentAbility() ability: AppAbility
+  ): Promise<void> {
+    return this.orgsService.remove(id, principal, ability)
   }
 
   /**
@@ -197,6 +219,7 @@ export class OrganizationsController {
    * `user.sub` here). See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-01.
    */
   @Post(':id/switch')
+  @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
   @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'Get new JWT with this organization context — must be a member' })
   @ZodResponse({ type: SwitchOrgResponseDto, status: 200, description: 'Org-context access token' })

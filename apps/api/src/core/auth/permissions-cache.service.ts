@@ -4,6 +4,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
 import type { Permission } from '@/generated/prisma/client'
+import { Prisma } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 
@@ -177,29 +178,36 @@ export class PermissionsCacheService {
     userId: string,
     organizationId: string
   ): Promise<Permission[]> {
-    const member = await this.prisma.orgMember.findUnique({
-      where: {
-        userId_organizationId: {
-          userId,
-          organizationId,
-        },
-      },
-      include: {
-        roles: {
+    // The supplied version is a cache-selection fence, not the exact revision
+    // of this snapshot. Concurrent changes may yield newer coherent rules under
+    // an old fence; later requests select the newly committed version instead.
+    const member = await this.prisma.$transaction(
+      (tx) =>
+        tx.orgMember.findUnique({
+          where: {
+            userId_organizationId: {
+              userId,
+              organizationId,
+            },
+          },
           include: {
-            role: {
+            roles: {
               include: {
-                permissions: {
+                role: {
                   include: {
-                    permission: true,
+                    permissions: {
+                      include: {
+                        permission: true,
+                      },
+                    },
                   },
                 },
               },
             },
           },
-        },
-      },
-    })
+        }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead }
+    )
 
     if (!member) {
       this.logger.warn({ userId, organizationId }, 'User is not a member of org')

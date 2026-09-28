@@ -160,7 +160,7 @@ describe('InviteService', () => {
     })
 
     it('returns uniform {status: invited} on Branch B (known user, not member)', async () => {
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.user.findUnique.mockResolvedValue(targetUser)
       prisma.orgMember.findUnique.mockResolvedValue(null)
@@ -198,7 +198,7 @@ describe('InviteService', () => {
     })
 
     it('returns uniform {status: invited} on Branch C (unknown email)', async () => {
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.user.findUnique.mockResolvedValue(null)
       prisma.orgInvite.findFirst.mockResolvedValue(null)
@@ -219,7 +219,7 @@ describe('InviteService', () => {
     })
 
     it('returns uniform {status: invited} on Branch A (already a member) — no row, no email', async () => {
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.user.findUnique.mockResolvedValue(targetUser)
       const existingMember: OrgMember = {
@@ -252,7 +252,7 @@ describe('InviteService', () => {
     })
 
     it('rotates an existing active row instead of inserting a duplicate', async () => {
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.user.findUnique.mockResolvedValue(targetUser)
       prisma.orgMember.findUnique.mockResolvedValue(null)
@@ -296,7 +296,7 @@ describe('InviteService', () => {
     })
 
     it('defaults to system MEMBER role when dto.roleId omitted', async () => {
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.user.findUnique.mockResolvedValue(null)
       prisma.orgInvite.findFirst.mockResolvedValue(null)
@@ -304,9 +304,9 @@ describe('InviteService', () => {
 
       await service.createInvite('org-1', { email: 'someone@example.com' }, principal)
 
-      expect(prisma.role.findFirst).toHaveBeenCalledWith({
-        where: { name: 'MEMBER', isSystem: true, organizationId: null },
-        select: { id: true },
+      expect(prisma.role.findMany).toHaveBeenCalledWith({
+        where: { name: 'MEMBER', organizationId: null },
+        select: { id: true, isSystem: true },
       })
       const createArg = prisma.orgInvite.create.mock.calls[0]?.[0] as {
         data: { roleId: string }
@@ -315,7 +315,7 @@ describe('InviteService', () => {
     })
 
     it('serializes create-or-rotate by advisory lock on org and canonical email', async () => {
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.user.findUnique.mockResolvedValue(null)
       prisma.orgInvite.findFirst.mockResolvedValue(null)
@@ -327,7 +327,7 @@ describe('InviteService', () => {
     })
 
     it('hashes email canonical with sha256 in audit log payload — never raw', async () => {
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.user.findUnique.mockResolvedValue(null)
       prisma.orgInvite.findFirst.mockResolvedValue(null)
@@ -353,7 +353,7 @@ describe('InviteService', () => {
     })
 
     it('fails closed when transactional audit insert fails', async () => {
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.user.findUnique.mockResolvedValue(null)
       prisma.orgInvite.findFirst.mockResolvedValue(null)
@@ -376,7 +376,7 @@ describe('InviteService', () => {
     }
 
     beforeEach(() => {
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.organization.findUnique.mockResolvedValue({
         id: 'org-1',
@@ -769,7 +769,7 @@ describe('InviteService', () => {
     it('falls back to system MEMBER role when invite.roleId is null', async () => {
       prisma.orgInvite.findUnique.mockResolvedValue({ ...inviteRow, roleId: null })
       userCacheService.getUser.mockResolvedValue(acceptUser)
-      prisma.role.findFirst.mockResolvedValue(memberRole)
+      prisma.role.findMany.mockResolvedValue([memberRole])
       prisma.role.findUnique.mockResolvedValue(memberRole)
       prisma.orgMember.create.mockResolvedValue({
         id: 'member-new',
@@ -780,9 +780,9 @@ describe('InviteService', () => {
 
       const result = await service.acceptInvite(acceptToken, acceptPrincipal, acceptIp)
       expect(result.roleId).toBe(memberRole.id)
-      expect(prisma.role.findFirst).toHaveBeenCalledWith({
-        where: { name: 'MEMBER', isSystem: true, organizationId: null },
-        select: { id: true },
+      expect(prisma.role.findMany).toHaveBeenCalledWith({
+        where: { name: 'MEMBER', organizationId: null },
+        select: { id: true, isSystem: true },
       })
     })
 

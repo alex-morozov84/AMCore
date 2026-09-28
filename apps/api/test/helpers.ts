@@ -13,14 +13,13 @@ import cookieParser from 'cookie-parser'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 
+import { seedOrgRoles } from '../prisma/seed-org-roles'
 import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
 import { NotificationDispatchProcessor } from '../src/core/notifications/dispatch/notification-dispatch.processor'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
 import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
-
-import type { Role } from '@/generated/prisma/client'
 
 /**
  * No-op PinoLogger stub for e2e. Per ai/TESTING.md "Known NestJS E2E Runtime
@@ -156,6 +155,10 @@ export async function setupE2ETest(
     stdio: 'inherit',
     env: { ...process.env, E2E_DATABASE_URL: databaseUrl },
   })
+
+  // Match supertest's IPv4 destination and keep one listener for the fixture.
+  // Its implicit listen/close cycle can deliver responses outside this server.
+  await app.listen(0, '127.0.0.1')
 
   return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
 }
@@ -303,48 +306,7 @@ export async function seedOrgMember(
  * Idempotent — safe to call multiple times.
  */
 export async function seedSystemRoles(prisma: PrismaService): Promise<void> {
-  const findOrCreate = async (name: string, description: string): Promise<Role> => {
-    const existing = await prisma.role.findFirst({
-      where: { name, organizationId: null, isSystem: true },
-    })
-    if (existing) return existing
-    return prisma.role.create({ data: { name, description, isSystem: true } })
-  }
-
-  const [adminRole, memberRole, viewerRole] = await Promise.all([
-    findOrCreate('ADMIN', 'Full organization management'),
-    findOrCreate('MEMBER', 'Standard member access'),
-    findOrCreate('VIEWER', 'Read-only access'),
-  ])
-
-  const alreadySeeded = await prisma.rolePermission.count({ where: { roleId: adminRole.id } })
-  if (alreadySeeded > 0) return
-
-  const [manageOrg, manageRole, managePerm, manageUser, updateOwnUser, createAll, readAll] =
-    await Promise.all([
-      prisma.permission.create({ data: { action: 'manage', subject: 'Organization' } }),
-      prisma.permission.create({ data: { action: 'manage', subject: 'Role' } }),
-      prisma.permission.create({ data: { action: 'manage', subject: 'Permission' } }),
-      prisma.permission.create({ data: { action: 'manage', subject: 'User' } }),
-      prisma.permission.create({
-        data: { action: 'update', subject: 'User', conditions: { id: '${user.sub}' } },
-      }),
-      prisma.permission.create({ data: { action: 'create', subject: 'all' } }),
-      prisma.permission.create({ data: { action: 'read', subject: 'all' } }),
-    ])
-
-  await prisma.rolePermission.createMany({
-    data: [
-      { roleId: adminRole.id, permissionId: manageOrg.id },
-      { roleId: adminRole.id, permissionId: manageRole.id },
-      { roleId: adminRole.id, permissionId: managePerm.id },
-      { roleId: adminRole.id, permissionId: manageUser.id },
-      { roleId: memberRole.id, permissionId: createAll.id },
-      { roleId: memberRole.id, permissionId: readAll.id },
-      { roleId: memberRole.id, permissionId: updateOwnUser.id },
-      { roleId: viewerRole.id, permissionId: readAll.id },
-    ],
-  })
+  await seedOrgRoles(prisma)
 }
 
 /**

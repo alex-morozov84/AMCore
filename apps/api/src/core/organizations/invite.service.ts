@@ -27,6 +27,7 @@ import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
 import { InviteRateLimiterService } from './invite-rate-limiter.service'
 import { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
+import { getSystemRoleId } from './system-role'
 
 import { AuditActorType, AuditTargetType, Prisma } from '@/generated/prisma/client'
 
@@ -659,14 +660,7 @@ export class InviteService {
   }
 
   private async getSystemRoleId(name: 'ADMIN' | 'MEMBER'): Promise<string> {
-    const role = await this.prisma.role.findFirst({
-      where: { name, isSystem: true, organizationId: null },
-      select: { id: true },
-    })
-    if (!role) {
-      throw new Error(`System ${name} role not found. Run: pnpm --filter api db:seed`)
-    }
-    return role.id
+    return getSystemRoleId(this.prisma, name)
   }
 
   /**

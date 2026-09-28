@@ -3,10 +3,16 @@ import { randomUUID } from 'node:crypto'
 import { guardedSql } from '../support/managed-target.mjs'
 
 export function setSystemRole(email: string, role: 'USER' | 'SUPER_ADMIN'): void {
-  guardedSql(`UPDATE core.users SET "systemRole" = :'role' WHERE "emailCanonical" = :'email';`, {
-    email,
-    role,
-  })
+  const output = guardedSql(
+    `UPDATE core.users SET "systemRole" = :'role' WHERE "emailCanonical" = :'email';`,
+    {
+      email,
+      role,
+    }
+  )
+  if (output.trim() !== 'UPDATE 1') {
+    throw new Error(`Expected exactly one registered user for role setup; got ${output.trim()}`)
+  }
 }
 export function countAuditViews(email: string): number {
   return Number(

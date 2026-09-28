@@ -7,6 +7,12 @@ import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
 
 import { setSystemRole } from './helpers'
 
+test('role setup refuses an account whose registration has not completed', () => {
+  expect(() => setSystemRole(uniqueEmail('console-unregistered'), 'SUPER_ADMIN')).toThrow(
+    'Expected exactly one registered user for role setup; got UPDATE 0'
+  )
+})
+
 test('host-mode Overview panel renders real readiness, version and process role, with no token exposed to the browser', async ({
   browser,
 }) => {
@@ -66,6 +72,9 @@ test('host-mode Overview panel denies a demoted session with a live re-check, no
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
+  await expect(productPage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+  )
   setSystemRole(email, 'SUPER_ADMIN')
 
   const console = await browser.newContext({
@@ -99,6 +108,9 @@ test('host-mode Overview locale switcher stays on the console host and switches 
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
+  await expect(productPage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+  )
   setSystemRole(email, 'SUPER_ADMIN')
 
   const console = await browser.newContext({

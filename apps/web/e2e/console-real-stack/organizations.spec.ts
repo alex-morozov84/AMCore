@@ -67,6 +67,9 @@ test('host-mode Organizations panel denies a demoted session with a live re-chec
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
+  await expect(productPage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+  )
   setSystemRole(email, 'SUPER_ADMIN')
 
   const console = await browser.newContext({
@@ -100,6 +103,9 @@ test('the admin route is denied on the product host even for a real SUPER_ADMIN 
   })
   const productPage = await product.newPage()
   await registerViaUi(productPage, email)
+  await expect(productPage).toHaveURL(
+    new RegExp('^' + escapeOrigin(standTarget.origins.product) + '/en/?$')
+  )
   setSystemRole(email, 'SUPER_ADMIN')
 
   // `hasCanonicalConsoleHost()` (`shared/lib/console-host-guard.ts`) gates
