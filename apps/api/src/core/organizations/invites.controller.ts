@@ -1,26 +1,26 @@
 import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Query } from '@nestjs/common'
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOperation,
   ApiQuery,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
-  Action,
   AuthType,
   type InviteListResponse,
   PAGINATION,
   type RequestPrincipal,
-  Subject,
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { Auth } from '../auth/decorators/auth.decorator'
-import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
 
 import { InviteListResponseDto } from './dto'
 import { InviteService } from './invite.service'
@@ -39,15 +39,19 @@ import { InviteService } from './invite.service'
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or invalid accepted credential' })
+@ApiForbiddenResponse({
+  description: 'FORBIDDEN: target, record/field or full TeamAccess authority denied',
+})
 @Controller('organizations/:orgId/invites')
 @Auth(AuthType.Bearer)
 export class InvitesController {
   constructor(private readonly inviteService: InviteService) {}
 
   @Get()
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiOperation({
-    summary: 'List active pending invites for the organization — ADMIN only',
+    summary: 'List active pending invites for the organization — requires full TeamAccess',
   })
   @ApiQuery({
     name: 'page',
@@ -79,10 +83,10 @@ export class InvitesController {
 
   @Delete(':inviteId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiOperation({
     summary:
-      'Revoke a pending invite — ADMIN only. Idempotent: revoking an ' +
+      'Revoke a pending invite — requires full TeamAccess. Idempotent: revoking an ' +
       'already-revoked invite returns 204. Revoking an accepted invite ' +
       'returns 400 BUSINESS_RULE_VIOLATION (remove the member via ' +
       'DELETE /organizations/:orgId/members/:userId instead).',

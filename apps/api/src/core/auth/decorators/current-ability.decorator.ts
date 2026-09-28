@@ -16,15 +16,10 @@ import type { AppAbility } from '../casl/ability.factory'
  * }
  * ```
  *
- * Usage in services (requires extending the Prisma Client with
- * `createCaslExtension()` from `@casl/prisma` first — see `docs/auth/rbac.md`):
- * ```typescript
- * async findAll(ability: AppAbility) {
- *   return this.prisma.contact.findMany({
- *     where: accessibleBy(ability).Contact
- *   })
- * }
- * ```
+ * Services must authorize actual records and fields. For the typed Prisma
+ * wrapper, existing-pool extension, tenant predicates and whole-row deletion,
+ * see docs/auth/rbac.md's executable Role recipe.
+
  */
 export const CurrentAbility = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AppAbility => {

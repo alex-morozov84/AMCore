@@ -369,8 +369,8 @@ model Role {
 model Permission {
   id             String   @id @default(cuid())
   action         String // 'create' | 'read' | 'update' | 'delete' | 'manage'
-  subject        String // 'Contact' | 'User' | 'Organization' | 'all'
-  conditions     Json? // CASL conditions: { "assignedToId": "${user.id}" }
+  subject        String // Registered User/Organization/Role/Permission models, TeamAccess, or DENY-only all
+  conditions     Json? // CASL conditions: { "assignedToId": "${user.sub}" }
   fields         String[] @default([]) // field-level: [] = all fields
   inverted       Boolean  @default(false) // explicit DENY (use sparingly)
   organizationId String? // null = system permission

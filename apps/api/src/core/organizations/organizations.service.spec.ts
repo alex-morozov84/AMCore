@@ -87,7 +87,7 @@ describe('OrganizationsService', () => {
   describe('create', () => {
     it('creates org with auto-generated slug and assigns ADMIN role to creator', async () => {
       prisma.organization.findUnique.mockResolvedValue(null) // slug not taken
-      prisma.role.findFirst.mockResolvedValue(mockRole)
+      prisma.role.findMany.mockResolvedValue([mockRole])
       // $transaction is mocked to return the callback's result — Arc C maps the
       // created org to the response shape (ISO dates) inside the callback.
       prisma.$transaction.mockResolvedValue(expectedOrgResponse)
@@ -95,8 +95,9 @@ describe('OrganizationsService', () => {
       const result = await service.create('user-1', { name: 'Acme Corp' })
 
       expect(result).toEqual(expectedOrgResponse)
-      expect(prisma.role.findFirst).toHaveBeenCalledWith({
-        where: { name: 'ADMIN', isSystem: true, organizationId: null },
+      expect(prisma.role.findMany).toHaveBeenCalledWith({
+        where: { name: 'ADMIN', organizationId: null },
+        select: { id: true, isSystem: true },
       })
       expect(prisma.$transaction).toHaveBeenCalled()
     })
@@ -111,7 +112,7 @@ describe('OrganizationsService', () => {
 
     it('throws AppException when system roles are not seeded', async () => {
       prisma.organization.findUnique.mockResolvedValue(null)
-      prisma.role.findFirst.mockResolvedValue(null) // no ADMIN role
+      prisma.role.findMany.mockResolvedValue([]) // no ADMIN role
 
       await expect(service.create('user-1', { name: 'Acme Corp' })).rejects.toThrow(AppException)
     })
@@ -240,13 +241,13 @@ describe('OrganizationsService', () => {
         scopes: ['read:User'], // does not allow read:Organization
       }
 
-      const ability = denyAbility() // can(Read, Organization) === false
+      prisma.organization.findUnique.mockResolvedValue(mockOrg)
+      prisma.orgMember.findUnique.mockResolvedValue(mockMember)
+      const ability = denyAbility() // actual record read denied
       await expect(service.findOne('org-1', apiKeyPrincipal, ability)).rejects.toThrow(
         ForbiddenException
       )
-      expect(ability.can).toHaveBeenCalledWith('read', 'Organization')
-      expect(prisma.organization.findUnique).not.toHaveBeenCalled()
-      expect(prisma.orgMember.findUnique).not.toHaveBeenCalled()
+      expect(ability.can).toHaveBeenCalledWith('read', expect.objectContaining({ id: 'org-1' }))
     })
 
     it('OA-03: returns org when api_key principal targets its bound org with read:Organization in ability', async () => {
@@ -270,16 +271,24 @@ describe('OrganizationsService', () => {
     it('throws ForbiddenException when principal.organizationId does not match', async () => {
       const wrongPrincipal: RequestPrincipal = { ...mockPrincipal, organizationId: 'org-other' }
 
-      await expect(service.update('org-1', wrongPrincipal, { name: 'New Name' })).rejects.toThrow(
-        ForbiddenException
-      )
+      await expect(
+        service.update('org-1', wrongPrincipal, { name: 'New Name' }, allowAbility())
+      ).rejects.toThrow(ForbiddenException)
     })
 
     it('updates org when caller is in the correct org context', async () => {
+      prisma.$transaction.mockImplementation(async (callback: any) => callback(prisma))
+      prisma.organization.findUnique.mockResolvedValue(mockOrg)
+      prisma.orgMember.findUnique.mockResolvedValue(mockMember)
       prisma.organization.findFirst.mockResolvedValue(null) // no slug conflict
       prisma.organization.update.mockResolvedValue({ ...mockOrg, name: 'New Name' })
 
-      const result = await service.update('org-1', mockPrincipal, { name: 'New Name' })
+      const result = await service.update(
+        'org-1',
+        mockPrincipal,
+        { name: 'New Name' },
+        allowAbility()
+      )
       expect(result.name).toBe('New Name')
     })
   })
@@ -287,12 +296,17 @@ describe('OrganizationsService', () => {
   describe('remove', () => {
     it('throws ForbiddenException when principal.organizationId does not match', async () => {
       const wrongPrincipal: RequestPrincipal = { ...mockPrincipal, organizationId: undefined }
-      await expect(service.remove('org-1', wrongPrincipal)).rejects.toThrow(ForbiddenException)
+      await expect(service.remove('org-1', wrongPrincipal, allowAbility())).rejects.toThrow(
+        ForbiddenException
+      )
     })
 
     it('deletes org when caller is in the correct org context', async () => {
+      prisma.$transaction.mockImplementation(async (callback: any) => callback(prisma))
+      prisma.organization.findUnique.mockResolvedValue(mockOrg)
+      prisma.orgMember.findUnique.mockResolvedValue(mockMember)
       prisma.organization.delete.mockResolvedValue(mockOrg)
-      await expect(service.remove('org-1', mockPrincipal)).resolves.toBeUndefined()
+      await expect(service.remove('org-1', mockPrincipal, allowAbility())).resolves.toBeUndefined()
     })
   })
 

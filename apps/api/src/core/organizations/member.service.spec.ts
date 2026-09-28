@@ -75,7 +75,7 @@ describe('MemberService', () => {
   describe('removeMember', () => {
     it('removes member and bumps aclVersion', async () => {
       prisma.orgMember.findUnique.mockResolvedValue(mockMember)
-      prisma.role.findFirst.mockResolvedValue(mockAdminRole)
+      prisma.role.findMany.mockResolvedValue([mockAdminRole])
       prisma.memberRole.findMany.mockResolvedValue([]) // not an admin
       prisma.orgMember.delete.mockResolvedValue(mockMember)
 
@@ -96,7 +96,7 @@ describe('MemberService', () => {
 
     it('throws BusinessRuleViolationException when removing last admin', async () => {
       prisma.orgMember.findUnique.mockResolvedValue(mockMember)
-      prisma.role.findFirst.mockResolvedValue(mockAdminRole)
+      prisma.role.findMany.mockResolvedValue([mockAdminRole])
       prisma.memberRole.findMany.mockResolvedValue([{ member: { userId: 'user-2' } }] as never) // only 1 admin, and it's the target
 
       await expect(service.removeMember('org-1', 'user-2', principal)).rejects.toThrow(
@@ -114,7 +114,7 @@ describe('MemberService', () => {
     describe('OA-09 companion: advisory lock + tx-aware reads', () => {
       it('acquires per-org advisory lock inside the transaction before reads', async () => {
         prisma.orgMember.findUnique.mockResolvedValue(mockMember)
-        prisma.role.findFirst.mockResolvedValue(mockAdminRole)
+        prisma.role.findMany.mockResolvedValue([mockAdminRole])
         prisma.memberRole.findMany.mockResolvedValue([])
         prisma.orgMember.delete.mockResolvedValue(mockMember)
 
@@ -245,7 +245,7 @@ describe('MemberService', () => {
   describe('removeRole', () => {
     it('removes non-admin role without last-admin check', async () => {
       prisma.orgMember.findUnique.mockResolvedValue(mockMember)
-      prisma.role.findFirst.mockResolvedValue(mockAdminRole) // ADMIN role id = 'role-admin'
+      prisma.role.findMany.mockResolvedValue([mockAdminRole]) // ADMIN role id = 'role-admin'
       prisma.memberRole.deleteMany.mockResolvedValue({ count: 1 })
 
       await service.removeRole('org-1', 'user-2', 'role-viewer', principal) // not admin role
@@ -258,7 +258,7 @@ describe('MemberService', () => {
 
     it('throws BusinessRuleViolationException when removing last admin role', async () => {
       prisma.orgMember.findUnique.mockResolvedValue(mockMember)
-      prisma.role.findFirst.mockResolvedValue(mockAdminRole) // ADMIN id = 'role-admin'
+      prisma.role.findMany.mockResolvedValue([mockAdminRole]) // ADMIN id = 'role-admin'
       prisma.memberRole.findMany.mockResolvedValue([{ member: { userId: 'user-2' } }] as never) // only 1 admin, it's the target
 
       await expect(service.removeRole('org-1', 'user-2', 'role-admin', principal)).rejects.toThrow(
@@ -274,7 +274,7 @@ describe('MemberService', () => {
      */
     it('acquires advisory lock before reads and runs member read inside the transaction', async () => {
       prisma.orgMember.findUnique.mockResolvedValue(mockMember)
-      prisma.role.findFirst.mockResolvedValue(mockAdminRole)
+      prisma.role.findMany.mockResolvedValue([mockAdminRole])
       prisma.memberRole.deleteMany.mockResolvedValue({ count: 1 })
 
       await service.removeRole('org-1', 'user-2', 'role-viewer', principal)
@@ -282,7 +282,7 @@ describe('MemberService', () => {
       const txOrder = (prisma.$transaction as unknown as jest.Mock).mock.invocationCallOrder[0]
       const lockOrder = prisma.$executeRaw.mock.invocationCallOrder[0]
       const memberReadOrder = prisma.orgMember.findUnique.mock.invocationCallOrder[0]
-      const adminRoleLookupOrder = prisma.role.findFirst.mock.invocationCallOrder[0]
+      const adminRoleLookupOrder = prisma.role.findMany.mock.invocationCallOrder[0]
       const deleteOrder = prisma.memberRole.deleteMany.mock.invocationCallOrder[0]
 
       expect(txOrder).toBeDefined()

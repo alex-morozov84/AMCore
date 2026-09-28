@@ -11,30 +11,31 @@ import {
   Query,
 } from '@nestjs/common'
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOperation,
   ApiQuery,
   ApiSecurity,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
-  Action,
   AuthType,
   type OrgRoleResponse,
   PAGINATION,
   type PermissionResponse,
   type RequestPrincipal,
   type RoleListResponse,
-  Subject,
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { Auth } from '../auth/decorators/auth.decorator'
-import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
 
 import {
   AssignPermissionDto,
@@ -51,7 +52,7 @@ import { RoleService } from './role.service'
  * dual-auth opt-in registered in ADR-034's allowlist (runtime default
  * after Stage 1c is `[AuthType.Bearer]`). API keys may manage org
  * roles subject to the CASL `userPerms ∩ scopes` model; the
- * per-handler `@CheckPolicies` decorators are the actual authorization
+ * per-handler `@RequireTeamAccess` decorators are the actual authorization
  * gate.
  *
  * The ADR-034 allowlist in `auth-decorator-coverage.spec.ts` enumerates
@@ -68,15 +69,19 @@ import { RoleService } from './role.service'
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or invalid accepted credential' })
+@ApiForbiddenResponse({
+  description: 'FORBIDDEN: target, record/field or full TeamAccess authority denied',
+})
 @Controller('organizations/:orgId/roles')
 @Auth(AuthType.Bearer, AuthType.ApiKey)
 export class RolesController {
   constructor(private readonly roleService: RoleService) {}
 
   @Get()
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'List all roles in the organization — ADMIN only' })
+  @ApiOperation({ summary: 'List all roles in the organization — requires full TeamAccess' })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -102,9 +107,9 @@ export class RolesController {
   }
 
   @Post()
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Create a custom role — ADMIN only' })
+  @ApiOperation({ summary: 'Create a custom role — requires full TeamAccess' })
   @ZodResponse({ type: OrgRoleResponseDto, status: 201, description: 'Role created' })
   createRole(
     @Param('orgId') orgId: string,
@@ -115,9 +120,9 @@ export class RolesController {
   }
 
   @Patch(':roleId')
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Update a custom role — ADMIN only' })
+  @ApiOperation({ summary: 'Update a custom role — requires full TeamAccess' })
   @ZodResponse({ type: OrgRoleResponseDto, status: 200, description: 'Updated role' })
   updateRole(
     @Param('orgId') orgId: string,
@@ -130,9 +135,11 @@ export class RolesController {
 
   @Delete(':roleId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Delete a custom role — ADMIN only (system roles cannot be deleted)' })
+  @ApiOperation({
+    summary: 'Delete a custom role — requires full TeamAccess (system roles cannot be deleted)',
+  })
   @ApiNoContentResponse({ description: 'Role deleted' })
   deleteRole(
     @Param('orgId') orgId: string,
@@ -143,10 +150,14 @@ export class RolesController {
   }
 
   @Post(':roleId/permissions')
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Assign a CASL permission to a custom role — ADMIN only' })
+  @ApiOperation({ summary: 'Assign a CASL permission to a custom role — requires full TeamAccess' })
   @ZodResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
+  @ApiBadRequestResponse({
+    description:
+      'Validation error: unknown registry value, positive all grant or restricted TeamAccess',
+  })
   assignPermission(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
@@ -158,9 +169,9 @@ export class RolesController {
 
   @Delete(':roleId/permissions/:permId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Remove a permission from a custom role — ADMIN only' })
+  @ApiOperation({ summary: 'Remove a permission from a custom role — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Permission removed' })
   removePermission(
     @Param('orgId') orgId: string,

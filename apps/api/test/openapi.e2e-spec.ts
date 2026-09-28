@@ -179,6 +179,33 @@ describe('OpenAPI success surface (e2e)', () => {
     }
   }, 120000)
 
+  it('documents TeamAccess/record-field failures and permission assignment branches', () => {
+    const orgOperations = Object.entries(document.paths).filter(([path]) =>
+      path.startsWith('/organizations')
+    )
+    const operations = orgOperations.flatMap(([path, item]) =>
+      HTTP_METHODS.flatMap((method) => (item?.[method] ? [{ path, operation: item[method]! }] : []))
+    )
+    expect(operations.filter(({ operation }) => !operation.responses?.['401'])).toEqual([])
+    expect(
+      operations.filter(
+        ({ path, operation }) => path !== '/organizations' && !operation.responses?.['403']
+      )
+    ).toEqual([])
+    const operation = document.paths['/organizations/{orgId}/roles/{roleId}/permissions']?.post
+    expect(operation?.responses?.['400']).toBeDefined()
+    const schema = document.components?.schemas?.AssignPermissionDto
+    expect(schema).toBeDefined()
+    const serialized = JSON.stringify(schema)
+    expect(serialized).toContain('TeamAccess')
+    expect(serialized).toMatch(/oneOf|anyOf/)
+    const org = document.paths['/organizations/{id}']!
+    expect(org.get?.description).toContain('membership-based discovery')
+    expect(org.get?.description).toContain('all six response fields')
+    for (const method of ['get', 'patch', 'delete'] as const)
+      expect(org[method]?.responses?.['404']).toBeDefined()
+  })
+
   const isExcluded = (path: string): boolean =>
     EXCLUDED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))
 

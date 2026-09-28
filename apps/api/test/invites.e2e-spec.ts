@@ -547,7 +547,7 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
         .send({
           name: 'Invite key',
           organizationId: orgId,
-          scopes: ['manage:Organization'],
+          scopes: ['manage:TeamAccess'],
         })
         .expect(201)
       const apiKey = keyRes.body.key as string
@@ -568,7 +568,7 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
         .send({
           name: 'List attempt',
           organizationId: orgId,
-          scopes: ['manage:Organization'],
+          scopes: ['manage:TeamAccess'],
         })
         .expect(201)
       const apiKey = keyRes.body.key as string
@@ -594,7 +594,7 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
         .send({
           name: 'Revoke attempt',
           organizationId: orgId,
-          scopes: ['manage:Organization'],
+          scopes: ['manage:TeamAccess'],
         })
         .expect(201)
       const apiKey = keyRes.body.key as string
@@ -669,7 +669,7 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
       const keyRes = await request(app.getHttpServer())
         .post('/api-keys')
         .set('Authorization', `Bearer ${tokenA}`)
-        .send({ name: 'Bound to A', organizationId: orgA, scopes: ['manage:Organization'] })
+        .send({ name: 'Bound to A', organizationId: orgA, scopes: ['manage:TeamAccess'] })
         .expect(201)
       const apiKey = keyRes.body.key as string
 

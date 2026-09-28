@@ -34,7 +34,7 @@ describe('assignPermissionSchema (OB-01)', () => {
   })
 
   describe('subject enum', () => {
-    it.each([Subject.User, Subject.Organization, Subject.Role, Subject.Permission, Subject.All])(
+    it.each([Subject.User, Subject.Organization, Subject.Role, Subject.Permission])(
       'accepts subject %s',
       (subject) => {
         const result = assignPermissionSchema.safeParse({ ...baseInput, subject })
@@ -63,15 +63,33 @@ describe('assignPermissionSchema (OB-01)', () => {
       expect(result.success).toBe(true)
     })
 
-    it('rejects MEMBER-style legacy "create:all" only if action invalid (Subject.All is valid)', () => {
-      // Subject.All by itself is fine; we only reject when action OR
-      // subject is off-enum. Sanity check the boundary.
+    it('rejects positive wildcard grants but accepts wildcard DENY', () => {
       expect(
         assignPermissionSchema.safeParse({ action: Action.Create, subject: Subject.All }).success
-      ).toBe(true)
-      expect(
-        assignPermissionSchema.safeParse({ action: 'CREATE', subject: Subject.All }).success
       ).toBe(false)
+      expect(
+        assignPermissionSchema.safeParse({
+          action: Action.Read,
+          subject: Subject.All,
+          inverted: true,
+        }).success
+      ).toBe(true)
+    })
+    it('accepts unrestricted TeamAccess only', () => {
+      const team = { action: Action.Manage, subject: Subject.TeamAccess }
+      expect(assignPermissionSchema.safeParse(team).success).toBe(true)
+      for (const variant of [
+        { action: Action.Read },
+        { conditions: { id: 'org' } },
+        { fields: ['name'] },
+      ]) {
+        expect(assignPermissionSchema.safeParse({ ...team, ...variant }).success).toBe(false)
+      }
+      for (const fields of [[], ['*']]) {
+        expect(
+          assignPermissionSchema.safeParse({ ...team, conditions: null, fields }).success
+        ).toBe(true)
+      }
     })
   })
 })

@@ -14,14 +14,15 @@ guide covers the model and the invariants OpenAPI does not express.
 ## The two layers
 
 Every request is evaluated against two independent layers. **Both must pass**,
-except that a `SUPER_ADMIN` bypasses layer 2 entirely.
+with an internal `SUPER_ADMIN` owner grant. API-key scopes still narrow that grant;
+organization management still requires matching organization context.
 
 ```
 Request
   │
   ▼
 Layer 1 — System role      USER        → normal access, continue to layer 2
-                           SUPER_ADMIN → everything, always (skips layer 2)
+                           SUPER_ADMIN → synthesized owner grant, then credential scopes
   │
   ▼
 Layer 2 — Org permissions  org membership + roles + permissions, evaluated by CASL
@@ -32,7 +33,7 @@ Layer 2 — Org permissions  org membership + roles + permissions, evaluated by 
 | **Scope**        | Platform-wide                    | Within one organization              |
 | **Stored**       | User record + JWT claim          | Database + Redis cache               |
 | **Granularity**  | Coarse (2 levels)                | Fine (action + subject + conditions) |
-| **Changed by**   | `SUPER_ADMIN`                    | Org `ADMIN`                          |
+| **Changed by**   | `SUPER_ADMIN`                    | Explicit full `TeamAccess` holder    |
 | **Takes effect** | Next login (see freshness below) | Next request                         |
 
 ---
@@ -150,15 +151,54 @@ The org creator automatically becomes its `ADMIN`.
 A role is a named bundle of permissions. Three shared system roles are seeded
 and available to every organization; they cannot be deleted:
 
-| Role     | Permissions                                                                    |
-| -------- | ------------------------------------------------------------------------------ |
-| `ADMIN`  | `manage` on `Organization`, `Role`, `Permission`, `User` — full org management |
-| `MEMBER` | `create`/`read` on `all`; `update` on own `User` record                        |
-| `VIEWER` | `read` on `all`                                                                |
+| Role     | Explicit default permissions                                                                     |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| `VIEWER` | Read the current Organization's six response fields; read own safe User profile fields           |
+| `MEMBER` | VIEWER + update own profile's editable fields                                                    |
+| `ADMIN`  | MEMBER + update current Organization name/slug, delete current Organization, manage `TeamAccess` |
 
-A member can hold multiple roles; their effective permissions are the union.
-Beyond these, an `ADMIN` can define **custom roles** with exactly the
-permissions the app needs.
+Organization fields are `id`, `name`, `slug`, `aclVersion`, `createdAt`, `updatedAt`.
+Safe profile reads match `userResponseSchema`; editable profile fields match
+`updateProfileSchema`. The definitions live in
+`apps/api/src/core/auth/casl/org-role-defaults.ts`; production seed and test fixtures
+share six permissions and eleven role links. New resources and fields receive no
+automatic grants, including for ADMIN. Domain rights must be deliberately assigned.
+VIEWER does not disable independent account self-service handlers.
+
+Role labels confer no authority. Multiple positive roles widen explicitly granted
+access; any matching DENY overrides their allows. The API cannot modify/delete
+built-in templates. Seed only initializes a clean database or verifies exact current
+templates; an installed legacy database needs the [controlled upgrade](authorization-upgrade.md).
+
+### Full team administration
+
+`manage:TeamAccess` is a separate, unrestricted full policy authority, not a Prisma
+model. It permits same-org role/permission editing, role assignment and invite/member
+management. A trusted administrator can deliberately grant any supported role or
+permission, including TeamAccess. Limited delegation is not supported.
+
+An ordinary caller needs live membership, explicit matching org context, an exact
+unrestricted owner `manage:TeamAccess` rule, and no owner DENY on TeamAccess, Role,
+Permission, User or `all`. Any such DENY vetoes full team trust even if conditional
+or field-limited; Organization DENYs instead govern org data operations independently.
+Role names, `manage:Organization`, and model-management grants cannot substitute.
+API keys additionally need the exact `manage:TeamAccess` scope. Owner trust is checked
+before scopes, so narrower scopes cannot hide a restrictive owner rule.
+
+```typescript
+@RequireTeamAccess('orgId')
+@Post('roles')
+createRole() { /* existing same-org service checks still apply */ }
+```
+
+PATCH organization data requires update on the actual record and every supplied
+name/slug field, plus read on all response fields. Inside one row-locked transaction,
+these checks are repeated on the actual Prisma update result, including `updatedAt`;
+any failed post-state/read check throws and rolls back the entire write. Empty PATCH
+performs authorization without UPDATE and preserves its timestamp. Timestamps,
+IDs and ACL versions are server-owned. DELETE cascades team data: it requires both
+TeamAccess and delete on every Organization scalar. Full team authority alone does
+not grant org deletion. Existing last-system-ADMIN checks remain a separate invariant.
 
 ### Permission shape
 
@@ -167,7 +207,7 @@ Roles grant nothing by themselves — permissions do. A permission is:
 ```
 Permission {
   action:     "create" | "read" | "update" | "delete" | "manage"
-  subject:    "User" | "Organization" | "Role" | "Permission" | "all"
+  subject:    "User" | "Organization" | "Role" | "Permission" | "TeamAccess" | "all"
   conditions: { "assignedToId": "${user.sub}" }   ← optional, row-level scope
   fields:     ["name", "email"]                    ← optional, field-level scope
   inverted:   false                                ← true = explicit DENY
@@ -176,13 +216,18 @@ Permission {
 
 - **action** — `manage` is the wildcard for all four concrete actions.
 - **subject** — the resource type. `all` is the wildcard for every subject;
-  `manage` + `all` = superuser within the org.
+  positive `all` grants are rejected for stored org policies. Wildcard DENYs remain
+  supported; the factory alone synthesizes a positive `manage:all` for SUPER_ADMIN.
 
 `action` and `subject` are **closed enums** (`Action` and `Subject` in
 `packages/shared/src/enums/permissions.ts`). `assignPermissionSchema` validates
-both, so an off-enum value returns `400 Bad Request`. Domain subjects
+subject-specific branches, so an off-enum value returns `400 Bad Request`. Domain subjects
 (`Contact`, `Deal`, …) are **not** built in — a fork adds them (see
 [Adding your own subjects](#adding-your-own-subjects)).
+
+TeamAccess assignments accept only `manage`, absent/null/empty conditions and
+absent/empty/`["*"]` fields, with an optional DENY flag. `all` assignments must be
+DENYs. Partial TeamAccess and positive wildcard grants return 400 validation errors.
 
 ### Conditions
 
@@ -202,98 +247,204 @@ rules like "update Contacts, but only ones assigned to you" with no imperative
 
 ---
 
-## The CASL policy model
+## Record, field and query enforcement
 
-Authorization is enforced with [CASL](https://casl.js.org). The server builds an
-`AppAbility` from the caller's org permissions and checks it three ways.
+Stored conditions contain JSON values. The native matcher compares DateTime facts
+against numeric epoch milliseconds (covered by organization PATCH tests); this
+contract does not promise ISO-string equality or arbitrary DateTime SQL parity.
+The bounded Prisma recipe below uses Role scalars and has no DateTime fields.
 
-**Method-level policy check** — the common case:
+The factory validates and interpolates the entire owner payload before scope
+narrowing, eagerly parses conditions, deduplicates source variants and orders
+allows before DENYs deterministically. Invalid stored rules fail the whole request
+with 500, including rules outside a key's scopes. Request validation failures are
+400; ordinary authorization failures are 403 `FORBIDDEN`; infrastructure failures
+propagate. No failed rule is silently dropped.
+
+A method-level `ability.can(action, Subject)` is only a coarse admission check.
+Load the full actual record, check each input/output field, and keep authorization
+and writes together. Never fake a partial record that omits policy facts. A field-less
+delete check ignores field restrictions; whole-row deletion must require every scalar.
+
+### Adding your own subjects
+
+Add the generated domain model to AppSubjects in the ability factory, register its
+Subject enum value and explicit model-permission schema branch, then rebuild shared.
+Add actual controller/service policies and OpenAPI metadata. Scopes recognize registered
+subjects automatically, but defaults grant nothing to the new subject. Explicitly
+assign appropriate domain permissions through a trusted TeamAccess holder.
+Creation additionally needs checks on server-owned tenant/owner facts; read filters
+do not authorize creation. Review immutable fields and every new model scalar.
+
+### Executable Prisma recipe
+
+The following bounded Role fixture is compiled and exercised against PostgreSQL;
+its source is `apps/api/test/recipes/role-authorization.recipe.ts`. It demonstrates
+how a domain consumer reuses the injected PrismaService and pool. Actual Role routes
+continue to require TeamAccess; this fixture adds no demo endpoint. Adapt imports
+for the destination module and use the request's factory-built ability.
+
+The wrapper `core/auth/casl/prisma-ability.ts` uses generated Prisma.TypeMap and
+`@casl/prisma/runtime`, avoiding the unconfigured generated-package client surface.
+The derived client is extended once before transactions; it is not a global service
+replacement and must not be disconnected separately.
+
+Adapter 2.0.2 `accessibleBy` emits literal `{OR: []}` on no access. Its extension
+rewrites nested empty OR before making a DB call; it does not promise a pre-query
+short circuit. Both tenant AND orders are tested. SQL row selection does not redact
+fields: list/direct read project each actual record, and unreadable IDs hide rows.
+Count measures row authority and can include records whose field projection is unusable.
+
+The fixture supports Role scalar equality/membership/not/comparison and AND/nonempty
+OR/NOT. Relation filters, arbitrary nested empty OR, JSON/list policy DSLs, create and
+aggregate operations are excluded. Unsupported shapes fail closed. Updates accept
+name/description only; mixed allowed/forbidden input rejects the whole patch, and
+pre/post state is checked under the lock. Whole-row DELETE checks all five current
+Role scalars: name-only allow or a name-field DENY must leave the row unchanged;
+unrestricted authorized deletion succeeds. Scalar coverage is checked against the
+generated model enum.
+
+<!-- role-authorization-recipe:start -->
 
 ```typescript
-import { CheckPolicies } from '@/core/auth/decorators/check-policies.decorator'
-import { Action, Subject } from '@amcore/shared'
+import { subject } from '@casl/ability'
 
-@CheckPolicies(ability => ability.can(Action.Read, Subject.Contact))
-@Get('/contacts')
-getContacts() { ... }
-```
+import { ForbiddenException } from '../../src/common/exceptions'
+import type { AppAbility } from '../../src/core/auth/casl/ability.factory'
+import { accessibleBy, createCaslExtension } from '../../src/core/auth/casl/prisma-ability'
+import type { Prisma, Role } from '../../src/generated/prisma/client'
+import type { PrismaService } from '../../src/prisma'
 
-**Combined with an auth type:**
+export const ROLE_SCALAR_FIELDS = [
+  'id',
+  'name',
+  'description',
+  'isSystem',
+  'organizationId',
+] as const
+const operators = new Set(['equals', 'in', 'notIn', 'not', 'lt', 'lte', 'gt', 'gte'])
 
-```typescript
-@Auth(AuthType.Bearer)
-@CheckPolicies(ability => ability.can(Action.Create, Subject.Contact))
-@Post('/contacts')
-createContact(@Body() dto: CreateContactDto) { ... }
-```
-
-**Manual check inside a service** — when the decision depends on the loaded row:
-
-```typescript
-// principal is the authenticated RequestPrincipal supplied to the service.
-const ability = await this.abilityFactory.createForUser(principal)
-if (!ability.can('update', subject('Contact', { assignedToId: principal.sub }))) {
-  throw new ForbiddenException()
+function validateCondition(value: unknown, fieldValue = false): void {
+  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Unsupported recipe condition')
+  for (const [key, item] of Object.entries(value)) {
+    if (!fieldValue && ['AND', 'OR', 'NOT'].includes(key)) {
+      const items = Array.isArray(item) ? item : [item]
+      if (!items.length) throw new Error('Empty logical recipe condition')
+      items.forEach((part) => validateCondition(part))
+    } else if (
+      !fieldValue &&
+      ROLE_SCALAR_FIELDS.includes(key as (typeof ROLE_SCALAR_FIELDS)[number])
+    ) {
+      validateCondition(item, true)
+    } else if (fieldValue && operators.has(key)) {
+      if (key === 'in' || key === 'notIn') {
+        if (!Array.isArray(item)) throw new Error('Invalid scalar membership')
+        item.forEach((part) => validateCondition(part, true))
+      } else validateCondition(item, true)
+    } else throw new Error('Unsupported recipe operator or scalar')
+  }
 }
-```
 
-For list/read paths, let CASL generate the `WHERE` clause instead of hand-writing
-filters — see the next section.
-
----
-
-## Adding your own subjects
-
-Out of the box, permissions cover `User`, `Organization`, `Role`, and
-`Permission`. To protect your own domain models:
-
-**1. Extend the `Subject` enum** in `packages/shared/src/enums/permissions.ts`
-and rebuild `@amcore/shared` (skipping the rebuild leaves the API rejecting the
-new subject with `400`):
-
-```typescript
-export enum Subject {
-  User = 'User',
-  Organization = 'Organization',
-  Role = 'Role',
-  Permission = 'Permission',
-  Contact = 'Contact', // ← your subjects
-  Deal = 'Deal',
-  All = 'all',
+function assertAction(
+  ability: AppAbility,
+  action: string,
+  row: Role,
+  fields: readonly string[]
+): void {
+  const record = subject('Role', row)
+  if (!ability.can(action, record) || fields.some((field) => !ability.can(action, record, field))) {
+    throw new ForbiddenException('Role record or field permission denied')
+  }
 }
-```
 
-**2. Guard the controller** with `@CheckPolicies` (see above).
+function project(ability: AppAbility, row: Role): Partial<Role> | null {
+  const record = subject('Role', row)
+  if (!ability.can('read', record) || !ability.can('read', record, 'id')) return null
+  return Object.fromEntries(
+    ROLE_SCALAR_FIELDS.filter((field) => ability.can('read', record, field)).map((field) => [
+      field,
+      row[field],
+    ])
+  )
+}
 
-**3. Filter reads with `accessibleBy`** so scope conditions apply automatically. `@casl/prisma`
-v2's `accessibleBy` no longer throws on its own — an unsatisfiable condition can otherwise
-surface as a raw Prisma query error instead of failing closed cleanly, because Prisma doesn't
-reliably mock an empty `OR` ([prisma/prisma#17367](https://github.com/prisma/prisma/issues/17367)).
-Extend the Prisma Client with `createCaslExtension()` **before** the first `accessibleBy()`
-call — AMCore does not wire this extension in by default since nothing in the starter calls
-`accessibleBy()` yet:
-
-```typescript
-import { accessibleBy, createCaslExtension } from '@casl/prisma'
-
-// Once, wherever the Prisma Client is constructed:
-const prisma = new PrismaClient().$extends(createCaslExtension())
-
-@Get('/contacts')
-findAll(@CurrentAbility() ability: AppAbility) {
-  return this.prisma.contact.findMany({
-    where: accessibleBy(ability).Contact, // WHERE clause derived from permissions
+/** Test/docs fixture only: uses the injected pool; actual team routes require TeamAccess. */
+export function roleAuthorizationRecipe(
+  prisma: PrismaService,
+  ability: AppAbility,
+  organizationId: string
+): {
+  list: () => Promise<Partial<Role>[]>
+  count: () => Promise<number>
+  read: (id: string) => Promise<Partial<Role>>
+  update: (id: string, patch: Record<string, unknown>) => Promise<void>
+  remove: (id: string) => Promise<void>
+} {
+  for (const rule of ability.rules) {
+    const subjects = Array.isArray(rule.subject) ? rule.subject : [rule.subject]
+    if (rule.conditions && subjects.some((name) => name === 'Role' || name === 'all'))
+      validateCondition(rule.conditions)
+  }
+  const client = prisma.$extends(createCaslExtension())
+  const where = (action: string): Prisma.RoleWhereInput => ({
+    AND: [accessibleBy(ability, action).ofType('Role'), { organizationId }],
   })
+  const lock = async (tx: Pick<typeof client, '$queryRaw' | 'role'>, id: string): Promise<Role> => {
+    await tx.$queryRaw`SELECT id FROM core.roles WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`
+    const row = await tx.role.findFirst({ where: { id, organizationId } })
+    if (!row) throw new ForbiddenException('Role outside authorized tenant')
+    return row
+  }
+  return {
+    list: async (): Promise<Partial<Role>[]> => {
+      const rows = await client.role.findMany({ where: where('read'), orderBy: { id: 'asc' } })
+      return rows.map((row) => project(ability, row)).filter((row) => row !== null)
+    },
+    count: async (): Promise<number> => client.role.count({ where: where('read') }),
+    read: async (id: string): Promise<Partial<Role>> => {
+      const row = await client.role.findFirst({ where: { AND: [where('read'), { id }] } })
+      const result = row ? project(ability, row) : null
+      if (!result) throw new ForbiddenException('Role read denied')
+      return result
+    },
+    update: async (id: string, patch: Record<string, unknown>): Promise<void> => {
+      const fields = Object.keys(patch)
+      if (
+        fields.some((field) => !['name', 'description'].includes(field)) ||
+        (patch.name !== undefined && typeof patch.name !== 'string') ||
+        (patch.description !== undefined &&
+          patch.description !== null &&
+          typeof patch.description !== 'string')
+      ) {
+        throw new ForbiddenException('Immutable or invalid Role field')
+      }
+      await client.$transaction(async (tx) => {
+        const row = await lock(tx, id)
+        assertAction(ability, 'update', row, fields)
+        // Role has no automatic timestamps or generated mutable scalars.
+        assertAction(ability, 'update', { ...row, ...patch } as Role, fields)
+        const changed = await tx.role.updateMany({
+          where: { AND: [where('update'), { id }] },
+          data: patch as Prisma.RoleUpdateManyMutationInput,
+        })
+        if (changed.count !== 1) throw new ForbiddenException('Role update predicate denied')
+      })
+    },
+    remove: async (id: string): Promise<void> => {
+      await client.$transaction(async (tx) => {
+        const row = await lock(tx, id)
+        assertAction(ability, 'delete', row, ROLE_SCALAR_FIELDS)
+        const deleted = await tx.role.deleteMany({ where: { AND: [where('delete'), { id }] } })
+        if (deleted.count !== 1) throw new ForbiddenException('Role delete predicate denied')
+      })
+    },
+  }
 }
 ```
 
-An `ADMIN` then sees all contacts and a `MEMBER` with a conditional permission
-sees only their own — with zero branching in the service.
-
-**4. Seed or grant permissions** for the new subject — add them to
-`prisma/seed.ts`, or let org admins create them at runtime via the roles API.
-
----
+<!-- role-authorization-recipe:end -->
 
 ## Freshness & caching
 
@@ -319,8 +470,8 @@ PostgreSQL `REPEATABLE READ` transaction. This prevents mixing relationship rows
 from different committed states. The version is a cache-selection fence, not an
 exact snapshot revision: an overlapping fill may contain newer coherent rules
 under an older key. Later lookups select the newer key regardless. Empty rule
-sets are cached too. Existing role filtering and permission ordering remain in
-effect; this mechanism does not redefine authorization semantics.
+sets are cached too. Role/permission ownership filtering remains; effective rules use the deterministic
+DENY-overrides contract above.
 
 ### The JWT `aclVersion` is not trusted
 
@@ -368,9 +519,8 @@ warm org-scoped JWT authorization now requires a database round-trip.
 ## Managing roles, permissions & members
 
 Role, permission and member management require matching organization context and
-`manage:Organization` permission. For JWTs, call `/switch` first. An `ADMIN` has
-this permission; a custom role can grant it too. Supported API keys use their
-bound organization and must also have a scope permitting the operation. See
+full `TeamAccess` authority as described above. For JWTs, call `/switch` first.
+Supported keys additionally require exact `manage:TeamAccess`. See
 `/docs` for each route's credentials and exact shapes; the semantics that matter:
 
 - **Roles list** is paginated and ordered `isSystem DESC, name ASC` so system
@@ -407,6 +557,7 @@ key can never exceed its creator's access even if scoped broadly, and
 
 ## See also
 
+- [Controlled authorization upgrade](./authorization-upgrade.md) — audit, maintenance, recovery.
 - [Concepts](./concepts.md) — tokens, sessions, the authentication model.
 - [Sessions](./sessions.md) — rotation and revocation (incl. role-change revoke).
 - [CSRF Posture](./csrf.md) — cookie surfaces and CSRF handling.
