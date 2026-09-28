@@ -140,6 +140,8 @@ The allowlist:
 | `POST /organizations`           | ❌                | Creates a new org and makes the caller ADMIN. A scoped key bound to org A could otherwise spin up org C — cross-org expansion via integration credential. Org creation is interactive.                                                                                                                                                        |
 | `GET /organizations`            | ❌                | Returns every org the owner belongs to — leaks org-membership topology beyond the key's bound org. Use the key's `organizationId` instead.                                                                                                                                                                                                    |
 | `GET /organizations/:id`        | ✅                | API key allowed **only when bound to that exact org** (`principal.organizationId === :id`) — read of another org returns 403. Actual record conditions and all six response-field permissions must pass; partial grants return 403. JWT principals keep the existing membership-based read so users can browse orgs before calling `/switch`. |
+| `PATCH /organizations/:id`      | ✅                | Bound-org update requires owner permissions and scopes for every input field and all returned fields; actual post-state authorization runs inside the transaction.                                                                                                                                                                            |
+| `DELETE /organizations/:id`     | ✅                | Requires trusted owner TeamAccess, exact `manage:TeamAccess` scope, and scoped owner delete authority on every Organization scalar.                                                                                                                                                                                                           |
 | `/organizations/:id/switch`     | ❌                | Mints a new JWT — would let a scoped key trade itself for a full-permission token.                                                                                                                                                                                                                                                            |
 | `/organizations/:id/members/**` | ✅                | Member management requires full owner TeamAccess and exact `manage:TeamAccess` scope. Role assignment validates role ownership — a member of org A cannot be assigned a custom role from org B.                                                                                                                                               |
 | `/organizations/:id/roles/**`   | ✅                | Org-role management requires full owner TeamAccess and exact `manage:TeamAccess` scope. `GET /organizations/:id/roles` requires `principal.organizationId === :id` so an admin switched into one org cannot enumerate another org's role/permission catalogue.                                                                                |
@@ -225,7 +227,7 @@ curl -X DELETE https://api.example.com/api/v1/api-keys/cm1xyz... \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
-**Success response:** `204 No Content`. The key is immediately invalid; any in-flight request authenticated with it returns `401`.
+**Success response:** `204 No Content`. Authentication reads the key from the database, so verification starting after revocation commits returns `401`. A request already admitted before revocation may finish; revocation does not cancel in-flight handlers.
 
 ---
 
@@ -268,14 +270,14 @@ so the meaning lives in `errorCode` and `message` is Zod's generic default.
 
 ## Authorization failures
 
-These are separate from schema validation — they happen at request time on routes that check policies (`@CheckPolicies(can(action, Subject))`):
+These are separate from schema validation — they happen at request time in TeamAccess admission and service record/field checks:
 
 | Status | Cause                                                                                 |
 | ------ | ------------------------------------------------------------------------------------- |
 | `401`  | Key revoked, expired, owner lost org membership, or org deleted                       |
 | `403`  | Authenticated successfully, but scope intersection doesn't grant the required ability |
 
-A common case: a key with `scopes: ["read:Organization"]` calling `PATCH /api/v1/organizations/:id`. The intersection narrows action to `read`, and PATCH requires `manage`, so the policy guard returns `403`.
+A common case: a key with `scopes: ["read:Organization"]` calling `PATCH /api/v1/organizations/:id`. The intersection grants no update action, so the service returns `403`. A permitted PATCH needs owner update rights for every supplied field, corresponding update scope, and read rights/scopes for every response field. TeamAccess is not required for PATCH.
 
 ---
 

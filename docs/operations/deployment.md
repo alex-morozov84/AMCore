@@ -361,8 +361,16 @@ first, migrate, then remove the old path in a later release.
 
 ## Seeding
 
-`pnpm --filter api db:seed` is dev/demo only. There is no implicit production
-seed; production rollout runs `migrate deploy` and nothing else.
+Production rollout runs `migrate deploy` without an implicit seed. A clean database
+has no organization role templates after migration; before organization creation,
+an operator must explicitly initialize them on the selected target. The guarded
+authorization seed accepts clean databases or exact current templates; installed
+legacy policies require the [controlled authorization upgrade](../auth/authorization-upgrade.md).
+
+`pnpm --filter api db:seed` runs both authorization initialization and AI catalogue
+upserts. Review both effects before using it on an installation: exact current
+authorization templates are unchanged, but AI catalogue defaults are reapplied.
+It is not a routine production migration or a repair command.
 
 ## Process roles: web / worker
 

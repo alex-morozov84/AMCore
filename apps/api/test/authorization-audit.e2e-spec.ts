@@ -208,6 +208,129 @@ describe('Read-only audit and recovery rehearsal (real PostgreSQL)', () => {
       })
     ).rejects.toThrow()
   })
+
+  it('reviewed member-link repair rolls back links and version on failure', async () => {
+    const legacy = await seedLegacyAuthorization(db)
+    await db.pool.query(defaultsMigrationSql())
+    const member = legacy.members[0]!
+    const restriction = await db.prisma.role.create({
+      data: {
+        name: 'Reviewed restriction',
+        organizationId: member.organizationId,
+        permissions: {
+          create: {
+            permission: {
+              create: {
+                action: 'manage',
+                subject: 'TeamAccess',
+                inverted: true,
+                organizationId: member.organizationId,
+              },
+            },
+          },
+        },
+      },
+    })
+    const link = await db.prisma.memberRole.create({
+      data: { memberId: member.id, roleId: restriction.id },
+    })
+    const before = await db.prisma.organization.findUniqueOrThrow({
+      where: { id: member.organizationId },
+    })
+    await expect(
+      db.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'org:last-admin:' + member.organizationId}))`
+        await tx.$queryRaw`SELECT id FROM core.organizations WHERE id=${member.organizationId} FOR UPDATE`
+        await tx.memberRole.delete({ where: { id: link.id } })
+        await tx.organization.update({
+          where: { id: member.organizationId },
+          data: { aclVersion: { increment: 1 } },
+        })
+        throw new Error('reviewed recovery failure')
+      })
+    ).rejects.toThrow('reviewed recovery failure')
+    expect(await db.prisma.memberRole.findUniqueOrThrow({ where: { id: link.id } })).toEqual(link)
+    expect(
+      await db.prisma.organization.findUniqueOrThrow({ where: { id: member.organizationId } })
+    ).toEqual(before)
+    expect(
+      (await db.audit()).find((row) => row.type === 'member' && row.memberId === member.id)
+        ?.structuralTeamAccess
+    ).toBe(false)
+  })
+
+  it('shared ADMIN repair restores actual authority and bumps every affected org atomically', async () => {
+    const legacy = await seedLegacyAuthorization(db)
+    const adminId = legacy.roles[0]!.id
+    await db.prisma.memberRole.create({
+      data: { memberId: legacy.members[1]!.id, roleId: adminId },
+    })
+    await db.pool.query(defaultsMigrationSql())
+    const permissionId = 'org-default-v2-team-access'
+    await db.prisma.permission.update({ where: { id: permissionId }, data: { inverted: true } })
+    const versions = await db.prisma.organization.findMany({ orderBy: { id: 'asc' } })
+    const identities = await db.prisma.memberRole.findMany({ orderBy: { id: 'asc' } })
+    const repair = async (fail: boolean): Promise<void> => {
+      await db.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`LOCK TABLE core.organizations, core.org_members, core.member_roles, core.roles, core.role_permissions, core.permissions IN SHARE ROW EXCLUSIVE MODE`
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(170017001)`
+        const affected = await tx.orgMember.findMany({
+          where: {
+            roles: { some: { role: { permissions: { some: { permissionId } } } } },
+          },
+          select: { organizationId: true },
+        })
+        const orgIds = [...new Set(affected.map((member) => member.organizationId))].sort()
+        expect(orgIds).toEqual(
+          legacy.organizations
+            .slice(0, 2)
+            .map((org) => org.id)
+            .sort()
+        )
+        await tx.permission.update({ where: { id: permissionId }, data: { inverted: false } })
+        await tx.organization.updateMany({
+          where: { id: { in: orgIds } },
+          data: { aclVersion: { increment: 1 } },
+        })
+        if (fail) throw new Error('shared recovery failure')
+      })
+    }
+    await expect(repair(true)).rejects.toThrow('shared recovery failure')
+    expect(
+      (await db.prisma.permission.findUniqueOrThrow({ where: { id: permissionId } })).inverted
+    ).toBe(true)
+    expect(await db.prisma.organization.findMany({ orderBy: { id: 'asc' } })).toEqual(versions)
+    await repair(false)
+    for (const [index, org] of legacy.organizations.entries()) {
+      expect(
+        (await db.prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).aclVersion
+      ).toBe(13 + (index < 2 ? 1 : 0))
+    }
+    expect(await db.prisma.memberRole.findMany({ orderBy: { id: 'asc' } })).toEqual(identities)
+    for (const member of legacy.members.slice(0, 2)) {
+      const rules = (
+        await db.prisma.memberRole.findMany({
+          where: { memberId: member.id },
+          include: { role: { include: { permissions: { include: { permission: true } } } } },
+        })
+      ).flatMap((link) => link.role.permissions.map((item) => item.permission))
+      const factory = new AbilityFactory(
+        { getPermissions: async () => rules } as never,
+        { getCurrent: async () => 14 } as never
+      )
+      const context = await factory.createAuthorizationContext({
+        type: 'jwt',
+        sub: member.userId,
+        organizationId: member.organizationId,
+        aclVersion: 0,
+        systemRole: SystemRole.User,
+      })
+      expect(context.teamAccess.ownerTrusted).toBe(true)
+      expect(context.teamAccess.aclVersion).toBe(14)
+    }
+    expect((await db.audit())[0]?.templateState).toBe('v2')
+  })
+
   it('exact psql report works with SELECT-only table rights', async () => {
     await seedOrgRoles(db.prisma)
     await db.pool.query(

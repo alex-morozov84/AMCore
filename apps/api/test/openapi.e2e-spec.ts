@@ -199,6 +199,11 @@ describe('OpenAPI success surface (e2e)', () => {
     const serialized = JSON.stringify(schema)
     expect(serialized).toContain('TeamAccess')
     expect(serialized).toMatch(/oneOf|anyOf/)
+    const org = document.paths['/organizations/{id}']!
+    expect(org.get?.description).toContain('membership-based discovery')
+    expect(org.get?.description).toContain('all six response fields')
+    for (const method of ['get', 'patch', 'delete'] as const)
+      expect(org[method]?.responses?.['404']).toBeDefined()
   })
 
   const isExcluded = (path: string): boolean =>

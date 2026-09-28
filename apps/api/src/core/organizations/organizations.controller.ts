@@ -14,6 +14,7 @@ import {
   ApiBearerAuth,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOperation,
   ApiQuery,
   ApiSecurity,
@@ -152,8 +153,13 @@ export class OrganizationsController {
    */
   @Get(':id')
   @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
+  @ApiNotFoundResponse({ description: 'Organization missing or caller is not a member' })
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Get organization details (must be a member)' })
+  @ApiOperation({
+    summary: 'Get organization details (must be a member)',
+    description:
+      'JWT: membership-based discovery without switching organization context. API key: bound organization, actual record conditions and read permission for all six response fields; partial grants return 403.',
+  })
   @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Organization details' })
   findOne(
     @Param('id') id: string,
@@ -165,6 +171,7 @@ export class OrganizationsController {
 
   @Patch(':id')
   @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
+  @ApiNotFoundResponse({ description: 'Organization missing' })
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({
     summary:
@@ -182,6 +189,7 @@ export class OrganizationsController {
 
   @Delete(':id')
   @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
+  @ApiNotFoundResponse({ description: 'Organization missing' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('id')
   @ApiSecurity('apiKeyBearer')

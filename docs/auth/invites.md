@@ -22,7 +22,7 @@ Recipient clicks link →  signs in / signs up  →  POST /auth/invites/accept
                          → membership created with the assigned role
 ```
 
-- **Create** is an full team-administration action (`manage:TeamAccess`). It
+- **Create** is a full team-administration action (`manage:TeamAccess`). It
   accepts a bearer token **or** an API key bound to the org with exact `manage:TeamAccess` scope and trusted owner.
 - **List / revoke** and **accept** are **bearer-only** — accepting proves
   ownership of the invited email, which a long-lived API key must not do.

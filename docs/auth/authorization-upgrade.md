@@ -90,11 +90,14 @@ deploy`) using the selected operator connection. Never use migrate dev/db push
    the intended administrators. Start only the new API version, probe actual
    JWT/key behavior, then reopen traffic.
 
-Seed (`pnpm --filter api db:seed`) is for a clean install or exact-v2 verification.
-It serializes with migration/other seeds, creates all defaults atomically, and
+The authorization part of seed (`pnpm --filter api db:seed`) initializes a clean
+install or validates exact-v2 templates without changing their grants or versions.
+It serializes with migration/other seeds, creates authorization defaults atomically, and
 fails on legacy/partial/ambiguous installations with migration/recovery guidance.
-Rerunning seed is not an installed-policy upgrade strategy. AI catalogue seeding
-is separate from authorization initialization.
+Rerunning seed is not an installed-policy upgrade strategy. The same command also
+runs separate AI catalogue upserts and reapplies their defaults; review that effect
+before running it on an existing installation. The read-only audit is the report
+command; the full seed command is not a read-only verification tool.
 
 Old `manage:Organization` keys lose role/member/invite administration. Intentionally
 issue a replacement key with exact `manage:TeamAccess` to an eligible owner, update
