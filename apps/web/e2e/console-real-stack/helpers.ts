@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 const project = process.env.CONSOLE_E2E_PROJECT ?? 'amcore-console-e2e'
 
 export function setSystemRole(email: string, role: 'USER' | 'SUPER_ADMIN'): void {
-  execFileSync(
+  const output = execFileSync(
     'docker',
     [
       'compose',
@@ -18,11 +18,16 @@ export function setSystemRole(email: string, role: 'USER' | 'SUPER_ADMIN'): void
       'amcore',
       '-d',
       'amcore',
+      '-v',
+      'ON_ERROR_STOP=1',
       '-c',
       `UPDATE core.users SET "systemRole" = '${role}' WHERE "emailCanonical" = '${email}';`,
     ],
-    { stdio: 'pipe' }
+    { encoding: 'utf8' }
   )
+  if (output.trim() !== 'UPDATE 1') {
+    throw new Error(`Expected exactly one registered user for role setup; got ${output.trim()}`)
+  }
 }
 
 /** See `e2e/real-stack/admin-helpers.ts`'s `countLiveSessions` — same reason
