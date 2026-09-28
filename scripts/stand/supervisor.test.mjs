@@ -5,6 +5,7 @@ import { rm } from 'node:fs/promises'
 import { root, directory, lease, save } from './state.mjs'
 import { supervise } from './supervisor.mjs'
 import { run, cleanEnvironment } from './process.mjs'
+import { allocateControlSocket } from './control-socket.mjs'
 
 test('active controller pins transport, source and resource generation; tampering refuses before data access', async () => {
   const id = `supervisor-${randomUUID()}`
@@ -23,7 +24,7 @@ test('active controller pins transport, source and resource generation; tamperin
     configHash: 'config',
     relay: 'http://127.0.0.1:24445',
     runToken: held.token,
-    controlSocket: `/private/tmp/amcore-${uuid}.sock`,
+    controlSocket: await allocateControlSocket(),
     resources: { container: ['owned-container'] },
     engine: { context: 'local' },
   }
@@ -36,6 +37,7 @@ test('active controller pins transport, source and resource generation; tamperin
       env: cleanEnvironment({
         AMCORE_STAND_MANIFEST: `${directory(id)}/manifest.json`,
         AMCORE_STAND_TOKEN: held.token,
+        TMPDIR: `${directory(id)}/different-runner-temp`,
       }),
     })
   try {

@@ -3,6 +3,7 @@ import { targetProof } from './target-proof.mjs'
 import { lstat } from 'node:fs/promises'
 import { connect } from 'node:net'
 import { readFile } from 'node:fs/promises'
+import { validateControlSocket } from './control-socket.mjs'
 
 const path = process.env.AMCORE_STAND_MANIFEST
 const token = process.env.AMCORE_STAND_TOKEN
@@ -27,9 +28,8 @@ const owner = JSON.parse(
   await readFile(`${m.worktree}/.amcore/stands/${m.id}/lease/owner.json`, 'utf8')
 )
 if (owner.token !== token || m.runToken !== token) throw new Error('Managed run lease mismatch')
+await validateControlSocket(m.controlSocket)
 await new Promise((resolve, reject) => {
-  if (m.controlSocket !== `/private/tmp/amcore-${m.uuid}.sock`)
-    throw new Error('Foreign control socket')
   const socket = connect(m.controlSocket)
   socket.setTimeout(3000, () => socket.destroy(new Error('Run supervisor unavailable')))
   socket.on('error', reject)

@@ -5,6 +5,7 @@ import { relay } from './relay.mjs'
 import { directory, save } from './state.mjs'
 import { supervise } from './supervisor.mjs'
 import { mockEnvironment } from './mock-environment.mjs'
+import { allocateControlSocket } from './control-socket.mjs'
 
 export async function test(m, lane, token, extra = []) {
   const mocked = lane === 'mocked'
@@ -20,7 +21,7 @@ export async function test(m, lane, token, extra = []) {
     env: cleanEnvironment(mocked ? mockEnvironment(m) : {}),
   })
   const proxy = await relay(Object.values(m.origins))
-  m.controlSocket = `/private/tmp/amcore-${m.uuid}.sock`
+  m.controlSocket = await allocateControlSocket()
   m.relay = proxy.url
   m.runToken = token
   m.lane = lane
@@ -47,7 +48,10 @@ export async function test(m, lane, token, extra = []) {
     m.testOutcome = 'failed'
     throw error
   } finally {
-    if (close) await close()
+    if (close) {
+      await close()
+      delete m.controlSocket
+    }
     await proxy.close()
     delete m.runToken
     delete m.relay

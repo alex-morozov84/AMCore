@@ -4,6 +4,8 @@ import { cleanup, discover } from './ownership.mjs'
 import { assertNoSurvivors } from './survivors.mjs'
 import { engine } from './docker.mjs'
 import { run } from './process.mjs'
+import { disposeControlSocket } from './control-socket.mjs'
+import { verifyRunnerRemoval } from './wrapper-removal.mjs'
 
 export async function closeout() {
   const records = []
@@ -20,7 +22,7 @@ export async function closeout() {
     )
     if (present) records.push(await load(id))
   }
-  for (const m of records) {
+  for (const m of records.sort((a, b) => Number(Boolean(a.wrapper)) - Number(Boolean(b.wrapper)))) {
     const held = await lease(m.id, 'closeout')
     try {
       await closeoutStand(m)
@@ -60,6 +62,8 @@ export async function closeoutStand(m) {
         throw new Error('Stand resources remain')
     }
     await assertNoSurvivors(m)
+    await disposeControlSocket(m.controlSocket)
+    await verifyRunnerRemoval(m)
     m.state = 'purged'
     m.closeout = { verifiedAt: new Date().toISOString() }
     await save(m)

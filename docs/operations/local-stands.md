@@ -96,10 +96,18 @@ resources are preserved with recovery metadata. No prune, default-project cleanu
 or automatic adoption of legacy resources is supported.
 
 A lease covers startup, admission, tests and cleanup. Competing mutation commands
-refuse. SIGINT/SIGTERM stops and awaits owned children before removing resources;
-forced termination leaves records for explicit recovery. Recovery refuses a live
-or reused PID or possible surviving child; inspect the recorded processes before
-retrying. Do not remove a lease merely because it is old. If the original worktree
+refuse. SIGINT/SIGTERM stops and awaits proved-owned process groups, including
+descendants after their direct parent exits, before removing resources. Console
+wrappers forward cancellation to their managed runner and await its cleanup;
+they retain their own lease and child journal when verification fails.
+The wrapper record also names its runner's recovery manifest; wrapper recovery
+or closeout refuses an unfinished runner, including one in an external fixture.
+The journal retains groups until their absence is verified; signalling requires
+a live member's recorded PID and birth identity. Unproved identity, a surviving
+group or forced termination preserves recovery and makes cleanup incomplete.
+Recovery refuses any live or reused recorded PID/group; inspect the recorded
+processes before retrying. Do not remove a lease merely because it is old. If the
+original worktree
 is missing, preserve/restore its private record under a surviving checkout and use
 `down --id <stand-id> --orphan --purge`; this path refuses live worktrees and
 unfinished test leases, and proves physical resources before deleting them.
@@ -144,6 +152,14 @@ No DB/Redis/API is provisioned. MSW server interceptors use the synthetic
 backend. Next testProxy's process-owned callback channel is separate from browser
 proxy admission. Ordinary manual dev output remains independent.
 
+The supervisor uses an allocated 0700 directory under the platform's `/tmp`,
+with a short socket path recorded in the admitted run manifest. Child TMPDIR
+does not change that location. Normal completion removes it; recovery/closeout
+removes a stale socket only after process absence and socket ownership checks.
+For the explicit Linux startup proof, run
+`pnpm test:stands --linux-startup-proof --test-name-pattern='Linux managed'`.
+This provisions a separate Linux fixture container; ordinary safety runs skip it.
+
 ## Compose files
 
 Keep `docker-compose.yml` as the root reference deployment entry point. Optional
@@ -162,7 +178,13 @@ managed local commands do not replace those deployment contracts.
 
 Run `pnpm stand closeout` in the task checkout before deleting its worktree. It
 purges every proved-owned local stand, verifies that labelled containers, networks
-and volumes are gone, and checks for surviving processes. Also verify any external
+and volumes are gone, and checks recorded process groups as well as source paths
+for survivors; a short or changed process title does not waive group checks.
+Kernel cwd inspection also blocks removal for an unobserved, reparented child
+under the stand source: `/proc` on Linux and `lsof` on macOS. Inventory failure is
+an incomplete check, never proof of absence. Such a child is recorded for manual
+inspection, not automatically signalled from its cwd alone.
+Also verify any external
 fixture checkout recorded by the task's specialized proofs. Never delete the
 worktree or its recovery records after a failure: closeout is incomplete until
 resource/process removal is proved. Retaining a stand requires an explicit owner

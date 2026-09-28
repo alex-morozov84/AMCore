@@ -1,6 +1,6 @@
 import { writeFileSync, renameSync } from 'node:fs'
 import { spawn } from 'node:child_process'
-import { clearTimeout } from 'node:timers'
+import { processTable, observeGroup, observeTree } from './process-groups.mjs'
 
 const allowed = ['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL', 'TERM', 'CI']
 export function cleanEnvironment(extra = {}, source = process.env) {
@@ -32,13 +32,29 @@ function recordChildren() {
   writeFileSync(
     tmp,
     JSON.stringify(
-      [...children].map((c) => ({ pid: c.pid, cwd: c.standCwd, started: c.standStarted }))
+      [...children].map((c) => ({
+        pid: c.pid,
+        cwd: c.standCwd,
+        started: c.standStarted,
+        members: c.standMembers,
+        closed: c.standClosed,
+        proofError: c.standProofError,
+        groups: c.standDetached?.map((group) => ({
+          pid: group.pid,
+          started: group.started,
+          members: group.standMembers,
+        })),
+      }))
     ),
     { mode: 0o600 }
   )
   renameSync(tmp, journal)
 }
-export function run(command, args, { cwd, env = cleanEnvironment(), capture = false, input } = {}) {
+export function run(
+  command,
+  args,
+  { cwd, env = cleanEnvironment(), capture = false, input, signal } = {}
+) {
   if (cancelled) return Promise.reject(new Error('Stand interrupted; new subprocess refused'))
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -49,8 +65,38 @@ export function run(command, args, { cwd, env = cleanEnvironment(), capture = fa
     })
     child.standCwd = cwd
     child.standStarted = new Date().toISOString()
-    children.add(child)
-    recordChildren()
+    if (child.pid) {
+      children.add(child)
+      try {
+        const leader = processTable().find((row) => row.pid === child.pid && row.pgid === child.pid)
+        child.standMembers = leader ? [{ pid: leader.pid, started: leader.started }] : []
+        child.standLeaderStarted = leader?.started
+        updateChild(child)
+      } catch (error) {
+        child.standProofError = error.message
+      }
+      recordChildren()
+    }
+    const monitor = setInterval(() => {
+      try {
+        updateChild(child)
+      } catch (error) {
+        child.standProofError = error.message
+      }
+      recordChildren()
+    }, 100)
+    const cancel = () => {
+      try {
+        const leader = processTable().find((row) => row.pid === child.pid)
+        if (!leader) return
+        if (leader.pgid !== child.pid || leader.started !== child.standLeaderStarted)
+          throw new Error('Runner PID identity unproved or reused; cancellation refused')
+        process.kill(child.pid, signal.reason)
+      } catch (error) {
+        child.standProofError = error.message
+      }
+    }
+    signal?.addEventListener('abort', cancel, { once: true })
     let output = ''
     let error = ''
     child.stdout?.on('data', (chunk) => {
@@ -60,14 +106,24 @@ export function run(command, args, { cwd, env = cleanEnvironment(), capture = fa
       error = (error + chunk).slice(-8000)
       if (!capture) process.stderr.write(chunk)
     })
-    child.on('error', reject)
-    child.on('close', (code, signal) => {
-      children.delete(child)
+    child.on('error', (error) => {
+      clearInterval(monitor)
+      reject(error)
+    })
+    child.on('close', (code, exitSignal) => {
+      clearInterval(monitor)
+      signal?.removeEventListener('abort', cancel)
+      child.standClosed = true
+      try {
+        updateChild(child)
+      } catch (error) {
+        child.standProofError = error.message
+      }
       recordChildren()
       if (code === 0) resolve(output)
       else {
         const failure = new Error(
-          `${command} failed (${signal ?? code})${capture ? `: ${error.trim()}` : ''}`
+          `${command} failed (${exitSignal ?? code})${capture ? `: ${error.trim()}` : ''}`
         )
         failure.stderr = error
         reject(failure)
@@ -77,26 +133,46 @@ export function run(command, args, { cwd, env = cleanEnvironment(), capture = fa
   })
 }
 
-export async function stopChildren() {
-  const active = [...children]
-  const exits = active.map((child) => new Promise((resolve) => child.once('close', resolve)))
-  for (const child of active) {
-    try {
-      process.kill(-child.pid, 'SIGTERM')
-    } catch {
-      /* Child already exited. */
-    }
+function updateChild(child) {
+  if (!children.has(child)) return false
+  if (!observeTree(child)) {
+    children.delete(child)
+    return false
   }
-  const timer = setTimeout(() => {
-    for (const child of active)
-      if (children.has(child)) {
+  delete child.standProofError
+  return true
+}
+
+let stopping
+export function stopChildren() {
+  stopping ??= stopGroups().finally(() => {
+    stopping = undefined
+  })
+  return stopping
+}
+
+async function stopGroups() {
+  const began = Date.now()
+  const signalled = new Map()
+  while (children.size) {
+    for (const child of [...children]) {
+      if (!updateChild(child)) continue
+      const signal = Date.now() - began >= 5000 ? 'SIGKILL' : 'SIGTERM'
+      for (const group of [child, ...(child.standDetached ?? [])]) {
+        if (!observeGroup(group) || signalled.get(group) === signal) continue
+        // A live member with the recorded birth identity anchors this group.
         try {
-          process.kill(-child.pid, 'SIGKILL')
-        } catch {
-          /* Child already exited. */
+          process.kill(-group.pid, signal)
+        } catch (error) {
+          if (error.code !== 'ESRCH') throw error
         }
+        signalled.set(group, signal)
       }
-  }, 5000)
-  await Promise.all(exits)
-  clearTimeout(timer)
+    }
+    recordChildren()
+    if (Date.now() - began >= 10000)
+      throw new Error('Owned process group remains; retain lease/recovery, cleanup incomplete')
+    if (children.size) await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  recordChildren()
 }

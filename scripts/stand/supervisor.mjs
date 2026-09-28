@@ -1,8 +1,10 @@
 import { createServer } from 'node:net'
 import { rm } from 'node:fs/promises'
 import { targetProof } from './target-proof.mjs'
+import { validateControlSocket, removeControlDirectory } from './control-socket.mjs'
 
 export async function supervise(m, token) {
+  await validateControlSocket(m.controlSocket)
   const proof = targetProof(m)
   const server = createServer({ allowHalfOpen: true }, (socket) => {
     socket.setTimeout(3000, () => socket.destroy())
@@ -21,5 +23,6 @@ export async function supervise(m, token) {
   return async () => {
     await new Promise((resolve) => server.close(resolve))
     await rm(m.controlSocket, { force: true })
+    await removeControlDirectory(m.controlSocket)
   }
 }

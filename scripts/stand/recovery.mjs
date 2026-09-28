@@ -2,6 +2,9 @@ import { readFile, lstat, rm, mkdir, writeFile } from 'node:fs/promises'
 import { assertNoSurvivors } from './survivors.mjs'
 import { directory, load, lease, save } from './state.mjs'
 import { cleanup } from './ownership.mjs'
+import { assertGroupsAbsent } from './process-groups.mjs'
+import { disposeControlSocket } from './control-socket.mjs'
+import { verifyRunnerRemoval } from './wrapper-removal.mjs'
 
 export async function recover(id, purge) {
   const m = await load(id)
@@ -34,23 +37,10 @@ async function inspectAndRecover(m, id, purge) {
     if (e.code !== 'ESRCH') throw e
   }
   const recorded = JSON.parse(await readFile(`${path}/children.json`, 'utf8'))
-  for (const child of recorded) {
-    if (!Number.isInteger(child.pid) || !child.started)
-      throw new Error('Incomplete child recovery identity')
-    try {
-      process.kill(child.pid, 0)
-      throw new Error('Recorded child alive or PID reused; recovery refused')
-    } catch (e) {
-      if (e.code !== 'ESRCH') throw e
-    }
-    try {
-      process.kill(-child.pid, 0)
-      throw new Error('Recorded process group still alive; recovery refused')
-    } catch (e) {
-      if (e.code !== 'ESRCH') throw e
-    }
-  }
+  assertGroupsAbsent(recorded)
   await assertNoSurvivors(m)
+  await verifyRunnerRemoval(m)
+  await disposeControlSocket(m.controlSocket)
   await rm(path, { recursive: true })
   const held = await lease(id, 'recovery')
   try {

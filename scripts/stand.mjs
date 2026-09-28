@@ -18,7 +18,11 @@ for (const signal of ['SIGINT', 'SIGTERM'])
     interrupted = true
     requestCancellation()
     process.exitCode = signal === 'SIGINT' ? 130 : 143
-    await stopChildren()
+    try {
+      await stopChildren()
+    } catch (error) {
+      console.error(`Cancellation incomplete; retain lease/recovery: ${error.message}`)
+    }
   })
 async function execute() {
   if (action === 'help') {
