@@ -1,6 +1,7 @@
 # AGENTS.md
 
 [Agent development, owner previews and Playwright](docs/operations/local-stands.md). Agents use managed commands for local DB writes and previews.
+API e2e uses its own isolated Testcontainers as described in that guide.
 
 Guidance for AI coding agents (and humans) working in this repository. Any agent
 should read this first — it is the cross-tool standard ([agents.md](https://agents.md)).
