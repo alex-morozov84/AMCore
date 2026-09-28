@@ -98,7 +98,9 @@ or automatic adoption of legacy resources is supported.
 A lease covers startup, admission, tests and cleanup. Competing mutation commands
 refuse. SIGINT/SIGTERM stops and awaits proved-owned process groups, including
 descendants after their direct parent exits, before removing resources. Console
-wrappers forward cancellation to their managed runner and await its cleanup;
+wrappers stop interrupted preparation groups with proved TERM/KILL escalation,
+without waiting for inherited streams to close. After startup they forward
+cancellation only to their managed runner and await its graceful cleanup;
 they retain their own lease and child journal when verification fails.
 The wrapper record also names its runner's recovery manifest; wrapper recovery
 or closeout refuses an unfinished runner, including one in an external fixture.
@@ -158,7 +160,8 @@ does not change that location. Normal completion removes it; recovery/closeout
 removes a stale socket only after process absence and socket ownership checks.
 For the explicit Linux startup proof, run
 `pnpm test:stands --linux-startup-proof --test-name-pattern='Linux managed'`.
-This provisions a separate Linux fixture container; ordinary safety runs skip it.
+This requires an already-cached `node:24-slim` Docker image and provisions a
+separate Linux fixture container; ordinary safety runs skip it.
 
 ## Compose files
 

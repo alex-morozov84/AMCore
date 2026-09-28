@@ -4,8 +4,8 @@ import { root, directory, lease, save } from './state.mjs'
 import { assertNoSurvivors } from './survivors.mjs'
 import { verifyRunnerRemoval } from './wrapper-removal.mjs'
 
-// A wrapper's runner owns its own cleanup. Signal the proved direct runner first,
-// await its finally, then use the same group machinery to verify all descendants.
+// Preparation cancellation stops its proved groups without depending on stream close.
+// Managed runners opt into direct signalling: await their own cleanup before verification.
 export async function cancellation({ fixture, targetId } = {}) {
   let signal
   const controller = new globalThis.AbortController()

@@ -50,10 +50,12 @@ function recordChildren() {
   )
   renameSync(tmp, journal)
 }
+// Preparation aborts stop the proved group independently of stream closure.
+// Only managed runners opt into direct signalling so their own finally can clean resources.
 export function run(
   command,
   args,
-  { cwd, env = cleanEnvironment(), capture = false, input, signal } = {}
+  { cwd, env = cleanEnvironment(), capture = false, input, signal, graceful = false } = {}
 ) {
   if (cancelled) return Promise.reject(new Error('Stand interrupted; new subprocess refused'))
   return new Promise((resolve, reject) => {
@@ -85,16 +87,33 @@ export function run(
       }
       recordChildren()
     }, 100)
+    let cancellation
     const cancel = () => {
-      try {
-        const leader = processTable().find((row) => row.pid === child.pid)
-        if (!leader) return
-        if (leader.pgid !== child.pid || leader.started !== child.standLeaderStarted)
-          throw new Error('Runner PID identity unproved or reused; cancellation refused')
-        process.kill(child.pid, signal.reason)
-      } catch (error) {
-        child.standProofError = error.message
+      if (graceful) {
+        try {
+          signalLeader(child, signal.reason)
+        } catch (error) {
+          child.standProofError = error.message
+          recordChildren()
+          interrupted(error)
+        }
+        return
       }
+      cancellation = stopGroups([child]).catch((error) => {
+        child.standProofError = error.message
+        recordChildren()
+        throw error
+      })
+      // Settle even if an unproved survivor keeps the inherited streams open.
+      cancellation.then(() => interrupted(), interrupted)
+    }
+    const interrupted = (error = new Error('Stand preparation interrupted')) => {
+      clearInterval(monitor)
+      signal?.removeEventListener('abort', cancel)
+      child.stdin?.destroy()
+      child.stdout?.destroy()
+      child.stderr?.destroy()
+      reject(error)
     }
     signal?.addEventListener('abort', cancel, { once: true })
     let output = ''
@@ -110,7 +129,7 @@ export function run(
       clearInterval(monitor)
       reject(error)
     })
-    child.on('close', (code, exitSignal) => {
+    child.on('close', async (code, exitSignal) => {
       clearInterval(monitor)
       signal?.removeEventListener('abort', cancel)
       child.standClosed = true
@@ -120,6 +139,10 @@ export function run(
         child.standProofError = error.message
       }
       recordChildren()
+      if (cancellation) {
+        await cancellation.catch(() => {})
+        return
+      }
       if (code === 0) resolve(output)
       else {
         const failure = new Error(
@@ -130,6 +153,7 @@ export function run(
       }
     })
     if (input !== undefined) child.stdin.end(input)
+    if (signal?.aborted) cancel()
   })
 }
 
@@ -151,11 +175,12 @@ export function stopChildren() {
   return stopping
 }
 
-async function stopGroups() {
+async function stopGroups(targets = children) {
   const began = Date.now()
   const signalled = new Map()
-  while (children.size) {
-    for (const child of [...children]) {
+  const pending = () => [...targets].filter((child) => children.has(child))
+  while (pending().length) {
+    for (const child of pending()) {
       if (!updateChild(child)) continue
       const signal = Date.now() - began >= 5000 ? 'SIGKILL' : 'SIGTERM'
       for (const group of [child, ...(child.standDetached ?? [])]) {
@@ -170,9 +195,17 @@ async function stopGroups() {
       }
     }
     recordChildren()
-    if (Date.now() - began >= 10000)
+    if (pending().length && Date.now() - began >= 10000)
       throw new Error('Owned process group remains; retain lease/recovery, cleanup incomplete')
-    if (children.size) await new Promise((resolve) => setTimeout(resolve, 50))
+    if (pending().length) await new Promise((resolve) => setTimeout(resolve, 50))
   }
   recordChildren()
+}
+
+function signalLeader(child, signal) {
+  const leader = processTable().find((row) => row.pid === child.pid)
+  if (!leader) return
+  if (leader.pgid !== child.pid || leader.started !== child.standLeaderStarted)
+    throw new Error('Runner PID identity unproved or reused; cancellation refused')
+  process.kill(child.pid, signal)
 }

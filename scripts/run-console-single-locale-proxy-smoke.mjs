@@ -25,7 +25,7 @@ try {
   await run(
     process.execPath,
     ['scripts/stand.mjs', 'e2e', '--lane', 'console-real-stack', '--id', id, '--proxy-smoke'],
-    { cwd: workspace, signal: operation.signal }
+    { cwd: workspace, signal: operation.signal, graceful: true }
   )
 } catch (error) {
   if (!operation.interrupted) throw error

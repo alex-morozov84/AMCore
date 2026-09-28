@@ -10,6 +10,7 @@ try {
     {
       cwd: root,
       signal: operation.signal,
+      graceful: true,
     }
   )
 } catch (error) {
