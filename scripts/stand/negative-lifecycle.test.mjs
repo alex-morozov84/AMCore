@@ -1,10 +1,11 @@
+import { localSql } from './local-sql.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { create } from './create.mjs'
 import { configuration } from './config.mjs'
 import { compose, docker, inspect } from './docker.mjs'
-import { dataAdmission, cleanup, sql, discover } from './ownership.mjs'
+import { dataAdmission, cleanup, discover } from './ownership.mjs'
 import { lease, save, load } from './state.mjs'
 import { closeoutStand } from './closeout.mjs'
 import { start } from './start.mjs'
@@ -19,7 +20,7 @@ test('marker bootstrap failure preserves recovery and permits physical cleanup',
     await save(m)
     await compose(m, ['up', '-d', '--wait', '--no-deps', 'postgres', 'redis'])
     await dataAdmission(m, true)
-    await sql(m, 'CREATE SCHEMA stand_meta;', false)
+    await localSql(m, 'CREATE SCHEMA stand_meta;')
     await assert.rejects(() => start(m), /already exists/)
     assert.ok((await load(id)).resources.volume.length)
     await assert.rejects(() => dataAdmission(m), /relation|identity/)
@@ -41,10 +42,9 @@ test('wrong marker denies data; a foreign network attachment blocks closeout bef
     await save(m)
     await compose(m, ['up', '-d', '--wait', '--no-deps', 'postgres', 'redis'])
     await dataAdmission(m, true)
-    await sql(
+    await localSql(
       m,
-      `CREATE SCHEMA stand_meta; CREATE TABLE stand_meta.identity(uuid text); INSERT INTO stand_meta.identity VALUES ('wrong-marker');`,
-      false
+      `CREATE SCHEMA stand_meta; CREATE TABLE stand_meta.identity(uuid text); INSERT INTO stand_meta.identity VALUES ('wrong-marker');`
     )
     await assert.rejects(() => dataAdmission(m), /marker mismatch/)
     const redis = await inspect(m, 'container', m.redis)

@@ -1,7 +1,8 @@
+import { initializeMarker } from './bootstrap-marker.mjs'
 import { writeFile } from 'node:fs/promises'
 import { compose, docker, inspect } from './docker.mjs'
 import { configuration } from './config.mjs'
-import { dataAdmission, sql, cleanup } from './ownership.mjs'
+import { dataAdmission, cleanup } from './ownership.mjs'
 import { save } from './state.mjs'
 
 export async function start(m) {
@@ -12,21 +13,7 @@ export async function start(m) {
   m.state = 'configured'
   await save(m)
   await compose(m, ['up', '-d', '--wait', '--no-deps', 'postgres', 'redis'])
-  await dataAdmission(m, true)
-  const existing = await sql(
-    m,
-    "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'stand_meta' AND table_name = 'identity';",
-    false
-  )
-  if (existing.trim() === '0') {
-    if (m.markerInitialized) throw new Error('Initialized DB marker missing; writes refused')
-    await sql(
-      m,
-      `CREATE SCHEMA stand_meta; CREATE TABLE stand_meta.identity (uuid text PRIMARY KEY); INSERT INTO stand_meta.identity VALUES ('${m.uuid}');`,
-      false
-    )
-  }
-  await dataAdmission(m)
+  await initializeMarker(m)
   m.markerInitialized = true
   m.state = 'infrastructure-ready'
   await save(m)

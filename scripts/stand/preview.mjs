@@ -1,9 +1,10 @@
+import { admitInvocation, endInvocation } from './invocation.mjs'
 import { previewLabels } from './preview-labels.mjs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import { cleanEnvironment } from './process.mjs'
-import { dataAdmission, sql } from './ownership.mjs'
+import { sql } from './ownership.mjs'
 import { relay } from './relay.mjs'
 import { save } from './state.mjs'
 import { fixtureAccounts } from './fixture-accounts.mjs'
@@ -11,7 +12,7 @@ import { fixtureAccounts } from './fixture-accounts.mjs'
 export async function preview(m, profile = 'default') {
   if (!['default', 'user', 'organization'].includes(profile))
     throw new Error('Unknown fixture profile')
-  await dataAdmission(m)
+  await admitInvocation(m)
   const labels = await previewLabels(m)
   const require = createRequire(join(m.worktree, 'apps/web/package.json'))
   const { chromium, request } = require('@playwright/test')
@@ -39,7 +40,6 @@ export async function preview(m, profile = 'default') {
       const existing = await sql(
         m,
         `SELECT id || ':' || "systemRole" FROM core.users WHERE "emailCanonical" = :'email';`,
-        true,
         { email: account.email }
       )
       if (existing.trim() !== `${account.id}:${account.role}`)
@@ -91,6 +91,7 @@ export async function preview(m, profile = 'default') {
     // AMCORE_CONSOLE_PREVIEW_SCENARIO_END
     console.log(`Scenario: ${scenario}. Stop: pnpm stand down --id ${m.id}`)
   } finally {
+    endInvocation(m)
     if (browser) await browser.close()
     if (api) await api.dispose()
     await proxy.close()

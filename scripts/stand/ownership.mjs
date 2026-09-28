@@ -1,3 +1,5 @@
+import { psqlArguments } from './local-sql.mjs'
+export { invocationSql as sql } from './invocation.mjs'
 import { resourceCensus } from './resource-census.mjs'
 import { createHash } from 'node:crypto'
 import { docker, inspect, composeArguments, withDockerEngine } from './docker.mjs'
@@ -117,7 +119,7 @@ export async function dataAdmission(m, bootstrap = false) {
     if (
       !bootstrap &&
       (
-        await execute(sqlArguments(m), {
+        await execute(psqlArguments(m), {
           capture: true,
           input: 'SELECT uuid FROM stand_meta.identity;',
         })
@@ -126,30 +128,6 @@ export async function dataAdmission(m, bootstrap = false) {
       throw new Error('DB marker mismatch')
     await save(m)
   })
-}
-export async function sql(m, query, check = true, variables = {}) {
-  if (check) await dataAdmission(m)
-  return docker(m, sqlArguments(m, variables), { capture: true, input: query })
-}
-function sqlArguments(m, variables = {}) {
-  return [
-    'exec',
-    '-i',
-    m.postgres,
-    'psql',
-    '-X',
-    '-v',
-    'ON_ERROR_STOP=1',
-    '-U',
-    'amcore',
-    '-d',
-    'amcore',
-    '-At',
-    ...Object.entries(variables).flatMap(([key, value]) => {
-      if (!/^[a-z][a-z0-9_]*$/.test(key)) throw new Error('Invalid SQL variable')
-      return ['-v', `${key}=${value}`]
-    }),
-  ]
 }
 export async function cleanup(m, purge) {
   await assertNoSurvivors(m)

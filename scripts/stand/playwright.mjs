@@ -1,3 +1,4 @@
+import { admitInvocation, endInvocation } from './invocation.mjs'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import { run, cleanEnvironment } from './process.mjs'
@@ -28,6 +29,7 @@ export async function test(m, lane, token, extra = []) {
   await save(m)
   let close
   try {
+    if (!mocked) await admitInvocation(m)
     close = await supervise(m, token)
     const config = mocked ? 'playwright.config.ts' : `playwright.${lane}.config.ts`
     await run(
@@ -48,6 +50,7 @@ export async function test(m, lane, token, extra = []) {
     m.testOutcome = 'failed'
     throw error
   } finally {
+    endInvocation(m)
     if (close) {
       await close()
       delete m.controlSocket

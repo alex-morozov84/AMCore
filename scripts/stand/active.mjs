@@ -9,6 +9,7 @@ const path = process.env.AMCORE_STAND_MANIFEST
 const token = process.env.AMCORE_STAND_TOKEN
 if (!path || !token) throw new Error('Use pnpm stand e2e; an active managed run is required')
 const m = JSON.parse(await readFile(path, 'utf8'))
+if (m.purpose !== 'e2e') throw new Error('Fixture run requires e2e-purpose stand')
 const localRoot = resolve(import.meta.dirname, '../..')
 if (localRoot !== m.worktree && localRoot !== m.snapshot) throw new Error('Foreign run source')
 if (

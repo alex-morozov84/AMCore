@@ -5,14 +5,11 @@ import { ageSessionLastAuthAt, countLiveSessions, setSystemRole } from '../admin
 import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../helpers'
 import { waitForSessionTransitions } from '../sessions-readability'
 
-async function signInAsPathAdmin(page: Page, email: string) {
-  // Called twice per test with the same email (create, then log back in
-  // after setting up the target) — the page may still be authenticated as
-  // whoever was last signed in (e.g. the freshly self-registered target),
-  // and an authenticated visitor is redirected away from /register before
-  // this reaches it.
+async function signInAsPathAdmin(page: Page, email: string, create = true) {
+  // Register once; later calls sign in to the existing admin account.
+  // Clear the target user's session before opening the admin login form.
   await page.context().clearCookies()
-  await registerViaUi(page, email, { name: 'Sessions Panel Admin' })
+  if (create) await registerViaUi(page, email, { name: 'Sessions Panel Admin' })
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
   await page.goto('/en/login')
@@ -58,7 +55,7 @@ test('path-mode: session list shows a parsed device label, never the raw user ag
     targetEmail,
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
   )
-  await signInAsPathAdmin(page, adminEmail)
+  await signInAsPathAdmin(page, adminEmail, false)
 
   await openTargetDetail(page, targetEmail)
 
@@ -86,7 +83,7 @@ test('path-mode: revoking one session soft-revokes it and removes it from the li
     targetEmail,
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)'
   )
-  await signInAsPathAdmin(page, adminEmail)
+  await signInAsPathAdmin(page, adminEmail, false)
 
   expect(countLiveSessions(targetEmail)).toBe(2)
   await openTargetDetail(page, targetEmail)
@@ -119,7 +116,7 @@ test('path-mode: revoking all sessions requires confirmation and empties the lis
     targetEmail,
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)'
   )
-  await signInAsPathAdmin(page, adminEmail)
+  await signInAsPathAdmin(page, adminEmail, false)
 
   expect(countLiveSessions(targetEmail)).toBe(2)
   await openTargetDetail(page, targetEmail)
@@ -142,7 +139,7 @@ test('path-mode: revoking with an aged admin session requires step-up', async ({
   await page.context().clearCookies()
   await registerViaUi(page, targetEmail)
   await page.context().clearCookies()
-  await signInAsPathAdmin(page, adminEmail)
+  await signInAsPathAdmin(page, adminEmail, false)
 
   ageSessionLastAuthAt(adminEmail)
   await openTargetDetail(page, targetEmail)
@@ -191,7 +188,7 @@ test('the Sessions card has no axe violations, populated or empty', async ({ pag
     targetEmail,
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)'
   )
-  await signInAsPathAdmin(page, adminEmail)
+  await signInAsPathAdmin(page, adminEmail, false)
 
   await openTargetDetail(page, targetEmail)
   await expect(page.getByRole('heading', { name: 'Sessions (2 total)' })).toBeVisible()

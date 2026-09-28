@@ -1,8 +1,7 @@
-import { dataAdmission, sql } from './ownership.mjs'
+import { sql } from './ownership.mjs'
 import { save } from './state.mjs'
 
 export async function organizationFixture(m, api) {
-  await dataAdmission(m)
   const account = m.accounts.find((a) => a.role === 'USER')
   if (!account) throw new Error('Organization profile requires preview USER')
   if (m.organization && m.organization.userId !== account.id) {
@@ -17,7 +16,6 @@ export async function organizationFixture(m, api) {
       JOIN core.member_roles mr ON mr."memberId" = om.id
       JOIN core.roles r ON r.id = mr."roleId"
       WHERE om."userId" = :'user' AND om."organizationId" = :'organization';`,
-      true,
       { user: account.id, organization: m.organization.id }
     )
     if (!roles.trim().split('\n').includes('ADMIN'))

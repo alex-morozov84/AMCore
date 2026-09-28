@@ -30,7 +30,7 @@ export async function fixtureAccounts(m, api, profile) {
 async function completeAccount(m, api, account) {
   const variables = { email: account.email, role: account.role }
   let id = (
-    await sql(m, `SELECT id FROM core.users WHERE "emailCanonical" = :'email';`, true, variables)
+    await sql(m, `SELECT id FROM core.users WHERE "emailCanonical" = :'email';`, variables)
   ).trim()
   if (!id) {
     const response = await api.post('/api/v1/auth/register', {
@@ -53,14 +53,13 @@ async function completeAccount(m, api, account) {
   account.id = id
   await save(m)
   const role = (
-    await sql(m, `SELECT "systemRole" FROM core.users WHERE id = :'id';`, true, { id })
+    await sql(m, `SELECT "systemRole" FROM core.users WHERE id = :'id';`, { id })
   ).trim()
   if (!['USER', account.role].includes(role))
     throw new Error('Unexpected pending fixture role; reset refused')
   await sql(
     m,
     `UPDATE core.users SET "systemRole" = :'role' WHERE id = :'id' AND "emailCanonical" = :'email'; DELETE FROM core.sessions WHERE "userId" = :'id';`,
-    true,
     { ...variables, id }
   )
   delete account.pending
@@ -75,7 +74,6 @@ async function retainLegacyAccounts(m) {
     const actual = await sql(
       m,
       `SELECT id || ':' || "systemRole" FROM core.users WHERE "emailCanonical" = :'email';`,
-      true,
       { email: account.email }
     )
     if (actual.trim() !== `${account.id}:${account.role}`)

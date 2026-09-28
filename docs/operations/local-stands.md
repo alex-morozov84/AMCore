@@ -47,12 +47,18 @@ these managed lanes.
 `pnpm test:console-session-e2e` remains its entry point.
 <!-- AMCORE_CONSOLE_STAND_COMMANDS_END -->
 
-Each fixture command receives a fresh admission: the runner verifies the local
-Docker engine, configuration, live resource identities and ownership, environment,
-networks, mounts, ports, images and database marker. Inspections are batched per
-resource kind and reused only within that admission; there is no cache across
-fixture commands. Commands use the proved Unix socket directly so retargeting a
-Docker context cannot redirect an admitted operation.
+A managed invocation performs full admission before work, holds its lease and
+pins the local Unix Docker endpoint and full DB/Redis container IDs. SQL fixtures
+then authenticate the active run and use that exact Postgres container, without
+re-rendering Compose or inspecting the whole stand for each query. The local psql
+connection has explicit socket/user/database/port and cleared connection defaults.
+It verifies the stand marker under a shared row lock in the same transaction as
+the fixture work; missing or changed markers refuse before fixture SQL. Wrapper
+bookkeeping preserves normal SELECT output and UPDATE command tags. Caller
+transaction control and reconnects are unsupported. Redis likewise uses its exact
+admitted container and explicit local transport. No target fallback or automatic
+adoption occurs; recreation requires a new admission. Preview SQL uses the same
+invocation-scoped lease/target capability. Bootstrap is a separate bounded step.
 
 ## What an agent gives the reviewer
 
@@ -95,11 +101,18 @@ Postgres has no published port; SQL runs inside the inspected owned container.
 Published web/API/Redis/TLS ports bind only to 127.0.0.1. Allocation is bounded;
 actual socket binding decides availability. Never kill a foreign port owner.
 
-Data-use admission requires rendered config, live resource/environment/network
-proof and the database's stand UUID marker. Initial metadata bootstrap runs only
+Full invocation admission requires rendered config, live resource/environment/
+network proof and the database's stand UUID marker. Initial metadata bootstrap runs only
 after physical ownership proof. Application migration/seed/fixture/test work does
 not proceed without the matching marker. Production migration remains seed-free;
 test role seeding is a managed-stand operation.
+
+These commands protect cooperative agents against accidental ambient-environment
+or foreign-stand targeting. Agents must use the managed entry points for task
+stands and fixtures. They do not sandbox arbitrary shell SQL, hostile fixture code
+or an administrator controlling Docker. External runtime/network changes can
+invalidate browser/API assumptions; per-query SQL proof is not continuous
+attestation of every request. Resource disposal still performs fresh checks.
 
 Resource disposal has a separate proof: local engine, recorded attempt, exact
 IDs/labels/membership and approved mounts. It does not query Postgres or require
