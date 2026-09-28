@@ -164,12 +164,6 @@
       "kind": "debt"
     },
     {
-      "file": "apps/api/test/helpers.ts",
-      "target": "ai/TESTING.md",
-      "count": 2,
-      "kind": "debt"
-    },
-    {
       "file": "apps/api/test/organizations.e2e-spec.ts",
       "target": "ai/ORGANIZATIONS_ADMIN_REVIEW.md",
       "count": 1,
