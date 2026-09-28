@@ -137,9 +137,16 @@ ID is distinguishable only with a different recorded leader birth; it is never
 adopted or signalled. New leases also record the supervisor birth. Legacy leases
 with a live numeric occupant but no supervisor birth still refuse recovery.
 Successful recovery archives the original lease/journal before replacing it;
-failed proof preserves resources and makes cleanup incomplete. Do not remove a lease merely because it is old. If the
-original worktree
-is missing, preserve/restore its private record under a surviving checkout and use
+failed proof preserves resources and makes cleanup incomplete. Do not remove a
+lease merely because it is old.
+
+On Linux, supplemental cwd discovery covers readable same-user processes;
+ptrace-denied unrelated processes are skipped. Recorded child/group checks and
+stand-path command checks still block disposal. This does not contain a deliberately
+unrecorded process that hides both its cwd and command identity.
+
+If the original worktree is missing, preserve/restore its private record under a
+surviving checkout and use
 `down --id <stand-id> --orphan --purge`; this path refuses live worktrees and
 unfinished test leases, and proves physical resources before deleting them.
 Cleanup failure retains the record; status and diagnostics distinguish failure

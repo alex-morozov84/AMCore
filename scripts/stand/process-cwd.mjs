@@ -11,7 +11,7 @@ export function sourceSurvivors(m, rows, excluded) {
       if (error.code !== 'ENOENT') throw error
     }
   }
-  const paths = process.platform === 'linux' ? linuxCwds(rows) : macCwds()
+  const paths = process.platform === 'linux' ? linuxCwds(rows, roots, excluded) : macCwds()
   return rows
     .filter((row) => !excluded.has(row.pid))
     .flatMap((row) => {
@@ -22,13 +22,23 @@ export function sourceSurvivors(m, rows, excluded) {
     })
 }
 
-function linuxCwds(rows) {
+export function linuxCwds(rows, roots, excluded, readlink = readlinkSync) {
   const paths = new Map()
-  for (const row of rows.filter((entry) => entry.uid === process.getuid())) {
+  for (const row of rows.filter(
+    (entry) => entry.uid === process.getuid() && !excluded.has(entry.pid)
+  )) {
     try {
-      paths.set(row.pid, readlinkSync(`/proc/${row.pid}/cwd`))
+      paths.set(row.pid, readlink(`/proc/${row.pid}/cwd`))
     } catch (error) {
-      if (error.code !== 'ENOENT' && error.code !== 'ESRCH') throw error
+      if (error.code === 'ENOENT' || error.code === 'ESRCH') continue
+      // Linux ptrace policy can hide unrelated same-UID processes' cwd.
+      // Recorded groups are checked separately; a stand command still fails closed.
+      if (
+        (error.code === 'EACCES' || error.code === 'EPERM') &&
+        !roots.some((root) => row.command.includes(root))
+      )
+        continue
+      throw error
     }
   }
   return paths
