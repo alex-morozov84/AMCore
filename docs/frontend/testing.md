@@ -446,10 +446,8 @@ open `apps/web/coverage/index.html` for file-level detail or read
 `apps/web/coverage/coverage-final.json` with a tool. These reports are
 informational: no percentage threshold determines whether the command passes.
 
-On a clean checkout, run `pnpm --filter @amcore/shared build` before either
-Playwright command. `apps/web` imports `@amcore/shared` through its built
-`dist/` export, and direct Playwright commands bypass turbo's `^build`
-dependency graph. The CI `web-e2e` job has this as an explicit step.
+The Playwright commands above prepare their own isolated runtime; see
+[local stands](../operations/local-stands.md) for prerequisites and lifecycle.
 
 ## Credential containment regression
 
