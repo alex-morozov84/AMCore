@@ -261,12 +261,12 @@ describe('AbilityFactory', () => {
       // implicitly covered below by the negative assertions, but the four
       // canonical cases come first.
 
-      it('MEMBER read:all permission + scope read:User → can read User only', async () => {
+      it('explicit read:User permission + scope read:User → can read User only', async () => {
         permissionsCache.getPermissions.mockResolvedValueOnce([
           {
             id: 'p',
             action: 'read',
-            subject: 'all',
+            subject: 'User',
             conditions: null,
             fields: [],
             inverted: false,
@@ -301,12 +301,12 @@ describe('AbilityFactory', () => {
         expect(ability.can(Action.Delete, Subject.Organization)).toBe(false)
       })
 
-      it('perm read:all + scope manage:User → can read User (narrowed on both axes)', async () => {
+      it('perm read:User + scope manage:User → can read User (narrowed on both axes)', async () => {
         permissionsCache.getPermissions.mockResolvedValueOnce([
           {
             id: 'p',
             action: 'read',
-            subject: 'all',
+            subject: 'User',
             conditions: null,
             fields: [],
             inverted: false,
@@ -347,7 +347,7 @@ describe('AbilityFactory', () => {
           {
             id: 'p',
             action: 'read',
-            subject: 'all',
+            subject: 'User',
             conditions: null,
             fields: [],
             inverted: false,
@@ -425,7 +425,7 @@ describe('AbilityFactory', () => {
           {
             id: 'p',
             action: 'read',
-            subject: 'all',
+            subject: 'User',
             conditions: null,
             fields: [],
             inverted: false,

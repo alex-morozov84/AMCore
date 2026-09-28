@@ -22,8 +22,8 @@ Recipient clicks link →  signs in / signs up  →  POST /auth/invites/accept
                          → membership created with the assigned role
 ```
 
-- **Create** is an org-admin action (`Manage` on `Organization`). It
-  accepts a bearer token **or** an API key bound to the org.
+- **Create** is an full team-administration action (`manage:TeamAccess`). It
+  accepts a bearer token **or** an API key bound to the org with exact `manage:TeamAccess` scope and trusted owner.
 - **List / revoke** and **accept** are **bearer-only** — accepting proves
   ownership of the invited email, which a long-lived API key must not do.
 
@@ -120,7 +120,7 @@ server falls back to the system `MEMBER` role and returns that id.
 
 ## 3. List and revoke invites
 
-List active (pending, not expired) invites — bearer-only, ADMIN only,
+List active (pending, not expired) invites — bearer-only, requires full TeamAccess,
 paginated:
 
 ```bash

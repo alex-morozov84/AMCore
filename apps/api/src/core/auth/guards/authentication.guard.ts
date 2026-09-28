@@ -17,6 +17,7 @@ import { AUTH_TYPE_KEY } from '../decorators/auth.decorator'
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { PoliciesGuard } from './policies.guard'
 import { SystemRolesGuard } from './system-roles.guard'
+import { TeamAccessGuard } from './team-access.guard'
 
 /**
  * AK-11: distinguish decision-class failures from infrastructure failures
@@ -77,7 +78,8 @@ export class AuthenticationGuard implements CanActivate {
     private readonly apiKeyGuard: ApiKeyGuard,
     private readonly abilityFactory: AbilityFactory,
     private readonly systemRolesGuard: SystemRolesGuard,
-    private readonly policiesGuard: PoliciesGuard
+    private readonly policiesGuard: PoliciesGuard,
+    private readonly teamAccessGuard: TeamAccessGuard
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -135,8 +137,9 @@ export class AuthenticationGuard implements CanActivate {
     const user = request.user
 
     if (user) {
-      const ability = await this.abilityFactory.createForUser(user)
-      request.ability = ability
+      const authorization = await this.abilityFactory.createAuthorizationContext(user)
+      request.ability = authorization.ability
+      request.teamAccess = authorization.teamAccess
     }
 
     // 5. Run authorization guards.
@@ -144,6 +147,7 @@ export class AuthenticationGuard implements CanActivate {
     // so the response always carries a machine-readable errorCode.
     await this.systemRolesGuard.canActivate(context)
     await this.policiesGuard.canActivate(context)
+    await this.teamAccessGuard.canActivate(context)
 
     return true
   }

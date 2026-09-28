@@ -27,6 +27,7 @@ import {
   RefreshTokenGuard,
   SystemRolesGuard,
 } from './guards'
+import { TeamAccessGuard } from './guards/team-access.guard'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { OAuthController } from './oauth/oauth.controller'
 import { OAuthService } from './oauth/oauth.service'
@@ -88,6 +89,7 @@ import { UserCacheService } from './user-cache.service'
     PermissionsCacheService,
     JwtAuthGuard,
     PoliciesGuard,
+    TeamAccessGuard,
     PrivilegedRoleService,
     SystemRolesGuard,
     FreshAuthGuard,

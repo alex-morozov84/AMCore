@@ -91,8 +91,10 @@ pnpm --filter api db:migrate -- --create-only --name <slug>  # emit SQL to revie
 ```
 
 Editing the _generated_ SQL is fine and sometimes necessary (data backfills, safe
-rollouts) — use `--create-only` to review it before apply; what you must not do is
-author migration files by hand. Production applies migrations as a one-shot
+rollouts) — use `--create-only` to review it before apply; schema migrations must originate from the Prisma diff. For a data-only policy
+upgrade with no schema delta, use explicitly reviewed versioned SQL with exact-state
+preconditions, atomic version updates and a controlled operator procedure; see
+[authorization upgrade](../auth/authorization-upgrade.md). Production applies migrations as a one-shot
 `db:migrate:prod` ([`deployment.md`](../operations/deployment.md)), never on app
 startup.
 

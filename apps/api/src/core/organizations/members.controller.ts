@@ -1,24 +1,20 @@
 import { Body, Controller, Delete, HttpCode, HttpStatus, Param, Post } from '@nestjs/common'
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOperation,
   ApiSecurity,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
-import {
-  Action,
-  AuthType,
-  type InviteResponse,
-  type RequestPrincipal,
-  Subject,
-} from '@amcore/shared'
+import { AuthType, type InviteResponse, type RequestPrincipal } from '@amcore/shared'
 
 import { Auth } from '../auth/decorators/auth.decorator'
-import { CheckPolicies } from '../auth/decorators/check-policies.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
 
 import { CreateInviteDto, InviteResponseDto } from './dto'
 import { InviteService } from './invite.service'
@@ -28,7 +24,7 @@ import { MemberService } from './member.service'
  * Class-level `@Auth(AuthType.Bearer, AuthType.ApiKey)` is an explicit
  * dual-auth opt-in registered in ADR-034's allowlist. API keys may
  * invite/remove/assign roles within their bound organization subject to
- * the CASL `userPerms ∩ scopes` model; the per-handler `@CheckPolicies`
+ * the CASL `userPerms ∩ scopes` model; the per-handler `@RequireTeamAccess`
  * decorators are the actual authorization gate.
  *
  * OB-02 Stage C deliberately preserves dual-auth on the invite handler —
@@ -51,6 +47,10 @@ import { MemberService } from './member.service'
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Missing or invalid accepted credential' })
+@ApiForbiddenResponse({
+  description: 'FORBIDDEN: target, record/field or full TeamAccess authority denied',
+})
 @Controller('organizations/:orgId/members')
 @Auth(AuthType.Bearer, AuthType.ApiKey)
 export class MembersController {
@@ -60,7 +60,7 @@ export class MembersController {
   ) {}
 
   @Post('invite')
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
   @ZodResponse({
     type: InviteResponseDto,
@@ -69,7 +69,7 @@ export class MembersController {
   })
   @ApiOperation({
     summary:
-      'Invite a user by email — ADMIN only. Returns a uniform 202 ' +
+      'Invite a user by email — requires full TeamAccess. Returns a uniform 202 ' +
       '{status:"invited"} regardless of whether the email already has an ' +
       'account, is already a member, or is unknown. An invite email ' +
       'carrying the raw accept token is delivered to the recipient. The ' +
@@ -86,9 +86,9 @@ export class MembersController {
 
   @Delete(':userId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Remove a member from the organization — ADMIN only' })
+  @ApiOperation({ summary: 'Remove a member from the organization — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Member removed' })
   removeMember(
     @Param('orgId') orgId: string,
@@ -100,9 +100,9 @@ export class MembersController {
 
   @Post(':userId/roles/:roleId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Assign a role to a member — ADMIN only' })
+  @ApiOperation({ summary: 'Assign a role to a member — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Role assigned' })
   assignRole(
     @Param('orgId') orgId: string,
@@ -115,9 +115,9 @@ export class MembersController {
 
   @Delete(':userId/roles/:roleId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @CheckPolicies((ability) => ability.can(Action.Manage, Subject.Organization))
+  @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Remove a role from a member — ADMIN only' })
+  @ApiOperation({ summary: 'Remove a role from a member — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Role removed' })
   removeRole(
     @Param('orgId') orgId: string,

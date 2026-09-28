@@ -29,21 +29,22 @@ When you create an API key, you define its **scopes** — the exact operations i
 
 Every scope is `action:Subject`, case-sensitive:
 
-| Part      | Allowed values                                                      |
-| --------- | ------------------------------------------------------------------- |
-| `action`  | `create`, `read`, `update`, `delete`, `manage` (= all four)         |
-| `Subject` | `User`, `Organization`, `Role`, `Permission`, `all` (= any subject) |
+| Part      | Allowed values                                                                            |
+| --------- | ----------------------------------------------------------------------------------------- |
+| `action`  | `create`, `read`, `update`, `delete`, `manage` (= all four)                               |
+| `Subject` | `User`, `Organization`, `Role`, `Permission`, `TeamAccess`, `all` (= registered subjects) |
 
 `Subject` is PascalCase for concrete types and lowercase `all` for the wildcard. Add domain subjects (e.g. `Contact`, `Deal`) by extending `packages/shared/src/enums/permissions.ts` — the scope schema picks them up automatically.
 
 ### Examples
 
-| Scope                 | What it allows                                                   |
-| --------------------- | ---------------------------------------------------------------- |
-| `read:User`           | Read users in the bound org                                      |
-| `manage:Organization` | Full control over the bound organization (read + write + delete) |
-| `read:all`            | Read any subject in the bound org                                |
-| `manage:User`         | Full control over users in the bound org                         |
+| Scope                 | What it allows                                                          |
+| --------------------- | ----------------------------------------------------------------------- |
+| `read:User`           | Read only explicitly permitted User records and fields in the bound org |
+| `manage:Organization` | Narrow owner grants to Organization actions; no team administration     |
+| `read:all`            | Read only explicitly granted subjects, records and fields               |
+| `manage:TeamAccess`   | Full team administration only for an independently trusted owner        |
+| `manage:User`         | Narrow owner grants to User actions, records and fields                 |
 
 ### `manage:all` is rejected
 
@@ -54,13 +55,24 @@ Every scope is `action:Subject`, case-sensitive:
 `Effective permissions = owner's org permissions ∩ key scopes`.
 
 ```
-Owner has:        manage:Organization, read:all
+Owner has:        read:Organization (current org, explicit response fields)
 Key scopes:       read:Organization
 
-Effective rule:   read:Organization  (action narrows to read; subject stays Organization)
+Effective rule:   read:Organization  (owner conditions and fields remain)
 ```
 
-The intersection narrows along two axes (action and subject) independently. Wildcards `manage` and `all` behave as expected: `read:all ∩ read:User → read:User`, `manage:Organization ∩ read:Organization → read:Organization`.
+The intersection narrows actions and subjects independently, preserving owner
+conditions, fields and DENYs. A `read:all` scope intersects an explicit `read:User`
+grant; it does not grant unassigned or future resources. Positive-all stored org
+grants are unsupported. Scope order and duplicates do not change authorization.
+
+Full team administration additionally requires owner trust computed **before**
+scopes and exact `manage:TeamAccess`. A Role/User/Permission/TeamAccess/all owner
+DENY cannot disappear behind a narrower key scope. `read:TeamAccess` is syntactically
+valid but grants no team administration; `manage:Organization` never substitutes.
+Old organization-management keys are not enlarged: create an intentional replacement,
+update/verify the integration, then revoke the old key. See the
+[controlled authorization upgrade](authorization-upgrade.md).
 
 If the owner loses a permission later, the key loses it too on the next request — there's no separate permission grant on the key itself.
 
@@ -122,24 +134,25 @@ Routes are JWT-only by default. A small, explicit allowlist of routes accepts AP
 
 The allowlist:
 
-| Route group                     | API key accepted? | Why                                                                                                                                                                                                                                     |
-| ------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /auth/me`                  | ✅                | Identity self-check for integrations. Stable opt-in.                                                                                                                                                                                    |
-| `POST /organizations`           | ❌                | Creates a new org and makes the caller ADMIN. A scoped key bound to org A could otherwise spin up org C — cross-org expansion via integration credential. Org creation is interactive.                                                  |
-| `GET /organizations`            | ❌                | Returns every org the owner belongs to — leaks org-membership topology beyond the key's bound org. Use the key's `organizationId` instead.                                                                                              |
-| `GET /organizations/:id`        | ✅                | API key allowed **only when bound to that exact org** (`principal.organizationId === :id`) — read of another org returns 403. JWT principals keep the existing membership-based read so users can browse orgs before calling `/switch`. |
-| `/organizations/:id/switch`     | ❌                | Mints a new JWT — would let a scoped key trade itself for a full-permission token.                                                                                                                                                      |
-| `/organizations/:id/members/**` | ✅                | Member management with `manage:Organization` scope. Per-handler `@CheckPolicies` is the actual authorization gate. Role assignment validates role ownership — a member of org A cannot be assigned a custom role from org B.            |
-| `/organizations/:id/roles/**`   | ✅                | Org-role management with `manage:Organization` scope. `GET /organizations/:id/roles` requires `principal.organizationId === :id` so an admin switched into one org cannot enumerate another org's role/permission catalogue.            |
-| `/api-keys/**`                  | ❌                | Credential management — you can't create/list/revoke keys with a key.                                                                                                                                                                   |
-| `/auth/sessions/**`             | ❌                | Browser session management — out of scope for integrations.                                                                                                                                                                             |
-| `/admin/**`                     | ❌                | Platform-admin operations — SUPER_ADMIN-owned keys would otherwise bypass scopes (the system-role guard ignores them).                                                                                                                  |
-| Everything else with auth       | ❌                | JWT-only by default — bearer-only is the safe baseline.                                                                                                                                                                                 |
+| Route group                     | API key accepted? | Why                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/me`                  | ✅                | Identity self-check for integrations. Stable opt-in.                                                                                                                                                                                                                                                                                          |
+| `POST /organizations`           | ❌                | Creates a new org and makes the caller ADMIN. A scoped key bound to org A could otherwise spin up org C — cross-org expansion via integration credential. Org creation is interactive.                                                                                                                                                        |
+| `GET /organizations`            | ❌                | Returns every org the owner belongs to — leaks org-membership topology beyond the key's bound org. Use the key's `organizationId` instead.                                                                                                                                                                                                    |
+| `GET /organizations/:id`        | ✅                | API key allowed **only when bound to that exact org** (`principal.organizationId === :id`) — read of another org returns 403. Actual record conditions and all six response-field permissions must pass; partial grants return 403. JWT principals keep the existing membership-based read so users can browse orgs before calling `/switch`. |
+| `/organizations/:id/switch`     | ❌                | Mints a new JWT — would let a scoped key trade itself for a full-permission token.                                                                                                                                                                                                                                                            |
+| `/organizations/:id/members/**` | ✅                | Member management requires full owner TeamAccess and exact `manage:TeamAccess` scope. Role assignment validates role ownership — a member of org A cannot be assigned a custom role from org B.                                                                                                                                               |
+| `/organizations/:id/roles/**`   | ✅                | Org-role management requires full owner TeamAccess and exact `manage:TeamAccess` scope. `GET /organizations/:id/roles` requires `principal.organizationId === :id` so an admin switched into one org cannot enumerate another org's role/permission catalogue.                                                                                |
+| `/api-keys/**`                  | ❌                | Credential management — you can't create/list/revoke keys with a key.                                                                                                                                                                                                                                                                         |
+| `/auth/sessions/**`             | ❌                | Browser session management — out of scope for integrations.                                                                                                                                                                                                                                                                                   |
+| `/admin/**`                     | ❌                | Platform-admin operations — SUPER_ADMIN-owned keys would otherwise bypass scopes (the system-role guard ignores them).                                                                                                                                                                                                                        |
+| Everything else with auth       | ❌                | JWT-only by default — bearer-only is the safe baseline.                                                                                                                                                                                                                                                                                       |
 
-> Per-handler `@CheckPolicies` decorators remain the actual authorization gate
-> within each accepted route; service-level `assertOrgContext` binds URL
-> `:orgId` parameters to the principal's bound org so cross-tenant catalogue
-> reads cannot slip through function-level policies.
+Team handlers use `RequireTeamAccess` and actual target binding; existing service
+ownership checks remain. Org PATCH separately checks actual pre/post rows, input
+fields and full response read inside one transaction. Org DELETE needs TeamAccess,
+owner delete on every scalar, and both team and Organization scopes on a key.
+No authorization failure retries another credential type.
 
 The `/admin/**` boundary includes `GET /admin/access`; a SUPER_ADMIN-owned API
 key is rejected there with `401` rather than acting as a console credential.

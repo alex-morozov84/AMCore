@@ -39,6 +39,15 @@ a separate header, since both credential types ride the same
   email. Inputs are trimmed; no provider-specific alias rules (Gmail dots,
   plus-tags) are applied. See [Concepts](./concepts.md#the-security-model).
 
+Organization team administration is separately authorized by exact unrestricted
+`manage:TeamAccess`, matching org context and live membership (the existing JWT
+SUPER_ADMIN management exception remains). Keys need exact `manage:TeamAccess`;
+limited org update grants cannot assign roles/permissions. Org PATCH checks actual
+pre/post records and all response fields transactionally; org DELETE additionally
+requires delete on every scalar. Ordinary failures are 403 `FORBIDDEN`; positive-all
+or partial TeamAccess permission assignments fail 400 validation. See [RBAC](rbac.md)
+and the [installed-database upgrade](authorization-upgrade.md).
+
 ### Security-relevant response semantics
 
 These behaviors are contracts, not incidental, and are easy to miss from shapes

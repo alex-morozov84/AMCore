@@ -11,6 +11,7 @@ import { AuthenticationGuard } from './authentication.guard'
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { PoliciesGuard } from './policies.guard'
 import { SystemRolesGuard } from './system-roles.guard'
+import { TeamAccessGuard } from './team-access.guard'
 
 // Raw NestJS exception subclasses (ForbiddenException, etc.) are banned
 // in src/** per the PR 7 / cross-cutting review rule. For tests that need
@@ -72,13 +73,14 @@ describe('AuthenticationGuard', () => {
       // (the auth chain), before the authz stage runs.
       {} as unknown as AbilityFactory,
       {} as unknown as SystemRolesGuard,
-      {} as unknown as PoliciesGuard
+      {} as unknown as PoliciesGuard,
+      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as TeamAccessGuard
     )
   })
 
   it('propagates authority lookup failure without attaching ability or running policies', async () => {
     const failure = new Error('primary unavailable')
-    const createForUser = jest.fn().mockRejectedValue(failure)
+    const createAuthorizationContext = jest.fn().mockRejectedValue(failure)
     const policies = { canActivate: jest.fn() }
     const request = { user: { sub: 'actor' }, ability: undefined }
     const context = {
@@ -90,14 +92,40 @@ describe('AuthenticationGuard', () => {
       reflector as unknown as Reflector,
       jwtAuthGuard as unknown as JwtAuthGuard,
       apiKeyGuard as unknown as ApiKeyGuard,
-      { createForUser } as unknown as AbilityFactory,
+      { createAuthorizationContext } as unknown as AbilityFactory,
       { canActivate: jest.fn() } as unknown as SystemRolesGuard,
-      policies as unknown as PoliciesGuard
+      policies as unknown as PoliciesGuard,
+      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as TeamAccessGuard
     )
     await expect(candidate.canActivate(context)).rejects.toBe(failure)
     expect(request.ability).toBeUndefined()
     expect(policies.canActivate).not.toHaveBeenCalled()
     expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+  })
+
+  it('TeamAccess authorization denial never retries a second credential', async () => {
+    const request = { user: { sub: 'actor' }, ability: undefined, teamAccess: undefined }
+    const ctx = {
+      ...createContext(),
+      switchToHttp: () => ({ getRequest: () => request }),
+    } as unknown as ExecutionContext
+    const denied = new HttpException('TeamAccess denied', HttpStatus.FORBIDDEN)
+    const keyGuard = { canActivate: jest.fn() }
+    const contextFactory = {
+      createAuthorizationContext: jest.fn().mockResolvedValue({ ability: {}, teamAccess: {} }),
+    }
+    const candidate = new AuthenticationGuard(
+      reflector as unknown as Reflector,
+      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as JwtAuthGuard,
+      keyGuard as unknown as ApiKeyGuard,
+      contextFactory as unknown as AbilityFactory,
+      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as SystemRolesGuard,
+      { canActivate: jest.fn().mockResolvedValue(true) } as unknown as PoliciesGuard,
+      { canActivate: jest.fn().mockRejectedValue(denied) } as unknown as TeamAccessGuard
+    )
+    await expect(candidate.canActivate(ctx)).rejects.toBe(denied)
+    expect(contextFactory.createAuthorizationContext).toHaveBeenCalledTimes(1)
+    expect(keyGuard.canActivate).not.toHaveBeenCalled()
   })
 
   describe('AK-11: decision-class failures swallowed, infra propagates', () => {

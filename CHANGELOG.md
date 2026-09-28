@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Replace ambient organization wildcard defaults with explicit resource/field grants;
+  separate full team access administration from limited organization management.
+  Enforce actual organization records/response fields and transactional PATCH
+  post-state checks. Existing installations require the controlled authorization
+  data upgrade; integration team administration needs exact `manage:TeamAccess` scope.
+
 - **Organization permission freshness.** Authorization reads the primary ACL
   version and loads permission misses in a coherent database snapshot, preventing
   stale version refills after role removal. Existing JWTs observe committed changes

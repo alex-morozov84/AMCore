@@ -191,7 +191,7 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
       .send({
         name: 'Deletion fixture key',
         organizationId: f.org.id,
-        scopes: ['manage:Organization'],
+        scopes: ['manage:TeamAccess'],
       })
       .expect(201)
     const key = created.body.key as string
@@ -259,7 +259,7 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
       .send({
         name: 'Fixture scoped key',
         organizationId: f.org.id,
-        scopes: ['manage:Organization'],
+        scopes: ['manage:TeamAccess'],
       })
       .expect(201)
     expect(created.body.key).toEqual(expect.any(String))

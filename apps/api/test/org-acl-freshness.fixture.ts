@@ -59,7 +59,7 @@ export async function aclFixture(context: E2ETestContext) {
   const grant = async (): Promise<{ id: string }> =>
     (
       await http('post', `${base}/roles/${role.id}/permissions`)
-        .send({ action: 'manage', subject: 'Organization' })
+        .send({ action: 'manage', subject: 'TeamAccess' })
         .expect(201)
     ).body as { id: string }
   const assign = async (): Promise<void> => {
