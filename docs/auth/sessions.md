@@ -282,6 +282,13 @@ enhancement, not part of this feature.
 
 ---
 
+Organization `/switch` does not renew this residual access: its JWT retains the
+parent's expiry, including repeated exchange. Preserved `sid` supports existing
+FreshAuth checks but is not live-session introspection. Common privilege admission
+also checks current primary role before every privileged bypass, independently of
+whether the original session was cleaned up. Ordinary login/refresh/step-up retain
+their own issuance lifetime.
+
 ## When sessions are automatically invalidated
 
 Sessions don't just expire — they can be invalidated by specific events:

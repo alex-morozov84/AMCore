@@ -1,6 +1,7 @@
 import { SystemRole } from '@amcore/shared'
 
 import { seedOrgRoles } from '../prisma/seed-org-roles'
+import { admissionForTest } from '../src/core/auth/__tests__/privileged-admission.fixture'
 import { AbilityFactory } from '../src/core/auth/casl/ability.factory'
 
 import {
@@ -139,13 +140,15 @@ describe('Read-only audit and recovery rehearsal (real PostgreSQL)', () => {
     )
     expect(
       (
-        await factory.createAuthorizationContext({
-          type: 'jwt',
-          sub: member.userId,
-          organizationId: member.organizationId,
-          aclVersion: 0,
-          systemRole: SystemRole.User,
-        })
+        await factory.createAuthorizationContext(
+          await admissionForTest({
+            type: 'jwt',
+            sub: member.userId,
+            organizationId: member.organizationId,
+            aclVersion: 0,
+            systemRole: SystemRole.User,
+          })
+        )
       ).teamAccess.ownerTrusted
     ).toBe(true)
   })
@@ -199,13 +202,15 @@ describe('Read-only audit and recovery rehearsal (real PostgreSQL)', () => {
       { getCurrent: async () => 0 } as never
     )
     await expect(
-      factory.createAuthorizationContext({
-        type: 'jwt',
-        sub: user.id,
-        organizationId: org.id,
-        aclVersion: 0,
-        systemRole: SystemRole.User,
-      })
+      factory.createAuthorizationContext(
+        await admissionForTest({
+          type: 'jwt',
+          sub: user.id,
+          organizationId: org.id,
+          aclVersion: 0,
+          systemRole: SystemRole.User,
+        })
+      )
     ).rejects.toThrow()
   })
 
@@ -318,13 +323,15 @@ describe('Read-only audit and recovery rehearsal (real PostgreSQL)', () => {
         { getPermissions: async () => rules } as never,
         { getCurrent: async () => 14 } as never
       )
-      const context = await factory.createAuthorizationContext({
-        type: 'jwt',
-        sub: member.userId,
-        organizationId: member.organizationId,
-        aclVersion: 0,
-        systemRole: SystemRole.User,
-      })
+      const context = await factory.createAuthorizationContext(
+        await admissionForTest({
+          type: 'jwt',
+          sub: member.userId,
+          organizationId: member.organizationId,
+          aclVersion: 0,
+          systemRole: SystemRole.User,
+        })
+      )
       expect(context.teamAccess.ownerTrusted).toBe(true)
       expect(context.teamAccess.aclVersion).toBe(14)
     }

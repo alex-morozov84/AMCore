@@ -13,9 +13,9 @@ import { PrismaService } from '../../prisma'
  * stale-cache window: a failed cache invalidation must never keep a demoted
  * SUPER_ADMIN privileged.
  *
- * Used only by `SystemRolesGuard`, which runs only on `@SystemRoles`-decorated
- * routes (low-traffic `/admin/**`), so this extra indexed PK read never touches
- * the authenticated hot path.
+ * Used by common privilege admission before ability/handler execution. Every
+ * privileged JWT claim is checked, including routes without SystemRoles metadata.
+ * Ordinary unannotated USER tokens need no additional privileged-role lookup.
  *
  * Returns `null` when the user row is absent (hard delete, ADR-030) so the
  * guard fails closed. Does NOT catch Prisma errors — an infra failure

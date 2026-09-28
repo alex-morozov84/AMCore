@@ -8,18 +8,25 @@ API keys are for server-to-server access — scripts, integrations, CI pipelines
 
 ## How API keys differ from user tokens
 
-|                 | JWT (user session)             | API key                                                       |
-| --------------- | ------------------------------ | ------------------------------------------------------------- |
-| **Issued via**  | Login flow                     | `POST /api/v1/api-keys` (JWT-auth)                            |
-| **Lifetime**    | 15 min access / 7 days refresh | Set at creation, or no expiry                                 |
-| **Permissions** | Full user permissions          | `userPerms ∩ apiKey.scopes` (see Effective permissions below) |
-| **Header**      | `Authorization: Bearer eyJ...` | `Authorization: Bearer amcore_live_...`                       |
-| **Org context** | Picked via `/switch`           | Bound to one org at creation                                  |
-| **Revocable**   | Revoking the session           | `DELETE /api/v1/api-keys/:id`                                 |
+|                 | JWT (user session)                                | API key                                                       |
+| --------------- | ------------------------------------------------- | ------------------------------------------------------------- |
+| **Issued via**  | Login flow                                        | `POST /api/v1/api-keys` (JWT-auth)                            |
+| **Lifetime**    | 15 min access / 7 days refresh                    | Set at creation, or no expiry                                 |
+| **Permissions** | Full user permissions                             | `userPerms ∩ apiKey.scopes` (see Effective permissions below) |
+| **Header**      | `Authorization: Bearer eyJ...`                    | `Authorization: Bearer amcore_live_...`                       |
+| **Org context** | Picked via `/switch`                              | Bound to one org at creation                                  |
+| **Revocable**   | Session revocation blocks refresh; access expires | `DELETE /api/v1/api-keys/:id`                                 |
 
 Both auth methods use the same `Authorization: Bearer` header — the server tells them apart by the token format. JWTs are `eyJ...`; API keys are `amcore_live_...`.
 
 ---
+
+API-key verification reads the owner's system role directly from primary on each
+request. Common privilege admission reuses that result; it does not perform a
+second privileged-role read. Live organization membership and scope intersection
+remain required even for a SUPER_ADMIN owner. Keys cannot use `/switch` or enter
+bearer-only Console/FreshAuth routes. Invite creation retains key support; pending
+invite list/revoke and acceptance remain bearer-only.
 
 ## Scopes
 

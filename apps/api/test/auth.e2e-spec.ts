@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import type { Response } from 'supertest'
 import request from 'supertest'
 
@@ -898,6 +899,31 @@ describe('Auth (e2e)', () => {
   })
 
   describe('Full Authentication Flow', () => {
+    it('login refresh and step-up keep ordinary signed issuance lifetimes', async () => {
+      const credentials = { email: 'issuance@example.com', password: 'StrongP@ss123' }
+      await request(app.getHttpServer()).post('/auth/register').send(credentials).expect(201)
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send(credentials)
+        .expect(200)
+      const refresh = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Cookie', `refresh_token=${extractRefreshToken(login)}`)
+        .set('Origin', TRUSTED_ORIGIN)
+        .expect(200)
+      const stepUp = await request(app.getHttpServer())
+        .post('/auth/step-up')
+        .set('Authorization', `Bearer ${refresh.body.accessToken}`)
+        .send({ password: credentials.password })
+        .expect(200)
+      const jwt = app.get(JwtService)
+      for (const result of [login, refresh, stepUp]) {
+        const signed = jwt.verify(result.body.accessToken)
+        expect(signed.exp - signed.iat).toBe(900)
+        expect(signed.sid).toEqual(expect.any(String))
+      }
+    })
+
     it('should complete: register → me → refresh → logout', async () => {
       // Create agent to persist cookies throughout the flow
       const agent = request.agent(app.getHttpServer())

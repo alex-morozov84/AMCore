@@ -37,6 +37,7 @@ import { OAuthStateService } from './oauth/oauth-state.service'
 import { OAuthProviderFactory } from './oauth/providers/oauth-provider.factory'
 import { OrgAclVersionService } from './org-acl-version.service'
 import { PermissionsCacheService } from './permissions-cache.service'
+import { PrivilegedAdmissionService } from './privileged-admission.service'
 import { PrivilegedRoleService } from './privileged-role.service'
 import { SessionService } from './session.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
@@ -91,10 +92,11 @@ import { UserCacheService } from './user-cache.service'
     PoliciesGuard,
     TeamAccessGuard,
     PrivilegedRoleService,
+    PrivilegedAdmissionService,
     SystemRolesGuard,
     FreshAuthGuard,
     AuthenticationGuard,
-    // Single global guard: authenticate → build ability → authorize
+    // Single global guard: authenticate → current privilege → build ability → authorize
     // Registered in AuthModule so it runs AFTER RateLimitGuard (ThrottlingModule)
     { provide: APP_GUARD, useClass: AuthenticationGuard },
   ],

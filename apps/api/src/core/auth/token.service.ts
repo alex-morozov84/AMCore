@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 
 import { type SystemRole } from '@amcore/shared'
 
+import { UnauthorizedException } from '../../common/exceptions'
 import { EnvService } from '../../env/env.service'
 
 import { hashRefreshToken } from './utils/refresh-token-hash'
@@ -29,6 +30,15 @@ export class TokenService {
   /** Generate access token (15 min) */
   generateAccessToken(payload: AccessTokenPayload): string {
     return this.jwtService.sign(payload)
+  }
+
+  /** Exchange cannot extend the authenticated parent's residual access window. */
+  generateDerivedAccessToken(payload: AccessTokenPayload, parentExpiry?: number): string {
+    const iat = Math.floor(Date.now() / 1000)
+    if (!Number.isSafeInteger(parentExpiry) || parentExpiry! <= iat) {
+      throw new UnauthorizedException('Parent access token must have a future expiry')
+    }
+    return this.jwtService.sign({ ...payload, iat }, { expiresIn: parentExpiry! - iat })
   }
 
   /** Verify access token */
