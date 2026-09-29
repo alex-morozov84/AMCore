@@ -50,6 +50,19 @@ these managed lanes.
 `pnpm test:console-session-e2e` remains its entry point.
 <!-- AMCORE_CONSOLE_STAND_COMMANDS_END -->
 
+### API Testcontainers
+
+Backend Jest E2E uses `pnpm --filter api test:e2e`; scope it with
+`--runTestsByPath test/<name>.e2e-spec.ts`. This is a separate lane from managed
+browser stands. Its shared helper starts fresh Postgres/Redis Testcontainers,
+sets their application/migration URLs and supplies a suite-local random JWT
+secret before application import. No local `.env` preparation is required.
+Secondary apps in the suite share that test secret. The shared setup helper
+attempts cleanup of its created application and containers if bootstrap fails.
+Tests using a custom setup remain responsible for its teardown.
+
+### Managed stand admission
+
 A managed invocation performs full admission before work, holds its lease and
 pins the local Unix Docker endpoint and full DB/Redis container IDs. SQL fixtures
 then authenticate the active run and use that exact Postgres container, without

@@ -21,10 +21,11 @@ import { EmailProcessor } from '../src/infrastructure/email/processors/email.pro
 import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
+import { cleanupFailedE2ESetup, prepareE2EAuthEnvironment } from './e2e-setup'
+
 /**
- * No-op PinoLogger stub for e2e. Per ai/TESTING.md "Known NestJS E2E Runtime
- * Caveat": once the Nest DI graph grows (OB-02 Stage D added the EmailModule
- * import + InviteService email deps to OrganizationsModule), the real
+ * No-op PinoLogger stub for e2e. With the EmailModule and InviteService
+ * dependencies in the Nest DI graph, the real
  * `nestjs-pino` provider makes `Test.createTestingModule(...).compile()` hang
  * indefinitely under Jest + ts-jest ESM — InstanceLoader stops mid-bootstrap
  * with no thrown error. Overriding only the logger sidesteps it. This is a
@@ -56,13 +57,19 @@ export interface E2ETestContext {
 export async function setupE2ETestInfrastructure(): Promise<
   Pick<E2ETestContext, 'postgresContainer' | 'redisContainer'>
 > {
+  prepareE2EAuthEnvironment()
   const postgresContainer = await new PostgreSqlContainer('postgres:18-alpine')
     .withDatabase('amcore_test')
     .withUsername('test')
     .withPassword('test')
     .start()
-  const redisContainer = await new RedisContainer('redis:7-alpine').start()
-  return { postgresContainer, redisContainer }
+  try {
+    const redisContainer = await new RedisContainer('redis:7-alpine').start()
+    return { postgresContainer, redisContainer }
+  } catch (error) {
+    await cleanupFailedE2ESetup([() => postgresContainer.stop({ timeout: 10_000 })])
+    throw error
+  }
 }
 
 /**
@@ -81,86 +88,99 @@ export async function setupE2ETest(
 ): Promise<E2ETestContext> {
   const { postgresContainer, redisContainer } = await setupE2ETestInfrastructure()
 
-  // Set environment variables
-  const databaseUrl = postgresContainer.getConnectionUri()
-  const redisUrl = redisContainer.getConnectionUrl()
+  let app: NestExpressApplication | undefined
+  let moduleFixture: TestingModule | undefined
+  try {
+    // Set environment variables
+    const databaseUrl = postgresContainer.getConnectionUri()
+    const redisUrl = redisContainer.getConnectionUrl()
 
-  process.env.DATABASE_URL = databaseUrl
-  process.env.REDIS_URL = redisUrl
-  // Keep readiness e2e deterministic on developer machines where the root
-  // APFS volume may legitimately report >90% used.
-  process.env.HEALTH_DISK_THRESHOLD_PERCENT = '0.99'
-  // A single `jest --runInBand` process holds every prior suite's heap, so by the time the
-  // health suite runs the process heap can exceed the production 1–1.5GB ceiling and flake the
-  // memory_heap probe to 503. Raise the ceiling well above any e2e process — a test artifact,
-  // not a production signal (the production defaults are unchanged when this is unset).
-  process.env.HEALTH_MEMORY_HEAP_BYTES = String(8 * 1024 * 1024 * 1024)
-  // E2E_DATABASE_URL: escape hatch consumed by prisma.config.ts to defeat
-  // Prisma CLI's `.env` auto-load (which otherwise overrides DATABASE_URL back
-  // to whatever sits in .env). Not used by application code.
-  process.env.E2E_DATABASE_URL = databaseUrl
+    process.env.DATABASE_URL = databaseUrl
+    process.env.REDIS_URL = redisUrl
+    // Keep readiness e2e deterministic on developer machines where the root
+    // APFS volume may legitimately report >90% used.
+    process.env.HEALTH_DISK_THRESHOLD_PERCENT = '0.99'
+    // A single `jest --runInBand` process holds every prior suite's heap, so by the time the
+    // health suite runs the process heap can exceed the production 1–1.5GB ceiling and flake the
+    // memory_heap probe to 503. Raise the ceiling well above any e2e process — a test artifact,
+    // not a production signal (the production defaults are unchanged when this is unset).
+    process.env.HEALTH_MEMORY_HEAP_BYTES = String(8 * 1024 * 1024 * 1024)
+    // E2E_DATABASE_URL: escape hatch consumed by prisma.config.ts to defeat
+    // Prisma CLI's `.env` auto-load (which otherwise overrides DATABASE_URL back
+    // to whatever sits in .env). Not used by application code.
+    process.env.E2E_DATABASE_URL = databaseUrl
 
-  // Log test environment (suppress ESLint in tests)
-  // eslint-disable-next-line no-console
-  console.log('🔧 Test Environment:', { databaseUrl, redisUrl })
+    // Log test environment (suppress ESLint in tests)
+    // eslint-disable-next-line no-console
+    console.log('🔧 Test Environment:', { databaseUrl, redisUrl })
 
-  // Dynamic import AFTER process.env is set — otherwise AppModule's
-  // ConfigModule.forRoot() evaluates at static-import time with the .env file
-  // values and ignores our testcontainer URLs. See @nestjs/config issue #245.
-  const { AppModule } = await import('../src/app.module')
+    // Dynamic import AFTER process.env is set — otherwise AppModule's
+    // ConfigModule.forRoot() evaluates at static-import time with the .env file
+    // values and ignores our testcontainer URLs. See @nestjs/config issue #245.
+    const { AppModule } = await import('../src/app.module')
 
-  // Create testing module with real AppModule (no mocks!). Only PinoLogger is
-  // overridden — see noopPinoLogger above and ai/TESTING.md for why this is
-  // required once the DI graph grows.
-  const baseBuilder = Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(PinoLogger)
-    .useValue(noopPinoLogger)
-  const moduleFixture: TestingModule = await (
-    configure ? configure(baseBuilder) : baseBuilder
-  ).compile()
+    // Create testing module with real AppModule (no mocks!). Only PinoLogger is
+    // overridden to avoid the Jest/ESM logger bootstrap hang described above.
+    const baseBuilder = Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PinoLogger)
+      .useValue(noopPinoLogger)
+    moduleFixture = await (configure ? configure(baseBuilder) : baseBuilder).compile()
 
-  // Create app instance. `rawBody: true` matches production (main.ts) so the
-  // e2e bootstrap shares one parser contract with prod, not a divergent one.
-  const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
+    // Create app instance. `rawBody: true` matches production (main.ts) so the
+    // e2e bootstrap shares one parser contract with prod, not a divergent one.
+    app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
 
-  // Apply same configuration as in main.ts
-  configureBodyParser(app)
-  app.use(cookieParser())
-  app.useGlobalPipes(new ZodValidationPipe())
+    // Apply same configuration as in main.ts
+    configureBodyParser(app)
+    app.use(cookieParser())
+    app.useGlobalPipes(new ZodValidationPipe())
 
-  await app.init()
+    await app.init()
 
-  // Get Prisma service and cache
-  const prisma = app.get(PrismaService)
-  const cache = app.get<Cache>(CACHE_MANAGER)
-  // GcraRedisLimiter is a plain injectable (no custom-token indirection like
-  // the old @nestjs/throttler storage needed) — the guard resolves the exact
-  // same instance via its own constructor injection.
-  const throttlerStorage = app.get(GcraRedisLimiter)
+    // Get Prisma service and cache
+    const prisma = app.get(PrismaService)
+    const cache = app.get<Cache>(CACHE_MANAGER)
+    // GcraRedisLimiter is a plain injectable (no custom-token indirection like
+    // the old @nestjs/throttler storage needed) — the guard resolves the exact
+    // same instance via its own constructor injection.
+    const throttlerStorage = app.get(GcraRedisLimiter)
 
-  // Run migrations
-  await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS core')
-  await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS fitness')
-  await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS finance')
-  await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS subscriptions')
+    // Run migrations
+    await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS core')
+    await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS fitness')
+    await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS finance')
+    await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS subscriptions')
 
-  // Deploy migrations against the testcontainer DB. We pass `env` explicitly
-  // because Jest's jest-environment-node sandboxes `process.env` and child
-  // processes spawned via execSync's default inheritance do NOT see mutations
-  // made by the test (verified empirically — DATABASE_URL was undefined in the
-  // subprocess despite being set on `process.env` above). Forwarding
-  // `E2E_DATABASE_URL` lets `prisma.config.ts` pick the testcontainer URL
-  // instead of the `.env`-derived production one.
-  execSync('pnpm prisma migrate deploy', {
-    stdio: 'inherit',
-    env: { ...process.env, E2E_DATABASE_URL: databaseUrl },
-  })
+    // Deploy migrations against the testcontainer DB. We pass `env` explicitly
+    // because Jest's jest-environment-node sandboxes `process.env` and child
+    // processes spawned via execSync's default inheritance do NOT see mutations
+    // made by the test (verified empirically — DATABASE_URL was undefined in the
+    // subprocess despite being set on `process.env` above). Forwarding
+    // `E2E_DATABASE_URL` lets `prisma.config.ts` pick the testcontainer URL
+    // instead of the `.env`-derived production one.
+    execSync('pnpm prisma migrate deploy', {
+      stdio: 'inherit',
+      env: { ...process.env, E2E_DATABASE_URL: databaseUrl },
+    })
 
-  // Match supertest's IPv4 destination and keep one listener for the fixture.
-  // Its implicit listen/close cycle can deliver responses outside this server.
-  await app.listen(0, '127.0.0.1')
+    // Match supertest's IPv4 destination and keep one listener for the fixture.
+    // Its implicit listen/close cycle can deliver responses outside this server.
+    await app.listen(0, '127.0.0.1')
 
-  return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
+    return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
+  } catch (error) {
+    await cleanupFailedE2ESetup([
+      async () => {
+        if (app) {
+          await closeBullWorkers(app)
+          await app.close()
+        } else await moduleFixture?.close()
+      },
+      () => redisContainer.stop({ timeout: 10_000 }),
+      () => postgresContainer.stop({ timeout: 10_000 }),
+    ])
+    throw error
+  }
 }
 
 /**

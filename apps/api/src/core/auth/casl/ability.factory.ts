@@ -5,6 +5,7 @@ import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shar
 
 import { OrgAclVersionService } from '../org-acl-version.service'
 import { PermissionsCacheService } from '../permissions-cache.service'
+import type { PrivilegedAdmission } from '../privileged-admission.service'
 
 import { OWN_USER_READ_FIELDS, OWN_USER_UPDATE_FIELDS } from './org-role-defaults'
 import {
@@ -44,21 +45,25 @@ export class AbilityFactory {
     private readonly orgAclVersion: OrgAclVersionService
   ) {}
 
-  async createForUser(principal: RequestPrincipal): Promise<AppAbility> {
-    return (await this.createAuthorizationContext(principal)).ability
+  async createForUser(admission: PrivilegedAdmission): Promise<AppAbility> {
+    return (await this.createAuthorizationContext(admission)).ability
   }
 
-  async createAuthorizationContext(principal: RequestPrincipal): Promise<{
+  async createAuthorizationContext(admission: PrivilegedAdmission): Promise<{
     ability: AppAbility
     teamAccess: TeamAccessDecision
   }> {
+    const { principal, authenticated, currentRole } = admission
     if (
       principal.type === 'api_key' &&
       (!principal.organizationId || principal.aclVersion == null)
     ) {
       throw new Error('API key principal must carry organization context (ADR-033)')
     }
-    const superAdmin = principal.systemRole === SystemRole.SuperAdmin
+    const superAdmin =
+      principal.systemRole === SystemRole.SuperAdmin &&
+      authenticated.systemRole === SystemRole.SuperAdmin &&
+      currentRole === SystemRole.SuperAdmin
     const aclVersion =
       !superAdmin &&
       principal.organizationId &&

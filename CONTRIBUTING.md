@@ -84,6 +84,9 @@ examples in [Project scaffolding](docs/frontend/brand-theme-and-tokens.md#option
 | `pnpm --filter api test:e2e -- oauth.e2e-spec.ts` | Single E2E suite                                 |
 | `pnpm --filter api test:email`                    | Email template integration tests (Vitest)        |
 
+API E2E tests provision their own Postgres/Redis and test JWT secret; no local
+`.env` preparation is required. See [API Testcontainers](docs/operations/local-stands.md#api-testcontainers).
+
 > **Note:** Never use `npx jest` directly for E2E tests — the `test:e2e` script sets `NODE_OPTIONS='--experimental-vm-modules'` required for ESM packages.
 
 ### Shared-package test commands

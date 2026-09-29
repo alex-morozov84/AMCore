@@ -39,6 +39,18 @@ a separate header, since both credential types ride the same
   email. Inputs are trimmed; no provider-specific alias rules (Gmail dots,
   plus-tags) are applied. See [Concepts](./concepts.md#the-security-model).
 
+`POST /organizations/:id/switch` remains bearer-only with `{accessToken}`. It
+requires current target membership and a valid future parent expiry, returning
+`401` for missing/invalid expiry and `403` for membership denial. The derived
+absolute `exp` never exceeds the parent, including recursive exchanges; A-to-B
+exchange remains supported for members of B. It is not a renewal or session
+introspection endpoint. Login/refresh/step-up issuance rules are unchanged.
+
+Privileged JWT claims are intersected with primary role before ability construction
+and all platform bypasses. `SystemRoles` additionally checks the original claim
+and primary role against its exact required set. API-key authentication's already
+loaded owner role is reused without widening scopes or accepted credentials.
+
 Organization team administration is separately authorized by exact unrestricted
 `manage:TeamAccess`, matching org context and live membership (the existing JWT
 SUPER_ADMIN management exception remains). Keys need exact `manage:TeamAccess`;

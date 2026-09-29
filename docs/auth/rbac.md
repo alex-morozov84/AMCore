@@ -59,21 +59,28 @@ getAllUsers() { ... }
 
 ### System-role freshness (next request)
 
-The `systemRole` claim in the JWT is **necessary but not sufficient** on
-`@SystemRoles` routes. On every privileged request the guard re-reads the
-caller's **current** `systemRole` from the database and requires that **both**
-the token claim **and** the live DB role satisfy the requirement
-(`claim ∩ current DB role`). Consequences:
+The common authentication guard checks every JWT `SUPER_ADMIN` claim against
+primary Postgres **before** building CASL permissions, including routes without
+`@SystemRoles`. A single request-local admission result keeps original credential
+facts separate from the effective principal passed to CASL, TeamAccess, tenant
+row-lock checks and AI control authorization. A demoted claim becomes effective
+`USER`; it cannot retain a platform permission or membership bypass through the
+user cache. Ordinary unannotated `USER` JWTs need no extra privileged-role read.
 
-- **Demotion takes effect on the next request.** A demoted `SUPER_ADMIN`'s
-  existing token — still cryptographically valid for up to its 15-minute
-  lifetime — is rejected on `/admin/**` immediately.
-- **Promotion requires a new token.** A freshly promoted user's existing token
-  still carries the old `USER` claim; they gain admin access only after
-  re-login mints a new token.
-- **A system-role change revokes that user's sessions** (see
-  [sessions.md](./sessions.md)), so a promotion cannot silently elevate an
-  existing refresh session and a demoted admin is signed out.
+`@SystemRoles` still requires both the **original claim** and **current DB role**
+to belong to its required set. Projecting a demoted claim to `USER` does not make
+it an original `USER` credential for a USER-only requirement. The role guard reuses
+admission evidence, without a second primary lookup. Missing users and primary
+lookup failures fail closed; infrastructure errors remain observable.
+
+- **Demotion takes effect on the next request**, including ordinary organization
+  routes and AI platform bypasses, without relying on cache invalidation/session cleanup.
+- **Promotion cannot elevate an old USER claim.** Obtain a new credential through
+  the normal authenticated issuance flow.
+- Administrative system-role changes still revoke the affected user's sessions;
+  [session revocation](./sessions.md) and live-role admission are separate protections.
+- API-key authentication already reads the owner's current role from primary;
+  admission reuses it, retaining live membership and scope intersection.
 
 This mirrors the org-permission freshness contract below.
 
@@ -143,6 +150,15 @@ then replace your access token with the returned one.
   "aclVersion": 5
 }
 ```
+
+Organization exchange preserves the parent's absolute `exp`: repeated `/switch`
+calls never renew access. A parent without a valid future expiry returns `401`.
+A-to-B exchange remains supported when the actor currently belongs to B; the
+response remains `{accessToken}`. Use ordinary refresh or login to renew access.
+The signed `sid` is preserved for existing step-up checks, not live-session proof.
+Revoking a session does not instantly expire an already issued JWT; derived tokens
+cannot extend that residual window beyond their parent. Login, refresh and step-up
+retain their ordinary issuance rules.
 
 The org creator automatically becomes its `ADMIN`.
 

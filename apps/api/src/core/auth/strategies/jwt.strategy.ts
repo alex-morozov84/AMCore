@@ -42,8 +42,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       aclVersion: payload.aclVersion,
       // Carried for FreshAuthGuard (OB-06b); inert on all other routes.
       sid: payload.sid,
-      // Carried so the SSE stream can close at token expiry (ADR-053); inert
-      // elsewhere. Optional — a token without `exp` fails closed on the stream route.
+      // Bounds derived organization exchange and SSE stream lifetime (ADR-053).
+      // Optional legacy claim; missing expiry fails closed on those routes.
       exp: payload.exp,
     }
   }

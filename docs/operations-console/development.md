@@ -215,3 +215,10 @@ and operator instructions ship together.
   states.
 - Run `pnpm test:observability-contract` after tracked documentation changes.
 - Follow the root `AGENTS.md` runtime-verification rule for Next.js behavior.
+
+Common API privilege admission runs before ability construction and before Console
+SystemRoles/FreshAuth. It checks privileged claims against primary role once and
+passes an effective principal to downstream consumers. SystemRoles reuses the
+original-claim/current-role evidence; FreshAuth still independently verifies the
+session freshness. Console routes remain bearer-only, and host/product vault and
+origin boundaries are unchanged. Do not add another claim-only platform bypass.

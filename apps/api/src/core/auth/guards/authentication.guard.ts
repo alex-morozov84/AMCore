@@ -13,6 +13,7 @@ import { UnauthorizedException } from '../../../common/exceptions'
 import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
 import { AbilityFactory } from '../casl/ability.factory'
 import { AUTH_TYPE_KEY } from '../decorators/auth.decorator'
+import { PrivilegedAdmissionService } from '../privileged-admission.service'
 
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { PoliciesGuard } from './policies.guard'
@@ -53,7 +54,7 @@ function isDecisionError(err: unknown): boolean {
  * 1. Check @Auth() decorator to determine auth types (default: [AuthType.Bearer])
  * 2. If AuthType.None → skip authentication (public route)
  * 3. Run authentication guards (JWT, ApiKey) to populate request.user
- * 4. Create CASL ability from user permissions and attach to request.ability
+ * 4. Resolve current privilege before creating CASL ability from effective permissions and attach to request.ability
  * 5. Run authorization guards (SystemRolesGuard, PoliciesGuard)
  *
  * Why single guard instead of multiple?
@@ -64,6 +65,7 @@ function isDecisionError(err: unknown): boolean {
  * Architecture:
  * Request → AuthenticationGuard
  *   ├─ Authenticate (JWT/ApiKey) → request.user
+ *   ├─ Primary privilege admission → effective request.user
  *   ├─ Create ability → request.ability
  *   └─ Authorize (SystemRoles, Policies)
  * → Controller
@@ -79,13 +81,13 @@ export class AuthenticationGuard implements CanActivate {
     private readonly abilityFactory: AbilityFactory,
     private readonly systemRolesGuard: SystemRolesGuard,
     private readonly policiesGuard: PoliciesGuard,
-    private readonly teamAccessGuard: TeamAccessGuard
+    private readonly teamAccessGuard: TeamAccessGuard,
+    private readonly privilegedAdmission: PrivilegedAdmissionService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Default fallback is [AuthType.Bearer] per ADR-034 — see
-    // `apps/api/src/core/auth/decorators/auth.decorator.ts` JSDoc and
-    // ADR-034 in `ai/DECISIONS.md` for the rationale (fail-safe default,
+    // Default fallback is [AuthType.Bearer]; explicit API-key opt-in preserves
+    // fail-safe credential admission (
     // server-side industry alignment, and the OA-01/02 lineage that
     // motivated the flip from the prior permissive default). The
     // ADR-034 allowlist of routes that opt in to AuthType.ApiKey is
@@ -137,7 +139,13 @@ export class AuthenticationGuard implements CanActivate {
     const user = request.user
 
     if (user) {
-      const authorization = await this.abilityFactory.createAuthorizationContext(user)
+      const admission = await this.privilegedAdmission.resolve(
+        user,
+        this.systemRolesGuard.requiredRoles(context)
+      )
+      request.privilegedAdmission = admission
+      request.user = admission.principal
+      const authorization = await this.abilityFactory.createAuthorizationContext(admission)
       request.ability = authorization.ability
       request.teamAccess = authorization.teamAccess
     }

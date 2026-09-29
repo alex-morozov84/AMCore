@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- API Testcontainers E2E bootstrap now supplies its own JWT secret in fresh
+  checkouts and cleans up owned resources when shared setup fails.
+
+- Organization `/switch` JWTs now expire with their parent, preventing repeated
+  exchange from renewing access while retaining membership-checked cross-organization exchange.
+- Privileged JWT claims now require primary-role admission before CASL and platform
+  bypasses on all authenticated routes; demotion cannot retain privileges through
+  cached identity. API-key scopes and Console step-up checks remain unchanged.
+
 - Session rows in Settings and Operations Console remain readable during
   refresh. Destructive buttons and confirmation actions retain text contrast
   in light/dark themes, including hover; Console operator initials use a
