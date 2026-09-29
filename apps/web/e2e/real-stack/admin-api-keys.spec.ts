@@ -94,7 +94,10 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect(page.locator('html')).toHaveClass(/dark/)
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    )
     for (const animation of document.getAnimations()) {
       const endTime = animation.effect?.getComputedTiming().endTime
       if (typeof endTime === 'number' && Number.isFinite(endTime)) animation.finish()
