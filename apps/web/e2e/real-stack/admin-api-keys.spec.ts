@@ -52,6 +52,8 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   await page.goBack()
   await expect(page).not.toHaveURL(/page=2/)
   await search.fill('Lifecycle 00')
+  await expect(page).toHaveURL(/search=Lifecycle(?:\+|%20)00/)
+  await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 00' })).toBeVisible()
   await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 01' })).toHaveCount(0)
   await page.getByRole('checkbox', { name: 'Select eligible keys on this page' }).check()
   ageSessionLastAuthAt(email)
@@ -90,14 +92,12 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect(page.locator('html')).toHaveClass(/dark/)
-  await page.evaluate(() =>
-    Promise.allSettled(
-      document
-        .getAnimations()
-        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
-        .map((animation) => animation.finished)
-    )
-  )
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) {
+      const endTime = animation.effect?.getComputedTiming().endTime
+      if (typeof endTime === 'number' && Number.isFinite(endTime)) animation.finish()
+    }
+  })
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByText('Lifecycle 00', { exact: true }).last()).toBeVisible()

@@ -1,5 +1,6 @@
 import { NextIntlClientProvider } from 'next-intl'
 import type { AdminApiKey, AdminApiKeyListResponse } from '@amcore/shared'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -43,7 +44,7 @@ const rows = [
 })) as AdminApiKey[]
 function view(identity = 'one', data = rows) {
   return (
-    <NextIntlClientProvider locale="en" messages={en}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={en}>
       <ApiKeysInventory
         response={{ data, total: data.length, page: 1, limit: 20 } as AdminApiKeyListResponse}
         identity={identity}

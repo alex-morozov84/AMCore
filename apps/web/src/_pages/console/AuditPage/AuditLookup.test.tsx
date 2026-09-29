@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -19,7 +20,10 @@ afterEach(() => vi.unstubAllGlobals())
 
 function renderLookup(children: ReactNode) {
   return render(
-    <NextIntlClientProvider locale="en" messages={{ console: { identityLookup: copy } }}>
+    <NextIntlClientProvider
+      locale={DEFAULT_LOCALE}
+      messages={{ console: { identityLookup: copy } }}
+    >
       {children}
     </NextIntlClientProvider>
   )

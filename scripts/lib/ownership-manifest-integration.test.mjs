@@ -23,7 +23,7 @@ function cloneManifest(change) {
 test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
   const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
-  assert.equal(operationsConsoleOwnership.facts.roots.length, 14)
+  assert.equal(operationsConsoleOwnership.facts.roots.length, 16)
   assert.ok(
     operationsConsoleOwnership.facts.roots.some(
       (fact) => fact.path === 'apps/web/src/features/console-discovery'
@@ -59,7 +59,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   assertExactScaffoldCounts([
     {
       name: 'console closed-root files',
-      expected: 216,
+      expected: 257,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {

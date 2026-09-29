@@ -41,8 +41,8 @@ describe('ConsoleLocaleSwitcher', () => {
 
     await userEvent.click(screen.getByRole('combobox', { name: 'Language' }))
 
-    expect(screen.getByRole('option', { name: 'English' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Русский' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'English' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'Русский' })).toBeInTheDocument()
   })
 
   it('navigates to the same pathname and query with the new locale, never the raw next/navigation router', async () => {

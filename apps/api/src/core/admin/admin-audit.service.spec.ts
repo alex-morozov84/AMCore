@@ -52,7 +52,7 @@ describe('AdminAuditService', () => {
     tx.auditLog.findMany.mockResolvedValue([])
     await service.list(query, actor)
     expect(tx.auditLog.findMany.mock.calls[0]?.[0]?.where?.action).toEqual({
-      notIn: ['admin.audit_logs.viewed', 'admin.user.sessions_viewed'],
+      notIn: ['admin.audit_logs.viewed', 'admin.api_keys.viewed', 'admin.user.sessions_viewed'],
     })
     await service.list({ ...query, includeReadEvents: true }, actor)
     expect(tx.auditLog.findMany.mock.calls[1]?.[0]?.where?.action).toBeUndefined()

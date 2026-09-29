@@ -1,4 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
@@ -14,7 +15,7 @@ const meta = {
   component: ApiKeysInventory,
   decorators: [
     (Story) => (
-      <NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}>
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} timeZone="UTC" messages={messages}>
         <Story />
       </NextIntlClientProvider>
     ),
