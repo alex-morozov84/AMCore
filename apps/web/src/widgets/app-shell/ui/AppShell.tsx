@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 
 import { LogoutButton } from '@/features/auth-logout'
 import { LocaleSwitcher } from '@/features/locale-switcher'
+import { AcceptedNavigationProvider } from '@/shared/lib/navigation/accepted-navigation'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import {
   Sidebar,
@@ -24,6 +25,7 @@ import {
 } from '@/shared/ui/sidebar'
 
 interface AppShellProps {
+  navigationAfterDashboard?: ReactNode
   email?: string
   /**
    * The `sidebar_state` cookie value, read server-side by
@@ -37,37 +39,21 @@ interface AppShellProps {
   children: ReactNode
 }
 
-/**
- * Its own component so it can call `useSidebar()` — that hook only works
- * *inside* `SidebarProvider`, which `AppShell` itself renders.
- *
- * `setOpenMobile(false)` on navigate is the reason it needs the hook at
- * all: below `md` the sidebar is an overlay Sheet, and shadcn's primitive
- * does not close it when a link inside is followed. Without this the menu
- * stays open on top of the page the user just navigated to — confirmed on
- * a real 375px viewport, and now asserted by `e2e/real-stack/app-shell.spec.ts`.
- * On desktop `openMobile` is unused, so this is a no-op there.
- */
-function NavMenu() {
+/** Existing dashboard/session items plus app-owned navigation slot. */
+function NavMenu({ afterDashboard }: { afterDashboard?: ReactNode }) {
   const t = useTranslations('nav')
   const tSessions = useTranslations('sessions')
-  const { setOpenMobile } = useSidebar()
 
   return (
     <SidebarMenu>
+      {afterDashboard}
       <SidebarMenuItem>
-        <SidebarMenuButton
-          render={<RouteProgressLink href="/" onClick={() => setOpenMobile(false)} />}
-        >
+        <SidebarMenuButton render={<RouteProgressLink href="/" />}>
           <span>{t('dashboard')}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
       <SidebarMenuItem>
-        <SidebarMenuButton
-          render={
-            <RouteProgressLink href="/settings/sessions" onClick={() => setOpenMobile(false)} />
-          }
-        >
+        <SidebarMenuButton render={<RouteProgressLink href="/settings/sessions" />}>
           <span>{tSessions('title')}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -83,41 +69,57 @@ function NavMenu() {
  * real auth gate, the cookie read below) stays in `(dashboard)/layout.tsx`;
  * this widget only receives the already-resolved `email`/`defaultSidebarOpen`.
  */
-export function AppShell({ email, defaultSidebarOpen, children }: AppShellProps) {
+export function AppShell({
+  email,
+  defaultSidebarOpen,
+  children,
+  navigationAfterDashboard,
+}: AppShellProps) {
   const t = useTranslations('nav')
 
   return (
     <SidebarProvider defaultOpen={defaultSidebarOpen}>
-      <Sidebar mobileTitle={t('mobileTitle')} mobileDescription={t('mobileDescription')}>
-        <SidebarHeader>
-          <span className="px-2 py-1.5 font-semibold">AMCore</span>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <NavMenu />
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter className="gap-3">
-          {email && <span className="truncate px-2 text-sm text-muted-foreground">{email}</span>}
-          <div className="flex items-center justify-between gap-2 px-2">
-            <LocaleSwitcher />
-            <LogoutButton variant="ghost" showText={false} />
-          </div>
-        </SidebarFooter>
-        <SidebarRail toggleLabel={t('toggleSidebar')} />
-      </Sidebar>
-      {/* `SidebarInset` already renders the page's `<main>` landmark — a
+      <MobileNavigationBoundary>
+        <Sidebar mobileTitle={t('mobileTitle')} mobileDescription={t('mobileDescription')}>
+          <SidebarHeader>
+            <span className="px-2 py-1.5 font-semibold">AMCore</span>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <NavMenu afterDashboard={navigationAfterDashboard} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarFooter className="gap-3">
+            {email && <span className="truncate px-2 text-sm text-muted-foreground">{email}</span>}
+            <div className="flex items-center justify-between gap-2 px-2">
+              <LocaleSwitcher />
+              <LogoutButton variant="ghost" showText={false} />
+            </div>
+          </SidebarFooter>
+          <SidebarRail toggleLabel={t('toggleSidebar')} />
+        </Sidebar>
+        {/* `SidebarInset` already renders the page's `<main>` landmark — a
       nested one here would trip axe's landmark-main-is-top-level/
       no-duplicate-main rules, caught live by sidebar.stories.tsx's a11y
       gate. */}
-      <SidebarInset>
-        <header className="flex h-14 items-center gap-2 border-b border-border px-4">
-          <SidebarTrigger toggleLabel={t('toggleSidebar')} />
-        </header>
-        <div className="mx-auto w-full max-w-7xl p-4">{children}</div>
-      </SidebarInset>
+        <SidebarInset>
+          <header className="flex h-14 items-center gap-2 border-b border-border px-4">
+            <SidebarTrigger toggleLabel={t('toggleSidebar')} />
+          </header>
+          <div className="mx-auto w-full max-w-7xl p-4">{children}</div>
+        </SidebarInset>
+      </MobileNavigationBoundary>
     </SidebarProvider>
+  )
+}
+
+function MobileNavigationBoundary({ children }: { children: ReactNode }) {
+  const { setOpenMobile } = useSidebar()
+  return (
+    <AcceptedNavigationProvider onAccepted={() => setOpenMobile(false)}>
+      {children}
+    </AcceptedNavigationProvider>
   )
 }

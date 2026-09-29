@@ -62,6 +62,8 @@ export {
   createOrganizationSchema,
   type CreateRoleInput,
   createRoleSchema,
+  type OrganizationContextResponse,
+  organizationContextResponseSchema,
   type OrganizationListResponse,
   organizationListResponseSchema,
   type OrgResponse,
@@ -79,6 +81,17 @@ export {
   type UpdateRoleInput,
   updateRoleSchema,
 } from './organization'
+
+// Product organization context transport
+export {
+  contextSessionBindingSchema,
+  type ProductAccessBootstrap,
+  productAccessBootstrapSchema,
+  type ProductOrganizationContext,
+  productOrganizationContextSchema,
+  type ProductOrganizationList,
+  productOrganizationListSchema,
+} from './product-access'
 
 // Backwards compatibility
 export { type User, userSchema } from './user'

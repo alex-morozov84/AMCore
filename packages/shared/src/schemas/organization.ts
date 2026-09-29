@@ -22,7 +22,7 @@ export const createOrganizationSchema = z.object({
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>
 
 /** Update organization */
-export const updateOrganizationSchema = z.object({
+export const updateOrganizationSchema = z.strictObject({
   name: z.string().min(2).max(100).optional(),
   slug: z
     .string()
@@ -101,6 +101,14 @@ export type OrgResponse = z.infer<typeof orgResponseSchema>
 export const organizationListResponseSchema = paginatedResponseSchema(orgResponseSchema)
 
 export type OrganizationListResponse = z.infer<typeof organizationListResponseSchema>
+
+/** Safe selected-organization overview; capabilities are affordances, not grants. */
+export const organizationContextResponseSchema = z.strictObject({
+  organization: z.strictObject({ id: z.string(), name: z.string(), slug: z.string() }),
+  canManageTeamAccess: z.boolean(),
+})
+
+export type OrganizationContextResponse = z.infer<typeof organizationContextResponseSchema>
 
 /** Permission response */
 export const permissionResponseSchema = z.object({

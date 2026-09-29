@@ -136,11 +136,15 @@ solo. Without an org context, a caller can only read and update their own
 profile. Create an org when several people need to collaborate with different
 levels of access. A user can belong to multiple orgs, each with its own roles.
 
-### Org context in the JWT
+### Selecting organization context
 
-Org permissions apply only once the JWT carries an `organizationId`. Obtain such
-a token by calling the org-switch endpoint (`POST /organizations/:orgId/switch`),
-then replace your access token with the returned one.
+Covered organization handlers accept a personal JWT and verify their explicitly
+selected organization before building rights. Path IDs are authoritative;
+an optional `X-AMCore-Organization-ID` must match. See the
+[context contract and extension recipe](./organization-context.md).
+The existing org-switch endpoint (`POST /organizations/:orgId/switch`) remains
+available for clients that use organization-bound JWTs. Its response supplies
+an organization-bound access token:
 
 ```json
 {
@@ -466,8 +470,11 @@ export function roleAuthorizationRecipe(
 
 JWT authorization that uses organization permissions reads the current
 organization `aclVersion` from the **primary database**, even when the permission
-payload is cached. The `SUPER_ADMIN` bypass and personal ability remain unchanged.
-API keys already read the current version during live membership admission.
+payload is cached. Scoped context admission obtains membership and version
+together; ability and TeamAccess reuse that snapshot. Other legacy callers retain
+their version-read path. API keys reuse their live membership admission snapshot.
+Personal ability and explicit existing live `SUPER_ADMIN` bypasses remain; the
+new selected overview requires membership even for a platform administrator.
 
 ```
 Permissions cache key: auth:perm:v2:{orgId}:{userId}:{aclVersion}
@@ -534,8 +541,9 @@ warm org-scoped JWT authorization now requires a database round-trip.
 
 ## Managing roles, permissions & members
 
-Role, permission and member management require matching organization context and
-full `TeamAccess` authority as described above. For JWTs, call `/switch` first.
+Role, permission and member management require verified matching organization
+context and full `TeamAccess` authority as described above. A personal JWT selects
+the path organization directly; a legacy bound JWT must match that target.
 Supported keys additionally require exact `manage:TeamAccess`. See
 `/docs` for each route's credentials and exact shapes; the semantics that matter:
 

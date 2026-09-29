@@ -10,6 +10,7 @@ import {
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
+import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 import {
   AuthType,
   type InviteListResponse,
@@ -21,6 +22,10 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
+import {
+  OrganizationContextBoundary,
+  RequestContextPolicy,
+} from '../auth/organization-context/request-context-policy'
 
 import { InviteListResponseDto } from './dto'
 import { InviteService } from './invite.service'
@@ -45,6 +50,7 @@ import { InviteService } from './invite.service'
 })
 @Controller('organizations/:orgId/invites')
 @Auth(AuthType.Bearer)
+@OrganizationContextBoundary(ORGANIZATION_CONTEXT_FAMILY)
 export class InvitesController {
   constructor(private readonly inviteService: InviteService) {}
 
@@ -73,6 +79,11 @@ export class InvitesController {
     status: 200,
     description: 'Paginated pending invites',
   })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   listInvites(
     @Param('orgId') orgId: string,
     @CurrentUser() principal: RequestPrincipal,
@@ -92,6 +103,11 @@ export class InvitesController {
       'DELETE /organizations/:orgId/members/:userId instead).',
   })
   @ApiNoContentResponse({ description: 'Invite revoked' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   revokeInvite(
     @Param('orgId') orgId: string,
     @Param('inviteId') inviteId: string,

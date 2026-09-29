@@ -10,11 +10,16 @@ import {
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
+import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 import { AuthType, type InviteResponse, type RequestPrincipal } from '@amcore/shared'
 
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
+import {
+  OrganizationContextBoundary,
+  RequestContextPolicy,
+} from '../auth/organization-context/request-context-policy'
 
 import { CreateInviteDto, InviteResponseDto } from './dto'
 import { InviteService } from './invite.service'
@@ -53,6 +58,7 @@ import { MemberService } from './member.service'
 })
 @Controller('organizations/:orgId/members')
 @Auth(AuthType.Bearer, AuthType.ApiKey)
+@OrganizationContextBoundary(ORGANIZATION_CONTEXT_FAMILY)
 export class MembersController {
   constructor(
     private readonly memberService: MemberService,
@@ -76,6 +82,11 @@ export class MembersController {
       'pending invite is attached to a membership when the recipient ' +
       'calls POST /auth/invites/accept with that token.',
   })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   invite(
     @Param('orgId') orgId: string,
     @Body() dto: CreateInviteDto,
@@ -90,6 +101,11 @@ export class MembersController {
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Remove a member from the organization — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Member removed' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   removeMember(
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,
@@ -104,6 +120,11 @@ export class MembersController {
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Assign a role to a member — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Role assigned' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   assignRole(
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,
@@ -119,6 +140,11 @@ export class MembersController {
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Remove a role from a member — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Role removed' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   removeRole(
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,

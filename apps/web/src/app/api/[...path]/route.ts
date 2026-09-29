@@ -1,3 +1,4 @@
+import { productOrganizationFamilies } from '@/_app/product-api'
 import { proxyToBackend } from '@/shared/api/bff/authenticated-proxy'
 
 interface RouteContext {
@@ -6,7 +7,7 @@ interface RouteContext {
 
 async function handle(request: Request, context: RouteContext): Promise<Response> {
   const { path } = await context.params
-  return proxyToBackend(request, path)
+  return proxyToBackend(request, path, productOrganizationFamilies)
 }
 
 export const GET = handle

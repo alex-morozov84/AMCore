@@ -28,8 +28,12 @@ Three tools, chosen by what each can actually see:
 A layer may import layers below it, never above:
 
 ```
-app  →  _pages  →  widgets  →  features  →  entities  →  shared
+app  →  _app  →  _pages  →  widgets  →  features  →  entities  →  shared
 ```
+
+`app/` is routing plumbing. `_app/<slice>` owns application composition (mounts,
+navigation and API-family injection), may import lower public APIs and is not
+importable by those lower layers. Sibling `_app` slices cannot import each other.
 
 ```ts
 // features may reach entities and shared
@@ -43,6 +47,10 @@ import { LoginForm } from '@/features/auth-login' // ✗ boundaries/dependencies
 ### Slice public API
 
 A slice is entered at its `index.ts` and nowhere else:
+
+The explicitly named `entities/organization-context/index.server.ts` is also a
+public server-only entry point for its DAL and family descriptor. This exception
+does not permit arbitrary deep imports or server barrels in other slices.
 
 ```ts
 import { LoginForm } from '@/features/auth-login' // ✓

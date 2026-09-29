@@ -5,6 +5,7 @@ import { forwardRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import { Link, usePathname } from '@/i18n/navigation'
+import { useAcceptedNavigation } from '@/shared/lib/navigation/accepted-navigation'
 import {
   type RouteProgressController,
   routeProgressController,
@@ -80,6 +81,7 @@ export const RouteProgressLink = forwardRef<
   { onNavigate, href, controller = routeProgressController, ...rest },
   ref
 ) {
+  const acceptedNavigation = useAcceptedNavigation()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
@@ -92,13 +94,14 @@ export const RouteProgressLink = forwardRef<
         event.preventDefault()
       },
     })
-    if (cancelled || !ROUTE_PROGRESS_ENABLED) return
+    if (cancelled) return
 
     const currentSearch = searchParams.toString()
     const currentKey = currentSearch ? `${pathname}?${currentSearch}` : pathname
     if (hrefToKey(href, currentKey) === currentKey) return
 
-    controller.start()
+    acceptedNavigation?.()
+    if (ROUTE_PROGRESS_ENABLED) controller.start()
   }
 
   return <Link ref={ref} href={href} onNavigate={handleNavigate} {...rest} />

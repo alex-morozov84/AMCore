@@ -179,6 +179,48 @@ describe('FSD boundaries', () => {
   // `sameGroup` mechanism stays in the policy for `pages` and a future
   // feature group, so this case stays asserted rather than deleted.
   it.each([
+    [
+      'routing may enter composition public API',
+      'src/app/api/probe.ts',
+      "'@/_app/product-api'",
+      false,
+    ],
+    [
+      'shared may not import application composition',
+      'src/shared/lib/probe.ts',
+      "'@/_app/product-api'",
+      true,
+    ],
+    [
+      'pages may not import application composition',
+      'src/_pages/auth/probe.ts',
+      "'@/_app/product-api'",
+      true,
+    ],
+    [
+      'composition may enter named organization server API',
+      'src/_app/product-api/probe.ts',
+      "'@/entities/organization-context/index.server'",
+      false,
+    ],
+    [
+      'composition cannot enter entity internals',
+      'src/_app/product-api/probe.ts',
+      "'@/entities/organization-context/api/context.server'",
+      true,
+    ],
+    [
+      'shared cannot import an entity server API',
+      'src/shared/lib/probe.ts',
+      "'@/entities/organization-context/index.server'",
+      true,
+    ],
+    [
+      'an entity cannot import application composition',
+      'src/entities/user/probe.ts',
+      "'@/_app/product-api'",
+      true,
+    ],
     ['shared may not import features', 'src/shared/lib/probe.ts', "'@/features/auth-login'", true],
     [
       'features may import entities',

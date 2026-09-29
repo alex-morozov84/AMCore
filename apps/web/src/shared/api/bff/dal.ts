@@ -82,10 +82,15 @@ export const getOptionalSession = cache(async (): Promise<DalSession | null> => 
 export const requireSession = cache(async (): Promise<DalSession> => {
   const session = await getOptionalSession()
   if (!session) {
-    return redirect({ href: '/login', locale: await getLocale() })
+    return redirectToLogin()
   }
   return session
 })
+
+/** Shared missing-session navigation; performs no credential or authority work. */
+export async function redirectToLogin(): Promise<never> {
+  return redirect({ href: '/login', locale: await getLocale() })
+}
 
 /**
  * For auth pages only (login/register): redirects to `/` if a session

@@ -23,6 +23,8 @@ import {
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
+import type { OrganizationContextResponse } from '@amcore/shared'
+import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 import {
   AuthType,
   type OrganizationListResponse,
@@ -34,10 +36,20 @@ import {
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import type { AppAbility } from '../auth/casl/ability.factory'
+import type { TeamAccessDecision } from '../auth/casl/ability.factory'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentAbility } from '../auth/decorators/current-ability.decorator'
+import { CurrentTeamAccess } from '../auth/decorators/current-team-access.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
+import {
+  OrganizationContextBoundary,
+  RequestContextPolicy,
+} from '../auth/organization-context/request-context-policy'
+import {
+  CurrentOrganizationContext,
+  type VerifiedOrganizationContext,
+} from '../auth/organization-context/verified-organization-context'
 import { TokenService } from '../auth/token.service'
 
 import {
@@ -46,6 +58,7 @@ import {
   SwitchOrgResponseDto,
   UpdateOrganizationDto,
 } from './dto'
+import { OrganizationContextResponseDto } from './dto/organization-context-response.dto'
 import { OrganizationListResponseDto } from './dto/organization-list-response.dto'
 import { OrganizationsService } from './organizations.service'
 
@@ -76,6 +89,7 @@ import { OrganizationsService } from './organizations.service'
 @ApiUnauthorizedResponse({ description: 'Missing or invalid accepted credential' })
 @Controller('organizations')
 @Auth(AuthType.Bearer, AuthType.ApiKey)
+@OrganizationContextBoundary(ORGANIZATION_CONTEXT_FAMILY)
 export class OrganizationsController {
   constructor(
     private readonly orgsService: OrganizationsService,
@@ -93,6 +107,7 @@ export class OrganizationsController {
   @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'Create a new organization — caller becomes ADMIN' })
   @ZodResponse({ type: OrgResponseDto, status: 201, description: 'Organization created' })
+  @RequestContextPolicy({ kind: 'personal' })
   create(
     @Body() dto: CreateOrganizationDto,
     @CurrentUser('sub') userId: string
@@ -130,6 +145,7 @@ export class OrganizationsController {
     status: 200,
     description: 'Paginated organizations',
   })
+  @RequestContextPolicy({ kind: 'discovery' })
   findAll(
     @CurrentUser('sub') userId: string,
     @Query() pagination: PaginationQueryDto
@@ -161,6 +177,7 @@ export class OrganizationsController {
       'JWT: membership-based discovery without switching organization context. API key: bound organization, actual record conditions and read permission for all six response fields; partial grants return 403.',
   })
   @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Organization details' })
+  @RequestContextPolicy({ kind: 'discovery' })
   findOne(
     @Param('id') id: string,
     @CurrentUser() principal: RequestPrincipal,
@@ -169,15 +186,42 @@ export class OrganizationsController {
     return this.orgsService.findOne(id, principal, ability)
   }
 
+  @Get(':id/context')
+  @Auth(AuthType.Bearer)
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'id' }, concealMissing: true })
+  @ApiOperation({
+    summary: 'Read selected organization context using a personal JWT',
+    description:
+      'Requires current membership even for a platform administrator. Affordances do not grant authority to later operations.',
+  })
+  @ApiNotFoundResponse({ description: 'Organization missing or caller is not a member' })
+  @ApiForbiddenResponse({ description: 'Bound credential organization does not match target' })
+  @ZodResponse({
+    type: OrganizationContextResponseDto,
+    status: 200,
+    description: 'Safe organization context',
+  })
+  selectedContext(
+    @CurrentOrganizationContext() context: VerifiedOrganizationContext,
+    @CurrentTeamAccess() access: TeamAccessDecision
+  ): Promise<OrganizationContextResponse> {
+    return this.orgsService.selectedContext(context, access)
+  }
+
   @Patch(':id')
   @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
   @ApiNotFoundResponse({ description: 'Organization missing' })
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({
     summary:
-      'Update permitted organization fields — bound org context and full response read required',
+      'Update selected organization fields — current authority and full response read required',
   })
   @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Updated organization' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'id' },
+    legacyPlatformMembershipBypass: true,
+  })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateOrganizationDto,
@@ -198,6 +242,11 @@ export class OrganizationsController {
       'Delete organization — full TeamAccess and delete on every organization field required',
   })
   @ApiNoContentResponse({ description: 'Organization deleted' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'id' },
+    legacyPlatformMembershipBypass: true,
+  })
   remove(
     @Param('id') id: string,
     @CurrentUser() principal: RequestPrincipal,
@@ -209,7 +258,7 @@ export class OrganizationsController {
   /**
    * Returns a new access token with this organization's context (organizationId + aclVersion).
    * Client should replace the current access token with the returned one.
-   * Org context is required for ADMIN operations and CASL permission evaluation.
+   * Retained exchange for direct clients. Personal JWT organization operations select their target explicitly.
    *
    * OA-01: bearer-only. An API key must never be convertible into a JWT —
    * doing so would let a narrowly-scoped integration credential mint a
@@ -230,6 +279,7 @@ export class OrganizationsController {
     description: 'UNAUTHORIZED: invalid credential or missing/elapsed parent expiry',
   })
   @ZodResponse({ type: SwitchOrgResponseDto, status: 200, description: 'Org-context access token' })
+  @RequestContextPolicy({ kind: 'exchange' })
   async switchOrganization(
     @Param('id') orgId: string,
     @CurrentUser() user: RequestPrincipal

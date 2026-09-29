@@ -195,13 +195,16 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - **Redis caching** for frequently-read entities (cache-aside + tag invalidation +
   distributed lock); pattern in `apps/api/src/core/auth/user-cache.service.ts`.
 - **Frontend (web):** Feature-Sliced Design on Next.js App Router — `app/` is
-  Next routing plumbing only (thin), page composition lives in `_pages/`,
+  Next routing plumbing only (thin), application composition lives in `_app/`, page composition lives in `_pages/`,
   `widgets`/`features`/`entities`/`shared` keep canonical FSD meanings.
   Import a slice through its public API only (`@/features/auth-login`, not
   `@/features/auth-login/ui/LoginForm`); `shared/ui` and `shared/lib` are
   collections of modules, so import those directly (`@/shared/ui/button`,
   `@/shared/lib/utils`) — there is no `@/shared/ui` barrel, and no layer-level
   barrel anywhere. A slice may not import a sibling slice in another group.
+  `_app/<slice>` enters lower slice public APIs and is not imported from below.
+  The explicitly named `entities/organization-context/index.server.ts` is its
+  server-only public DAL entry; other deep server imports remain forbidden.
   TanStack Query for server state, Zustand for local client state (kept as
   the convention; no live store exists today — see
   `docs/frontend/architecture-and-conventions.md` → State model). Theme
