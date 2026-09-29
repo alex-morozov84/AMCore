@@ -94,13 +94,16 @@ export function createOrganizationContextScheduler(
         })
         if (retryDelay > 0)
           retryTimer = setTimeout(() => {
-            lease.publish(current, () => update({ ...state, retryAt: undefined }))
+            retryTimer = undefined
+            update({ ...state, retryAt: undefined })
           }, retryDelay)
       })
     }
   }
 
   const start = (verifyIdentity: boolean) => {
+    if (retryTimer) clearTimeout(retryTimer)
+    retryTimer = undefined
     const work = cycle(verifyIdentity)
     pending = work
     void work.finally(() => {
@@ -121,6 +124,7 @@ export function createOrganizationContextScheduler(
       if (state.retryAt && Date.now() < state.retryAt) return
       if (timer) clearTimeout(timer)
       lease.retire()
+      validatedIdentity = false
       suspend()
       timer = setTimeout(() => {
         timer = undefined
@@ -129,12 +133,18 @@ export function createOrganizationContextScheduler(
     },
     setInput(next: OrganizationContextInput) {
       if (organizationContextTarget(next) === organizationContextTarget(input)) return
-      if (timer) clearTimeout(timer)
-      timer = undefined
       lease.retire()
       input = next
       if (state.status === 'changed' || state.status === 'missing') {
         update({ ...state, target: organizationContextTarget(input) })
+        return
+      }
+      if (state.retryAt && Date.now() < state.retryAt) {
+        update({ ...state, target: organizationContextTarget(input) })
+        return
+      }
+      if (timer) {
+        suspend()
         return
       }
       void start(!validatedIdentity)
