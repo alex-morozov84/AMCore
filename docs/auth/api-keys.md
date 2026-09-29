@@ -210,6 +210,9 @@ curl 'https://api.example.com/api/v1/api-keys?page=1&limit=20' \
       "name": "CI Pipeline",
       "organizationId": "cm1abc...",
       "scopes": ["read:User", "read:Organization"],
+      "status": "unexpired",
+      "revokedAt": null,
+      "revocationReason": null,
       "expiresAt": "2027-01-01T00:00:00.000Z",
       "lastUsedAt": "2026-05-15T08:15:00.000Z",
       "createdAt": "2026-05-01T10:00:00.000Z"
