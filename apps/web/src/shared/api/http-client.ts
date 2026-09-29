@@ -86,8 +86,11 @@ function formInit(method: string, body: FormData): RequestInit {
  * exactly what's needed to send `amcore_session`).
  */
 export const apiClient = {
-  get: <T>(path: string, options?: { headers?: Record<string, string> }): Promise<T> =>
-    request<T>(path, { method: 'GET', headers: options?.headers }),
+  get: <T>(
+    path: string,
+    options?: { headers?: Record<string, string>; signal?: AbortSignal }
+  ): Promise<T> =>
+    request<T>(path, { method: 'GET', headers: options?.headers, signal: options?.signal }),
   post: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('POST', body)),
   patch: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('PATCH', body)),
   put: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('PUT', body)),

@@ -269,6 +269,9 @@ importers:
       '@amcore/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@jest/globals':
+        specifier: ^30.5.2
+        version: 30.5.2
       '@nestjs/cli':
         specifier: ^11.0.24
         version: 11.0.24(@swc/cli@0.8.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(chokidar@4.0.3))(@swc/core@1.16.2(@swc/helpers@0.5.23))(@types/node@26.6.2)(esbuild@0.28.1)(prettier@3.9.8)

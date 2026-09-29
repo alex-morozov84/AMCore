@@ -5,7 +5,7 @@ import {
   getConsoleOrganizationsHref,
   getConsoleUsersHref,
 } from '@/shared/lib/console-public-href'
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
+import { BackLink } from '@/shared/ui/back-link'
 
 import { CopyConsoleId } from './CopyConsoleId'
 
@@ -25,15 +25,7 @@ export async function DetailBackLink({
       : kind === 'user'
         ? t('backUsers')
         : t('backOrganizations')
-  return (
-    <RouteProgressLink
-      prefetch={false}
-      href={href}
-      className="text-sm text-muted-foreground underline-offset-2 hover:underline focus-visible:underline"
-    >
-      ← {label}
-    </RouteProgressLink>
-  )
+  return <BackLink href={href}>{label}</BackLink>
 }
 
 export async function DetailId({ id }: { id: string }) {

@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react'
 import { render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { AcceptedNavigationProvider } from '@/shared/lib/navigation/accepted-navigation'
 import {
   createRouteProgressController,
   routeProgressController,
@@ -143,5 +144,41 @@ describe('RouteProgressLink', () => {
     render(<RouteProgressLink href="/other">Other</RouteProgressLink>)
     fireNavigate()
     expect(routeProgressController.getPhase()).toBe('idle')
+  })
+  it.each([true, false])(
+    'notifies accepted different navigation with progress enabled=%s',
+    (enabled) => {
+      routeProgressFlag.enabled = enabled
+      const accepted = vi.fn()
+      render(
+        <AcceptedNavigationProvider onAccepted={accepted}>
+          <RouteProgressLink href="/other">Other</RouteProgressLink>
+        </AcceptedNavigationProvider>
+      )
+      fireNavigate()
+      expect(accepted).toHaveBeenCalledTimes(1)
+    }
+  )
+  it.each(['/login', '#section'])('does not close the shell for current/hash href %s', (href) => {
+    const accepted = vi.fn()
+    render(
+      <AcceptedNavigationProvider onAccepted={accepted}>
+        <RouteProgressLink href={href}>Here</RouteProgressLink>
+      </AcceptedNavigationProvider>
+    )
+    fireNavigate()
+    expect(accepted).not.toHaveBeenCalled()
+  })
+  it('does not close the shell when the navigating caller prevents default', () => {
+    const accepted = vi.fn()
+    render(
+      <AcceptedNavigationProvider onAccepted={accepted}>
+        <RouteProgressLink href="/other" onNavigate={(event) => event.preventDefault()}>
+          Other
+        </RouteProgressLink>
+      </AcceptedNavigationProvider>
+    )
+    fireNavigate()
+    expect(accepted).not.toHaveBeenCalled()
   })
 })

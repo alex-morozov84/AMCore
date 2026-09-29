@@ -6,6 +6,10 @@ export const LOCALE_PURE_MOVES = Object.freeze([
   '(dashboard)/layout.tsx',
   '(dashboard)/page.tsx',
   '(dashboard)/settings/sessions/page.tsx',
+  '(organization-access)/error.tsx',
+  '(organization-access)/layout.tsx',
+  '(organization-access)/organizations/page.tsx',
+  '(organization-access)/organizations/[id]/page.tsx',
   'providers.tsx',
 ])
 

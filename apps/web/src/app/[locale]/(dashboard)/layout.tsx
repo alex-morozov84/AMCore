@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cookies } from 'next/headers'
 
+import { OrganizationNavigationEntry } from '@/_app/organization-access'
 import { getOptionalSession } from '@/shared/api/bff/dal'
 import { SIDEBAR_COOKIE_NAME } from '@/shared/ui/sidebar-cookie'
 import { AppShell } from '@/widgets/app-shell'
@@ -42,7 +43,11 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   const defaultSidebarOpen = sidebarCookie === undefined ? undefined : sidebarCookie === 'true'
 
   return (
-    <AppShell email={email} defaultSidebarOpen={defaultSidebarOpen}>
+    <AppShell
+      email={email}
+      defaultSidebarOpen={defaultSidebarOpen}
+      navigationAfterDashboard={<OrganizationNavigationEntry />}
+    >
       {children}
     </AppShell>
   )

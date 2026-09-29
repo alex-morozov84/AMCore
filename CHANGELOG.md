@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Product organization cards and a read-only selected overview at
+  `/[locale]/organizations`, with ordered session/access revalidation, localized
+  skeleton/error states, responsive theme support and independent headless mounts.
+
 - API-verified organization selection with personal JWTs, a safe selected-context
   endpoint, and typed browser/server transport fenced against identity changes.
 

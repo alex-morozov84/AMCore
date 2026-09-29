@@ -76,7 +76,11 @@ roots, including reserved `/api/v1/product-access`; only typed routes expose
 organization operations. Classification uses the final upstream URL, configured
 API base prefix, segment boundaries and bounded security normalization. It does
 not rewrite IDs or outgoing URLs. Malformed encodings and ambiguous traversal or
-encoded separators fail closed before cookie/vault/refresh/fetch work.
+encoded separators fail closed before cookie/vault/refresh/fetch work. Next may
+normalize repeated slashes or backslashes before Route Handler dispatch, returning
+`308` to a same-origin canonical URL. That destination returns `404`, with zero
+authority, vault, refresh or API work for all seven methods. This exception does
+not allow another origin or a permissive canonical destination.
 
 Coverage tests enumerate registered opted-in controllers and actual aliases and
 check family closure. This is a scoped contract, not a global API registry. An

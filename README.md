@@ -39,7 +39,11 @@ approximate IP locations; see [session management](docs/operations-console/users
 and [GeoIP setup](docs/operations/geoip-setup.md). It is not a product backoffice or a
 catalog/content admin UI.
 
-### Backend Starter Capabilities
+The product app includes a minimal [organization selector and read-only context
+overview](docs/frontend/organization-context.md), separate from Operations Console.
+The headless lifecycle and ready blocks can be mounted in a downstream shell.
+
+## Backend Starter Capabilities
 
 | Capability        | Status          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

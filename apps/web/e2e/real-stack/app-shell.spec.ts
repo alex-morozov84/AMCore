@@ -40,7 +40,7 @@ test.describe('dashboard app shell', () => {
     await expect(page).toHaveURL(/\/en\/settings\/sessions/)
 
     // The Sheet must close itself on navigate — shadcn's primitive does not
-    // do this, so `NavMenu` calls `setOpenMobile(false)`. Without it the
+    // do this, so accepted navigation closes the product Sidebar provider. Without it the
     // menu stays open on top of the page the user just navigated to.
     await expect(mobileSidebar).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Active sessions' })).toBeVisible()
