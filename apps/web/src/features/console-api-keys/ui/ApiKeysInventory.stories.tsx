@@ -5,8 +5,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { TableHead } from '@/shared/ui/table'
 
-import messages from '../../../../messages/en.json'
-
+import messages from './api-key-copy.fixture.json'
 import { API_KEY_FIXTURES } from './api-key-fixtures'
 import { ApiKeysInventory } from './ApiKeysInventory'
 

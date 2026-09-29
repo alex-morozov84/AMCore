@@ -3,7 +3,7 @@ import type { AdminApiKey, AdminApiKeyListResponse } from '@amcore/shared'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import en from '../../../../messages/en.json'
+import en from './api-key-copy.fixture.json'
 
 vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
   useRouteProgressRouter: () => ({ refresh: vi.fn() }),

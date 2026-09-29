@@ -19,10 +19,13 @@ function seedKeys(userId: string) {
   guardedSql(
     `INSERT INTO core.organizations (id,name,slug,"updatedAt") VALUES (:'org','Key review',:'org',now());
  INSERT INTO core.api_keys (id,name,"shortToken","keyHash",salt,scopes,"userId","organizationId","createdAt","expiresAt")
- SELECT id,name,"shortToken",'fake-fixture-verifier','fake-fixture-salt',ARRAY['read:User'],:'user',:'org',now() - (age * interval '1 minute'), CASE WHEN age = 21 THEN now() - interval '1 day' ELSE NULL END
+ SELECT id,name,"shortToken",'fake-fixture-verifier','fake-fixture-salt',ARRAY['read:User'],:'user',:'org',now() - (age * interval '1 minute'), NULL
  FROM jsonb_to_recordset(:'keys'::jsonb) AS r(id text,name text,"shortToken" text,age int);`,
     { org: organizationId, user: userId, keys: JSON.stringify(keys) }
   )
+  guardedSql(`UPDATE core.api_keys SET "expiresAt" = now() - interval '1 day' WHERE id = :'id';`, {
+    id: keys[21]!.id,
+  })
   return { keys, organizationId }
 }
 test('platform key discovery, captured bulk step-up, lifecycle history and responsive access', async ({

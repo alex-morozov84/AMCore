@@ -10,7 +10,13 @@ import {
 import { ZodResponse, ZodValidationException } from 'nestjs-zod'
 import { z } from 'zod'
 
-import { AuthType, type RequestPrincipal, SystemRole } from '@amcore/shared'
+import {
+  type AdminApiKeyListResponse,
+  type AdminApiKeyRevokeResponse,
+  AuthType,
+  type RequestPrincipal,
+  SystemRole,
+} from '@amcore/shared'
 
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling'
 import { ApiKeyRevocationService } from '../api-keys/api-key-revocation.service'

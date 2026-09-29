@@ -8,6 +8,7 @@ import { Skeleton } from '@/shared/ui/skeleton'
 
 import { ApiKeyFilters } from './ApiKeyFilters'
 import { ApiKeyResults } from './ApiKeyResults'
+import { ApiKeyResultsSkeleton } from './ApiKeyResultsSkeleton'
 import { keyDiscoveryState } from './query-state'
 
 export function ApiKeysPageSkeleton() {
@@ -15,7 +16,7 @@ export function ApiKeysPageSkeleton() {
     <div className="space-y-4">
       <Skeleton className="h-10 w-56" />
       <Skeleton className="h-16 w-full" />
-      <Skeleton className="h-72 w-full" />
+      <ApiKeyResultsSkeleton />
     </div>
   )
 }
@@ -41,7 +42,7 @@ export async function ApiKeysPage({ query }: { query: AdminApiKeyQuery }) {
           maxLength={100}
         />
         <ApiKeyFilters query={query} baseHref={baseHref} />
-        <Suspense fallback={<ApiKeysPageSkeleton />}>
+        <Suspense fallback={<ApiKeyResultsSkeleton />}>
           <ApiKeyResults query={query} baseHref={baseHref} />
         </Suspense>
       </DiscoverySearchBoundary>

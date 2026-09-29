@@ -36,7 +36,16 @@ export function ApiKeysInventory({
   const [targets, setTargets] = useState<AdminApiKey[] | null>(null)
   const [busy, setBusy] = useState(false)
   const refresh = useRef<HTMLButtonElement>(null)
+  const restoreFocus = useRef(false)
   const previousIdentity = useRef(identity)
+  useEffect(() => {
+    if (busy || targets || !restoreFocus.current) return
+    const frame = requestAnimationFrame(() => {
+      refresh.current?.focus()
+      restoreFocus.current = false
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [busy, targets])
   useEffect(() => {
     const eligible = new Set(
       response.data.filter((row) => row.status !== 'revoked').map((row) => row.id)
@@ -57,10 +66,10 @@ export function ApiKeysInventory({
     }
   }
   function success() {
+    restoreFocus.current = true
     setSelected([])
     setTargets(null)
     setBusy(false)
-    refresh.current?.focus()
   }
   const selection = (row: AdminApiKey) =>
     row.status !== 'revoked' ? (
@@ -205,7 +214,12 @@ export function ApiKeysInventory({
                   </div>
                   <div>
                     <dt className="text-muted-foreground">{t('status')}</dt>
-                    <dd>{t(row.status)}</dd>
+                    <dd>
+                      {t(row.status)}
+                      {row.revocationReason && (
+                        <p className="text-xs text-muted-foreground">{t(row.revocationReason)}</p>
+                      )}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">{t('expiry')}</dt>
@@ -248,9 +262,9 @@ export function ApiKeysInventory({
           onBusy={setBusy}
           onSuccess={success}
           onClose={() => {
+            restoreFocus.current = true
             setTargets(null)
             setBusy(false)
-            refresh.current?.focus()
           }}
         />
       )}
