@@ -1,6 +1,7 @@
 export type DiscoverySortOrder = 'asc' | 'desc'
 
 export interface DiscoveryQueryState {
+  extraQuery?: Readonly<Record<string, string | undefined>>
   search?: string
   sortBy: string
   sortOrder?: DiscoverySortOrder
@@ -16,7 +17,16 @@ export interface DiscoveryQueryState {
  * direction) until the operator actually interacts with sort.
  */
 export function buildDiscoveryHref(baseHref: string, state: DiscoveryQueryState): string {
+  if (baseHref.includes('?') || baseHref.includes('#'))
+    throw new Error('Discovery base must be a pathname')
   const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(state.extraQuery ?? {}).sort(([a], [b]) =>
+    a.localeCompare(b)
+  )) {
+    if (['search', 'sortBy', 'sortOrder', 'page'].includes(key))
+      throw new Error('Reserved discovery query key')
+    if (value !== undefined && value !== '') params.set(key, value)
+  }
   if (state.search) params.set('search', state.search)
   params.set('sortBy', state.sortBy)
   if (state.sortOrder) params.set('sortOrder', state.sortOrder)

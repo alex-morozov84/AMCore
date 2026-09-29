@@ -35,7 +35,7 @@ export function ConsoleNavigation() {
                 // class). Matching the same `data-active:` scope lets
                 // tailwind-merge actually drop the base color in favor of
                 // this one.
-                'rounded-md text-foreground-muted data-active:bg-console-accent/8 data-active:font-semibold data-active:text-console-accent data-active:hover:bg-console-accent/12'
+                'rounded-md text-foreground-muted data-active:bg-console-accent/8 data-active:font-semibold data-active:text-console-accent data-active:hover:bg-console-accent/12 dark:data-active:text-sidebar-accent-foreground'
               )}
               render={
                 <RouteProgressLink

@@ -1,31 +1,30 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 
+import { useConsoleTimeZone } from '@/shared/lib/console-time-zone'
 import { Button } from '@/shared/ui/button'
 import { DateTimeRangePicker } from '@/shared/ui/date-time-range-picker'
 
 import { auditCalendarValues } from './audit-calendar-values'
 import type { AuditCopy } from './audit-copy'
 import { auditRangeError } from './audit-date-window'
-import { formatInputInstant, parseInputInstant, useAuditTimeZone } from './AuditTimeZone'
+import { formatInputInstant } from './AuditTimeZone'
+import type { useAuditRangeDraft } from './use-audit-range-draft'
 
 interface Props {
-  from: string
-  to: string
-  setFrom: (value: string) => void
-  setTo: (value: string) => void
+  range: ReturnType<typeof useAuditRangeDraft>
   copy: AuditCopy
   locale: string
 }
 
-function selectedDate(value: string, mode: 'utc' | 'local'): Date | undefined {
-  const instant = parseInputInstant(value, mode)
-  return instant ? new Date(instant) : undefined
-}
-
-export function AuditDateRange({ from, to, setFrom, setTo, copy, locale }: Props) {
-  const { mode, zone } = useAuditTimeZone()
+export function AuditDateRange({ range, copy, locale }: Props) {
+  const t = useTranslations('console.audit')
+  const { from: fromEndpoint, to: toEndpoint, setFrom, setTo } = range
+  const from = fromEndpoint.text,
+    to = toEndpoint.text
+  const { mode, zone } = useConsoleTimeZone()
   const [preset, setPreset] = useState<'day' | 'week' | null>(null)
   const [current, setCurrent] = useState<Date | null>(null)
   const calendarOpen = current !== null
@@ -34,16 +33,18 @@ export function AuditDateRange({ from, to, setFrom, setTo, copy, locale }: Props
     const timer = window.setInterval(() => setCurrent(new Date()), 30_000)
     return () => window.clearInterval(timer)
   }, [calendarOpen])
-  const start = parseInputInstant(from, mode)
-  const end = parseInputInstant(to, mode)
+  const start = fromEndpoint.instant
+  const end = toEndpoint.instant
   const error = auditRangeError(start, end)
   const errorText =
     error === 'future' ? copy.futureRange : error === 'tooLong' ? copy.longRange : copy.invalidRange
 
   function chooseHours(hours: number) {
     const now = Math.floor(Date.now() / 1000) * 1000
-    setTo(formatInputInstant(new Date(now).toISOString(), mode))
-    setFrom(formatInputInstant(new Date(now - hours * 60 * 60_000).toISOString(), mode))
+    range.setInstants(
+      new Date(now - hours * 60 * 60_000).toISOString(),
+      new Date(now).toISOString()
+    )
     setPreset(hours === 24 ? 'day' : 'week')
   }
 
@@ -89,8 +90,8 @@ export function AuditDateRange({ from, to, setFrom, setTo, copy, locale }: Props
         )}
       </div>
       <DateTimeRangePicker
-        fromDate={selectedDate(from, mode)}
-        toDate={selectedDate(to, mode)}
+        fromDate={start ? new Date(start) : undefined}
+        toDate={end ? new Date(end) : undefined}
         fromTime={from.slice(11, 19)}
         toTime={to.slice(11, 19)}
         latestDate={current ?? undefined}
@@ -111,6 +112,19 @@ export function AuditDateRange({ from, to, setFrom, setTo, copy, locale }: Props
         }}
         invalid={!!error}
       />
+      {[fromEndpoint, toEndpoint]
+        .filter((endpoint) => endpoint.invalid)
+        .map((endpoint, index) => (
+          <p key={index} role="alert" className="text-sm text-destructive">
+            {t('draftTimeZone', {
+              zone:
+                endpoint.editMode === 'utc'
+                  ? 'UTC'
+                  : Intl.DateTimeFormat().resolvedOptions().timeZone,
+            })}
+            <code className="ml-2">{endpoint.text}</code>
+          </p>
+        ))}
       <p className="text-xs text-muted-foreground">{copy.rangeBounds}</p>
       {error && (
         <p role="alert" className="text-sm text-destructive">

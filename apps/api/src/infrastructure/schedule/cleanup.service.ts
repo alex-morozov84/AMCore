@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
+import { staleTerminalApiKeyWhere } from '../../core/api-keys/api-key-lifecycle'
+
 import { SingletonCronRunner } from './singleton-cron.runner'
 
 import { PrismaService } from '@/prisma'
@@ -11,7 +13,7 @@ export type CleanupRecordType =
   | 'expiredSessions'
   | 'expiredPasswordResetTokens'
   | 'expiredEmailVerificationTokens'
-  | 'expiredApiKeys'
+  | 'staleTerminalApiKeys'
   | 'expiredPendingInvites'
   | 'staleTerminalInvites'
 
@@ -19,7 +21,7 @@ export interface CleanupResult {
   expiredSessions: number
   expiredPasswordResetTokens: number
   expiredEmailVerificationTokens: number
-  expiredApiKeys: number
+  staleTerminalApiKeys: number
   expiredPendingInvites: number
   staleTerminalInvites: number
   /**
@@ -116,8 +118,8 @@ export class CleanupService {
           this.prisma.emailVerificationToken.deleteMany({ where: { expiresAt: { lt: now } } }),
       },
       {
-        field: 'expiredApiKeys',
-        run: () => this.prisma.apiKey.deleteMany({ where: { expiresAt: { lt: now } } }),
+        field: 'staleTerminalApiKeys',
+        run: () => this.prisma.apiKey.deleteMany({ where: staleTerminalApiKeyWhere(now) }),
       },
       {
         // Expired pending invites: past expiry and never accepted/revoked.
@@ -147,7 +149,7 @@ export class CleanupService {
       expiredSessions: 0,
       expiredPasswordResetTokens: 0,
       expiredEmailVerificationTokens: 0,
-      expiredApiKeys: 0,
+      staleTerminalApiKeys: 0,
       expiredPendingInvites: 0,
       staleTerminalInvites: 0,
       failures: [],

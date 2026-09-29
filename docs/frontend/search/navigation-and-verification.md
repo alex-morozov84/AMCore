@@ -116,3 +116,18 @@ keyboard cases; use `pnpm --filter web test:e2e` for mocked browser behavior.
 Use `pnpm --filter web test:e2e:real-stack` when the change depends on the
 actual auth/BFF/cookie/Redis/App Router stack. The full verification loop and
 lane selection live in [Frontend testing](../testing.md).
+
+## Console discovery filters
+
+The Console discovery adapter accepts optional `extraQuery` state. A panel
+validates and allowlists its domain filters before passing them to
+`DiscoverySearchBoundary` and `buildDiscoveryHref`. Reserved search, sort and page
+keys cannot be supplied as extras. The base href is a pathname without a query
+or fragment. Every sort, paging, search and recovery call preserves the extras;
+search and sort reset the page. The same canonical state defines view identity,
+including filters and page size, so filter-only navigation reconciles drafts.
+
+`SearchInput` accepts `maxLength` (default255); set it to the panel's backend
+search bound. Its GET fallback carries extras as hidden fields. Existing panels
+without extra state retain their current URL behavior. Do not put domain validation
+in the shared draft controller or encode filters into the base href.

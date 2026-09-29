@@ -7,6 +7,7 @@ import {
   SearchInput,
 } from '@/features/console-discovery'
 import { getConsoleUsersHref } from '@/shared/lib/console-public-href'
+import { ConsoleFilterPanel } from '@/shared/ui/console-detail/ConsoleFilterPanel'
 import { ConsoleRestorePosition } from '@/shared/ui/console-detail/ConsoleRestorePosition'
 
 import { getUsersEffectiveSortOrder, type UsersSortableField } from './parse-query'
@@ -51,12 +52,14 @@ export async function UsersPage({
         sortOrder={sortOrder}
         effectiveSortOrder={getUsersEffectiveSortOrder(sortBy, sortOrder)}
       >
-        <SearchInput
-          label={t('usersSearchLabel')}
-          placeholder={t('usersSearchPlaceholder')}
-          clearLabel={t('usersSearchClear')}
-          inputId="users-search"
-        />
+        <ConsoleFilterPanel>
+          <SearchInput
+            label={t('usersSearchLabel')}
+            placeholder={t('usersSearchPlaceholder')}
+            clearLabel={t('usersSearchClear')}
+            inputId="users-search"
+          />
+        </ConsoleFilterPanel>
         <Suspense fallback={<UsersResultsSkeleton />}>
           <UsersResults
             page={page}

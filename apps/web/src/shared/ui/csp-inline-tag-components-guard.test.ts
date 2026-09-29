@@ -38,7 +38,8 @@ const CSP_SENSITIVE_PATTERNS: { name: string; pattern: RegExp }[] = [
   },
   {
     name: 'Select with alignItemWithTrigger (renders an inline <style> to position the popup)',
-    pattern: /alignItemWithTrigger/,
+    pattern:
+      /alignItemWithTrigger(?!\s*=\s*\{\s*false\s*\})|<(?:Select(?:Primitive)?\.Positioner|SelectPositioner)\b(?![^>]*\balignItemWithTrigger\s*=\s*\{\s*false\s*\})[^>]*>/,
   },
 ]
 
@@ -55,6 +56,16 @@ describe('shared/ui does not use a CSP-sensitive Base UI component without re-ve
 
   it('found at least one shared/ui source file (the scan itself is not vacuous)', () => {
     expect(files.length).toBeGreaterThan(0)
+  })
+
+  it('guards aligned Select while allowing its explicitly disabled mode', () => {
+    const pattern = CSP_SENSITIVE_PATTERNS[3]!.pattern
+    expect(pattern.test('<Select.Positioner alignItemWithTrigger={false} />')).toBe(false)
+    expect(pattern.test('<Select.Positioner alignItemWithTrigger />')).toBe(true)
+    expect(pattern.test('<Select.Positioner alignItemWithTrigger={true} />')).toBe(true)
+    expect(pattern.test('<Select.Positioner alignItemWithTrigger={enabled} />')).toBe(true)
+    expect(pattern.test('<Select.Positioner />')).toBe(true)
+    expect(pattern.test('<SelectPrimitive.Positioner />')).toBe(true)
   })
 
   it.each(CSP_SENSITIVE_PATTERNS)('does not use $name', ({ pattern }) => {

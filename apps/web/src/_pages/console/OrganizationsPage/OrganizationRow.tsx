@@ -15,7 +15,7 @@ export interface OrganizationRowProps {
   returnTo?: string
 }
 
-export function OrganizationRow({ organization, format, returnTo }: OrganizationRowProps) {
+export function OrganizationRow({ organization, returnTo }: OrganizationRowProps) {
   return (
     <TableRow className="border-line-soft">
       <TableCell className="font-medium">
@@ -29,10 +29,10 @@ export function OrganizationRow({ organization, format, returnTo }: Organization
       </TableCell>
       <TableCell className={cn(MONO, 'text-foreground-muted')}>{organization.slug}</TableCell>
       <TableCell>
-        <ConsoleTimestamp value={organization.createdAt} format={format} />
+        <ConsoleTimestamp value={organization.createdAt} />
       </TableCell>
       <TableCell>
-        <ConsoleTimestamp value={organization.updatedAt} format={format} />
+        <ConsoleTimestamp value={organization.updatedAt} />
       </TableCell>
     </TableRow>
   )

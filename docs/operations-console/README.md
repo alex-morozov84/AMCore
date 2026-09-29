@@ -12,6 +12,7 @@ their organization role.
 | [Overview](overview.md)           | Check this API instance's readiness, dependencies, version, and process role.              |
 | [Users](users.md)                 | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |
 | [Organizations](organizations.md) | Inspect organizations, members and their roles without changing them.                      |
+| [API keys](api-keys.md)           | Inspect credential metadata and irreversibly revoke one or selected keys.                  |
 | [Audit](audit.md)                 | Browse recent system events and narrow them by action, identity, or time.                  |
 
 The Console also has a [configuration and deployment guide](configuration.md)
@@ -45,9 +46,18 @@ unavailable state instead. A `SUPER_ADMIN` demotion takes effect on the next
 protected request. See [configuration and deployment](configuration.md) for the
 session and routing details.
 
+## Display time zone
+
+The header's **Time** selector controls how Console dates are displayed. Choose
+**UTC** or **Local time**, determined by your browser. The local option identifies
+the zone and current UTC offset; the header shows the selected offset explicitly.
+The preference is saved for this browser origin, across reloads and Console pages,
+and defaults to UTC when storage is unavailable. It does not change stored event
+timestamps or the instants submitted in Audit queries.
+
 ## Scope
 
-The Console has the four areas above, with full user and organization detail
+The Console has the five areas above, with full user and organization detail
 pages accessible from the lists and from current identities in Audit. It has
 no metrics, queues, or AI control panels. Product administration belongs in a
 separate area with its own roles and permissions.

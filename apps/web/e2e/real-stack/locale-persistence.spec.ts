@@ -22,7 +22,8 @@ test('a locale switch persists to a fresh session on another device/browser', as
       response.request().method() === 'PATCH' &&
       response.ok()
   )
-  await page.getByLabel(/language/i).selectOption('ru')
+  await page.getByRole('combobox', { name: /language/i }).click()
+  await page.getByRole('option', { name: 'Русский' }).click()
   await localePersisted
   await expect(page).toHaveURL(/\/ru\/?$/)
 

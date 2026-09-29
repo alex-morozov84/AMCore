@@ -2,12 +2,11 @@
 
 import { useFormatter } from 'next-intl'
 
+import { useConsoleTimeZone } from '@/shared/lib/console-time-zone'
 import { formatConsoleDate, formatConsoleTime } from '@/shared/lib/format-console-date-time'
 
-import { useAuditTimeZone } from './AuditTimeZone'
-
 export function AuditTimestamp({ value, inline = false }: { value: string; inline?: boolean }) {
-  const { zone } = useAuditTimeZone()
+  const { zone } = useConsoleTimeZone()
   const format = useFormatter()
   const date = new Date(value)
   return (

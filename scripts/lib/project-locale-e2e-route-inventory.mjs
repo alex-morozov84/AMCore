@@ -84,3 +84,11 @@ export function rewriteRoutePrefixes(text) {
 export function commentRange(reference) {
   return { getStart: () => reference.start, end: reference.end }
 }
+
+export function hasLocaleSwitcherSelection(text) {
+  return (
+    text.includes('name: /language/i') &&
+    (text.includes("selectOption('ru')") ||
+      (text.includes("getByRole('option'") && text.includes("name: 'Русский'")))
+  )
+}

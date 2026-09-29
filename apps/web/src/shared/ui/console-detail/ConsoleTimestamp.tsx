@@ -1,27 +1,39 @@
-import type { getFormatter } from 'next-intl/server'
+'use client'
 
+import { useFormatter } from 'next-intl'
+
+import { useConsoleTimeZone } from '@/shared/lib/console-time-zone'
 import { formatConsoleDate, formatConsoleTime } from '@/shared/lib/format-console-date-time'
 
-/**
- * Stacked date/time cell shared by every dense console admin table (Users,
- * Organizations, Sessions) — date on top, muted time below. The caller
- * handles a missing value with its own worded fallback (e.g. "never signed
- * in"), so this always renders a real timestamp.
- */
+/** Serializable presentation props keep server data fetching outside this leaf. */
 export function ConsoleTimestamp({
   value,
-  format,
+  variant = 'stacked',
+  seconds = false,
 }: {
   value: string
-  format: Awaited<ReturnType<typeof getFormatter>>
+  variant?: 'stacked' | 'date' | 'inline'
+  seconds?: boolean
 }) {
-  const timestamp = new Date(value)
+  const format = useFormatter()
+  const { zone } = useConsoleTimeZone()
+  const date = new Date(value)
   return (
-    <time dateTime={value} className="flex flex-col leading-tight tabular-nums">
-      <span>{formatConsoleDate(format, timestamp)}</span>
-      <span className="mt-1 text-xs text-foreground-muted">
-        {formatConsoleTime(format, timestamp)}
-      </span>
+    <time
+      dateTime={value}
+      className={
+        variant === 'stacked' ? 'flex flex-col leading-tight tabular-nums' : 'tabular-nums'
+      }
+    >
+      <span>{formatConsoleDate(format, date, zone)}</span>
+      {variant !== 'date' && (
+        <>
+          {variant === 'inline' ? ' / ' : null}
+          <span className={variant === 'stacked' ? 'mt-1 text-xs text-muted-foreground' : ''}>
+            {formatConsoleTime(format, date, { timeZone: zone, seconds })}
+          </span>
+        </>
+      )}
     </time>
   )
 }

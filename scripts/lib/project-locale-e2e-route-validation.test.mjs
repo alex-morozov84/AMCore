@@ -56,3 +56,21 @@ test('missing or unexpected route anchors fail closed', () => {
   assert.throws(() => apply(pathname, count + 1, 'en'))
   assert.throws(() => apply(pathname, count - 1, 'ru'))
 })
+
+test('locale switcher residual detection covers custom shadcn options', () => {
+  const clean = new Map(
+    E2E_ROUTE_SURFACES.map(([pathname, count, unavailable = 0]) => [
+      pathname,
+      apply(pathname, count, 'en', unavailable),
+    ])
+  )
+  const progress = 'apps/web/e2e/mocked/route-progress-bar.spec.ts'
+  clean.set(
+    progress,
+    `${clean.get(progress)}
+page.getByRole('combobox', { name: /language/i }).click()
+page.getByRole('option', { name: 'Русский' }).click()
+`
+  )
+  assert.ok(e2eRouteResiduals(clean).some((item) => item.endsWith('locale-switcher scenario')))
+})

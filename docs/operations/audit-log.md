@@ -240,3 +240,18 @@ maintenance window if necessary; do not disable the append-only trigger.
 The local PostgreSQL 18 rehearsal on 100,001 rows took 227 ms, preserved
 the trigger and yielded query probes below the 2-second statement timeout.
 That fixture does not predict a production table's lock time or workload.
+
+## API-key lifecycle events
+
+`api_key.revoked` is recorded once per actual irreversible transition, in the
+same transaction as verifier destruction. `admin.api_keys.revocation_requested`
+records requestedCount/affectedCount and platform_revoked reason, including
+known no-op requests. Unknown targets roll back the batch and have no successful
+summary. First revocation actor/time/reason is preserved.
+
+`admin.api_keys.viewed` is a mandatory fail-closed read event. It contains only
+filter-presence booleans and resultCount, not search/name/returned IDs/verifiers.
+The Console Audit read-event opt-in includes it; transition/request summaries
+are visible by default. HTTP query redaction covers search, userId,
+organizationId and id in URL and structured query. Cleanup metadata names
+`staleTerminalApiKeys`. Audit retention is independent of key metadata retention.

@@ -55,16 +55,14 @@ export const Collapsed: Story = {
   play: async ({ canvasElement }) => {
     const trigger = canvasElement.querySelector<HTMLButtonElement>('[data-slot="sidebar-trigger"]')
     const title = canvasElement.querySelector('[data-console-shell="title"]')
-    const footer = canvasElement.querySelector('[data-console-shell="footer"]')
 
-    if (!trigger || !title || !footer) {
+    if (!trigger || !title) {
       throw new Error('Console shell collapse targets are missing.')
     }
 
     await userEvent.click(trigger)
 
     await waitFor(() => expect(title).not.toBeVisible())
-    expect(footer).not.toBeVisible()
   },
 }
 

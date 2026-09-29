@@ -16,6 +16,8 @@ interface UseStepUpMutationOptions<TResult> {
   mutationFn: () => Promise<TResult>
   /** Called once the action has succeeded, including after a step-up retry. */
   onSuccess: (result: TResult) => void
+  /** Return true when the caller has handled this action failure. */
+  onError?: (error: unknown) => boolean
 }
 
 /**
@@ -31,6 +33,7 @@ interface UseStepUpMutationOptions<TResult> {
 export function useStepUpMutation<TResult>({
   mutationFn,
   onSuccess,
+  onError,
 }: UseStepUpMutationOptions<TResult>) {
   const describeError = useApiError()
   const [stepUp, setStepUp] = useState<StepUpPhase>({ kind: 'closed' })
@@ -49,7 +52,7 @@ export function useStepUpMutation<TResult>({
         setStepUp({ kind: 'open' })
         return
       }
-      toast.add({ type: 'error', title: describeError(error).message })
+      if (!onError?.(error)) toast.add({ type: 'error', title: describeError(error).message })
     }
   }
 
@@ -81,7 +84,7 @@ export function useStepUpMutation<TResult>({
         return
       }
       setStepUp({ kind: 'closed' })
-      toast.add({ type: 'error', title: describeError(error).message })
+      if (!onError?.(error)) toast.add({ type: 'error', title: describeError(error).message })
     }
   }
 

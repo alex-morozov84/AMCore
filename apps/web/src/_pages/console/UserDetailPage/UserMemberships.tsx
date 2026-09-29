@@ -1,8 +1,8 @@
-import { getFormatter, getTranslations } from 'next-intl/server'
+import { getTranslations } from 'next-intl/server'
 import type { AdminUserDetailResponse } from '@amcore/shared'
 
 import { getConsoleOrganizationDetailHref } from '@/shared/lib/console-public-href'
-import { formatConsoleDate } from '@/shared/lib/format-console-date-time'
+import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 import { DetailRoles } from '@/shared/ui/console-detail/DetailRoles'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 type Membership = AdminUserDetailResponse['memberships']['data'][number]
 
 export async function UserMemberships({ rows }: { rows: Membership[] }) {
-  const [t, format] = await Promise.all([getTranslations('console.detail'), getFormatter()])
+  const t = await getTranslations('console.detail')
   return (
     <>
       <div className="hidden rounded-lg border border-border bg-surface-elevated shadow-md sm:block">
@@ -41,9 +41,7 @@ export async function UserMemberships({ rows }: { rows: Membership[] }) {
                   <DetailRoles roles={row.roles} empty={t('noRoles')} />
                 </TableCell>
                 <TableCell>
-                  <time dateTime={row.joinedAt}>
-                    {formatConsoleDate(format, new Date(row.joinedAt))}
-                  </time>
+                  <ConsoleTimestamp value={row.joinedAt} variant="date" />
                 </TableCell>
               </TableRow>
             ))}
@@ -68,10 +66,7 @@ export async function UserMemberships({ rows }: { rows: Membership[] }) {
             </p>
             <DetailRoles roles={row.roles} empty={t('noRoles')} />
             <p className="text-xs text-muted-foreground">
-              {t('joined')}:{' '}
-              <time dateTime={row.joinedAt}>
-                {formatConsoleDate(format, new Date(row.joinedAt))}
-              </time>
+              {t('joined')}: <ConsoleTimestamp value={row.joinedAt} variant="date" />
             </p>
           </li>
         ))}

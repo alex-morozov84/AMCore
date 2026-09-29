@@ -396,3 +396,11 @@ issuance-style credential.
 - [Webhook verification](webhooks.md) — the provider-keyed
   `WEBHOOK_<PROVIDER>_SECRET` shape this guide's two-sided secrets section
   points back to.
+
+## AMCore API keys
+
+AMCore-issued integration keys are distinct from provider/environment secrets.
+For planned replacement create a new own key, migrate/test consumers, then revoke
+the old one; for compromise revoke first. Approximate last use cannot prove
+migration. See [API keys](../auth/api-keys.md) and
+[lifecycle restore safety](api-key-lifecycle.md).

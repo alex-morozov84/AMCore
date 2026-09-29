@@ -5,6 +5,7 @@ import { createContext, use } from 'react'
 import type { DiscoverySortOrder } from '../model/discovery-query'
 
 export interface DiscoverySearchContextValue {
+  extraQuery?: Readonly<Record<string, string | undefined>>
   baseHref: string
   sortBy: string
   sortOrder?: DiscoverySortOrder

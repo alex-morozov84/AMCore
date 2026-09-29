@@ -16,7 +16,7 @@ export interface SortableColumnHeadProps {
   baseHref: string
   column: string
   defaultOrder: DiscoverySortOrder
-  current: Pick<DiscoveryQueryState, 'search' | 'sortBy' | 'sortOrder'>
+  current: Pick<DiscoveryQueryState, 'search' | 'sortBy' | 'sortOrder' | 'extraQuery'>
   /** Shown visually; not the link's accessible name (see `accessibleLabel`). */
   visibleLabel: string
   /** The link's full accessible name — states the next action/direction
@@ -45,6 +45,7 @@ export function SortableColumnHead({
   const ariaSort = ariaSortValue(column, current, defaultOrder)
   const nextOrder = toggleSortOrder(column, current, defaultOrder)
   const href = buildDiscoveryHref(baseHref, {
+    extraQuery: current.extraQuery,
     search: current.search,
     sortBy: column,
     sortOrder: nextOrder,

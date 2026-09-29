@@ -34,8 +34,10 @@ investigation reference; the screen has no event-ID search field.
    calendar. You can adjust the start and end times below the calendar.
 3. To filter by a person, choose **Actor** or **Target**, search their current
    name or email, and select a suggestion. Search an organization's current
-   name or slug in the adjacent field. Enter or **Find** runs a lookup
-   immediately. If more than ten suggestions match, narrow the search text.
+   name or slug in the adjacent field. Search runs automatically after a short
+   pause once at least two characters are entered; Enter runs it immediately without submitting filters. An empty
+   result is shown explicitly. If more than ten suggestions match, narrow the
+   search text.
 4. Choose **Apply filters** for the event types, date range, and exact IDs you
    entered. **Clear filters** returns to the recent seven-day view.
 
@@ -49,10 +51,11 @@ over event contents.
 ## Choose the time zone and range
 
 The selected date range stays visible above the filters, including when the
-filter form is collapsed on a narrow screen. The time-zone switch above the
-filters applies to every date and time on the screen. It starts at **UTC**;
-**Local time** uses your browser's time zone and
-shows its current UTC offset. Switching zones changes how the same interval
+filter form is collapsed on a narrow screen. The **Time** selector in the Console
+header applies to dates throughout the Console. It starts at **UTC** and remembers
+your choice in this browser, including after reload. **Local time** uses your
+browser's time zone; its option shows the IANA zone and current UTC offset.
+The closed selector shows UTC or the selected local offset. Switching zones changes how the same interval
 is displayed, not which events belong to it.
 
 The start of an interval is included; its end is excluded. A range can span

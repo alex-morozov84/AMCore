@@ -70,6 +70,9 @@ const EXPECTED: Record<string, Expected> = {
   // auth-invites
   'post /auth/invites/accept': { status: '200', kind: 'json' },
   // admin
+  'get /admin/api-keys': { status: '200', kind: 'json' },
+  'delete /admin/api-keys/{id}': { status: '200', kind: 'json' },
+  'post /admin/api-keys/revoke': { status: '200', kind: 'json' },
   'get /admin/access': { status: '204', kind: 'none' },
   'get /admin/audit-logs': { status: '200', kind: 'json' },
   'get /admin/users': { status: '200', kind: 'json' },

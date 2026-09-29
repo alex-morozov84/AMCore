@@ -20,6 +20,10 @@ export function getConsoleUsersHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/users`
 }
 
+export function getConsoleApiKeysHref(): string {
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/api-keys`
+}
+
 /** Audit is a separate bounded cursor/filter route in both Console topologies. */
 export function getConsoleAuditHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/audit`
@@ -27,7 +31,12 @@ export function getConsoleAuditHref(): string {
 
 /** Open identity activity in the widest single interval accepted by Audit. */
 export function getConsoleDetailAuditHref(
-  filters: { actorId?: string; targetId?: string; targetType?: 'USER'; organizationId?: string },
+  filters: {
+    actorId?: string
+    targetId?: string
+    targetType?: 'USER' | 'API_KEY'
+    organizationId?: string
+  },
   now = Date.now()
 ): string {
   const query = new URLSearchParams()
@@ -91,9 +100,11 @@ export function parseConsoleReturnHref(value: unknown): string | null {
   const keys =
     url.pathname === getConsoleAuditHref()
       ? AUDIT_KEYS
-      : url.pathname === getConsoleUsersHref() || url.pathname === getConsoleOrganizationsHref()
-        ? DISCOVERY_KEYS
-        : null
+      : url.pathname === getConsoleApiKeysHref()
+        ? new Set([...DISCOVERY_KEYS, 'userId', 'organizationId', 'status', 'id', 'limit'])
+        : url.pathname === getConsoleUsersHref() || url.pathname === getConsoleOrganizationsHref()
+          ? DISCOVERY_KEYS
+          : null
   if (!keys) return null
   const seen = new Set<string>()
   for (const key of url.searchParams.keys()) {

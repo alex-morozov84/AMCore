@@ -1,4 +1,5 @@
 import type {
+  AdminApiKeyRevokeResponse,
   AdminSessionsListResponse,
   AdminUserResponse,
   SupportedLocale,
@@ -17,6 +18,12 @@ import { apiClient } from './http-client'
  * `getConsolePublicApiPath()` so it resolves correctly in both topologies.
  */
 export const consoleApi = {
+  revokeApiKey: (id: string): Promise<AdminApiKeyRevokeResponse> =>
+    apiClient.delete<AdminApiKeyRevokeResponse>(
+      getConsolePublicApiPath(`/api-keys/${encodeURIComponent(id)}`)
+    ),
+  revokeSelectedApiKeys: (ids: string[]): Promise<AdminApiKeyRevokeResponse> =>
+    apiClient.post<AdminApiKeyRevokeResponse>(getConsolePublicApiPath('/api-keys/revoke'), { ids }),
   updateUserRole: (userId: string, systemRole: SystemRole): Promise<AdminUserResponse> =>
     apiClient.patch<AdminUserResponse>(getConsolePublicApiPath(`/users/${userId}/role`), {
       systemRole,

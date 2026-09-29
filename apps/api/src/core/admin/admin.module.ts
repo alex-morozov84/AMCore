@@ -3,10 +3,13 @@ import { Module } from '@nestjs/common'
 import { GeoipModule } from '../../infrastructure/geoip/geoip.module'
 import { CleanupModule } from '../../infrastructure/schedule/cleanup.module'
 import { PrismaModule } from '../../prisma'
+import { ApiKeyRevocationService } from '../api-keys/api-key-revocation.service'
 import { AuditModule } from '../audit'
 
 import { AdminController } from './admin.controller'
 import { AdminService } from './admin.service'
+import { AdminApiKeysController } from './admin-api-keys.controller'
+import { AdminApiKeysService } from './admin-api-keys.service'
 import { AdminAuditService } from './admin-audit.service'
 import { AdminDetailService } from './admin-detail.service'
 import { AdminOverviewService } from './admin-overview.service'
@@ -24,9 +27,11 @@ import { HealthModule } from '@/health'
 // everywhere" property as CleanupModule.
 @Module({
   imports: [PrismaModule, CleanupModule, AuditModule, HealthModule, GeoipModule],
-  controllers: [AdminController],
+  controllers: [AdminController, AdminApiKeysController],
   providers: [
     AdminService,
+    AdminApiKeysService,
+    ApiKeyRevocationService,
     AdminDetailService,
     AdminOverviewService,
     AdminAuditService,

@@ -126,7 +126,8 @@ test('host-mode Overview locale switcher stays on the console host and switches 
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )
 
-  await consolePage.getByRole('combobox', { name: /language/i }).selectOption('ru')
+  await consolePage.getByRole('combobox', { name: /language/i }).click()
+  await consolePage.getByRole('option', { name: 'Русский' }).click()
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/ru/?$')
   )

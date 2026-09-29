@@ -243,3 +243,9 @@ buried in `docker compose logs`.
 - Redis is not covered — it holds queues/cache/rate-limit state, not durable
   application data; see "Redis production profile" in
   [deployment.md](deployment.md) for its persistence (AOF) requirements.
+
+## AMCore API keys
+
+Before restored traffic resumes, replay trusted post-backup API-key revocations
+or invalidate restored credentials. A pre-revoke verifier backup can revive a
+key; see [API-key restore safety](api-key-lifecycle.md#restore).

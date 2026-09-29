@@ -36,18 +36,21 @@ beforeEach(() => {
 })
 
 describe('ConsoleLocaleSwitcher', () => {
-  it('renders every supported locale as an option', () => {
+  it('renders every supported locale as an option', async () => {
     renderSwitcher()
 
-    expect(screen.getByRole('option', { name: 'English' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Русский' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('combobox', { name: 'Language' }))
+
+    expect(await screen.findByRole('option', { name: 'English' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'Русский' })).toBeInTheDocument()
   })
 
   it('navigates to the same pathname and query with the new locale, never the raw next/navigation router', async () => {
     const user = userEvent.setup()
     renderSwitcher()
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'ru')
+    await user.click(screen.getByRole('combobox', { name: 'Language' }))
+    await user.click(await screen.findByRole('option', { name: 'Русский' }))
 
     expect(replace).toHaveBeenCalledWith(
       { pathname: '/admin/organizations', query: { page: '2' } },
@@ -59,7 +62,8 @@ describe('ConsoleLocaleSwitcher', () => {
     const user = userEvent.setup()
     renderSwitcher()
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'en')
+    await user.click(screen.getByRole('combobox', { name: 'Language' }))
+    await user.click(await screen.findByRole('option', { name: 'English' }))
 
     expect(replace).not.toHaveBeenCalled()
   })

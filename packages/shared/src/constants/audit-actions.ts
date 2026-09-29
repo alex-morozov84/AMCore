@@ -1,6 +1,8 @@
 /** Current semantic actions offered by the Console selector. Historical codes remain queryable. */
 export const AUDIT_ACTIONS = [
   'admin.audit_logs.viewed',
+  'admin.api_keys.viewed',
+  'admin.api_keys.revocation_requested',
   'admin.cleanup.executed',
   'admin.user.session_revoked',
   'admin.user.sessions_revoked',
@@ -45,5 +47,6 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number]
  */
 export const HIDDEN_READ_AUDIT_ACTIONS: readonly AuditAction[] = [
   'admin.audit_logs.viewed',
+  'admin.api_keys.viewed',
   'admin.user.sessions_viewed',
 ]

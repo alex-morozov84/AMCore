@@ -532,7 +532,7 @@ describe('AdminService', () => {
         expiredSessions: 5,
         expiredPasswordResetTokens: 3,
         expiredEmailVerificationTokens: 7,
-        expiredApiKeys: 0,
+        staleTerminalApiKeys: 0,
         expiredPendingInvites: 2,
         staleTerminalInvites: 1,
         failures: [],

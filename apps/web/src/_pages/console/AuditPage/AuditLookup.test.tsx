@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { DEFAULT_LOCALE } from '@amcore/shared'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AuditCopy } from './audit-copy'
@@ -6,15 +7,27 @@ import { AuditLookup } from './AuditLookup'
 
 const copy = {
   lookupUser: 'Search user',
+  lookupOrganization: 'Search organization',
   lookupSearch: 'At least 2 characters',
-  lookupSubmit: 'Find',
+  lookupEmpty: 'Nothing found',
   lookupSelect: 'Select record',
   lookupRefine: 'Refine search',
   lookupError: 'Search unavailable',
   loading: 'Loading',
-} as AuditCopy
+} satisfies Pick<AuditCopy, 'lookupUser' | 'lookupOrganization'> & Record<string, string>
 
 afterEach(() => vi.unstubAllGlobals())
+
+function renderLookup(children: ReactNode) {
+  return render(
+    <NextIntlClientProvider
+      locale={DEFAULT_LOCALE}
+      messages={{ console: { identityLookup: copy } }}
+    >
+      {children}
+    </NextIntlClientProvider>
+  )
+}
 
 describe('AuditLookup', () => {
   it('runs Enter as an explicit lookup without submitting surrounding filters', async () => {
@@ -24,7 +37,7 @@ describe('AuditLookup', () => {
     })
     vi.stubGlobal('fetch', fetch)
     const submit = vi.fn()
-    render(
+    renderLookup(
       <form onSubmit={submit}>
         <AuditLookup kind="user" copy={copy} onSelect={() => undefined} />
       </form>
@@ -37,18 +50,48 @@ describe('AuditLookup', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
-  it('does not repeat a completed debounced lookup when Find is clicked', async () => {
+  it('shows a persistent empty result and does not repeat a completed lookup on Enter', async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ kind: 'user', items: [], hasMore: false }),
     })
     vi.stubGlobal('fetch', fetch)
-    render(<AuditLookup kind="user" copy={copy} onSelect={() => undefined} />)
+    renderLookup(<AuditLookup kind="user" copy={copy} onSelect={() => undefined} />)
     fireEvent.change(screen.getByRole('textbox', { name: 'Search user' }), {
       target: { value: 'Ada' },
     })
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
-    fireEvent.click(screen.getByRole('button', { name: 'Find' }))
+    await waitFor(() => expect(screen.getByText('Nothing found')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Find' })).not.toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search user' }), { key: 'Enter' })
     expect(fetch).toHaveBeenCalledTimes(1)
   })
+  it('ignores an old response after a new query completes', async () => {
+    let resolveOld!: (value: unknown) => void
+    const oldResponse = new Promise((resolve) => {
+      resolveOld = resolve
+    })
+    const response = (items: Array<{ id: string; name: string }>) => ({
+      ok: true,
+      json: async () => ({ kind: 'user', items, hasMore: false }),
+    })
+    const fetch = vi.fn().mockReturnValueOnce(oldResponse).mockResolvedValueOnce(response([]))
+    vi.stubGlobal('fetch', fetch)
+    renderLookup(<AuditLookup kind="user" copy={copy} onSelect={() => undefined} />)
+    const input = screen.getByRole('textbox', { name: 'Search user' })
+    fireEvent.change(input, { target: { value: 'Ada' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    fireEvent.change(input, { target: { value: 'Nobody' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(screen.getByText('Nothing found')).toBeInTheDocument())
+    await act(async () => {
+      resolveOld(response([{ id: 'old', name: 'Ada' }]))
+    })
+    expect(screen.queryByText('Ada')).not.toBeInTheDocument()
+    expect(screen.getByText('Nothing found')).toBeInTheDocument()
+    fireEvent.change(input, { target: { value: '' } })
+    expect(screen.queryByText('Nothing found')).not.toBeInTheDocument()
+  })
 })
+import type { ReactNode } from 'react'
+import { NextIntlClientProvider } from 'next-intl'
