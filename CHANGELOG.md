@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Operations Console API-key inventory with safe lifecycle metadata, identity filters,
   single revoke and selected-page bulk revoke with password step-up.
 
+### Changed
+
+- Console filters share a consistent surface, use custom Select controls and show
+  a persistent, labelled display time-zone selector in the header. Standalone
+  checkboxes use a shared shadcn control; identity search runs automatically,
+  shows empty results explicitly and gives suggestions a pointer cursor.
+
+- API-key revocation destroys verifiers and retains safe metadata until cleanup
+  eligibility 30 days after first expiry/revocation; parent Cascade remains. Own lists
+  include historical rows with lifecycle status/filter. Cleanup response category
+  `expiredApiKeys` is renamed `staleTerminalApiKeys`. Schema cutover requires stopped
+  old writers; backup restore must replay revocations or invalidate restored keys.
+
+## [0.10.1] - 2026-09-29
+
+### Added
+
 - Managed isolated local development, prepared account previews and browser-test
   stands with explicit target ownership, loopback ports and scoped cleanup.
 
@@ -30,17 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default, matching the existing Audit-log read pattern.
 
 ### Changed
-
-- Console filters share a consistent surface, use custom Select controls and show
-  a persistent, labelled display time-zone selector in the header. Standalone
-  checkboxes use a shared shadcn control; identity search runs automatically,
-  shows empty results explicitly and gives suggestions a pointer cursor.
-
-- API-key revocation destroys verifiers and retains safe metadata until cleanup
-  eligibility 30 days after first expiry/revocation; parent Cascade remains. Own lists
-  include historical rows with lifecycle status/filter. Cleanup response category
-  `expiredApiKeys` is renamed `staleTerminalApiKeys`. Schema cutover requires stopped
-  old writers; backup restore must replay revocations or invalidate restored keys.
 
 - Grouped optional Compose overlays and test fixtures under `docker/compose/`
   and `docker/testing/`, retaining the root reference stack.
@@ -1953,7 +1959,8 @@ production-readiness work and the platform foundation built so far.
 
 ---
 
-[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.10.0...HEAD
+[unreleased]: https://github.com/alex-morozov84/AMCore/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/alex-morozov84/AMCore/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/alex-morozov84/AMCore/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/alex-morozov84/AMCore/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/alex-morozov84/AMCore/compare/v0.7.0...v0.8.0
