@@ -26,6 +26,8 @@ const SENSITIVE_QUERY_PARAMS = [
   'actorId',
   'targetId',
   'organizationId',
+  'userId',
+  'id',
   'cursor',
 ]
 

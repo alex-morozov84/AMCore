@@ -30,3 +30,23 @@ describe('buildDiscoveryIdentity', () => {
     ).not.toBe(first)
   })
 })
+
+it('distinguishes filter-only changes and canonicalizes filter insertion order', () => {
+  const base = { sortBy: 'name', effectiveSortOrder: 'asc' as const, page: 1 }
+  const first = buildDiscoveryIdentity('/admin/api-keys', {
+    ...base,
+    extraQuery: { userId: 'owner', status: 'all', limit: '20' },
+  })
+  expect(
+    buildDiscoveryIdentity('/admin/api-keys', {
+      ...base,
+      extraQuery: { limit: '20', status: 'all', userId: 'owner' },
+    })
+  ).toBe(first)
+  expect(
+    buildDiscoveryIdentity('/admin/api-keys', {
+      ...base,
+      extraQuery: { userId: 'owner', status: 'revoked', limit: '20' },
+    })
+  ).not.toBe(first)
+})

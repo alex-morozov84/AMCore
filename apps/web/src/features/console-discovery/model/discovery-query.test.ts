@@ -89,3 +89,29 @@ describe('ariaSortValue', () => {
     expect(ariaSortValue('name', { sortBy: 'name', sortOrder: 'desc' }, 'asc')).toBe('descending')
   })
 })
+
+it('preserves canonical filter state without permitting reserved overrides', () => {
+  const extraQuery = {
+    userId: 'owner',
+    organizationId: 'org',
+    status: 'revoked',
+    id: 'key',
+    limit: '20',
+  }
+  const href = buildDiscoveryHref('/admin/api-keys', {
+    extraQuery,
+    search: 'CI',
+    sortBy: 'name',
+    page: 2,
+  })
+  const query = new URL(href, 'https://example.test').searchParams
+  for (const [key, value] of Object.entries(extraQuery)) expect(query.get(key)).toBe(value)
+  expect(query.get('search')).toBe('CI')
+  expect(query.get('page')).toBe('2')
+  expect(() =>
+    buildDiscoveryHref('/admin/api-keys?status=all', { sortBy: 'name', page: 1 })
+  ).toThrow()
+  expect(() =>
+    buildDiscoveryHref('/admin/api-keys', { extraQuery: { page: '5' }, sortBy: 'name', page: 1 })
+  ).toThrow()
+})

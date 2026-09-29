@@ -798,3 +798,9 @@ indefinitely:
 - [Deployment platforms](deployment-platforms.md) — a decision matrix for
   Kubernetes, Cloud Run, Fly, Render, Railway, and (with a hard caveat)
   Vercel, if VPS/Compose isn't your target.
+
+## AMCore API keys
+
+API-key retained revocation requires a drained, all-process cutover. Follow the
+[API-key lifecycle runbook](api-key-lifecycle.md) before this schema upgrade;
+mixed old/new writers and direct old-version rollback are unsupported.

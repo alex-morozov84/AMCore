@@ -320,9 +320,13 @@ describe('createLoggingConfig', () => {
           targetId: 'target-secret-456',
           organizationId: 'organization-secret-789',
           cursor: 'cursor-secret-abc',
+          userId: 'owner-secret-abc',
+          id: 'key-secret-abc',
           limit: '25',
         })
-        await request(server).get(`/audit-probe?${query}`).expect(200)
+        await request(server)
+          .get(`/audit-probe?${query}&userId=owner-secret-repeat&id=key-secret-repeat`)
+          .expect(200)
       } finally {
         server.close()
       }
@@ -332,12 +336,16 @@ describe('createLoggingConfig', () => {
         'target-secret-456',
         'organization-secret-789',
         'cursor-secret-abc',
+        'owner-secret-abc',
+        'key-secret-abc',
+        'owner-secret-repeat',
+        'key-secret-repeat',
       ]) {
         expect(output).not.toContain(secret)
       }
       expect(output).toContain('limit=25')
       const parsed = JSON.parse(output) as { req: { url: string } }
-      for (const key of ['actorId', 'targetId', 'organizationId', 'cursor']) {
+      for (const key of ['actorId', 'targetId', 'organizationId', 'cursor', 'userId', 'id']) {
         expect(new URL(parsed.req.url, 'http://test.invalid').searchParams.get(key)).toBe(
           '[REDACTED]'
         )
@@ -347,10 +355,12 @@ describe('createLoggingConfig', () => {
         targetId: 'target-secret-456',
         organizationId: 'organization-secret-789',
         cursor: 'cursor-secret-abc',
+        userId: 'owner-secret-abc',
+        id: 'key-secret-abc',
       })
       const structuredQuery = (JSON.parse(structured) as { req: { query: Record<string, string> } })
         .req.query
-      expect(Object.values(structuredQuery)).toEqual(Array(4).fill('[REDACTED]'))
+      expect(Object.values(structuredQuery)).toEqual(Array(6).fill('[REDACTED]'))
     })
 
     it('preserves the path and non-sensitive query keys in the sanitized url', () => {

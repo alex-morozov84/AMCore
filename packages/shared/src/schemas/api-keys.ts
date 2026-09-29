@@ -3,6 +3,12 @@ import { z } from 'zod'
 import { ApiKeyScopeErrorCode } from '../constants'
 import { Action, Subject } from '../enums/permissions'
 
+import {
+  apiKeyRevocationReasonSchema,
+  apiKeyStatusFilterSchema,
+  apiKeyStatusSchema,
+} from './admin-api-keys'
+import { paginationQuerySchema } from './pagination'
 import { paginatedResponseSchema } from './pagination'
 
 // Allowed scope grammar (AK-05).
@@ -77,6 +83,11 @@ export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>
  * `apps/api/src/core/api-keys/api-keys.service.ts`. The plaintext
  * token is never exposed on the list endpoint — only metadata.
  */
+export const apiKeyQuerySchema = paginationQuerySchema.extend({
+  status: apiKeyStatusFilterSchema.default('all'),
+})
+export type ApiKeyQuery = z.infer<typeof apiKeyQuerySchema>
+
 export const apiKeyListItemSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -84,6 +95,9 @@ export const apiKeyListItemSchema = z.object({
   scopes: z.array(z.string()),
   expiresAt: z.iso.datetime().nullable(),
   lastUsedAt: z.iso.datetime().nullable(),
+  revokedAt: z.iso.datetime().nullable(),
+  revocationReason: apiKeyRevocationReasonSchema.nullable(),
+  status: apiKeyStatusSchema,
   createdAt: z.iso.datetime(),
 })
 

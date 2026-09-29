@@ -5,6 +5,7 @@ export {
   type DiscoverySortOrder,
   toggleSortOrder,
 } from './model/discovery-query'
+export { useDiscoveryDraftDiscard } from './ui/discovery-search-context'
 export {
   DiscoveryNavigationLink,
   type DiscoveryNavigationLinkProps,

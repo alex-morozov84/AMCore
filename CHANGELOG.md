@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Operations Console API-key inventory with safe lifecycle metadata, identity filters,
+  single revoke and selected-page bulk revoke with password step-up.
+
 - Managed isolated local development, prepared account previews and browser-test
   stands with explicit target ownership, loopback ports and scoped cleanup.
 
@@ -27,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default, matching the existing Audit-log read pattern.
 
 ### Changed
+
+- API-key revocation destroys verifiers and retains safe metadata until cleanup
+  eligibility 30 days after first expiry/revocation; parent Cascade remains. Own lists
+  include historical rows with lifecycle status/filter. Cleanup response category
+  `expiredApiKeys` is renamed `staleTerminalApiKeys`. Schema cutover requires stopped
+  old writers; backup restore must replay revocations or invalidate restored keys.
 
 - Grouped optional Compose overlays and test fixtures under `docker/compose/`
   and `docker/testing/`, retaining the root reference stack.

@@ -62,7 +62,7 @@ describe('CleanupService', () => {
         expiredSessions: 5,
         expiredPasswordResetTokens: 3,
         expiredEmailVerificationTokens: 7,
-        expiredApiKeys: 2,
+        staleTerminalApiKeys: 2,
         expiredPendingInvites: 4,
         staleTerminalInvites: 1,
         failures: [],
@@ -99,7 +99,9 @@ describe('CleanupService', () => {
         where: { expiresAt: { lt: expect.any(Date) } },
       })
       expect(prisma.apiKey.deleteMany).toHaveBeenCalledWith({
-        where: { expiresAt: { lt: expect.any(Date) } },
+        where: {
+          OR: [{ revokedAt: { lte: expect.any(Date) } }, { expiresAt: { lte: expect.any(Date) } }],
+        },
       })
     })
 
@@ -112,7 +114,7 @@ describe('CleanupService', () => {
         expiredSessions: 0,
         expiredPasswordResetTokens: 0,
         expiredEmailVerificationTokens: 0,
-        expiredApiKeys: 0,
+        staleTerminalApiKeys: 0,
         expiredPendingInvites: 0,
         staleTerminalInvites: 0,
         failures: [],
@@ -127,12 +129,12 @@ describe('CleanupService', () => {
       const result = await service.runCleanup()
 
       expect(result.expiredSessions).toBe(9)
-      expect(result.expiredApiKeys).toBe(0)
-      expect(result.failures).toEqual(['expiredApiKeys'])
+      expect(result.staleTerminalApiKeys).toBe(0)
+      expect(result.failures).toEqual(['staleTerminalApiKeys'])
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           event: 'schedule.cleanup_partial_failure',
-          recordType: 'expiredApiKeys',
+          recordType: 'staleTerminalApiKeys',
         }),
         expect.any(String)
       )

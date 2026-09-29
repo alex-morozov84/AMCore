@@ -122,7 +122,7 @@ export const cleanupResultSchema = z.object({
   expiredSessions: z.number().int(),
   expiredPasswordResetTokens: z.number().int(),
   expiredEmailVerificationTokens: z.number().int(),
-  expiredApiKeys: z.number().int(),
+  staleTerminalApiKeys: z.number().int(),
   expiredPendingInvites: z.number().int(),
   staleTerminalInvites: z.number().int(),
   failures: z.array(z.string()),

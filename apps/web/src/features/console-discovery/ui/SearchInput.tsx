@@ -12,6 +12,7 @@ export interface SearchInputProps {
   placeholder: string
   clearLabel: string
   inputId: string
+  maxLength?: number
   className?: string
 }
 
@@ -32,8 +33,10 @@ export function SearchInput({
   clearLabel,
   inputId,
   className,
+  maxLength = 255,
 }: SearchInputProps) {
-  const { baseHref, sortBy, sortOrder, value, setValue, commitNow } = useDiscoverySearch()
+  const { baseHref, sortBy, sortOrder, extraQuery, value, setValue, commitNow } =
+    useDiscoverySearch()
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -62,10 +65,13 @@ export function SearchInput({
         label={label}
         placeholder={placeholder}
         clearLabel={clearLabel}
-        maxLength={255}
+        maxLength={maxLength}
       />
       {/* Hidden fields carry the current sort forward for the no-JS GET
           fallback — client navigation builds its own href instead. */}
+      {Object.entries(extraQuery ?? {}).map(([name, value]) =>
+        value === undefined ? null : <input key={name} type="hidden" name={name} value={value} />
+      )}
       <input type="hidden" name="sortBy" value={sortBy} />
       {sortOrder && <input type="hidden" name="sortOrder" value={sortOrder} />}
     </form>

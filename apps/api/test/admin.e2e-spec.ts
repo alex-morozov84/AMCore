@@ -622,7 +622,7 @@ describe('Admin (e2e)', () => {
         expiredSessions: expect.any(Number),
         expiredPasswordResetTokens: expect.any(Number),
         expiredEmailVerificationTokens: expect.any(Number),
-        expiredApiKeys: expect.any(Number),
+        staleTerminalApiKeys: expect.any(Number),
         expiredPendingInvites: expect.any(Number),
         staleTerminalInvites: expect.any(Number),
         failures: [], // EQS-04: per-type failures surfaced; empty on success

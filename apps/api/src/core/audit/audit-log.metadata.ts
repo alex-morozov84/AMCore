@@ -50,7 +50,7 @@ const aiReasonRef: MetadataValueRule = (value) => {
 }
 
 const cleanupCounts: MetadataSpec = {
-  expiredApiKeys: true,
+  staleTerminalApiKeys: true,
   expiredEmailVerificationTokens: true,
   expiredPasswordResetTokens: true,
   expiredPendingInvites: true,
@@ -106,6 +106,19 @@ const specs: Record<AuditAction, MetadataSpec> = {
     organization: auditFilterFlag,
     time: auditFilterFlag,
     resultCount: auditResultCount,
+  },
+  'admin.api_keys.viewed': {
+    search: auditFilterFlag,
+    user: auditFilterFlag,
+    organization: auditFilterFlag,
+    status: auditFilterFlag,
+    id: auditFilterFlag,
+    resultCount: boundedResultCount,
+  },
+  'admin.api_keys.revocation_requested': {
+    requestedCount: boundedResultCount,
+    affectedCount: boundedResultCount,
+    reason: aiCode,
   },
   'admin.cleanup.executed': { counts: cleanupCounts },
   'admin.user.session_revoked': { sessionId: true, count: true },

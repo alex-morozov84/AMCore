@@ -167,6 +167,8 @@ export {
   apiKeyListItemSchema,
   type ApiKeyListResponse,
   apiKeyListResponseSchema,
+  type ApiKeyQuery,
+  apiKeyQuerySchema,
   type CreateApiKeyInput,
   type CreateApiKeyResponse,
   createApiKeyResponseSchema,
@@ -372,6 +374,22 @@ export {
 } from './ai-tools'
 
 // Invite schemas (OB-02)
+export {
+  ADMIN_API_KEY_SORT_FIELDS,
+  type AdminApiKey,
+  type AdminApiKeyListResponse,
+  adminApiKeyListResponseSchema,
+  type AdminApiKeyQuery,
+  adminApiKeyQuerySchema,
+  type AdminApiKeyRevokeInput,
+  type AdminApiKeyRevokeResponse,
+  adminApiKeyRevokeResponseSchema,
+  adminApiKeyRevokeSchema,
+  adminApiKeySchema,
+  apiKeyRevocationReasonSchema,
+  apiKeyStatusFilterSchema,
+  apiKeyStatusSchema,
+} from './admin-api-keys'
 export {
   type AcceptInviteInput,
   type AcceptInviteResponse,

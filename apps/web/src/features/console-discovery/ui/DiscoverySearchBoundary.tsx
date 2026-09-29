@@ -14,6 +14,7 @@ const DEBOUNCE_MS = 300
 const normalizeSearch = (value: string) => value.trim()
 
 export interface DiscoverySearchBoundaryProps {
+  extraQuery?: Readonly<Record<string, string | undefined>>
   baseHref: string
   search?: string
   page: number
@@ -24,35 +25,45 @@ export interface DiscoverySearchBoundaryProps {
 }
 
 type ControllerProps = Omit<DiscoverySearchBoundaryProps, 'children'>
-type CommitIdentityProps = Pick<ControllerProps, 'baseHref' | 'sortBy' | 'effectiveSortOrder'>
-type SearchCommitProps = Pick<ControllerProps, 'baseHref' | 'sortBy' | 'sortOrder'>
+type CommitIdentityProps = Pick<
+  ControllerProps,
+  'baseHref' | 'sortBy' | 'effectiveSortOrder' | 'extraQuery'
+>
+type SearchCommitProps = Pick<ControllerProps, 'baseHref' | 'sortBy' | 'sortOrder' | 'extraQuery'>
 
-function useCommitIdentity({ baseHref, sortBy, effectiveSortOrder }: CommitIdentityProps) {
+function useCommitIdentity({
+  baseHref,
+  sortBy,
+  effectiveSortOrder,
+  extraQuery,
+}: CommitIdentityProps) {
   return useCallback(
     (value: string) =>
       buildDiscoveryIdentity(baseHref, {
+        extraQuery,
         search: value || undefined,
         page: 1,
         sortBy,
         effectiveSortOrder,
       }),
-    [baseHref, effectiveSortOrder, sortBy]
+    [baseHref, effectiveSortOrder, sortBy, extraQuery]
   )
 }
 
-function useSearchCommit({ baseHref, sortBy, sortOrder }: SearchCommitProps) {
+function useSearchCommit({ baseHref, sortBy, sortOrder, extraQuery }: SearchCommitProps) {
   const router = useRouteProgressRouter()
   return useCallback(
     (value: string) => {
-      const state = { search: value || undefined, sortBy, sortOrder, page: 1 }
+      const state = { extraQuery, search: value || undefined, sortBy, sortOrder, page: 1 }
       router.replace(buildDiscoveryHref(baseHref, state), { scroll: false })
     },
-    [baseHref, router, sortBy, sortOrder]
+    [baseHref, router, sortBy, sortOrder, extraQuery]
   )
 }
 
 function useDiscoverySearchController({
   baseHref,
+  extraQuery,
   search = '',
   page,
   sortBy,
@@ -60,13 +71,14 @@ function useDiscoverySearchController({
   effectiveSortOrder,
 }: ControllerProps) {
   const authoritativeIdentity = buildDiscoveryIdentity(baseHref, {
+    extraQuery,
     search: search || undefined,
     page,
     sortBy,
     effectiveSortOrder,
   })
-  const getCommitIdentity = useCommitIdentity({ baseHref, sortBy, effectiveSortOrder })
-  const onCommit = useSearchCommit({ baseHref, sortBy, sortOrder })
+  const getCommitIdentity = useCommitIdentity({ baseHref, sortBy, effectiveSortOrder, extraQuery })
+  const onCommit = useSearchCommit({ baseHref, sortBy, sortOrder, extraQuery })
 
   return useDebouncedDraft({
     authoritativeValue: search,
@@ -79,11 +91,11 @@ function useDiscoverySearchController({
 }
 
 export function DiscoverySearchBoundary(props: DiscoverySearchBoundaryProps) {
-  const { baseHref, sortBy, sortOrder, children } = props
+  const { baseHref, sortBy, sortOrder, extraQuery, children } = props
   const controller = useDiscoverySearchController(props)
   const context = useMemo(
-    () => ({ baseHref, sortBy, sortOrder, ...controller }),
-    [baseHref, controller, sortBy, sortOrder]
+    () => ({ baseHref, sortBy, sortOrder, extraQuery, ...controller }),
+    [baseHref, controller, sortBy, sortOrder, extraQuery]
   )
 
   return <DiscoverySearchContext value={context}>{children}</DiscoverySearchContext>

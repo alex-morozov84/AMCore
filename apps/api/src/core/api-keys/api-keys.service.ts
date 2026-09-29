@@ -8,9 +8,12 @@ import { PinoLogger } from 'nestjs-pino'
 import type { ApiKeyListResponse } from '@amcore/shared'
 import type { CreateApiKeyInput } from '@amcore/shared'
 
-import { ForbiddenException, NotFoundException } from '../../common/exceptions'
+import { ForbiddenException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 import { AuditLogService } from '../audit'
+
+import { apiKeyStatus, apiKeyStatusWhere } from './api-key-lifecycle'
+import { ApiKeyRevocationService } from './api-key-revocation.service'
 
 import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
 
@@ -32,6 +35,9 @@ export interface ApiKeyListItem {
   expiresAt: string | null
   lastUsedAt: string | null
   createdAt: string
+  revokedAt: string | null
+  revocationReason: 'owner_revoked' | 'platform_revoked' | null
+  status: 'unexpired' | 'expired' | 'revoked'
 }
 
 @Injectable()
@@ -40,7 +46,8 @@ export class ApiKeysService {
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly auditLog: AuditLogService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly revocation: ApiKeyRevocationService
   ) {
     this.logger.setContext(ApiKeysService.name)
   }
@@ -114,19 +121,26 @@ export class ApiKeysService {
     }
   }
 
-  async findAllForUser(userId: string, page: number, limit: number): Promise<ApiKeyListResponse> {
+  async findAllForUser(
+    userId: string,
+    page: number,
+    limit: number,
+    status: 'all' | 'unexpired' | 'expired' | 'revoked' = 'all'
+  ): Promise<ApiKeyListResponse> {
     // ADR-036: paginated envelope. ORDER BY createdAt DESC, id ASC for
     // deterministic page boundaries (createdAt is usually unique but
     // not guaranteed; id tie-break is mandatory).
+    const now = new Date()
+    const where = { userId, ...apiKeyStatusWhere(status, now) }
     const skip = (page - 1) * limit
     const [keys, total] = await Promise.all([
       this.prisma.apiKey.findMany({
-        where: { userId },
+        where,
         skip,
         take: limit,
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       }),
-      this.prisma.apiKey.count({ where: { userId } }),
+      this.prisma.apiKey.count({ where }),
     ])
 
     return {
@@ -138,6 +152,9 @@ export class ApiKeysService {
         expiresAt: k.expiresAt?.toISOString() ?? null,
         lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
         createdAt: k.createdAt.toISOString(),
+        revokedAt: k.revokedAt?.toISOString() ?? null,
+        revocationReason: k.revocationReason as ApiKeyListItem['revocationReason'],
+        status: apiKeyStatus(k, now),
       })),
       total,
       page,
@@ -146,40 +163,11 @@ export class ApiKeysService {
   }
 
   async revoke(id: string, userId: string): Promise<void> {
-    const deleted = await this.prisma.$transaction(async (tx) => {
-      const apiKey = await tx.apiKey.findUnique({
-        where: { id },
-        select: { id: true, organizationId: true, userId: true },
-      })
-
-      if (!apiKey || apiKey.userId !== userId) {
-        throw new NotFoundException('API key')
-      }
-
-      const result = await tx.apiKey.deleteMany({
-        where: { id, userId },
-      })
-
-      await this.auditLog.record(
-        {
-          action: 'api_key.revoked',
-          actorId: userId,
-          actorType: AuditActorType.USER,
-          metadata: {
-            pinoEvent: 'api_key.revoked',
-            reason: 'user_revoked',
-          },
-          organizationId: apiKey.organizationId,
-          targetId: id,
-          targetType: AuditTargetType.API_KEY,
-        },
-        { tx }
-      )
-
-      return result
-    })
-
-    this.logger.info({ userId, apiKeyId: id, deleted: deleted.count }, 'API key revoked')
+    const result = await this.revocation.revoke([id], userId, false)
+    this.logger.info(
+      { userId, apiKeyId: id, affectedCount: result.affectedCount },
+      'API key revoked'
+    )
   }
 
   async verifyByShortToken(
@@ -193,8 +181,9 @@ export class ApiKeysService {
       include: { user: { select: { systemRole: true } } },
     })
 
-    if (!apiKey) return null
-    if (apiKey.expiresAt && apiKey.expiresAt < new Date()) return null
+    const now = new Date()
+    if (!apiKey || apiKey.revokedAt || !apiKey.keyHash || !apiKey.salt) return null
+    if (apiKey.expiresAt && apiKey.expiresAt <= now) return null
     if (!this.verifyLongToken(longToken, apiKey.keyHash, apiKey.salt)) return null
 
     return apiKey
@@ -223,15 +212,13 @@ export class ApiKeysService {
 
     if (alreadyUpdated) return
 
-    // Best-effort update. P2025 (record not found) is expected when
-    // revoke() races between verify and touch — the existing .catch()
-    // swallows it.
-    //
-    // DO NOT switch to `upsert` here. Upsert would resurrect a revoked
-    // key row with the same id, defeating revocation. The race is
-    // already safe; keep `update` + tolerant catch.
+    // Conditional metadata update cannot modify a terminal credential or resurrect a row.
+    const now = new Date()
     void this.prisma.apiKey
-      .update({ where: { id }, data: { lastUsedAt: new Date() } })
+      .updateMany({
+        where: { id, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+        data: { lastUsedAt: now },
+      })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to update lastUsedAt'))
 
     try {

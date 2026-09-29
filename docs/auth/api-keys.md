@@ -177,7 +177,7 @@ API-key route fails CI until runtime auth and Swagger security metadata agree.
 
 ## Organization binding
 
-An API key is bound to one organization at creation. The runtime re-verifies on every request that the key's owner is still a member of that organization — lose membership, lose the key.
+An API key is bound to one organization at creation. The runtime re-verifies on every request that the key's owner is still a member of that organization — membership removal denies authentication but retains the key. Rejoining can restore access to an unexpired, unrevoked key within current rights/scopes. This is the chosen membership policy; explicit revocation remains irreversible.
 
 | Scenario                                   | Result                                 |
 | ------------------------------------------ | -------------------------------------- |
@@ -195,7 +195,7 @@ Use one key per (owner, organization) pair. To grant cross-org access, issue mul
 
 Paginated list. Accepts `?page=N&limit=M` with `1 ≤ page` and
 `1 ≤ limit ≤ 100`; defaults `page=1, limit=20`. Keys are ordered newest first
-(`createdAt DESC, id ASC`). No secret fields are exposed.
+(`createdAt DESC, id ASC`). No secret fields are exposed. The default includes retained historical rows; `status=all|unexpired|expired|revoked` filters lifecycle status. Rows include `status`, `revokedAt` and `revocationReason`. Revoked takes precedence over expired; expiry equal to the verification time is expired.
 
 ```bash
 curl 'https://api.example.com/api/v1/api-keys?page=1&limit=20' \
@@ -234,7 +234,7 @@ curl -X DELETE https://api.example.com/api/v1/api-keys/cm1xyz... \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
-**Success response:** `204 No Content`. Authentication reads the key from the database, so verification starting after revocation commits returns `401`. A request already admitted before revocation may finish; revocation does not cancel in-flight handlers.
+**Success response:** `204 No Content`. A known already-revoked key is a no-op; foreign, unknown or purged keys return404. The first actor/time/reason remains unchanged. Revocation destroys hash and salt in the same transaction as its audit event, retaining safe metadata. Authentication reads the key from the database, so verification starting after revocation commits returns `401`. A request already admitted before revocation may finish; revocation does not cancel in-flight handlers.
 
 ---
 
@@ -307,4 +307,6 @@ export AMCORE_API_KEY="amcore_live_..."
 
 **Use the narrowest scopes that work.** A read-only reporter doesn't need `manage:User`. Narrowing scopes is a one-way safety net — the intersection model means even a leaked narrow key can't escalate.
 
-**Rotate proactively.** If a key may have been exposed, revoke and recreate. There's no key "rotation" endpoint — `DELETE` + `POST` is the rotation pattern.
+**Replace deliberately.** For planned replacement create a new own key, migrate/test consumers, then revoke the old key. For suspected compromise revoke first, even if it causes downtime. There is no dedicated rotation endpoint, scope editing or reactivation. Scopes are an immutable issuance ceiling, not a permission snapshot: future owner grants can enlarge access within that ceiling. Last use cannot prove consumer migration.
+
+Safe metadata becomes purge-eligible30 days after the first expiry or revocation. Nightly/manual cleanup removes eligible rows; parent user/organization Cascade may remove them sooner. Audit retention is separate. No legacy deleted history can be recovered. No-expiry and past-expiry issuance remain supported. See the [deployment and restore runbook](../operations/api-key-lifecycle.md).

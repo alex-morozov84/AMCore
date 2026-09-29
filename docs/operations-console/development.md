@@ -222,3 +222,18 @@ passes an effective principal to downstream consumers. SystemRoles reuses the
 original-claim/current-role evidence; FreshAuth still independently verifies the
 session freshness. Console routes remain bearer-only, and host/product vault and
 origin boundaries are unchanged. Do not add another claim-only platform bypass.
+
+## API-key inventory composition
+
+API keys reuse discovery optional `extraQuery` for status/identity/limit fields,
+with stable canonical URL identity and a100-character search override. Preserve
+extras in sort/page/search and GET fallback; use the draft-discard API before
+programmatic filters. Page selection is bound to full identity and intersects
+fresh eligible results; confirmation owns a captured snapshot through step-up.
+
+Generic `shared/ui/identity-lookup` owns the input/debounce/result interaction;
+Console adapters own lookup transport and copy. It remains available in a fork
+without Console. Import the shared module rather than a sibling page's internals.
+The safe inventory reads directly in RSC with the console-aware token/no-store;
+fixed revoke BFF routes use the existing origin/session seam. Optional Console
+removal leaves backend admin endpoints, core lifecycle and shared API contracts.

@@ -262,8 +262,11 @@ model ApiKey {
   id             String    @id @default(cuid())
   name           String
   shortToken     String    @unique
-  keyHash        String
-  salt           String
+  keyHash        String?
+  salt           String?
+  revokedAt      DateTime?
+  revokedByUserId String?
+  revocationReason String?
   scopes         String[]  @default([])
   expiresAt      DateTime?
   lastUsedAt     DateTime?
@@ -277,6 +280,8 @@ model ApiKey {
   @@index([userId])
   @@index([organizationId])
   @@index([expiresAt])
+  @@index([revokedAt])
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@map("api_keys")
   @@schema("core")
 }

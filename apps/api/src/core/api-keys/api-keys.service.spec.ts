@@ -5,6 +5,7 @@ import { ForbiddenException, NotFoundException } from '../../common/exceptions'
 import type { AuditLogService } from '../audit'
 import { createMockContext, type MockContext, mockContextToPrisma } from '../auth/test-context'
 
+import type { ApiKeyRevocationService } from './api-key-revocation.service'
 import { ApiKeysService } from './api-keys.service'
 
 import { SystemRole } from '@/generated/prisma/client'
@@ -14,6 +15,7 @@ describe('ApiKeysService', () => {
   let mockCtx: MockContext
   let mockCache: jest.Mocked<Pick<Cache, 'get' | 'set' | 'del'>>
   let mockAuditLog: jest.Mocked<Pick<AuditLogService, 'record'>>
+  const mockRevocation = { revoke: jest.fn() }
   let mockLogger: jest.Mocked<PinoLogger>
 
   const mockApiKey = {
@@ -24,6 +26,9 @@ describe('ApiKeysService', () => {
     salt: 'somesalt',
     scopes: ['read:User'],
     expiresAt: null,
+    revokedAt: null,
+    revokedByUserId: null,
+    revocationReason: null,
     lastUsedAt: null,
     createdAt: new Date('2024-01-01'),
     userId: 'user-1',
@@ -58,7 +63,8 @@ describe('ApiKeysService', () => {
       prisma,
       mockCache as unknown as Cache,
       mockAuditLog as unknown as AuditLogService,
-      mockLogger
+      mockLogger,
+      mockRevocation as unknown as ApiKeyRevocationService
     )
     ;(mockCtx.prisma.$transaction as unknown as jest.Mock).mockImplementation(
       async (cb: (tx: typeof mockCtx.prisma) => Promise<unknown>) => cb(mockCtx.prisma)
@@ -186,32 +192,14 @@ describe('ApiKeysService', () => {
   })
 
   describe('revoke', () => {
-    it('should delete when id and userId match', async () => {
-      mockCtx.prisma.apiKey.findUnique.mockResolvedValue({
-        id: 'key-1',
-        organizationId: 'org-1',
-        userId: 'user-1',
-      } as never)
-      mockCtx.prisma.apiKey.deleteMany.mockResolvedValue({ count: 1 })
-
-      await expect(service.revoke('key-1', 'user-1')).resolves.not.toThrow()
-
-      expect(mockCtx.prisma.apiKey.deleteMany).toHaveBeenCalledWith({
-        where: { id: 'key-1', userId: 'user-1' },
-      })
-      expect(mockAuditLog.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'api_key.revoked',
-          organizationId: 'org-1',
-          targetId: 'key-1',
-        }),
-        expect.objectContaining({ tx: mockCtx.prisma })
-      )
+    it('delegates own irreversible transition to the shared service', async () => {
+      mockRevocation.revoke.mockResolvedValue({ requestedCount: 1, affectedCount: 1 })
+      await service.revoke('key-1', 'user-1')
+      expect(mockRevocation.revoke).toHaveBeenCalledWith(['key-1'], 'user-1', false)
+      expect(mockCtx.prisma.apiKey.deleteMany).not.toHaveBeenCalled()
     })
-
-    it('should throw NotFoundException when not found or not owned by user', async () => {
-      mockCtx.prisma.apiKey.findUnique.mockResolvedValue(null)
-
+    it('propagates foreign/missing-key404', async () => {
+      mockRevocation.revoke.mockRejectedValue(new NotFoundException('API key'))
       await expect(service.revoke('key-1', 'wrong-user')).rejects.toThrow(NotFoundException)
     })
   })
@@ -226,6 +214,33 @@ describe('ApiKeysService', () => {
       expect(result).toEqual(mockApiKeyWithUser)
     })
 
+    it.each([
+      { revokedAt: new Date(), keyHash: null, salt: null },
+      { revokedAt: null, keyHash: null },
+      { revokedAt: null, salt: null },
+    ])('rejects terminal/incomplete verifier before hashing: %j', async (state) => {
+      const hash = jest.spyOn(service as any, 'verifyLongToken').mockReturnValue(true)
+      mockCtx.prisma.apiKey.findUnique.mockResolvedValue({
+        ...mockApiKeyWithUser,
+        ...state,
+      } as never)
+      expect(await service.verifyByShortToken('abc', 'token')).toBeNull()
+      expect(hash).not.toHaveBeenCalled()
+    })
+    it('rejects expiry equality before hashing', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-09-29T08:00:00Z'))
+      const hash = jest.spyOn(service as any, 'verifyLongToken').mockReturnValue(true)
+      mockCtx.prisma.apiKey.findUnique.mockResolvedValue({
+        ...mockApiKeyWithUser,
+        expiresAt: new Date(),
+      } as never)
+      try {
+        expect(await service.verifyByShortToken('abc', 'token')).toBeNull()
+        expect(hash).not.toHaveBeenCalled()
+      } finally {
+        jest.useRealTimers()
+      }
+    })
     it('should return null if key not found', async () => {
       mockCtx.prisma.apiKey.findUnique.mockResolvedValue(null)
 
@@ -259,19 +274,23 @@ describe('ApiKeysService', () => {
 
       await service.touchLastUsed('key-1')
 
-      expect(mockCtx.prisma.apiKey.update).not.toHaveBeenCalled()
+      expect(mockCtx.prisma.apiKey.updateMany).not.toHaveBeenCalled()
     })
 
     it('should update db and set Redis gate on cache miss', async () => {
       mockCache.get.mockResolvedValue(null)
-      mockCtx.prisma.apiKey.update.mockResolvedValue(mockApiKey)
+      mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
 
       await service.touchLastUsed('key-1')
 
       await new Promise((resolve) => setImmediate(resolve))
 
-      expect(mockCtx.prisma.apiKey.update).toHaveBeenCalledWith({
-        where: { id: 'key-1' },
+      expect(mockCtx.prisma.apiKey.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'key-1',
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }],
+        },
         data: { lastUsedAt: expect.any(Date) },
       })
       expect(mockCache.set).toHaveBeenCalledWith('api_key:last_used:key-1', '1', 3600 * 1000)
@@ -284,7 +303,7 @@ describe('ApiKeysService', () => {
     describe('AK-12: best-effort cache I/O', () => {
       it('cache.get rejection → no throw, warn logged, db update still fires', async () => {
         mockCache.get.mockRejectedValueOnce(new Error('Redis ECONNRESET'))
-        mockCtx.prisma.apiKey.update.mockResolvedValue(mockApiKey)
+        mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
 
         await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
         await new Promise((resolve) => setImmediate(resolve))
@@ -295,13 +314,13 @@ describe('ApiKeysService', () => {
         )
         // Falls through to the DB update — we don't know if it was a
         // recent touch, so we do the extra write rather than skip silently.
-        expect(mockCtx.prisma.apiKey.update).toHaveBeenCalled()
+        expect(mockCtx.prisma.apiKey.updateMany).toHaveBeenCalled()
       })
 
       it('cache.set rejection → no throw, warn logged', async () => {
         mockCache.get.mockResolvedValue(null)
         mockCache.set.mockRejectedValueOnce(new Error('Redis OOM'))
-        mockCtx.prisma.apiKey.update.mockResolvedValue(mockApiKey)
+        mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
 
         await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
         await new Promise((resolve) => setImmediate(resolve))
@@ -315,7 +334,7 @@ describe('ApiKeysService', () => {
       it('both cache ops reject → method completes, two warns', async () => {
         mockCache.get.mockRejectedValueOnce(new Error('get failed'))
         mockCache.set.mockRejectedValueOnce(new Error('set failed'))
-        mockCtx.prisma.apiKey.update.mockResolvedValue(mockApiKey)
+        mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
 
         await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
         await new Promise((resolve) => setImmediate(resolve))
@@ -334,7 +353,7 @@ describe('ApiKeysService', () => {
       it('warn payloads never contain raw key material', async () => {
         mockCache.get.mockRejectedValueOnce(new Error('boom'))
         mockCache.set.mockRejectedValueOnce(new Error('boom'))
-        mockCtx.prisma.apiKey.update.mockResolvedValue(mockApiKey)
+        mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
 
         await service.touchLastUsed('key-1')
         await new Promise((resolve) => setImmediate(resolve))
