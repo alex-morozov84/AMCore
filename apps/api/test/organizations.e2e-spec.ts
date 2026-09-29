@@ -1,12 +1,15 @@
 import type { INestApplication } from '@nestjs/common'
+import { ModulesContainer } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import request from 'supertest'
 
-import { SystemRole } from '@amcore/shared'
+import { ORGANIZATION_CONTEXT_FAMILY, SystemRole } from '@amcore/shared'
 
+import { OrgAclVersionService } from '../src/core/auth/org-acl-version.service'
 import { PrivilegedRoleService } from '../src/core/auth/privileged-role.service'
 import type { PrismaService } from '../src/prisma'
 
+import { assertFamiliesCloseRoutes, scopedContextRoutes } from './context-policy-coverage'
 import {
   cleanDatabase,
   cleanOrgData,
@@ -16,6 +19,8 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+
+const jest = import.meta.jest
 
 describe('Organizations (e2e)', () => {
   let app: INestApplication
@@ -46,6 +51,171 @@ describe('Organizations (e2e)', () => {
       .expect(201)
     return res.body.accessToken as string
   }
+
+  describe('personal JWT explicit organization context', () => {
+    it('recomputes capability after role loss and conceals removed membership with the same personal JWT', async () => {
+      const token = await registerAndLogin('context-freshness@example.com')
+      const actor = app.get(JwtService).verify(token)
+      const org = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Fresh context' })
+        .expect(201)
+      const initial = await request(app.getHttpServer())
+        .get(`/organizations/${org.body.id}/context`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+      expect(initial.body.canManageTeamAccess).toBe(true)
+      const member = await prisma.orgMember.findUniqueOrThrow({
+        where: { userId_organizationId: { userId: actor.sub, organizationId: org.body.id } },
+      })
+      const memberRole = await prisma.role.findFirstOrThrow({
+        where: { name: 'MEMBER', isSystem: true },
+      })
+      await prisma.$transaction(async (tx) => {
+        await tx.memberRole.deleteMany({ where: { memberId: member.id } })
+        await tx.memberRole.create({ data: { memberId: member.id, roleId: memberRole.id } })
+        await tx.organization.update({
+          where: { id: org.body.id },
+          data: { aclVersion: { increment: 1 } },
+        })
+      })
+      const changed = await request(app.getHttpServer())
+        .get(`/organizations/${org.body.id}/context`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+      expect(changed.body.canManageTeamAccess).toBe(false)
+      await prisma.$transaction(async (tx) => {
+        await tx.orgMember.delete({ where: { id: member.id } })
+        await tx.organization.update({
+          where: { id: org.body.id },
+          data: { aclVersion: { increment: 1 } },
+        })
+      })
+      await request(app.getHttpServer())
+        .get(`/organizations/${org.body.id}/context`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404)
+    })
+    it('covers every registered opted-in handler and makes an omitted generic family fail', () => {
+      const controllers = [...app.get(ModulesContainer).values()].flatMap((module) =>
+        [...module.controllers.values()]
+          .map((wrapper) => wrapper.metatype)
+          .filter((type): type is NonNullable<typeof type> => !!type)
+      )
+      const routes = scopedContextRoutes(controllers)
+      expect(routes.length).toBeGreaterThan(0)
+      expect(routes).toContain('/api/v1/organizations/:id/context')
+      assertFamiliesCloseRoutes(routes, [ORGANIZATION_CONTEXT_FAMILY])
+      expect(() => assertFamiliesCloseRoutes(routes, [])).toThrow(
+        'Generic organization family omitted'
+      )
+    })
+    it('reads safe current authority and writes selected target without switch; body overrides cannot mutate', async () => {
+      const token = await registerAndLogin('context-owner@example.com')
+      const org = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Selected' })
+        .expect(201)
+      const versions = jest.spyOn(app.get(OrgAclVersionService), 'getCurrent')
+      const memberships = jest.spyOn(prisma.orgMember, 'findUnique')
+      try {
+        const context = await request(app.getHttpServer())
+          .get(`/organizations/${org.body.id}/context`)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200)
+        expect(context.body).toEqual({
+          organization: { id: org.body.id, name: 'Selected', slug: org.body.slug },
+          canManageTeamAccess: true,
+        })
+        expect(memberships).toHaveBeenCalledTimes(1)
+        expect(versions).not.toHaveBeenCalled()
+      } finally {
+        versions.mockRestore()
+        memberships.mockRestore()
+      }
+      await request(app.getHttpServer())
+        .patch(`/organizations/${org.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Renamed' })
+        .expect(200)
+      const before = await prisma.organization.findUniqueOrThrow({ where: { id: org.body.id } })
+      await request(app.getHttpServer())
+        .patch(`/organizations/${org.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Must not write', organizationId: 'foreign' })
+        .expect(400)
+      expect(await prisma.organization.findUniqueOrThrow({ where: { id: org.body.id } })).toEqual(
+        before
+      )
+      await request(app.getHttpServer())
+        .patch(`/organizations/${org.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-AMCore-Organization-ID', 'foreign')
+        .send({ name: 'Must not write' })
+        .expect(400)
+      expect(await prisma.organization.findUniqueOrThrow({ where: { id: org.body.id } })).toEqual(
+        before
+      )
+    })
+
+    it('conceals missing/nonmember context, enforces legacy target and requires platform membership on new overview', async () => {
+      const actorToken = await registerAndLogin('context-actor@example.com')
+      const ownerToken = await registerAndLogin('context-foreign@example.com')
+      const own = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${actorToken}`)
+        .send({ name: 'Own' })
+        .expect(201)
+      const foreign = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: 'Foreign' })
+        .expect(201)
+      const selected = await request(app.getHttpServer())
+        .post(`/organizations/${own.body.id}/switch`)
+        .set('Authorization', `Bearer ${actorToken}`)
+        .expect(200)
+      await request(app.getHttpServer())
+        .get(`/organizations/${foreign.body.id}/context`)
+        .set('Authorization', `Bearer ${actorToken}`)
+        .expect(404)
+      await request(app.getHttpServer())
+        .get('/organizations/missing/context')
+        .set('Authorization', `Bearer ${actorToken}`)
+        .expect(404)
+      await request(app.getHttpServer())
+        .get(`/organizations/${foreign.body.id}/context`)
+        .set('Authorization', `Bearer ${selected.body.accessToken}`)
+        .expect(403)
+      const jwt = app.get(JwtService)
+      const actor = jwt.verify(actorToken)
+      await prisma.user.update({
+        where: { id: actor.sub },
+        data: { systemRole: SystemRole.SuperAdmin },
+      })
+      const platform = jwt.sign({
+        sub: actor.sub,
+        email: actor.email,
+        sid: actor.sid,
+        systemRole: SystemRole.SuperAdmin,
+      })
+      await request(app.getHttpServer())
+        .get(`/organizations/${foreign.body.id}/context`)
+        .set('Authorization', `Bearer ${platform}`)
+        .expect(404)
+      await request(app.getHttpServer())
+        .get(`/organizations/${own.body.id}/context`)
+        .set('Authorization', `Bearer ${platform}`)
+        .expect(200)
+      // Legacy member discovery retains its non-enumerating 404 behavior.
+      await request(app.getHttpServer())
+        .get(`/organizations/${foreign.body.id}`)
+        .set('Authorization', `Bearer ${actorToken}`)
+        .expect(404)
+    })
+  })
 
   describe('current privileged admission before tenant bypasses', () => {
     it('demotion closes ordinary row-lock and TeamAccess bypasses without session/cache cleanup', async () => {
@@ -576,11 +746,11 @@ describe('Organizations (e2e)', () => {
       expect(names).toContain('VIEWER')
     })
 
-    it('GET /organizations/:id/roles — returns 403 without org context', async () => {
+    it('GET /organizations/:id/roles — resolves explicit target for a personal JWT without switch', async () => {
       await request(app.getHttpServer())
         .get(`/organizations/${orgId}/roles`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(403)
+        .expect(200)
     })
 
     it('POST /organizations/:id/members/invite — returns uniform 202 and does NOT auto-create membership (OB-02 Stage C)', async () => {

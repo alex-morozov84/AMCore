@@ -23,6 +23,10 @@ stream.
 
 A dedicated route is needed when:
 
+- **The operation selects an organization.** Generic organization-family routes
+  are closed for every method. Bootstrap the current identity and use the typed,
+  session-fenced product routes or the direct entity server DAL. See
+  [explicit organization context](../auth/organization-context.md).
 - **The backend returns login credentials.** The generic proxy denies JWT issuance
   before origin, cookie, vault or upstream work, even for an existing session.
   Dedicated handlers must consume those credentials on the server and return a
@@ -63,8 +67,9 @@ exchange server-side. Its existing temporary HttpOnly `refresh_token` cookie
 handoff is consumed and cleared; see [OAuth](../auth/oauth.md).
 
 Direct backend APIs remain available to authorized clients and server code.
-There is no generic browser organization-switch endpoint: a future product
-integration must consume its returned JWT server-side. API-key issuance is a
+There is no generic browser organization-switch endpoint. The product executor
+uses a personal JWT and an API-verified explicit target without exchanging tokens.
+An integration choosing legacy exchange must consume its JWT server-side. API-key issuance is a
 separate, explicit one-time secret response and is unaffected by this JWT guard.
 
 When adding a backend JWT issuance route, update the classifier inventory and

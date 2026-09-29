@@ -29,6 +29,8 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
 
 ## Start here
 
+- Selecting organization authority or adding another tenant namespace →
+  [Explicit organization context](../auth/organization-context.md)
 - Extending or adding a route/page → [Architecture & conventions](./architecture-and-conventions.md#the-recipe--adding-a-route)
 - Adding local or URL-backed search →
   [Frontend search](./search/README.md)

@@ -32,6 +32,7 @@ const PUBLIC_API = 'index.{ts,tsx}';
 
 const ELEMENTS = [
   { type: 'app', pattern: 'src/app/**/*', partialMatch: false },
+  { type: 'composition', pattern: 'src/_app/*', capture: ['slice'] },
   // Not FSD layers, and imported from everywhere. Left unclassified they would
   // either be reported or force `no-unknown`-style classification of every asset.
   { type: 'neutral', pattern: 'src/i18n' },
@@ -47,7 +48,12 @@ const ELEMENTS = [
 
 /** Layers below may only be entered at their public API. */
 const below = (...types) =>
-  types.map((type) => ({ element: { type, fileInternalPath: PUBLIC_API } }));
+  types.flatMap((type) => [
+    { element: { type, fileInternalPath: PUBLIC_API } },
+    ...(type === 'entities'
+      ? [{ element: { type, captured: { slice: 'organization-context' }, fileInternalPath: 'index.server.ts' } }]
+      : []),
+  ]);
 
 const sharedAndNeutral = [{ element: { type: 'shared' } }, { element: { type: 'neutral' } }];
 
@@ -66,7 +72,7 @@ const sameGroup = (type) => ({
 // `boundaries` cannot see layer-level barrels: `src/features/index.ts` sits
 // inside no element, so there is nothing for it to police. Banned here instead.
 const LAYER_BARREL = {
-  regex: '^@/(features|entities|widgets|_pages|shared)$',
+  regex: '^@/(features|entities|widgets|_pages|_app|shared)$',
   message:
     'No layer-level barrels — import the slice public API (@/features/auth-login) ' +
     'or the shared module (@/shared/ui/button). See docs/frontend/.',
@@ -317,9 +323,15 @@ export default [
               allow: {
                 to: [
                   { element: { type: 'app' } },
-                  ...below('pages', 'widgets', 'features', 'entities'),
+                  ...below('composition', 'pages', 'widgets', 'features', 'entities'),
                   ...sharedAndNeutral,
                 ],
+              },
+            },
+            {
+              from: { element: { type: 'composition' } },
+              allow: {
+                to: [...below('pages', 'widgets', 'features', 'entities'), ...sharedAndNeutral],
               },
             },
             {

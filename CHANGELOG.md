@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- API-verified organization selection with personal JWTs, a safe selected-context
+  endpoint, and typed browser/server transport fenced against identity changes.
+
 - Operations Console API-key inventory with safe lifecycle metadata, identity filters,
   single revoke and selected-page bulk revoke with password step-up.
 
@@ -18,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   progress for repeated resets of the current unfiltered page.
 
 ### Changed
+
+- Generic browser proxy routes for declared organization families are closed for
+  every HTTP method. Organization PATCH rejects unknown fields. Direct API keys,
+  legacy organization JWTs and membership-checked `/switch` remain supported.
 
 - Console filters share a consistent surface, use custom Select controls and show
   a persistent, labelled display time-zone selector in the header. Standalone

@@ -229,13 +229,13 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
       expect(rows[0]?.tokenHash).not.toBe(firstRow.tokenHash)
     })
 
-    it('rejects invite without org context with 403', async () => {
+    it('accepts invite with a personal JWT and an API-verified path organization without switch', async () => {
       const { adminToken, orgId } = await setupAdminOrg()
       await request(app.getHttpServer())
         .post(`/organizations/${orgId}/members/invite`)
         .set('Authorization', `Bearer ${adminToken}`) // no /switch
         .send({ email: 'target@example.com' })
-        .expect(403)
+        .expect(202)
     })
   })
 

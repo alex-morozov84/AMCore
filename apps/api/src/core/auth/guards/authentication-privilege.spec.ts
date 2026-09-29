@@ -5,6 +5,7 @@ import { AuthType, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import type { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
 import type { AbilityFactory } from '../casl/ability.factory'
+import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service'
 import { PrivilegedAdmissionService } from '../privileged-admission.service'
 import type { PrivilegedRoleService } from '../privileged-role.service'
 
@@ -74,7 +75,10 @@ it('normalizes privilege before ability and every downstream guard, outside auth
     new SystemRolesGuard(reflector),
     policies as unknown as PoliciesGuard,
     team as unknown as TeamAccessGuard,
-    new PrivilegedAdmissionService(roles as unknown as PrivilegedRoleService)
+    new PrivilegedAdmissionService(roles as unknown as PrivilegedRoleService),
+    {
+      resolve: async (_context: unknown, admission: unknown) => ({ admission }),
+    } as unknown as OrganizationContextResolver
   )
   await guard.canActivate(ctx)
   expect(order).toEqual(['auth', 'primary', 'ability', 'policy', 'team'])

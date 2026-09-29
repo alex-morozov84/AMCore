@@ -8,6 +8,10 @@ import { type AcceptInviteResponse, AuthType, type RequestPrincipal } from '@amc
 import { getClientIp } from '../../common/utils/anonymize-ip'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import {
+  OrganizationContextBoundary,
+  RequestContextPolicy,
+} from '../auth/organization-context/request-context-policy'
 
 import { AcceptInviteDto, AcceptInviteResponseDto } from './dto'
 import { InviteService } from './invite.service'
@@ -36,6 +40,7 @@ import { InviteService } from './invite.service'
 @ApiBearerAuth()
 @Controller('auth/invites')
 @Auth(AuthType.Bearer)
+@OrganizationContextBoundary({ apiRoots: [] })
 export class AuthInvitesController {
   constructor(private readonly inviteService: InviteService) {}
 
@@ -51,6 +56,7 @@ export class AuthInvitesController {
       'already accepted / email mismatch) all return 400 with errorCode ' +
       'INVITE_INVALID_OR_EXPIRED.',
   })
+  @RequestContextPolicy({ kind: 'personal' })
   accept(
     @Body() dto: AcceptInviteDto,
     @CurrentUser() principal: RequestPrincipal,

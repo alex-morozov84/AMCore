@@ -171,9 +171,7 @@ export class MemberService {
 
   private assertOrgContext(principal: RequestPrincipal, orgId: string): void {
     if (principal.organizationId !== orgId) {
-      throw new ForbiddenException(
-        'Organization context mismatch — call POST /organizations/:id/switch first'
-      )
+      throw new ForbiddenException('Organization context does not match the operation target')
     }
   }
 

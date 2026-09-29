@@ -23,6 +23,7 @@ import {
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
+import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 import {
   AuthType,
   type OrgRoleResponse,
@@ -36,6 +37,10 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
+import {
+  OrganizationContextBoundary,
+  RequestContextPolicy,
+} from '../auth/organization-context/request-context-policy'
 
 import {
   AssignPermissionDto,
@@ -75,6 +80,7 @@ import { RoleService } from './role.service'
 })
 @Controller('organizations/:orgId/roles')
 @Auth(AuthType.Bearer, AuthType.ApiKey)
+@OrganizationContextBoundary(ORGANIZATION_CONTEXT_FAMILY)
 export class RolesController {
   constructor(private readonly roleService: RoleService) {}
 
@@ -98,6 +104,11 @@ export class RolesController {
     example: PAGINATION.DEFAULT_LIMIT,
   })
   @ZodResponse({ type: RoleListResponseDto, status: 200, description: 'Paginated roles' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   listRoles(
     @Param('orgId') orgId: string,
     @CurrentUser() principal: RequestPrincipal,
@@ -111,6 +122,11 @@ export class RolesController {
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Create a custom role — requires full TeamAccess' })
   @ZodResponse({ type: OrgRoleResponseDto, status: 201, description: 'Role created' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   createRole(
     @Param('orgId') orgId: string,
     @Body() dto: CreateRoleDto,
@@ -124,6 +140,11 @@ export class RolesController {
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Update a custom role — requires full TeamAccess' })
   @ZodResponse({ type: OrgRoleResponseDto, status: 200, description: 'Updated role' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   updateRole(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
@@ -141,6 +162,11 @@ export class RolesController {
     summary: 'Delete a custom role — requires full TeamAccess (system roles cannot be deleted)',
   })
   @ApiNoContentResponse({ description: 'Role deleted' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   deleteRole(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
@@ -158,6 +184,11 @@ export class RolesController {
     description:
       'Validation error: unknown registry value, positive all grant or restricted TeamAccess',
   })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   assignPermission(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
@@ -173,6 +204,11 @@ export class RolesController {
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Remove a permission from a custom role — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Permission removed' })
+  @RequestContextPolicy({
+    kind: 'organization',
+    selector: { param: 'orgId' },
+    legacyPlatformMembershipBypass: true,
+  })
   removePermission(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,

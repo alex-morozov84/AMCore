@@ -7,6 +7,7 @@
     "RATE_LIMIT_EXCEEDED": "Too many attempts. Please wait a moment and try again.",
     "AUTH_ORIGIN_REJECTED": "This request came from an unrecognized origin.",
     "SESSION_NOT_FOUND": "That session no longer exists.",
+    "CONTEXT_SESSION_CHANGED": "Your session changed. Reload the page to continue.",
     "UNAUTHORIZED": "Please sign in to continue.",
     "OAUTH_STATE_INVALID": "The sign-in attempt expired. Please try again.",
     "OAUTH_PROVIDER_ERROR": "The sign-in provider returned an error. Please try again.",

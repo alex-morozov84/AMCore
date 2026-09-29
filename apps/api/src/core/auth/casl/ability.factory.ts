@@ -4,6 +4,10 @@ import { Injectable } from '@nestjs/common'
 import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
 
 import { OrgAclVersionService } from '../org-acl-version.service'
+import {
+  assertVerifiedContext,
+  type VerifiedOrganizationContext,
+} from '../organization-context/verified-organization-context'
 import { PermissionsCacheService } from '../permissions-cache.service'
 import type { PrivilegedAdmission } from '../privileged-admission.service'
 
@@ -49,11 +53,15 @@ export class AbilityFactory {
     return (await this.createAuthorizationContext(admission)).ability
   }
 
-  async createAuthorizationContext(admission: PrivilegedAdmission): Promise<{
+  async createAuthorizationContext(
+    admission: PrivilegedAdmission,
+    context?: VerifiedOrganizationContext
+  ): Promise<{
     ability: AppAbility
     teamAccess: TeamAccessDecision
   }> {
     const { principal, authenticated, currentRole } = admission
+    if (context) assertVerifiedContext(context, admission)
     if (
       principal.type === 'api_key' &&
       (!principal.organizationId || principal.aclVersion == null)
@@ -65,6 +73,7 @@ export class AbilityFactory {
       authenticated.systemRole === SystemRole.SuperAdmin &&
       currentRole === SystemRole.SuperAdmin
     const aclVersion =
+      !context &&
       !superAdmin &&
       principal.organizationId &&
       principal.type === 'jwt' &&

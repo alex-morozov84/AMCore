@@ -1,10 +1,11 @@
 import { cookies } from 'next/headers'
-import { AuthErrorCode } from '@amcore/shared'
+import { AuthErrorCode, type OrganizationContextFamily } from '@amcore/shared'
 
 import { apiErrorResponse } from './api-error-response'
 import { authFailureResponse } from './auth-failure-response'
 import { isCredentialRoute } from './credential-route'
 import { ensureFreshSession } from './ensure-fresh-session'
+import { isClosedOrganizationFamily } from './organization-family'
 import { isTrustedOrigin } from './origin-guard'
 import { forwardRequestHeaders, forwardResponseHeaders } from './proxy-headers'
 import { SESSION_COOKIE_NAME } from './session-cookie'
@@ -25,9 +26,16 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
  * response bodies streamed (not buffered) so multipart uploads and SSE
  * responses pass through unmodified.
  */
-export async function proxyToBackend(request: Request, pathSegments: string[]): Promise<Response> {
+export async function proxyToBackend(
+  request: Request,
+  pathSegments: string[],
+  organizationFamilies: readonly OrganizationContextFamily[] = []
+): Promise<Response> {
   const upstreamUrl = buildUpstreamUrl(pathSegments, request)
-  if (isCredentialRoute(upstreamUrl)) {
+  if (
+    isCredentialRoute(upstreamUrl) ||
+    isClosedOrganizationFamily(upstreamUrl, organizationFamilies, API_URL)
+  ) {
     return apiErrorResponse(request, { statusCode: 404, message: 'Not found' })
   }
 

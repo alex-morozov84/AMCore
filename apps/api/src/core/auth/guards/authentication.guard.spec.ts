@@ -1,4 +1,4 @@
-import { type ExecutionContext, HttpException, HttpStatus } from '@nestjs/common'
+import { Controller, type ExecutionContext, Get, HttpException, HttpStatus } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
 import { AuthErrorCode, AuthType } from '@amcore/shared'
@@ -6,6 +6,11 @@ import { AuthErrorCode, AuthType } from '@amcore/shared'
 import { AppException } from '../../../common/exceptions'
 import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
 import { AbilityFactory } from '../casl/ability.factory'
+import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service'
+import {
+  OrganizationContextBoundary,
+  RequestContextPolicy,
+} from '../organization-context/request-context-policy'
 import { PrivilegedAdmissionService } from '../privileged-admission.service'
 
 import { AuthenticationGuard } from './authentication.guard'
@@ -29,6 +34,21 @@ import { TeamAccessGuard } from './team-access.guard'
 // for 429 propagation is preserved verbatim — it's the canonical
 // "infra propagates" test and must stay green after the AK-11 refactor
 // unified both branches under one discriminating catch.
+
+@Controller('public-context-fixture')
+@OrganizationContextBoundary({ apiRoots: ['/api/v1/public-context-fixture'] })
+class PublicContextFixture {
+  @Get('missing')
+  missing() {
+    return undefined
+  }
+
+  @Get(':id')
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'id' } })
+  selected() {
+    return undefined
+  }
+}
 
 describe('AuthenticationGuard', () => {
   let guard: AuthenticationGuard
@@ -78,9 +98,27 @@ describe('AuthenticationGuard', () => {
       { canActivate: jest.fn().mockResolvedValue(true) } as unknown as TeamAccessGuard,
       {
         resolve: async (principal: any) => ({ principal, authenticated: principal }),
-      } as unknown as PrivilegedAdmissionService
+      } as unknown as PrivilegedAdmissionService,
+      {
+        resolve: async (_context: unknown, admission: unknown) => ({ admission }),
+      } as unknown as OrganizationContextResolver
     )
   })
+
+  it.each(['missing', 'selected'] as const)(
+    'does not let public auth bypass scoped %s admission',
+    async (method) => {
+      reflector.getAllAndOverride.mockReturnValue([AuthType.None])
+      const context = {
+        ...createContext(),
+        getHandler: () => PublicContextFixture.prototype[method],
+        getClass: () => PublicContextFixture,
+      } as unknown as ExecutionContext
+      await expect(guard.canActivate(context)).rejects.toThrow()
+      expect(jwtAuthGuard.canActivate).not.toHaveBeenCalled()
+      expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+    }
+  )
 
   it('propagates authority lookup failure without attaching ability or running policies', async () => {
     const failure = new Error('primary unavailable')
@@ -102,7 +140,10 @@ describe('AuthenticationGuard', () => {
       { canActivate: jest.fn().mockResolvedValue(true) } as unknown as TeamAccessGuard,
       {
         resolve: async (principal: any) => ({ principal, authenticated: principal }),
-      } as unknown as PrivilegedAdmissionService
+      } as unknown as PrivilegedAdmissionService,
+      {
+        resolve: async (_context: unknown, admission: unknown) => ({ admission }),
+      } as unknown as OrganizationContextResolver
     )
     await expect(candidate.canActivate(context)).rejects.toBe(failure)
     expect(request.ability).toBeUndefined()
@@ -134,7 +175,10 @@ describe('AuthenticationGuard', () => {
       { canActivate: jest.fn().mockRejectedValue(denied) } as unknown as TeamAccessGuard,
       {
         resolve: async (principal: any) => ({ principal, authenticated: principal }),
-      } as unknown as PrivilegedAdmissionService
+      } as unknown as PrivilegedAdmissionService,
+      {
+        resolve: async (_context: unknown, admission: unknown) => ({ admission }),
+      } as unknown as OrganizationContextResolver
     )
     await expect(candidate.canActivate(ctx)).rejects.toBe(denied)
     expect(contextFactory.createAuthorizationContext).toHaveBeenCalledTimes(1)

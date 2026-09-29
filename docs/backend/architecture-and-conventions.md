@@ -181,6 +181,13 @@ accept them, and never for credential management or other high-risk operations. 
 role/permission checks and adding your own CASL subjects, follow
 [`docs/auth/rbac.md`](../auth/rbac.md) — don't reinvent it.
 
+Organization handlers additionally opt into the scoped
+[context boundary and own-method policy](../auth/organization-context.md#authorization-freshness-and-extension).
+Resolve the target after credential/current-privilege admission and before the
+single ability build. Keep business record/field/tenant checks in the domain;
+context metadata does not replace them. Other public/personal handlers do not
+need a global context registration.
+
 If a handler accepts API keys, add it to the ADR-034 allowlist
 (`apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts`) and document
 the operation with `@ApiSecurity('apiKeyBearer')` at the **handler level**. Do
@@ -401,8 +408,8 @@ Commands are in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#api-specific-test-comm
 
 ## Privileged admission before authorization
 
-The global AuthenticationGuard authenticates, resolves current privilege, builds
-one CASL/TeamAccess context and runs policy guards. Every privileged JWT claim
+The global AuthenticationGuard authenticates, resolves current privilege, admits
+declared organization context, builds one CASL/TeamAccess context and runs policy guards. Every privileged JWT claim
 requires primary-role authority even on routes without SystemRoles metadata.
 Downstream handlers/services receive the effective request.user; original claims
 remain in API-only request-local admission evidence. Do not reread the claim to

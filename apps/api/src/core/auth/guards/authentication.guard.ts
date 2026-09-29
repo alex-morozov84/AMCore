@@ -9,10 +9,13 @@ import { Reflector } from '@nestjs/core'
 
 import { AuthType } from '@amcore/shared'
 
-import { UnauthorizedException } from '../../../common/exceptions'
+import { BadRequestException, UnauthorizedException } from '../../../common/exceptions'
 import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
 import { AbilityFactory } from '../casl/ability.factory'
 import { AUTH_TYPE_KEY } from '../decorators/auth.decorator'
+import { contextPolicyMetadata } from '../organization-context/context-policy-metadata'
+import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service'
+import { organizationHeader } from '../organization-context/organization-selector'
 import { PrivilegedAdmissionService } from '../privileged-admission.service'
 
 import { JwtAuthGuard } from './jwt-auth.guard'
@@ -82,7 +85,8 @@ export class AuthenticationGuard implements CanActivate {
     private readonly systemRolesGuard: SystemRolesGuard,
     private readonly policiesGuard: PoliciesGuard,
     private readonly teamAccessGuard: TeamAccessGuard,
-    private readonly privilegedAdmission: PrivilegedAdmissionService
+    private readonly privilegedAdmission: PrivilegedAdmissionService,
+    private readonly organizationContext: OrganizationContextResolver
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -99,6 +103,12 @@ export class AuthenticationGuard implements CanActivate {
 
     // 2. If public route (AuthType.None), skip all checks
     if (authTypes.includes(AuthType.None)) {
+      if (contextPolicyMetadata(context)?.kind === 'organization') {
+        throw new Error('Organization context requires authenticated admission')
+      }
+      if (organizationHeader(context.switchToHttp().getRequest()) !== undefined) {
+        throw new BadRequestException('Undeclared organization selector')
+      }
       return true
     }
 
@@ -139,13 +149,21 @@ export class AuthenticationGuard implements CanActivate {
     const user = request.user
 
     if (user) {
-      const admission = await this.privilegedAdmission.resolve(
+      const privilege = await this.privilegedAdmission.resolve(
         user,
         this.systemRolesGuard.requiredRoles(context)
       )
+      const { admission, context: verifiedContext } = await this.organizationContext.resolve(
+        context,
+        privilege
+      )
       request.privilegedAdmission = admission
       request.user = admission.principal
-      const authorization = await this.abilityFactory.createAuthorizationContext(admission)
+      request.organizationContext = verifiedContext
+      const authorization = await this.abilityFactory.createAuthorizationContext(
+        admission,
+        verifiedContext
+      )
       request.ability = authorization.ability
       request.teamAccess = authorization.teamAccess
     }

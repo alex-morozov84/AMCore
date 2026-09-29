@@ -36,6 +36,7 @@ import { OAuthLoginTicketService } from './oauth/oauth-login-ticket.service'
 import { OAuthStateService } from './oauth/oauth-state.service'
 import { OAuthProviderFactory } from './oauth/providers/oauth-provider.factory'
 import { OrgAclVersionService } from './org-acl-version.service'
+import { OrganizationContextResolver } from './organization-context/organization-context-resolver.service'
 import { PermissionsCacheService } from './permissions-cache.service'
 import { PrivilegedAdmissionService } from './privileged-admission.service'
 import { PrivilegedRoleService } from './privileged-role.service'
@@ -93,6 +94,7 @@ import { UserCacheService } from './user-cache.service'
     TeamAccessGuard,
     PrivilegedRoleService,
     PrivilegedAdmissionService,
+    OrganizationContextResolver,
     SystemRolesGuard,
     FreshAuthGuard,
     AuthenticationGuard,
@@ -107,6 +109,7 @@ import { UserCacheService } from './user-cache.service'
     TokenService,
     EmailIdentityService,
     OrgAclVersionService,
+    OrganizationContextResolver,
   ],
 })
 export class AuthModule {}

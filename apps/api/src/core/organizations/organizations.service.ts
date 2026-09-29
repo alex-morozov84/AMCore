@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common'
 
 import {
   Action,
+  type OrganizationContextResponse,
   type OrganizationListResponse,
   type OrgResponse,
   type RequestPrincipal,
@@ -12,8 +13,10 @@ import {
 import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 import type { AppAbility } from '../auth/casl/ability.factory'
+import type { TeamAccessDecision } from '../auth/casl/ability.factory'
 import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults'
 import { OrgAclVersionService } from '../auth/org-acl-version.service'
+import type { VerifiedOrganizationContext } from '../auth/organization-context/verified-organization-context'
 
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
 import {
@@ -88,6 +91,26 @@ export class OrganizationsService {
       createdAt: org.createdAt.toISOString(),
       updatedAt: org.updatedAt.toISOString(),
     }
+  }
+
+  async selectedContext(
+    context: VerifiedOrganizationContext,
+    access: TeamAccessDecision
+  ): Promise<OrganizationContextResponse> {
+    if (
+      !context.membershipVerified ||
+      access.actorId !== context.actorId ||
+      access.organizationId !== context.organizationId ||
+      access.aclVersion !== context.aclVersion
+    ) {
+      throw new Error('Organization context authority mismatch')
+    }
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: context.organizationId },
+      select: { id: true, name: true, slug: true },
+    })
+    if (!organization) throw new NotFoundException('Organization', context.organizationId)
+    return { organization, canManageTeamAccess: access.ownerTrusted && access.credentialTrusted }
   }
 
   async findOne(
@@ -222,9 +245,7 @@ export class OrganizationsService {
 
   private assertOrgContext(principal: RequestPrincipal, orgId: string): void {
     if (principal.organizationId !== orgId) {
-      throw new ForbiddenException(
-        'Organization context mismatch — call POST /organizations/:id/switch first'
-      )
+      throw new ForbiddenException('Organization context does not match the operation target')
     }
   }
 

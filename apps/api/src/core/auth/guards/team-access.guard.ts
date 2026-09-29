@@ -7,6 +7,11 @@ import { ForbiddenException } from '../../../common/exceptions'
 import { PrismaService } from '../../../prisma'
 import type { TeamAccessDecision } from '../casl/ability.factory'
 import { TEAM_ACCESS_KEY } from '../decorators/require-team-access.decorator'
+import {
+  assertVerifiedContext,
+  type VerifiedOrganizationContext,
+} from '../organization-context/verified-organization-context'
+import type { PrivilegedAdmission } from '../privileged-admission.service'
 
 @Injectable()
 export class TeamAccessGuard implements CanActivate {
@@ -25,6 +30,8 @@ export class TeamAccessGuard implements CanActivate {
       user?: RequestPrincipal
       teamAccess?: TeamAccessDecision
       params: Record<string, string>
+      organizationContext?: VerifiedOrganizationContext
+      privilegedAdmission?: PrivilegedAdmission
     }>()
     const actor = request.user
     const decision = request.teamAccess
@@ -44,6 +51,16 @@ export class TeamAccessGuard implements CanActivate {
       throw new ForbiddenException('Full team access is required for this organization')
     }
     if (actor.type === 'jwt' && actor.systemRole !== SystemRole.SuperAdmin) {
+      const verified = request.organizationContext
+      if (verified && request.privilegedAdmission) {
+        assertVerifiedContext(verified, request.privilegedAdmission)
+        if (
+          verified.membershipVerified &&
+          verified.organizationId === orgId &&
+          verified.actorId === actor.sub
+        )
+          return true
+      }
       const member = await this.prisma.orgMember.findUnique({
         where: { userId_organizationId: { userId: actor.sub, organizationId: orgId } },
         select: { id: true },

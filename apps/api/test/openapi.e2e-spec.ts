@@ -93,6 +93,7 @@ const EXPECTED: Record<string, Expected> = {
   'post /organizations': { status: '201', kind: 'json' },
   'get /organizations': { status: '200', kind: 'json' },
   'get /organizations/{id}': { status: '200', kind: 'json' },
+  'get /organizations/{id}/context': { status: '200', kind: 'json' },
   'patch /organizations/{id}': { status: '200', kind: 'json' },
   'delete /organizations/{id}': { status: '204', kind: 'none' },
   'post /organizations/{id}/switch': { status: '200', kind: 'json' },
