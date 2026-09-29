@@ -51,6 +51,8 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 21' })).toBeVisible()
   await page.goBack()
   await expect(page).not.toHaveURL(/page=2/)
+  await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 00' })).toBeVisible()
+  await expect(search).toHaveValue('Lifecycle')
   await search.fill('Lifecycle 00')
   await expect(page).toHaveURL(/search=Lifecycle(?:\+|%20)00/)
   await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 00' })).toBeVisible()
