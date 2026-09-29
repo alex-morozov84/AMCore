@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Operations Console API-key inventory with safe lifecycle metadata, identity filters,
   single revoke and selected-page bulk revoke with password step-up.
 
+### Fixed
+
+- Console filter reset uses a shared navigation control and avoids starting route
+  progress for repeated resets of the current unfiltered page.
+
 ### Changed
 
 - Console filters share a consistent surface, use custom Select controls and show

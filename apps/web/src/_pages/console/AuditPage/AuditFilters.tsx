@@ -4,11 +4,11 @@ import { type FormEvent, useState } from 'react'
 import type { AdminAuditQuery } from '@amcore/shared'
 
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
-import { Button, buttonVariants } from '@/shared/ui/button'
+import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { ConsoleFilterActions } from '@/shared/ui/console-detail/ConsoleFilterActions'
 import { ConsoleFilterPanel } from '@/shared/ui/console-detail/ConsoleFilterPanel'
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
+import { ConsoleFilterReset } from '@/shared/ui/console-detail/ConsoleFilterReset'
 
 import type { AuditCopy } from './audit-copy'
 import { auditRangeError } from './audit-date-window'
@@ -125,15 +125,7 @@ export function AuditFilters({ baseHref, query, copy, locale }: Props) {
                 {copy.apply}
               </Button>
             }
-            reset={
-              <RouteProgressLink
-                href={baseHref}
-                prefetch={false}
-                className={buttonVariants({ variant: 'outline', size: 'lg' })}
-              >
-                {copy.clear}
-              </RouteProgressLink>
-            }
+            reset={<ConsoleFilterReset href={baseHref} label={copy.clear} />}
           />
         </form>
       </ConsoleFilterPanel>
