@@ -12,9 +12,10 @@ vi.mock('@/shared/ui/route-progress-link', () => ({
 
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/admin/audit' }))
 
+import { ConsoleTimeZoneProvider } from '@/shared/lib/console-time-zone'
+
 import type { AuditCopy } from './audit-copy'
 import { AuditEventRow } from './AuditEventRow'
-import { AuditTimeZoneProvider } from './AuditTimeZone'
 
 const actions = Object.fromEntries(
   AUDIT_ACTIONS.map((code) => [code, code])
@@ -67,9 +68,9 @@ const item: AdminAuditResponse['items'][number] = {
 function renderRow(value = item) {
   return render(
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
-      <AuditTimeZoneProvider>
+      <ConsoleTimeZoneProvider>
         <AuditEventRow item={value} baseHref="/admin/audit" query={{ limit: 25 }} copy={copy} />
-      </AuditTimeZoneProvider>
+      </ConsoleTimeZoneProvider>
     </NextIntlClientProvider>
   )
 }

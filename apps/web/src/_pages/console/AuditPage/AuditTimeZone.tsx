@@ -1,34 +1,4 @@
-'use client'
-
-import { createContext, type ReactNode, useContext, useState } from 'react'
-
 type Mode = 'utc' | 'local'
-
-interface TimeZoneState {
-  mode: Mode
-  zone: string
-  setMode: (mode: Mode) => void
-}
-
-const AuditTimeZoneContext = createContext<TimeZoneState | null>(null)
-
-export function AuditTimeZoneProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<Mode>('utc')
-  // The server and the first client render both use UTC. Browser zone is read
-  // only after the operator explicitly chooses local display.
-  const zone = mode === 'local' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC'
-  return (
-    <AuditTimeZoneContext.Provider value={{ mode, zone, setMode }}>
-      {children}
-    </AuditTimeZoneContext.Provider>
-  )
-}
-
-export function useAuditTimeZone(): TimeZoneState {
-  const value = useContext(AuditTimeZoneContext)
-  if (!value) throw new Error('Audit time zone provider missing')
-  return value
-}
 
 export function localUtcOffset(date = new Date()): string {
   const minutes = -date.getTimezoneOffset()

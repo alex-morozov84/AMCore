@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Input } from '@/shared/ui/input'
 
-import { Button } from '@/shared/ui/button'
+import { useIdentityLookup } from './use-identity-lookup'
 
 export interface IdentityLookupItem {
   id: string
@@ -12,7 +12,7 @@ export interface IdentityLookupItem {
 }
 export interface IdentityLookupCopy {
   lookupSearch: string
-  lookupSubmit: string
+  lookupEmpty: string
   lookupSelect: string
   lookupError: string
   lookupRefine: string
@@ -35,75 +35,20 @@ export function IdentityLookup({
   searchItems,
   onSelect,
 }: IdentityLookupProps) {
-  const [search, setSearch] = useState('')
-  const [items, setItems] = useState<
-    Array<{ id: string; name?: string; email?: string; slug?: string }>
-  >([])
-  const [hasMore, setHasMore] = useState(false)
-  const [error, setError] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const sequence = useRef(0)
-  const debounce = useRef<number | undefined>(undefined)
-  const lastRequested = useRef('')
-
-  const lookup = useCallback(
-    async (term: string) => {
-      if (lastRequested.current === term) return
-      lastRequested.current = term
-      const requestNumber = ++sequence.current
-      setBusy(true)
-      setError(false)
-      setItems([])
-      try {
-        const parsed = await searchItems(term)
-        if (requestNumber === sequence.current) {
-          setItems(parsed.items)
-          setHasMore(parsed.hasMore)
-        }
-      } catch {
-        if (requestNumber === sequence.current) {
-          lastRequested.current = ''
-          setError(true)
-        }
-      } finally {
-        if (requestNumber === sequence.current) setBusy(false)
-      }
-    },
-    [searchItems]
-  )
-
-  useEffect(() => {
-    const term = search.trim()
-    if (term.length < 2) return
-    debounce.current = window.setTimeout(() => void lookup(term), 400)
-    return () => window.clearTimeout(debounce.current)
-  }, [lookup, search])
-
-  function find() {
-    const term = search.trim()
-    if (term.length < 2) return
-    window.clearTimeout(debounce.current)
-    void lookup(term)
-  }
+  const { search, items, hasMore, error, busy, completed, find, change, dismiss } =
+    useIdentityLookup(searchItems)
 
   return (
-    <div className="space-y-2 rounded-md border border-border p-3">
+    <div className="space-y-2">
       <label htmlFor={inputId} className="block text-sm font-medium">
         {label}
       </label>
-      <div className="flex gap-2">
-        <input
+      <div className="flex items-center gap-2">
+        <Input
           id={inputId}
           value={search}
           maxLength={80}
-          onChange={(event) => {
-            sequence.current += 1
-            lastRequested.current = ''
-            setSearch(event.target.value)
-            setItems([])
-            setHasMore(false)
-            setBusy(false)
-          }}
+          onChange={(event) => change(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault()
@@ -111,20 +56,17 @@ export function IdentityLookup({
             }
           }}
           placeholder={copy.lookupSearch}
-          className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2"
+          className="min-w-0 flex-1 bg-background"
         />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={search.trim().length < 2 || busy}
-          onClick={find}
-        >
-          {copy.lookupSubmit}
-        </Button>
       </div>
       {busy && (
         <p role="status" className="text-xs text-muted-foreground">
           {copy.loading}
+        </p>
+      )}
+      {completed && !busy && !error && !items.length && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {copy.lookupEmpty}
         </p>
       )}
       {error && (
@@ -139,10 +81,10 @@ export function IdentityLookup({
               type="button"
               onClick={() => {
                 onSelect(item.id)
-                setItems([])
+                dismiss()
               }}
               aria-label={`${copy.lookupSelect}: ${item.name ?? item.email ?? item.slug ?? item.id}`}
-              className="w-full rounded-md px-2 py-1 text-left hover:bg-accent focus-visible:outline-2"
+              className="w-full cursor-pointer rounded-md px-2 py-1 text-left hover:bg-accent focus-visible:outline-2"
             >
               <span>{item.name ?? item.email ?? item.slug ?? item.id}</span>
               {(item.email || item.slug) && (

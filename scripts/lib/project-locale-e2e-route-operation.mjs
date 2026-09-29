@@ -4,6 +4,7 @@ import { findAllNodes, findUniqueNode } from './path-algebra-ast-query.mjs'
 import { absent, claim, localeParams } from './project-locale-ast-helpers.mjs'
 import {
   commentRange,
+  hasLocaleSwitcherSelection,
   rewriteRoutePrefixes,
   routeReferenceInventory,
 } from './project-locale-e2e-route-inventory.mjs'
@@ -22,8 +23,7 @@ function removeUnavailableUiCase(model, expected, ctx) {
     (node) =>
       ts.isCallExpression(node) &&
       ['test', 'it'].includes(node.expression.getText()) &&
-      node.getText().includes("selectOption('ru')") &&
-      node.getText().includes('name: /language/i')
+      hasLocaleSwitcherSelection(node.getText())
   )
   if (matches.length !== expected) {
     findUniqueNode(model, () => false, { ...ctx, describe: `${expected} unavailable UI cases` })

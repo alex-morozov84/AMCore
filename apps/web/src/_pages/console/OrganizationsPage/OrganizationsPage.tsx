@@ -7,6 +7,7 @@ import {
   SearchInput,
 } from '@/features/console-discovery'
 import { getConsoleOrganizationsHref } from '@/shared/lib/console-public-href'
+import { ConsoleFilterPanel } from '@/shared/ui/console-detail/ConsoleFilterPanel'
 import { ConsoleRestorePosition } from '@/shared/ui/console-detail/ConsoleRestorePosition'
 
 import { OrganizationsResults } from './OrganizationsResults'
@@ -51,12 +52,14 @@ export async function OrganizationsPage({
         sortOrder={sortOrder}
         effectiveSortOrder={getOrganizationsEffectiveSortOrder(sortBy, sortOrder)}
       >
-        <SearchInput
-          label={t('organizationsSearchLabel')}
-          placeholder={t('organizationsSearchPlaceholder')}
-          clearLabel={t('organizationsSearchClear')}
-          inputId="organizations-search"
-        />
+        <ConsoleFilterPanel>
+          <SearchInput
+            label={t('organizationsSearchLabel')}
+            placeholder={t('organizationsSearchPlaceholder')}
+            clearLabel={t('organizationsSearchClear')}
+            inputId="organizations-search"
+          />
+        </ConsoleFilterPanel>
         <Suspense fallback={<OrganizationsResultsSkeleton />}>
           <OrganizationsResults
             page={page}

@@ -57,14 +57,17 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   ageSessionLastAuthAt(email)
   const mutations: number[] = [],
     stepUpBodies: string[] = []
-  page.on('response', async (response) => {
+  page.on('response', (response) => {
     if (
       response.url().includes('/api/console/api-keys/') &&
       response.request().method() === 'DELETE'
     )
       mutations.push(response.status())
-    if (response.url().endsWith('/api/console/auth/step-up'))
-      stepUpBodies.push(await response.text())
+  })
+  await page.route('**/api/console/auth/step-up', async (route) => {
+    const response = await route.fetch()
+    stepUpBodies.push(await response.text())
+    await route.fulfill({ response })
   })
   await page.getByRole('button', { name: 'Revoke selected (1)' }).click()
   const confirm = page.getByRole('alertdialog')
@@ -85,7 +88,16 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
     ).trim()
   ).toBe('1')
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
-  await page.evaluate(() => document.documentElement.classList.add('dark'))
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await page.evaluate(() =>
+    Promise.allSettled(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) => animation.finished)
+    )
+  )
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByText('Lifecycle 00', { exact: true }).last()).toBeVisible()

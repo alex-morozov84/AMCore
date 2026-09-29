@@ -7,6 +7,7 @@ import { SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
 import { useCurrentUser } from '@/entities/user'
 import { usePathname } from '@/i18n/navigation'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 
 import { usePersistLocale } from '../model/use-persist-locale'
 
@@ -49,22 +50,28 @@ export function LocaleSwitcher({ className }: LocaleSwitcherProps) {
     })
   }
 
+  const items = SUPPORTED_LOCALES.map((value) => ({ value, label: t(value) }))
   return (
-    <label className={className}>
-      <span className="sr-only">{t('label')}</span>
-      <select
+    <div className={className}>
+      <Select
         value={locale}
         disabled={isPending}
-        onChange={(event) => onSelect(event.target.value as SupportedLocale)}
-        aria-label={t('label')}
-        className="rounded-md border border-border bg-card px-2 py-1 text-sm"
+        items={items}
+        onValueChange={(next) => {
+          if (SUPPORTED_LOCALES.some((value) => value === next)) onSelect(next as SupportedLocale)
+        }}
       >
-        {SUPPORTED_LOCALES.map((value) => (
-          <option key={value} value={value}>
-            {t(value)}
-          </option>
-        ))}
-      </select>
-    </label>
+        <SelectTrigger size="sm" aria-label={t('label')}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   )
 }

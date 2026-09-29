@@ -66,7 +66,8 @@ test('path-mode console locale switcher preserves the current page and its query
   await expect(page).toHaveURL(/\/en\/?$/)
 
   await page.goto('/en/admin/organizations?page=2')
-  await page.getByRole('combobox', { name: /language/i }).selectOption('ru')
+  await page.getByRole('combobox', { name: /language/i }).click()
+  await page.getByRole('option', { name: 'Русский' }).click()
 
   await expect(page).toHaveURL(/\/ru\/admin\/organizations\?page=2$/)
   await expect(page.getByRole('heading', { name: 'Организации' })).toBeVisible()

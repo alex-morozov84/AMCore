@@ -37,7 +37,7 @@ function timeCell(
   iso: string | null,
   notAvailable: string
 ) {
-  return iso ? <ConsoleTimestamp value={iso} format={format} /> : notAvailable
+  return iso ? <ConsoleTimestamp value={iso} /> : notAvailable
 }
 
 /**

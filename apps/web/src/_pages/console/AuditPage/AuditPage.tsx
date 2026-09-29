@@ -12,7 +12,6 @@ import { AuditFilters } from './AuditFilters'
 import { AuditResults } from './AuditResults'
 import { AuditResultsSkeleton } from './AuditResultsSkeleton'
 import { AuditTimestamp } from './AuditTimestamp'
-import { AuditTimeZoneProvider } from './AuditTimeZone'
 
 interface AuditPageProps {
   query: AdminAuditQuery | null
@@ -44,7 +43,7 @@ export async function AuditPage({ query }: AuditPageProps) {
         <h1 className="text-3xl font-semibold">{copy.title}</h1>
         <p className="text-muted-foreground">{copy.description}</p>
       </div>
-      <AuditTimeZoneProvider>
+      <>
         <div className="space-y-1 rounded-lg border border-border bg-card p-3 text-sm">
           <p className="flex flex-wrap items-baseline gap-x-2">
             <strong>{copy.selectedRange}</strong>
@@ -64,7 +63,7 @@ export async function AuditPage({ query }: AuditPageProps) {
         <Suspense fallback={<AuditResultsSkeleton label={copy.loading} />}>
           <AuditResults baseHref={baseHref} query={effectiveQuery} copy={copy} />
         </Suspense>
-      </AuditTimeZoneProvider>
+      </>
     </section>
   )
 }

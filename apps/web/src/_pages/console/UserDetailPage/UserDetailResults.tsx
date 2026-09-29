@@ -1,4 +1,4 @@
-import { getFormatter, getTranslations } from 'next-intl/server'
+import { getTranslations } from 'next-intl/server'
 import { adminDetailIdSchema } from '@amcore/shared'
 
 import { UserRoleAction } from '@/features/console-user-role'
@@ -10,8 +10,8 @@ import {
   getConsoleDetailAuditHref,
   getConsoleUserDetailHref,
 } from '@/shared/lib/console-public-href'
-import { formatConsoleDate, formatConsoleTime } from '@/shared/lib/format-console-date-time'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
+import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 import { DetailFact, DetailId } from '@/shared/ui/console-detail/DetailChrome'
 import { DetailPager } from '@/shared/ui/console-detail/DetailPager'
 import { DetailRelationSearch } from '@/shared/ui/console-detail/DetailRelationSearch'
@@ -37,9 +37,8 @@ export async function UserDetailResults({
     getTranslations('common'),
   ])
   if (!adminDetailIdSchema.safeParse(id).success) return <p role="alert">{t('invalidId')}</p>
-  const [outcome, format, actor] = await Promise.all([
+  const [outcome, actor] = await Promise.all([
     fetchConsoleUserDetail(id, page, search),
-    getFormatter(),
     getConsoleAwareUser(),
   ])
   if (outcome.status === 'not-found') return <p role="alert">{t('notFoundUser')}</p>
@@ -79,23 +78,16 @@ export async function UserDetailResults({
             <DetailFact label={t('phone')}>{user.phone ?? tCommon('notAvailable')}</DetailFact>
             <DetailFact label={t('lastSignIn')}>
               {user.lastLoginAt ? (
-                <time dateTime={user.lastLoginAt}>
-                  {formatConsoleDate(format, new Date(user.lastLoginAt))} ·{' '}
-                  {formatConsoleTime(format, new Date(user.lastLoginAt))}
-                </time>
+                <ConsoleTimestamp value={user.lastLoginAt} variant="inline" />
               ) : (
                 tCommon('notAvailable')
               )}
             </DetailFact>
             <DetailFact label={t('created')}>
-              <time dateTime={user.createdAt}>
-                {formatConsoleDate(format, new Date(user.createdAt))}
-              </time>
+              <ConsoleTimestamp value={user.createdAt} variant="date" />
             </DetailFact>
             <DetailFact label={t('updated')}>
-              <time dateTime={user.updatedAt}>
-                {formatConsoleDate(format, new Date(user.updatedAt))}
-              </time>
+              <ConsoleTimestamp value={user.updatedAt} variant="date" />
             </DetailFact>
           </dl>
         </CardContent>

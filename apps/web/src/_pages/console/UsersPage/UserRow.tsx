@@ -18,7 +18,7 @@ export interface UserRowProps {
   returnTo?: string
 }
 
-export function UserRow({ user, format, t, isSelf, returnTo }: UserRowProps) {
+export function UserRow({ user, t, isSelf, returnTo }: UserRowProps) {
   return (
     <TableRow className="border-line-soft">
       <TableCell>
@@ -36,17 +36,13 @@ export function UserRow({ user, format, t, isSelf, returnTo }: UserRowProps) {
         {t(user.systemRole === 'SUPER_ADMIN' ? 'superAdminRole' : 'usersRoleUser')}
       </TableCell>
       <TableCell>
-        {user.lastLoginAt ? (
-          <ConsoleTimestamp value={user.lastLoginAt} format={format} />
-        ) : (
-          t('usersNeverSignedIn')
-        )}
+        {user.lastLoginAt ? <ConsoleTimestamp value={user.lastLoginAt} /> : t('usersNeverSignedIn')}
       </TableCell>
       <TableCell>
-        <ConsoleTimestamp value={user.createdAt} format={format} />
+        <ConsoleTimestamp value={user.createdAt} />
       </TableCell>
       <TableCell>
-        <ConsoleTimestamp value={user.updatedAt} format={format} />
+        <ConsoleTimestamp value={user.updatedAt} />
       </TableCell>
       <TableCell>
         <UserRoleAction user={{ id: user.id, systemRole: user.systemRole }} isSelf={isSelf} />

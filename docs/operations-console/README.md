@@ -46,6 +46,15 @@ unavailable state instead. A `SUPER_ADMIN` demotion takes effect on the next
 protected request. See [configuration and deployment](configuration.md) for the
 session and routing details.
 
+## Display time zone
+
+The header's **Time** selector controls how Console dates are displayed. Choose
+**UTC** or **Local time**, determined by your browser. The local option identifies
+the zone and current UTC offset; the header shows the selected offset explicitly.
+The preference is saved for this browser origin, across reloads and Console pages,
+and defaults to UTC when storage is unavailable. It does not change stored event
+timestamps or the instants submitted in Audit queries.
+
 ## Scope
 
 The Console has the five areas above, with full user and organization detail

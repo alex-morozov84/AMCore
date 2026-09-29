@@ -1,4 +1,4 @@
-import { getFormatter, getTranslations } from 'next-intl/server'
+import { getTranslations } from 'next-intl/server'
 import { adminDetailIdSchema } from '@amcore/shared'
 
 import { fetchConsoleOrganizationDetail } from '@/shared/api/console/organizations'
@@ -7,8 +7,8 @@ import {
   getConsoleDetailAuditHref,
   getConsoleOrganizationDetailHref,
 } from '@/shared/lib/console-public-href'
-import { formatConsoleDate } from '@/shared/lib/format-console-date-time'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
+import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 import { DetailFact, DetailId } from '@/shared/ui/console-detail/DetailChrome'
 import { DetailPager } from '@/shared/ui/console-detail/DetailPager'
 import { DetailRelationSearch } from '@/shared/ui/console-detail/DetailRelationSearch'
@@ -30,10 +30,7 @@ export async function OrganizationDetailResults({
 }) {
   const t = await getTranslations('console.detail')
   if (!adminDetailIdSchema.safeParse(id).success) return <p role="alert">{t('invalidId')}</p>
-  const [outcome, format] = await Promise.all([
-    fetchConsoleOrganizationDetail(id, page, search),
-    getFormatter(),
-  ])
+  const outcome = await fetchConsoleOrganizationDetail(id, page, search)
   if (outcome.status === 'not-found') return <p role="alert">{t('notFoundOrganization')}</p>
   if (outcome.status === 'unavailable')
     return <PrimaryUnavailableFallback reason={outcome.reason} />
@@ -54,14 +51,10 @@ export async function OrganizationDetailResults({
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <DetailFact label={t('slug')}>{organization.slug}</DetailFact>
             <DetailFact label={t('created')}>
-              <time dateTime={organization.createdAt}>
-                {formatConsoleDate(format, new Date(organization.createdAt))}
-              </time>
+              <ConsoleTimestamp value={organization.createdAt} variant="date" />
             </DetailFact>
             <DetailFact label={t('updated')}>
-              <time dateTime={organization.updatedAt}>
-                {formatConsoleDate(format, new Date(organization.updatedAt))}
-              </time>
+              <ConsoleTimestamp value={organization.updatedAt} variant="date" />
             </DetailFact>
           </dl>
         </CardContent>

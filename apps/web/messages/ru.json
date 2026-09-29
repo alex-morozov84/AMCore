@@ -199,7 +199,8 @@
         "org.invite_revoked": "Отзыв приглашения в организацию",
         "telegram.connection_linked": "Подключение Telegram",
         "telegram.connection_unlinked": "Отключение Telegram"
-      }
+      },
+      "draftTimeZone": "Некорректное время введено в зоне {zone}. Исправьте его в выбранном часовом поясе."
     },
     "detail": {
       "userTitle": "Карточка пользователя",
@@ -326,7 +327,6 @@
     "mobileNavigation": "Навигация операционной консоли",
     "mobileNavigationDescription": "Переходы в операционной консоли.",
     "toggleNavigation": "Переключить навигацию консоли",
-    "controlPlane": "Системная плоскость управления",
     "overviewEyebrow": "Control Room",
     "overviewSubtitle": "Статус API-инстанса, обработавшего этот запрос",
     "overviewVersionLabel": "Версия API",
@@ -372,7 +372,7 @@
       "userId": "ID владельца",
       "organizationId": "ID организации",
       "id": "ID ключа",
-      "apply": "Применить",
+      "apply": "Применить фильтры по ID",
       "applied": "Применены ID:",
       "searchLabel": "Поиск по названию ключа",
       "searchPlaceholder": "Название ключа",
@@ -384,7 +384,7 @@
       "copyId": "Копировать ID ключа",
       "copied": "ID ключа скопирован",
       "copyFailed": "Не удалось скопировать ID ключа",
-      "scopes": "{count, plural, one {# scope} few {# scopes} many {# scopes} other {# scopes}}",
+      "scopes": "{count, plural, one {# разрешение} few {# разрешения} many {# разрешений} other {# разрешения}}",
       "noExpiry": "Без срока",
       "noUsage": "Использование не записано",
       "selectKey": "Выбрать {name}",
@@ -416,6 +416,21 @@
       "invalidFilters": "Некорректные фильтры API-ключей. Проверьте ID и параметры запроса.",
       "missing": "Один или несколько ключей больше недоступны. Обновите список и выберите ключи заново.",
       "notApplicable": "—"
+    },
+    "identityLookup": {
+      "lookupSearch": "Минимум 2 символа",
+      "lookupEmpty": "Ничего не найдено. Попробуйте другое имя, email или slug организации.",
+      "lookupSelect": "Выбрать нынешнюю запись",
+      "lookupError": "Поиск недоступен. Введите ID или повторите попытку.",
+      "lookupRefine": "Показаны первые 10 — уточните запрос, чтобы найти остальные.",
+      "loading": "Загружаем события аудита…"
+    },
+    "timeZone": {
+      "label": "Часовой пояс отображения",
+      "browser": "Местное время",
+      "display": "Время: {zone}",
+      "localOption": "Местное время — {zone} ({offset})",
+      "description": "Часовой пояс дат во всей консоли. Местное время определяется вашим браузером."
     }
   },
   "auth": {

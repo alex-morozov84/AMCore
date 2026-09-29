@@ -1,9 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
-
-import { lookupConsoleIdentity } from '@/shared/api/console/identity-lookup-client'
-import { IdentityLookup } from '@/shared/ui/identity-lookup'
+import { ConsoleIdentityLookup } from '@/shared/ui/console-detail/ConsoleIdentityLookup'
 
 import type { AuditCopy } from './audit-copy'
 
@@ -13,16 +10,14 @@ export function AuditLookup({
   onSelect,
 }: {
   kind: 'user' | 'organization'
-  copy: AuditCopy
+  copy: Pick<AuditCopy, 'lookupUser' | 'lookupOrganization'>
   onSelect: (id: string) => void
 }) {
-  const searchItems = useCallback((term: string) => lookupConsoleIdentity(kind, term), [kind])
   return (
-    <IdentityLookup
+    <ConsoleIdentityLookup
       inputId={`audit-lookup-${kind}`}
       label={kind === 'user' ? copy.lookupUser : copy.lookupOrganization}
-      copy={copy}
-      searchItems={searchItems}
+      kind={kind}
       onSelect={onSelect}
     />
   )

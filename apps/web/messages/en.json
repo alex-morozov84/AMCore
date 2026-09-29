@@ -199,7 +199,8 @@
         "org.invite_revoked": "Organization invitation revoked",
         "telegram.connection_linked": "Telegram connection linked",
         "telegram.connection_unlinked": "Telegram connection unlinked"
-      }
+      },
+      "draftTimeZone": "Invalid time entered in {zone}. Correct it using the selected time zone."
     },
     "detail": {
       "userTitle": "User details",
@@ -326,7 +327,6 @@
     "mobileNavigation": "Operations Console navigation",
     "mobileNavigationDescription": "Navigate the Operations Console.",
     "toggleNavigation": "Toggle console navigation",
-    "controlPlane": "System control plane",
     "overviewEyebrow": "Control Room",
     "overviewSubtitle": "Status of the API instance answering this request",
     "overviewVersionLabel": "API version",
@@ -372,7 +372,7 @@
       "userId": "Owner ID",
       "organizationId": "Organization ID",
       "id": "Key ID",
-      "apply": "Apply",
+      "apply": "Apply ID filters",
       "applied": "Applied IDs:",
       "searchLabel": "Search key names",
       "searchPlaceholder": "Key name",
@@ -416,6 +416,21 @@
       "invalidFilters": "Invalid API key filters. Check the IDs and query values.",
       "missing": "One or more keys are no longer available. Refresh the list and select keys again.",
       "notApplicable": "—"
+    },
+    "identityLookup": {
+      "lookupSearch": "At least 2 characters",
+      "lookupEmpty": "Nothing found. Try another name, email or organization slug.",
+      "lookupSelect": "Select current record",
+      "lookupError": "Lookup unavailable. Enter an ID or try again.",
+      "lookupRefine": "First 10 shown — refine your search to find more.",
+      "loading": "Loading audit events…"
+    },
+    "timeZone": {
+      "label": "Display time zone",
+      "browser": "Local time",
+      "display": "Time: {zone}",
+      "localOption": "Local time — {zone} ({offset})",
+      "description": "Time zone for dates throughout the console. Local time is determined by your browser."
     }
   },
   "auth": {

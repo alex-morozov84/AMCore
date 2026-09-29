@@ -1,5 +1,6 @@
 import { parseStructuralModel } from './path-algebra-ast-model.mjs'
 import {
+  hasLocaleSwitcherSelection,
   routeReferenceInventory,
   weakRootAssertionCount,
 } from './project-locale-e2e-route-inventory.mjs'
@@ -20,7 +21,7 @@ export function e2eRouteResiduals(contents) {
     const inventory = routeReferenceInventory(model)
     if (inventory.count) residuals.push(`${pathname}:${inventory.count} locale-prefixed routes`)
     if (weakRootAssertionCount(model)) residuals.push(`${pathname}:inexact root URL assertion`)
-    if (content.includes('name: /language/i') && content.includes("selectOption('ru')")) {
+    if (hasLocaleSwitcherSelection(content)) {
       residuals.push(`${pathname}:locale-switcher scenario`)
     }
   }

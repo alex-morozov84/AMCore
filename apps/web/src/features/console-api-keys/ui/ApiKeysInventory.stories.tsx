@@ -14,11 +14,7 @@ const meta = {
   component: ApiKeysInventory,
   decorators: [
     (Story) => (
-      <NextIntlClientProvider
-        locale="en"
-        timeZone="UTC"
-        messages={{ console: { apiKeys: messages.console.apiKeys }, common: messages.common }}
-      >
+      <NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}>
         <Story />
       </NextIntlClientProvider>
     ),
@@ -56,7 +52,9 @@ export const SelectedConfirmation: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement),
       body = within(canvasElement.ownerDocument.body)
-    await userEvent.click(canvas.getByLabelText('Select eligible keys on this page'))
+    await userEvent.click(
+      canvas.getByRole('checkbox', { name: 'Select eligible keys on this page' })
+    )
     await userEvent.click(canvas.getByRole('button', { name: 'Revoke selected (2)' }))
     expect(await body.findByRole('alertdialog')).toHaveTextContent('Revoke 2 keys?')
     expect(body.getByRole('alertdialog')).toHaveTextContent('Reporting integration')
@@ -76,7 +74,9 @@ export const NoOp: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement),
       body = within(canvasElement.ownerDocument.body)
-    await userEvent.click(canvas.getByLabelText('Select eligible keys on this page'))
+    await userEvent.click(
+      canvas.getByRole('checkbox', { name: 'Select eligible keys on this page' })
+    )
     await userEvent.click(canvas.getByRole('button', { name: 'Revoke selected (2)' }))
     await userEvent.click(body.getByRole('button', { name: /^Revoke$/ }))
     await waitFor(() =>

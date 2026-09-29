@@ -167,8 +167,10 @@ test('Audit event and name journeys keep filters useful', async ({ page }) => {
   await page.getByRole('button', { name: 'Apply filters' }).click()
   await expect(page).toHaveURL(/from=/)
   const utcBounds = new URL(page.url()).searchParams
-  await page.getByRole('button', { name: 'Local time' }).click()
-  await expect(page.getByText(/Europe\/Moscow \(currently UTC\+03:00\)/)).toBeVisible()
+  const zone = page.getByRole('combobox', { name: 'Display time zone' })
+  await zone.click()
+  await page.getByRole('option', { name: /Local time.*Europe\/Moscow.*UTC\+03:00/ }).click()
+  await expect(zone).toContainText('Time: UTC+03:00')
   await page.getByRole('button', { name: 'Apply filters' }).click()
   await expect(page).toHaveURL(/from=/)
   const localBounds = new URL(page.url()).searchParams
@@ -215,7 +217,7 @@ test('Audit event and name journeys keep filters useful', async ({ page }) => {
   const organizationToken = `auditorg${Date.now()}`
   createOrganization(organizationToken, organizationToken)
   await page.getByLabel('Search current organization by name or slug').fill(organizationToken)
-  await page.getByRole('button', { name: 'Find', exact: true }).last().click()
+  await page.getByLabel('Search current organization by name or slug').press('Enter')
   await expect(page.getByRole('button', { name: /Select current record/ })).toHaveCount(1)
   await page.getByRole('button', { name: /Select current record/ }).click()
   await expect(page).toHaveURL(/organizationId=/)

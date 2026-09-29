@@ -57,7 +57,7 @@ function view(identity = 'one', data = rows) {
 describe('page-bound key selection', () => {
   it('selects only eligible visible keys and captures confirmation targets until cancellation', async () => {
     const { rerender } = render(view())
-    fireEvent.click(screen.getByLabelText('Select eligible keys on this page'))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select eligible keys on this page' }))
     fireEvent.click(screen.getByRole('button', { name: 'Revoke selected (2)' }))
     expect(screen.getByTestId('captured')).toHaveTextContent('live,expired')
     rerender(view('other', rows.slice(2)))
@@ -70,7 +70,7 @@ describe('page-bound key selection', () => {
   })
   it('intersects selection on fresh results and clears it on a filter-only identity change', async () => {
     const { rerender } = render(view())
-    fireEvent.click(screen.getByLabelText('Select eligible keys on this page'))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select eligible keys on this page' }))
     rerender(view('one', rows.slice(1)))
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Revoke selected (1)' })).toBeEnabled()

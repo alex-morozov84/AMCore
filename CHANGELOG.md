@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Console filters share a consistent surface, use custom Select controls and show
+  a persistent, labelled display time-zone selector in the header. Standalone
+  checkboxes use a shared shadcn control; identity search runs automatically,
+  shows empty results explicitly and gives suggestions a pointer cursor.
+
 - API-key revocation destroys verifiers and retains safe metadata until cleanup
   eligibility 30 days after first expiry/revocation; parent Cascade remains. Own lists
   include historical rows with lifecycle status/filter. Cleanup response category

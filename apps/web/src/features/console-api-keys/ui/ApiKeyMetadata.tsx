@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import type { AdminApiKey } from '@amcore/shared'
 
 import {
@@ -63,11 +63,6 @@ export function ApiKeyOrganization({ row, returnTo }: { row: AdminApiKey; return
 }
 
 export function ApiKeyTime({ value, expiry = false }: { value: string | null; expiry?: boolean }) {
-  const format = useFormatter()
   const t = useTranslations('console.apiKeys')
-  return value ? (
-    <ConsoleTimestamp value={value} format={format} />
-  ) : (
-    t(expiry ? 'noExpiry' : 'noUsage')
-  )
+  return value ? <ConsoleTimestamp value={value} /> : t(expiry ? 'noExpiry' : 'noUsage')
 }

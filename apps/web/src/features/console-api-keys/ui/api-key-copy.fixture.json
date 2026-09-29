@@ -59,7 +59,11 @@
       "invalidFilters": "Invalid API key filters. Check the IDs and query values.",
       "missing": "One or more keys are no longer available. Refresh the list and select keys again.",
       "notApplicable": "—"
-    }
+    },
+    "stepUpTitle": "Confirm your password",
+    "stepUpDescription": "This is a sensitive action. Re-enter your password to continue.",
+    "loginPassword": "Password",
+    "stepUpSubmit": "Confirm"
   },
   "common": {
     "loading": "Loading…",

@@ -36,8 +36,10 @@ beforeEach(() => {
 })
 
 describe('ConsoleLocaleSwitcher', () => {
-  it('renders every supported locale as an option', () => {
+  it('renders every supported locale as an option', async () => {
     renderSwitcher()
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Language' }))
 
     expect(screen.getByRole('option', { name: 'English' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Русский' })).toBeInTheDocument()
@@ -47,7 +49,8 @@ describe('ConsoleLocaleSwitcher', () => {
     const user = userEvent.setup()
     renderSwitcher()
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'ru')
+    await user.click(screen.getByRole('combobox', { name: 'Language' }))
+    await user.click(await screen.findByRole('option', { name: 'Русский' }))
 
     expect(replace).toHaveBeenCalledWith(
       { pathname: '/admin/organizations', query: { page: '2' } },
@@ -59,7 +62,8 @@ describe('ConsoleLocaleSwitcher', () => {
     const user = userEvent.setup()
     renderSwitcher()
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'en')
+    await user.click(screen.getByRole('combobox', { name: 'Language' }))
+    await user.click(await screen.findByRole('option', { name: 'English' }))
 
     expect(replace).not.toHaveBeenCalled()
   })

@@ -15,6 +15,7 @@ const roots = [
   'apps/web/src/features/console-api-keys',
   'apps/web/src/shared/api/console',
   'apps/web/src/shared/ui/console-detail',
+  'apps/web/src/shared/lib/console-time-zone',
   'apps/web/src/widgets/console-shell',
   'apps/web/e2e/console-real-stack',
   'apps/web/e2e/real-stack/admin-sessions',

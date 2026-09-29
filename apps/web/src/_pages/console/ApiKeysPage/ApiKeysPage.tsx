@@ -4,6 +4,7 @@ import type { AdminApiKeyQuery } from '@amcore/shared'
 
 import { DiscoverySearchBoundary, SearchInput } from '@/features/console-discovery'
 import { getConsoleApiKeysHref } from '@/shared/lib/console-public-href'
+import { ConsoleFilterPanel } from '@/shared/ui/console-detail/ConsoleFilterPanel'
 import { Skeleton } from '@/shared/ui/skeleton'
 
 import { ApiKeyFilters } from './ApiKeyFilters'
@@ -34,14 +35,16 @@ export async function ApiKeysPage({ query }: { query: AdminApiKeyQuery }) {
         {...state}
         effectiveSortOrder={query.sortOrder ?? (query.sortBy === 'name' ? 'asc' : 'desc')}
       >
-        <SearchInput
-          label={t('searchLabel')}
-          placeholder={t('searchPlaceholder')}
-          clearLabel={t('clearSearch')}
-          inputId="api-key-search"
-          maxLength={100}
-        />
-        <ApiKeyFilters query={query} baseHref={baseHref} />
+        <ConsoleFilterPanel>
+          <SearchInput
+            label={t('searchLabel')}
+            placeholder={t('searchPlaceholder')}
+            clearLabel={t('clearSearch')}
+            inputId="api-key-search"
+            maxLength={100}
+          />
+          <ApiKeyFilters query={query} baseHref={baseHref} />
+        </ConsoleFilterPanel>
         <Suspense fallback={<ApiKeyResultsSkeleton />}>
           <ApiKeyResults query={query} baseHref={baseHref} />
         </Suspense>
