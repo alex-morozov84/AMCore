@@ -1,8 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto'
 
+import { jest } from '@jest/globals'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
+import { InviteService } from '../src/core/organizations/invite.service'
+import { EmailService } from '../src/infrastructure/email'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -625,19 +628,67 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
         .expect(401)
     })
 
+    it.each([false, true])(
+      'Stage B invite key denial before writes/mail (owner veto=%s)',
+      async (ownerVeto) => {
+        const { adminToken, orgId, adminUserId } = await setupAdminOrg()
+        const key = await request(app.getHttpServer())
+          .post('/api-keys')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            name: 'Denied invite key',
+            organizationId: orgId,
+            scopes: [ownerVeto ? 'manage:TeamAccess' : 'manage:Organization'],
+          })
+          .expect(201)
+        if (ownerVeto) {
+          const role = await prisma.role.create({
+            data: { name: 'Owner veto', organizationId: orgId },
+          })
+          const permission = await prisma.permission.create({
+            data: {
+              action: 'read',
+              subject: 'Role',
+              inverted: true,
+              fields: ['name'],
+              conditions: { id: 'impossible' },
+              organizationId: orgId,
+            },
+          })
+          await prisma.rolePermission.create({
+            data: { roleId: role.id, permissionId: permission.id },
+          })
+          const member = await prisma.orgMember.findUniqueOrThrow({
+            where: { userId_organizationId: { userId: adminUserId, organizationId: orgId } },
+          })
+          await prisma.memberRole.create({ data: { memberId: member.id, roleId: role.id } })
+          await prisma.organization.update({
+            where: { id: orgId },
+            data: { aclVersion: { increment: 1 } },
+          })
+        }
+        const create = jest.spyOn(app.get(InviteService), 'createInvite')
+        const delivery = jest.spyOn(app.get(EmailService), 'sendOrgInviteEmail')
+        try {
+          await request(app.getHttpServer())
+            .post(`/organizations/${orgId}/members/invite`)
+            .set('Authorization', `Bearer ${key.body.key}`)
+            .send({ email: 'denied-invite@example.com' })
+            .expect(403)
+          expect(await prisma.orgInvite.count({ where: { organizationId: orgId } })).toBe(0)
+          expect(create).not.toHaveBeenCalled()
+          expect(delivery).not.toHaveBeenCalled()
+        } finally {
+          create.mockRestore()
+          delivery.mockRestore()
+        }
+      }
+    )
+
     /**
-     * Cross-org boundary on the (dual-auth) invite-create route. An API
-     * key is an org-bound credential per ADR-033; `InviteService.createInvite`
-     * calls `assertOrgContext(principal, orgId)` before any write, so a key
-     * bound to org A cannot invite into org B.
-     *
-     * The expected status is 403, not 401: the route is dual-auth so the key
-     * authenticates, and the owner is seeded into org B as a MEMBER below, so
-     * a membership-only check would pass — the denial must come from the
-     * org-context boundary, not from a missing membership or a malformed key.
-     * The scope is `manage:Organization` so `@CheckPolicies(Manage,
-     * Organization)` passes and the 403 originates at the org-context
-     * assertion, not at authorization.
+     * A key bound to A cannot target B even when its owner belongs to B.
+     * The scoped resolver rejects the bound target before TeamAccess construction
+     * and before InviteService; exact manage:TeamAccess scope does not retarget it.
      */
     it('POST /organizations/:orgId/members/invite rejects an API key bound to a different org with 403', async () => {
       // userA — admin of org A.
