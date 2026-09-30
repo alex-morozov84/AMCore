@@ -32,7 +32,10 @@ export class AdminOverviewService {
   async getOverview(): Promise<AdminOverviewResponse> {
     try {
       const result = await this.readiness.check()
-      return this.toResponse('ready', result.details)
+      if (result.status !== 'ok' && result.status !== 'degraded') {
+        throw new Error('Unexpected readiness result')
+      }
+      return this.toResponse(result.status === 'degraded' ? 'degraded' : 'ready', result.details)
     } catch (err) {
       if (err instanceof ServiceUnavailableException) {
         return this.toResponse('not_ready', this.extractDetails(err))
@@ -65,8 +68,9 @@ export class AdminOverviewService {
       )
       .map(([name, value]) => ({
         name,
-        status: (value?.status === 'up' || value?.status === 'down' ? value.status : 'unknown') as
-          'up' | 'down' | 'unknown',
+        status: (value?.status === 'up' || value?.status === 'down' || value?.status === 'degraded'
+          ? value.status
+          : 'unknown') as 'up' | 'down' | 'degraded' | 'unknown',
       }))
 
     return {

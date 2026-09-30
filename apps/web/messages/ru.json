@@ -432,7 +432,9 @@
       "display": "Время: {zone}",
       "localOption": "Местное время — {zone} ({offset})",
       "description": "Часовой пояс дат во всей консоли. Местное время определяется вашим браузером."
-    }
+    },
+    "overviewDependencyStatusDegraded": "Ограниченная готовность",
+    "overviewDegradedNotice": "API сообщает об ограниченной готовности. Проверьте зависимости и обновите данные."
   },
   "auth": {
     "login": "Войти",

@@ -39,6 +39,8 @@ const consoleMessages = {
   overviewDependencyLabelStorage: 'Storage',
   overviewDependencyStatusUp: 'Up',
   overviewDependencyStatusDown: 'Down',
+  overviewDependencyStatusDegraded: 'Degraded',
+  overviewDegradedNotice: 'The API reports degraded readiness.',
   overviewDependencyStatusUnknown: 'Unknown',
   overviewNotReadyTitle: 'API instance not ready',
   overviewNotReadyDependencies: 'Affected: {dependencies}',
@@ -98,6 +100,24 @@ describe('OverviewPage', () => {
     expect(
       screen.queryByText('This is temporarily unavailable. Please try again.')
     ).not.toBeInTheDocument()
+  })
+
+  it('renders fulfilled degraded readiness without claiming not-ready or unavailable', async () => {
+    vi.mocked(fetchConsoleOverview).mockResolvedValue({
+      status: 'success',
+      data: {
+        readiness: 'degraded',
+        dependencies: [{ name: 'redis', status: 'degraded' }],
+        version: '1.0.0',
+        processRole: 'all',
+      },
+    })
+
+    renderPage(await OverviewPage())
+
+    expect(screen.getByText('The API reports degraded readiness.')).toBeInTheDocument()
+    expect(screen.getByText('Degraded')).toBeInTheDocument()
+    expect(screen.queryByText('API instance not ready')).not.toBeInTheDocument()
   })
 
   it('renders the unavailable fallback for a real transport failure, not the not-ready alert', async () => {

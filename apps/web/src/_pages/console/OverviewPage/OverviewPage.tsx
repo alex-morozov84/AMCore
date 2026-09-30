@@ -36,6 +36,12 @@ export async function OverviewPage() {
         <p className="mt-1 text-sm text-foreground-muted">{t('overviewSubtitle')}</p>
       </div>
 
+      {overview.readiness === 'degraded' && (
+        <p className="rounded-lg border border-warning p-4 text-warning">
+          {t('overviewDegradedNotice')}
+        </p>
+      )}
+
       {overview.readiness === 'not_ready' && (
         <OverviewNotReadyAlert dependencies={overview.dependencies} />
       )}

@@ -432,7 +432,9 @@
       "display": "Time: {zone}",
       "localOption": "Local time — {zone} ({offset})",
       "description": "Time zone for dates throughout the console. Local time is determined by your browser."
-    }
+    },
+    "overviewDependencyStatusDegraded": "Degraded",
+    "overviewDegradedNotice": "The API instance reports degraded readiness. Review dependency statuses and refresh."
   },
   "auth": {
     "login": "Sign in",

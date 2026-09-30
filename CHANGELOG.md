@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Upgrade API health checks to Terminus 12.1.0, preserving expected-down and
+  shutdown responses and exposing fulfilled degraded readiness in Console Overview.
+
 - Generic browser proxy routes for declared organization families are closed for
   every HTTP method. Organization PATCH rejects unknown fields. Direct API keys,
   legacy organization JWTs and membership-checked `/switch` remain supported.

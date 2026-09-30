@@ -33,6 +33,7 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @ApiResponse({ status: 500, description: 'Unexpected health provider failure' })
   @ApiOperation({ summary: 'General health summary (alias of readiness)' })
   @ApiResponse({ status: 200, description: 'Service is healthy and ready to accept traffic' })
   @ApiResponse({ status: 503, description: 'Service is not ready to accept traffic' })
@@ -61,6 +62,7 @@ export class HealthController {
    */
   @Get('startup')
   @HealthCheck()
+  @ApiResponse({ status: 500, description: 'Unexpected health provider failure' })
   @ApiOperation({ summary: 'Startup probe (Kubernetes startupProbe)' })
   @ApiResponse({ status: 200, description: 'Application started successfully' })
   @ApiResponse({ status: 503, description: 'Application not ready yet' })
@@ -99,6 +101,7 @@ export class HealthController {
    */
   @Get('ready')
   @HealthCheck()
+  @ApiResponse({ status: 500, description: 'Unexpected health provider failure' })
   @ApiOperation({ summary: 'Readiness probe (Kubernetes readinessProbe)' })
   @ApiResponse({ status: 200, description: 'Service is ready to accept traffic' })
   @ApiResponse({ status: 503, description: 'Service is not ready' })
@@ -128,6 +131,7 @@ export class HealthController {
    */
   @Get('live')
   @HealthCheck()
+  @ApiResponse({ status: 500, description: 'Unexpected health provider failure' })
   @ApiOperation({ summary: 'Liveness probe (Kubernetes livenessProbe)' })
   @ApiResponse({ status: 200, description: 'Service is alive' })
   @ApiResponse({ status: 503, description: 'Service should be restarted' })

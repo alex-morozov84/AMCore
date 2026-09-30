@@ -10,6 +10,9 @@ dependency. The information comes from the same readiness checks used by
 ## Understand the status
 
 - **Up** means that the dependency passed its readiness check.
+- **Degraded** means that the check completed but reported impaired service.
+  Review the affected dependencies and refresh; it is distinct from a failed
+  request or an instance that reports not ready.
 - **Down** or **Unknown** means that the instance cannot currently confirm that
   dependency is ready. The **API instance not ready** notice names the affected
   dependencies. Choose **Refresh** to check again.

@@ -44,6 +44,27 @@ describe('AdminOverviewService', () => {
     })
   })
 
+  it('preserves fulfilled degraded readiness and sanitizes its dependency', async () => {
+    readiness.check.mockResolvedValue({
+      status: 'degraded',
+      details: { redis: { status: 'degraded', message: 'private-provider-detail' } },
+    } as any)
+
+    const result = await service.getOverview()
+
+    expect(result.readiness).toBe('degraded')
+    expect(result.dependencies).toEqual([{ name: 'redis', status: 'degraded' }])
+    expect(JSON.stringify(result)).not.toContain('private-provider-detail')
+  })
+
+  it.each(['error', 'shutting_down', 'unexpected'])(
+    'rejects unexpected fulfilled overall status %s rather than reporting ready',
+    async (status) => {
+      readiness.check.mockResolvedValue({ status, details: {} } as any)
+      await expect(service.getOverview()).rejects.toThrow('Unexpected readiness result')
+    }
+  )
+
   it('reports an observed not-ready instance as a typed 200, never as an HTTP error', async () => {
     readiness.check.mockRejectedValue(
       new ServiceUnavailableException({

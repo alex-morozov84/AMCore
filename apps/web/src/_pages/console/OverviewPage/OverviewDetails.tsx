@@ -11,16 +11,19 @@ const MONO = 'font-console-mono'
 const DEPENDENCY_STATUS_KEY = {
   up: 'overviewDependencyStatusUp',
   down: 'overviewDependencyStatusDown',
+  degraded: 'overviewDependencyStatusDegraded',
   unknown: 'overviewDependencyStatusUnknown',
 } as const
 const DEPENDENCY_DOT_STYLE: Record<AdminOverviewDependency['status'], string> = {
   up: 'bg-success',
   down: 'bg-destructive',
+  degraded: 'bg-warning',
   unknown: 'bg-foreground-muted',
 }
 const DEPENDENCY_TEXT_STYLE: Record<AdminOverviewDependency['status'], string> = {
   up: 'text-success',
   down: 'text-destructive',
+  degraded: 'text-warning',
   unknown: 'text-foreground-muted',
 }
 const PROCESS_ROLE_KEY = {

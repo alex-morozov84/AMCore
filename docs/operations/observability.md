@@ -353,6 +353,21 @@ After adding one, extend the [Metric Families](#metric-families) list above so t
 family reference stays complete, and cover the emit path in the metrics unit
 specs.
 
+## Health result semantics
+
+Health probes use Terminus 12. Successful checks return HTTP 200 with `ok`;
+a fulfilled impaired check returns HTTP 200 with `degraded`. An expected
+indicator failure returns `down` and produces HTTP 503. Unexpected indicator
+exceptions produce HTTP 500; shutdown produces HTTP 503. The API exception filter normalizes error bodies;
+`shutting_down` is the underlying health result, not a guaranteed HTTP error field.
+Readiness and liveness retain their separate check sets and configured limits.
+
+The authenticated Console Overview projects readiness as data, including
+`degraded` and `not_ready`; a failed observation remains a separate request error.
+API Jest entry points enable experimental VM modules to load Terminus's ESM
+package. Production retains Node 24 CommonJS loading; no API module-mode migration
+is required.
+
 ## Web and Worker Roles
 
 `PROCESS_ROLE=web`, `worker`, and `all` all expose metrics. The worker has no

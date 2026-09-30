@@ -144,10 +144,10 @@ export const ADMIN_OVERVIEW_DEPENDENCY_NAMES = [
   'storage',
 ] as const
 
-/** Per-dependency readiness state, sanitized to name + up/down/unknown only. */
+/** Per-dependency readiness state, sanitized to name + up/down/degraded/unknown only. */
 export const adminOverviewDependencySchema = z.object({
   name: z.enum(ADMIN_OVERVIEW_DEPENDENCY_NAMES),
-  status: z.enum(['up', 'down', 'unknown']),
+  status: z.enum(['up', 'down', 'degraded', 'unknown']),
 })
 
 export type AdminOverviewDependency = z.infer<typeof adminOverviewDependencySchema>
@@ -163,7 +163,7 @@ export type AdminOverviewDependency = z.infer<typeof adminOverviewDependencySche
  * fetched", not folded into this same 200 shape.
  */
 export const adminOverviewResponseSchema = z.object({
-  readiness: z.enum(['ready', 'not_ready']),
+  readiness: z.enum(['ready', 'degraded', 'not_ready']),
   dependencies: z.array(adminOverviewDependencySchema),
   version: z.string(),
   processRole: z.enum(['web', 'worker', 'all']),
