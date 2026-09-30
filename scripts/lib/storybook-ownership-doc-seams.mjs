@@ -8,7 +8,7 @@ export const storybookIndexSeams = [
     'storybook.root-index',
     'README.md',
     block(
-      '| Storybook                           |',
+      '[`docs/frontend/storybook.md`](docs/frontend/storybook.md)',
       'component workshop, story conventions, a11y gate, and maintenance procedures'
     ),
     ['docs/frontend/storybook.md'],
