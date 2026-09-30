@@ -50,7 +50,7 @@ export const operationsConsoleDiscoverySeams = [
   entry(
     'console.root-map',
     'README.md',
-    { text: '| Operations Console                  | [`docs/operations-console/`' },
+    { text: '[`docs/operations-console/`](docs/operations-console/README.md)' },
     undefined,
     { operationKey: 'readme-console' }
   ),
