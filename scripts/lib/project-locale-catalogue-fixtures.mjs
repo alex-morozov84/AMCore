@@ -63,6 +63,14 @@ export function singleCatalogueFixture(model, { locale, variant }, ctx) {
     catalogueObject(model, locale, ctx)
     return
   }
+  if (variant === 'sessions') {
+    const header = findUniqueNode(
+      model,
+      (node) => ts.isPropertyAccessExpression(node) && node.getText() === 'en.sessions.createdAt',
+      { ...ctx, describe: 'Sessions latest-token catalogue label' }
+    )
+    if (locale === 'ru') model.replaceNode(header, 'ru.sessions.createdAt', ctx)
+  }
   if (locale === 'ru') replaceStrings(model, COPY[variant], ctx)
   const attributes = findAllNodes(
     model,

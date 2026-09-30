@@ -2,6 +2,7 @@ import type { ExecutionContext } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import type { Request, Response } from 'express'
 
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import {
   AuthErrorCode,
   type RequestPrincipal,
@@ -529,7 +530,7 @@ describe('AuthController', () => {
         'current-hashed-token',
         1,
         20,
-        'en'
+        DEFAULT_LOCALE
       )
       expect(result).toEqual(mockEnvelope)
     })
@@ -550,7 +551,7 @@ describe('AuthController', () => {
         undefined,
         1,
         20,
-        'en'
+        DEFAULT_LOCALE
       )
       expect(result).toEqual(mockEnvelope)
     })
@@ -558,18 +559,19 @@ describe('AuthController', () => {
     it('negotiates a supported Accept-Language header into the session locale', async () => {
       sessionService.getUserSessions.mockResolvedValue(mockEnvelope)
 
-      await controller.sessions(mockUser.id, mockRequest, defaultPagination, 'ru')
+      const locale = SUPPORTED_LOCALES.at(-1) ?? DEFAULT_LOCALE
+      await controller.sessions(mockUser.id, mockRequest, defaultPagination, locale)
 
       expect(sessionService.getUserSessions).toHaveBeenCalledWith(
         mockUser.id,
         undefined,
         1,
         20,
-        'ru'
+        locale
       )
     })
 
-    it('falls back to en for an unsupported or malformed Accept-Language header', async () => {
+    it('falls back to the default locale for an unsupported or malformed Accept-Language header', async () => {
       sessionService.getUserSessions.mockResolvedValue(mockEnvelope)
 
       await controller.sessions(mockUser.id, mockRequest, defaultPagination, 'fr-FR;q=0.9')
@@ -579,7 +581,7 @@ describe('AuthController', () => {
         undefined,
         1,
         20,
-        'en'
+        DEFAULT_LOCALE
       )
     })
   })

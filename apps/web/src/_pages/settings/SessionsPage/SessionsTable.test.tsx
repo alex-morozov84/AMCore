@@ -69,6 +69,6 @@ describe('SessionsTable — current session row', () => {
     expect(screen.getByRole('cell', { name: 'This device' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'This device' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Latest token issued' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: en.sessions.createdAt })).toBeInTheDocument()
   })
 })

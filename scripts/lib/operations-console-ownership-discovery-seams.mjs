@@ -29,6 +29,7 @@ export const operationsConsoleDiscoverySeams = [
     {
       start: 'The optional [Operations Console](docs/operations-console/README.md)',
       end: 'catalog/content admin UI.',
+      consumeBlankLine: true,
     },
     undefined,
     { operationKey: 'readme-console' }
@@ -71,10 +72,7 @@ export const operationsConsoleDiscoverySeams = [
   entry(
     'console.docs-index',
     'docs/README.md',
-    block(
-      '- **[Operations Console](operations-console/README.md)**',
-      'and safe extension rules.'
-    ),
+    block('- **[Operations Console](operations-console/README.md)**', 'and safe extension rules.'),
     undefined,
     { operationKey: 'docs-index-console' }
   ),
