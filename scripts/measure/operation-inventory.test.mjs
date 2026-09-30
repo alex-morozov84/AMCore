@@ -38,7 +38,8 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic claims',
-        expected: 1441,
+        // README table-padding claim appears in the two Console-disabled scenarios.
+        expected: 1443,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
