@@ -47,7 +47,8 @@ read as Next reserved directories — Next's own routing only ever looks inside
 
 ### Import rule: public API only
 
-Import a slice through its `index.ts`, never a file inside it:
+Import a slice through its public API: `index.ts` is the default entry point.
+Do not import private files inside a slice:
 
 ```ts
 // Correct
@@ -57,7 +58,19 @@ import { LoginForm } from '@/features/auth-login'
 import { LoginForm } from '@/features/auth-login/ui/LoginForm'
 ```
 
-Each slice folder's `index.ts` is the contract for what other layers may use.
+Each slice folder's public entry points define what other layers may use.
+The exact additional public entries are:
+
+- `entities/organization-context/index.server.ts`: the server-only DAL and
+  family descriptor, available to layers that may import this entity.
+- `_app/organization-access/index.server.ts`, `index.client.ts` and
+  `index.config.ts`: server mount, client menu and universal placement,
+  respectively, available only to Next route wiring in `src/app/`.
+
+These named exceptions do not permit arbitrary deep imports, additional server
+barrels or lower-layer imports of `_app`. See
+[Organization composition capability entries](#organization-composition-capability-entries)
+for the organization entries' capability boundaries.
 This is enforced by `eslint-plugin-boundaries`, not by convention — see
 [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md#import-rules) for
 what each rule catches, including the `shared` exception below.
@@ -481,3 +494,12 @@ architectural structure.
   rules on this page.
 - [Bundle baseline and budget](./bundle-budget.md) — current per-route client
   bundle measurements and the deferred CI-budget reopening path.
+
+### Organization composition capability entries
+
+Next route wiring may enter `_app/organization-access/index.server.ts` (ready
+content mount without AppShell), `index.client.ts` (menu), and `index.config.ts`
+(serializable placement). These are exact ESLint boundary exceptions for this
+slice; lower layers and arbitrary deep imports remain forbidden. The existing
+slice index preserves compatibility but has a mixed module graph. See
+[product integration](../product-admin/integration.md).

@@ -1,3 +1,4 @@
+import { compactConsoleReadmeTable } from './project-console-readme-format.mjs'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -71,9 +72,15 @@ function materializeText(root, pathname, facts) {
   const uniqueFacts = dedupeFacts(facts)
   validateClaims(pathname, uniqueFacts)
   const before = readFileSync(path.join(root, pathname), 'utf8')
-  const after = [...uniqueFacts]
+  let after = [...uniqueFacts]
     .sort((left, right) => left.operationKey.localeCompare(right.operationKey))
     .reduce((text, fact) => claimsFor(fact).definition.apply(text, fact.params), before)
+  if (
+    pathname === 'README.md' &&
+    uniqueFacts.some((fact) => fact.operationKey === 'readme-console')
+  ) {
+    after = compactConsoleReadmeTable(after)
+  }
   return { before, after }
 }
 

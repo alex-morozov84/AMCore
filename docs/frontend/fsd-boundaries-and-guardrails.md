@@ -46,11 +46,20 @@ import { LoginForm } from '@/features/auth-login' // ✗ boundaries/dependencies
 
 ### Slice public API
 
-A slice is entered at its `index.ts` and nowhere else:
+A slice is entered through its public API; `index.ts` is the default entry point.
 
-The explicitly named `entities/organization-context/index.server.ts` is also a
-public server-only entry point for its DAL and family descriptor. This exception
-does not permit arbitrary deep imports or server barrels in other slices.
+The exact additional public entries are:
+
+- `entities/organization-context/index.server.ts`: the server-only DAL and
+  family descriptor, available to layers that may import this entity.
+- `_app/organization-access/index.server.ts`, `index.client.ts` and
+  `index.config.ts`: server mount, client menu and universal placement,
+  respectively, available only to Next route wiring in `src/app/`.
+
+These named exceptions do not permit arbitrary deep imports, additional server
+barrels or lower-layer imports of `_app`. See
+[Organization composition capability entries](#organization-composition-capability-entries)
+for the organization entries' capability boundaries.
 
 ```ts
 import { LoginForm } from '@/features/auth-login' // ✓
@@ -282,3 +291,12 @@ Stated so nobody assumes coverage that does not exist:
 - [Shared UI & shadcn](./shared-ui-and-shadcn.md) — the `shared/ui` reuse
   rule the "collection of modules" section above assumes, and the safe
   procedure for touching shadcn-generated files.
+
+### Organization composition capability entries
+
+Next route wiring may enter `_app/organization-access/index.server.ts` (ready
+content mount without AppShell), `index.client.ts` (menu), and `index.config.ts`
+(serializable placement). These are exact ESLint boundary exceptions for this
+slice; lower layers and arbitrary deep imports remain forbidden. The existing
+slice index preserves compatibility but has a mixed module graph. See
+[product integration](../product-admin/integration.md).

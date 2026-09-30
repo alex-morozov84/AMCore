@@ -1,4 +1,4 @@
-import { ORGANIZATION_CONTEXT_FAMILY } from '@/entities/organization-context/index.server'
+import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 
 /** Application composition: downstream tenant modules contribute their public family here. */
 export const productOrganizationFamilies = Object.freeze([ORGANIZATION_CONTEXT_FAMILY])

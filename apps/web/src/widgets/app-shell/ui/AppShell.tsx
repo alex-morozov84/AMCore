@@ -25,6 +25,7 @@ import {
 } from '@/shared/ui/sidebar'
 
 interface AppShellProps {
+  homeHref?: string
   navigationAfterDashboard?: ReactNode
   email?: string
   /**
@@ -40,7 +41,7 @@ interface AppShellProps {
 }
 
 /** Existing dashboard/session items plus app-owned navigation slot. */
-function NavMenu({ afterDashboard }: { afterDashboard?: ReactNode }) {
+function NavMenu({ afterDashboard, homeHref }: { afterDashboard?: ReactNode; homeHref: string }) {
   const t = useTranslations('nav')
   const tSessions = useTranslations('sessions')
 
@@ -48,7 +49,7 @@ function NavMenu({ afterDashboard }: { afterDashboard?: ReactNode }) {
     <SidebarMenu>
       {afterDashboard}
       <SidebarMenuItem>
-        <SidebarMenuButton render={<RouteProgressLink href="/" />}>
+        <SidebarMenuButton render={<RouteProgressLink href={homeHref} />}>
           <span>{t('dashboard')}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -71,6 +72,7 @@ function NavMenu({ afterDashboard }: { afterDashboard?: ReactNode }) {
  */
 export function AppShell({
   email,
+  homeHref = '/',
   defaultSidebarOpen,
   children,
   navigationAfterDashboard,
@@ -87,7 +89,7 @@ export function AppShell({
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
-                <NavMenu afterDashboard={navigationAfterDashboard} />
+                <NavMenu afterDashboard={navigationAfterDashboard} homeHref={homeHref} />
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>

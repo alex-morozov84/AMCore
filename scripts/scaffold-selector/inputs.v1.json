@@ -76,6 +76,7 @@
           "CONTRIBUTING.md",
           "README.md",
           "docs/README.md",
+          "docs/product-admin/README.md",
           "docs/auth/README.md",
           "docs/auth/csrf.md",
           "docs/auth/rbac.md",

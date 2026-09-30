@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { cookies } from 'next/headers'
 
-import { OrganizationNavigationEntry } from '@/_app/organization-access'
+import { OrganizationNavigationEntry } from '@/_app/organization-access/index.client'
+import { organizationAccessPlacement } from '@/_app/organization-access/index.config'
 import { getOptionalSession } from '@/shared/api/bff/dal'
 import { SIDEBAR_COOKIE_NAME } from '@/shared/ui/sidebar-cookie'
 import { AppShell } from '@/widgets/app-shell'
@@ -45,6 +46,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   return (
     <AppShell
       email={email}
+      homeHref={organizationAccessPlacement.homeHref}
       defaultSidebarOpen={defaultSidebarOpen}
       navigationAfterDashboard={<OrganizationNavigationEntry />}
     >

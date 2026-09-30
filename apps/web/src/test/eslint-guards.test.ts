@@ -186,6 +186,48 @@ describe('FSD boundaries', () => {
       false,
     ],
     [
+      'routing may enter organization capability index.server',
+      'src/app/api/probe.ts',
+      "'@/_app/organization-access/index.server'",
+      false,
+    ],
+    [
+      'pages cannot enter organization capability index.server',
+      'src/_pages/auth/probe.ts',
+      "'@/_app/organization-access/index.server'",
+      true,
+    ],
+    [
+      'routing may enter organization capability index.client',
+      'src/app/api/probe.ts',
+      "'@/_app/organization-access/index.client'",
+      false,
+    ],
+    [
+      'pages cannot enter organization capability index.client',
+      'src/_pages/auth/probe.ts',
+      "'@/_app/organization-access/index.client'",
+      true,
+    ],
+    [
+      'routing may enter organization capability index.config',
+      'src/app/api/probe.ts',
+      "'@/_app/organization-access/index.config'",
+      false,
+    ],
+    [
+      'pages cannot enter organization capability index.config',
+      'src/_pages/auth/probe.ts',
+      "'@/_app/organization-access/index.config'",
+      true,
+    ],
+    [
+      'routing cannot enter organization internals',
+      'src/app/api/probe.ts',
+      "'@/_app/organization-access/ui/mount'",
+      true,
+    ],
+    [
       'shared may not import application composition',
       'src/shared/lib/probe.ts',
       "'@/_app/product-api'",
