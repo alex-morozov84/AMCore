@@ -119,3 +119,13 @@ test('fails closed instead of mixing structural and text adapters on one path', 
     /mixed structural\/text operations/
   )
 })
+
+
+test('disabled Console removes its product-admin link while keeping integration guidance', () => {
+  const after = materialize('docs/product-admin/README.md', 'console.product-admin-intro')
+  assert.doesNotMatch(after, /operations-console\/README\.md/)
+  assert.match(after, /# Product administration foundation/)
+  assert.match(after, /signed-in members/)
+  assert.match(after, /## Connect the ready pages/)
+  assert.match(after, /organizationAccessPlacement/)
+})

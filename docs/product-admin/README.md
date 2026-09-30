@@ -1,8 +1,9 @@
 # Product administration foundation
 
 AMCore supplies an Organizations selector and read-only organization overview for
-signed-in members. This product surface is independent of the
-[Operations Console](../operations-console/README.md), which is restricted to
+signed-in members.
+
+This product surface is independent of the [Operations Console](../operations-console/README.md), which is restricted to
 platform super-administrators. An organization role does not grant Console access.
 
 The default pages are `/organizations` and `/organizations/[id]`, with `/en` or

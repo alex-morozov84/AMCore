@@ -15,6 +15,15 @@ const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDiscoverySeams = [
   entry(
+    'console.product-admin-intro',
+    'docs/product-admin/README.md',
+    block(
+      'This product surface is independent of the [Operations Console]',
+      'platform super-administrators. An organization role does not grant Console access.'
+    ),
+    ['../operations-console/README.md']
+  ),
+  entry(
     'console.root-intro',
     'README.md',
     {

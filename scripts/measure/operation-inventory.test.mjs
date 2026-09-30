@@ -9,10 +9,12 @@ describe('operation inventory against the real plans', () => {
 
   test('reports every stale measured exact count together', () => {
     assertExactScaffoldCounts([
+      // Product-admin Console-link removal adds one measured operation, two
+      // semantic facts/claims, and one final filesystem edit.
       // Delivered API-key lifecycle adds nine records; organization foundation adds20.
       // Four locale-route moves in three scenarios plus four story deletions
       // in two scenarios add 20 operations and their one-claim semantic facts.
-      { name: 'measured operations', expected: 574, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 575, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -31,17 +33,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 789,
+        expected: 791,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1439,
+        expected: 1441,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 561,
+        expected: 562,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])
