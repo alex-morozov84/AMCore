@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { expectNoAxeViolations } from '../shared/axe'
+
 import { setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 
@@ -29,10 +31,35 @@ test('path-mode Overview panel renders real readiness, version and process role 
   // A fresh docker-compose stack is healthy - assert the ready state, not
   // the not-ready one, and confirm it never says the console is unhealthy.
   await expect(page.getByText('API instance not ready')).not.toBeVisible()
-  await expect(page.getByText('Database')).toBeVisible()
+  await expect(page.getByText('Database', { exact: true })).toBeVisible()
   await expect(page.getByText('Cache (Redis)')).toBeVisible()
   await expect(page.getByText('API version')).toBeVisible()
   await expect(page.getByText('Process role')).toBeVisible()
+
+  for (const name of [
+    'Web artifact',
+    'Local database pool',
+    'API process memory',
+    'API root filesystem',
+  ]) {
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+  }
+  const observed = page.locator('header time').last()
+  const before = await observed.getAttribute('datetime')
+  const refresh = page.getByRole('button', { name: 'Refresh', exact: true })
+  await refresh.focus()
+  await expect(refresh).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(observed).not.toHaveAttribute('datetime', before!)
+  await expect(refresh).toBeEnabled()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(
+    page.getByRole('heading', { name: 'API root filesystem', exact: true })
+  ).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  )
+  await expectNoAxeViolations(page)
 
   const html = await page.content()
   expect(html).not.toContain('Bearer ')

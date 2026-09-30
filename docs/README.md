@@ -131,7 +131,8 @@ provide an operator interface for admin session management.
   `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion,
   and the `ROUTE_PROGRESS_ENABLED` dev/agent flag.
 - **[Operations Console](operations-console/README.md)** — the optional
-  `SUPER_ADMIN` control plane: Overview, user and organization details,
+  `SUPER_ADMIN` control plane: Overview readiness, API/web identity and local
+  resources, user and organization details,
   Users system-role changes, bounded Audit browsing, topology,
   host-session boundary, downstream scaffolding, deployment, verification,
   and safe extension rules.

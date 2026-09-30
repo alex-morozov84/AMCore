@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Console Overview API/web identity, per-process pool and memory snapshots, root
+  filesystem pressure, independent observation times and explicit unknown/unavailable
+  states, with optional API environment and deployment labels.
+
 - Product organization cards and a read-only selected overview at
   `/[locale]/organizations`, with ordered session/access revalidation, localized
   skeleton/error states, responsive theme support and independent headless mounts.

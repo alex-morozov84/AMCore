@@ -99,7 +99,6 @@ export { type User, userSchema } from './user'
 // Admin schemas
 export {
   ADMIN_ORGANIZATION_SORT_FIELDS,
-  ADMIN_OVERVIEW_DEPENDENCY_NAMES,
   ADMIN_USER_SORT_FIELDS,
   type AdminOrganizationListQuery,
   adminOrganizationListQuerySchema,
@@ -108,10 +107,6 @@ export {
   type AdminOrganizationResponse,
   adminOrganizationResponseSchema,
   type AdminOrganizationSortField,
-  type AdminOverviewDependency,
-  adminOverviewDependencySchema,
-  type AdminOverviewResponse,
-  adminOverviewResponseSchema,
   type AdminSortOrder,
   adminSortOrderSchema,
   type AdminUserListQuery,
@@ -403,6 +398,18 @@ export {
   apiKeyStatusFilterSchema,
   apiKeyStatusSchema,
 } from './admin-api-keys'
+export {
+  ADMIN_OVERVIEW_DEPENDENCY_NAMES,
+  type AdminOverviewDependency,
+  adminOverviewDependencySchema,
+  adminOverviewFilesystemSchema,
+  adminOverviewMemorySchema,
+  adminOverviewPoolSchema,
+  type AdminOverviewResources,
+  adminOverviewResourcesSchema,
+  type AdminOverviewResponse,
+  adminOverviewResponseSchema,
+} from './admin-overview'
 export {
   type AcceptInviteInput,
   type AcceptInviteResponse,

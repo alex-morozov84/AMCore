@@ -153,6 +153,11 @@ custom Docker build, use `--build-arg NEXT_DEPLOYMENT_ID=<unique-build-id>`.
 Leaving it unset is supported. Do not put secrets in this public identity.
 Promotion must pull the original digest rather than rebuilding for production.
 
+The authenticated [Console Overview](../operations-console/overview.md) shows this
+compiled web artifact ID separately from API metadata. API version/commit and
+optional environment/deployment labels come from the API runtime configuration;
+see [Console metadata settings](../operations-console/configuration.md#overview-metadata-and-resource-settings).
+
 ### Freshness and recovery limits
 
 Allow unauthenticated GET access to `/api/deployment-version` on every frontend

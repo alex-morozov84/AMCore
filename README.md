@@ -31,7 +31,7 @@ Feature-specific admin surfaces remain intentionally product-owned.
 
 The optional [Operations Console](docs/operations-console/README.md) is a
 separate `SUPER_ADMIN` control plane. It ships **Overview** for instance
-readiness, **Users** inventory, system-role changes and session revocation, read-only
+readiness, deployment identity and local resource snapshots, **Users** inventory, system-role changes and session revocation, read-only
 **Organizations**, and bounded **Audit** browsing. Path/host topology,
 isolated host sessions, downstream scaffolding, deployment guidance, and a
 safe extension recipe are included. Session views show parsed devices and

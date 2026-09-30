@@ -52,6 +52,16 @@
 x-app-env: &app-env
   NODE_ENV: ${NODE_ENV:-development}
   API_PORT: 5002
+  # Operator-declared metadata; web artifact identity is set separately at build time.
+  APP_VERSION: ${APP_VERSION:-unknown}
+  APP_COMMIT: ${APP_COMMIT:-unknown}
+  APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
+  APP_DEPLOYMENT_ID: ${APP_DEPLOYMENT_ID:-}
+  DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+  DATABASE_POOL_WAITING_THRESHOLD: ${DATABASE_POOL_WAITING_THRESHOLD:-5}
+  HEALTH_DISK_THRESHOLD_PERCENT: ${HEALTH_DISK_THRESHOLD_PERCENT:-0.9}
+  # Blank is absent: readiness/liveness retain their distinct default heap ceilings.
+  HEALTH_MEMORY_HEAP_BYTES: ${HEALTH_MEMORY_HEAP_BYTES:-}
   # Express `trust proxy` (ADR / deployment.md → "TLS & reverse proxy").
   # Default off (safe with no proxy in front). Set TRUST_PROXY=1 in .env when
   # enabling the `edge` Caddy profile — Caddy is exactly one hop.

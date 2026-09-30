@@ -65,6 +65,22 @@ CI, or mixed docs must declare a narrow seam or structural operation. Novel
 unmarked semantics remain an explicit author/reviewer classification boundary;
 see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#optional-feature-extension-ownership).
 
+### Overview observation contract
+
+`GET /api/v1/admin/overview` retains live personal-JWT `SUPER_ADMIN` admission;
+API keys remain ineligible. Its response is `private, no-store`. The Console
+adapter opts into fetch `no-store` without changing other server consumers.
+The shared Zod schema is the API and web contract: readiness/dependencies are
+separate from allowlisted API identity, process identity and independently dated
+pool, memory and fixed-root filesystem samples. A secondary read failure produces
+only an unavailable sample, while an unexpected readiness failure remains HTTP 500. Swagger documents that error; a browser deadline is not an API 503 contract.
+
+Do not turn a resource count into a health verdict, expose arbitrary filesystem
+paths or copy full environment/health-error objects into the response. Keep web
+artifact identity local to the web build. Console UI, stories and adapters under
+closed Console roots are removed with the feature; shared schemas, backend
+sampling, deployment inputs and the generic fetch option remain reusable core.
+
 ### Interactive session data inside a server-rendered page
 
 The User Detail Sessions card is an interactive client leaf. Its Query calls a

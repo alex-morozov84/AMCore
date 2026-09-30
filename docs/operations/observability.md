@@ -374,6 +374,15 @@ is required.
 business API routes and no Bull Board, but does expose health and metrics so
 Kubernetes can probe it and Prometheus can scrape it.
 
+The [Console Overview](../operations-console/overview.md) adds independent local
+`pg.Pool`, Node.js memory and API-container `/` filesystem snapshots. Their
+values and timestamps are separate from readiness samples; they neither replace
+health results nor represent fleet, host or worker utilization. Filesystem
+pressure uses bytes available to an unprivileged process, including reserved
+space in pressure. A secondary sampling failure is an explicit unavailable card.
+API labels and the separately compiled web artifact ID are documented in
+[Console configuration](../operations-console/configuration.md#overview-metadata-and-resource-settings).
+
 ## Local Verification Harness
 
 An optional `monitoring` Docker Compose profile ships a dev-only

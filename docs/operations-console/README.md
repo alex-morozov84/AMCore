@@ -9,7 +9,7 @@ their organization role.
 
 | Screen                            | Use it to                                                                                  |
 | --------------------------------- | ------------------------------------------------------------------------------------------ |
-| [Overview](overview.md)           | Check this API instance's readiness, dependencies, version, and process role.              |
+| [Overview](overview.md)           | Check API readiness, deployment identity and local resources; identify the web artifact.   |
 | [Users](users.md)                 | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |
 | [Organizations](organizations.md) | Inspect organizations, members and their roles without changing them.                      |
 | [API keys](api-keys.md)           | Inspect credential metadata and irreversibly revoke one or selected keys.                  |

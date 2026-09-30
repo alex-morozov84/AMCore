@@ -106,6 +106,31 @@ preserve assets/API/CSP paths, and map only public console pages and API paths.
 See the authoritative [proxy and TLS mapping
 tables](../operations/deployment.md#operations-console-host-mode-reference).
 
+## Overview metadata and resource settings
+
+Set `APP_VERSION` and `APP_COMMIT` on the API deployment. Overview trims these
+values and projects only 1–128 characters from letters, digits, `.`, `_`, `+`
+and `-`; empty, invalid or literal `unknown` becomes an explicit unknown value.
+This projection does not change the existing metrics-label inputs.
+
+`APP_ENVIRONMENT` (1–64 characters) and `APP_DEPLOYMENT_ID` (1–128) are optional
+API labels. They accept letters, digits, `.`, `_` and `-`; blank means absent,
+while an invalid nonblank value fails API environment validation. They must not
+contain secrets or URLs. `NODE_ENV` remains the separate runtime mode.
+The base Compose file forwards these inputs to API/worker services.
+
+The resource comparison settings are `DATABASE_POOL_MAX`,
+`DATABASE_POOL_WAITING_THRESHOLD`, `HEALTH_MEMORY_HEAP_BYTES` and
+`HEALTH_DISK_THRESHOLD_PERCENT`. A blank heap setting preserves the existing probe-specific
+health defaults: 1 GiB for readiness and 1.5 GiB for liveness. Overview samples only the
+responding API process; it does not collect worker resource data. Filesystem
+sampling always uses `/` inside that API container.
+
+Build the web artifact with `NEXT_DEPLOYMENT_ID` to supply its ID, or let the
+build generate one. Overview uses the compiled artifact identity; setting the
+variable on an already built web container does not change it. See
+[deployment identity](../operations/deployment.md) for build and rollout behavior.
+
 ## Database prerequisite: `pg_trgm` (Users/Organizations search)
 
 The Users and Organizations panels' search (ADR-082) is backed by

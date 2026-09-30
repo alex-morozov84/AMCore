@@ -4,11 +4,19 @@ import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type * as DeploymentIdentity from '@/shared/lib/deployment-version/identity'
+
 vi.mock('server-only', () => ({}))
+vi.mock('@/shared/lib/deployment-version/identity', async (importOriginal) => ({
+  ...(await importOriginal<typeof DeploymentIdentity>()),
+  DEPLOYMENT_VERSION: 'web-artifact-123',
+}))
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/admin' }))
 
 import { fetchConsoleOverview } from '@/shared/api/console/overview'
+import { BackendRequestError } from '@/shared/api/server/errors'
 
+import { overviewFixture } from './overview-fixture'
 import { OverviewPage } from './OverviewPage'
 
 vi.mock('@/shared/api/console/overview', () => ({ fetchConsoleOverview: vi.fn() }))
@@ -25,6 +33,15 @@ const consoleMessages = {
   overviewSubtitle: 'Status of the API instance answering this request',
   overviewVersionLabel: 'API version',
   overviewVersionHelp: 'help',
+  overviewWebTitle: 'Web artifact',
+  overviewPoolTitle: 'Local database pool',
+  overviewMemoryTitle: 'API process memory',
+  overviewDiskTitle: 'API root filesystem',
+  overviewMiB: '{value} MiB',
+  overviewAbove: 'Above {value}',
+  overviewSeconds: '{value} s',
+  overviewMeasurementUnavailable: 'Measurement unavailable',
+  overviewStorageNotConfigured: 'Probe not configured',
   overviewVersionUnknown: 'Unknown',
   overviewProcessRoleLabel: 'Process role',
   overviewProcessRoleHelp: 'help',
@@ -59,6 +76,10 @@ const messages = {
 // components (`OverviewNotReadyAlert`, `PrimaryUnavailableFallback`) get via
 // `NextIntlClientProvider`, so both layers render consistent, real text.
 vi.mock('next-intl/server', () => ({
+  getFormatter: vi.fn().mockResolvedValue({
+    number: (value: number, options?: Intl.NumberFormatOptions) =>
+      new Intl.NumberFormat('en', options).format(value),
+  }),
   getTranslations: vi.fn().mockResolvedValue((key: string, values?: Record<string, unknown>) => {
     let text = (consoleMessages as Record<string, string>)[key] ?? key
     if (values) {
@@ -72,7 +93,7 @@ vi.mock('next-intl/server', () => ({
 
 function renderPage(page: ReactElement) {
   return render(
-    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} timeZone="UTC" messages={messages}>
       {page}
     </NextIntlClientProvider>
   )
@@ -87,6 +108,7 @@ describe('OverviewPage', () => {
     vi.mocked(fetchConsoleOverview).mockResolvedValue({
       status: 'success',
       data: {
+        ...overviewFixture,
         readiness: 'not_ready',
         dependencies: [{ name: 'redis', status: 'down' }],
         version: '1.0.0',
@@ -106,6 +128,7 @@ describe('OverviewPage', () => {
     vi.mocked(fetchConsoleOverview).mockResolvedValue({
       status: 'success',
       data: {
+        ...overviewFixture,
         readiness: 'degraded',
         dependencies: [{ name: 'redis', status: 'degraded' }],
         version: '1.0.0',
@@ -116,7 +139,7 @@ describe('OverviewPage', () => {
     renderPage(await OverviewPage())
 
     expect(screen.getByText('The API reports degraded readiness.')).toBeInTheDocument()
-    expect(screen.getByText('Degraded')).toBeInTheDocument()
+    expect(screen.getAllByText('Degraded')).toHaveLength(2)
     expect(screen.queryByText('API instance not ready')).not.toBeInTheDocument()
   })
 
@@ -132,5 +155,29 @@ describe('OverviewPage', () => {
       screen.getByText('This is temporarily unavailable. Please try again.')
     ).toBeInTheDocument()
     expect(screen.queryByText('API instance not ready')).not.toBeInTheDocument()
+    expect(screen.getByText('web-artifact-123')).toBeInTheDocument()
+  })
+
+  it('propagates malformed 2xx contract errors to the route error boundary', async () => {
+    const error = new BackendRequestError('invalid-payload', 'test-correlation', 200)
+    vi.mocked(fetchConsoleOverview).mockRejectedValue(error)
+    await expect(OverviewPage()).rejects.toBe(error)
+  })
+
+  it('retains pool and memory when the filesystem sample is unavailable', async () => {
+    vi.mocked(fetchConsoleOverview).mockResolvedValue({
+      status: 'success',
+      data: {
+        ...overviewFixture,
+        resources: {
+          ...overviewFixture.resources,
+          filesystem: { status: 'unavailable', sampledAt: null },
+        },
+      },
+    })
+    renderPage(await OverviewPage())
+    expect(screen.getByText('Measurement unavailable')).toBeInTheDocument()
+    expect(screen.getByText('128 MiB')).toBeInTheDocument()
+    expect(screen.getByText('Probe not configured')).toBeInTheDocument()
   })
 })

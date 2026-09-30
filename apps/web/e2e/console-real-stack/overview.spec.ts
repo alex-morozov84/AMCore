@@ -49,10 +49,23 @@ test('host-mode Overview panel renders real readiness, version and process role,
   // A fresh docker-compose stack is healthy — assert the ready state, not
   // the not-ready one, and confirm it never says the console is unhealthy.
   await expect(consolePage.getByText('API instance not ready')).not.toBeVisible()
-  await expect(consolePage.getByText('Database')).toBeVisible()
+  await expect(consolePage.getByText('Database', { exact: true })).toBeVisible()
   await expect(consolePage.getByText('Cache (Redis)')).toBeVisible()
   await expect(consolePage.getByText('API version')).toBeVisible()
   await expect(consolePage.getByText('Process role')).toBeVisible()
+
+  for (const name of [
+    'Web artifact',
+    'Local database pool',
+    'API process memory',
+    'API root filesystem',
+  ]) {
+    await expect(consolePage.getByRole('heading', { name, exact: true })).toBeVisible()
+  }
+  const observed = consolePage.locator('header time').last()
+  const before = await observed.getAttribute('datetime')
+  await consolePage.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await expect(observed).not.toHaveAttribute('datetime', before!)
 
   const html = await consolePage.content()
   expect(html).not.toContain('Bearer ')
