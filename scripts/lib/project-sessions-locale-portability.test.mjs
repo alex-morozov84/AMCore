@@ -32,6 +32,12 @@ for (const locale of ['en', 'ru']) {
       assert.doesNotMatch(web, /Latest token issued/)
       assert.match(web, /toHaveLength\(1\)/)
       assert.match(web, new RegExp(`messages/${locale}\\.json`))
+      const admin = readFileSync(
+        path.join(copy.root, 'apps/api/src/core/admin/admin-detail.service.spec.ts'),
+        'utf8'
+      )
+      assert.equal(admin.match(/locale: DEFAULT_LOCALE/g)?.length, 2)
+      assert.equal(admin.match(/result.user.locale\).toBe\(DEFAULT_LOCALE/g)?.length, 2)
       const api = readFileSync(
         path.join(copy.root, 'apps/api/src/core/auth/auth.controller.spec.ts'),
         'utf8'
