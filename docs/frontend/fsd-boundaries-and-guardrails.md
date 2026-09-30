@@ -282,3 +282,12 @@ Stated so nobody assumes coverage that does not exist:
 - [Shared UI & shadcn](./shared-ui-and-shadcn.md) — the `shared/ui` reuse
   rule the "collection of modules" section above assumes, and the safe
   procedure for touching shadcn-generated files.
+
+### Organization composition capability entries
+
+Next route wiring may enter `_app/organization-access/index.server.ts` (ready
+content mount without AppShell), `index.client.ts` (menu), and `index.config.ts`
+(serializable placement). These are exact ESLint boundary exceptions for this
+slice; lower layers and arbitrary deep imports remain forbidden. The existing
+slice index preserves compatibility but has a mixed module graph. See
+[product integration](../product-admin/integration.md).

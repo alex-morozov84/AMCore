@@ -324,6 +324,9 @@ export default [
                 to: [
                   { element: { type: 'app' } },
                   ...below('composition', 'pages', 'widgets', 'features', 'entities'),
+                  ...['index.server.ts', 'index.client.ts', 'index.config.ts'].map((fileInternalPath) => ({
+                    element: { type: 'composition', captured: { slice: 'organization-access' }, fileInternalPath },
+                  })),
                   ...sharedAndNeutral,
                 ],
               },

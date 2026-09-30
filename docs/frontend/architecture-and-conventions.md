@@ -481,3 +481,12 @@ architectural structure.
   rules on this page.
 - [Bundle baseline and budget](./bundle-budget.md) — current per-route client
   bundle measurements and the deferred CI-budget reopening path.
+
+### Organization composition capability entries
+
+Next route wiring may enter `_app/organization-access/index.server.ts` (ready
+content mount without AppShell), `index.client.ts` (menu), and `index.config.ts`
+(serializable placement). These are exact ESLint boundary exceptions for this
+slice; lower layers and arbitrary deep imports remain forbidden. The existing
+slice index preserves compatibility but has a mixed module graph. See
+[product integration](../product-admin/integration.md).
