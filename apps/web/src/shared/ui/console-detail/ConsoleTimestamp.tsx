@@ -28,7 +28,7 @@ export function ConsoleTimestamp({
       <span>{formatConsoleDate(format, date, zone)}</span>
       {variant !== 'date' && (
         <>
-          {variant === 'inline' ? ' / ' : null}
+          {variant === 'inline' ? ', ' : null}
           <span className={variant === 'stacked' ? 'mt-1 text-xs text-muted-foreground' : ''}>
             {formatConsoleTime(format, date, { timeZone: zone, seconds })}
           </span>

@@ -71,7 +71,7 @@ see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#option
 API keys remain ineligible. Its response is `private, no-store`. The Console
 adapter opts into fetch `no-store` without changing other server consumers.
 The shared Zod schema is the API and web contract: readiness/dependencies are
-separate from allowlisted API identity, process identity and independently dated
+separate from generated build identity, cached independent storage observation and independently dated
 pool, memory and fixed-root filesystem samples. A secondary read failure produces
 only an unavailable sample, while an unexpected readiness failure remains HTTP 500. Swagger documents that error; a browser deadline is not an API 503 contract.
 
@@ -253,3 +253,8 @@ without Console. Import the shared module rather than a sibling page's internals
 The safe inventory reads directly in RSC with the console-aware token/no-store;
 fixed revoke BFF routes use the existing origin/session seam. Optional Console
 removal leaves backend admin endpoints, core lifecycle and shared API contracts.
+
+The storage snapshot includes `nextScheduledAt` (nullable ISO timestamp from the
+server scheduler) and `inProgress`. Never derive scheduling from `checkedAt` plus
+cadence: it records result publication, including timeout, rather than start time.
+During an active or stopped probe, no next transaction start is promised.

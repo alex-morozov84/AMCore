@@ -208,6 +208,13 @@ ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
 
 **Storage & media**
 
+- `storage_probe_state{driver,state}` is a cached per-instance active file check;
+  exactly one of healthy/failed/unknown/stale is 1. API and worker independently
+  exercise small private write/read/delete operations, with no I/O during scrape.
+  `AMCoreStorageProbeFailed` holds unhealthy state for five minutes before firing.
+  Configure a downstream notification receiver once.
+  See [storage runbook](runbooks/storage.md#file-diagnostic).
+
 - `storage_operations_total{driver,operation,result,role}` and
   `storage_operation_duration_seconds{driver,operation,result,role}` —
   `driver=s3|local|memory`, `result=success|error`, bounded `operation` set
@@ -362,7 +369,7 @@ exceptions produce HTTP 500; shutdown produces HTTP 503. The API exception filte
 `shutting_down` is the underlying health result, not a guaranteed HTTP error field.
 Readiness and liveness retain their separate check sets and configured limits.
 
-The authenticated Console Overview projects readiness as data, including
+The authenticated `/admin/overview` endpoint projects readiness as data, including
 `degraded` and `not_ready`; a failed observation remains a separate request error.
 API Jest entry points enable experimental VM modules to load Terminus's ESM
 package. Production retains Node 24 CommonJS loading; no API module-mode migration
@@ -374,13 +381,17 @@ is required.
 business API routes and no Bull Board, but does expose health and metrics so
 Kubernetes can probe it and Prometheus can scrape it.
 
-The [Console Overview](../operations-console/overview.md) adds independent local
+The privileged `/admin/overview` endpoint adds independent local
 `pg.Pool`, Node.js memory and API-container `/` filesystem snapshots. Their
 values and timestamps are separate from readiness samples; they neither replace
 health results nor represent fleet, host or worker utilization. Filesystem
 pressure uses bytes available to an unprivileged process, including reserved
 space in pressure. A secondary sampling failure is an explicit unavailable card.
-API labels and the separately compiled web artifact ID are documented in
+API artifact identity is generated at build time; it does not attest production.
+
+The optional [Console Overview](../operations-console/overview.md) presents these
+local snapshots and the responding web server build. Its page does not send
+notifications; configure monitoring delivery independently. See
 [Console configuration](../operations-console/configuration.md#overview-metadata-and-resource-settings).
 
 ## Local Verification Harness

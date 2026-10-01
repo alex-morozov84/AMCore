@@ -31,8 +31,9 @@ type Story = StoryObj<typeof meta>
 export const Ready: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    await canvas.getByText('Build details').click()
     await expect(canvas.getByText('web-artifact-independent')).toBeVisible()
-    await expect(canvas.getByText(overviewFixture.process.instanceId)).toBeVisible()
+    await expect(canvas.queryByText(overviewFixture.process.instanceId)).toBeNull()
   },
 }
 
@@ -79,7 +80,7 @@ export const LongIdentifiers: Story = {
   args: {
     overview: {
       ...overviewFixture,
-      api: { ...overviewFixture.api, deploymentId: 'a'.repeat(128) },
+      build: { ...overviewFixture.build, id: 'a'.repeat(128) },
     },
     artifactId: 'b'.repeat(128),
   },
@@ -92,9 +93,54 @@ export const LongIdentifiers: Story = {
   ],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    await canvas.getByText('Build details').click()
     await expect(canvas.getByText('a'.repeat(128))).toBeVisible()
     await expect(canvas.getByText('b'.repeat(128))).toBeVisible()
     const container = canvasElement.firstElementChild as HTMLElement
     await expect(container.scrollWidth).toBeLessThanOrEqual(container.clientWidth)
+  },
+}
+
+export const FilesFailed: Story = {
+  args: {
+    overview: {
+      ...overviewFixture,
+      storage: {
+        ...overviewFixture.storage,
+        state: 'failed',
+        failure: 'access_denied',
+        stage: 'write',
+      },
+    },
+  },
+}
+export const FilesStale: Story = {
+  args: {
+    overview: { ...overviewFixture, storage: { ...overviewFixture.storage, state: 'stale' } },
+  },
+}
+export const FilesUnknown: Story = {
+  args: {
+    overview: {
+      ...overviewFixture,
+      storage: { ...overviewFixture.storage, state: 'unknown', checkedAt: null },
+    },
+  },
+}
+
+export const S3RequestCost: Story = {
+  args: { overview: { ...overviewFixture, storage: { ...overviewFixture.storage, driver: 's3' } } },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText('S3 checks consume billable requests')
+    ).toBeVisible()
+  },
+}
+export const StorageCheckInProgress: Story = {
+  args: {
+    overview: {
+      ...overviewFixture,
+      storage: { ...overviewFixture.storage, inProgress: true, nextScheduledAt: null },
+    },
   },
 }

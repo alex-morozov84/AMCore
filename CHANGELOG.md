@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Console Overview API/web identity, per-process pool and memory snapshots, root
-  filesystem pressure, independent observation times and explicit unknown/unavailable
-  states, with optional API environment and deployment labels.
+- Console Overview with automatic API/web build identity, clear per-instance DB,
+  JavaScript memory and disk facts, one snapshot completion time and help.
+- Independent periodic local/S3-compatible file write/read/delete monitoring,
+  stale/failure states and a tested persistent-failure alert with runbook.
+- Production local storage with a shared persistent API/worker volume and
+  visibility-gated public-copy downloads; corrected unsafe static-serving guidance.
 
 - Product organization cards and a read-only selected overview at
   `/[locale]/organizations`, with ordered session/access revalidation, localized
@@ -29,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   progress for repeated resets of the current unfiltered page.
 
 ### Changed
+
+- Operations Console file storage shows last/next check times, explains S3 request costs and build diagnostics.
 
 - Upgrade API health checks to Terminus 12.1.0, preserving expected-down and
   shutdown responses and exposing fulfilled degraded readiness in Console Overview.

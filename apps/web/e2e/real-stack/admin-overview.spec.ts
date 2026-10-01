@@ -33,15 +33,13 @@ test('path-mode Overview panel renders real readiness, version and process role 
   await expect(page.getByText('API instance not ready')).not.toBeVisible()
   await expect(page.getByText('Database', { exact: true })).toBeVisible()
   await expect(page.getByText('Cache (Redis)')).toBeVisible()
+  await expect(page.getByText('API is ready', { exact: true })).toBeVisible()
+  await expect(page.getByText('Working', { exact: true })).toBeVisible()
+  await page.getByText('Build details', { exact: true }).click()
   await expect(page.getByText('API version')).toBeVisible()
-  await expect(page.getByText('Process role')).toBeVisible()
+  await expect(page.getByText('Process role')).not.toBeVisible()
 
-  for (const name of [
-    'Web artifact',
-    'Local database pool',
-    'API process memory',
-    'API root filesystem',
-  ]) {
+  for (const name of ['Web build', 'Database connections', 'JavaScript memory', 'API disk space']) {
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
   }
   const observed = page.locator('header time').last()
@@ -53,9 +51,7 @@ test('path-mode Overview panel renders real readiness, version and process role 
   await expect(observed).not.toHaveAttribute('datetime', before!)
   await expect(refresh).toBeEnabled()
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect(
-    page.getByRole('heading', { name: 'API root filesystem', exact: true })
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'API disk space', exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   )

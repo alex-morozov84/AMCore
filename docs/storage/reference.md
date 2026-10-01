@@ -104,6 +104,7 @@ stricter key guard on read/write operations.
 ## URLs
 
 ```ts
+// The avatar was uploaded with visibility: 'public-read'.
 const publicUrl = storage.getPublicUrl('avatars/user-123')
 const signed = await storage.getSignedDownloadUrl({
   key: 'private/report.pdf',
@@ -127,8 +128,12 @@ Capability support:
 If a driver does not support a capability, `StorageService` throws
 `501 STORAGE_CAPABILITY_UNSUPPORTED`.
 
-`getPublicUrl()` is only a real unauthenticated public/static/CDN URL. It must
-not point at a guarded app download route.
+`getPublicUrl()` constructs a URL without checking object visibility. Use it
+only after deliberately making the object public; never expose a private key
+through this method. For local storage it points to the unauthenticated API
+endpoint, which checks visibility and serves a separate public copy. For S3,
+actual public delivery depends on object ACL and bucket/CDN policy. It must not
+point at a guarded app download route.
 
 ## Copy And Move
 

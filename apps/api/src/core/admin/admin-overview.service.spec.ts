@@ -38,6 +38,19 @@ describe('AdminOverviewService', () => {
             filesystem: { status: 'unavailable', sampledAt: null },
           },
         }),
+      } as any,
+      {
+        snapshot: () => ({
+          state: 'unknown',
+          driver: 'memory',
+          checkedAt: null,
+          nextScheduledAt: null,
+          inProgress: false,
+          failure: null,
+          stage: null,
+          intervalSeconds: 60,
+          staleAfterSeconds: 180,
+        }),
       } as any
     )
   })
@@ -171,6 +184,19 @@ describe('AdminOverviewService', () => {
       env as any,
       {
         sample: async () => independent,
+      } as any,
+      {
+        snapshot: () => ({
+          state: 'unknown',
+          driver: 'memory',
+          checkedAt: null,
+          nextScheduledAt: null,
+          inProgress: false,
+          failure: null,
+          stage: null,
+          intervalSeconds: 60,
+          staleAfterSeconds: 180,
+        }),
       } as any
     )
     const result = await subject.getOverview()

@@ -16,7 +16,8 @@ import { EnvService } from '@/env/env.service'
  * genuine failure — bad credentials, unreachable endpoint, broken FS — throws
  * and reports `down`. The probe key is configurable so object-scoped S3
  * credentials can point it inside their allowed prefix (avoids a false 403);
- * `exists` (HEAD on a key) also sidesteps the `HeadBucket` 403 caveat.
+ * Missing-key HEAD may still return 403 without ListBucket; that access
+ * ambiguity must not be described as a definitive provider outage.
  */
 @Injectable()
 export class StorageHealthIndicator {

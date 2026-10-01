@@ -46,36 +46,39 @@ export function OverviewDetails({ overview, t }: OverviewDetailsProps) {
           {t('overviewDependenciesLabel')}
         </h2>
         <ul className="mt-2 flex flex-col gap-1">
-          {ADMIN_OVERVIEW_DEPENDENCY_NAMES.map((name) =>
-            name === 'storage' && !overview.storageHealthEnabled
-              ? { name, status: 'unknown' as const }
-              : (overview.dependencies.find((entry) => entry.name === name) ?? {
+          {ADMIN_OVERVIEW_DEPENDENCY_NAMES.filter(
+            (name) => name !== 'storage' || overview.storageHealthEnabled
+          )
+            .map(
+              (name) =>
+                overview.dependencies.find((entry) => entry.name === name) ?? {
                   name,
                   status: 'unknown' as const,
-                })
-          ).map((dependency) => (
-            <li
-              key={dependency.name}
-              className="flex items-center justify-between gap-4 border-line-soft border-b py-1 text-sm last:border-0"
-            >
-              <span>{t(DEPENDENCY_LABEL_KEY[dependency.name])}</span>
-              <span
-                className={cn(
-                  MONO,
-                  'flex items-center gap-1.5',
-                  DEPENDENCY_TEXT_STYLE[dependency.status]
-                )}
+                }
+            )
+            .map((dependency) => (
+              <li
+                key={dependency.name}
+                className="flex items-center justify-between gap-4 border-line-soft border-b py-1 text-sm last:border-0"
               >
+                <span>{t(DEPENDENCY_LABEL_KEY[dependency.name])}</span>
                 <span
-                  aria-hidden="true"
-                  className={cn('size-2 rounded-full', DEPENDENCY_DOT_STYLE[dependency.status])}
-                />
-                {dependency.name === 'storage' && !overview.storageHealthEnabled
-                  ? t('overviewStorageNotConfigured')
-                  : t(DEPENDENCY_STATUS_KEY[dependency.status])}
-              </span>
-            </li>
-          ))}
+                  className={cn(
+                    MONO,
+                    'flex items-center gap-1.5',
+                    DEPENDENCY_TEXT_STYLE[dependency.status]
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn('size-2 rounded-full', DEPENDENCY_DOT_STYLE[dependency.status])}
+                  />
+                  {dependency.name === 'storage' && !overview.storageHealthEnabled
+                    ? t('overviewStorageNotConfigured')
+                    : t(DEPENDENCY_STATUS_KEY[dependency.status])}
+                </span>
+              </li>
+            ))}
         </ul>
       </div>
     </div>

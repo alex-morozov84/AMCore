@@ -458,3 +458,15 @@ groups:
       # open a stream on every page. Alerting on a bare drop to zero
       # presumes a traffic shape this starter cannot ship and would teach
       # operators to ignore the alert channel — deliberately absent here.
+
+  - name: amcore-storage
+    rules:
+      - alert: AMCoreStorageProbeFailed
+        expr: max without (state) (amcore_storage_probe_state{state=~"failed|stale|unknown"}) == 1
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'AMCore file storage diagnostic unhealthy'
+          description: 'A failed, unmeasured or stale cached file-check result has remained visible for 5m. This does not prove continuous failed I/O. API readiness may remain healthy; investigate this instance.'
+          runbook_path: docs/operations/runbooks/storage.md#file-diagnostic

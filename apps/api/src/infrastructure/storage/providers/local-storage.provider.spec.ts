@@ -74,15 +74,14 @@ describe('LocalStorageProvider', () => {
 
   describe('public URLs', () => {
     it('reports publicUrls=true and builds a clean url when a base is configured', () => {
-      // The base is expected to be a static mount of `<root>/objects`, so the
-      // URL is `${base}/${key}` with no internal `objects/`/`meta/` segment.
+      // The public endpoint receives a safely encoded object-key query.
       const provider = new LocalStorageProvider({
         root: makeRoot(),
         publicBaseUrl: 'https://cdn.example.com/assets/',
       })
       expect(provider.capabilities.publicUrls).toBe(true)
       expect(provider.getPublicUrl('avatars/u1.webp')).toBe(
-        'https://cdn.example.com/assets/avatars/u1.webp'
+        'https://cdn.example.com/assets?key=avatars%2Fu1.webp'
       )
     })
 

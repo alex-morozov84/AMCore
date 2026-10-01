@@ -34,6 +34,9 @@ export function normalizeObjectKey(input: string): string {
   }
 
   const trimmed = input.trim()
+  if (trimmed.split('/').includes('.amcore-probes')) {
+    throw new InvalidObjectKeyError('reserved diagnostic namespace')
+  }
 
   if (trimmed.length === 0) {
     throw new InvalidObjectKeyError('key must not be empty or whitespace-only')

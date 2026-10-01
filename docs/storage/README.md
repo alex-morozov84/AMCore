@@ -6,15 +6,15 @@ is selected by `STORAGE_DRIVER`.
 
 ## What Is Included
 
-| Area       | Built-in behavior                                                                         |
-| ---------- | ----------------------------------------------------------------------------------------- |
-| Drivers    | S3-compatible production driver, local filesystem dev driver, in-memory test driver       |
-| Safety     | Private-by-default uploads, object-key traversal guard, no guaranteed upload URL          |
-| Validation | Server-side magic-byte validation with image/document presets                             |
-| URLs       | Public URLs only for `public-read` objects; signed URLs only on drivers that support them |
-| Downloads  | Reusable app-mediated download primitive for authorized consumers                         |
-| Health     | Opt-in readiness probe for storage-dependent deployments                                  |
-| Avatar     | `POST/DELETE /auth/me/avatar` as the public-read example consumer                         |
+| Area       | Built-in behavior                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| Drivers    | S3-compatible production driver, local filesystem production/development driver, in-memory test driver |
+| Safety     | Private-by-default uploads, object-key traversal guard, no guaranteed upload URL                       |
+| Validation | Server-side magic-byte validation with image/document presets                                          |
+| URLs       | URL generation for public objects; signed URLs only on drivers that support them                        |
+| Downloads  | Reusable app-mediated download primitive for authorized consumers                                      |
+| Health     | Independent active file checks; separately opt-in readiness                                            |
+| Avatar     | `POST/DELETE /auth/me/avatar` as the public-read example consumer                                      |
 
 ## Mental Model
 
@@ -22,7 +22,7 @@ is selected by `STORAGE_DRIVER`.
 Application code
   -> StorageService
       -> MemoryStorageProvider  (tests)
-      -> LocalStorageProvider   (development)
+      -> LocalStorageProvider   (production / development)
       -> S3StorageProvider      (production / S3-compatible)
 ```
 
@@ -35,6 +35,12 @@ Callers choose the access path explicitly:
 - `StorageDownloadService` for authenticated app-mediated streaming after the
   caller has performed authorization.
 
+`getPublicUrl(key)` builds an address; it does not check the object's visibility.
+Call it only for deliberately public objects. The local public endpoint checks
+visibility before serving bytes; S3 public access depends on the bucket/CDN
+policy and the object's ACL. Never return a generated public URL for a private
+object.
+
 ## Quick Start
 
 Development defaults to local storage:
@@ -42,11 +48,15 @@ Development defaults to local storage:
 ```env
 STORAGE_DRIVER=local
 STORAGE_LOCAL_ROOT=./uploads
-STORAGE_LOCAL_PUBLIC_BASE_URL=http://localhost:3001/static
+STORAGE_LOCAL_PUBLIC_BASE_URL=http://localhost:5002/api/v1/storage/public
 ```
 
-Production defaults to S3. An unconfigured production boot fails fast instead of
-silently writing to local disk:
+Local storage is also supported in production with an explicit `STORAGE_DRIVER=local`
+and a persistent shared volume; see [Configuration](configuration.md#local-production).
+
+Outside Docker Compose, production defaults to S3 when no driver is selected and
+fails to boot without bucket credentials. Compose supplies `local` by default
+even in production, so choose the driver explicitly for a production rollout:
 
 ```env
 STORAGE_DRIVER=s3

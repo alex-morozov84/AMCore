@@ -5,9 +5,11 @@
 #                                `migrate` service runs `migrate deploy` once,
 #                                then api + web boot. Works out of the box.
 #
-# Remote DB / Redis / S3 (managed or VPS):
-#   set COMPOSE_PROFILES= (empty) and COMPOSE_DATABASE_URL / COMPOSE_REDIS_URL /
-#   STORAGE_DRIVER=s3 (+ creds) in .env → bundled Postgres/Redis are NOT started;
+# Remote DB / Redis (managed or VPS):
+#   set COMPOSE_PROFILES= (empty) and COMPOSE_DATABASE_URL / COMPOSE_REDIS_URL
+#   in .env → bundled Postgres/Redis are NOT started. File storage is separate:
+#   choose STORAGE_DRIVER=s3 (+ creds) or explicitly keep local with the shared
+#   persistent local_storage volume and a public API URL.
 #   `required:false` makes the optional dependency skip. (The host DATABASE_URL /
 #   REDIS_URL are for `pnpm dev` and do not affect this stack.)
 #
@@ -87,6 +89,16 @@ x-app-env: &app-env
   STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app/uploads}
   STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
   STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-}
+  STORAGE_MAX_FILE_SIZE: ${STORAGE_MAX_FILE_SIZE:-52428800}
+  STORAGE_SIGNED_URL_DEFAULT_TTL: ${STORAGE_SIGNED_URL_DEFAULT_TTL:-3600}
+  STORAGE_SIGNED_URL_MAX_TTL: ${STORAGE_SIGNED_URL_MAX_TTL:-604800}
+  STORAGE_FORCE_PATH_STYLE: ${STORAGE_FORCE_PATH_STYLE:-false}
+  STORAGE_LOCAL_PUBLIC_BASE_URL: ${STORAGE_LOCAL_PUBLIC_BASE_URL:-}
+  STORAGE_HEALTH_ENABLED: ${STORAGE_HEALTH_ENABLED:-false}
+  STORAGE_HEALTH_PROBE_KEY: ${STORAGE_HEALTH_PROBE_KEY:-__storage_health_check__}
+  STORAGE_PROBE_INTERVAL_SECONDS: ${STORAGE_PROBE_INTERVAL_SECONDS:-600}
+  STORAGE_PROBE_TIMEOUT_SECONDS: ${STORAGE_PROBE_TIMEOUT_SECONDS:-10}
+  STORAGE_PROBE_PREFIX: ${STORAGE_PROBE_PREFIX:-__amcore_probes__}
   STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
   STORAGE_BUCKET: ${STORAGE_BUCKET:-}
   STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-}
@@ -233,6 +245,7 @@ services:
       # GeoIP database (read-only here; the worker's own updater is the sole
       # writer). Shared across replicas on this single-host Compose topology
       # only — see docs/operations/geoip-setup.md.
+      - local_storage:/app/uploads
       - geoip_data:/data/geoip:ro
     depends_on:
       migrate:
@@ -256,6 +269,7 @@ services:
       PROCESS_ROLE: worker
     volumes:
       # Sole GeoIP updater writer — see docs/operations/geoip-setup.md.
+      - local_storage:/app/uploads
       - geoip_data:/data/geoip
     depends_on:
       migrate:
@@ -517,6 +531,7 @@ secrets:
 volumes:
   postgres_data_pg18:
   redis_data:
+  local_storage:
   geoip_data:
   caddy_data:
   caddy_config:

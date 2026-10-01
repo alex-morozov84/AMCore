@@ -1,4 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing'
+import { LoggerModule } from 'nestjs-pino'
 
 import { LocalStorageProvider } from './providers/local-storage.provider'
 import { MemoryStorageProvider } from './providers/memory-storage.provider'
@@ -23,7 +24,7 @@ const ENV_VALUES: Record<string, unknown> = {
 }
 
 function compileWith(driver: string): Promise<TestingModule> {
-  return Test.createTestingModule({ imports: [StorageModule.forRoot()] })
+  return Test.createTestingModule({ imports: [LoggerModule.forRoot({ pinoHttp: { enabled: false } }), StorageModule.forRoot()] })
     .overrideProvider(EnvService)
     .useValue({ get: (key: string) => (key === 'STORAGE_DRIVER' ? driver : ENV_VALUES[key]) })
     .compile()

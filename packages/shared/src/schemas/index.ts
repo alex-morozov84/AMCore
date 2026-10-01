@@ -409,6 +409,8 @@ export {
   adminOverviewResourcesSchema,
   type AdminOverviewResponse,
   adminOverviewResponseSchema,
+  type AdminOverviewStorage,
+  adminOverviewStorageSchema,
 } from './admin-overview'
 export {
   type AcceptInviteInput,

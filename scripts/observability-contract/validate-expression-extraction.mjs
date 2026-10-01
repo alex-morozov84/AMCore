@@ -15,6 +15,7 @@ const RULE_FILES = [
 ]
 const DASHBOARD_PATH = 'docker/monitoring/grafana/dashboards/amcore-overview.json'
 const RUNBOOK_PATHS = [
+  'docs/operations/runbooks/storage.md',
   'docs/operations/runbooks/http.md',
   'docs/operations/runbooks/db.md',
   'docs/operations/runbooks/redis.md',

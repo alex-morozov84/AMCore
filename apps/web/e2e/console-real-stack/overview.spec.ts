@@ -51,15 +51,13 @@ test('host-mode Overview panel renders real readiness, version and process role,
   await expect(consolePage.getByText('API instance not ready')).not.toBeVisible()
   await expect(consolePage.getByText('Database', { exact: true })).toBeVisible()
   await expect(consolePage.getByText('Cache (Redis)')).toBeVisible()
+  await expect(consolePage.getByText('API is ready', { exact: true })).toBeVisible()
+  await expect(consolePage.getByText('Working', { exact: true })).toBeVisible()
+  await consolePage.getByText('Build details', { exact: true }).click()
   await expect(consolePage.getByText('API version')).toBeVisible()
-  await expect(consolePage.getByText('Process role')).toBeVisible()
+  await expect(consolePage.getByText('Process role')).not.toBeVisible()
 
-  for (const name of [
-    'Web artifact',
-    'Local database pool',
-    'API process memory',
-    'API root filesystem',
-  ]) {
+  for (const name of ['Web build', 'Database connections', 'JavaScript memory', 'API disk space']) {
     await expect(consolePage.getByRole('heading', { name, exact: true })).toBeVisible()
   }
   const observed = consolePage.locator('header time').last()

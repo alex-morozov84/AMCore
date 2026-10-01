@@ -38,6 +38,13 @@ const consoleMessages = {
   overviewMemoryTitle: 'API process memory',
   overviewDiskTitle: 'API root filesystem',
   overviewMiB: '{value} MiB',
+  overviewBytes: '{value} {unit}',
+  overviewUnitMB: 'MB',
+  overviewUnitGB: 'GB',
+  overviewUnitTB: 'TB',
+  overviewFilesHealthy: 'Working',
+  overviewFilesCostTitle: 'S3 checks consume billable requests',
+  overviewFilesWaiting: 'Waiting for the current check to finish',
   overviewAbove: 'Above {value}',
   overviewSeconds: '{value} s',
   overviewMeasurementUnavailable: 'Measurement unavailable',
@@ -177,7 +184,35 @@ describe('OverviewPage', () => {
     })
     renderPage(await OverviewPage())
     expect(screen.getByText('Measurement unavailable')).toBeInTheDocument()
-    expect(screen.getByText('128 MiB')).toBeInTheDocument()
-    expect(screen.getByText('Probe not configured')).toBeInTheDocument()
+    expect(screen.getByText('134.2 MB')).toBeInTheDocument()
+    expect(screen.getByText('Working')).toBeInTheDocument()
+    expect(screen.queryByText('Probe not configured')).not.toBeInTheDocument()
+  })
+  it('shows server schedule and warns about S3 costs only for S3', async () => {
+    vi.mocked(fetchConsoleOverview).mockResolvedValue({
+      status: 'success',
+      data: { ...overviewFixture, storage: { ...overviewFixture.storage, driver: 's3' } },
+    })
+    const { container, unmount } = renderPage(await OverviewPage())
+    expect(screen.getByText('S3 checks consume billable requests')).toBeInTheDocument()
+    expect(
+      container.querySelector(`time[datetime="${overviewFixture.storage.nextScheduledAt}"]`)
+    ).toBeInTheDocument()
+    unmount()
+    vi.mocked(fetchConsoleOverview).mockResolvedValue({
+      status: 'success',
+      data: {
+        ...overviewFixture,
+        storage: {
+          ...overviewFixture.storage,
+          driver: 'local',
+          inProgress: true,
+          nextScheduledAt: null,
+        },
+      },
+    })
+    renderPage(await OverviewPage())
+    expect(screen.queryByText('S3 checks consume billable requests')).not.toBeInTheDocument()
+    expect(screen.getByText(/Waiting for the current check to finish/)).toBeInTheDocument()
   })
 })

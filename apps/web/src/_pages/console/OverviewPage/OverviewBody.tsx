@@ -6,6 +6,7 @@ import type { OverviewFormatter, OverviewTranslations } from './overview-types'
 import { OverviewDetails } from './OverviewDetails'
 import { OverviewIdentity, OverviewWebIdentity } from './OverviewIdentity'
 import { OverviewResources } from './OverviewResources'
+import { OverviewStorage } from './OverviewStorage'
 
 export function OverviewBody({
   overview,
@@ -20,12 +21,15 @@ export function OverviewBody({
 }) {
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <OverviewIdentity overview={overview} t={t} format={format} />
-        <OverviewWebIdentity artifactId={artifactId} t={t} />
-      </div>
+      {overview.readiness === 'ready' && (
+        <Alert>
+          <AlertTitle>{t('overviewReadyTitle')}</AlertTitle>
+          <AlertDescription>{t('overviewReadyHelp')}</AlertDescription>
+        </Alert>
+      )}
       <p className="text-sm text-muted-foreground">{t('overviewIndependentSamplesHelp')}</p>
       <OverviewResources overview={overview} t={t} format={format} />
+      <OverviewStorage overview={overview} t={t} format={format} />
       {overview.readiness !== 'ready' && (
         <Alert variant={overview.readiness === 'not_ready' ? 'destructive' : 'default'}>
           <AlertTitle>
@@ -43,6 +47,13 @@ export function OverviewBody({
         </Alert>
       )}
       <OverviewDetails overview={overview} t={t} />
+      <details className="rounded-lg border bg-surface-elevated p-6 shadow-md">
+        <summary className="cursor-pointer font-semibold">{t('overviewTechnicalDetails')}</summary>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <OverviewIdentity overview={overview} t={t} format={format} />
+          <OverviewWebIdentity artifactId={artifactId} t={t} />
+        </div>
+      </details>
     </>
   )
 }

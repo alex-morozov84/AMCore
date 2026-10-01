@@ -77,6 +77,19 @@ const deploymentLabel = z
   .regex(/^[A-Za-z0-9._-]+$/)
   .nullable()
 
+export const adminOverviewStorageSchema = z.object({
+  state: z.enum(['healthy', 'failed', 'unknown', 'stale']),
+  driver: z.enum(['local', 's3', 'memory']),
+  checkedAt: sampledAt.nullable(),
+  nextScheduledAt: sampledAt.nullable(),
+  inProgress: z.boolean(),
+  failure: z.enum(['access_denied', 'timeout', 'content_mismatch', 'io_error']).nullable(),
+  stage: z.enum(['write', 'read', 'delete']).nullable(),
+  intervalSeconds: z.number().int().positive(),
+  staleAfterSeconds: z.number().int().positive(),
+})
+export type AdminOverviewStorage = z.infer<typeof adminOverviewStorageSchema>
+
 /** A successful observation is 200 even if not ready; request errors are separate.
  * Numeric samples are independent of the readiness indicator's actual samples.
  */
@@ -90,6 +103,9 @@ export const adminOverviewResponseSchema = z.object({
     .regex(/^[A-Za-z0-9._+-]+$/),
   processRole: z.enum(['web', 'worker', 'all']),
   checkedAt: sampledAt,
+  completedAt: sampledAt,
+  build: z.object({ id: declaredMetadata, version: declaredMetadata, commit: declaredMetadata }),
+  storage: adminOverviewStorageSchema,
   storageHealthEnabled: z.boolean(),
   api: z.object({
     version: declaredMetadata,

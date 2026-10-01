@@ -13,6 +13,8 @@ import { AdminOverviewResourcesService } from './admin-overview-resources.servic
 
 import { EnvService } from '@/env/env.service'
 import { ReadinessCheckService } from '@/health'
+import { readBuildIdentity } from '@/infrastructure/build-identity'
+import { StorageProbeService } from '@/infrastructure/storage'
 
 /**
  * Console Overview status.
@@ -29,7 +31,8 @@ export class AdminOverviewService {
   constructor(
     private readonly readiness: ReadinessCheckService,
     private readonly env: EnvService,
-    private readonly resources: AdminOverviewResourcesService
+    private readonly resources: AdminOverviewResourcesService,
+    private readonly storageProbe: StorageProbeService
   ) {}
 
   async getOverview(): Promise<AdminOverviewResponse> {
@@ -46,6 +49,9 @@ export class AdminOverviewService {
       ...observation,
       ...samples,
       api,
+      build: readBuildIdentity(),
+      storage: this.storageProbe.snapshot(),
+      completedAt: new Date().toISOString(),
       version: api.version ?? 'unknown',
       processRole: this.env.get('PROCESS_ROLE'),
       storageHealthEnabled: this.env.get('STORAGE_HEALTH_ENABLED'),

@@ -85,6 +85,7 @@ const EXPECTED: Record<string, Expected> = {
   'get /admin/organizations': { status: '200', kind: 'json' },
   'get /admin/organizations/{id}': { status: '200', kind: 'json' },
   'get /admin/overview': { status: '200', kind: 'json' },
+  'get /storage/public': { status: '200', kind: 'binary' },
   // api-keys
   'post /api-keys': { status: '201', kind: 'json' },
   'get /api-keys': { status: '200', kind: 'json' },
@@ -418,11 +419,19 @@ describe('OpenAPI success surface (e2e)', () => {
         'version',
         'processRole',
         'checkedAt',
+        'completedAt',
+        'build',
+        'storage',
         'storageHealthEnabled',
         'api',
         'process',
         'resources',
       ]),
+      properties: {
+        storage: {
+          required: expect.arrayContaining(['state', 'checkedAt', 'nextScheduledAt', 'inProgress']),
+        },
+      },
     })
   })
 

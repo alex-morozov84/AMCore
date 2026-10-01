@@ -32,11 +32,8 @@ export async function OverviewPage() {
           <p className="mt-1 text-sm text-muted-foreground">{t('overviewSubtitle')}</p>
           {outcome.status === 'available' && (
             <p className="mt-3 text-sm text-muted-foreground">
-              {t('overviewEnvironmentLabel')}:{' '}
-              {outcome.data.api.environment ?? t('overviewVersionUnknown')}
-              {' / '}
               {t('overviewCheckedAt')}:{' '}
-              <ConsoleTimestamp value={outcome.data.checkedAt} variant="inline" seconds />
+              <ConsoleTimestamp value={outcome.data.completedAt} variant="inline" seconds />
             </p>
           )}
         </div>

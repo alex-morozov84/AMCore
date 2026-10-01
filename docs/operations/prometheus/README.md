@@ -22,6 +22,8 @@ change to load.
   for the one-line change that enables it. Tested the same way, in
   `optional/tests/amcore-slo-burn-rate_test.yml`.
 
-Runbooks these alerts link to (`runbook_path`, a repo-relative path, not an
-absolute URL) land in a later pass — until then the linked
-`docs/operations/runbooks/*.md` files do not exist yet.
+Alert annotations link to shipped runbooks through `runbook_path`, a
+repo-relative path rather than an absolute URL. The
+[file storage runbook](../runbooks/storage.md) explains cached probe states,
+permissions, detection delay and recovery. Configure a downstream notification
+receiver separately; shipping an alert rule does not deliver notifications.

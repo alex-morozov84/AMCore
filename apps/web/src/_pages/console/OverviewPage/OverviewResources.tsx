@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { AdminOverviewResponse } from '@amcore/shared'
 
-import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
+import { InfoTooltip } from '@/shared/ui/info-tooltip'
 
 import type { OverviewFormatter, OverviewTranslations } from './overview-types'
 
@@ -16,8 +16,16 @@ export function OverviewResources({
 }) {
   const { pool, memory, filesystem } = overview.resources
   const n = (value: number) => format.number(value)
-  const bytes = (value: number) =>
-    t('overviewMiB', { value: format.number(value / 1024 ** 2, { maximumFractionDigits: 1 }) })
+  const bytes = (value: number) => {
+    const unit = value >= 1e12 ? 'TB' : value >= 1e9 ? 'GB' : 'MB'
+    const scale = unit === 'TB' ? 1e12 : unit === 'GB' ? 1e9 : 1e6
+    return t('overviewBytes', {
+      value: format.number(value / scale, { maximumFractionDigits: 1 }),
+      unit: t(
+        unit === 'TB' ? 'overviewUnitTB' : unit === 'GB' ? 'overviewUnitGB' : 'overviewUnitMB'
+      ),
+    })
+  }
   const percent = (value: number) =>
     format.number(value, { style: 'percent', maximumFractionDigits: 1 })
   return (
@@ -25,6 +33,7 @@ export function OverviewResources({
       <ResourceCard
         title={t('overviewPoolTitle')}
         scope={t('overviewPoolScope')}
+        help={t('overviewPoolHelp')}
         sample={pool}
         t={t}
       >
@@ -44,6 +53,7 @@ export function OverviewResources({
       <ResourceCard
         title={t('overviewMemoryTitle')}
         scope={t('overviewMemoryScope')}
+        help={t('overviewMemoryHelp')}
         sample={memory}
         t={t}
       >
@@ -54,13 +64,13 @@ export function OverviewResources({
               label={t('overviewHeapLimit')}
               value={t('overviewAbove', { value: bytes(memory.readinessHeapLimitBytes) })}
             />
-            <Fact label={t('overviewRss')} value={bytes(memory.rssBytes)} />
           </dl>
         )}
       </ResourceCard>
       <ResourceCard
         title={t('overviewDiskTitle')}
         scope={t('overviewDiskScope')}
+        help={t('overviewDiskHelp')}
         sample={filesystem}
         t={t}
       >
@@ -83,29 +93,28 @@ export function OverviewResources({
 function ResourceCard({
   title,
   scope,
+  help,
   sample,
   t,
   children,
 }: {
   title: string
   scope: string
+  help: string
   sample: { status: string; sampledAt: string | null }
   t: OverviewTranslations
   children: ReactNode
 }) {
   return (
     <section className="rounded-lg border bg-surface-elevated p-6 shadow-md" aria-label={title}>
-      <h2 className="text-lg font-semibold">{title}</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <InfoTooltip label={help} />
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">{scope}</p>
       <div className="mt-4">
         {sample.status === 'available' ? children : <p>{t('overviewMeasurementUnavailable')}</p>}
       </div>
-      {sample.sampledAt && (
-        <p className="mt-4 text-xs text-muted-foreground">
-          {t('overviewSampledAt')}{' '}
-          <ConsoleTimestamp value={sample.sampledAt} variant="inline" seconds />
-        </p>
-      )}
     </section>
   )
 }

@@ -35,7 +35,7 @@ import { ObservabilityModule } from './infrastructure/observability'
 import { QueueMetricsModule, QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
-import { StorageModule } from './infrastructure/storage'
+import { StorageModule, StoragePublicModule } from './infrastructure/storage'
 import { ThrottlingModule } from './infrastructure/throttling'
 import { WebhooksModule } from './infrastructure/webhooks'
 import { PrismaModule } from './prisma'
@@ -172,6 +172,7 @@ export function coreImports(): Imports {
 
 /** Business HTTP modules — `web` and `all` only. */
 export const webImports: Imports = [
+  StoragePublicModule,
   // Auth
   AuthModule,
   // Core: Organizations, Roles & Permissions

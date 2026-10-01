@@ -9,6 +9,8 @@ import { StorageHealthIndicator } from './storage.health'
 import type { StorageProvider } from './storage.interface'
 import { StorageService } from './storage.service'
 import { StorageDownloadService } from './storage-download.service'
+import { StorageProbeIo } from './storage-probe.io'
+import { StorageProbeService } from './storage-probe.service'
 
 import { EnvModule } from '@/env/env.module'
 import { EnvService } from '@/env/env.service'
@@ -42,8 +44,10 @@ export class StorageModule {
         StorageService,
         StorageDownloadService,
         StorageHealthIndicator,
+        StorageProbeIo,
+        StorageProbeService,
       ],
-      exports: [StorageService, StorageDownloadService, StorageHealthIndicator],
+      exports: [StorageService, StorageDownloadService, StorageHealthIndicator, StorageProbeService],
     }
   }
 }
