@@ -60,7 +60,7 @@ export const operationsConsoleDocSeams = [
   entry(
     'console.frontend-index-row',
     'docs/frontend/README.md',
-    { text: '[Operations Console](../operations-console/README.md)                   |' },
+    { text: '| [Operations Console](../operations-console/README.md)' },
     undefined,
     { operationKey: 'frontend-index-console' }
   ),

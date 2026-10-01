@@ -96,6 +96,15 @@ test('fails closed when an owned-block anchor is missing or duplicated', () => {
   assert.throws(() => definition.apply(`${source}\n${anchor}\n`), /expected exactly one anchor/)
 })
 
+test('removes only the Console row after product administration was added', () => {
+  const after = materialize('README.md', 'readme-console')
+  assert.match(after, /\| \*\*Product administration foundation\*\*\s+\|/)
+  assert.doesNotMatch(after, /\| \*\*Operations Console\*\*\s+\|/)
+  const frontend = materialize('docs/frontend/README.md', 'frontend-index-console')
+  assert.match(frontend, /\| \[Product administration foundation\]/)
+  assert.doesNotMatch(frontend, /\| \[Operations Console\]/)
+})
+
 test('fails closed instead of mixing structural and text adapters on one path', () => {
   const pathname = 'apps/web/src/instrumentation.ts'
   assert.throws(
@@ -119,7 +128,6 @@ test('fails closed instead of mixing structural and text adapters on one path', 
     /mixed structural\/text operations/
   )
 })
-
 
 test('disabled Console removes its product-admin link while keeping integration guidance', () => {
   const after = materialize('docs/product-admin/README.md', 'console.product-admin-intro')
