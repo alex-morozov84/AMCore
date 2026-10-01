@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -26,6 +27,29 @@ describe('LocalStorageProvider', () => {
   })
 
   describe('filesystem behavior', () => {
+    it('uses a stable SHA-256 ETag for new uploads and preserves stored legacy ETags', async () => {
+      const root = makeRoot()
+      const provider = new LocalStorageProvider({ root })
+      const body = Buffer.from('version one')
+      const upload = await provider.upload({ key: 'docs/file.txt', body })
+      expect(upload.etag).toBe(createHash('sha256').update(body).digest('hex'))
+      expect((await provider.getMetadata(upload.key)).etag).toBe(upload.etag)
+      const sidecar = path.join(root, 'meta', 'docs', 'file.txt.json')
+      const legacy = '00000000000000000000000000000000'
+      await writeFile(sidecar, JSON.stringify({ visibility: 'private', etag: legacy }))
+      expect((await provider.getMetadata(upload.key)).etag).toBe(legacy)
+      await provider.copy({ source: upload.key, destination: 'docs/copy.txt' })
+      expect((await provider.getMetadata('docs/copy.txt')).etag).toBe(legacy)
+    })
+
+    it.each(['../outside.txt', '/outside.txt', 'docs/../../outside.txt'])(
+      'rejects traversal before metadata reads: %s',
+      async (key) => {
+        const provider = new LocalStorageProvider({ root: makeRoot() })
+        await expect(provider.getMetadata(key)).rejects.toThrow('Invalid object key')
+      }
+    )
+
     it('creates nested directories on upload', async () => {
       const provider = new LocalStorageProvider({ root: makeRoot() })
       await provider.upload({ key: 'deep/nested/dir/file.bin', body: Buffer.from('data') })

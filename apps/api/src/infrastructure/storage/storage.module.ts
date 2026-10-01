@@ -47,7 +47,12 @@ export class StorageModule {
         StorageProbeIo,
         StorageProbeService,
       ],
-      exports: [StorageService, StorageDownloadService, StorageHealthIndicator, StorageProbeService],
+      exports: [
+        StorageService,
+        StorageDownloadService,
+        StorageHealthIndicator,
+        StorageProbeService,
+      ],
     }
   }
 }

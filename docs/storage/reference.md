@@ -43,6 +43,10 @@ Result:
 
 `UploadResult` deliberately has no guaranteed URL.
 
+Treat `etag` as a provider-specific opaque object version. New local uploads
+use a SHA-256 content digest; existing stored ETags remain valid when reading
+or copying older objects. S3-compatible providers supply their own ETags.
+
 ## Read
 
 ```ts

@@ -11,7 +11,7 @@ is selected by `STORAGE_DRIVER`.
 | Drivers    | S3-compatible production driver, local filesystem production/development driver, in-memory test driver |
 | Safety     | Private-by-default uploads, object-key traversal guard, no guaranteed upload URL                       |
 | Validation | Server-side magic-byte validation with image/document presets                                          |
-| URLs       | URL generation for public objects; signed URLs only on drivers that support them                        |
+| URLs       | URL generation for public objects; signed URLs only on drivers that support them                       |
 | Downloads  | Reusable app-mediated download primitive for authorized consumers                                      |
 | Health     | Independent active file checks; separately opt-in readiness                                            |
 | Avatar     | `POST/DELETE /auth/me/avatar` as the public-read example consumer                                      |

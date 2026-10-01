@@ -6,7 +6,7 @@ import { Readable } from 'node:stream'
 
 import { Injectable } from '@nestjs/common'
 
-import { normalizeObjectKey } from '../object-key'
+import { InvalidObjectKeyError, normalizeObjectKey } from '../object-key'
 import { DEFAULT_VISIBILITY } from '../storage.constants'
 import {
   type CopyObjectInput,
@@ -65,7 +65,7 @@ export class LocalStorageProvider implements StorageProvider {
   async upload(input: UploadInput): Promise<UploadResult> {
     const key = normalizeObjectKey(input.key)
     const body = await bufferFromBody(input.body)
-    const etag = createHash('md5').update(body).digest('hex')
+    const etag = createHash('sha256').update(body).digest('hex')
     // Remove old public bytes before a private rewrite, never expose private bytes.
     await rm(this.publicPath(key), { force: true })
     await this.writeFileAt(this.objectPath(key), body)
@@ -251,9 +251,12 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   private async statFileOrThrow(fullPath: string, key: string): Promise<Stats> {
+    const root = path.resolve(this.config.root, OBJECTS_DIR) + path.sep
+    const resolved = path.resolve(fullPath)
+    if (!resolved.startsWith(root)) throw new InvalidObjectKeyError('path outside object storage')
     let stats: Stats
     try {
-      stats = await stat(fullPath)
+      stats = await stat(resolved)
     } catch (err) {
       throw this.toNotFound(err, key)
     }
@@ -263,8 +266,11 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   private async readSidecar(key: string): Promise<SidecarMeta | undefined> {
+    const fullPath = this.metaPath(key)
+    const root = path.resolve(this.config.root, META_DIR) + path.sep
+    if (!fullPath.startsWith(root)) throw new InvalidObjectKeyError('path outside metadata storage')
     try {
-      return JSON.parse(await readFile(this.metaPath(key), 'utf8')) as SidecarMeta
+      return JSON.parse(await readFile(fullPath, 'utf8')) as SidecarMeta
     } catch {
       return undefined
     }

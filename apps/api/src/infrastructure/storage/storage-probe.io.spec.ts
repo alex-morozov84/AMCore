@@ -45,11 +45,9 @@ describe('storage diagnostic driver I/O', () => {
     const mock = mockClient(S3Client)
     try {
       mock.on(PutObjectCommand).resolves({})
-      mock
-        .on(GetObjectCommand)
-        .callsFake(() => ({
-          Body: Readable.from([Buffer.from('AMCore isolated storage diagnostic\n')]),
-        }))
+      mock.on(GetObjectCommand).callsFake(() => ({
+        Body: Readable.from([Buffer.from('AMCore isolated storage diagnostic\n')]),
+      }))
       mock.on(DeleteObjectCommand).resolves({})
       const config = env({
         STORAGE_DRIVER: 's3',
@@ -64,7 +62,12 @@ describe('storage diagnostic driver I/O', () => {
         STORAGE_PROBE_TIMEOUT_SECONDS: 10,
       })
       const io = new StorageProbeIo(config)
-      const service = new StorageProbeService(config, io, {} as MetricsService, { warn: jest.fn() } as unknown as PinoLogger)
+      const service = new StorageProbeService(
+        config,
+        io,
+        {} as MetricsService,
+        { warn: jest.fn() } as unknown as PinoLogger
+      )
       await service.run()
       expect(service.snapshot().state).toBe('healthy')
       expect(mock.commandCalls(PutObjectCommand)).toHaveLength(1)

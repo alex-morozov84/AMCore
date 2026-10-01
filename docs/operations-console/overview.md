@@ -33,11 +33,11 @@ is displayed.
 
 ## Resources
 
-| Card                 | Why to look and what it means                                                                                                                                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Card                 | Why to look and what it means                                                                                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Database connections | Open/idle connections and waiting requests in this API's pool. A persistent queue can indicate saturation; waiting above the configured threshold makes the API not ready. This is not database-wide utilization or proof of connectivity. |
-| JavaScript memory    | Memory used by JavaScript in this API process. Persistent growth may indicate a leak; exceeding the heap threshold fails readiness. It excludes native/process/container/VPS memory.                                                  |
-| API disk space       | Capacity and available bytes on the filesystem containing `/` inside the API. Unavailable share includes reserved blocks. It can share backing storage with the VPS, but does not measure S3 or a separate uploads volume.            |
+| JavaScript memory    | Memory used by JavaScript in this API process. Persistent growth may indicate a leak; exceeding the heap threshold fails readiness. It excludes native/process/container/VPS memory.                                                       |
+| API disk space       | Capacity and available bytes on the filesystem containing `/` inside the API. Unavailable share includes reserved blocks. It can share backing storage with the VPS, but does not measure S3 or a separate uploads volume.                 |
 
 Bytes use decimal MB/GB/TB (1 MB = 1,000,000 bytes) with appropriate scale.
 Thresholds are configured comparisons, not capacity guarantees. Failed secondary

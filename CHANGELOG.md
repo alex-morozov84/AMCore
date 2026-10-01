@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Local storage uses SHA-256 ETags for new uploads and checks object/metadata
+  path containment immediately before filesystem reads, preserving existing ETags.
+
 - Console filter reset uses a shared navigation control and avoids starting route
   progress for repeated resets of the current unfiltered page.
 
