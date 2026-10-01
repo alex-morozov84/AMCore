@@ -52,4 +52,25 @@ describe('capability actor projection', () => {
     expect(registry.actor(rules, team)['organization.delete']).toBe('denied')
     expect(registry.actor(rules, team)['organization.update']).toBe('allowed')
   })
+
+  it('treats empty conditions as unconditional for allows and required-field DENYs', () => {
+    const allow = ability([
+      { action: Action.Read, subject: Subject.Organization, conditions: {} },
+      { action: Action.Delete, subject: Subject.Organization, conditions: {} },
+      { action: Action.Update, subject: Subject.Organization, fields: ['slug'], conditions: {} },
+    ])
+    expect(registry.actor(allow, team)['organization.delete']).toBe('allowed')
+    expect(registry.actor(allow, team)['organization.update']).toBe('allowed')
+    const denied = ability([
+      ...allow.rules,
+      {
+        action: Action.Delete,
+        subject: Subject.Organization,
+        fields: ['name'],
+        conditions: {},
+        inverted: true,
+      },
+    ])
+    expect(registry.actor(denied, team)['organization.delete']).toBe('denied')
+  })
 })

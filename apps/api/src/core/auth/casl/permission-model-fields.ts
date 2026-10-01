@@ -1,7 +1,8 @@
 import { Subject } from '@amcore/shared'
 
 export type ModelSubject = Subject.User | Subject.Organization | Subject.Role | Subject.Permission
-export type ScalarKind = 'string' | 'nullableString' | 'boolean' | 'number' | 'date'
+export type ScalarKind =
+  'string' | 'nullableString' | 'boolean' | 'integer' | 'date' | 'nullableDate'
 
 export const MODEL_FIELDS: Record<ModelSubject, Record<string, ScalarKind>> = {
   [Subject.User]: {
@@ -15,14 +16,14 @@ export const MODEL_FIELDS: Record<ModelSubject, Record<string, ScalarKind>> = {
     timezone: 'string',
     createdAt: 'date',
     updatedAt: 'date',
-    lastLoginAt: 'date',
+    lastLoginAt: 'nullableDate',
     systemRole: 'string',
   },
   [Subject.Organization]: {
     id: 'string',
     name: 'string',
     slug: 'string',
-    aclVersion: 'number',
+    aclVersion: 'integer',
     createdAt: 'date',
     updatedAt: 'date',
   },

@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import { ModulesContainer } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
+import Redis from 'ioredis'
 import request from 'supertest'
 
 import { ORGANIZATION_CONTEXT_FAMILY, SystemRole } from '@amcore/shared'
@@ -835,7 +836,15 @@ describe('Organizations (e2e)', () => {
         version: (await prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion,
       }
       const invalidate = jest.spyOn(app.get(OrganizationsService), 'invalidateAclVersion')
+      const redis = new Redis(context.redisContainer.getConnectionUrl())
       try {
+        await request(app.getHttpServer())
+          .get(`/organizations/${orgId}/roles`)
+          .set('Authorization', `Bearer ${orgToken}`)
+          .expect(200)
+        const authorityKeys = await redis.keys('auth:perm:*')
+        expect(authorityKeys.length).toBeGreaterThan(0)
+        const authorityBefore = await redis.mget(...authorityKeys)
         const rejected = [
           [
             { action: 'read', subject: 'Role', conditions: { name: { bad: 'x' } } },
@@ -855,6 +864,22 @@ describe('Organizations (e2e)', () => {
           ],
           [
             { action: 'read', subject: 'Organization', conditions: { updatedAt: { gt: 1.5 } } },
+            'PERMISSION_RULE_UNSUPPORTED',
+          ],
+          [
+            { action: 'read', subject: 'Organization', conditions: { aclVersion: 1.5 } },
+            'PERMISSION_RULE_UNSUPPORTED',
+          ],
+          [
+            { action: 'read', subject: 'Organization', conditions: { aclVersion: -1 } },
+            'PERMISSION_RULE_UNSUPPORTED',
+          ],
+          [
+            { action: 'read', subject: 'Organization', conditions: { aclVersion: 2_147_483_648 } },
+            'PERMISSION_RULE_UNSUPPORTED',
+          ],
+          [
+            { action: 'read', subject: 'User', conditions: { lastLoginAt: { gt: null } } },
             'PERMISSION_RULE_UNSUPPORTED',
           ],
           [
@@ -884,8 +909,11 @@ describe('Organizations (e2e)', () => {
           (await prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion
         ).toBe(before.version)
         expect(invalidate).not.toHaveBeenCalled()
+        expect(await redis.keys('auth:perm:*')).toEqual(authorityKeys)
+        expect(await redis.mget(...authorityKeys)).toEqual(authorityBefore)
       } finally {
         invalidate.mockRestore()
+        redis.disconnect()
       }
       await request(app.getHttpServer())
         .post(path)

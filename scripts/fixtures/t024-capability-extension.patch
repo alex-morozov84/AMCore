@@ -53,7 +53,7 @@ index 0ad0ca1..c9a01ef 100644
  export type AppAbility = Ability<[string, AppSubjects], PrismaQuery>
  
 diff --git a/apps/api/src/core/auth/casl/permission-model-fields.ts b/apps/api/src/core/auth/casl/permission-model-fields.ts
-index f846149..b2608c6 100644
+index d16a961..ea2e209 100644
 --- a/apps/api/src/core/auth/casl/permission-model-fields.ts
 +++ b/apps/api/src/core/auth/casl/permission-model-fields.ts
 @@ -1,6 +1,6 @@
@@ -61,10 +61,10 @@ index f846149..b2608c6 100644
  
 -export type ModelSubject = Subject.User | Subject.Organization | Subject.Role | Subject.Permission
 +export type ModelSubject = Subject.User | Subject.Organization | Subject.Role | Subject.Permission | Subject.FixtureOrder
- export type ScalarKind = 'string' | 'nullableString' | 'boolean' | 'number' | 'date'
+ export type ScalarKind =
+   'string' | 'nullableString' | 'boolean' | 'integer' | 'date' | 'nullableDate'
  
- export const MODEL_FIELDS: Record<ModelSubject, Record<string, ScalarKind>> = {
-@@ -40,6 +40,10 @@ export const MODEL_FIELDS: Record<ModelSubject, Record<string, ScalarKind>> = {
+@@ -41,6 +41,10 @@ export const MODEL_FIELDS: Record<ModelSubject, Record<string, ScalarKind>> = {
      inverted: 'boolean',
      organizationId: 'nullableString',
    },
@@ -75,11 +75,66 @@ index f846149..b2608c6 100644
  }
  
  export const MODEL_SUBJECTS = Object.keys(MODEL_FIELDS) as ModelSubject[]
+diff --git a/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts b/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
+index 26f9d5a..0468022 100644
+--- a/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
++++ b/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
+@@ -161,6 +161,19 @@ export const ADR_034_APIKEY_ALLOWLIST: readonly HandlerAllowlistEntry[] = [
+     reason: 'removePermission — manage:Organization scope per ADR-033.',
+   },
+ 
++  {
++    method: RequestMethod.GET,
++    classPath: 'organizations/:orgId/fixture-orders',
++    handlerPath: '',
++    reason: 'FixtureOrder tenant-bound read with explicit scope and ability checks.',
++  },
++  {
++    method: RequestMethod.PATCH,
++    classPath: 'organizations/:orgId/fixture-orders',
++    handlerPath: ':id',
++    reason: 'FixtureOrder tenant-bound write with explicit scope and ability checks.',
++  },
++
+   // AuthController.me — handler-level @Auth(Bearer, ApiKey).
+   // Stable opt-in per AK-01 — identity self-check surface.
+   {
+diff --git a/apps/api/src/core/organizations/capability-policy-parity.spec.ts b/apps/api/src/core/organizations/capability-policy-parity.spec.ts
+index 999a3bc..cda8311 100644
+--- a/apps/api/src/core/organizations/capability-policy-parity.spec.ts
++++ b/apps/api/src/core/organizations/capability-policy-parity.spec.ts
+@@ -11,6 +11,7 @@ import { REQUEST_CONTEXT_POLICY } from '../auth/organization-context/request-con
+ 
+ import { CapabilitiesController } from './capabilities.controller'
+ import { CAPABILITY_ADAPTERS } from './capability-registry.service'
++import { FixtureOrdersController } from './fixture-orders.controller'
+ import { OrganizationsController } from './organizations.controller'
+ import { PresetPermissionsController } from './preset-permissions.controller'
+ import { RolesController } from './roles.controller'
+@@ -21,6 +22,8 @@ const bindings = {
+   'organization.read': { controller: OrganizationsController, handler: 'findOne' },
+   'organization.update': { controller: OrganizationsController, handler: 'update' },
+   'organization.delete': { controller: OrganizationsController, handler: 'remove' },
++  'fixtureOrder.read': { controller: FixtureOrdersController, handler: 'list' },
++  'fixtureOrder.update': { controller: FixtureOrdersController, handler: 'update' },
+ } satisfies Record<CapabilityId, Binding>
+ 
+ function route(cls: object, name: string) {
+@@ -81,7 +84,8 @@ describe('published capability route parity', () => {
+         ])
+       )
+       expect(adapter.requiredReadFields).toEqual(
+-        descriptor.subject === 'Organization' ? ORG_READ_FIELDS : []
++        descriptor.subject === 'Organization' ? ORG_READ_FIELDS :
++          descriptor.subject === 'FixtureOrder' ? ['id', 'status'] : []
+       )
+     }
+   })
 diff --git a/apps/api/src/core/organizations/capability-registry.service.ts b/apps/api/src/core/organizations/capability-registry.service.ts
-index 70646b7..c61cb4e 100644
+index e5b49fd..57d0a5f 100644
 --- a/apps/api/src/core/organizations/capability-registry.service.ts
 +++ b/apps/api/src/core/organizations/capability-registry.service.ts
-@@ -42,49 +42,53 @@ const organizationPreset = (
+@@ -49,6 +49,20 @@ const organizationPreset = (
    inverted: false,
  })
  
@@ -97,66 +152,28 @@ index 70646b7..c61cb4e 100644
 +  inverted: false,
 +})
 +
- const ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
+ export const CAPABILITY_ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
    'teamAccess.manage': {
--    operation: 'roles.list',
--    subject: Subject.TeamAccess,
--    action: Action.Manage,
--    credentials: ['bearer', 'apiKey'],
--    presets: ['all'],
--    editableFields: [],
--    preset: () => ({
--      action: Action.Manage,
--      subject: Subject.TeamAccess,
--      conditions: null,
--      fields: [],
--      inverted: false,
--    }),
-+    operation: 'roles.list', subject: Subject.TeamAccess, action: Action.Manage,
-+    credentials: ['bearer', 'apiKey'], presets: ['all'], editableFields: [],
-+    preset: () => ({ action: Action.Manage, subject: Subject.TeamAccess,
-+      conditions: null, fields: [], inverted: false }),
-   },
-   'organization.read': {
--    operation: 'organizations.findOne',
--    subject: Subject.Organization,
--    action: Action.Read,
--    credentials: ['bearer', 'apiKey'],
--    presets: ['own', 'all'],
--    editableFields: [],
-+    operation: 'organizations.findOne', subject: Subject.Organization, action: Action.Read,
-+    credentials: ['bearer', 'apiKey'], presets: ['own', 'all'], editableFields: [],
-     preset: (id) => organizationPreset(Action.Read, [], id),
-   },
-   'organization.update': {
--    operation: 'organizations.update',
--    subject: Subject.Organization,
--    action: Action.Update,
--    credentials: ['bearer', 'apiKey'],
--    presets: ['own', 'all'],
--    editableFields: ['name', 'slug'],
-+    operation: 'organizations.update', subject: Subject.Organization, action: Action.Update,
-+    credentials: ['bearer', 'apiKey'], presets: ['own', 'all'], editableFields: ['name', 'slug'],
-     preset: (id) => organizationPreset(Action.Update, ['name', 'slug'], id),
-   },
-   'organization.delete': {
--    operation: 'organizations.remove',
--    subject: Subject.Organization,
--    action: Action.Delete,
--    credentials: ['bearer', 'apiKey'],
--    presets: ['own', 'all'],
--    editableFields: [],
-+    operation: 'organizations.remove', subject: Subject.Organization, action: Action.Delete,
-+    credentials: ['bearer', 'apiKey'], presets: ['own', 'all'], editableFields: [],
+     operation: 'roles.list',
+@@ -104,6 +118,25 @@ export const CAPABILITY_ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
+     editableFields: [],
      preset: (id) => organizationPreset(Action.Delete, [], id),
    },
 +  'fixtureOrder.read': {
-+    operation: 'fixtureOrders.list', subject: Subject.FixtureOrder, action: Action.Read,
++    operation: 'fixtureOrders.list',
++    method: 'GET', path: '/organizations/:orgId/fixture-orders',
++    context: 'organization', selector: 'orgId', teamAccess: false,
++    tenantBound: true, requiredReadFields: ['id', 'status'],
++    subject: Subject.FixtureOrder, action: Action.Read,
 +    credentials: ['bearer', 'apiKey'], presets: ['own', 'assigned', 'all'],
 +    editableFields: [], preset: (id) => fixturePreset(Action.Read, [], id),
 +  },
 +  'fixtureOrder.update': {
-+    operation: 'fixtureOrders.update', subject: Subject.FixtureOrder, action: Action.Update,
++    operation: 'fixtureOrders.update',
++    method: 'PATCH', path: '/organizations/:orgId/fixture-orders/:id',
++    context: 'organization', selector: 'orgId', teamAccess: false,
++    tenantBound: true, requiredReadFields: ['id', 'status'],
++    subject: Subject.FixtureOrder, action: Action.Update,
 +    credentials: ['bearer', 'apiKey'], presets: ['own', 'assigned', 'all'],
 +    editableFields: ['status', 'note'],
 +    preset: (id) => fixturePreset(Action.Update, ['status', 'note'], id),
@@ -164,10 +181,10 @@ index 70646b7..c61cb4e 100644
  }
  const error = (): never => {
    throw new AppException(
-@@ -95,17 +99,18 @@ const error = (): never => {
- }
- 
+@@ -116,17 +149,18 @@ const error = (): never => {
  type Rule = AppAbility['rules'][number]
+ const unconditional = (rule: Rule): boolean =>
+   !rule.conditions || Object.keys(rule.conditions).length === 0
 -const relevant = (rule: Rule, action: Action, field: string): boolean =>
 -  (rule.subject === Subject.Organization || rule.subject === Subject.All) &&
 +const relevant = (rule: Rule, action: Action, field: string, subjectType: Subject): boolean =>
@@ -187,7 +204,7 @@ index 70646b7..c61cb4e 100644
    const allows = rules.filter((rule) => !rule.inverted)
    const denies = rules.filter((rule) => rule.inverted)
    return {
-@@ -117,9 +122,10 @@ function fieldPossibility(
+@@ -138,9 +172,10 @@ function fieldPossibility(
  function classify(
    ability: AppAbility,
    action: Action,
@@ -200,25 +217,7 @@ index 70646b7..c61cb4e 100644
    if (checks.some((check) => !check.possible)) return 'denied'
    if (checks.every((check) => check.unconditional)) return 'allowed'
    return 'recordRequired'
-@@ -134,15 +140,11 @@ export class CapabilityRegistry {
-       ids.length !== Object.keys(ADAPTERS).length ||
-       CAPABILITY_CATALOGUE.some((entry) => {
-         const adapter = ADAPTERS[entry.id]
--        return (
--          !adapter ||
--          adapter.operation !== entry.operation ||
--          adapter.subject !== entry.subject ||
--          adapter.action !== entry.action ||
-+        return !adapter || adapter.operation !== entry.operation ||
-+          adapter.subject !== entry.subject || adapter.action !== entry.action ||
-           JSON.stringify(adapter.credentials) !== JSON.stringify(entry.credentials) ||
-           JSON.stringify(adapter.presets) !== JSON.stringify(entry.presets) ||
-           JSON.stringify(adapter.editableFields) !== JSON.stringify(entry.editableFields)
--        )
-       })
-     )
-       throw new Error('Capability adapter coverage mismatch')
-@@ -182,6 +184,10 @@ export class CapabilityRegistry {
+@@ -205,6 +240,10 @@ export class CapabilityRegistry {
        'organization.read': 'allowed', // verified membership on this bearer-only context
        'organization.update': update,
        'organization.delete': team ? classify(ability, Action.Delete, ORG_READ_FIELDS) : 'denied',
@@ -231,12 +230,12 @@ index 70646b7..c61cb4e 100644
  
 diff --git a/apps/api/src/core/organizations/fixture-orders.controller.ts b/apps/api/src/core/organizations/fixture-orders.controller.ts
 new file mode 100644
-index 0000000..a9ccc59
+index 0000000..4c08cba
 --- /dev/null
 +++ b/apps/api/src/core/organizations/fixture-orders.controller.ts
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,90 @@
 +import { subject } from '@casl/ability'
-+import { Body, Controller, Get, Param, Patch } from '@nestjs/common'
++import { BadRequestException, Body, Controller, Get, Param, Patch } from '@nestjs/common'
 +import { ApiBearerAuth, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger'
 +import { createZodDto } from 'nestjs-zod'
 +
@@ -258,6 +257,8 @@ index 0000000..a9ccc59
 +import type { FixtureOrder, Prisma } from '@/generated/prisma/client'
 +
 +class FixtureOrderUpdateDto extends createZodDto(fixtureOrderUpdateSchema) {}
++const MAX_SCAN = 200
++const PAGE_SIZE = 20
 +
 +const canRead = (ability: AppAbility, row: FixtureOrder): boolean => {
 +  const record = subject('FixtureOrder', row)
@@ -290,11 +291,15 @@ index 0000000..a9ccc59
 +    const where: Prisma.FixtureOrderWhereInput = {
 +      AND: [{ organizationId: orgId }, accessibleBy(ability).ofType('FixtureOrder')],
 +    }
-+    const rows = await client.fixtureOrder.findMany({ where, orderBy: { id: 'asc' } })
-+    const data = rows.filter((row) => canRead(ability, row)).map((row) => ({
++    const rows = await client.fixtureOrder.findMany({
++      where, orderBy: { id: 'asc' }, take: MAX_SCAN + 1,
++    })
++    if (rows.length > MAX_SCAN) throw new BadRequestException('Fixture order scan limit exceeded')
++    const visible = rows.filter((row) => canRead(ability, row))
++    const data = visible.slice(0, PAGE_SIZE).map((row) => ({
 +      id: row.id, status: row.status, access: hint(ability, row),
 +    }))
-+    return { data, total: data.length }
++    return { data, total: visible.length }
 +  }
 +
 +  @Patch(':id')
@@ -304,7 +309,7 @@ index 0000000..a9ccc59
 +  async update(@Param('orgId') orgId: string, @Param('id') id: string,
 +    @Body() input: FixtureOrderUpdateDto, @CurrentAbility() ability: AppAbility) {
 +    return this.prisma.$transaction(async (tx) => {
-+      await tx.$queryRaw`SELECT id FROM core.fixture_orders WHERE id = ${id} FOR UPDATE`
++      await tx.$queryRaw`SELECT id FROM core.fixture_orders WHERE id = ${id} AND "organizationId" = ${orgId} FOR UPDATE`
 +      const before = await tx.fixtureOrder.findUnique({ where: { id } })
 +      if (!before || before.organizationId !== orgId) throw new NotFoundException('FixtureOrder', id)
 +      const fields = Object.keys(input) as (keyof FixtureOrderUpdate)[]
@@ -341,12 +346,14 @@ index f6b2d08..4700b15 100644
      InvitesController,
 diff --git a/apps/api/test/fixture-order-extension.e2e-spec.ts b/apps/api/test/fixture-order-extension.e2e-spec.ts
 new file mode 100644
-index 0000000..99154c0
+index 0000000..5795deb
 --- /dev/null
 +++ b/apps/api/test/fixture-order-extension.e2e-spec.ts
-@@ -0,0 +1,225 @@
+@@ -0,0 +1,269 @@
 +import type { INestApplication } from '@nestjs/common'
 +import { JwtService } from '@nestjs/jwt'
++import { writeFileSync } from 'node:fs'
++import { Client } from 'pg'
 +import request from 'supertest'
 +
 +import { Action, Subject } from '@amcore/shared'
@@ -417,7 +424,7 @@ index 0000000..99154c0
 +      organizationId: org, ownerId: owner.userId, assignedToId: staff.userId,
 +      status: 'blocked', note: 'Denied',
 +    } })
-+    await prisma.fixtureOrder.create({ data: {
++    const foreignRow = await prisma.fixtureOrder.create({ data: {
 +      organizationId: otherOrg, ownerId: staff.userId, assignedToId: staff.userId,
 +      status: 'draft', note: 'Foreign',
 +    } })
@@ -568,6 +575,48 @@ index 0000000..99154c0
 +    expect(fieldFiltered.data.map((row: { id: string }) => row.id))
 +      .toEqual([own.id])
 +    expect(fieldFiltered.total).toBe(1)
++    await prisma.fixtureOrder.createMany({ data: Array.from({ length: 24 }, (_, index) => ({
++      organizationId: org, ownerId: staff.userId, assignedToId: null,
++      status: 'draft', note: `Extra ${index}`,
++    })) })
++    const paged = (await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${staff.token}`).expect(200)).body
++    expect(paged.data).toHaveLength(20)
++    expect(paged.total).toBe(25)
++    const samples: number[] = []
++    for (let index = 0; index < 25; index++) {
++      const started = performance.now()
++      const response = await request(app.getHttpServer()).get(list)
++        .set('Authorization', `Bearer ${staff.token}`).expect(200)
++      expect(response.body.total).toBe(25)
++      if (index >= 5) samples.push(performance.now() - started)
++    }
++    const sorted = samples.sort((left, right) => left - right)
++    writeFileSync('fixture-order-measurement.json', JSON.stringify({
++      sampleCount: sorted.length, warmups: 5, seededOwnTenantRows: 27,
++      visibleRows: 25, pageSize: 20, maxScan: 200,
++      p50Ms: sorted[Math.ceil(sorted.length * 0.50) - 1],
++      p95Ms: sorted[Math.ceil(sorted.length * 0.95) - 1],
++    }, null, 2))
++    const holder = new Client({ connectionString: process.env.E2E_DATABASE_URL })
++    await holder.connect()
++    try {
++      await holder.query('BEGIN')
++      await holder.query('SELECT id FROM core.fixture_orders WHERE id=$1 FOR UPDATE',
++        [foreignRow.id])
++      await request(app.getHttpServer()).patch(`${list}/${foreignRow.id}`)
++        .set('Authorization', `Bearer ${staff.token}`)
++        .send({ status: 'review' }).timeout({ response: 2000, deadline: 2500 }).expect(404)
++    } finally {
++      await holder.query('ROLLBACK')
++      await holder.end()
++    }
++    await prisma.fixtureOrder.createMany({ data: Array.from({ length: 177 }, (_, index) => ({
++      organizationId: org, ownerId: staff.userId, assignedToId: null,
++      status: 'draft', note: `Overflow ${index}`,
++    })) })
++    await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${staff.token}`).expect(400)
 +  })
 +})
 diff --git a/apps/web/src/entities/organization-context/model/context-fixture.ts b/apps/web/src/entities/organization-context/model/context-fixture.ts

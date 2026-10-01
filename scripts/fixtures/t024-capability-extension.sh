@@ -36,7 +36,11 @@ chmod +x "$fixture_root/fixture-bin/pnpm"
 (cd "$fixture_root/apps/api" && ./node_modules/.bin/tsc --noEmit)
 (cd "$fixture_root/apps/web" && ./node_modules/.bin/tsc --noEmit)
 (cd "$fixture_root/apps/api" && \
+  ./node_modules/.bin/jest --config jest.config.js --runInBand \
+  --runTestsByPath src/core/organizations/capability-policy-parity.spec.ts --silent)
+(cd "$fixture_root/apps/api" && \
   PATH="$fixture_root/fixture-bin:$PATH" NODE_OPTIONS=--experimental-vm-modules \
   ./node_modules/.bin/jest --config jest-e2e.config.js --runInBand \
   --runTestsByPath test/fixture-order-extension.e2e-spec.ts --silent)
+cat "$fixture_root/apps/api/fixture-order-measurement.json"
 finished=true

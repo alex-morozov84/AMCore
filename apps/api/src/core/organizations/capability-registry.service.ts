@@ -22,6 +22,13 @@ import type { Organization } from '@/generated/prisma/client'
 
 interface CapabilityAdapter {
   operation: string
+  method: 'GET' | 'PATCH' | 'DELETE'
+  path: `/${string}`
+  context: 'discovery' | 'organization'
+  selector?: 'id' | 'orgId'
+  teamAccess: boolean
+  tenantBound: boolean
+  requiredReadFields: readonly string[]
   subject: Subject
   action: Action
   credentials: readonly ('bearer' | 'apiKey')[]
@@ -42,9 +49,16 @@ const organizationPreset = (
   inverted: false,
 })
 
-const ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
+export const CAPABILITY_ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
   'teamAccess.manage': {
     operation: 'roles.list',
+    method: 'GET',
+    path: '/organizations/:orgId/roles',
+    context: 'organization',
+    selector: 'orgId',
+    teamAccess: true,
+    tenantBound: true,
+    requiredReadFields: [],
     subject: Subject.TeamAccess,
     action: Action.Manage,
     credentials: ['bearer', 'apiKey'],
@@ -60,6 +74,12 @@ const ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
   },
   'organization.read': {
     operation: 'organizations.findOne',
+    method: 'GET',
+    path: '/organizations/:id',
+    context: 'discovery',
+    teamAccess: false,
+    tenantBound: true,
+    requiredReadFields: ORG_READ_FIELDS,
     subject: Subject.Organization,
     action: Action.Read,
     credentials: ['bearer', 'apiKey'],
@@ -69,6 +89,13 @@ const ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
   },
   'organization.update': {
     operation: 'organizations.update',
+    method: 'PATCH',
+    path: '/organizations/:id',
+    context: 'organization',
+    selector: 'id',
+    teamAccess: false,
+    tenantBound: true,
+    requiredReadFields: ORG_READ_FIELDS,
     subject: Subject.Organization,
     action: Action.Update,
     credentials: ['bearer', 'apiKey'],
@@ -78,6 +105,13 @@ const ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
   },
   'organization.delete': {
     operation: 'organizations.remove',
+    method: 'DELETE',
+    path: '/organizations/:id',
+    context: 'organization',
+    selector: 'id',
+    teamAccess: true,
+    tenantBound: true,
+    requiredReadFields: ORG_READ_FIELDS,
     subject: Subject.Organization,
     action: Action.Delete,
     credentials: ['bearer', 'apiKey'],
@@ -95,6 +129,8 @@ const error = (): never => {
 }
 
 type Rule = AppAbility['rules'][number]
+const unconditional = (rule: Rule): boolean =>
+  !rule.conditions || Object.keys(rule.conditions).length === 0
 const relevant = (rule: Rule, action: Action, field: string): boolean =>
   (rule.subject === Subject.Organization || rule.subject === Subject.All) &&
   (rule.action === action || rule.action === Action.Manage) &&
@@ -109,8 +145,8 @@ function fieldPossibility(
   const allows = rules.filter((rule) => !rule.inverted)
   const denies = rules.filter((rule) => rule.inverted)
   return {
-    possible: allows.length > 0 && !denies.some((rule) => !rule.conditions),
-    unconditional: allows.some((rule) => !rule.conditions) && denies.length === 0,
+    possible: allows.length > 0 && !denies.some(unconditional),
+    unconditional: allows.some(unconditional) && denies.length === 0,
   }
 }
 
@@ -131,12 +167,14 @@ export class CapabilityRegistry {
     const ids = CAPABILITY_CATALOGUE.map((entry) => entry.id)
     if (
       ids.length !== new Set(ids).size ||
-      ids.length !== Object.keys(ADAPTERS).length ||
+      ids.length !== Object.keys(CAPABILITY_ADAPTERS).length ||
       CAPABILITY_CATALOGUE.some((entry) => {
-        const adapter = ADAPTERS[entry.id]
+        const adapter = CAPABILITY_ADAPTERS[entry.id]
         return (
           !adapter ||
           adapter.operation !== entry.operation ||
+          adapter.method !== entry.method ||
+          adapter.path !== entry.path ||
           adapter.subject !== entry.subject ||
           adapter.action !== entry.action ||
           JSON.stringify(adapter.credentials) !== JSON.stringify(entry.credentials) ||
@@ -160,7 +198,7 @@ export class CapabilityRegistry {
   }
 
   preset(input: CreatePresetPermissionInput): AssignPermissionInput {
-    const adapter = ADAPTERS[input.capabilityId]
+    const adapter = CAPABILITY_ADAPTERS[input.capabilityId]
     if (!adapter || !adapter.presets.includes(input.presetId)) return error()
     return adapter.preset(input.presetId)
   }

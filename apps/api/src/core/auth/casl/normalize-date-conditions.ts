@@ -24,7 +24,12 @@ export function normalizeDateConditions(
         ])
       )
     }
-    if (key && dateFields[key] === 'date' && isEpochMilliseconds(value)) return new Date(value)
+    if (
+      key &&
+      (dateFields[key] === 'date' || dateFields[key] === 'nullableDate') &&
+      isEpochMilliseconds(value)
+    )
+      return new Date(value)
     return value
   }
   return walk(conditions) as Record<string, unknown>

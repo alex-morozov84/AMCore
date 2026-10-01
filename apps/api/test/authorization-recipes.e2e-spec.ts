@@ -268,6 +268,73 @@ describe('Bounded Prisma recipe (real PostgreSQL)', () => {
     }
   })
 
+  it('nullable DateTime and integer ACL conditions agree across CASL and PostgreSQL', async () => {
+    const user = await db.prisma.user.create({
+      data: { email: 'date-rule@fixture.test', emailCanonical: 'date-rule@fixture.test' },
+    })
+    const datedUser = await db.prisma.user.create({
+      data: {
+        email: 'dated-rule@fixture.test',
+        emailCanonical: 'dated-rule@fixture.test',
+        lastLoginAt: new Date(946684800000),
+      },
+    })
+    const principal: RequestPrincipal = {
+      type: 'jwt',
+      sub: user.id,
+      organizationId: org,
+      aclVersion: 0,
+      systemRole: SystemRole.User,
+    }
+    const client = db.prisma.$extends(createCaslExtension())
+    const verifyUser = async (current: AppAbility, row: typeof user, field: string) => {
+      expect(current.can(Action.Read, subject('User', row), field)).toBe(true)
+      const where = { AND: [accessibleBy(current).ofType('User'), { id: row.id }] }
+      expect((await client.user.findMany({ where })).map((item) => item.id)).toEqual([row.id])
+      expect(await client.user.count({ where })).toBe(1)
+    }
+    const verifyOrganization = async (
+      current: AppAbility,
+      row: Awaited<ReturnType<typeof db.prisma.organization.findUniqueOrThrow>>,
+      field: string
+    ) => {
+      expect(current.can(Action.Read, subject('Organization', row), field)).toBe(true)
+      const where = { AND: [accessibleBy(current).ofType('Organization'), { id: org }] }
+      expect((await client.organization.findMany({ where })).map((item) => item.id)).toEqual([org])
+      expect(await client.organization.count({ where })).toBe(1)
+    }
+    for (const [ruleSubject, conditions, field, row] of [
+      [Subject.User, { lastLoginAt: null }, 'lastLoginAt', user],
+      [Subject.User, { lastLoginAt: { gte: 946684800000 } }, 'lastLoginAt', datedUser],
+      [
+        Subject.Organization,
+        { aclVersion: 0 },
+        'aclVersion',
+        await db.prisma.organization.findUniqueOrThrow({ where: { id: org } }),
+      ],
+    ] as const) {
+      const input = { action: Action.Read, subject: ruleSubject, conditions, fields: [field] }
+      expect(() => validatePermissionRule(input)).not.toThrow()
+      const [normalized] = normalizeOwnerPermissions(
+        [{ id: 'scalar', ...input, inverted: false }],
+        principal
+      )
+      const current = createPrismaAbility<AppAbility>([
+        {
+          action: Action.Read,
+          subject: ruleSubject,
+          conditions: normalized!.conditions as never,
+          fields: [field],
+        },
+      ])
+      if (ruleSubject === Subject.User) {
+        await verifyUser(current, row, field)
+      } else {
+        await verifyOrganization(current, row, field)
+      }
+    }
+  })
+
   it.each(['update', 'delete'])(
     'row lock checks current facts after a concurrent change for %s',
     async (action) => {

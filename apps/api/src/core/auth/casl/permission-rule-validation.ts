@@ -66,9 +66,15 @@ function substitute(
 
 function scalar(value: unknown, kind: ScalarKind, subject: ModelSubject, field: string): unknown {
   const resolved = substitute(value, kind, subject, field)
-  if (resolved === null && kind === 'nullableString') return null
-  if (kind === 'date' && isEpochMilliseconds(resolved)) return resolved
-  if (kind === 'number' && typeof resolved === 'number' && Number.isFinite(resolved))
+  if (resolved === null && (kind === 'nullableString' || kind === 'nullableDate')) return null
+  if ((kind === 'date' || kind === 'nullableDate') && isEpochMilliseconds(resolved)) return resolved
+  if (
+    kind === 'integer' &&
+    typeof resolved === 'number' &&
+    Number.isInteger(resolved) &&
+    resolved >= 0 &&
+    resolved <= 2_147_483_647
+  )
     return resolved
   if (kind === 'boolean' && typeof resolved === 'boolean') return resolved
   if ((kind === 'string' || kind === 'nullableString') && typeof resolved === 'string') {
@@ -119,7 +125,10 @@ function predicate(
         kind !== 'nullableString'
       )
         fail('PERMISSION_RULE_UNSUPPORTED')
-      if (['gt', 'gte', 'lt', 'lte'].includes(operator) && kind !== 'number' && kind !== 'date')
+      if (
+        ['gt', 'gte', 'lt', 'lte'].includes(operator) &&
+        ((kind !== 'integer' && kind !== 'date' && kind !== 'nullableDate') || operand === null)
+      )
         fail('PERMISSION_RULE_UNSUPPORTED')
       return [operator, scalar(operand, kind, subject, field)]
     })
