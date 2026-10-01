@@ -47,7 +47,7 @@ test('a missing owned Markdown block fails closed', () => {
     writeFileSync(target, changed)
     assert.throws(
       () => materializeProjectContentPath(root, pathname, [fact(pathname, 'readme-storybook')]),
-      /expected exactly one \| Storybook  table row/
+      /expected exactly one \| Storybook\s{2}table row/
     )
   })
 })
