@@ -88,7 +88,7 @@ capabilities without inheriting an unrelated sample domain.
 | **Backend**       | NestJS 11, PostgreSQL 18, Prisma 7, Redis, BullMQ                              |
 | **Auth**          | JWT + Refresh Tokens, OAuth 2.0 / OIDC, API Keys                               |
 | **Email**         | Resend, vendored React Email primitives + `@react-email/render`, FormatJS i18n |
-| **Storage**       | S3-compatible storage, local production/development driver, memory test driver                    |
+| **Storage**       | S3-compatible storage, local production/development driver, memory test driver |
 | **Frontend**      | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui + Base UI                      |
 | **i18n**          | next-intl (web) + FormatJS (email), ICU MessageFormat, CLDR plurals            |
 | **Architecture**  | Feature-Sliced Design (FSD)                                                    |
