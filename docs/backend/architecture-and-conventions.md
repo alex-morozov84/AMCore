@@ -217,6 +217,10 @@ Env is validated once at boot by a Zod schema. It is split into domain sections
 under [`apps/api/src/env/schema/`](../../apps/api/src/env/schema) (one `*.env.ts`
 per area), composed flat in `base.ts`, with cross-field logic in `refinements/`.
 `apps/api/src/env.ts` is a re-export shim, so consumers keep importing from `@/env`.
+Nest Config reads only validated values (`skipProcessEnv: true`). This preserves
+schema normalization: an optional empty value stays absent instead of falling back
+to its raw environment string. Environment variables are still loaded and validated
+at boot.
 
 1. **Declare it** in the matching section (e.g. `storage.env.ts`) as a Zod field:
    - a safe fallback → `.default(...)` (the app runs without the operator setting it);

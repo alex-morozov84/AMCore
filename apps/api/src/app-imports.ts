@@ -23,7 +23,7 @@ import { NotificationsCoreModule } from './core/notifications/notifications-core
 import { NotificationsWebModule } from './core/notifications/notifications-web.module'
 import { NotificationsWorkerModule } from './core/notifications/notifications-worker.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
-import { validate } from './env'
+import { envConfigOptions } from './env/env.config'
 import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
@@ -59,11 +59,7 @@ type Imports = NonNullable<ModuleMetadata['imports']>
 export function coreImports(): Imports {
   return [
     // Environment variables (validated via Zod, typed Env)
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '../../.env',
-      validate,
-    }),
+    ConfigModule.forRoot(envConfigOptions),
 
     EnvModule,
 

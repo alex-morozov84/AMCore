@@ -39,7 +39,12 @@ test('path-mode Overview panel renders real readiness, version and process role 
   await expect(page.getByText('API version')).toBeVisible()
   await expect(page.getByText('Process role')).not.toBeVisible()
 
-  for (const name of ['Web build', 'Database connections', 'JavaScript memory', 'API disk space']) {
+  for (const name of [
+    'Responding web server build',
+    'Database connections',
+    'JavaScript memory',
+    'API disk space',
+  ]) {
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
   }
   const observed = page.locator('header time').last()

@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep empty optional backend environment values absent after validation, so
+  Compose's unset heap override preserves the default readiness and liveness limits.
+
 - Local storage uses SHA-256 ETags for new uploads and checks object/metadata
   path containment immediately before filesystem reads, preserving existing ETags.
 
