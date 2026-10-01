@@ -38,11 +38,16 @@ test('a missing owned Markdown block fails closed', () => {
   withCopy((root) => {
     const pathname = 'README.md'
     const target = path.join(root, pathname)
-    const content = readFileSync(target, 'utf8').replace('| Storybook ', '| RemovedBook ')
-    writeFileSync(target, content)
+    const content = readFileSync(target, 'utf8')
+    const changed = content.replace(
+      /^\| Storybook +\| \[`docs\/frontend\/storybook\.md`\]/m,
+      '| RemovedBook | [`docs/frontend/storybook.md`]'
+    )
+    assert.notEqual(changed, content)
+    writeFileSync(target, changed)
     assert.throws(
       () => materializeProjectContentPath(root, pathname, [fact(pathname, 'readme-storybook')]),
-      /expected exactly one occurrence/
+      /expected exactly one \| Storybook  table row/
     )
   })
 })
