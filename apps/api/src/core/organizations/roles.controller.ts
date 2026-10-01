@@ -182,7 +182,7 @@ export class RolesController {
   @ZodResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
   @ApiBadRequestResponse({
     description:
-      'Validation error: unknown registry value, positive all grant or restricted TeamAccess',
+      'Validation error or unsupported condition, field or identity placeholder (PERMISSION_RULE_UNSUPPORTED, PERMISSION_FIELD_UNSUPPORTED, PERMISSION_PLACEHOLDER_UNSUPPORTED)',
   })
   @RequestContextPolicy({
     kind: 'organization',

@@ -59,6 +59,21 @@ Prisma parsing. ISO strings and fractional dates are rejected because their
 record and SQL behavior would differ. These limits are checked separately
 from the route's tenant, immutable-field and response-field policy.
 
+| Subject        | Accepted condition and field names                                                                                                        |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`         | `id`, `email`, `emailVerified`, `name`, `avatarUrl`, `phone`, `locale`, `timezone`, `createdAt`, `updatedAt`, `lastLoginAt`, `systemRole` |
+| `Organization` | `id`, `name`, `slug`, `aclVersion`, `createdAt`, `updatedAt`                                                                              |
+| `Role`         | `id`, `name`, `description`, `isSystem`, `organizationId`                                                                                 |
+| `Permission`   | `id`, `action`, `subject`, `inverted`, `organizationId`                                                                                   |
+
+For these four subjects, `fields` may also be omitted, `[]` or `['*']` for all
+fields. `TeamAccess` supports only `manage` with no condition and unrestricted
+fields. Subject `all` supports DENY only; any condition or field restriction
+must be valid for every model subject. Logical nesting is limited to four
+levels and 64 condition nodes; `in` and `notIn` accept at most 64 values. An
+empty nested branch, unknown field, relation path or unsupported operator is
+rejected before a permission is saved.
+
 ## Extend a downstream product
 
 1. Add the domain Prisma model and a migration. Add its name to the shared
@@ -69,10 +84,12 @@ from the route's tenant, immutable-field and response-field policy.
    capability ID/response schemas. Name the exact handler, action, subject,
    supported presets and editable fields. Register its model scalar grammar in
    `permission-model-fields.ts` and its typed subject in `AppAbility`.
-3. Add an API adapter with the route's actual admission, credential, tenant,
-   field and record policy. Register it in `CapabilityRegistry`, extend its
-   startup coverage assertion and route-policy parity test. A descriptor with
-   no implemented, checked handler must not be published. Credential metadata
+3. Implement admission, credential, tenant, field and record checks in the
+   domain handler and service. Register the matching operation metadata and
+   preset builder in `CapabilityRegistry`; its startup check compares the
+   declared catalogue entries with the registered adapter entries. Add the
+   handler to `capability-policy-parity.spec.ts` and verify its route, auth and
+   guards against the descriptor before publishing it. Credential metadata
    never overrides route `@Auth` or the API-key allowlist.
 4. For lists, combine `accessibleBy(ability)` with the verified tenant predicate
    using `AND`. Load the page once, check actual rows/fields in memory, and

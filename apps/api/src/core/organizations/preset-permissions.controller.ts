@@ -55,7 +55,10 @@ export class PresetPermissionsController {
   @ApiOperation({ summary: 'Assign a declared permission preset to a custom role' })
   @ApiParam({ name: 'orgId', description: 'Selected organization ID' })
   @ApiParam({ name: 'roleId', description: 'Custom role ID in that organization' })
-  @ApiBadRequestResponse({ description: 'Unsupported capability/preset or rule' })
+  @ApiBadRequestResponse({
+    description:
+      'Unsupported capability/preset (CAPABILITY_UNSUPPORTED) or invalid generated rule (PERMISSION_RULE_UNSUPPORTED, PERMISSION_FIELD_UNSUPPORTED, PERMISSION_PLACEHOLDER_UNSUPPORTED)',
+  })
   @ZodResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
   assign(
     @Param('orgId') orgId: string,
