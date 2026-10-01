@@ -1,5 +1,5 @@
 // AMCore observability contract — live rule-group inventory (item 4, part 2):
-// exactly the 8 default groups load, and the optional SLO groups genuinely
+// exactly the declared default groups load, and the optional SLO groups genuinely
 // do not (proving prometheus.yml's non-recursive rule_files glob live, not
 // only by reading the config).
 import { getJson, PROMETHEUS_URL } from './http.mjs'

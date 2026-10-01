@@ -5,11 +5,11 @@ operations a starter needs without tying application code to one cloud.
 
 ## Provider Matrix
 
-| Provider | Intended use | Persistence          | Public URLs | Signed URLs |
-| -------- | ------------ | -------------------- | ----------- | ----------- |
-| memory   | unit tests   | process memory       | no          | no          |
-| local    | development  | filesystem           | optional    | no          |
-| s3       | production   | S3-compatible bucket | yes         | yes         |
+| Provider | Intended use           | Persistence          | Public URLs | Signed URLs |
+| -------- | ---------------------- | -------------------- | ----------- | ----------- |
+| memory   | unit tests             | process memory       | no          | no          |
+| local    | production/development | filesystem           | optional    | no          |
+| s3       | production             | S3-compatible bucket | yes         | yes         |
 
 ## S3-Compatible Driver
 
@@ -32,7 +32,7 @@ browser-facing endpoint.
 
 ## Local Driver
 
-The local driver is for development and simple forks. It stores:
+The local driver supports production and development. It stores:
 
 ```text
 {root}/objects/{key}
@@ -40,8 +40,13 @@ The local driver is for development and simple forks. It stores:
 ```
 
 The split keeps object names like `report.meta.json` from colliding with
-metadata. If a static server is mounted for public URLs, mount `objects/`, not
-the root directory.
+metadata. Explicit public uploads also create a separate `public/` copy. The
+HTTP-only `/api/v1/storage/public?key=...` consumer checks visibility and serves
+only this copy, never private bytes or metadata. Never mount `objects/` or the
+storage root on a public static server. Public URLs now use this API endpoint,
+rather than the former unsafe whole-directory static-mount recommendation.
+Public copies consume additional local disk space and must be backed up together
+with objects and metadata. Private uploads remove old public copies before writes.
 
 ## Memory Driver
 

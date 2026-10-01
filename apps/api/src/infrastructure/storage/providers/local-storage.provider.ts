@@ -6,7 +6,7 @@ import { Readable } from 'node:stream'
 
 import { Injectable } from '@nestjs/common'
 
-import { normalizeObjectKey } from '../object-key'
+import { InvalidObjectKeyError, normalizeObjectKey } from '../object-key'
 import { DEFAULT_VISIBILITY } from '../storage.constants'
 import {
   type CopyObjectInput,
@@ -28,15 +28,7 @@ import { bufferFromBody } from './body.util'
 
 export interface LocalStorageConfig {
   root: string
-  /**
-   * When set, enables `getPublicUrl`, which returns `${publicBaseUrl}/${key}`.
-   *
-   * The base MUST be an unauthenticated static/CDN route that serves the
-   * driver's object bytes — i.e. it must be mounted at `<root>/objects`, NOT at
-   * `<root>`. Mounting `<root>` would also expose the private `<root>/meta`
-   * sidecars (visibility/etag JSON). It must NOT point at the guarded
-   * app-mediated download route.
-   */
+  /** Absolute API /api/v1/storage/public endpoint; only explicit public copies are served. */
   publicBaseUrl?: string
 }
 
@@ -73,7 +65,9 @@ export class LocalStorageProvider implements StorageProvider {
   async upload(input: UploadInput): Promise<UploadResult> {
     const key = normalizeObjectKey(input.key)
     const body = await bufferFromBody(input.body)
-    const etag = createHash('md5').update(body).digest('hex')
+    const etag = createHash('sha256').update(body).digest('hex')
+    // Remove old public bytes before a private rewrite, never expose private bytes.
+    await rm(this.publicPath(key), { force: true })
     await this.writeFileAt(this.objectPath(key), body)
     const meta: SidecarMeta = {
       contentType: input.contentType,
@@ -81,6 +75,7 @@ export class LocalStorageProvider implements StorageProvider {
       etag,
     }
     await this.writeFileAt(this.metaPath(key), Buffer.from(JSON.stringify(meta)))
+    if (meta.visibility === 'public-read') await this.writeFileAt(this.publicPath(key), body)
     return { key, size: body.length, etag, contentType: input.contentType }
   }
 
@@ -116,6 +111,7 @@ export class LocalStorageProvider implements StorageProvider {
       if (this.isErrno(err, 'ENOENT')) return
       throw err
     }
+    await rm(this.publicPath(key), { force: true })
     await rm(full, { force: true })
     await rm(this.metaPath(key), { force: true })
   }
@@ -148,10 +144,7 @@ export class LocalStorageProvider implements StorageProvider {
         'Public URLs are not configured for the local storage driver (set STORAGE_LOCAL_PUBLIC_BASE_URL)'
       )
     }
-    // `${base}/${key}` with no `objects/` segment: the base is expected to be a
-    // static mount of `<root>/objects` (see LocalStorageConfig.publicBaseUrl),
-    // which keeps URLs clean and the `<root>/meta` sidecars unexposed.
-    return `${this.config.publicBaseUrl.replace(/\/+$/, '')}/${normalizeObjectKey(key)}`
+    return `${this.config.publicBaseUrl.replace(/\/+$/, '')}?key=${encodeURIComponent(normalizeObjectKey(key))}`
   }
 
   async getSignedDownloadUrl(_input: SignedDownloadInput): Promise<string> {
@@ -166,11 +159,15 @@ export class LocalStorageProvider implements StorageProvider {
     const sourceKey = normalizeObjectKey(input.source)
     const destKey = normalizeObjectKey(input.destination)
     await this.statFileOrThrow(this.objectPath(sourceKey), input.source)
+    await rm(this.publicPath(destKey), { force: true })
     await this.copyFileAt(this.objectPath(sourceKey), this.objectPath(destKey))
     try {
       await this.copyFileAt(this.metaPath(sourceKey), this.metaPath(destKey))
     } catch (err) {
       if (!this.isErrno(err, 'ENOENT')) throw err
+    }
+    if ((await this.readSidecar(destKey))?.visibility === 'public-read') {
+      await this.copyFileAt(this.publicPath(sourceKey), this.publicPath(destKey))
     }
   }
 
@@ -185,6 +182,10 @@ export class LocalStorageProvider implements StorageProvider {
 
   private objectPath(key: string): string {
     return this.resolveUnder(OBJECTS_DIR, normalizeObjectKey(key))
+  }
+
+  private publicPath(key: string): string {
+    return this.resolveUnder('public', normalizeObjectKey(key))
   }
 
   private metaPath(key: string): string {
@@ -250,9 +251,12 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   private async statFileOrThrow(fullPath: string, key: string): Promise<Stats> {
+    const root = path.resolve(this.config.root, OBJECTS_DIR) + path.sep
+    const resolved = path.resolve(fullPath)
+    if (!resolved.startsWith(root)) throw new InvalidObjectKeyError('path outside object storage')
     let stats: Stats
     try {
-      stats = await stat(fullPath)
+      stats = await stat(resolved)
     } catch (err) {
       throw this.toNotFound(err, key)
     }
@@ -262,8 +266,11 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   private async readSidecar(key: string): Promise<SidecarMeta | undefined> {
+    const fullPath = this.metaPath(key)
+    const root = path.resolve(this.config.root, META_DIR) + path.sep
+    if (!fullPath.startsWith(root)) throw new InvalidObjectKeyError('path outside metadata storage')
     try {
-      return JSON.parse(await readFile(this.metaPath(key), 'utf8')) as SidecarMeta
+      return JSON.parse(await readFile(fullPath, 'utf8')) as SidecarMeta
     } catch {
       return undefined
     }

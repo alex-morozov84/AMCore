@@ -9,8 +9,12 @@ function isKnownDependencyName(name: string): name is KnownDependencyName {
   return (ADMIN_OVERVIEW_DEPENDENCY_NAMES as readonly string[]).includes(name)
 }
 
+import { AdminOverviewResourcesService } from './admin-overview-resources.service'
+
 import { EnvService } from '@/env/env.service'
 import { ReadinessCheckService } from '@/health'
+import { readBuildIdentity } from '@/infrastructure/build-identity'
+import { StorageProbeService } from '@/infrastructure/storage'
 
 /**
  * Console Overview status.
@@ -26,13 +30,43 @@ import { ReadinessCheckService } from '@/health'
 export class AdminOverviewService {
   constructor(
     private readonly readiness: ReadinessCheckService,
-    private readonly env: EnvService
+    private readonly env: EnvService,
+    private readonly resources: AdminOverviewResourcesService,
+    private readonly storageProbe: StorageProbeService
   ) {}
 
   async getOverview(): Promise<AdminOverviewResponse> {
+    const observation = await this.observeReadiness()
+    const samples = await this.resources.sample()
+    const api = {
+      version: safeMetadata(this.env.get('APP_VERSION')),
+      commit: safeMetadata(this.env.get('APP_COMMIT')),
+      deploymentId: this.env.get('APP_DEPLOYMENT_ID') ?? null,
+      environment: this.env.get('APP_ENVIRONMENT') ?? null,
+      runtimeMode: this.env.get('NODE_ENV'),
+    }
+    return {
+      ...observation,
+      ...samples,
+      api,
+      build: readBuildIdentity(),
+      storage: this.storageProbe.snapshot(),
+      completedAt: new Date().toISOString(),
+      version: api.version ?? 'unknown',
+      processRole: this.env.get('PROCESS_ROLE'),
+      storageHealthEnabled: this.env.get('STORAGE_HEALTH_ENABLED'),
+    }
+  }
+
+  private async observeReadiness(): Promise<
+    Pick<AdminOverviewResponse, 'readiness' | 'dependencies' | 'checkedAt'>
+  > {
     try {
       const result = await this.readiness.check()
-      return this.toResponse('ready', result.details)
+      if (result.status !== 'ok' && result.status !== 'degraded') {
+        throw new Error('Unexpected readiness result')
+      }
+      return this.toResponse(result.status === 'degraded' ? 'degraded' : 'ready', result.details)
     } catch (err) {
       if (err instanceof ServiceUnavailableException) {
         return this.toResponse('not_ready', this.extractDetails(err))
@@ -58,22 +92,27 @@ export class AdminOverviewService {
   private toResponse(
     readiness: AdminOverviewResponse['readiness'],
     details: HealthCheckResult['details']
-  ): AdminOverviewResponse {
+  ): Pick<AdminOverviewResponse, 'readiness' | 'dependencies' | 'checkedAt'> {
     const dependencies = Object.entries(details)
       .filter((entry): entry is [KnownDependencyName, HealthCheckResult['details'][string]] =>
         isKnownDependencyName(entry[0])
       )
       .map(([name, value]) => ({
         name,
-        status: (value?.status === 'up' || value?.status === 'down' ? value.status : 'unknown') as
-          'up' | 'down' | 'unknown',
+        status: (value?.status === 'up' || value?.status === 'down' || value?.status === 'degraded'
+          ? value.status
+          : 'unknown') as 'up' | 'down' | 'degraded' | 'unknown',
       }))
 
     return {
       readiness,
       dependencies,
-      version: this.env.get('APP_VERSION'),
-      processRole: this.env.get('PROCESS_ROLE'),
+      checkedAt: new Date().toISOString(),
     }
   }
+}
+
+function safeMetadata(value: string): string | null {
+  const normalized = value.trim()
+  return normalized !== 'unknown' && /^[A-Za-z0-9._+-]{1,128}$/.test(normalized) ? normalized : null
 }

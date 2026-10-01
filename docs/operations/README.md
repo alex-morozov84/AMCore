@@ -92,6 +92,10 @@ Already running? Reach for whichever concern below applies.
 - **[Slow query investigation](slow-query-investigation.md)** — triage
   queries once the above is set up — the tool the DB runbook's Slow queries
   entry points to for "which query," not just "that queries are slow."
+- **[File storage monitoring](runbooks/storage.md)** — local/S3 probe failures,
+  permissions, sampling delay and recovery; see
+  [storage configuration](../storage/configuration.md#active-file-monitoring-and-readiness)
+  for cadence, operation budget and production setup.
 - **[CI & repo security](ci-security.md)** — the CI security gates, what a fork
   inherits (and what it doesn't), the `strict`-mode `setup-repo-security.sh` step,
   the action-pin rules, and the local pre-commit size advisory.

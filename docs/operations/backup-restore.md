@@ -229,10 +229,10 @@ buried in `docker compose logs`.
 
 - **Object storage** (uploaded files/media under `STORAGE_DRIVER=s3` or the
   `local` driver) is a separate concern from the Postgres backups above.
-  Production already requires `STORAGE_DRIVER=s3` (see "Production
-  environment requirements" in [deployment.md](deployment.md)) — durability
-  for that data is the object-storage provider's responsibility, not this
-  guide's.
+  Both S3-compatible and local storage are supported in production. Provider
+  durability does not replace an operator retention/recovery policy; configure
+  versioning or backups appropriate to the selected backend. For a local
+  deployment, follow [Local file storage](#local-file-storage) below.
 - **Secret rotation** (JWT secret, database/Redis credentials, OAuth
   credentials, storage/AI provider keys) is a separate operator runbook — see
   [Secret rotation](secret-rotation.md).
@@ -249,3 +249,13 @@ buried in `docker compose logs`.
 Before restored traffic resumes, replay trusted post-backup API-key revocations
 or invalidate restored credentials. A pre-revoke verifier backup can revive a
 key; see [API-key restore safety](api-key-lifecycle.md#restore).
+
+## Local file storage
+
+Postgres backups do not include application files. For STORAGE_DRIVER=local,
+back up the persistent shared storage volume separately: objects/, meta/ and
+public/ must be consistent, using a filesystem snapshot or pausing API/worker
+writes. Store backups outside the VPS and define retention/RPO. Restore them
+with runtime uid/gid 1001 permissions to an isolated deployment, verify private
+and public access, and test persistence across container recreation. Exclude
+objects/.amcore-probes/ and meta/.amcore-probes/ from application backups. See [local production storage](../storage/configuration.md#local-production).

@@ -136,7 +136,8 @@ provide an operator interface for admin session management.
   organization selector and read-only overview, one-placement integration and
   headless extension path; product-domain management UI remains downstream-owned.
 - **[Operations Console](operations-console/README.md)** — the optional
-  `SUPER_ADMIN` control plane: Overview, user and organization details,
+  `SUPER_ADMIN` control plane: Overview readiness, API/web identity and local
+  resources, user and organization details,
   Users system-role changes, bounded Audit browsing, topology,
   host-session boundary, downstream scaffolding, deployment, verification,
   and safe extension rules.

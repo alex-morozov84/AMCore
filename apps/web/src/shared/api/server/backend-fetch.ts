@@ -17,6 +17,8 @@ const API_URL = process.env.API_URL ?? 'http://localhost:5002'
 const DEFAULT_TIMEOUT_MS = 5_000
 
 export interface BackendFetchOptions {
+  /** Opt-in request cache policy; other consumers keep their existing defaults. */
+  cache?: RequestCache
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
   /** No default - every call site must state its policy explicitly. See
@@ -101,6 +103,7 @@ async function performRequest(
 
     const response = await fetch(`${API_URL}${path}`, {
       method: opts.method ?? 'GET',
+      ...(opts.cache !== undefined ? { cache: opts.cache } : {}),
       headers: headersResult.headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       signal,

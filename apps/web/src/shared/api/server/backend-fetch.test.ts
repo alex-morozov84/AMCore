@@ -51,6 +51,14 @@ describe('fetchBackend - orchestration', () => {
     })
   })
 
+  it('forwards an explicit no-store policy without changing other callers', async () => {
+    const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
+    await fetchBackend('/things/p1', schema, { auth: 'none', cache: 'no-store' })
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ cache: 'no-store' })
+    await fetchBackend('/things/p1', schema, { auth: 'none' })
+    expect(fetchMock.mock.calls[1][1]).not.toHaveProperty('cache')
+  })
+
   it('throws BackendRequestError(invalid-payload) when a 2xx body fails the schema', async () => {
     stubFetch(new Response(JSON.stringify({ wrong: 'shape' }), { status: 200 }))
 
@@ -210,7 +218,7 @@ describe('fetchBackend - orchestration', () => {
   })
 
   describe('deadline and cancellation', () => {
-    it('classifies a deadline expiry as unavailable(timeout), not caller cancellation', async () => {
+    it('classifies the default five-second deadline as unavailable(timeout), not caller cancellation', async () => {
       vi.useFakeTimers()
       vi.stubGlobal(
         'fetch',
@@ -222,8 +230,8 @@ describe('fetchBackend - orchestration', () => {
         )
       )
 
-      const resultPromise = fetchBackend('/things', schema, { auth: 'none', timeoutMs: 1_000 })
-      await vi.advanceTimersByTimeAsync(1_000)
+      const resultPromise = fetchBackend('/things', schema, { auth: 'none' })
+      await vi.advanceTimersByTimeAsync(5_000)
 
       expect(await resultPromise).toEqual({
         status: 'unavailable',

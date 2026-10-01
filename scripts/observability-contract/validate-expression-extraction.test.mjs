@@ -29,12 +29,12 @@ test('real repository yields every expr non-empty', () => {
 
 test('real repository expression count covers alerts, dashboard targets, and runbook fences', () => {
   const all = getAllExpressions()
-  // 34 alerting rules (32 default + 2 optional SLO) + 6 recording rules +
-  // 33 dashboard panel targets (some panels plot more than one series) + 15
+  // 35 alerting rules (33 default + 2 optional SLO) + 6 recording rules +
+  // 33 dashboard panel targets (some panels plot more than one series) + 16
   // tagged runbook fences (realtime.md's rejected_user/rejected_global query
   // pair was split into two single-query fences during this track — every
   // fence carries exactly one PromQL statement, matching every other one).
-  assert.equal(all.length, 34 + 6 + 33 + 15)
+  assert.equal(all.length, 35 + 6 + 33 + 16)
 })
 
 test('recording rule names are read from the rule files, not hand-copied', () => {

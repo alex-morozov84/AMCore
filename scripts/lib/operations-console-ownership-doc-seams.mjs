@@ -219,6 +219,35 @@ export const operationsConsoleDocSeams = [
     { start: '| HTTPS Console host stack', end: '| Fresh disposable host-mode database' },
     ['console-real-stack']
   ),
+  entry(
+    'console.overview-deployment',
+    'docs/operations/deployment.md',
+    block(
+      'The optional [Console Overview](../operations-console/overview.md) shows this API',
+      '[Console metadata settings](../operations-console/configuration.md#overview-metadata-and-resource-settings).'
+    ),
+    undefined,
+    { operationKey: 'console.deploy-doc' }
+  ),
+  entry(
+    'console.overview-observability',
+    'docs/operations/observability.md',
+    block(
+      'The optional [Console Overview](../operations-console/overview.md) presents these',
+      '[Console configuration](../operations-console/configuration.md#overview-metadata-and-resource-settings).'
+    )
+  ),
+  entry('console.storage-display', 'docs/storage/configuration.md', {
+    text: 'The optional Console displays the cached file-check result; it does not send alerts.',
+  }),
+  entry(
+    'console.storage-runbook',
+    'docs/operations/runbooks/storage.md',
+    block(
+      'The optional Console Overview reads the cached result of the responding API.',
+      'An open Console page does not itself send notifications.'
+    )
+  ),
   ...operationsConsoleDiscoverySeams,
 ]
 import { operationsConsoleDiscoverySeams } from './operations-console-ownership-discovery-seams.mjs'

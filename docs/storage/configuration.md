@@ -11,6 +11,12 @@ startup.
 | `test`          | `memory`       | Fast deterministic unit tests                                  |
 | everything else | `local`        | No cloud dependency during development                         |
 
+This table applies when `STORAGE_DRIVER` is **unset in the API environment**.
+The reference Docker Compose file supplies `local` by default, including when
+`NODE_ENV=production`. Set `STORAGE_DRIVER` explicitly for each production
+deployment: `local` for the shared persistent volume below, or `s3` with bucket
+credentials. Do not rely on the runtime-mode default to select storage in Compose.
+
 Override with:
 
 ```env
@@ -67,6 +73,15 @@ Public URL shape without `STORAGE_PUBLIC_ENDPOINT`:
 https://{bucket}.s3.{region}.amazonaws.com/{key}
 ```
 
+The current S3 driver uploads `public-read` objects with a `public-read` ACL.
+New AWS buckets disable ACLs by default, so those uploads fail with
+`AccessControlListNotSupported` unless the bucket deliberately permits ACLs.
+For the shipped public-avatar flow, use an ACL-capable bucket with a deliberate
+public-access policy, or adapt the S3 provider for policy-based delivery before
+using an ACL-disabled bucket. Private uploads and the active file check do not
+need a public ACL. A healthy file check does not verify public object delivery.
+See [AWS Object Ownership](https://docs.aws.amazon.com/AmazonS3/latest/userguide/managing-acls.html).
+
 ### Cloudflare R2
 
 ```env
@@ -113,7 +128,7 @@ STORAGE_PUBLIC_ENDPOINT=https://cdn.example.com/assets
 ```env
 STORAGE_DRIVER=local
 STORAGE_LOCAL_ROOT=./uploads
-STORAGE_LOCAL_PUBLIC_BASE_URL=http://localhost:3001/static
+STORAGE_LOCAL_PUBLIC_BASE_URL=http://localhost:5002/api/v1/storage/public
 ```
 
 The local driver stores bytes under:
@@ -128,25 +143,116 @@ and metadata sidecars under:
 {STORAGE_LOCAL_ROOT}/meta/{key}.json
 ```
 
-`STORAGE_LOCAL_PUBLIC_BASE_URL` must point at a static mount of
-`{STORAGE_LOCAL_ROOT}/objects`, not at `{STORAGE_LOCAL_ROOT}`. Mounting the root
-would expose metadata sidecars.
+`STORAGE_LOCAL_PUBLIC_BASE_URL` points at the browser-facing API endpoint
+`/api/v1/storage/public`; generated URLs encode the object key in `?key=...`.
+It must be reachable through your API reverse proxy. Only explicit public copies
+are served, with safe content types, attachment disposition, nosniff and sandbox
+headers. Public copies explicitly permit cross-origin resource embedding so a
+frontend on a different API domain can display images. This does not grant
+access to private files. The web starter's CSP still allows images only from
+its own origin: expose this public endpoint through the product reverse proxy
+under the same origin, or have downstream explicitly allow its trusted public
+asset origin in `img-src`. A public API response does not override the page's CSP.
+Private objects, metadata and probes are never served. Existing local
+public URLs from the old static-mount layout must be migrated; re-upload existing
+public objects through the provider to create their public copies before switching
+URLs, or perform a controlled visibility-aware migration. Do not continue exposing
+the whole objects directory.
 
-## Health
+### Local production
 
-Storage readiness is opt-in:
+Explicitly choose `STORAGE_DRIVER=local`. The reference Compose stack mounts the
+same named `local_storage` volume at `/app/uploads` in API and worker. The image
+creates this directory with runtime uid/gid 1001 ownership, which Docker copies
+into a new empty volume. Existing volumes and bind mounts retain their own
+permissions: provision ownership before rollout. Do not use world-writable access.
+If overriding `STORAGE_LOCAL_ROOT`, mount the same durable storage at the new path
+in both services; an environment override alone does not move a volume.
+
+This supports a single-host deployment such as a VPS. Replicas on different hosts
+need shared durable storage or S3; identically named local volumes are not shared
+across machines. Separate Compose projects also get separate named volumes by
+default; plan shared storage or a coordinated file migration before a blue-green
+cutover. Preserve the volume during upgrades; `docker compose down -v`
+removes it. Back up objects, metadata and public copies consistently while writes
+are paused or using a filesystem snapshot. Restore to an isolated deployment and
+verify private downloads, public avatars and API/worker access. Database backups
+do not include this volume. See [backup/restore](../operations/backup-restore.md).
+A successful probe proves current I/O, not persistence after recreation or backups.
+
+## Active file monitoring and readiness
+
+Every API/worker process checks the selected local, S3-compatible or test-memory
+driver independently. It writes a 35-byte private canary, reads/compares the bytes
+and deletes it. Overview and metrics scrapes only read the cached result.
+Overview shows result time and the next scheduled check; an unfinished operation
+blocks new checks. A timeout timestamp is publication of the failed verdict, not
+proof that underlying I/O or cleanup has completed.
 
 ```env
+STORAGE_PROBE_INTERVAL_SECONDS=600
+STORAGE_PROBE_TIMEOUT_SECONDS=10
+STORAGE_PROBE_PREFIX=__amcore_probes__
 STORAGE_HEALTH_ENABLED=false
 STORAGE_HEALTH_PROBE_KEY=__storage_health_check__
 ```
 
-If a production bucket uses prefix-scoped credentials, set
-`STORAGE_HEALTH_PROBE_KEY` inside the allowed prefix, for example:
+Cadence accepts 30–3600 seconds; transaction deadline 1–20 seconds plus a separate
+five-second cleanup deadline. Results become stale after three cadences. Startup
+has an unmeasured state until completion; success, failure, unknown and stale are
+separate. Cancellation is cooperative: unfinished I/O retains the single-operation
+slot, so timed-out work cannot accumulate. No deadline promises cancellation of
+kernel filesystem operations. Crash/denial can leave a canary; use lifecycle cleanup
+only on the dedicated S3 prefix (including noncurrent versions when applicable)
+and old-file cleanup only on local `objects/.amcore-probes/` and `meta/.amcore-probes/`.
 
-```env
-STORAGE_HEALTH_PROBE_KEY=avatars/.health
-```
+The default interval is **10 minutes** (`STORAGE_PROBE_INTERVAL_SECONDS=600`).
+Normal S3 traffic is one PUT, one GET and one DELETE per check per process.
+Over 30 days, one API and one worker therefore perform **8,640 operations of each
+type** (25,920 requests in total), excluding startup checks, retries and cleanup
+after failures. Replicas multiply this traffic; application traffic shares any
+provider free allowance. For example, Yandex Object Storage currently includes
+10,000 standard write operations and 100,000 reads per month; DELETE is free.
+These checks alone use about 86% of its free write allowance for that topology.
+Check current [provider pricing](https://yandex.cloud/ru/docs/storage/pricing)
+before deployment; other S3-compatible providers have different terms.
+Each instance tests its own credentials/mount, including worker. Increasing
+the interval reduces cost but delays detection: with checks completing on schedule,
+a failure just after a successful check is not seen for about ten minutes at the
+default interval. A stalled operation can delay the next check further; its result
+eventually becomes stale. The synthetic check complements metrics from actual
+user operations. It does not test public/CDN URLs,
+backup integrity, persistence across container recreation or S3 capacity.
+
+The active S3 check needs `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject`
+under `{bucket}/{STORAGE_PROBE_PREFIX}/*`. An AWS resource example is
+`arn:aws:s3:::example-bucket/__amcore_probes__/*`; compatible providers use their
+corresponding policy. The same configured credentials also serve application files:
+grant their required object permissions separately. Restricting the credentials
+to the diagnostic prefix alone would break user uploads and downloads. The check
+needs no ListBucket or public ACL permission. Encryption
+policies may additionally require KMS access. Prefix-scoped deployments can select
+a dedicated reserved prefix inside their allowed namespace. Do not share it with
+user objects. HTTP 403 is an access failure, not proof of a provider outage.
+
+Storage failure does not change API readiness by default. The separate existing
+`STORAGE_HEALTH_ENABLED=true` opt-in adds a passive HEAD/exists check to readiness;
+it does not trigger a synthetic write per health request. That passive check can
+return 403 for a missing S3 key without ListBucket. Configure its key to an existing
+readable object or grant appropriate scoped listing access; don't interpret 403 as
+"S3 is down". Compose forwards both monitoring and readiness settings.
+
+`amcore_storage_probe_state{driver,state}` and the tested five-minute alert expose
+cached failures without user traffic. The five-minute alert hold starts when
+monitoring observes a failed result; it does not prove five minutes of continuous
+failed I/O. With the default cadence, initial detection plus the hold can take
+about fifteen minutes, plus scrape/evaluation delays. A transient failure may
+remain reported until the next successful check. Set up a downstream notification receiver
+once. For the supplied monitoring harness,
+follow [Alertmanager receiver setup](../operations/observability.md#local-verification-harness).
+See the [storage runbook](../operations/runbooks/storage.md) for failure recovery.
+
+The optional Console displays the cached file-check result; it does not send alerts.
 
 ## Limits
 

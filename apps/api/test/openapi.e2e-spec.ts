@@ -24,7 +24,7 @@ import { setupE2ETest, teardownE2ETest } from './helpers'
  * status) fails CI, and a silent status flip (e.g. a `POST` defaulting back
  * to 200) is caught.
  *
- * Terminus health probes (`/health*`) document 200/503 via `@ApiResponse`
+ * Terminus health probes (`/health*`) document 200/503/500 via `@ApiResponse`
  * without a body schema by design and are the one justified exclusion.
  *
  * A second guardrail below (`apiKeyBearer` security surface) shares
@@ -85,6 +85,7 @@ const EXPECTED: Record<string, Expected> = {
   'get /admin/organizations': { status: '200', kind: 'json' },
   'get /admin/organizations/{id}': { status: '200', kind: 'json' },
   'get /admin/overview': { status: '200', kind: 'json' },
+  'get /storage/public': { status: '200', kind: 'binary' },
   // api-keys
   'post /api-keys': { status: '201', kind: 'json' },
   'get /api-keys': { status: '200', kind: 'json' },
@@ -407,9 +408,36 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation?.responses).toHaveProperty('200')
     expect(operation?.responses).toHaveProperty('401')
     expect(operation?.responses).toHaveProperty('403')
-    // 503 here means the observation itself failed - distinct from the typed
-    // 200 `readiness: 'not_ready'` response for an observed degraded instance.
-    expect(operation?.responses).toHaveProperty('503')
+    // Provider bugs are 500; browser timeouts are not an API HTTP 503 response.
+    expect(operation?.responses).toHaveProperty('500')
+    expect(operation?.responses).not.toHaveProperty('503')
+    const response = operation?.responses?.['200'] as {
+      content?: { 'application/json'?: { schema?: { $ref?: string } } }
+    }
+    const ref = response.content?.['application/json']?.schema?.$ref
+    expect(ref).toBeDefined()
+    const schema = document.components?.schemas?.[ref!.split('/').at(-1)!]
+    expect(schema).toMatchObject({
+      required: expect.arrayContaining([
+        'readiness',
+        'dependencies',
+        'version',
+        'processRole',
+        'checkedAt',
+        'completedAt',
+        'build',
+        'storage',
+        'storageHealthEnabled',
+        'api',
+        'process',
+        'resources',
+      ]),
+      properties: {
+        storage: {
+          required: expect.arrayContaining(['state', 'checkedAt', 'nextScheduledAt', 'inProgress']),
+        },
+      },
+    })
   })
 
   it('documents the bounded bearer-only audit read without raw metadata', () => {

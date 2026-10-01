@@ -513,25 +513,19 @@ export class AdminController {
   }
 
   @Get('overview')
+  @Header('Cache-Control', 'private, no-store')
   @ApiOperation({ summary: 'Console Overview status — SUPER_ADMIN only' })
   @ZodResponse({
     type: AdminOverviewResponseDto,
     status: 200,
     description:
-      'This API instance’s readiness, dependency states, version and process role. ' +
+      'This API instance’s readiness, declared deployment metadata and independent local resource samples. ' +
       'Always 200 even when the instance is not ready (see `readiness`); an HTTP 5xx here ' +
       'means the observation itself failed, not that the instance is unhealthy.',
   })
   @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
   @ApiResponse({ status: 403, description: 'SUPER_ADMIN required' })
-  @ApiResponse({
-    status: 503,
-    description:
-      'The observation itself could not be completed (e.g. the request timed out or the ' +
-      'service was otherwise unreachable) — distinct from the typed 200 `readiness: ' +
-      "'not_ready'` response, which means the observation succeeded and found this " +
-      'instance degraded.',
-  })
+  @ApiResponse({ status: 500, description: 'Unexpected observation provider failure' })
   getOverview(): Promise<AdminOverviewResponse> {
     return this.overviewService.getOverview()
   }

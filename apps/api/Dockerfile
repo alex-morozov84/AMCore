@@ -42,7 +42,8 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 RUN pnpm --filter @amcore/shared build
 RUN pnpm --filter api db:generate
-RUN pnpm --filter api build
+ARG BUILD_SOURCE_COMMIT
+RUN BUILD_SOURCE_COMMIT="$BUILD_SOURCE_COMMIT" pnpm --filter api build
 
 # Produce a self-contained production bundle (flat node_modules with all deps,
 # including the workspace `@amcore/shared`, resolvable from the bundle root).
@@ -128,7 +129,7 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 # copies this directory's ownership from the image, so both services can use
 # it without a root init step; without this, an empty volume defaults to
 # root:root and the worker's downloader fails with EACCES.
-RUN mkdir -p /data/geoip && chown nestjs:nodejs /data/geoip
+RUN mkdir -p /data/geoip /app/uploads && chown nestjs:nodejs /data/geoip /app/uploads
 
 USER nestjs
 

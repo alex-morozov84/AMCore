@@ -13,6 +13,7 @@ import { AdminApiKeysService } from './admin-api-keys.service'
 import { AdminAuditService } from './admin-audit.service'
 import { AdminDetailService } from './admin-detail.service'
 import { AdminOverviewService } from './admin-overview.service'
+import { AdminOverviewResourcesService } from './admin-overview-resources.service'
 import { AdminSessionsService } from './admin-sessions.service'
 
 import { HealthModule } from '@/health'
@@ -34,6 +35,7 @@ import { HealthModule } from '@/health'
     ApiKeyRevocationService,
     AdminDetailService,
     AdminOverviewService,
+    AdminOverviewResourcesService,
     AdminAuditService,
     AdminSessionsService,
   ],

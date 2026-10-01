@@ -57,7 +57,12 @@ describe('ReadinessCheckService', () => {
     diskIndicator.checkStorage.mockResolvedValue({ disk: { status: 'up' } } as any)
     memoryIndicator.checkHeap.mockResolvedValue({ memory_heap: { status: 'up' } } as any)
     healthCheckService.check.mockImplementation(async (indicators) => {
-      await Promise.all(indicators.map((indicator) => indicator()))
+      await Promise.all(
+        indicators.map((indicator) => {
+          if (typeof indicator !== 'function') throw new Error('Expected a callable health check')
+          return indicator()
+        })
+      )
       return { status: 'ok' } as any
     })
     await service.check()
