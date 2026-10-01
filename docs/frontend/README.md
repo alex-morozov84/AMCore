@@ -27,6 +27,7 @@ guessing.
 This index is the public entry point for the current frontend starter surface;
 see `architecture-and-conventions.md`'s "See also" section for related guides.
 
+- [Product administration foundation](../product-admin/README.md) — one-placement ready pages, custom headless UI and module extension.
 - [Organization foundation UI](./organization-context.md) — root selector, read-only overview, ordered identity/authority lifecycle and custom mounts.
 
 ## Start here

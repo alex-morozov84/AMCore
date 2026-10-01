@@ -15,11 +15,21 @@ const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDiscoverySeams = [
   entry(
+    'console.product-admin-intro',
+    'docs/product-admin/README.md',
+    block(
+      'This product surface is independent of the [Operations Console]',
+      'platform super-administrators. An organization role does not grant Console access.'
+    ),
+    ['../operations-console/README.md']
+  ),
+  entry(
     'console.root-intro',
     'README.md',
     {
       start: 'The optional [Operations Console](docs/operations-console/README.md)',
       end: 'catalog/content admin UI.',
+      consumeBlankLine: true,
     },
     undefined,
     { operationKey: 'readme-console' }
@@ -41,7 +51,7 @@ export const operationsConsoleDiscoverySeams = [
   entry(
     'console.root-map',
     'README.md',
-    { text: '| Operations Console                  | [`docs/operations-console/`' },
+    { text: '[`docs/operations-console/`](docs/operations-console/README.md)' },
     undefined,
     { operationKey: 'readme-console' }
   ),
@@ -62,10 +72,7 @@ export const operationsConsoleDiscoverySeams = [
   entry(
     'console.docs-index',
     'docs/README.md',
-    block(
-      '- **[Operations Console](operations-console/README.md)**',
-      'and safe extension rules.'
-    ),
+    block('- **[Operations Console](operations-console/README.md)**', 'and safe extension rules.'),
     undefined,
     { operationKey: 'docs-index-console' }
   ),

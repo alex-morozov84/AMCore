@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE } from '@amcore/shared'
+
 import type { PrismaService } from '../../prisma'
 
 import { AdminDetailService } from './admin-detail.service'
@@ -16,7 +18,7 @@ describe('AdminDetailService', () => {
           name: 'Ada',
           avatarUrl: null,
           phone: null,
-          locale: 'en',
+          locale: DEFAULT_LOCALE,
           timezone: null,
           systemRole: 'USER',
           createdAt: date,
@@ -38,6 +40,7 @@ describe('AdminDetailService', () => {
       limit: 10,
       search: undefined,
     })
+    expect(result.user.locale).toBe(DEFAULT_LOCALE)
     expect(result.user).not.toHaveProperty('passwordHash')
     expect(result.memberships).toMatchObject({ total: 30, page: 2, limit: 10 })
     expect(result.membershipCount).toBe(30)
@@ -63,7 +66,7 @@ describe('AdminDetailService', () => {
           name: 'Ada',
           avatarUrl: null,
           phone: null,
-          locale: 'en',
+          locale: DEFAULT_LOCALE,
           timezone: null,
           systemRole: 'USER',
           createdAt: date,
@@ -84,6 +87,7 @@ describe('AdminDetailService', () => {
       limit: 10,
       search: 'North%',
     })
+    expect(result.user.locale).toBe(DEFAULT_LOCALE)
     expect(result.membershipCount).toBe(20)
     expect(result.memberships.total).toBe(1)
     expect(tx.orgMember.count.mock.calls[1][0].where.organization.OR).toEqual([

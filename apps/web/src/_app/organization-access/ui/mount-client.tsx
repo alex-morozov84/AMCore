@@ -6,29 +6,38 @@ import type { ProductAccessBootstrap } from '@amcore/shared'
 import { OrganizationAccessClient } from '@/_pages/organization-access'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
+import {
+  organizationAccessHrefs,
+  type OrganizationAccessPlacement,
+  organizationAccessPlacement,
+} from '../model/placement'
+
 export function OrganizationAccessClientMount({
   admission,
+  placement = organizationAccessPlacement,
   id,
   page,
   explicitList,
 }: {
   admission: ProductAccessBootstrap
+  placement?: OrganizationAccessPlacement
   id?: string
   page: number
   explicitList: boolean
 }) {
   const router = useRouteProgressRouter()
   const locale = useLocale()
+  const hrefs = organizationAccessHrefs(placement)
   return (
     <OrganizationAccessClient
       admission={admission}
       input={id ? { kind: 'selected', id, locale } : { kind: 'list', page, locale }}
       explicitList={explicitList}
-      contextHref={(value) => `/organizations/${encodeURIComponent(value)}`}
-      pageHref={(value) => `/organizations?view=list&page=${value}`}
-      listHref="/organizations?view=list"
+      contextHref={hrefs.contextHref}
+      pageHref={hrefs.pageHref}
+      listHref={hrefs.listHref}
       loginHref="/login"
-      dashboardHref="/"
+      dashboardHref={hrefs.homeHref}
       onReplace={(href) => router.replace(href)}
       onReload={() => window.location.reload()}
     />

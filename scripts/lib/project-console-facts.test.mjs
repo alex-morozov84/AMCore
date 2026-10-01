@@ -44,10 +44,10 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console disabled content',
-      expected: 43,
+      expected: 44,
       actual: count(disabled.consoleFacts, 'content'),
     },
-    { name: 'console disabled steps', expected: 78, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 79, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     {
@@ -69,7 +69,7 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console single-locale content',
-      expected: 42,
+      expected: 43,
       actual: count(singleDisabled.consoleFacts, 'content'),
     },
   ])

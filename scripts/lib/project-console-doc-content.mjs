@@ -44,7 +44,12 @@ export function consoleOwnedBlockDefinition(operationKey) {
   const seams = seamsFor(operationKey)
   if (!seams.length || seams.some((seam) => seam.seamKind !== 'owned-block')) return undefined
   return {
-    claims: () => seams.map((seam) => ({ location: `ownership:seam:${seam.id}`, value: 'absent' })),
+    claims: () => [
+      ...seams.map((seam) => ({ location: `ownership:seam:${seam.id}`, value: 'absent' })),
+      ...(operationKey === 'readme-console'
+        ? [{ location: 'markdown:table:frontend-capabilities:padding', value: 'compact' }]
+        : []),
+    ],
     apply: (text) => seams.reduce(removeSelector, text),
   }
 }

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Features
+
+- Organization pages accept one application placement for addresses, pagination
+  and both product menus; shell-free mount and public product-admin integration
+  guides preserve explicit routing and independent headless composition.
+
 ### Added
 
 - Console Overview with automatic API/web build identity, clear per-instance DB,

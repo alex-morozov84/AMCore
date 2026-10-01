@@ -70,7 +70,9 @@ through `core/auth/organization-context`; use `CurrentOrganizationContext` for
 the API-issued admission evidence, never deserialize that evidence from a body.
 The guard applies after credential admission, outside credential fallback.
 
-Add the same family through the application's `_app/product-api` public
+Keep family registration in retained application code, imported directly from
+shared contracts independently of reference frontend removal. Add the same family
+through the application's `_app/product-api` public
 composition API. The generic BFF refuses every method under declared family
 roots, including reserved `/api/v1/product-access`; only typed routes expose
 organization operations. Classification uses the final upstream URL, configured
@@ -124,3 +126,5 @@ There is no server-global active organization or dependency on Console pages.
 See [RBAC](./rbac.md), [API consumption](../frontend/api-consumption.md),
 [FSD guardrails](../frontend/fsd-boundaries-and-guardrails.md), and
 [managed local checks](../operations/local-stands.md).
+
+For ready pages and custom UI, see [product administration](../product-admin/README.md).

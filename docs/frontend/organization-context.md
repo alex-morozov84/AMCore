@@ -49,14 +49,17 @@ claimed to be one transactional snapshot. No mutation is automatically replayed.
 - `widgets/organization-context-summary`: read-only localized organization/access block.
 - `_pages/organization-access`: page content composition, navigation/recovery and
   status presentation.
-- `_app/organization-access`: first root mount, safe admission/frame, canonical
-  URL builders and the menu insertion. Thin Next routes import this public seam.
+- `_app/organization-access`: app-owned serializable placement, safe admission,
+  shell-free server content mount, separate frame and client menu. Use its narrow
+  `index.server`, `index.client` and `index.config` entries for capability isolation. Thin Next routes import this public seam.
 
 Use `useOrganizationContext(binding,input)` for a custom presentation. Inputs
 are explicit `{kind:'list',page,locale}` or `{kind:'selected',id,locale}`; each
 consumer has its own lifetime, so two tabs/targets cannot change a global active
-organization. A cabinet can supply `/manage/organizations` hrefs and another
-frame while reusing the headless API or ready blocks. This is a source composition
+organization. A cabinet sets one app-owned placement for `/manage/organizations`; ready
+page URLs and both product menus derive from it. Custom nonhierarchical routes
+retain the explicit page href/callback API. See [product administration](../product-admin/README.md)
+and its [integration recipes](../product-admin/integration.md). This is a source composition
 seam, not a delivered configurable topology framework. Import the server DAL
 only through `index.server.ts`, never from a Client Component.
 
