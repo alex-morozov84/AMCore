@@ -871,7 +871,7 @@ describe('Organizations (e2e)', () => {
             'PERMISSION_RULE_UNSUPPORTED',
           ],
           [
-            { action: 'read', subject: 'Organization', conditions: { aclVersion: -1 } },
+            { action: 'read', subject: 'Organization', conditions: { aclVersion: -2_147_483_649 } },
             'PERMISSION_RULE_UNSUPPORTED',
           ],
           [
@@ -925,6 +925,16 @@ describe('Organizations (e2e)', () => {
           fields: ['id', 'name'],
         })
         .expect(201)
+      const signedRule = await request(app.getHttpServer())
+        .post(path)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({
+          action: 'read',
+          subject: 'Organization',
+          conditions: { aclVersion: { gte: -1 } },
+        })
+        .expect(201)
+      expect(signedRule.body.conditions).toEqual({ aclVersion: { gte: -1 } })
     })
 
     it('discovers only declared actions and stores holder-bound presets with bearer auth', async () => {

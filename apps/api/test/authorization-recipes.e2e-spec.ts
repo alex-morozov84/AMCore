@@ -312,6 +312,12 @@ describe('Bounded Prisma recipe (real PostgreSQL)', () => {
         'aclVersion',
         await db.prisma.organization.findUniqueOrThrow({ where: { id: org } }),
       ],
+      [
+        Subject.Organization,
+        { aclVersion: { gte: -1 } },
+        'aclVersion',
+        await db.prisma.organization.findUniqueOrThrow({ where: { id: org } }),
+      ],
     ] as const) {
       const input = { action: Action.Read, subject: ruleSubject, conditions, fields: [field] }
       expect(() => validatePermissionRule(input)).not.toThrow()
@@ -333,6 +339,40 @@ describe('Bounded Prisma recipe (real PostgreSQL)', () => {
         await verifyOrganization(current, row, field)
       }
     }
+  })
+
+  it('loads a historically stored signed ACL threshold into CASL and PostgreSQL', async () => {
+    const stored = await db.prisma.permission.create({
+      data: {
+        action: Action.Read,
+        subject: Subject.Organization,
+        organizationId: org,
+        conditions: { aclVersion: { gte: -1 } },
+        fields: ['aclVersion'],
+      },
+    })
+    const principal: RequestPrincipal = {
+      type: 'jwt',
+      sub: 'historical-actor',
+      organizationId: org,
+      aclVersion: 0,
+      systemRole: SystemRole.User,
+    }
+    const [loaded] = normalizeOwnerPermissions([stored], principal)
+    const current = createPrismaAbility<AppAbility>([
+      {
+        action: Action.Read,
+        subject: Subject.Organization,
+        conditions: loaded!.conditions as never,
+        fields: loaded!.fields,
+      },
+    ])
+    const row = await db.prisma.organization.findUniqueOrThrow({ where: { id: org } })
+    expect(current.can(Action.Read, subject('Organization', row), 'aclVersion')).toBe(true)
+    const where = { AND: [accessibleBy(current).ofType('Organization'), { id: org }] }
+    const client = db.prisma.$extends(createCaslExtension())
+    expect((await client.organization.findMany({ where })).map((item) => item.id)).toEqual([org])
+    expect(await client.organization.count({ where })).toBe(1)
   })
 
   it.each(['update', 'delete'])(

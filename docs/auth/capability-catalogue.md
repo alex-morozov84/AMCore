@@ -57,8 +57,10 @@ DateTime comparisons use **integer epoch milliseconds** within JavaScript
 `Date`'s range; evaluation converts a fresh copy to `Date` before CASL and
 Prisma parsing. ISO strings and fractional dates are rejected because their
 record and SQL behavior would differ. `User.lastLoginAt` is nullable and
-accepts `null` equality; `Organization.aclVersion` accepts only nonnegative
-32-bit integers. Top-level `{}` is an unconditional condition, including in
+accepts `null` equality; `Organization.aclVersion` conditions accept the full
+signed 32-bit integer range, including negative comparison thresholds such as
+`{ gte: -1 }`. The stored ACL counter itself normally starts at zero. Top-level
+`{}` is an unconditional condition, including in
 actor hints. These limits are checked separately
 from the route's tenant, immutable-field and response-field policy.
 

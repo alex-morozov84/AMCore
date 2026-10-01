@@ -72,7 +72,7 @@ function scalar(value: unknown, kind: ScalarKind, subject: ModelSubject, field: 
     kind === 'integer' &&
     typeof resolved === 'number' &&
     Number.isInteger(resolved) &&
-    resolved >= 0 &&
+    resolved >= -2_147_483_648 &&
     resolved <= 2_147_483_647
   )
     return resolved
