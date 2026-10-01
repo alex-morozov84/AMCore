@@ -1,11 +1,21 @@
 import { removeExactBlock, replaceExactBlock } from './content-blocks.mjs'
 
-const DOCS_INDEX_ROW =
-  '| Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |\n'
-const SCAFFOLDING_ROW_BEFORE =
-  '| Initialize a downstream fork (rebrand, locale/Storybook/console shape, route-progress)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
-const SCAFFOLDING_ROW_AFTER =
-  '| Initialize a downstream fork (rebrand, locale/console shape, route-progress)             | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |\n'
+function mapTableRow(content, prefix, edit) {
+  const lines = content.split('\n')
+  const matches = lines.flatMap((line, index) => (line.startsWith(prefix) ? [index] : []))
+  if (matches.length !== 1) throw new Error(`expected exactly one ${prefix} table row`)
+  const index = matches[0]
+  const replacement = edit(lines[index])
+  lines.splice(index, 1, ...(replacement === null ? [] : [replacement]))
+  return lines.join('\n')
+}
+
+function replaceRowText(content, prefix, before, after) {
+  return mapTableRow(content, prefix, (line) => {
+    const changed = replaceExactBlock(line, before, after)
+    return changed.slice(0, -1) + ' '.repeat(line.length - changed.length) + '|'
+  })
+}
 const TESTING_BEFORE = `- **[Frontend testing](frontend/testing.md)** — the test taxonomy
   (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/
   real-stack E2E, Storybook, and axe scans), the technical boundary the E2E
@@ -28,14 +38,17 @@ const BRAND_AFTER = `  downstream rebrand checklist, and initializing a fork's l
 `
 
 export function removeStorybookDocsIndex(content) {
-  let next = removeExactBlock(content, DOCS_INDEX_ROW)
-  next = replaceExactBlock(next, SCAFFOLDING_ROW_BEFORE, SCAFFOLDING_ROW_AFTER)
+  let next = mapTableRow(content, '| Write or review a Storybook story ', () => null)
+  next = replaceRowText(
+    next,
+    '| Initialize a downstream fork (rebrand, ',
+    'locale/Storybook/console shape',
+    'locale/console shape'
+  )
   next = replaceExactBlock(next, TESTING_BEFORE, TESTING_AFTER)
   return replaceExactBlock(next, BRAND_BEFORE, BRAND_AFTER)
 }
 
-const FRONTEND_INDEX_ROW =
-  "| [Storybook](./storybook.md)                                             | The component workshop: what's wired (a11y/theme/MSW/i18n decorators), story conventions, the CLI-safety/`optimizeDeps.include` rules, and running a fork without Storybook                                                                                                                                                            |\n"
 const FRONTEND_START =
   '- Writing or reviewing a `shared/ui`/feature-flow story → [Storybook](./storybook.md)\n'
 const FRONTEND_SCAFFOLD_BEFORE = `- Initializing a downstream fork (\`pnpm init:brand\`/\`pnpm init:project\`:
@@ -48,7 +61,7 @@ const FRONTEND_SCAFFOLD_AFTER = `- Initializing a downstream fork (\`pnpm init:b
 `
 
 export function removeStorybookFrontendIndex(content) {
-  const withoutIndex = removeExactBlock(content, FRONTEND_INDEX_ROW)
+  const withoutIndex = mapTableRow(content, '| [Storybook](./storybook.md)', () => null)
   const withoutStart = removeExactBlock(withoutIndex, FRONTEND_START)
   return replaceExactBlock(withoutStart, FRONTEND_SCAFFOLD_BEFORE, FRONTEND_SCAFFOLD_AFTER)
 }

@@ -1,11 +1,5 @@
-import { removeExactBlock, replaceExactBlock } from './content-blocks.mjs'
+import { replaceExactBlock } from './content-blocks.mjs'
 
-const TEST_ROW_BEFORE = `| Frontend testing                                             | [\`docs/frontend/testing.md\`](docs/frontend/testing.md) — Vitest/MSW, Storybook, Playwright mocked/server-mocked/real-stack lanes, and automated a11y scans                                                                                                                                                                                                                                                                                                                                                                                                       |
-`
-const TEST_ROW_AFTER = `| Frontend testing                                             | [\`docs/frontend/testing.md\`](docs/frontend/testing.md) — Vitest/MSW, Playwright mocked/server-mocked/real-stack lanes, and automated a11y scans                                                                                                                                                                                                                                                                                                                                                                                                                  |
-`
-const STORYBOOK_ROW = `| Storybook                                                    | [\`docs/frontend/storybook.md\`](docs/frontend/storybook.md) — component workshop, story conventions, a11y gate, and maintenance procedures                                                                                                                                                                                                                                                                                                                                                                                                                        |
-`
 const FLAGS_BEFORE = `> \`pnpm init:project\` (single-locale, Storybook, or Operations Console shape,
 > all one-time; route-progress's default is non-destructive)
 > — see
@@ -43,19 +37,39 @@ for where a shared schema's own test belongs, and
 [\`docs/frontend/testing.md\`](docs/frontend/testing.md) for the frontend test
 taxonomy and command choices.
 `
-const A11Y_BEFORE = `| **Accessibility (a11y)** | ✅ Shipped      | Solid token-pair contrast tests, browser checks of destructive-button normal/hover states, real-page WCAG A/AA scans including retained Sessions refetch, and CI-gating Storybook a11y checks                  |
-`
-const A11Y_AFTER = `| **Accessibility (a11y)** | ✅ Shipped      | Solid token-pair contrast tests, real-page WCAG A/AA scans including retained Sessions refetch                                                                                                                 |
-`
-const WORKSHOP_ROW = `| **Component workshop**   | ✅ Shipped      | Storybook wired to the same MSW/theme/i18n stack as the real app; every story doubles as a Vitest test with a CI-gating axe check                                                                              |
-`
+function mapTableRow(content, prefix, edit) {
+  const lines = content.split('\n')
+  const matches = lines.flatMap((line, index) => (line.startsWith(prefix) ? [index] : []))
+  if (matches.length !== 1) throw new Error(`expected exactly one ${prefix} table row`)
+  const index = matches[0]
+  const replacement = edit(lines[index])
+  lines.splice(index, 1, ...(replacement === null ? [] : [replacement]))
+  return lines.join('\n')
+}
+
+function replaceRowText(content, prefix, before, after) {
+  return mapTableRow(content, prefix, (line) => {
+    const changed = replaceExactBlock(line, before, after)
+    return changed.slice(0, -1) + ' '.repeat(line.length - changed.length) + '|'
+  })
+}
 
 export function removeStorybookRoot(content) {
-  let next = replaceExactBlock(content, TEST_ROW_BEFORE, TEST_ROW_AFTER)
-  next = removeExactBlock(next, STORYBOOK_ROW)
+  let next = replaceRowText(
+    content,
+    '| Frontend testing ',
+    'Vitest/MSW, Storybook, Playwright',
+    'Vitest/MSW, Playwright'
+  )
+  next = mapTableRow(next, '| Storybook ', () => null)
   next = replaceExactBlock(next, TOOLING_BEFORE, TOOLING_AFTER)
   next = replaceExactBlock(next, FLAGS_BEFORE, FLAGS_AFTER)
   next = replaceExactBlock(next, STRUCTURE_BEFORE, STRUCTURE_AFTER)
-  next = replaceExactBlock(next, A11Y_BEFORE, A11Y_AFTER)
-  return removeExactBlock(next, WORKSHOP_ROW)
+  next = replaceRowText(
+    next,
+    '| **Accessibility (a11y)**',
+    'Solid token-pair contrast tests, browser checks of destructive-button normal/hover states, real-page WCAG A/AA scans including retained Sessions refetch, and CI-gating Storybook a11y checks',
+    'Solid token-pair contrast tests, real-page WCAG A/AA scans including retained Sessions refetch'
+  )
+  return mapTableRow(next, '| **Component workshop**', () => null)
 }
