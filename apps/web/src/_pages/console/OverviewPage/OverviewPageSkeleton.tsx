@@ -1,45 +1,45 @@
 import { Skeleton } from '@/shared/ui/skeleton'
 
-const DEPENDENCY_ROWS = Array.from({ length: 5 }, (_, index) => index)
+const ROWS = [0, 1, 2, 3, 4]
 
-/** Mirrors the Overview heading and status-card structure. */
+/** Mirrors the header, independent identities, three resource cards and dependencies. */
 export function OverviewPageSkeleton() {
   return (
     <section className="flex flex-col gap-4" aria-busy="true">
-      <div>
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="mt-3 h-9 w-52" />
-        <Skeleton className="mt-2 h-5 w-80" />
-      </div>
-      <div className="rounded-lg border border-border bg-surface-elevated p-6 shadow-md">
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div>
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="mt-1 h-5 w-24" />
-          </div>
-          <div>
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="mt-1 h-5 w-16" />
-          </div>
-        </dl>
-        <div className="mt-6">
-          <Skeleton className="h-3 w-28" />
-          <ul className="mt-2 flex flex-col gap-1">
-            {DEPENDENCY_ROWS.map((row) => (
-              <OverviewDependencySkeleton key={row} />
-            ))}
-          </ul>
+      <div className="flex flex-wrap justify-between gap-4">
+        <div>
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="mt-3 h-9 w-52" />
+          <Skeleton className="mt-2 h-5 w-64 max-w-full" />
+          <Skeleton className="mt-3 h-5 w-64 max-w-full" />
         </div>
+        <Skeleton className="h-9 w-28" />
       </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SkeletonCard rows={ROWS} />
+        <SkeletonCard rows={[0, 1]} />
+      </div>
+      <Skeleton className="h-5 w-full" />
+      <div className="grid gap-4 lg:grid-cols-3">
+        {[0, 1, 2].map((card) => (
+          <SkeletonCard key={card} rows={ROWS} />
+        ))}
+      </div>
+      <SkeletonCard rows={ROWS} />
     </section>
   )
 }
 
-function OverviewDependencySkeleton() {
+function SkeletonCard({ rows }: { rows: number[] }) {
   return (
-    <li className="flex items-center justify-between gap-4 border-b border-line-soft py-1 last:border-0">
-      <Skeleton className="h-5 w-32" />
-      <Skeleton className="h-5 w-16" />
-    </li>
+    <div className="rounded-lg border bg-surface-elevated p-6">
+      <Skeleton className="h-6 w-40" />
+      {rows.map((row) => (
+        <div key={row} className="mt-4 flex justify-between gap-3">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+      ))}
+    </div>
   )
 }

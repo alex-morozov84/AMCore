@@ -15,7 +15,7 @@ function mockRulesFetch(groups) {
 
 const okGroup = (name) => ({ name, rules: [{ name: `${name}-rule`, health: 'ok' }] })
 
-test('all 8 default groups present and healthy passes', async () => {
+test('all declared default groups present and healthy passes', async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = mockRulesFetch(DEFAULT_GROUPS.map(okGroup))
   try {

@@ -79,7 +79,7 @@ unreachable, `web` fails closed on those flows (no session can be created or
 verified) rather than falling back to an insecure path; unauthenticated pages
 keep working.
 
-### Managed / VPS DB, remote Redis, real S3
+### Managed / VPS DB and remote Redis, with S3
 
 Edit `.env`:
 
@@ -99,6 +99,11 @@ docker compose up             # bundled postgres/redis skipped; migrate runs aga
 > **Common mistake:** leaving `COMPOSE_PROFILES=local-infra` while pointing
 > `COMPOSE_DATABASE_URL` at a remote DB will _also_ start the bundled
 > Postgres/Redis. Set `COMPOSE_PROFILES=` empty for remote mode.
+
+Compose supplies `STORAGE_DRIVER=local` when it is unset, even with
+`NODE_ENV=production`. Select `STORAGE_DRIVER=s3` explicitly for this S3 example.
+For production files on the same VPS instead, use the
+[local storage setup](#production-local-files) below.
 
 ### Upgrades (new migrations in a release)
 
@@ -152,6 +157,16 @@ For the Compose local-build path, `.env` can supply `NEXT_DEPLOYMENT_ID`; for a
 custom Docker build, use `--build-arg NEXT_DEPLOYMENT_ID=<unique-build-id>`.
 Leaving it unset is supported. Do not put secrets in this public identity.
 Promotion must pull the original digest rather than rebuilding for production.
+
+The API build automatically records its root product version, compiled
+JS/shared-code/lockfile fingerprint and source commit when available. CI supplies
+the checkout SHA automatically; local dirty builds omit a misleading exact commit.
+These facts do not attest production or replace the deployed image digest.
+
+The optional [Console Overview](../operations-console/overview.md) shows this API
+identity and the compiled ID supplied by the responding web server. That web ID
+does not necessarily identify JavaScript already loaded in a tab. See
+[Console metadata settings](../operations-console/configuration.md#overview-metadata-and-resource-settings).
 
 ### Freshness and recovery limits
 
@@ -282,6 +297,12 @@ http://api:5002`) resolves that hostname once, at nginx startup/reload,
    migration ordering for a schema-changing release the way a fully separate
    stack does — "blue" stays untouched and is your instant rollback target.
 
+   With `STORAGE_DRIVER=local`, the default `local_storage` volume is scoped to
+   each Compose project. A new green project therefore starts with a different,
+   empty file volume. Do not switch traffic until both deployments use a planned
+   shared durable store or files have been copied and writes coordinated. S3
+   avoids this project-volume split.
+
 Neither path is bundled as a script in this starter; both are documented
 patterns to apply with your own reverse proxy, since the correct choice
 depends on infrastructure this repo does not own (see [Production deploy
@@ -332,13 +353,47 @@ rotation:** set a new `WEBHOOK_TELEGRAM_SECRET`, redeploy, then re-run this comm
 
 ## Production environment requirements
 
-The dev-friendly compose defaults are local-only. With `NODE_ENV=production` the
-API fails fast (env validation) unless:
+The dev-friendly Compose defaults are not a production configuration. With
+`NODE_ENV=production`, API environment validation requires:
 
 - `DATABASE_URL` includes `sslmode=require` or `sslmode=verify-full`;
-- `STORAGE_DRIVER=s3` with `STORAGE_BUCKET` / `STORAGE_ACCESS_KEY_ID` /
-  `STORAGE_SECRET_ACCESS_KEY` (+ region/endpoint for non-AWS providers);
+- S3 credentials when the selected driver is `s3`;
 - `JWT_SECRET` is a real secret ≥ 32 chars (`openssl rand -base64 32`).
+
+Choose `STORAGE_DRIVER` explicitly for production. Without Compose, an unset
+driver resolves to S3. Compose supplies `local` by default, including in
+production; API validation does not enforce a durable mount for that choice.
+Use the persistent local setup below or configure S3.
+
+### Production local files
+
+File monitoring defaults to **one check every 10 minutes per API/worker instance**.
+Set `STORAGE_PROBE_INTERVAL_SECONDS` in `.env` to change it; Compose passes it to
+both roles. S3 checks incur PUT/GET/DELETE traffic independently of user requests.
+Plan the operation budget and detection delay using the
+[storage monitoring guide](../storage/configuration.md#active-file-monitoring-and-readiness).
+
+Local storage is a supported production choice. Compose shares `local_storage`
+between API and worker at `/app/uploads`; a new volume inherits runtime uid 1001
+ownership from the image. Provision existing/bind-mounted permissions explicitly.
+Set the following values in `.env` when using the reference Compose stack:
+
+```env
+STORAGE_DRIVER=local
+STORAGE_LOCAL_ROOT=/app/uploads
+STORAGE_LOCAL_PUBLIC_BASE_URL=https://api.example.com/api/v1/storage/public
+```
+
+Use your actual public API origin. If changing `STORAGE_LOCAL_ROOT`, change both
+services' mounts as well. Keep the volume during upgrades, back up and restore
+objects/meta/public together, and
+verify files after container recreation. A successful live probe alone does not
+establish persistence. Multi-host replicas need shared storage or S3.
+
+The API serves only explicitly public copies, with encoded keys. Never expose
+the entire objects or metadata directory through a static server. See
+[local production](../storage/configuration.md#local-production)
+for the volume/backup/public-file contract and independent monitoring settings.
 
 ## Adopting on an existing database
 

@@ -18,6 +18,7 @@ export function findUntaggedPromqlLookingFences(fences) {
 
 export function runAgainstRealRepo({
   runbookPaths = [
+    'docs/operations/runbooks/storage.md',
     'docs/operations/runbooks/http.md',
     'docs/operations/runbooks/db.md',
     'docs/operations/runbooks/redis.md',

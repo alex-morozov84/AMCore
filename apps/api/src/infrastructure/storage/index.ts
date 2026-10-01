@@ -5,6 +5,8 @@ export * from './storage.interface'
 export { StorageModule } from './storage.module'
 export { StorageService } from './storage.service'
 export { StorageDownloadService } from './storage-download.service'
+export { StorageProbeService } from './storage-probe.service'
+export { StoragePublicModule } from './storage-public.module'
 export {
   type FileValidationOptions,
   FileValidationPipe,

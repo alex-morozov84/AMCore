@@ -1,46 +1,52 @@
-import { getTranslations } from 'next-intl/server'
+import { getFormatter, getTranslations } from 'next-intl/server'
 
 import { fetchConsoleOverview } from '@/shared/api/console/overview'
 import { resolvePrimary } from '@/shared/api/server'
-import { cn } from '@/shared/lib/utils'
+import {
+  DEPLOYMENT_VERSION,
+  deploymentVersionResponseSchema,
+} from '@/shared/lib/deployment-version/identity'
+import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 
-import { OverviewDetails } from './OverviewDetails'
-import { OverviewNotReadyAlert } from './OverviewNotReadyAlert'
+import { OverviewBody } from './OverviewBody'
+import { OverviewWebIdentity } from './OverviewIdentity'
+import { OverviewRefresh } from './OverviewRefresh'
 
-const MONO = 'font-console-mono'
-
-/**
- * Console Overview: this API instance's readiness, dependency states,
- * version and process role only — no Queues/Recent Activity content (a
- * later, separate backlog item regardless of what the pinned design
- * reference shows on one screen).
- */
 export async function OverviewPage() {
   const t = await getTranslations('console')
+  const format = await getFormatter()
+  // Rejected 4xx or malformed 2xx deliberately propagate to the real error boundary.
   const outcome = resolvePrimary(await fetchConsoleOverview(), { source: 'console-overview' })
-
-  if (outcome.status === 'unavailable') {
-    return <PrimaryUnavailableFallback reason={outcome.reason} />
-  }
-
-  const overview = outcome.data
-
+  const identity = deploymentVersionResponseSchema.safeParse({ version: DEPLOYMENT_VERSION })
+  const artifactId =
+    identity.success && identity.data.version !== 'unknown' ? identity.data.version : null
   return (
     <section className="flex flex-col gap-4">
-      <div>
-        <p className={cn(MONO, 'text-xs tracking-[0.2em] text-foreground-muted uppercase')}>
-          {t('overviewEyebrow')}
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">{t('title')}</h1>
-        <p className="mt-1 text-sm text-foreground-muted">{t('overviewSubtitle')}</p>
-      </div>
-
-      {overview.readiness === 'not_ready' && (
-        <OverviewNotReadyAlert dependencies={overview.dependencies} />
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="font-console-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">
+            {t('overviewEyebrow')}
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{t('title')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t('overviewSubtitle')}</p>
+          {outcome.status === 'available' && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              {t('overviewCheckedAt')}:{' '}
+              <ConsoleTimestamp value={outcome.data.completedAt} variant="inline" seconds />
+            </p>
+          )}
+        </div>
+        {outcome.status === 'available' && <OverviewRefresh />}
+      </header>
+      {outcome.status === 'unavailable' ? (
+        <>
+          <OverviewWebIdentity artifactId={artifactId} t={t} />
+          <PrimaryUnavailableFallback reason={outcome.reason} />
+        </>
+      ) : (
+        <OverviewBody overview={outcome.data} artifactId={artifactId} t={t} format={format} />
       )}
-
-      <OverviewDetails overview={overview} t={t} />
     </section>
   )
 }

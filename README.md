@@ -31,7 +31,7 @@ Feature-specific admin surfaces remain intentionally product-owned.
 
 The optional [Operations Console](docs/operations-console/README.md) is a
 separate `SUPER_ADMIN` control plane. It ships **Overview** for instance
-readiness, **Users** inventory, system-role changes and session revocation, read-only
+readiness, deployment identity and local resource snapshots, **Users** inventory, system-role changes and session revocation, read-only
 **Organizations**, and bounded **Audit** browsing. Path/host topology,
 isolated host sessions, downstream scaffolding, deployment guidance, and a
 safe extension recipe are included. Session views show parsed devices and
@@ -88,7 +88,7 @@ capabilities without inheriting an unrelated sample domain.
 | **Backend**       | NestJS 11, PostgreSQL 18, Prisma 7, Redis, BullMQ                              |
 | **Auth**          | JWT + Refresh Tokens, OAuth 2.0 / OIDC, API Keys                               |
 | **Email**         | Resend, vendored React Email primitives + `@react-email/render`, FormatJS i18n |
-| **Storage**       | S3-compatible storage, local dev driver, memory test driver                    |
+| **Storage**       | S3-compatible storage, local production/development driver, memory test driver |
 | **Frontend**      | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui + Base UI                      |
 | **i18n**          | next-intl (web) + FormatJS (email), ICU MessageFormat, CLDR plurals            |
 | **Architecture**  | Feature-Sliced Design (FSD)                                                    |
@@ -211,9 +211,10 @@ pnpm dev
 
 > Production uses `prisma migrate deploy` from the CLI-capable migrator image as
 > a one-shot step before rolling out the slim app image — never `db:migrate`
-> (which is `migrate dev`). To run the Docker stack against a managed/VPS DB or
-> real S3, set `COMPOSE_PROFILES=` empty plus `COMPOSE_DATABASE_URL` /
-> `COMPOSE_REDIS_URL` (and the S3 vars) in `.env`. See
+> (which is `migrate dev`). For a managed/VPS database and Redis, set
+> `COMPOSE_PROFILES=` empty plus `COMPOSE_DATABASE_URL` / `COMPOSE_REDIS_URL`
+> in `.env`. File storage is a separate choice: configure S3, or explicitly use
+> `STORAGE_DRIVER=local` with a persistent volume shared by API and worker. See
 > [`docs/operations/deployment.md`](docs/operations/deployment.md).
 
 > **Building a product from this starter?** Run `pnpm init:brand` (product

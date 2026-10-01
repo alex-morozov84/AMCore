@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
-import { SystemRole } from '@amcore/shared'
+import { adminOverviewResponseSchema, SystemRole } from '@amcore/shared'
 
 import type { PrismaService } from '../src/prisma'
 
@@ -683,7 +683,12 @@ describe('Admin (e2e)', () => {
         .set('Authorization', `Bearer ${superToken}`)
         .expect(200)
 
-      expect(res.body).toEqual({
+      expect(adminOverviewResponseSchema.parse(res.body)).toEqual(res.body)
+      expect(res.body.resources.pool.status).toBe('available')
+      expect(res.body.resources.memory.status).toBe('available')
+      expect(res.body.process.uptimeSeconds).toBeGreaterThanOrEqual(0)
+      expect(res.headers['cache-control']).toBe('private, no-store')
+      expect(res.body).toMatchObject({
         readiness: 'ready',
         dependencies: expect.arrayContaining([
           expect.objectContaining({ name: 'database', status: 'up' }),
@@ -696,7 +701,7 @@ describe('Admin (e2e)', () => {
       // indicator message/detail field leaks onto the wire.
       for (const dep of res.body.dependencies) {
         expect(Object.keys(dep).sort()).toEqual(['name', 'status'])
-        expect(['up', 'down', 'unknown']).toContain(dep.status)
+        expect(['up', 'down', 'degraded', 'unknown']).toContain(dep.status)
       }
     })
   })

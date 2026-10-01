@@ -23,7 +23,7 @@ import { NotificationsCoreModule } from './core/notifications/notifications-core
 import { NotificationsWebModule } from './core/notifications/notifications-web.module'
 import { NotificationsWorkerModule } from './core/notifications/notifications-worker.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
-import { validate } from './env'
+import { envConfigOptions } from './env/env.config'
 import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
@@ -35,7 +35,7 @@ import { ObservabilityModule } from './infrastructure/observability'
 import { QueueMetricsModule, QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
-import { StorageModule } from './infrastructure/storage'
+import { StorageModule, StoragePublicModule } from './infrastructure/storage'
 import { ThrottlingModule } from './infrastructure/throttling'
 import { WebhooksModule } from './infrastructure/webhooks'
 import { PrismaModule } from './prisma'
@@ -59,11 +59,7 @@ type Imports = NonNullable<ModuleMetadata['imports']>
 export function coreImports(): Imports {
   return [
     // Environment variables (validated via Zod, typed Env)
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '../../.env',
-      validate,
-    }),
+    ConfigModule.forRoot(envConfigOptions),
 
     EnvModule,
 
@@ -172,6 +168,7 @@ export function coreImports(): Imports {
 
 /** Business HTTP modules — `web` and `all` only. */
 export const webImports: Imports = [
+  StoragePublicModule,
   // Auth
   AuthModule,
   // Core: Organizations, Roles & Permissions

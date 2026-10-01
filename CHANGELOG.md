@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Console Overview with automatic API/web build identity, clear per-instance DB,
+  JavaScript memory and disk facts, one snapshot completion time and help.
+- Independent periodic local/S3-compatible file write/read/delete monitoring,
+  stale/failure states and a tested persistent-failure alert with runbook.
+- Production local storage with a shared persistent API/worker volume and
+  visibility-gated public-copy downloads; corrected unsafe static-serving guidance.
+
 - Product organization cards and a read-only selected overview at
   `/[locale]/organizations`, with ordered session/access revalidation, localized
   skeleton/error states, responsive theme support and independent headless mounts.
@@ -27,10 +34,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep empty optional backend environment values absent after validation, so
+  Compose's unset heap override preserves the default readiness and liveness limits.
+
+- Local storage uses SHA-256 ETags for new uploads and checks object/metadata
+  path containment immediately before filesystem reads, preserving existing ETags.
+
 - Console filter reset uses a shared navigation control and avoids starting route
   progress for repeated resets of the current unfiltered page.
 
 ### Changed
+
+- Operations Console file storage shows last/next check times, explains S3 request costs and build diagnostics.
+
+- Upgrade API health checks to Terminus 12.1.0, preserving expected-down and
+  shutdown responses and exposing fulfilled degraded readiness in Console Overview.
 
 - Generic browser proxy routes for declared organization families are closed for
   every HTTP method. Organization PATCH rejects unknown fields. Direct API keys,

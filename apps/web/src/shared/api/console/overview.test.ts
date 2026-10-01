@@ -13,14 +13,15 @@ vi.mock('./access-token', () => ({ getConsoleAwareAccessToken: vi.fn() }))
 describe('fetchConsoleOverview', () => {
   it('requests the overview endpoint with the console token resolver', async () => {
     vi.mocked(fetchBackend).mockResolvedValue({
-      status: 'success',
-      data: { readiness: 'ready', dependencies: [], version: '1.0.0', processRole: 'all' },
+      status: 'unavailable',
+      reason: 'upstream',
     })
 
     await fetchConsoleOverview()
 
     expect(fetchBackend).toHaveBeenCalledWith('/api/v1/admin/overview', expect.anything(), {
       auth: 'required',
+      cache: 'no-store',
       tokenResolver: getConsoleAwareAccessToken,
     })
   })

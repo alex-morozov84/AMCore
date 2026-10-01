@@ -1086,3 +1086,57 @@ tests:
       - eval_time: 6m
         alertname: AMCoreRealtimeStartupFailurePage
         exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_storage_probe_state{driver="s3",state="failed",instance="api:5002"}'
+        values: '1+0x6 0+0x5'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: AMCoreStorageProbeFailed
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: AMCoreStorageProbeFailed
+        exp_alerts:
+          - exp_labels:
+              driver: s3
+              instance: api:5002
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore file storage diagnostic unhealthy'
+              description: 'A failed, unmeasured or stale cached file-check result has remained visible for 5m. This does not prove continuous failed I/O. API readiness may remain healthy; investigate this instance.'
+              runbook_path: docs/operations/runbooks/storage.md#file-diagnostic
+      - eval_time: 8m
+        alertname: AMCoreStorageProbeFailed
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_storage_probe_state{driver="local",state="healthy"}'
+        values: '1+0x10'
+      - series: 'amcore_storage_probe_state{driver="local",state="failed"}'
+        values: '0+0x10'
+      - series: 'amcore_storage_probe_state{driver="local",state="unknown"}'
+        values: '0+0x10'
+      - series: 'amcore_storage_probe_state{driver="local",state="stale"}'
+        values: '0+0x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AMCoreStorageProbeFailed
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_storage_probe_state{driver="local",state="stale"}'
+        values: '1+0x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AMCoreStorageProbeFailed
+        exp_alerts:
+          - exp_labels:
+              driver: local
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore file storage diagnostic unhealthy'
+              description: 'A failed, unmeasured or stale cached file-check result has remained visible for 5m. This does not prove continuous failed I/O. API readiness may remain healthy; investigate this instance.'
+              runbook_path: docs/operations/runbooks/storage.md#file-diagnostic

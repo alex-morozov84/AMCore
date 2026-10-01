@@ -8,8 +8,8 @@ import 'server-only'
 
 /**
  * Console Overview status. Always resolves to `DataOutcome<'success'>` with
- * a typed payload when the request itself succeeds — a degraded observed
- * instance (`readiness: 'not_ready'`) is still `'success'`, since the
+ * a typed payload when the request itself succeeds — an impaired observed
+ * instance (`readiness: 'degraded'` or `'not_ready'`) is still `'success'`, since the
  * endpoint reports it as data, not as an HTTP error. `DataOutcome`'s
  * `'unavailable'` here means the observation itself could not be fetched
  * (network error, timeout, an actual 5xx) — a different failure than an
@@ -18,6 +18,7 @@ import 'server-only'
 export function fetchConsoleOverview(): Promise<DataOutcome<AdminOverviewResponse>> {
   return fetchBackend('/api/v1/admin/overview', adminOverviewResponseSchema, {
     auth: 'required',
+    cache: 'no-store',
     tokenResolver: getConsoleAwareAccessToken,
   })
 }
