@@ -76,8 +76,10 @@ from the route's tenant, immutable-field and response-field policy.
    never overrides route `@Auth` or the API-key allowlist.
 4. For lists, combine `accessibleBy(ability)` with the verified tenant predicate
    using `AND`. Load the page once, check actual rows/fields in memory, and
-   project bounded action hints. Check write input, pre-state and post-state in
-   the transaction; keep tenant and assignment columns immutable. An action
+   project bounded action hints. Compute the visible total after field filtering
+   (or enforce the same filter in SQL); never disclose a hidden-row count.
+   Check write input, pre-state and post-state in the transaction; keep tenant
+   and assignment columns immutable. An action
    hint is never the write authorization. Do not send client-provided records
    to a generic `/can` endpoint or call the server once per button.
 5. Compile shared, API and web consumers; exercise multiple roles, conditional

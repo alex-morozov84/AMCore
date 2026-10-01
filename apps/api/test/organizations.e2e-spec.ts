@@ -6,6 +6,7 @@ import request from 'supertest'
 import { ORGANIZATION_CONTEXT_FAMILY, SystemRole } from '@amcore/shared'
 
 import { OrgAclVersionService } from '../src/core/auth/org-acl-version.service'
+import { PermissionsCacheService } from '../src/core/auth/permissions-cache.service'
 import { PrivilegedRoleService } from '../src/core/auth/privileged-role.service'
 import { OrganizationsService } from '../src/core/organizations/organizations.service'
 import type { PrismaService } from '../src/prisma'
@@ -123,6 +124,9 @@ describe('Organizations (e2e)', () => {
         .expect(201)
       const versions = jest.spyOn(app.get(OrgAclVersionService), 'getCurrent')
       const memberships = jest.spyOn(prisma.orgMember, 'findUnique')
+      const organizations = jest.spyOn(prisma.organization, 'findUnique')
+      const permissions = app.get(PermissionsCacheService)
+      const cacheBefore = permissions.getMetrics()
       try {
         const context = await request(app.getHttpServer())
           .get(`/organizations/${org.body.id}/context`)
@@ -139,10 +143,13 @@ describe('Organizations (e2e)', () => {
           },
         })
         expect(memberships).toHaveBeenCalledTimes(1)
+        expect(organizations).toHaveBeenCalledTimes(1)
         expect(versions).not.toHaveBeenCalled()
+        expect(permissions.getMetrics().total - cacheBefore.total).toBe(1)
       } finally {
         versions.mockRestore()
         memberships.mockRestore()
+        organizations.mockRestore()
       }
       await request(app.getHttpServer())
         .patch(`/organizations/${org.body.id}`)

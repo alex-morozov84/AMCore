@@ -294,7 +294,7 @@ index 0000000..a9ccc59
 +    const data = rows.filter((row) => canRead(ability, row)).map((row) => ({
 +      id: row.id, status: row.status, access: hint(ability, row),
 +    }))
-+    return { data, total: await client.fixtureOrder.count({ where }) }
++    return { data, total: data.length }
 +  }
 +
 +  @Patch(':id')
@@ -344,7 +344,7 @@ new file mode 100644
 index 0000000..99154c0
 --- /dev/null
 +++ b/apps/api/test/fixture-order-extension.e2e-spec.ts
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,225 @@
 +import type { INestApplication } from '@nestjs/common'
 +import { JwtService } from '@nestjs/jwt'
 +import request from 'supertest'
@@ -553,6 +553,21 @@ index 0000000..99154c0
 +    expect(await prisma.permission.count({ where: { organizationId: org } })).toBe(count)
 +    expect((await prisma.organization.findUniqueOrThrow({ where: { id: org } })).aclVersion)
 +      .toBe(before.aclVersion)
++    const readFieldDeny = await prisma.permission.create({ data: {
++      action: Action.Read, subject: Subject.FixtureOrder,
++      organizationId: org, inverted: true, fields: ['status'],
++      conditions: { id: assigned.id },
++    } })
++    await prisma.rolePermission.create({ data: {
++      roleId: role.id, permissionId: readFieldDeny.id,
++    } })
++    await prisma.organization.update({ where: { id: org },
++      data: { aclVersion: { increment: 1 } } })
++    const fieldFiltered = (await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${staff.token}`).expect(200)).body
++    expect(fieldFiltered.data.map((row: { id: string }) => row.id))
++      .toEqual([own.id])
++    expect(fieldFiltered.total).toBe(1)
 +  })
 +})
 diff --git a/apps/web/src/entities/organization-context/model/context-fixture.ts b/apps/web/src/entities/organization-context/model/context-fixture.ts
