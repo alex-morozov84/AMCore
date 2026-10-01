@@ -154,6 +154,30 @@ status card or definition list instead of the ready overview. It imports no read
 organization feature, widget, page, mount, AppShell or Console. The typed browser
 namespace remains `/api/product-access`; page placement never changes it.
 
+For a downstream CRM list, load rows and their server-evaluated record/field hints
+in one response. Omit unreadable rows. An authorized row can enable Delete;
+for a readable row where deletion is denied, keep the action disabled and give a
+visible reason associated with it, plus a keyboard-reachable explanation:
+
+```tsx
+<div>
+  <button type="button" disabled aria-describedby={`delete-reason-${row.id}`}>
+    {t('delete')}
+  </button>
+  <span id={`delete-reason-${row.id}`} role="note" tabIndex={0}>
+    {t('deleteDenied')}
+  </span>
+</div>
+```
+
+Use `deleteDenied` = “You can't delete this record.” / “Вы не можете удалить
+эту запись.” in the CRM's EN/RU catalogues. Hide stale row controls while
+authority refreshes; on a 403, explain and refresh authority without replaying
+the delete. The server must check the operation again. This is an integration
+example, not a delivered CRM screen. See the
+[capability guide](../auth/capability-catalogue.md) for `recordRequired` and
+field decisions.
+
 ## Validate your composition
 
 Check menu links from dashboard and organization frame, direct list/id entry,

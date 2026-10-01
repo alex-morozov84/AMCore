@@ -13,6 +13,7 @@ import type { PrismaService } from '../../prisma'
 import type { AppAbility } from '../auth/casl/ability.factory'
 import type { OrgAclVersionService } from '../auth/org-acl-version.service'
 
+import { CapabilityRegistry } from './capability-registry.service'
 import { OrganizationsService } from './organizations.service'
 
 import type { Organization, OrgMember, Role } from '@/generated/prisma/client'
@@ -80,7 +81,8 @@ describe('OrganizationsService', () => {
     aclVersionService = { invalidate: jest.fn().mockResolvedValue(undefined) }
     service = new OrganizationsService(
       prisma as unknown as PrismaService,
-      aclVersionService as unknown as OrgAclVersionService
+      aclVersionService as unknown as OrgAclVersionService,
+      new CapabilityRegistry()
     )
   })
 

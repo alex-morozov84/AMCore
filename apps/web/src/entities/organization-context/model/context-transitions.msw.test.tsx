@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 
 import { server } from '@/test/msw/server'
 
+import { contextAffordances } from './context-fixture'
 import type { OrganizationContextInput } from './context-input'
 import { useOrganizationContext } from './use-organization-context'
 
@@ -31,6 +32,7 @@ function fixture() {
         data: {
           organization: { id: params.id, name: 'Company', slug: 'company' },
           canManageTeamAccess: true,
+          ...contextAffordances,
         },
       })
     })
@@ -123,6 +125,7 @@ it.each(['bootstrap', 'domain'])(
               data: {
                 organization: { id: params.id, name: 'Latest', slug: 'latest' },
                 canManageTeamAccess: true,
+                ...contextAffordances,
               },
             })
       })

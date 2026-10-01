@@ -5,6 +5,7 @@ import { ApiRequestError } from '@/shared/api/http-client'
 
 import type { OrganizationContextData } from '../api/context-client'
 
+import { contextAffordances } from './context-fixture'
 import { type OrganizationContextInput, organizationContextKey } from './context-input'
 import { createOrganizationContextScheduler } from './context-scheduler'
 
@@ -12,7 +13,11 @@ const binding = 'a'.repeat(64)
 const selected: OrganizationContextInput = { kind: 'selected', id: 'A', locale: 'ru' }
 const overview = {
   binding,
-  data: { organization: { id: 'A', name: 'Company A', slug: 'a' }, canManageTeamAccess: true },
+  data: {
+    organization: { id: 'A', name: 'Company A', slug: 'a' },
+    canManageTeamAccess: true,
+    ...contextAffordances,
+  },
 }
 const actor = { id: 'actor', email: 'actor@example.test' }
 const deferred = <T>() => {

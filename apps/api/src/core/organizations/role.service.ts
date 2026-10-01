@@ -9,8 +9,12 @@ import type {
 
 import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
+import {
+  type PermissionWriteInput,
+  validatePermissionRule,
+} from '../auth/casl/permission-rule-validation'
 
-import type { AssignPermissionDto, CreateRoleDto, UpdateRoleDto } from './dto'
+import type { CreateRoleDto, UpdateRoleDto } from './dto'
 import { OrganizationsService } from './organizations.service'
 
 import type { Permission, Prisma, Role } from '@/generated/prisma/client'
@@ -191,11 +195,12 @@ export class RoleService {
   async assignPermission(
     orgId: string,
     roleId: string,
-    dto: AssignPermissionDto,
+    dto: PermissionWriteInput,
     principal: RequestPrincipal
   ): Promise<PermissionResponse> {
     this.assertOrgContext(principal, orgId)
     await this.findCustomRole(orgId, roleId)
+    validatePermissionRule(dto)
 
     // OA-12: permission create + role link + bump in the same
     // transaction. Wrapping the existing two-step (permission then

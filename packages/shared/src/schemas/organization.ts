@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { Action, Subject } from '../enums/permissions'
 
+import { actorAffordancesSchema, organizationRecordAffordancesSchema } from './capability'
 import { paginatedResponseSchema } from './pagination'
 
 // ===========================================
@@ -106,6 +107,8 @@ export type OrganizationListResponse = z.infer<typeof organizationListResponseSc
 export const organizationContextResponseSchema = z.strictObject({
   organization: z.strictObject({ id: z.string(), name: z.string(), slug: z.string() }),
   canManageTeamAccess: z.boolean(),
+  actorAffordances: actorAffordancesSchema,
+  recordAffordances: organizationRecordAffordancesSchema,
 })
 
 export type OrganizationContextResponse = z.infer<typeof organizationContextResponseSchema>

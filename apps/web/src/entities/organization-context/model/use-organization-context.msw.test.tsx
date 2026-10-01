@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 
 import { server } from '@/test/msw/server'
 
+import { contextAffordances } from './context-fixture'
 import type { OrganizationContextInput } from './context-input'
 import { useOrganizationContext } from './use-organization-context'
 
@@ -35,6 +36,7 @@ it('actual disabled Query observers and browser resume events preserve ordered c
         data: {
           organization: { id: params.id, name: `Company ${params.id}`, slug: String(params.id) },
           canManageTeamAccess: true,
+          ...contextAffordances,
         },
       })
     })

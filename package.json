@@ -37,7 +37,8 @@
     "init:project": "node scripts/init-project.mjs",
     "measure:scaffold": "node scripts/measure/run-baseline.mjs",
     "stand": "node scripts/stand.mjs",
-    "test:stands": "node scripts/stand/run-tests.mjs"
+    "test:stands": "node scripts/stand/run-tests.mjs",
+    "test:capability-extension": "bash scripts/fixtures/t024-capability-extension.sh"
   },
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",

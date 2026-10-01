@@ -16,6 +16,7 @@ This guide covers everything — from "how do I log a user in" to "how do I rest
 | [OAuth](./oauth.md)                                   | Social login (Google, GitHub, Apple, Telegram) + account linking                   |
 | [Sessions](./sessions.md)                             | Own/admin session listing and revocation, rotation, device/IP/location metadata    |
 | [RBAC](./rbac.md)                                     | System roles, organizations, permissions, CASL — the auth-z guide                  |
+| [Capability catalogue](./capability-catalogue.md)     | Implemented actions, permission presets and actor/record access hints              |
 | [Organization context](./organization-context.md)     | Explicit API-verified targets, typed session-fenced transport and tenant extension |
 | [Authorization upgrade](./authorization-upgrade.md)   | Audit and controlled transition to explicit defaults and TeamAccess                |
 | [Invites](./invites.md)                               | Inviting people to an organization by email                                        |

@@ -24,11 +24,12 @@ guessing.
 | [Top route progress bar](./route-progress.md)                           | The global navigation-progress indicator: what starts/finishes it, the `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion, and the `ROUTE_PROGRESS_ENABLED` dev/agent flag                                                                                                                                        |
 | [Operations Console](../operations-console/README.md)                   | The isolated `SUPER_ADMIN` control plane: Overview, Users and Organizations details, Users role and session management, approximate IP location, Audit browsing, FSD ownership, topology, session boundary, deployment, verification, and extension rules                                                                              |
 
+| [Product administration foundation](../product-admin/README.md) | Read-only organization selector and overview, one-placement integration and custom headless UI; product-domain screens remain downstream-owned |
+| [Organization foundation UI](./organization-context.md) | Selected organization overview, ordered identity/authority lifecycle and custom mounts |
+| [Capability catalogue and access hints](../auth/capability-catalogue.md) | Authorable actions, current-employee status and actual-record decisions for future role editors and domain UI |
+
 This index is the public entry point for the current frontend starter surface;
 see `architecture-and-conventions.md`'s "See also" section for related guides.
-
-- [Product administration foundation](../product-admin/README.md) — one-placement ready pages, custom headless UI and module extension.
-- [Organization foundation UI](./organization-context.md) — root selector, read-only overview, ordered identity/authority lifecycle and custom mounts.
 
 ## Start here
 

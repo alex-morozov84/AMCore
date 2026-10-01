@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Implemented-action capability catalogue, validated permission presets and
+  selected-organization actor/record access hints. The ready overview now shows
+  the verified team-access decision; no role-management page is added.
+
 - Product organization cards and a read-only selected overview at
   `/[locale]/organizations`, with ordered session/access revalidation, localized
   skeleton/error states, responsive theme support and independent headless mounts.
@@ -31,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   progress for repeated resets of the current unfiltered page.
 
 ### Changed
+
+- Advanced permission writes reject unsupported conditions, fields and principal
+  templates before saving. Existing valid custom rules remain usable; incompatible
+  stored rules fail closed. Numeric DateTime conditions use integer epoch
+  milliseconds and are normalized before ability and SQL evaluation.
 
 - Generic browser proxy routes for declared organization families are closed for
   every HTTP method. Organization PATCH rejects unknown fields. Direct API keys,

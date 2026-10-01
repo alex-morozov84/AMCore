@@ -76,13 +76,14 @@ examples in [Project scaffolding](docs/frontend/brand-theme-and-tokens.md#option
 
 ### API-specific test commands
 
-| Command                                           | Description                                      |
-| ------------------------------------------------- | ------------------------------------------------ |
-| `pnpm --filter api test`                          | All unit tests                                   |
-| `pnpm --filter api test -- path/to/file.spec.ts`  | Single test file                                 |
-| `pnpm --filter api test:e2e`                      | All E2E tests (requires Docker — Testcontainers) |
-| `pnpm --filter api test:e2e -- oauth.e2e-spec.ts` | Single E2E suite                                 |
-| `pnpm --filter api test:email`                    | Email template integration tests (Vitest)        |
+| Command                                           | Description                                                                   |
+| ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `pnpm --filter api test`                          | All unit tests                                                                |
+| `pnpm --filter api test -- path/to/file.spec.ts`  | Single test file                                                              |
+| `pnpm --filter api test:e2e`                      | All E2E tests (requires Docker — Testcontainers)                              |
+| `pnpm --filter api test:e2e -- oauth.e2e-spec.ts` | Single E2E suite                                                              |
+| `pnpm test:capability-extension`                  | Disposable downstream resource compilation and PostgreSQL authorization proof |
+| `pnpm --filter api test:email`                    | Email template integration tests (Vitest)                                     |
 
 API E2E tests provision their own Postgres/Redis and test JWT secret; no local
 `.env` preparation is required. See [API Testcontainers](docs/operations/local-stands.md#api-testcontainers).

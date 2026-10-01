@@ -56,6 +56,18 @@ export {
 
 // Organization schemas
 export {
+  type ActorAffordances,
+  actorAffordancesSchema,
+  affordanceDecisionSchema,
+  type CapabilityCatalogueResponse,
+  capabilityCatalogueResponseSchema,
+  capabilityIdSchema,
+  type CreatePresetPermissionInput,
+  createPresetPermissionSchema,
+  type OrganizationRecordAffordances,
+  organizationRecordAffordancesSchema,
+} from './capability'
+export {
   type AssignPermissionInput,
   assignPermissionSchema,
   type CreateOrganizationInput,

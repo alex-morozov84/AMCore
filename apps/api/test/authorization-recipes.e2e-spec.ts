@@ -1,6 +1,10 @@
 import { subject } from '@casl/ability'
 
+import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
+
 import type { AppAbility } from '../src/core/auth/casl/ability.factory'
+import { normalizeOwnerPermissions } from '../src/core/auth/casl/permission-normalization'
+import { validatePermissionRule } from '../src/core/auth/casl/permission-rule-validation'
 import {
   accessibleBy,
   createCaslExtension,
@@ -136,6 +140,131 @@ describe('Bounded Prisma recipe (real PostgreSQL)', () => {
       ]) {
         expect(await client.role.count({ where: { AND: terms } })).toBe(rules.length ? 1 : 0)
       }
+    }
+  })
+
+  it('normalizes stored epoch dates before CASL and PostgreSQL list/count, including DENY', async () => {
+    const row = await db.prisma.organization.findUniqueOrThrow({ where: { id: org } })
+    const epoch = row.createdAt.getTime()
+    const principal: RequestPrincipal = {
+      type: 'jwt',
+      sub: 'holder',
+      organizationId: org,
+      aclVersion: 1,
+      systemRole: SystemRole.User,
+    }
+    const cases = [
+      { createdAt: epoch },
+      { createdAt: { gte: epoch } },
+      { OR: [{ createdAt: { in: [epoch] } }, { id: 'never' }] },
+      { NOT: { createdAt: { notIn: [epoch] } } },
+    ]
+    const client = db.prisma.$extends(createCaslExtension())
+    for (const conditions of cases) {
+      const [permission] = normalizeOwnerPermissions(
+        [
+          {
+            id: 'date-allow',
+            action: Action.Read,
+            subject: Subject.Organization,
+            conditions,
+            fields: [],
+            inverted: false,
+          },
+        ],
+        principal
+      )
+      const ability = createPrismaAbility<AppAbility>([
+        {
+          action: Action.Read,
+          subject: Subject.Organization,
+          conditions: permission!.conditions as never,
+        },
+      ])
+      expect(ability.can(Action.Read, subject('Organization', row))).toBe(true)
+      const where = { AND: [accessibleBy(ability).ofType('Organization'), { id: org }] }
+      expect((await client.organization.findMany({ where })).map((item) => item.id)).toEqual([org])
+      expect(await client.organization.count({ where })).toBe(1)
+    }
+    const normalized = normalizeOwnerPermissions(
+      [
+        {
+          id: 'allow',
+          action: Action.Read,
+          subject: Subject.Organization,
+          conditions: null,
+          fields: [],
+          inverted: false,
+        },
+        {
+          id: 'deny',
+          action: Action.Read,
+          subject: Subject.Organization,
+          conditions: { createdAt: { gte: epoch } },
+          fields: [],
+          inverted: true,
+        },
+      ],
+      principal
+    )
+    const ability = createPrismaAbility<AppAbility>(
+      normalized.map((permission) => ({
+        action: permission.action as Action,
+        subject: permission.subject as Subject.Organization,
+        inverted: permission.inverted,
+        ...(permission.conditions === null ? {} : { conditions: permission.conditions as never }),
+      }))
+    )
+    expect(ability.can(Action.Read, subject('Organization', row))).toBe(false)
+    const where = { AND: [accessibleBy(ability).ofType('Organization'), { id: org }] }
+    expect(await client.organization.findMany({ where })).toEqual([])
+    expect(await client.organization.count({ where })).toBe(0)
+  })
+
+  it('accepted advanced operators agree across validation, CASL and PostgreSQL', async () => {
+    const row = await db.prisma.role.findUniqueOrThrow({ where: { id: role } })
+    const cases: Record<string, unknown>[] = [
+      { name: 'Before' },
+      { name: { not: 'Other' } },
+      { name: { in: ['Before', 'Other'] } },
+      { name: { notIn: ['Other'] } },
+      { name: { contains: 'for' } },
+      { name: { startsWith: 'Be' } },
+      { name: { endsWith: 'ore' } },
+      { isSystem: false },
+      { AND: [{ name: 'Before' }, { isSystem: false }] },
+      { OR: [{ name: 'Other' }, { name: 'Before' }] },
+      { NOT: { name: 'Other' } },
+    ]
+    const principal: RequestPrincipal = {
+      type: 'jwt',
+      sub: 'holder',
+      organizationId: org,
+      aclVersion: 1,
+      systemRole: SystemRole.User,
+    }
+    const client = db.prisma.$extends(createCaslExtension())
+    for (const conditions of cases) {
+      const input = {
+        action: Action.Read,
+        subject: Subject.Role,
+        conditions,
+        fields: ['id', 'name'],
+        inverted: false,
+      }
+      expect(() => validatePermissionRule(input)).not.toThrow()
+      const [permission] = normalizeOwnerPermissions([{ id: 'rule', ...input }], principal)
+      const rule = {
+        action: Action.Read,
+        subject: Subject.Role,
+        conditions: permission!.conditions as never,
+        fields: ['id', 'name'],
+      }
+      const current = createPrismaAbility<AppAbility>([rule])
+      expect(current.can(Action.Read, subject('Role', row), 'name')).toBe(true)
+      const where = { AND: [accessibleBy(current).ofType('Role'), { organizationId: org }] }
+      expect((await client.role.findMany({ where })).map((item) => item.id)).toEqual([role])
+      expect(await client.role.count({ where })).toBe(1)
     }
   })
 

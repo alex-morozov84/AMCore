@@ -39,6 +39,10 @@ of workflow self-hardening to keep the example forkable.
   - boot the API and serve `/api/v1/health/ready`;
   - let the Next.js web container return `/` `200`;
   - keep the worker healthy.
+- **Test** also runs `pnpm test:capability-extension`: an isolated disposable
+  resource variant compiles shared, API and web consumers and exercises
+  authorization against PostgreSQL and Redis Testcontainers. The fixture does
+  not add a sample product domain to the shipped starter.
 - **workflow-lint** checks workflow syntax and hardening rules, and verifies
   that every `uses:` pin matches the real tag commit (including annotated tags).
 - **Observability contract (static)** — job id `promtool`, display name

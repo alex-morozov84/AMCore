@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { ApiRequestError } from '@/shared/api/http-client'
 
+import { contextAffordances } from './context-fixture'
 import type { OrganizationContextInput } from './context-input'
 import { createOrganizationContextScheduler } from './context-scheduler'
 
@@ -12,7 +13,11 @@ function fixture() {
   const bootstrap = vi.fn(async () => ({ binding, actor }))
   const authority = vi.fn(async () => ({
     binding,
-    data: { organization: { id: 'B', name: 'B', slug: 'b' }, canManageTeamAccess: true },
+    data: {
+      organization: { id: 'B', name: 'B', slug: 'b' },
+      canManageTeamAccess: true,
+      ...contextAffordances,
+    },
   }))
   const publish = vi.fn()
   const scheduler = createOrganizationContextScheduler(binding, initial, {

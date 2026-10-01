@@ -4,6 +4,7 @@ import {
   CommonErrorCode,
   InfrastructureErrorCode,
   InviteErrorCode,
+  PermissionErrorCode,
   ResourceErrorCode,
   SUPPORTED_LOCALES,
 } from '@amcore/shared'
@@ -29,6 +30,7 @@ const backendCodes = [
   ...Object.values(ApiKeyScopeErrorCode),
   ...Object.values(InviteErrorCode),
   ...Object.values(CommonErrorCode),
+  ...Object.values(PermissionErrorCode),
 ]
 
 const clientCodes = Object.values(ClientErrorCode)

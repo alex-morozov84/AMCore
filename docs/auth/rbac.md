@@ -228,8 +228,8 @@ Roles grant nothing by themselves — permissions do. A permission is:
 Permission {
   action:     "create" | "read" | "update" | "delete" | "manage"
   subject:    "User" | "Organization" | "Role" | "Permission" | "TeamAccess" | "all"
-  conditions: { "assignedToId": "${user.sub}" }   ← optional, row-level scope
-  fields:     ["name", "email"]                    ← optional, field-level scope
+  conditions: { "id": "${user.sub}" }             ← optional User row-level scope
+  fields:     ["name", "email"]                    ← optional User field-level scope
   inverted:   false                                ← true = explicit DENY
 }
 ```
@@ -254,14 +254,19 @@ DENYs. Partial TeamAccess and positive wildcard grants return 400 validation err
 Conditions restrict a rule to matching rows. They use `${...}` placeholders
 resolved from the request principal at evaluation time:
 
+For built-in models, valid examples include `User.id = ${user.sub}` and
+`Organization.id = ${user.organizationId}`. A downstream `Contact` model may
+add `assignedToId` and `organizationId` to its declared model-field grammar;
+only then can it author these rules:
+
 ```json
 { "assignedToId": "${user.sub}" }
 { "organizationId": "${user.organizationId}" }
-{ "status": "active" }
 ```
 
-Supported paths are dotted lookups on the principal — `${user.sub}` (the current
-user's ID) and `${user.organizationId}` are the common ones. This expresses
+New rules accept only whole-value `${user.sub}` (the current permission holder's
+ID) on declared identity/assignee fields and `${user.organizationId}` on
+declared tenant/organization ID fields. This expresses
 rules like "update Contacts, but only ones assigned to you" with no imperative
 `if` in your service — CASL applies the filter.
 
@@ -269,10 +274,12 @@ rules like "update Contacts, but only ones assigned to you" with no imperative
 
 ## Record, field and query enforcement
 
-Stored conditions contain JSON values. The native matcher compares DateTime facts
-against numeric epoch milliseconds (covered by organization PATCH tests); this
-contract does not promise ISO-string equality or arbitrary DateTime SQL parity.
-The bounded Prisma recipe below uses Role scalars and has no DateTime fields.
+Stored conditions contain JSON values. New DateTime conditions accept integer
+epoch milliseconds in JavaScript `Date`'s range. Ability construction converts
+an evaluated copy to `Date` before both CASL matching and Prisma SQL filtering;
+the stored rule is unchanged. Fractional/out-of-range dates and ISO strings are
+rejected. The bounded Role recipe below has no DateTime fields; the organization
+authorization recipe tests actual-row and SQL list/count agreement separately.
 
 The factory validates and interpolates the entire owner payload before scope
 narrowing, eagerly parses conditions, deduplicates source variants and orders
@@ -290,6 +297,8 @@ delete check ignores field restrictions; whole-row deletion must require every s
 
 Add the generated domain model to AppSubjects in the ability factory, register its
 Subject enum value and explicit model-permission schema branch, then rebuild shared.
+Add its condition/field grammar, typed capability manifest and server adapter;
+see [Capability catalogue and access hints](./capability-catalogue.md).
 Add actual controller/service policies and OpenAPI metadata. Scopes recognize registered
 subjects automatically, but defaults grant nothing to the new subject. Explicitly
 assign appropriate domain permissions through a trusted TeamAccess holder.
@@ -553,6 +562,9 @@ Supported keys additionally require exact `manage:TeamAccess`. See
   inline permissions on role creation. Each permission is validated, audited,
   and linked on its own; the join row and the `aclVersion` bump are
   transactional.
+- **Named presets** are bearer-only and require full TeamAccess and a custom
+  role. The older advanced-rule POST remains available for valid custom allow
+  and DENY rules, including known-model pairs absent from the UI catalogue.
 - **Built-in roles** (`ADMIN`, `MEMBER`, `VIEWER`) and **built-in permissions**
   are seeded on first run (`pnpm --filter api db:seed`) and cannot be modified or
   deleted via the API.

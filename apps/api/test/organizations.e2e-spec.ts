@@ -7,6 +7,7 @@ import { ORGANIZATION_CONTEXT_FAMILY, SystemRole } from '@amcore/shared'
 
 import { OrgAclVersionService } from '../src/core/auth/org-acl-version.service'
 import { PrivilegedRoleService } from '../src/core/auth/privileged-role.service'
+import { OrganizationsService } from '../src/core/organizations/organizations.service'
 import type { PrismaService } from '../src/prisma'
 
 import { assertFamiliesCloseRoutes, scopedContextRoutes } from './context-policy-coverage'
@@ -66,6 +67,7 @@ describe('Organizations (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200)
       expect(initial.body.canManageTeamAccess).toBe(true)
+      expect(initial.body.actorAffordances['teamAccess.manage']).toBe('allowed')
       const member = await prisma.orgMember.findUniqueOrThrow({
         where: { userId_organizationId: { userId: actor.sub, organizationId: org.body.id } },
       })
@@ -85,6 +87,7 @@ describe('Organizations (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200)
       expect(changed.body.canManageTeamAccess).toBe(false)
+      expect(changed.body.actorAffordances['teamAccess.manage']).toBe('denied')
       await prisma.$transaction(async (tx) => {
         await tx.orgMember.delete({ where: { id: member.id } })
         await tx.organization.update({
@@ -125,9 +128,15 @@ describe('Organizations (e2e)', () => {
           .get(`/organizations/${org.body.id}/context`)
           .set('Authorization', `Bearer ${token}`)
           .expect(200)
-        expect(context.body).toEqual({
+        expect(context.body).toMatchObject({
           organization: { id: org.body.id, name: 'Selected', slug: org.body.slug },
           canManageTeamAccess: true,
+          actorAffordances: { 'teamAccess.manage': 'allowed', 'organization.read': 'allowed' },
+          recordAffordances: {
+            'organization.read': { allowed: true },
+            'organization.update': { allowed: true },
+            'organization.delete': { allowed: true },
+          },
         })
         expect(memberships).toHaveBeenCalledTimes(1)
         expect(versions).not.toHaveBeenCalled()
@@ -804,6 +813,123 @@ describe('Organizations (e2e)', () => {
         .set('Authorization', `Bearer ${orgToken}`)
         .send({ action: 'read', subject: 'Contact' })
         .expect(400)
+    })
+
+    it('validates advanced writes before state change while keeping uncatalogued Role rules', async () => {
+      const role = await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/roles`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({ name: 'AdvancedRules' })
+        .expect(201)
+      const path = `/organizations/${orgId}/roles/${role.body.id}/permissions`
+      const before = {
+        permissions: await prisma.permission.count({ where: { organizationId: orgId } }),
+        links: await prisma.rolePermission.count({ where: { roleId: role.body.id } }),
+        version: (await prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion,
+      }
+      const invalidate = jest.spyOn(app.get(OrganizationsService), 'invalidateAclVersion')
+      try {
+        const rejected = [
+          [
+            { action: 'read', subject: 'Role', conditions: { name: { bad: 'x' } } },
+            'PERMISSION_RULE_UNSUPPORTED',
+          ],
+          [
+            { action: 'read', subject: 'Role', fields: ['missing'] },
+            'PERMISSION_FIELD_UNSUPPORTED',
+          ],
+          [
+            { action: 'read', subject: 'Role', conditions: { id: '${user.email}' } },
+            'PERMISSION_PLACEHOLDER_UNSUPPORTED',
+          ],
+          [
+            { action: 'read', subject: 'Role', conditions: { name: '${user.sub}' } },
+            'PERMISSION_PLACEHOLDER_UNSUPPORTED',
+          ],
+          [
+            { action: 'read', subject: 'Organization', conditions: { updatedAt: { gt: 1.5 } } },
+            'PERMISSION_RULE_UNSUPPORTED',
+          ],
+          [
+            {
+              action: 'read',
+              subject: 'Organization',
+              conditions: { updatedAt: { gt: 8_640_000_000_000_001 } },
+            },
+            'PERMISSION_RULE_UNSUPPORTED',
+          ],
+        ] as const
+        for (const [rule, code] of rejected) {
+          const response = await request(app.getHttpServer())
+            .post(path)
+            .set('Authorization', `Bearer ${orgToken}`)
+            .send(rule)
+            .expect(400)
+          expect(response.body.errorCode).toBe(code)
+        }
+        expect(await prisma.permission.count({ where: { organizationId: orgId } })).toBe(
+          before.permissions
+        )
+        expect(await prisma.rolePermission.count({ where: { roleId: role.body.id } })).toBe(
+          before.links
+        )
+        expect(
+          (await prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion
+        ).toBe(before.version)
+        expect(invalidate).not.toHaveBeenCalled()
+      } finally {
+        invalidate.mockRestore()
+      }
+      await request(app.getHttpServer())
+        .post(path)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({
+          action: 'read',
+          subject: 'Role',
+          conditions: { name: { not: 'Excluded' } },
+          fields: ['id', 'name'],
+        })
+        .expect(201)
+    })
+
+    it('discovers only declared actions and stores holder-bound presets with bearer auth', async () => {
+      const role = await request(app.getHttpServer())
+        .post(`/organizations/${orgId}/roles`)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({ name: 'PresetRules' })
+        .expect(201)
+      const discovery = `/organizations/${orgId}/capabilities`
+      const preset = `/organizations/${orgId}/roles/${role.body.id}/permissions/presets`
+      const catalogue = await request(app.getHttpServer())
+        .get(discovery)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .expect(200)
+      expect(catalogue.body.capabilities.map((entry: { id: string }) => entry.id)).toEqual([
+        'teamAccess.manage',
+        'organization.read',
+        'organization.update',
+        'organization.delete',
+      ])
+      const created = await request(app.getHttpServer())
+        .post(preset)
+        .set('Authorization', `Bearer ${orgToken}`)
+        .send({ capabilityId: 'organization.update', presetId: 'own' })
+        .expect(201)
+      expect(created.body.conditions).toEqual({ id: '${user.organizationId}' })
+      const key = await request(app.getHttpServer())
+        .post('/api-keys')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'Preset forbidden', organizationId: orgId, scopes: ['manage:TeamAccess'] })
+        .expect(201)
+      await request(app.getHttpServer())
+        .get(discovery)
+        .set('Authorization', `Bearer ${key.body.key}`)
+        .expect(401)
+      await request(app.getHttpServer())
+        .post(preset)
+        .set('Authorization', `Bearer ${key.body.key}`)
+        .send({ capabilityId: 'organization.update', presetId: 'all' })
+        .expect(401)
     })
 
     /**
