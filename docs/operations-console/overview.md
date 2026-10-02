@@ -90,8 +90,10 @@ conditions; this is not fleet confirmation. Editor unavailability leaves
 observations visible. Conflict or ambiguous timeout preserves the draft and
 rereads before another explicit Save; there is no blind automatic replay.
 
-Saving 600 is an explicit override. Operator automation can clear the override
+Operator automation can save 600 as an explicit override or clear the override
 through the retained [settings API](../backend/settings.md#operator-api-and-rights).
+The inline editor offers Save only for a changed numeric value; use the API to
+pin the baseline number when the displayed value is already the same.
 Reset uses each API/worker's deployment baseline; align their env values if the
 same effective interval is required. Neither reads nor writes start a storage check.
 

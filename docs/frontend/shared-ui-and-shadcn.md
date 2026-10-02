@@ -90,8 +90,9 @@ for explanation, not the only source of an error or required action.
 
 The primitive knows no setting keys, revisions, backend, authorization or query
 cache. The storage interval feature is the first application recipe; its form
-and step-up/reread logic stay in the feature. The primitive's controlled numeric
-and text-slot tests demonstrate reuse without enabling another product setting.
+and step-up/reread logic stay in the feature. The controlled field slot supports
+numeric or text inputs without assigning a domain type, persistence policy or
+permission to the primitive.
 
 ## Base UI, not Radix
 

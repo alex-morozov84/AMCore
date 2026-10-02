@@ -55,9 +55,11 @@ re-derive it from scratch:
   interaction contract; do not import a sibling feature's internals.
 
 This preserves the [step-up re-authentication
-boundary](../auth/sessions.md#step-up-re-authentication) for every future
-dangerous action, in both topologies — the host-mode console-audience flow
-this section previously called out as undesigned is now built and reviewed.
+boundary](../auth/sessions.md#step-up-re-authentication) in both topologies.
+Host-mode step-up uses the Console audience and session; it does not replace the
+product session. Capture the intended value and revision before re-authentication
+for settings writes; a conflict or uncertain outcome requires an authoritative
+reread, not replay of a newly edited draft.
 
 Console files added below the closed roots listed above are scaffold-owned
 automatically. A Console contribution to shared navigation, config, scripts,
@@ -115,9 +117,12 @@ replace it with a token hash or infer authorization from the displayed device.
    only job is to change the page's own URL (a router refresh, a debounced
    search box, a sort-header link) and let the existing Server Component
    re-fetch on the resulting navigation. No separate Route Handler is needed
-   for that case, Organizations and Overview included. Every protected page
-   must render through `ConsolePageFrame`, because a persisted App Router
-   layout is not a sufficient re-check on sibling navigation and must not
+   for that case: Organizations and Overview's cached observation read use this
+   server-rendered path. Overview's inline interval editor independently initiates
+   browser GET/PATCH requests and needs its fixed Console BFF handler; do not
+   infer a whole page's transport from its server-rendered observations.
+   Every protected page must render through `ConsolePageFrame`, because a persisted
+   App Router layout is not a sufficient re-check on sibling navigation and must not
    retain chrome after denied/unavailable admission. The frame remounts the
    shell after an admitted sibling navigation, so it must also read the
    existing non-sensitive `sidebar_state` preference and pass it to

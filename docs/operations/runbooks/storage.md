@@ -62,9 +62,20 @@ Overview storage observations remain available. Redis session/rate failures can
 block operator access without stopping the database readers/probes.
 
 Restore a previous interval through a new revision-checked write. Reset uses
-null through the operator API, retaining the row/revision; saving 600 is an
-explicit override. After restoring an older database backup, restart all
-API/worker processes to clear revision-regression protection and initialize
-from restored state. Align deployment baselines before reset. For binary rollback,
-verify schemaVersion compatibility; an older reader does not apply unknown
-versions. These controls do not trigger manual probes or acknowledge a fleet.
+null through the operator API, retaining the row and advancing revision on a
+real change; saving 600 is an explicit override. Align deployment baselines before
+reset. These controls do not trigger manual probes or acknowledge a fleet.
+
+After restoring an older database backup, restart all API/worker processes to
+clear revision-regression protection and initialize from restored state. Confirm
+settings GET and each process's application events after recovery; restoring a
+backup can also lose settings and audit changes made after that backup.
+
+For deployment or binary rollback, follow the
+[all-process rollout contract](../deployment.md#runtime-settings-rollout).
+Pre-settings API/worker binaries ignore overrides and use env; their API/web audit
+contracts reject `RUNTIME_SETTING` events. Direct rollback to those releases is
+unsupported once such events exist. Reset does not remove them or make rollback
+safe. Prefer forward repair; preserve settings and audit data. Settings-aware
+readers also require compatible schema versions. Do not delete rows or reverse
+migrations to silence a compatibility failure.

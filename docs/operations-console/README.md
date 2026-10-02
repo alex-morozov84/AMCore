@@ -19,7 +19,9 @@ The Console also has a [configuration and deployment guide](configuration.md)
 for operators who set it up and a [development guide](development.md) for teams
 adding panels. The [persistent audit log guide](../operations/audit-log.md)
 describes how events are recorded and protected across the application; the
-[Audit screen guide](audit.md) explains how to browse them.
+[Audit screen guide](audit.md) explains how to browse them. The
+[retained runtime settings guide](../backend/settings.md) covers the operator API,
+runtime recovery and extension contract independently of the optional Console.
 
 ## Get access
 

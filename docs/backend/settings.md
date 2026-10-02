@@ -34,8 +34,8 @@ the same transaction. Audit failure rolls back the change. A stale revision
 conflicts even if its proposed value would be a no-op. A matching no-op changes
 neither revision nor audit. Real changes increment revision; exhaustion fails.
 
-Reset passes `undefined` to the writer, stores `Prisma.DbNull` and advances
-revision without deleting the row. Saving the baseline number is an explicit
+Reset passes `undefined` to the writer and stores `Prisma.DbNull`, advancing
+revision on a real change without deleting the row. Saving the baseline number is an explicit
 override. Restoring a previous value is a new compare-and-set write; never rewind
 revision or delete a row to reset it.
 
@@ -63,8 +63,8 @@ the confirmed value without rolling back the committed write.
 
 Lower revisions, or different data at the same revision, are integrity failures.
 After restoring an older database backup, restart every API/worker process so its
-reader can initialize from the restored state. An older binary cannot apply an
-unsupported schema version; plan compatible rollback or restore separately.
+reader can initialize from the restored state. See [rollout and recovery](#rollout-and-recovery)
+for binary compatibility and recovery requirements.
 
 Storage owns its timer. Numeric changes use the last actual probe start as their
 anchor. Active I/O keeps its exclusive slot and schedules only after settlement,
@@ -87,34 +87,122 @@ privileged mutation rate policy. An organization selector header is rejected.
 The optional Console editor uses these same retained endpoints; removing the
 administrative frontend leaves the backend, contracts, migration and reader.
 
-For operator automation, obtain a fresh personal JWT through the normal auth
-flow and keep it outside scripts/history. Substitute its variable below; the
-example placeholder is not a credential. Consult development `/docs` for the
-complete contract and error schemas.
+### Read and interpret the response
+
+Use the API origin in `API_URL` (for example, `https://api.example.com`, without
+`/api/v1`) and a fresh personal JWT in `PERSONAL_ACCESS_TOKEN`. Obtain the token
+through the normal auth flow; do not embed it in scripts, shell history or logs.
+These Bash examples require `curl` and `jq`. Development `/docs` exposes the
+complete OpenAPI contract; the optional Console uses its session BFF instead of
+exposing this bearer token to browser JavaScript.
 
 ```bash
 curl --fail-with-body "$API_URL/api/v1/admin/runtime-settings/storage-probe" \
   -H "Authorization: Bearer $PERSONAL_ACCESS_TOKEN"
-# Reread the current saved revision before each deliberate write.
-curl --fail-with-body -X PATCH "$API_URL/api/v1/admin/runtime-settings/storage-probe" \
-  -H "Authorization: Bearer $PERSONAL_ACCESS_TOKEN" -H 'Content-Type: application/json' \
-  --data '{"intervalSeconds":60,"expectedRevision":0}'
-# Reset after rereading revision; 1 here is only this example's next revision.
-curl --fail-with-body -X PATCH "$API_URL/api/v1/admin/runtime-settings/storage-probe" \
-  -H "Authorization: Bearer $PERSONAL_ACCESS_TOKEN" -H 'Content-Type: application/json' \
-  --data '{"intervalSeconds":null,"expectedRevision":1}'
 ```
 
-On conflict, reread and choose a new explicit write. After an ambiguous timeout,
-reread before retrying; do not blindly replay. Reset uses each process's validated
-env baseline (upstream 600 seconds). Align API/worker deployment baselines when
-the same effective interval is required. The responding API's baseline is not a
-worker or fleet acknowledgement. Redis session/rate failures can block admission
-while existing readers and probes keep their last configuration.
+| Field                                              | Meaning                                                                                             |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `saved.intervalSeconds`                            | Durable override, or null when no override is saved.                                                |
+| `saved.revision`                                   | Current per-key CAS revision; use it for the next deliberate write.                                 |
+| `baselineSeconds`                                  | Responding API's validated deployment baseline.                                                     |
+| `applied.intervalSeconds`, `applied.revision`      | Responding API's local value and revision; revision is null before confirmation.                    |
+| `applied.source`                                   | `override`, `baseline`, or `unconfirmed`.                                                           |
+| `applied.lastConfirmedAt`, `applied.refreshStatus` | Last successful confirmation and `confirmed`, `unconfirmed`, `failed`, or `stale` authority status. |
+| `applied.nextScheduledAt`                          | Next scheduled local probe, or null when no next timer is armed, including active I/O.              |
+
+An HTTP 200 write certifies the durable commit. Saved and applied revisions may
+differ while the reader catches up; the response does not acknowledge a worker
+or fleet. Readers reconcile independently, even if the Console is absent.
+
+### Save and reset deliberately
+
+Run this as a Bash script with the two environment variables above. It rereads
+rather than assuming an initial revision and stops if the read fails. This
+example saves a 60-second override; saving 600 also creates an override.
+
+```bash
+set -eu
+saved_state=$(curl --fail-with-body \
+  "$API_URL/api/v1/admin/runtime-settings/storage-probe" \
+  -H "Authorization: Bearer $PERSONAL_ACCESS_TOKEN")
+expected_revision=$(printf '%s' "$saved_state" | jq -er '.saved.revision')
+request_body=$(jq -cn --argjson revision "$expected_revision" \
+  '{intervalSeconds:60,expectedRevision:$revision}')
+curl --fail-with-body -X PATCH \
+  "$API_URL/api/v1/admin/runtime-settings/storage-probe" \
+  -H "Authorization: Bearer $PERSONAL_ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' --data "$request_body"
+```
+
+Reset is an operator API operation, not a Console button. Run it only when the
+intended result is each process's validated env baseline (upstream 600 seconds).
+Reread immediately before reset; do not reuse the revision from the Save example:
+
+```bash
+set -eu
+saved_state=$(curl --fail-with-body \
+  "$API_URL/api/v1/admin/runtime-settings/storage-probe" \
+  -H "Authorization: Bearer $PERSONAL_ACCESS_TOKEN")
+expected_revision=$(printf '%s' "$saved_state" | jq -er '.saved.revision')
+request_body=$(jq -cn --argjson revision "$expected_revision" \
+  '{intervalSeconds:null,expectedRevision:$revision}')
+curl --fail-with-body -X PATCH \
+  "$API_URL/api/v1/admin/runtime-settings/storage-probe" \
+  -H "Authorization: Bearer $PERSONAL_ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' --data "$request_body"
+```
+
+Align API/worker deployment baselines if reset must produce one effective
+interval. The responding API's baseline does not describe other processes.
+
+| Response / symptom                        | Operator action                                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400                                       | Check the strict body, integer range and revision. Extra fields are rejected.                                                                     |
+| 401 / 403                                 | Check personal authentication and the current platform role. For `STEP_UP_REQUIRED`, complete fresh authentication before a new deliberate write. |
+| 409 `SETTING_REVISION_CONFLICT`           | Reread saved state and decide whether the proposed value is still intended. Never overwrite using a guessed revision.                             |
+| 429                                       | Respect the privileged mutation rate limit; do not create a retry loop.                                                                           |
+| 500 / 503 or an ambiguous network timeout | There is no success receipt. Reread before deciding on another write; a missing response alone does not prove that no commit occurred.            |
+| Saved revision ahead of applied revision  | Check reader health and process-local application events; wait for reconciliation rather than triggering a probe.                                 |
+
+Redis session/rate failures can block operator admission while existing database
+readers and probes keep their last configuration. Storage observations can remain
+available when the authoritative settings GET fails. For runtime diagnosis, use
+the [storage runbook](../operations/runbooks/storage.md#interval-configuration).
+
+## Rollout and recovery
+
+The supported first deployment is a drained, all-process cutover: migrate, update
+all API/worker/web consumers, verify reads and local application, then admit
+settings writes. Follow the [deployment procedure](../operations/deployment.md#runtime-settings-rollout).
+Pre-settings API/worker binaries have no reader and use env regardless of saved
+overrides. Their API/web audit DTOs reject the new `RUNTIME_SETTING` target;
+additive SQL persistence alone does not guarantee mixed-version compatibility.
+
+Once settings audit events exist, direct rollback to a pre-settings release is
+unsupported. Reset preserves prior audit events and can add another event; it is
+not a compatibility repair. Prefer forward repair. A different rollback path
+requires a tested compatible API/web/worker set and a backup/data-impact plan.
+Preserve settings rows, audit history and migrations; do not delete audit events,
+rewind revisions or use destructive migration reset as a workaround.
+
+For settings-aware releases, a schema-version change requires an explicit data
+migration, compatible decoding and a coordinated rollout/rollback plan. A reader
+that cannot decode a known definition retains its last confirmed value, or uses
+an unconfirmed baseline on cold start; an authoritative GET fails. Unknown keys
+remain inert, which does not make unsupported versions of known keys compatible.
+
+After a database restore, restart all API/worker readers to clear revision
+regression protection and initialize from the restored state. Verify authoritative
+GET, application events and Audit reads. A backup restore can lose settings,
+audit events and other writes made after the backup; handle that data impact in
+the [backup and restore procedure](../operations/backup-restore.md).
 
 ## Extend the ordinary foundation
 
-A downstream ordinary boolean definition follows the same contract:
+A definition establishes a typed value contract, not a complete settings feature.
+This illustrative boolean fragment uses the ordinary value engine; it deliberately
+projects no before/after value into audit metadata. It is not a production key:
 
 ```ts
 const example: SettingDefinition<boolean> = {
@@ -130,12 +218,62 @@ const example: SettingDefinition<boolean> = {
 }
 ```
 
-Register it in `SETTING_DEFINITIONS`, seed its row in a migration, and add a
-typed domain facade with authorization and language-agnostic shared contracts.
-Choose domain bounds, failure/application behavior and a content-safe audit
-projection explicitly. Subscribe a consumer before its first action and own its
-application state independently of durable state. String, boolean and nullable
-test-only definitions exercise this same writer, reader and codec in tests.
+Use `z` from `zod` and `SettingDefinition` from the backend settings module's
+`setting-definition.ts`. Before exposing another setting, complete these steps:
+
+1. Register the definition in `SETTING_DEFINITIONS` and seed its versioned SQL NULL
+   row through a migration. Choose strict domain bounds, a validated baseline and
+   ordinary JSON limits. Do not activate an unknown persisted key through HTTP.
+2. Add a typed domain facade and language-agnostic shared request/response schemas.
+   The facade must authorize the actor and trusted target before calling the
+   writer; the writer is not an authorization service. Preserve revision-checked
+   writes and distinguish durable state from consumer application.
+3. Complete the audit pipeline below before admitting writes. An empty
+   `auditProjection` is not a useful value-change history and does not make the
+   current interval-specific audit summary suitable for a boolean or string.
+4. Subscribe the consumer before its first action and manage its applied state.
+   `SettingsReader.subscribe` takes a synchronous `() => void` notification; read
+   the immutable snapshot inside it. Synchronous application failures are retried.
+   An async consumer must own completion/error handling: the reader does not await
+   a returned promise or certify external side effects.
+5. Prove type/bounds, reset versus explicit null, CAS/no-op/audit rollback,
+   reconciliation failures and the consumer's application behavior. Verify actual
+   Save/read/reset with multiple processes, and ensure optional UI removal retains
+   the backend contract. Add use, configuration and recovery instructions.
+
+`retain-last-confirmed-or-baseline` is the only implemented failure policy.
+Do not assume it is suitable for every future permission or security-sensitive
+value; a different failure contract needs an explicit design and implementation.
+Per-key revisions do not provide an atomic snapshot across interdependent keys;
+group values or design a coordinated contract when changes must take effect together.
+
+### Complete the audit integration
+
+The writer emits `admin.runtime_setting.changed` with `RUNTIME_SETTING` and the
+reserved `settingKey`, `beforeRevision` and `afterRevision` fields. A definition's
+projection must not overwrite these fields. The current sanitizer, shared summary
+and Audit UI support the sole production storage interval. Other projection keys
+are dropped unless explicitly allowed, and the current revision-based display
+would incorrectly label another setting as a probe interval.
+
+For each new domain, update the complete bounded path. The
+[audit extension guide](../operations/audit-log.md#add-an-audited-action) describes
+metadata sanitization and transactional audit requirements:
+
+- `core/audit/audit-log.metadata.ts`: allow only its content-safe metadata fields
+  for the action, with domain limits. Never expose arbitrary value JSON or secrets.
+- `packages/shared/src/schemas/admin-audit.ts` and
+  `core/admin/audit-projection.ts`: define and validate a typed safe summary;
+  discriminate the setting/domain so storage-only fields do not imply its meaning.
+- Console Audit rendering and locale catalogues: dispatch by that safe domain
+  identity and provide accurate labels and baseline/reset semantics in each locale.
+  Do not classify every pair of revision numbers as an interval change.
+- Tests: exercise definition projection through persistence sanitization, API
+  projection and localized display; assert the domain's correct before/after and
+  reset summary, rejection of unapproved fields and absence of sensitive content.
+
+The existing storage interval supplies the reference implementation. Adding only
+a definition, row and facade is insufficient for an operator-facing new setting.
 
 Platform and future organization settings may share the technical codec and
 consistency primitives, but need separate rights and persistence. Organization
