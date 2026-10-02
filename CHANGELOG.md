@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Implemented-action capability catalogue, validated permission presets and
+  selected-organization actor/record access hints. The ready overview now shows
+  the verified team-access decision; no role-management page is added.
 - Console Overview with automatic API/web build identity, clear per-instance DB,
   JavaScript memory and disk facts, one snapshot completion time and help.
 - Independent periodic local/S3-compatible file write/read/delete monitoring,
@@ -45,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Advanced permission writes reject unsupported conditions, fields and principal
+  templates before saving. Existing valid custom rules remain usable; incompatible
+  stored rules fail closed. Numeric DateTime conditions use integer epoch
+  milliseconds and are normalized before ability and SQL evaluation.
 - Operations Console file storage shows last/next check times, explains S3 request costs and build diagnostics.
 
 - Upgrade API health checks to Terminus 12.1.0, preserving expected-down and

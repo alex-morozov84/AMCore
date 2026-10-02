@@ -46,6 +46,7 @@ find for something, that page is under-documented; please open an issue.
 | Add UI copy, a locale, or an error message                                               | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                      |
 | Configure auth, OAuth, sessions                                                          | [`auth/`](auth/README.md)                                                                                                         |
 | Set up RBAC / authorization                                                              | [`auth/rbac.md`](auth/rbac.md)                                                                                                    |
+| Discover implemented actions, author permission presets, or add a resource               | [`auth/capability-catalogue.md`](auth/capability-catalogue.md)                                                                    |
 | Integrate product administration pages or custom headless UI                             | [Product administration foundation](product-admin/README.md)                                                                      |
 | Use or mount the product organization UI                                                 | [`frontend/organization-context.md`](frontend/organization-context.md)                                                            |
 | Select or extend organization context                                                    | [`auth/organization-context.md`](auth/organization-context.md)                                                                    |
@@ -131,6 +132,9 @@ provide an operator interface for admin session management.
   navigation-progress indicator: what starts/finishes it, the
   `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion,
   and the `ROUTE_PROGRESS_ENABLED` dev/agent flag.
+- **[Product administration foundation](product-admin/README.md)** — the
+  organization selector and read-only overview, one-placement integration and
+  headless extension path; product-domain management UI remains downstream-owned.
 - **[Operations Console](operations-console/README.md)** — the optional
   `SUPER_ADMIN` control plane: Overview readiness, API/web identity and local
   resources, user and organization details,
@@ -138,7 +142,8 @@ provide an operator interface for admin session management.
   host-session boundary, downstream scaffolding, deployment, verification,
   and safe extension rules.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
-  sessions, OAuth, [RBAC](auth/rbac.md), [API keys](auth/api-keys.md), invites,
+  sessions, OAuth, [RBAC](auth/rbac.md), [capability catalogue and access
+  hints](auth/capability-catalogue.md), [API keys](auth/api-keys.md), invites,
   CSRF, and the [auth contracts reference](auth/reference.md).
 - **[Email](email/README.md)** — `EmailService` vs `NotificationsService`, React
   Email templates, delivery classes, and secret-link rules.

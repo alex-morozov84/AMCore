@@ -11,20 +11,27 @@ All paths below are relative to `/api/v1`. Organizations, members, roles and
 invites declare an organization-context boundary. Each handler declares its own
 personal, discovery, exchange or organization policy.
 
-| Operation                                               | Context and credentials                                                                  |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `POST /organizations`                                   | Personal, bearer-only; creates ADMIN membership                                          |
-| `GET /organizations`                                    | Actor-owned discovery, bearer-only                                                       |
-| `GET /organizations/:id`                                | Existing membership discovery; accepted keys remain bound and scope-limited              |
-| `GET /organizations/:id/context`                        | Selected organization, bearer-only; current membership required even for SUPER_ADMIN     |
-| `PATCH /organizations/:id`, `DELETE /organizations/:id` | Selected organization; existing credential/field/TeamAccess requirements retained        |
-| Organization member/role/invite handlers                | Path-selected organization; existing per-handler credential allowlist retained           |
-| `POST /auth/invites/accept`                             | Personal, bearer-only                                                                    |
-| `POST /organizations/:id/switch`                        | Existing bearer-only exchange; membership-checked A→B and parent-bounded expiry retained |
+| Operation                                                      | Context and credentials                                                                  |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `POST /organizations`                                          | Personal, bearer-only; creates ADMIN membership                                          |
+| `GET /organizations`                                           | Actor-owned discovery, bearer-only                                                       |
+| `GET /organizations/:id`                                       | Existing membership discovery; accepted keys remain bound and scope-limited              |
+| `GET /organizations/:id/context`                               | Selected organization, bearer-only; current membership required even for SUPER_ADMIN     |
+| `GET /organizations/:orgId/capabilities`                       | Selected organization, bearer-only; full TeamAccess; implemented authoring metadata only |
+| `POST /organizations/:orgId/roles/:roleId/permissions/presets` | Selected organization, bearer-only; full TeamAccess and custom role                      |
+| `PATCH /organizations/:id`, `DELETE /organizations/:id`        | Selected organization; existing credential/field/TeamAccess requirements retained        |
+| Organization member/role/invite handlers                       | Path-selected organization; existing per-handler credential allowlist retained           |
+| `POST /auth/invites/accept`                                    | Personal, bearer-only                                                                    |
+| `POST /organizations/:id/switch`                               | Existing bearer-only exchange; membership-checked A→B and parent-bounded expiry retained |
 
-`GET /organizations/:id/context` returns
-`{organization: {id, name, slug}, canManageTeamAccess}`. The boolean is an
-affordance for display; every later operation performs its own authorization.
+`GET /organizations/:id/context` returns the safe organization summary,
+`canManageTeamAccess`, finite `actorAffordances` and actual-organization
+`recordAffordances`. The actor map distinguishes unconditional `allowed`,
+`recordRequired` (a real row is needed, with no existence guarantee) and
+`denied`. Record hints include read, update-field and delete decisions for the
+server-loaded organization row. The old boolean stays consistent with
+`teamAccess.manage`. These are display affordances; every later operation
+performs its own authorization.
 Missing organizations and nonmembers both receive `404` on this overview and
 existing JWT detail discovery. Other selected handlers retain `403` for missing
 membership. No team, role or invitation management UI is implied by this API.

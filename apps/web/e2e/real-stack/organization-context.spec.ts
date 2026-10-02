@@ -35,6 +35,8 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   await page.goto(ui.path())
   await expect(page).toHaveURL(new RegExp(`${ui.path(`/${first.id}`)}$`))
   await expect(page.getByRole('heading', { name: 'Company Alpha', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: ui.text('access') })).toBeVisible()
+  await expect(page.getByText(ui.text('permitted'), { exact: true })).toBeVisible()
   expect(calls).toEqual([
     '/api/product-access/bootstrap',
     '/api/product-access/organizations',
@@ -91,7 +93,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
     { actor: actor.id, org: first.id }
   )
   await page.getByRole('button', { name: ui.text('refresh'), exact: true }).click()
-  await expect(page.getByText(ui.text('teamDenied'), { exact: true })).toBeVisible()
+  await expect(page.getByText(ui.text('notPermitted'), { exact: true })).toBeVisible()
   guardedSql(
     `DELETE FROM core.org_members WHERE "userId"=:'actor' AND "organizationId"=:'org'; UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=:'org';`,
     { actor: actor.id, org: first.id }

@@ -87,6 +87,18 @@ describe('total owner normalization', () => {
     expect(normalizeOwnerPermissions([rule(), rule({ id: 'other' })], actor)).toHaveLength(2)
   })
 
+  it('keeps signed Int32 ACL thresholds from stored rules', () => {
+    for (const value of [-2_147_483_648, -1, 2_147_483_647]) {
+      const stored = rule({ conditions: { aclVersion: { gte: value } } })
+      expect(normalizeOwnerPermissions([stored], actor)[0]?.conditions).toEqual(stored.conditions)
+    }
+    for (const value of [-2_147_483_649, 1.5, 2_147_483_648]) {
+      expect(() =>
+        normalizeOwnerPermissions([rule({ conditions: { aclVersion: { gte: value } } })], actor)
+      ).toThrow('Stored authorization rule incompatible')
+    }
+  })
+
   it('computes owner trust before scope narrowing and requires exact team scope', async () => {
     const team = rule({ subject: Subject.TeamAccess })
     expect(

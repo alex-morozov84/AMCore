@@ -18,6 +18,7 @@ import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults'
 import { OrgAclVersionService } from '../auth/org-acl-version.service'
 import type { VerifiedOrganizationContext } from '../auth/organization-context/verified-organization-context'
 
+import { CapabilityRegistry } from './capability-registry.service'
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
 import {
   assertOrganizationAction,
@@ -34,7 +35,8 @@ type PrismaTx = Prisma.TransactionClient
 export class OrganizationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly aclVersionService: OrgAclVersionService
+    private readonly aclVersionService: OrgAclVersionService,
+    private readonly capabilities: CapabilityRegistry
   ) {}
 
   async create(userId: string, dto: CreateOrganizationDto): Promise<OrgResponse> {
@@ -95,7 +97,8 @@ export class OrganizationsService {
 
   async selectedContext(
     context: VerifiedOrganizationContext,
-    access: TeamAccessDecision
+    access: TeamAccessDecision,
+    ability: AppAbility
   ): Promise<OrganizationContextResponse> {
     if (
       !context.membershipVerified ||
@@ -107,10 +110,14 @@ export class OrganizationsService {
     }
     const organization = await this.prisma.organization.findUnique({
       where: { id: context.organizationId },
-      select: { id: true, name: true, slug: true },
     })
     if (!organization) throw new NotFoundException('Organization', context.organizationId)
-    return { organization, canManageTeamAccess: access.ownerTrusted && access.credentialTrusted }
+    return {
+      organization: { id: organization.id, name: organization.name, slug: organization.slug },
+      canManageTeamAccess: access.ownerTrusted && access.credentialTrusted,
+      actorAffordances: this.capabilities.actor(ability, access),
+      recordAffordances: this.capabilities.record(ability, access, organization),
+    }
   }
 
   async findOne(

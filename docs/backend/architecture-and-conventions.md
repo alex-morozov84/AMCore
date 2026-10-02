@@ -180,6 +180,11 @@ session) is the default credential; allow API keys only on handlers that should
 accept them, and never for credential management or other high-risk operations. For
 role/permission checks and adding your own CASL subjects, follow
 [`docs/auth/rbac.md`](../auth/rbac.md) — don't reinvent it.
+If the action should be authorable in a future role editor, also register its
+implemented route, presets and record/field evaluator through the
+[capability catalogue](../auth/capability-catalogue.md). That metadata does not
+grant access or replace route authorization. The disposable PostgreSQL
+extension fixture is available through `pnpm test:capability-extension`.
 
 Organization handlers additionally opt into the scoped
 [context boundary and own-method policy](../auth/organization-context.md#authorization-freshness-and-extension).

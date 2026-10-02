@@ -13,6 +13,17 @@ describe('product organization wire boundaries', () => {
       data: {
         organization: { id: 'org-a', name: 'Company', slug: 'company' },
         canManageTeamAccess: true,
+        actorAffordances: {
+          'teamAccess.manage': 'allowed',
+          'organization.read': 'allowed',
+          'organization.update': 'recordRequired',
+          'organization.delete': 'recordRequired',
+        },
+        recordAffordances: {
+          'organization.read': { allowed: true, fields: {} },
+          'organization.update': { allowed: false, fields: { name: false, slug: false } },
+          'organization.delete': { allowed: false, fields: {} },
+        },
       },
     }
     expect(productAccessBootstrapSchema.safeParse(bootstrap).success).toBe(true)

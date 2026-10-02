@@ -9,8 +9,12 @@ automatically. The overview's All organizations link uses `?view=list` to avoid
 a single-organization redirect loop. Multiple memberships use cards and URL
 pagination, 20 per page. There is no search, table or organization CRUD UI.
 
-`/[locale]/organizations/[id]` confirms the company, signed-in account and full
-team-access affordance. It is a read-only landing point for future downstream
+`/[locale]/organizations/[id]` confirms the company and signed-in account. Its
+read-only “Your access” / “Ваш доступ” card shows the verified
+“Team access management” / “Управление доступом команды” decision as
+“Permitted” / “Разрешено” or “Not permitted” / “Не разрешено”, followed by a
+reminder that actions are checked again. It makes no claim about assigned
+records. It is a read-only landing point for future downstream
 work. Team, role and invitation screens are not included; no inactive links
 promise them. A missing/removed target stays unavailable at that URL; it never
 silently adopts another organization. Capability text never grants authority.
@@ -62,6 +66,13 @@ retain the explicit page href/callback API. See [product administration](../prod
 and its [integration recipes](../product-admin/integration.md). This is a source composition
 seam, not a delivered configurable topology framework. Import the server DAL
 only through `index.server.ts`, never from a Client Component.
+
+The selected-context payload also carries bounded actor decisions and
+actual-organization record/field hints. A downstream screen should request
+authority once for its current actor and target, then attach server-evaluated
+row hints to rows it already fetched. It must not request permission per button
+or treat a hint as authority to write. See the
+[capability guide](../auth/capability-catalogue.md).
 
 Retire a consumer before accepting another session/target. The headless action
 wrapper publishes only into the still-current run; it never cancels an already

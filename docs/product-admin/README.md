@@ -10,7 +10,11 @@ The default pages are `/organizations` and `/organizations/[id]`, with `/en` or
 `/ru` prefixes in multi-locale builds. The selector displays memberships, opens a
 single membership automatically, and paginates multiple memberships in groups of 20. **All organizations** returns to `?view=list`, preserving list access even
 with one membership. The overview confirms organization, account and team-access
-capability. It does not provide organization, member, role or invitation CRUD.
+capability. The “Your access” card reports only the verified team-access decision;
+it does not infer permissions for individual records. It does not provide
+organization, member, role or invitation CRUD. See the
+[capability catalogue and access hints](../auth/capability-catalogue.md) for the
+separate discovery, actor and record contracts.
 
 ## Connect the ready pages
 

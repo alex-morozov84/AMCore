@@ -6,6 +6,8 @@ import { AuditModule } from '../audit'
 import { AuthModule } from '../auth/auth.module'
 
 import { AuthInvitesController } from './auth-invites.controller'
+import { CapabilitiesController } from './capabilities.controller'
+import { CapabilityRegistry } from './capability-registry.service'
 import { InviteService } from './invite.service'
 import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
 import { InviteRateLimiterService } from './invite-rate-limiter.service'
@@ -14,6 +16,7 @@ import { MemberService } from './member.service'
 import { MembersController } from './members.controller'
 import { OrganizationsController } from './organizations.controller'
 import { OrganizationsService } from './organizations.service'
+import { PresetPermissionsController } from './preset-permissions.controller'
 import { RoleService } from './role.service'
 import { RoleAssignabilityService } from './role-assignability.service'
 import { RolesController } from './roles.controller'
@@ -27,6 +30,8 @@ import { RolesController } from './roles.controller'
   ],
   controllers: [
     OrganizationsController,
+    CapabilitiesController,
+    PresetPermissionsController,
     MembersController,
     RolesController,
     InvitesController,
@@ -34,6 +39,7 @@ import { RolesController } from './roles.controller'
   ],
   providers: [
     OrganizationsService,
+    CapabilityRegistry,
     MemberService,
     RoleService,
     RoleAssignabilityService,

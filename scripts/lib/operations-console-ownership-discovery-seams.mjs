@@ -41,13 +41,9 @@ export const operationsConsoleDiscoverySeams = [
     undefined,
     { operationKey: 'readme-console' }
   ),
-  entry(
-    'console.root-capability',
-    'README.md',
-    { text: '| **Operations Console**   | ✅ Shipped' },
-    undefined,
-    { operationKey: 'readme-console' }
-  ),
+  entry('console.root-capability', 'README.md', { text: '| **Operations Console**' }, undefined, {
+    operationKey: 'readme-console',
+  }),
   entry(
     'console.root-map',
     'README.md',

@@ -1,4 +1,10 @@
 export {
+  CAPABILITY_CATALOGUE,
+  type CapabilityDescriptor,
+  type CapabilityId,
+  type CapabilityPresetId,
+} from './capability-catalogue'
+export {
   isOrganizationContextId,
   ORGANIZATION_CONTEXT_FAMILY,
   ORGANIZATION_CONTEXT_ID_PATTERN,
@@ -77,6 +83,13 @@ export enum InviteErrorCode {
 // developer-facing and vary per call site).
 export enum CommonErrorCode {
   BUSINESS_RULE_VIOLATION = 'BUSINESS_RULE_VIOLATION',
+}
+
+export enum PermissionErrorCode {
+  PERMISSION_RULE_UNSUPPORTED = 'PERMISSION_RULE_UNSUPPORTED',
+  PERMISSION_FIELD_UNSUPPORTED = 'PERMISSION_FIELD_UNSUPPORTED',
+  PERMISSION_PLACEHOLDER_UNSUPPORTED = 'PERMISSION_PLACEHOLDER_UNSUPPORTED',
+  CAPABILITY_UNSUPPORTED = 'CAPABILITY_UNSUPPORTED',
 }
 
 // HTTP Status codes

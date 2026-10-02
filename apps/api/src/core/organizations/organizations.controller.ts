@@ -203,9 +203,10 @@ export class OrganizationsController {
   })
   selectedContext(
     @CurrentOrganizationContext() context: VerifiedOrganizationContext,
-    @CurrentTeamAccess() access: TeamAccessDecision
+    @CurrentTeamAccess() access: TeamAccessDecision,
+    @CurrentAbility() ability: AppAbility
   ): Promise<OrganizationContextResponse> {
-    return this.orgsService.selectedContext(context, access)
+    return this.orgsService.selectedContext(context, access, ability)
   }
 
   @Patch(':id')

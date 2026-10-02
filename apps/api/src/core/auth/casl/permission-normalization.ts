@@ -1,6 +1,9 @@
 import { Action, type RequestPrincipal, Subject } from '@amcore/shared'
 
 import { interpolateConditions } from './interpolate-conditions'
+import { normalizeDateConditions } from './normalize-date-conditions'
+import { isModelSubject } from './permission-model-fields'
+import { type PermissionWriteInput, validatePermissionRule } from './permission-rule-validation'
 import { prismaQuery } from './prisma-ability'
 
 export interface AbilityPermission {
@@ -79,16 +82,27 @@ export function normalizeOwnerPermissions(
   const result: AbilityPermission[] = []
   for (const permission of permissions) {
     validate(permission, synthetic)
+    if (!(synthetic && permission.subject === Subject.All && !permission.inverted)) {
+      try {
+        validatePermissionRule(permission as unknown as PermissionWriteInput)
+      } catch {
+        throw new Error('Stored authorization rule incompatible')
+      }
+    }
     const signature = canonical(permission)
     const previous = identities.get(permission.id)
     if (previous !== undefined && previous !== signature)
       throw new Error('Conflicting permission ID')
     if (previous !== undefined) continue
     identities.set(permission.id, signature)
-    const conditions =
+    const interpolated =
       permission.conditions === null
         ? null
         : interpolateConditions(permission.conditions as Record<string, unknown>, principal)
+    const conditions =
+      interpolated && isModelSubject(permission.subject)
+        ? normalizeDateConditions(interpolated, permission.subject)
+        : interpolated
     if (conditions && Object.keys(conditions).length) prismaQuery(conditions).ast
     result.push({ ...permission, conditions, fields: [...permission.fields] })
   }

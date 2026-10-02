@@ -1,0 +1,770 @@
+diff --git a/apps/api/prisma/fixture-order.prisma b/apps/api/prisma/fixture-order.prisma
+new file mode 100644
+index 0000000..64f2a3d
+--- /dev/null
++++ b/apps/api/prisma/fixture-order.prisma
+@@ -0,0 +1,12 @@
++model FixtureOrder {
++  id             String  @id @default(cuid())
++  organizationId String
++  ownerId        String
++  assignedToId   String?
++  status         String
++  note           String?
++
++  @@index([organizationId])
++  @@map("fixture_orders")
++  @@schema("core")
++}
+diff --git a/apps/api/prisma/migrations/20261001000000_fixture_order/migration.sql b/apps/api/prisma/migrations/20261001000000_fixture_order/migration.sql
+new file mode 100644
+index 0000000..24bd3e1
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261001000000_fixture_order/migration.sql
+@@ -0,0 +1,9 @@
++CREATE TABLE core.fixture_orders (
++  id text PRIMARY KEY,
++  "organizationId" text NOT NULL,
++  "ownerId" text NOT NULL,
++  "assignedToId" text,
++  status text NOT NULL,
++  note text
++);
++CREATE INDEX fixture_orders_organization_id_idx ON core.fixture_orders ("organizationId");
+diff --git a/apps/api/src/core/auth/casl/ability.factory.ts b/apps/api/src/core/auth/casl/ability.factory.ts
+index 0ad0ca1..c9a01ef 100644
+--- a/apps/api/src/core/auth/casl/ability.factory.ts
++++ b/apps/api/src/core/auth/casl/ability.factory.ts
+@@ -20,7 +20,7 @@ import {
+ } from './permission-normalization'
+ import { createPrismaAbility, type PrismaQuery, type Subjects } from './prisma-ability'
+ 
+-import type { Organization, Permission, Role, User } from '@/generated/prisma/client'
++import type { FixtureOrder, Organization, Permission, Role, User } from '@/generated/prisma/client'
+ 
+ type AppSubjects =
+   | 'all'
+@@ -30,6 +30,7 @@ type AppSubjects =
+       Organization: Organization
+       Role: Role
+       Permission: Permission
++      FixtureOrder: FixtureOrder
+     }>
+ export type AppAbility = Ability<[string, AppSubjects], PrismaQuery>
+ 
+diff --git a/apps/api/src/core/auth/casl/permission-model-fields.ts b/apps/api/src/core/auth/casl/permission-model-fields.ts
+index d16a961..ea2e209 100644
+--- a/apps/api/src/core/auth/casl/permission-model-fields.ts
++++ b/apps/api/src/core/auth/casl/permission-model-fields.ts
+@@ -1,6 +1,6 @@
+ import { Subject } from '@amcore/shared'
+ 
+-export type ModelSubject = Subject.User | Subject.Organization | Subject.Role | Subject.Permission
++export type ModelSubject = Subject.User | Subject.Organization | Subject.Role | Subject.Permission | Subject.FixtureOrder
+ export type ScalarKind =
+   'string' | 'nullableString' | 'boolean' | 'integer' | 'date' | 'nullableDate'
+ 
+@@ -41,6 +41,10 @@ export const MODEL_FIELDS: Record<ModelSubject, Record<string, ScalarKind>> = {
+     inverted: 'boolean',
+     organizationId: 'nullableString',
+   },
++  [Subject.FixtureOrder]: {
++    id: 'string', organizationId: 'string', ownerId: 'string',
++    assignedToId: 'nullableString', status: 'string', note: 'nullableString',
++  },
+ }
+ 
+ export const MODEL_SUBJECTS = Object.keys(MODEL_FIELDS) as ModelSubject[]
+diff --git a/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts b/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
+index 26f9d5a..0468022 100644
+--- a/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
++++ b/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
+@@ -161,6 +161,19 @@ export const ADR_034_APIKEY_ALLOWLIST: readonly HandlerAllowlistEntry[] = [
+     reason: 'removePermission — manage:Organization scope per ADR-033.',
+   },
+ 
++  {
++    method: RequestMethod.GET,
++    classPath: 'organizations/:orgId/fixture-orders',
++    handlerPath: '',
++    reason: 'FixtureOrder tenant-bound read with explicit scope and ability checks.',
++  },
++  {
++    method: RequestMethod.PATCH,
++    classPath: 'organizations/:orgId/fixture-orders',
++    handlerPath: ':id',
++    reason: 'FixtureOrder tenant-bound write with explicit scope and ability checks.',
++  },
++
+   // AuthController.me — handler-level @Auth(Bearer, ApiKey).
+   // Stable opt-in per AK-01 — identity self-check surface.
+   {
+diff --git a/apps/api/src/core/organizations/capability-policy-parity.spec.ts b/apps/api/src/core/organizations/capability-policy-parity.spec.ts
+index 999a3bc..cda8311 100644
+--- a/apps/api/src/core/organizations/capability-policy-parity.spec.ts
++++ b/apps/api/src/core/organizations/capability-policy-parity.spec.ts
+@@ -11,6 +11,7 @@ import { REQUEST_CONTEXT_POLICY } from '../auth/organization-context/request-con
+ 
+ import { CapabilitiesController } from './capabilities.controller'
+ import { CAPABILITY_ADAPTERS } from './capability-registry.service'
++import { FixtureOrdersController } from './fixture-orders.controller'
+ import { OrganizationsController } from './organizations.controller'
+ import { PresetPermissionsController } from './preset-permissions.controller'
+ import { RolesController } from './roles.controller'
+@@ -21,6 +22,8 @@ const bindings = {
+   'organization.read': { controller: OrganizationsController, handler: 'findOne' },
+   'organization.update': { controller: OrganizationsController, handler: 'update' },
+   'organization.delete': { controller: OrganizationsController, handler: 'remove' },
++  'fixtureOrder.read': { controller: FixtureOrdersController, handler: 'list' },
++  'fixtureOrder.update': { controller: FixtureOrdersController, handler: 'update' },
+ } satisfies Record<CapabilityId, Binding>
+ 
+ function route(cls: object, name: string) {
+@@ -81,7 +84,8 @@ describe('published capability route parity', () => {
+         ])
+       )
+       expect(adapter.requiredReadFields).toEqual(
+-        descriptor.subject === 'Organization' ? ORG_READ_FIELDS : []
++        descriptor.subject === 'Organization' ? ORG_READ_FIELDS :
++          descriptor.subject === 'FixtureOrder' ? ['id', 'status'] : []
+       )
+     }
+   })
+diff --git a/apps/api/src/core/organizations/capability-registry.service.ts b/apps/api/src/core/organizations/capability-registry.service.ts
+index e5b49fd..57d0a5f 100644
+--- a/apps/api/src/core/organizations/capability-registry.service.ts
++++ b/apps/api/src/core/organizations/capability-registry.service.ts
+@@ -49,6 +49,20 @@ const organizationPreset = (
+   inverted: false,
+ })
+ 
++const fixturePreset = (
++  action: Action,
++  fields: string[],
++  id: string
++): AssignPermissionInput => ({
++  action,
++  subject: Subject.FixtureOrder,
++  conditions: id === 'all' ? null : {
++    [id === 'own' ? 'ownerId' : 'assignedToId']: '${user.sub}',
++  },
++  fields,
++  inverted: false,
++})
++
+ export const CAPABILITY_ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
+   'teamAccess.manage': {
+     operation: 'roles.list',
+@@ -104,6 +118,25 @@ export const CAPABILITY_ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
+     editableFields: [],
+     preset: (id) => organizationPreset(Action.Delete, [], id),
+   },
++  'fixtureOrder.read': {
++    operation: 'fixtureOrders.list',
++    method: 'GET', path: '/organizations/:orgId/fixture-orders',
++    context: 'organization', selector: 'orgId', teamAccess: false,
++    tenantBound: true, requiredReadFields: ['id', 'status'],
++    subject: Subject.FixtureOrder, action: Action.Read,
++    credentials: ['bearer', 'apiKey'], presets: ['own', 'assigned', 'all'],
++    editableFields: [], preset: (id) => fixturePreset(Action.Read, [], id),
++  },
++  'fixtureOrder.update': {
++    operation: 'fixtureOrders.update',
++    method: 'PATCH', path: '/organizations/:orgId/fixture-orders/:id',
++    context: 'organization', selector: 'orgId', teamAccess: false,
++    tenantBound: true, requiredReadFields: ['id', 'status'],
++    subject: Subject.FixtureOrder, action: Action.Update,
++    credentials: ['bearer', 'apiKey'], presets: ['own', 'assigned', 'all'],
++    editableFields: ['status', 'note'],
++    preset: (id) => fixturePreset(Action.Update, ['status', 'note'], id),
++  },
+ }
+ const error = (): never => {
+   throw new AppException(
+@@ -116,17 +149,18 @@ const error = (): never => {
+ type Rule = AppAbility['rules'][number]
+ const unconditional = (rule: Rule): boolean =>
+   !rule.conditions || Object.keys(rule.conditions).length === 0
+-const relevant = (rule: Rule, action: Action, field: string): boolean =>
+-  (rule.subject === Subject.Organization || rule.subject === Subject.All) &&
++const relevant = (rule: Rule, action: Action, field: string, subjectType: Subject): boolean =>
++  (rule.subject === subjectType || rule.subject === Subject.All) &&
+   (rule.action === action || rule.action === Action.Manage) &&
+   (!rule.fields?.length || rule.fields.includes('*') || rule.fields.includes(field))
+ 
+ function fieldPossibility(
+   ability: AppAbility,
+   action: Action,
+-  field: string
++  field: string,
++  subjectType: Subject = Subject.Organization
+ ): { possible: boolean; unconditional: boolean } {
+-  const rules = ability.rules.filter((rule) => relevant(rule, action, field))
++  const rules = ability.rules.filter((rule) => relevant(rule, action, field, subjectType))
+   const allows = rules.filter((rule) => !rule.inverted)
+   const denies = rules.filter((rule) => rule.inverted)
+   return {
+@@ -138,9 +172,10 @@ function fieldPossibility(
+ function classify(
+   ability: AppAbility,
+   action: Action,
+-  fields: readonly string[]
++  fields: readonly string[],
++  subjectType: Subject = Subject.Organization
+ ): ActorAffordances[keyof ActorAffordances] {
+-  const checks = fields.map((field) => fieldPossibility(ability, action, field))
++  const checks = fields.map((field) => fieldPossibility(ability, action, field, subjectType))
+   if (checks.some((check) => !check.possible)) return 'denied'
+   if (checks.every((check) => check.unconditional)) return 'allowed'
+   return 'recordRequired'
+@@ -205,6 +240,10 @@ export class CapabilityRegistry {
+       'organization.read': 'allowed', // verified membership on this bearer-only context
+       'organization.update': update,
+       'organization.delete': team ? classify(ability, Action.Delete, ORG_READ_FIELDS) : 'denied',
++      'fixtureOrder.read': classify(ability, Action.Read,
++        ['id', 'status'], Subject.FixtureOrder),
++      'fixtureOrder.update': classify(ability, Action.Update,
++        ['status'], Subject.FixtureOrder),
+     }
+   }
+ 
+diff --git a/apps/api/src/core/organizations/fixture-orders.controller.ts b/apps/api/src/core/organizations/fixture-orders.controller.ts
+new file mode 100644
+index 0000000..4c08cba
+--- /dev/null
++++ b/apps/api/src/core/organizations/fixture-orders.controller.ts
+@@ -0,0 +1,90 @@
++import { subject } from '@casl/ability'
++import { BadRequestException, Body, Controller, Get, Param, Patch } from '@nestjs/common'
++import { ApiBearerAuth, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger'
++import { createZodDto } from 'nestjs-zod'
++
++import {
++  Action, AuthType, type FixtureOrderUpdate, fixtureOrderUpdateSchema,
++  ORGANIZATION_CONTEXT_FAMILY,
++} from '@amcore/shared'
++
++import { ForbiddenException, NotFoundException } from '../../common/exceptions'
++import { PrismaService } from '../../prisma'
++import type { AppAbility } from '../auth/casl/ability.factory'
++import { accessibleBy, createCaslExtension } from '../auth/casl/prisma-ability'
++import { Auth } from '../auth/decorators/auth.decorator'
++import { CurrentAbility } from '../auth/decorators/current-ability.decorator'
++import {
++  OrganizationContextBoundary, RequestContextPolicy,
++} from '../auth/organization-context/request-context-policy'
++
++import type { FixtureOrder, Prisma } from '@/generated/prisma/client'
++
++class FixtureOrderUpdateDto extends createZodDto(fixtureOrderUpdateSchema) {}
++const MAX_SCAN = 200
++const PAGE_SIZE = 20
++
++const canRead = (ability: AppAbility, row: FixtureOrder): boolean => {
++  const record = subject('FixtureOrder', row)
++  return ability.can(Action.Read, record) &&
++    ['id', 'status'].every((field) => ability.can(Action.Read, record, field))
++}
++
++const hint = (ability: AppAbility, row: FixtureOrder) => {
++  const record = subject('FixtureOrder', row)
++  const fields = Object.fromEntries(['status', 'note'].map((field) => [field,
++    ability.can(Action.Update, record) && ability.can(Action.Update, record, field)]))
++  return { allowed: Object.values(fields).some(Boolean), fields }
++}
++
++@ApiTags('fixture-orders')
++@ApiBearerAuth()
++@ApiSecurity('apiKeyBearer')
++@Controller('organizations/:orgId/fixture-orders')
++@Auth(AuthType.Bearer, AuthType.ApiKey)
++@OrganizationContextBoundary(ORGANIZATION_CONTEXT_FAMILY)
++export class FixtureOrdersController {
++  constructor(private readonly prisma: PrismaService) {}
++
++  @Get()
++  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' },
++    legacyPlatformMembershipBypass: true })
++  @ApiOperation({ summary: 'List authorized fixture orders' })
++  async list(@Param('orgId') orgId: string, @CurrentAbility() ability: AppAbility) {
++    const client = this.prisma.$extends(createCaslExtension())
++    const where: Prisma.FixtureOrderWhereInput = {
++      AND: [{ organizationId: orgId }, accessibleBy(ability).ofType('FixtureOrder')],
++    }
++    const rows = await client.fixtureOrder.findMany({
++      where, orderBy: { id: 'asc' }, take: MAX_SCAN + 1,
++    })
++    if (rows.length > MAX_SCAN) throw new BadRequestException('Fixture order scan limit exceeded')
++    const visible = rows.filter((row) => canRead(ability, row))
++    const data = visible.slice(0, PAGE_SIZE).map((row) => ({
++      id: row.id, status: row.status, access: hint(ability, row),
++    }))
++    return { data, total: visible.length }
++  }
++
++  @Patch(':id')
++  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' },
++    legacyPlatformMembershipBypass: true })
++  @ApiOperation({ summary: 'Update authorized fixture order fields' })
++  async update(@Param('orgId') orgId: string, @Param('id') id: string,
++    @Body() input: FixtureOrderUpdateDto, @CurrentAbility() ability: AppAbility) {
++    return this.prisma.$transaction(async (tx) => {
++      await tx.$queryRaw`SELECT id FROM core.fixture_orders WHERE id = ${id} AND "organizationId" = ${orgId} FOR UPDATE`
++      const before = await tx.fixtureOrder.findUnique({ where: { id } })
++      if (!before || before.organizationId !== orgId) throw new NotFoundException('FixtureOrder', id)
++      const fields = Object.keys(input) as (keyof FixtureOrderUpdate)[]
++      const permitted = (row: FixtureOrder) => fields.every((field) =>
++        ability.can(Action.Update, subject('FixtureOrder', row), field))
++      if (!ability.can(Action.Update, subject('FixtureOrder', before)) || !permitted(before) ||
++        !canRead(ability, before)) throw new ForbiddenException('Fixture order denied')
++      const after = await tx.fixtureOrder.update({ where: { id }, data: input })
++      if (!ability.can(Action.Update, subject('FixtureOrder', after)) || !permitted(after) ||
++        !canRead(ability, after)) throw new ForbiddenException('Fixture order denied')
++      return { id: after.id, status: after.status }
++    })
++  }
++}
+diff --git a/apps/api/src/core/organizations/organizations.module.ts b/apps/api/src/core/organizations/organizations.module.ts
+index f6b2d08..4700b15 100644
+--- a/apps/api/src/core/organizations/organizations.module.ts
++++ b/apps/api/src/core/organizations/organizations.module.ts
+@@ -17,6 +17,7 @@ import { MembersController } from './members.controller'
+ import { OrganizationsController } from './organizations.controller'
+ import { OrganizationsService } from './organizations.service'
+ import { PresetPermissionsController } from './preset-permissions.controller'
++import { FixtureOrdersController } from './fixture-orders.controller'
+ import { RoleService } from './role.service'
+ import { RoleAssignabilityService } from './role-assignability.service'
+ import { RolesController } from './roles.controller'
+@@ -32,6 +33,7 @@ import { RolesController } from './roles.controller'
+     OrganizationsController,
+     CapabilitiesController,
+     PresetPermissionsController,
++    FixtureOrdersController,
+     MembersController,
+     RolesController,
+     InvitesController,
+diff --git a/apps/api/test/fixture-order-extension.e2e-spec.ts b/apps/api/test/fixture-order-extension.e2e-spec.ts
+new file mode 100644
+index 0000000..5795deb
+--- /dev/null
++++ b/apps/api/test/fixture-order-extension.e2e-spec.ts
+@@ -0,0 +1,269 @@
++import type { INestApplication } from '@nestjs/common'
++import { JwtService } from '@nestjs/jwt'
++import { writeFileSync } from 'node:fs'
++import { Client } from 'pg'
++import request from 'supertest'
++
++import { Action, Subject } from '@amcore/shared'
++
++import type { PrismaService } from '../src/prisma'
++
++import {
++  cleanDatabase, cleanOrgData, type E2ETestContext, seedOrgMember,
++  seedSystemRoles, setupE2ETest, teardownE2ETest,
++} from './helpers'
++
++describe('disposable FixtureOrder resource extension on PostgreSQL', () => {
++  let context: E2ETestContext
++  let app: INestApplication
++  let prisma: PrismaService
++  beforeAll(async () => {
++    context = await setupE2ETest()
++    app = context.app
++    prisma = context.prisma
++    await seedSystemRoles(prisma)
++  }, 120000)
++  afterAll(async () => { await teardownE2ETest(context) }, 120000)
++  beforeEach(async () => {
++    await cleanOrgData(prisma)
++    await cleanDatabase(prisma, context.cache, context.throttlerStorage)
++  })
++
++  const register = async (email: string) => {
++    const response = await request(app.getHttpServer()).post('/auth/register')
++      .send({ email, password: 'StrongP@ss123' }).expect(201)
++    const token = response.body.accessToken as string
++    const userId = app.get(JwtService).verify(token).sub as string
++    return { token, userId }
++  }
++
++  it('compiles discovery/presets and enforces keys, roles, tenant, rows, DENY and fields', async () => {
++    const owner = await register('owner@fixture.test')
++    const staff = await register('staff@fixture.test')
++    const org = (await request(app.getHttpServer()).post('/organizations')
++      .set('Authorization', `Bearer ${owner.token}`)
++      .send({ name: 'Fixture North' }).expect(201)).body.id as string
++    const otherOrg = (await request(app.getHttpServer()).post('/organizations')
++      .set('Authorization', `Bearer ${owner.token}`)
++      .send({ name: 'Fixture South' }).expect(201)).body.id as string
++    const role = await prisma.role.create({ data: {
++      name: 'Fixture staff', organizationId: org,
++    } })
++    const assignedRole = await prisma.role.create({ data: {
++      name: 'Fixture assigned', organizationId: org,
++    } })
++    await seedOrgMember(prisma, { orgId: org, userId: staff.userId, roleId: role.id })
++    const staffMember = await prisma.orgMember.findUniqueOrThrow({
++      where: { userId_organizationId: { userId: staff.userId, organizationId: org } },
++    })
++    await prisma.memberRole.create({ data: { memberId: staffMember.id,
++      roleId: assignedRole.id } })
++    await prisma.organization.update({ where: { id: org }, data: { aclVersion: { increment: 1 } } })
++
++    const own = await prisma.fixtureOrder.create({ data: {
++      organizationId: org, ownerId: staff.userId, assignedToId: null,
++      status: 'draft', note: 'Owned',
++    } })
++    const assigned = await prisma.fixtureOrder.create({ data: {
++      organizationId: org, ownerId: owner.userId, assignedToId: staff.userId,
++      status: 'draft', note: 'Assigned',
++    } })
++    const denied = await prisma.fixtureOrder.create({ data: {
++      organizationId: org, ownerId: owner.userId, assignedToId: staff.userId,
++      status: 'blocked', note: 'Denied',
++    } })
++    const foreignRow = await prisma.fixtureOrder.create({ data: {
++      organizationId: otherOrg, ownerId: staff.userId, assignedToId: staff.userId,
++      status: 'draft', note: 'Foreign',
++    } })
++
++    const key = (await request(app.getHttpServer()).post('/api-keys')
++      .set('Authorization', `Bearer ${owner.token}`)
++      .send({ name: 'Early wildcard', organizationId: org, scopes: ['read:all'] })
++      .expect(201)).body.key as string
++    const narrowKey = (await request(app.getHttpServer()).post('/api-keys')
++      .set('Authorization', `Bearer ${owner.token}`)
++      .send({ name: 'Early narrow', organizationId: org,
++        scopes: ['read:FixtureOrder'] }).expect(201)).body.key as string
++    const list = `/organizations/${org}/fixture-orders`
++    expect((await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${key}`).expect(200)).body.data).toEqual([])
++    expect((await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${narrowKey}`).expect(200)).body.data).toEqual([])
++    const ownerRoles = await prisma.memberRole.findMany({
++      where: { member: { userId: owner.userId, organizationId: org } },
++    })
++    const ownerGrant = await prisma.permission.create({ data: {
++      action: Action.Read, subject: Subject.FixtureOrder, organizationId: org,
++    } })
++    await prisma.rolePermission.create({ data: {
++      roleId: ownerRoles[0]!.roleId, permissionId: ownerGrant.id,
++    } })
++    await prisma.organization.update({ where: { id: org },
++      data: { aclVersion: { increment: 1 } } })
++    const keyRows = (await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${key}`).expect(200)).body
++    expect(keyRows.data.map((row: { id: string }) => row.id).sort())
++      .toEqual([own.id, assigned.id, denied.id].sort())
++    expect(keyRows.total).toBe(3)
++    expect((await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${narrowKey}`).expect(200)).body.total).toBe(3)
++    await request(app.getHttpServer()).get(`/organizations/${org}/capabilities`)
++      .set('Authorization', `Bearer ${key}`).expect(401)
++
++    const catalogue = (await request(app.getHttpServer())
++      .get(`/organizations/${org}/capabilities`)
++      .set('Authorization', `Bearer ${owner.token}`).expect(200)).body
++    expect(catalogue.capabilities.some((entry: { id: string }) =>
++      entry.id === 'fixtureOrder.read')).toBe(true)
++    const preset = `/organizations/${org}/roles/${role.id}/permissions/presets`
++    for (const presetId of ['own', 'assigned'] as const) {
++      const target = presetId === 'own' ? role.id : assignedRole.id
++      const saved = await request(app.getHttpServer())
++        .post(`/organizations/${org}/roles/${target}/permissions/presets`)
++        .set('Authorization', `Bearer ${owner.token}`)
++        .send({ capabilityId: 'fixtureOrder.read', presetId }).expect(201)
++      expect(saved.body.conditions).toEqual({
++        [presetId === 'own' ? 'ownerId' : 'assignedToId']: '${user.sub}',
++      })
++    }
++    const denial = await prisma.permission.create({ data: {
++      action: Action.Read, subject: Subject.FixtureOrder,
++      organizationId: org, inverted: true, conditions: { status: 'blocked' },
++    } })
++    await prisma.rolePermission.create({ data: {
++      roleId: role.id, permissionId: denial.id,
++    } })
++    await prisma.organization.update({ where: { id: org },
++      data: { aclVersion: { increment: 1 } } })
++    const staffRows = (await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${staff.token}`).expect(200)).body
++    expect(staffRows.data.map((row: { id: string }) => row.id).sort())
++      .toEqual([own.id, assigned.id].sort())
++    expect(staffRows.total).toBe(2)
++    await request(app.getHttpServer()).post(preset)
++      .set('Authorization', `Bearer ${owner.token}`)
++      .send({ capabilityId: 'fixtureOrder.read', presetId: 'all' }).expect(201)
++    expect((await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${staff.token}`).expect(200)).body.total).toBe(2)
++    const actor = (await request(app.getHttpServer()).get(`/organizations/${org}/context`)
++      .set('Authorization', `Bearer ${staff.token}`).expect(200)).body
++    expect(actor.actorAffordances['fixtureOrder.read']).toBe('recordRequired')
++    const update = await request(app.getHttpServer()).post(preset)
++      .set('Authorization', `Bearer ${owner.token}`)
++      .send({ capabilityId: 'fixtureOrder.update', presetId: 'assigned' }).expect(201)
++    expect(update.body.fields).toEqual(['status', 'note'])
++    await request(app.getHttpServer()).patch(`${list}/${assigned.id}`)
++      .set('Authorization', `Bearer ${staff.token}`)
++      .send({ status: 'review' }).expect(200)
++    const fieldDeny = await prisma.permission.create({ data: {
++      action: Action.Update, subject: Subject.FixtureOrder,
++      organizationId: org, inverted: true, fields: ['note'],
++    } })
++    const postStateDeny = await prisma.permission.create({ data: {
++      action: Action.Update, subject: Subject.FixtureOrder,
++      organizationId: org, inverted: true, conditions: { status: 'done' },
++    } })
++    await prisma.rolePermission.createMany({ data: [fieldDeny, postStateDeny].map((rule) => ({
++      roleId: role.id, permissionId: rule.id,
++    })) })
++    await prisma.organization.update({ where: { id: org },
++      data: { aclVersion: { increment: 1 } } })
++    const withHints = (await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${staff.token}`).expect(200)).body
++    expect(withHints.data.find((row: { id: string }) => row.id === assigned.id)
++      .access.fields.status).toBe(true)
++    expect(withHints.data.find((row: { id: string }) => row.id === assigned.id)
++      .access.fields.note).toBe(false)
++    await request(app.getHttpServer()).patch(`${list}/${assigned.id}`)
++      .set('Authorization', `Bearer ${staff.token}`)
++      .send({ status: 'done' }).expect(403)
++    expect((await prisma.fixtureOrder.findUniqueOrThrow({ where: { id: assigned.id } }))
++      .status).toBe('review')
++    await request(app.getHttpServer()).patch(`${list}/${assigned.id}`)
++      .set('Authorization', `Bearer ${staff.token}`)
++      .send({ note: 'Forbidden' }).expect(403)
++    await request(app.getHttpServer()).patch(`${list}/${own.id}`)
++      .set('Authorization', `Bearer ${staff.token}`)
++      .send({ status: 'done' }).expect(403)
++    await request(app.getHttpServer()).patch(`${list}/${assigned.id}`)
++      .set('Authorization', `Bearer ${staff.token}`)
++      .send({ organizationId: otherOrg }).expect(400)
++    expect((await prisma.fixtureOrder.findUniqueOrThrow({ where: { id: assigned.id } }))
++      .organizationId).toBe(org)
++    await request(app.getHttpServer()).get(`/organizations/${otherOrg}/fixture-orders`)
++      .set('Authorization', `Bearer ${staff.token}`).expect(403)
++    const before = await prisma.organization.findUniqueOrThrow({ where: { id: org } })
++    const count = await prisma.permission.count({ where: { organizationId: org } })
++    await request(app.getHttpServer()).post(preset)
++      .set('Authorization', `Bearer ${owner.token}`)
++      .send({ capabilityId: 'fixtureOrder.read', presetId: 'notReal' }).expect(400)
++    await request(app.getHttpServer()).post(`/organizations/${org}/roles/${role.id}/permissions`)
++      .set('Authorization', `Bearer ${owner.token}`)
++      .send({ action: 'read', subject: 'FixtureOrder', fields: ['notReal'] }).expect(400)
++    await request(app.getHttpServer()).post(`/organizations/${org}/roles/${role.id}/permissions`)
++      .set('Authorization', `Bearer ${owner.token}`)
++      .send({ action: 'read', subject: 'FixtureOrder',
++        conditions: { status: { unknownOperator: 'draft' } } }).expect(400)
++    expect(await prisma.permission.count({ where: { organizationId: org } })).toBe(count)
++    expect((await prisma.organization.findUniqueOrThrow({ where: { id: org } })).aclVersion)
++      .toBe(before.aclVersion)
++    const readFieldDeny = await prisma.permission.create({ data: {
++      action: Action.Read, subject: Subject.FixtureOrder,
++      organizationId: org, inverted: true, fields: ['status'],
++      conditions: { id: assigned.id },
++    } })
++    await prisma.rolePermission.create({ data: {
++      roleId: role.id, permissionId: readFieldDeny.id,
++    } })
++    await prisma.organization.update({ where: { id: org },
++      data: { aclVersion: { increment: 1 } } })
++    const fieldFiltered = (await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${staff.token}`).expect(200)).body
++    expect(fieldFiltered.data.map((row: { id: string }) => row.id))
++      .toEqual([own.id])
++    expect(fieldFiltered.total).toBe(1)
++    await prisma.fixtureOrder.createMany({ data: Array.from({ length: 24 }, (_, index) => ({
++      organizationId: org, ownerId: staff.userId, assignedToId: null,
++      status: 'draft', note: `Extra ${index}`,
++    })) })
++    const paged = (await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${staff.token}`).expect(200)).body
++    expect(paged.data).toHaveLength(20)
++    expect(paged.total).toBe(25)
++    const samples: number[] = []
++    for (let index = 0; index < 25; index++) {
++      const started = performance.now()
++      const response = await request(app.getHttpServer()).get(list)
++        .set('Authorization', `Bearer ${staff.token}`).expect(200)
++      expect(response.body.total).toBe(25)
++      if (index >= 5) samples.push(performance.now() - started)
++    }
++    const sorted = samples.sort((left, right) => left - right)
++    writeFileSync('fixture-order-measurement.json', JSON.stringify({
++      sampleCount: sorted.length, warmups: 5, seededOwnTenantRows: 27,
++      visibleRows: 25, pageSize: 20, maxScan: 200,
++      p50Ms: sorted[Math.ceil(sorted.length * 0.50) - 1],
++      p95Ms: sorted[Math.ceil(sorted.length * 0.95) - 1],
++    }, null, 2))
++    const holder = new Client({ connectionString: process.env.E2E_DATABASE_URL })
++    await holder.connect()
++    try {
++      await holder.query('BEGIN')
++      await holder.query('SELECT id FROM core.fixture_orders WHERE id=$1 FOR UPDATE',
++        [foreignRow.id])
++      await request(app.getHttpServer()).patch(`${list}/${foreignRow.id}`)
++        .set('Authorization', `Bearer ${staff.token}`)
++        .send({ status: 'review' }).timeout({ response: 2000, deadline: 2500 }).expect(404)
++    } finally {
++      await holder.query('ROLLBACK')
++      await holder.end()
++    }
++    await prisma.fixtureOrder.createMany({ data: Array.from({ length: 177 }, (_, index) => ({
++      organizationId: org, ownerId: staff.userId, assignedToId: null,
++      status: 'draft', note: `Overflow ${index}`,
++    })) })
++    await request(app.getHttpServer()).get(list)
++      .set('Authorization', `Bearer ${staff.token}`).expect(400)
++  })
++})
+diff --git a/apps/web/src/entities/organization-context/model/context-fixture.ts b/apps/web/src/entities/organization-context/model/context-fixture.ts
+index 6e1fa06..681d9b4 100644
+--- a/apps/web/src/entities/organization-context/model/context-fixture.ts
++++ b/apps/web/src/entities/organization-context/model/context-fixture.ts
+@@ -7,6 +7,8 @@ export const contextAffordances = {
+     'organization.read': 'allowed',
+     'organization.update': 'recordRequired',
+     'organization.delete': 'recordRequired',
++    'fixtureOrder.read': 'denied',
++    'fixtureOrder.update': 'denied',
+   },
+   recordAffordances: {
+     'organization.read': { allowed: true, fields: {} },
+diff --git a/apps/web/src/widgets/organization-context-summary/ui/organization-context-summary.stories.tsx b/apps/web/src/widgets/organization-context-summary/ui/organization-context-summary.stories.tsx
+index db1b79c..1f13909 100644
+--- a/apps/web/src/widgets/organization-context-summary/ui/organization-context-summary.stories.tsx
++++ b/apps/web/src/widgets/organization-context-summary/ui/organization-context-summary.stories.tsx
+@@ -19,6 +19,8 @@ const meta = {
+         'organization.read': 'allowed',
+         'organization.update': 'recordRequired',
+         'organization.delete': 'recordRequired',
++        'fixtureOrder.read': 'denied',
++        'fixtureOrder.update': 'denied',
+       },
+       recordAffordances: {
+         'organization.read': { allowed: true, fields: {} },
+diff --git a/fixture-bin/pnpm b/fixture-bin/pnpm
+new file mode 100755
+index 0000000..bac1316
+--- /dev/null
++++ b/fixture-bin/pnpm
+@@ -0,0 +1,7 @@
++#!/bin/sh
++if [ "$1" = prisma ]; then
++  shift
++  exec ./node_modules/.bin/prisma "$@"
++fi
++echo 'Fixture only supports pnpm prisma' >&2
++exit 2
+diff --git a/packages/shared/src/constants/capability-catalogue.ts b/packages/shared/src/constants/capability-catalogue.ts
+index dfdd29c..bfa518f 100644
+--- a/packages/shared/src/constants/capability-catalogue.ts
++++ b/packages/shared/src/constants/capability-catalogue.ts
+@@ -63,6 +63,20 @@ export const CAPABILITY_CATALOGUE = [
+     presets: ['own', 'all'] as const,
+     editableFields: [] as const,
+   },
++  {
++    id: 'fixtureOrder.read', subject: Subject.FixtureOrder, action: Action.Read,
++    operation: 'fixtureOrders.list', method: 'GET',
++    path: '/organizations/:orgId/fixture-orders',
++    credentials: ['bearer', 'apiKey'] as const, labelKey: 'fixtureOrderRead',
++    presets: ['own', 'assigned', 'all'] as const, editableFields: [] as const,
++  },
++  {
++    id: 'fixtureOrder.update', subject: Subject.FixtureOrder, action: Action.Update,
++    operation: 'fixtureOrders.update', method: 'PATCH',
++    path: '/organizations/:orgId/fixture-orders/:id',
++    credentials: ['bearer', 'apiKey'] as const, labelKey: 'fixtureOrderUpdate',
++    presets: ['own', 'assigned', 'all'] as const, editableFields: ['status', 'note'] as const,
++  },
+ ] as const satisfies readonly CapabilityDescriptor[]
+ 
+ export type CapabilityId = (typeof CAPABILITY_CATALOGUE)[number]['id']
+diff --git a/packages/shared/src/enums/permissions.ts b/packages/shared/src/enums/permissions.ts
+index e71faa5..b22234d 100644
+--- a/packages/shared/src/enums/permissions.ts
++++ b/packages/shared/src/enums/permissions.ts
+@@ -14,6 +14,7 @@ export enum Subject {
+   Organization = 'Organization',
+   Role = 'Role',
+   Permission = 'Permission',
++  FixtureOrder = 'FixtureOrder',
+   TeamAccess = 'TeamAccess', // explicit full team policy authority
+   All = 'all', // wildcard: all subjects
+ }
+diff --git a/packages/shared/src/schemas/capability.ts b/packages/shared/src/schemas/capability.ts
+index 0f6a26e..ed3273c 100644
+--- a/packages/shared/src/schemas/capability.ts
++++ b/packages/shared/src/schemas/capability.ts
+@@ -7,6 +7,8 @@ export const capabilityIdSchema = z.enum([
+   'organization.read',
+   'organization.update',
+   'organization.delete',
++  'fixtureOrder.read',
++  'fixtureOrder.update',
+ ])
+ export const affordanceDecisionSchema = z.enum(['allowed', 'recordRequired', 'denied'])
+ 
+@@ -15,6 +17,8 @@ export const actorAffordancesSchema = z.strictObject({
+   'organization.read': affordanceDecisionSchema,
+   'organization.update': affordanceDecisionSchema,
+   'organization.delete': affordanceDecisionSchema,
++  'fixtureOrder.read': affordanceDecisionSchema,
++  'fixtureOrder.update': affordanceDecisionSchema,
+ })
+ 
+ export const recordActionSchema = z.strictObject({
+diff --git a/packages/shared/src/schemas/fixture-order.ts b/packages/shared/src/schemas/fixture-order.ts
+new file mode 100644
+index 0000000..fdbda7f
+--- /dev/null
++++ b/packages/shared/src/schemas/fixture-order.ts
+@@ -0,0 +1,7 @@
++import { z } from 'zod'
++
++export const fixtureOrderUpdateSchema = z.strictObject({
++  status: z.string().min(1).optional(),
++  note: z.string().nullable().optional(),
++})
++export type FixtureOrderUpdate = z.infer<typeof fixtureOrderUpdateSchema>
+diff --git a/packages/shared/src/schemas/index.ts b/packages/shared/src/schemas/index.ts
+index 3159801..0a795dd 100644
+--- a/packages/shared/src/schemas/index.ts
++++ b/packages/shared/src/schemas/index.ts
+@@ -55,6 +55,7 @@ export {
+ } from './auth'
+ 
+ // Organization schemas
++export { fixtureOrderUpdateSchema, type FixtureOrderUpdate } from './fixture-order'
+ export {
+   type ActorAffordances,
+   actorAffordancesSchema,
+diff --git a/packages/shared/src/schemas/organization.ts b/packages/shared/src/schemas/organization.ts
+index 419811f..609dffc 100644
+--- a/packages/shared/src/schemas/organization.ts
++++ b/packages/shared/src/schemas/organization.ts
+@@ -56,7 +56,7 @@ const permissionActionSchema = z.enum(Action)
+ const permissionFieldsSchema = z.array(z.string())
+ const modelPermissionSchema = z.object({
+   action: permissionActionSchema,
+-  subject: z.enum([Subject.User, Subject.Organization, Subject.Role, Subject.Permission]),
++  subject: z.enum([Subject.User, Subject.Organization, Subject.Role, Subject.Permission, Subject.FixtureOrder]),
+   conditions: z.record(z.string(), z.unknown()).nullable().optional(),
+   fields: permissionFieldsSchema.optional(),
+   inverted: z.boolean().optional().default(false),
+diff --git a/packages/shared/src/schemas/product-access.test.ts b/packages/shared/src/schemas/product-access.test.ts
+index cdddff2..dbd5dc5 100644
+--- a/packages/shared/src/schemas/product-access.test.ts
++++ b/packages/shared/src/schemas/product-access.test.ts
+@@ -18,6 +18,8 @@ describe('product organization wire boundaries', () => {
+           'organization.read': 'allowed',
+           'organization.update': 'recordRequired',
+           'organization.delete': 'recordRequired',
++          'fixtureOrder.read': 'denied',
++          'fixtureOrder.update': 'denied',
+         },
+         recordAffordances: {
+           'organization.read': { allowed: true, fields: {} },

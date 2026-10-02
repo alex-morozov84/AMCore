@@ -5,6 +5,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { Button } from '@/shared/ui/button'
 
+import { contextAffordances } from './context-fixture'
 import { useOrganizationContext } from './use-organization-context'
 
 const binding = 'a'.repeat(64)
@@ -67,6 +68,7 @@ const meta = {
               data: {
                 organization: { id: params.id, name: 'Company', slug: 'company' },
                 canManageTeamAccess: true,
+                ...contextAffordances,
               },
             })
       })

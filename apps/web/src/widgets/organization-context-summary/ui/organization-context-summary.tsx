@@ -33,9 +33,15 @@ export function OrganizationContextSummary({
           <CardTitle as="h2">{t('access')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p>{context.canManageTeamAccess ? t('teamAllowed') : t('teamDenied')}</p>
-          <p className="text-sm text-muted-foreground">{t('accessCaveat')}</p>
-          <p className="text-sm text-muted-foreground">{t('foundationGuidance')}</p>
+          <dl>
+            <dt className="text-sm text-muted-foreground">{t('teamManagement')}</dt>
+            <dd>
+              {context.actorAffordances['teamAccess.manage'] === 'allowed'
+                ? t('permitted')
+                : t('notPermitted')}
+            </dd>
+          </dl>
+          <p className="text-sm text-muted-foreground">{t('readOnlyCaveat')}</p>
         </CardContent>
       </Card>
     </div>
