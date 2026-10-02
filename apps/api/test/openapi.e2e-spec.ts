@@ -85,6 +85,8 @@ const EXPECTED: Record<string, Expected> = {
   'get /admin/organizations': { status: '200', kind: 'json' },
   'get /admin/organizations/{id}': { status: '200', kind: 'json' },
   'get /admin/overview': { status: '200', kind: 'json' },
+  'get /admin/runtime-settings/storage-probe': { status: '200', kind: 'json' },
+  'patch /admin/runtime-settings/storage-probe': { status: '200', kind: 'json' },
   'get /storage/public': { status: '200', kind: 'binary' },
   // api-keys
   'post /api-keys': { status: '201', kind: 'json' },

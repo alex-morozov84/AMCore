@@ -1,3 +1,4 @@
+import { Global, Module } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { LoggerModule } from 'nestjs-pino'
 
@@ -10,6 +11,30 @@ import { StorageModule } from './storage.module'
 import { StorageService } from './storage.service'
 
 import { EnvService } from '@/env/env.service'
+import { SettingsReader } from '@/infrastructure/settings/settings-reader'
+import { StorageSettingDefinition } from '@/infrastructure/settings/storage-setting.definition'
+
+// This isolated storage graph has no database; application integration proves the real reader.
+@Global()
+@Module({
+  providers: [
+    {
+      provide: SettingsReader,
+      useValue: {
+        snapshot: () => ({
+          value: 600,
+          revision: 0,
+          source: 'baseline',
+          lastConfirmedAt: null,
+          refreshStatus: 'unconfirmed',
+        }),
+      },
+    },
+    { provide: StorageSettingDefinition, useValue: {} },
+  ],
+  exports: [SettingsReader, StorageSettingDefinition],
+})
+class SettingsFixtureModule {}
 
 // Values the s3/local factory branches read; STORAGE_DRIVER is supplied per test.
 const ENV_VALUES: Record<string, unknown> = {
@@ -25,7 +50,11 @@ const ENV_VALUES: Record<string, unknown> = {
 
 function compileWith(driver: string): Promise<TestingModule> {
   return Test.createTestingModule({
-    imports: [LoggerModule.forRoot({ pinoHttp: { enabled: false } }), StorageModule.forRoot()],
+    imports: [
+      LoggerModule.forRoot({ pinoHttp: { enabled: false } }),
+      SettingsFixtureModule,
+      StorageModule.forRoot(),
+    ],
   })
     .overrideProvider(EnvService)
     .useValue({ get: (key: string) => (key === 'STORAGE_DRIVER' ? driver : ENV_VALUES[key]) })

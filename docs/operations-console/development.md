@@ -258,3 +258,18 @@ The storage snapshot includes `nextScheduledAt` (nullable ISO timestamp from the
 server scheduler) and `inProgress`. Never derive scheduling from `checkedAt` plus
 cadence: it records result publication, including timeout, rather than start time.
 During an active or stopped probe, no next transaction start is promised.
+
+## Runtime interval editor
+
+Overview's File storage editor is a client leaf in `features/console-storage-setting`.
+It reads authoritative saved state through a fixed Console BFF GET, while the
+surrounding server-rendered Overview keeps its cached observations. It uses the
+shared step-up hook with captured value/revision, keeps the draft on conflict,
+and rereads ambiguous writes without automatic replay. The editor never starts
+storage I/O. No Settings route or navigation item is added.
+
+The [backend settings foundation](../backend/settings.md) owns ordinary definitions,
+persistence, atomic audit and runtime reconciliation. Console removal owns only
+this editor, its BFF/UI copy and adapters; shared contracts, backend API, migration
+and API/worker reader remain core. Organization capability catalogue/permissions
+remain separate from personal platform settings rights.

@@ -48,12 +48,14 @@ keyboard focus as well as pointer hover; the visible description gives basic sco
 
 File storage is actively checked independently of API readiness: a small isolated
 write/read/delete transaction runs periodically on the configured local or
-S3-compatible driver. The default is **every 10 minutes**, configured through
-`STORAGE_PROBE_INTERVAL_SECONDS`. The File storage card displays the actual interval
-and explains that each API/worker instance consumes S3 requests independently;
+S3-compatible driver. The deployment baseline is **every 10 minutes** through
+`STORAGE_PROBE_INTERVAL_SECONDS`; a saved runtime override takes precedence.
+The editable field displays the saved interval; its application can briefly lag.
+Each API/worker instance consumes S3 requests independently;
 provider charges may apply. S3 displays a prominent request-cost notice: increasing
 the interval reduces request volume but delays failure detection. Local storage
-does not show a provider request-charge notice. Overview only reads its cached result. **Working** requires
+does not show a provider request-charge notice. Monitoring observations read
+only the cached probe result. **Working** requires
 matching bytes and successful cleanup. **Check failed**, **Not checked yet** and
 **Result is stale** are distinct. The card shows the last result timestamp and
 the next scheduled check in the selected Console time zone. These are storage
@@ -69,6 +71,29 @@ report a persistent failure; a downstream must configure a notification receiver
 once. Leaving this page open does not itself send notifications. See
 [storage configuration](../storage/configuration.md#active-file-monitoring-and-readiness)
 and [runbook](../operations/runbooks/storage.md).
+
+### Change the probe interval
+
+File storage shows a compact **Check every [number] seconds** field. Enter
+30–3600 seconds; **Save** and **Cancel** appear only after the value changes.
+Save shows a loading indicator and prevents duplicate submission. Cancel restores
+the saved interval without sending a write. The heading help explains what the check does. Field help explains the allowed
+range, application delay and precedence over the deployment baseline. A password
+step-up may be required. There is no separate Settings page or reset button.
+
+The editor reads authoritative saved configuration, independently of the cached
+storage observation. A saved acknowledgement can precede application; a short
+message explains when the change is still taking effect. Technical revisions,
+overrides and process details stay in the operator API, not on the card.
+Other processes reconcile independently, normally within 35 seconds under healthy
+conditions; this is not fleet confirmation. Editor unavailability leaves
+observations visible. Conflict or ambiguous timeout preserves the draft and
+rereads before another explicit Save; there is no blind automatic replay.
+
+Saving 600 is an explicit override. Operator automation can clear the override
+through the retained [settings API](../backend/settings.md#operator-api-and-rights).
+Reset uses each API/worker's deployment baseline; align their env values if the
+same effective interval is required. Neither reads nor writes start a storage check.
 
 ## Build details
 

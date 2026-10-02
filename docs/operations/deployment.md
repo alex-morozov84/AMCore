@@ -859,3 +859,16 @@ indefinitely:
 API-key retained revocation requires a drained, all-process cutover. Follow the
 [API-key lifecycle runbook](api-key-lifecycle.md) before this schema upgrade;
 mixed old/new writers and direct old-version rollback are unsupported.
+
+## Runtime settings rollout
+
+Apply the settings migration before starting a binary with the
+[runtime settings reader](../backend/settings.md). Keep API/worker deployment
+baselines aligned when resetting an override must yield one interval. Saved
+changes need no process restart under healthy reconciliation; a successful
+operator response certifies the commit and only reports this API's applied state.
+After restoring an older database backup, restart every API/worker reader to
+initialize its revision from that backup. Verify schema-version compatibility
+before a binary rollback; unknown versions retain last-confirmed or unconfirmed
+baseline state and require remediation. Console frontend removal leaves this
+backend capability and migration intact.

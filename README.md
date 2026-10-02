@@ -31,13 +31,17 @@ Feature-specific admin surfaces remain intentionally product-owned.
 
 The optional [Operations Console](docs/operations-console/README.md) is a
 separate `SUPER_ADMIN` control plane. It ships **Overview** for instance
-readiness, deployment identity and local resource snapshots, **Users** inventory, system-role changes and session revocation, read-only
+readiness, deployment identity, local resource snapshots and storage probe interval editing, **Users** inventory, system-role changes and session revocation, read-only
 **Organizations**, and bounded **Audit** browsing. Path/host topology,
 isolated host sessions, downstream scaffolding, deployment guidance, and a
 safe extension recipe are included. Session views show parsed devices and
 approximate IP locations; see [session management](docs/operations-console/users.md#manage-sessions)
 and [GeoIP setup](docs/operations/geoip-setup.md). It is not a product backoffice or a
 catalog/content admin UI.
+
+The retained [runtime settings foundation](docs/backend/settings.md) provides
+code-owned typed ordinary configuration, revision-checked writes with atomic audit,
+and API/worker adoption without restart. It survives Console frontend removal.
 
 The [product administration foundation](docs/product-admin/README.md) includes a
 minimal [organization selector and read-only context

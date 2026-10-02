@@ -1,0 +1,11 @@
+/// Code-owned ordinary platform settings. UI removal does not remove these rows.
+model PlatformSetting {
+  key           String   @id @db.VarChar(96)
+  override      Json?
+  schemaVersion Int      @default(1)
+  revision      Int      @default(0)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  @@schema("core")
+  @@map("platform_settings")
+}

@@ -35,6 +35,7 @@ import { ObservabilityModule } from './infrastructure/observability'
 import { QueueMetricsModule, QueueModule } from './infrastructure/queue'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
+import { SettingsModule } from './infrastructure/settings/settings.module'
 import { StorageModule, StoragePublicModule } from './infrastructure/storage'
 import { ThrottlingModule } from './infrastructure/throttling'
 import { WebhooksModule } from './infrastructure/webhooks'
@@ -132,6 +133,7 @@ export function coreImports(): Imports {
 
     // Database
     PrismaModule,
+    SettingsModule,
 
     // Health check (served by every role; the worker's only HTTP surface)
     HealthModule,

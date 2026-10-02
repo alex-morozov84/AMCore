@@ -35,7 +35,8 @@
     "NETWORK_ERROR": "Can't reach the server. Check your connection and try again.",
     "TIMEOUT": "The request took too long. Please try again.",
     "UNKNOWN_ERROR": "Something went wrong. Please try again.",
-    "correlationHint": "Reference: {id}"
+    "correlationHint": "Reference: {id}",
+    "SETTING_REVISION_CONFLICT": "The saved setting changed. Your draft is preserved; review the current revision before saving again."
   },
   "validation": {
     "required": "This field is required.",
@@ -203,9 +204,12 @@
         "org.invite_created": "Organization invitation created",
         "org.invite_revoked": "Organization invitation revoked",
         "telegram.connection_linked": "Telegram connection linked",
-        "telegram.connection_unlinked": "Telegram connection unlinked"
+        "telegram.connection_unlinked": "Telegram connection unlinked",
+        "admin.runtime_setting.changed": "Runtime setting changed"
       },
-      "draftTimeZone": "Invalid time entered in {zone}. Correct it using the selected time zone."
+      "draftTimeZone": "Invalid time entered in {zone}. Correct it using the selected time zone.",
+      "summaryInterval": "Probe interval",
+      "summaryBaseline": "environment baseline"
     },
     "detail": {
       "userTitle": "User details",
@@ -492,7 +496,7 @@
     "overviewFilesStale": "Result is stale",
     "overviewFilesS3": "S3-compatible storage",
     "overviewFilesLocal": "Local file storage",
-    "overviewFilesHelp": "Every {interval} seconds, this process writes, reads and deletes a small isolated file. Results older than {stale} seconds are stale. This tests current file operations, not backups, persistence after container recreation or public URL delivery.",
+    "overviewFilesHelp": "Checks whether file storage is working by writing, reading and deleting a temporary file. Your files are not changed. If checks stop arriving, the status becomes outdated.",
     "overviewFilesAccessDenied": "Access was denied. Check storage credentials and write, read and delete permissions; this does not prove the storage service is down.",
     "overviewFilesTimeout": "The check exceeded its time limit. Check storage connectivity and response times.",
     "overviewFilesMismatch": "The file read back did not match the bytes written.",
@@ -507,14 +511,32 @@
     "overviewUnitGB": "GB",
     "overviewUnitTB": "TB",
     "overviewFilesMemory": "Test memory storage; files do not survive a restart",
-    "overviewFilesCadence": "Checks every {minutes} min per API/worker instance. Set STORAGE_PROBE_INTERVAL_SECONDS in deployment settings to change the interval.",
+    "overviewFilesCadence": "Checks every {minutes} min.",
     "overviewFilesLastCheck": "Last check",
     "overviewFilesNextCheck": "Next check (scheduled)",
     "overviewFilesWaiting": "Waiting for the current check to finish",
     "overviewFilesUnscheduled": "Not scheduled",
     "overviewFilesUnmeasured": "Not checked yet",
     "overviewFilesCostTitle": "S3 checks consume billable requests",
-    "overviewFilesCostHelp": "Each API/worker instance independently performs one write, one read and one delete per check. Increase the interval to reduce request costs; failures will take longer to detect. Free allowances and prices depend on your provider."
+    "overviewFilesCostHelp": "Each API/worker instance independently performs one write, one read and one delete per check. Increase the interval to reduce request costs; failures will take longer to detect. Free allowances and prices depend on your provider.",
+    "storageSetting": {
+      "label": "Probe interval (seconds)",
+      "prefix": "Check every",
+      "suffix": "seconds",
+      "help": "Choose 30–3600 seconds. Changes usually take effect within 35 seconds. The saved interval takes precedence over the environment setting.",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "loading": "Loading interval…",
+      "refresh": "Try again",
+      "saved": "Saved",
+      "applying": "Saved. The new interval will take effect shortly.",
+      "observed": "Check every {seconds} seconds",
+      "refreshFailed": "Could not load the interval for editing. Storage status is still available.",
+      "statusFailed": "We could not confirm whether the change was saved. Your value is still in the field. Check the latest interval before saving again.",
+      "refreshStale": "The interval is saved, but we could not confirm that it has taken effect.",
+      "conflict": "Another administrator changed the interval. Your value is still in the field. Check it and save again."
+    }
   },
   "auth": {
     "login": "Sign in",
