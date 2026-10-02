@@ -101,7 +101,7 @@ function supportedSchemaResiduals(locale, content) {
     .map((expectation) => `${AUTH_SCHEMA_TEST}:missing ${expectation}`)
 }
 
-export function assertLocaleSemanticProjection(locale, contents) {
+export function assertLocaleSemanticProjection(locale, contents, removed = new Set()) {
   const residuals = requestResiduals(locale, contents.get(REQUEST_PATH) ?? '')
   for (const contract of emailContracts) {
     residuals.push(...emailResiduals(locale, contract, contents.get(contract.path) ?? ''))
@@ -109,9 +109,9 @@ export function assertLocaleSemanticProjection(locale, contents) {
   residuals.push(...frontendUrlResiduals(locale, contents.get(FRONTEND_URL_TEST) ?? ''))
   residuals.push(...databaseDefaultResiduals(locale, contents))
   residuals.push(...supportedSchemaResiduals(locale, contents.get(AUTH_SCHEMA_TEST) ?? ''))
-  residuals.push(...e2eRouteResiduals(contents))
+  residuals.push(...e2eRouteResiduals(contents, removed))
   residuals.push(...proxyResiduals(contents))
-  residuals.push(...e2eUiResiduals(locale, contents))
+  residuals.push(...e2eUiResiduals(locale, contents, removed))
   residuals.push(...ruNarrowingResiduals(locale, contents))
   if (!residuals.length) return
   throw ownershipError(

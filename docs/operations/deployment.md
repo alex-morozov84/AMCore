@@ -373,9 +373,16 @@ File monitoring defaults to **one check every 10 minutes per API/worker instance
 initialization, so changing `.env` requires redeployment. A saved runtime override
 wins over that baseline and survives restart: after saving 60 seconds, changing
 the baseline from 600 to 120 seconds still leaves the effective interval at 60.
-A personal `SUPER_ADMIN` can change the inline interval on Console Overview and **Save** without restart. The retained
+The retained
 [operator API](../backend/settings.md#operator-api-and-rights) can also reset the
-override to each process's baseline; the Console has no reset button.
+override to each process's baseline.
+
+<!-- AMCORE_CONSOLE_STORAGE_SETTING_START -->
+
+A personal `SUPER_ADMIN` can change the inline interval on Console Overview and
+**Save** without restart. The Console has no reset button.
+<!-- AMCORE_CONSOLE_STORAGE_SETTING_END -->
+
 S3 checks incur PUT/GET/DELETE traffic independently of user requests. Plan the
 operation budget and detection delay using the
 [storage monitoring guide](../storage/configuration.md#active-file-monitoring-and-readiness).

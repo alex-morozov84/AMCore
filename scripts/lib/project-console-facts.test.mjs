@@ -36,10 +36,10 @@ test('reports every stale Console exact count together', () => {
     'admin-console': 'disabled',
   })
   assertExactScaffoldCounts([
-    { name: 'console roots', expected: 16, actual: operationsConsoleOwnership.facts.roots.length },
+    { name: 'console roots', expected: 17, actual: operationsConsoleOwnership.facts.roots.length },
     {
       name: 'console disabled deletes',
-      expected: 51,
+      expected: 56,
       actual: count(disabled.consoleFacts, 'delete'),
     },
     {
@@ -47,7 +47,7 @@ test('reports every stale Console exact count together', () => {
       expected: 44,
       actual: count(disabled.consoleFacts, 'content'),
     },
-    { name: 'console disabled steps', expected: 79, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 84, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     {
@@ -64,7 +64,7 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console single-locale deletes',
-      expected: 51,
+      expected: 56,
       actual: count(singleDisabled.consoleFacts, 'delete'),
     },
     {

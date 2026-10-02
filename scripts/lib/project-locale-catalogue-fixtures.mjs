@@ -6,6 +6,14 @@ const COPY = {
   sessions: { Actions: 'Действия', 'This device': 'Это устройство' },
   oauth: { 'Continue with Google': 'Продолжить с Google' },
   section: {},
+  'storage-setting': {
+    Save: 'Сохранить',
+    Cancel: 'Отмена',
+    Password: 'Пароль',
+    'Saving…': 'Сохранение…',
+    'Check every 600 seconds': 'Проверка каждые 600 секунд',
+    'Try again': 'Повторить',
+  },
 }
 
 function jsonImports(model, locale) {
@@ -71,7 +79,16 @@ export function singleCatalogueFixture(model, { locale, variant }, ctx) {
     )
     if (locale === 'ru') model.replaceNode(header, 'ru.sessions.createdAt', ctx)
   }
-  if (locale === 'ru') replaceStrings(model, COPY[variant], ctx)
+  if (locale === 'ru') {
+    replaceStrings(model, COPY[variant], ctx)
+    if (variant === 'storage-setting') {
+      for (const node of findAllNodes(
+        model,
+        (node) => ts.isPropertyAccessExpression(node) && node.expression.getText() === 'en'
+      ))
+        model.replaceNode(node.expression, 'ru', ctx)
+    }
+  }
   const attributes = findAllNodes(
     model,
     (node) => ts.isJsxAttribute(node) && ['locale', 'messages'].includes(node.name.getText())
@@ -88,4 +105,4 @@ export const fixtureParams = (params) =>
   typeof params === 'object' &&
   Object.keys(params).length === 2 &&
   ['en', 'ru'].includes(params.locale) &&
-  ['errors', 'sessions', 'oauth', 'section'].includes(params.variant)
+  ['errors', 'sessions', 'oauth', 'section', 'storage-setting'].includes(params.variant)

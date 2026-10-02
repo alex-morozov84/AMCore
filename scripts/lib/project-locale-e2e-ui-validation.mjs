@@ -2,9 +2,10 @@ import { parseStructuralModel } from './path-algebra-ast-model.mjs'
 import { e2eUiExpectationInventory } from './project-locale-e2e-ui-inventory.mjs'
 import { E2E_UI_SURFACES } from './project-locale-e2e-ui-surfaces.mjs'
 
-export function e2eUiResiduals(locale, contents) {
+export function e2eUiResiduals(locale, contents, removed = new Set()) {
   const residuals = []
   for (const { path, namespaces, expectedReferences } of E2E_UI_SURFACES) {
+    if (removed.has(path)) continue
     const content = contents.get(path)
     if (content === undefined) {
       residuals.push(`${path}:missing localized verification surface`)

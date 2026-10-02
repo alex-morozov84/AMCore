@@ -1,4 +1,8 @@
 export const LOCALE_DISPLAY_ORDER = [
+  'apps/web/src/features/console-storage-setting/ui/StorageProbeIntervalEditor.test.tsx',
+  'apps/web/e2e/shared/storage-setting-journey.ts',
+  'apps/web/e2e/real-stack/storage-runtime-settings.spec.ts',
+  'apps/web/e2e/console-real-stack/storage-runtime-settings.spec.ts',
   'packages/shared/src/constants/index.ts',
   'apps/api/prisma/migrations/20260801103725_default_locale_en_timezone_utc/migration.sql',
   'apps/api/prisma/user.prisma',

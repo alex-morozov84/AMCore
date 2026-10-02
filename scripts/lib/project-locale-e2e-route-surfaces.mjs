@@ -4,6 +4,9 @@ export const LOCALE_ONLY_E2E_PATHS = [
 ]
 
 export const E2E_ROUTE_SURFACES = [
+  // These routes use /en; /runtime-settings is an API path, not a /ru locale.
+  ['apps/web/e2e/real-stack/storage-runtime-settings.spec.ts', 6, 0, ['/en']],
+  ['apps/web/e2e/console-real-stack/storage-runtime-settings.spec.ts', 4, 0, ['/en']],
   ['apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts', 6],
   ['apps/web/e2e/console-real-stack/sessions.spec.ts', 6],
   ['apps/web/e2e/console-real-stack/session-isolation.spec.ts', 5],

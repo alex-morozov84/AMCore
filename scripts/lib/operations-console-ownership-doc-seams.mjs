@@ -237,6 +237,22 @@ export const operationsConsoleDocSeams = [
       '[Console configuration](../operations-console/configuration.md#overview-metadata-and-resource-settings).'
     )
   ),
+  ...['docs/storage/configuration.md', 'docs/operations/deployment.md'].map((path) =>
+    entry(
+      `console.storage-setting.${path}`,
+      path,
+      block(
+        '<!-- AMCORE_CONSOLE_STORAGE_SETTING_START -->',
+        '<!-- AMCORE_CONSOLE_STORAGE_SETTING_END -->'
+      ),
+      undefined,
+      {
+        operationKey: path.includes('deployment')
+          ? 'console.deploy-doc'
+          : 'console.storage-display',
+      }
+    )
+  ),
   entry('console.storage-display', 'docs/storage/configuration.md', {
     text: 'The optional Console displays the cached file-check result; it does not send alerts.',
   }),

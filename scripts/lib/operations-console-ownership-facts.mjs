@@ -8,6 +8,7 @@ const roots = [
   'apps/web/src/app/api/console',
   'apps/web/src/_pages/console',
   'apps/web/src/features/console-discovery',
+  'apps/web/src/features/console-storage-setting',
   'apps/web/src/features/console-login',
   'apps/web/src/features/console-logout',
   'apps/web/src/features/console-user-role',
@@ -60,6 +61,10 @@ const verification = [
   'apps/web/e2e/real-stack/admin-audit.spec.ts',
   'apps/web/e2e/real-stack/admin-api-keys.spec.ts',
   'apps/web/e2e/real-stack/admin-overview.spec.ts',
+  'apps/web/e2e/real-stack/storage-runtime-settings.spec.ts',
+  'apps/web/e2e/shared/storage-setting-journey.ts',
+  'apps/web/e2e/support/runtime-settings-proof.ts',
+  'scripts/stand/runtime-settings-proof.mjs',
   'apps/web/e2e/real-stack/admin-users.spec.ts',
   'apps/web/e2e/real-stack/admin-users-role-management.spec.ts',
 ].map((path) => one(path, { tags: ['verification:console'] }))
