@@ -18,6 +18,7 @@ import {
   type PollFloors,
   retryAfterSecondsOf,
 } from './queue-poll-policy'
+import { useCooldownTicks } from './use-cooldown-ticks'
 
 const visibleStore = {
   subscribe: (onChange: () => void) => focusManager.subscribe(onChange),
@@ -69,26 +70,7 @@ export function useQueueSummary(initial: AdminQueuesResponse, initialUpdatedAt: 
     refetchOnReconnect: true,
   })
 
-  // Each floor expires on its own clock: a short `Retry-After` frees manual refresh even while a
-  // longer automatic backoff still holds back automatic fetches. While a `Retry-After` is active
-  // the state also ticks once a second so the remaining time shown is honest.
-  useEffect(() => {
-    const at = Date.now()
-    const ends = [floors.retryAfterUntil, floors.backoffUntil].filter((until) => until > at)
-    const timers: Array<() => void> = ends.map((until) => {
-      const timer = setTimeout(() => setNow(Date.now()), until - at + 1)
-      return () => clearTimeout(timer)
-    })
-    if (floors.retryAfterUntil > at) {
-      const ticker = setInterval(() => {
-        const current = Date.now()
-        setNow(current)
-        if (current >= floors.retryAfterUntil) clearInterval(ticker)
-      }, 1_000)
-      timers.push(() => clearInterval(ticker))
-    }
-    return () => timers.forEach((stop) => stop())
-  }, [floors])
+  useCooldownTicks(floors, setNow)
 
   // Every transition that leaves automatic fetching unadmitted (auto off, hidden, offline,
   // denied, cool-down) cancels queued or in-flight AUTOMATIC work, even when `admitted` was

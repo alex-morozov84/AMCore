@@ -2,9 +2,9 @@ import { expect, test } from '@playwright/test'
 
 import {
   backgroundWorkDegradedJourney,
-  backgroundWorkJourney,
   backgroundWorkRetryAfterJourney,
-} from '../shared/background-work-journey'
+} from '../shared/background-work-intercepted-journeys'
+import { backgroundWorkJourney } from '../shared/background-work-journey'
 import { settingsProof } from '../support/runtime-settings-proof'
 
 import { setSystemRole } from './admin-helpers'

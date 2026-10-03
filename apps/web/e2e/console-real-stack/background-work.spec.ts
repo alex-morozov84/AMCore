@@ -3,9 +3,9 @@ import { expect, test } from '@playwright/test'
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import {
   backgroundWorkDegradedJourney,
-  backgroundWorkJourney,
   backgroundWorkRetryAfterJourney,
-} from '../shared/background-work-journey'
+} from '../shared/background-work-intercepted-journeys'
+import { backgroundWorkJourney } from '../shared/background-work-journey'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { setSystemRole } from './helpers'

@@ -64,46 +64,54 @@ function importedNames(
   return { named, namespaces }
 }
 
+type Bindings = ReturnType<typeof importedNames>
+
+function constructionForm(node: ts.Node, bull: Bindings): string | null {
+  if (!ts.isNewExpression(node)) return null
+  const callee = node.expression
+  if (ts.isIdentifier(callee) && bull.named.has(callee.text)) return 'new Queue'
+  const viaNamespace =
+    ts.isPropertyAccessExpression(callee) &&
+    callee.name.text === 'Queue' &&
+    ts.isIdentifier(callee.expression) &&
+    bull.namespaces.has(callee.expression.text)
+  return viaNamespace ? 'new Queue' : null
+}
+
+function registrationForm(node: ts.Node): string | null {
+  if (!ts.isCallExpression(node)) return null
+  const callee = node.expression
+  if (ts.isPropertyAccessExpression(callee) && REGISTER.has(callee.name.text))
+    return callee.name.text
+  if (
+    ts.isElementAccessExpression(callee) &&
+    ts.isStringLiteralLike(callee.argumentExpression) &&
+    REGISTER.has(callee.argumentExpression.text)
+  ) {
+    return callee.argumentExpression.text
+  }
+  return null
+}
+
+function injectionForm(node: ts.Node, inject: Bindings): string | null {
+  const isInject =
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    inject.named.has(node.expression.text) &&
+    ts.isDecorator(node.parent)
+  return isInject ? '@InjectQueue' : null
+}
+
 function findQueueCreations(text: string, fileName = 'file.ts'): Finding[] {
   const sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true)
-  const bullQueue = importedNames(sf, 'bullmq', 'Queue')
-  const injectQueue = importedNames(sf, '@nestjs/bullmq', 'InjectQueue')
+  const bull = importedNames(sf, 'bullmq', 'Queue')
+  const inject = importedNames(sf, '@nestjs/bullmq', 'InjectQueue')
   const found: Finding[] = []
-  const report = (node: ts.Node, form: string) =>
-    found.push({ line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, form })
-
   const visit = (node: ts.Node): void => {
-    if (ts.isNewExpression(node)) {
-      const callee = node.expression
-      if (ts.isIdentifier(callee) && bullQueue.named.has(callee.text)) report(node, 'new Queue')
-      if (
-        ts.isPropertyAccessExpression(callee) &&
-        callee.name.text === 'Queue' &&
-        ts.isIdentifier(callee.expression) &&
-        bullQueue.namespaces.has(callee.expression.text)
-      ) {
-        report(node, 'new Queue')
-      }
-    }
-    if (ts.isCallExpression(node)) {
-      const callee = node.expression
-      if (ts.isPropertyAccessExpression(callee) && REGISTER.has(callee.name.text)) {
-        report(node, callee.name.text)
-      }
-      if (
-        ts.isElementAccessExpression(callee) &&
-        ts.isStringLiteralLike(callee.argumentExpression) &&
-        REGISTER.has(callee.argumentExpression.text)
-      ) {
-        report(node, callee.argumentExpression.text)
-      }
-      if (
-        ts.isIdentifier(callee) &&
-        injectQueue.named.has(callee.text) &&
-        ts.isDecorator(node.parent)
-      ) {
-        report(node, '@InjectQueue')
-      }
+    const form =
+      constructionForm(node, bull) ?? registrationForm(node) ?? injectionForm(node, inject)
+    if (form) {
+      found.push({ line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, form })
     }
     ts.forEachChild(node, visit)
   }
