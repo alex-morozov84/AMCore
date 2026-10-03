@@ -71,7 +71,10 @@ itself about every 30 seconds while the browser tab is visible and online.
 - After a failed refresh, or while every queue stays unreadable, automatic
   refresh waits longer: 30 seconds, then 60, 120, 240 and at most 300 seconds. A
   rate-limit answer is honoured: **Refresh** shows when it is available again.
-- A hidden tab does not refresh itself. When you come back, the page refreshes once, unless auto-refresh is paused, you are offline, or a wait after a failure or rate limit has not ended yet. A refresh you started yourself may finish while the tab is hidden.
+- A hidden tab does not refresh itself. When you come back, the page refreshes if
+  its data is due for refresh and auto-refresh is on, you are online, and any wait
+  after a failure or rate limit has ended. A refresh you started yourself may
+  finish while the tab is hidden.
 - If your Console access ends (for example your role was changed), the rows
   disappear immediately and the page checks your access again.
 
@@ -126,8 +129,10 @@ with generic text for its kind. Add an entry named after its technical name unde
 
 A test fails when ordinary code registers or constructs a BullMQ queue outside that
 list. It reads the source structurally, so import aliases and multi-line calls are
-caught, but queues built dynamically are not. A queue is therefore not added by
-accident and left invisible here.
+caught, but dynamic construction and re-exports through your own modules are not.
+See the [queue guide](../../apps/api/src/infrastructure/queue/README.md#adding-a-queue)
+for the guard's scope. Keep queue creation in the inventory so registration,
+metrics and this screen stay in sync.
 
 Setting `enabled: false` for a queue switches off its registration and reading,
 and the screen shows **Disabled**. It does not remove the code that sends jobs to
