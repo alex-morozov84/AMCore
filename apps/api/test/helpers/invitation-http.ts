@@ -20,6 +20,7 @@ export async function afterInvitationAdmission(
   const release = deferred()
   const original = invites[method].bind(invites)
   let captured = false
+  let started: Promise<unknown> | undefined
   const spy = jest.spyOn(invites, method).mockImplementation((async (...args: unknown[]) => {
     if (!captured) {
       captured = true
@@ -29,6 +30,7 @@ export async function afterInvitationAdmission(
     const operation = trackInvitationOperation(() =>
       (original as (...values: unknown[]) => Promise<unknown>)(...args)
     )
+    started = operation
     void operation.catch(() => undefined)
     if (resumed) await resumed(operation)
     return operation
@@ -48,6 +50,7 @@ export async function afterInvitationAdmission(
   } finally {
     release.resolve()
     await response.catch(() => undefined)
+    if (started) await Promise.allSettled([started])
     spy.mockRestore()
   }
 }
@@ -70,10 +73,12 @@ export function invitationHttp(
     ? request(server)
         .post(`/organizations/${orgId}/members/invite`)
         .auth(credential, { type: 'bearer' })
+        .timeout({ response: 5000, deadline: 6000 })
         .send({ email: recipient.email })
         .then((r) => r)
     : request(server)
         .delete(`/organizations/${orgId}/invites/${inviteId}`)
         .auth(credential, { type: 'bearer' })
+        .timeout({ response: 5000, deadline: 6000 })
         .then((r) => r)
 }

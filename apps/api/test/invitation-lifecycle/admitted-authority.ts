@@ -163,6 +163,43 @@ export function registerAdmittedAuthorityProofs(getFixture: () => InvitationProo
       }
     }
   )
+  it('F2 HTTP barrier teardown awaits actual work when an observer refuses after resume', async () => {
+    const f = getFixture()
+    const { context, prisma, orgId, invites, pending } = f
+    const { invite } = await pending()
+    const jwt = await invitationJwt(f)
+    const mail = jest
+      .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
+      .mockResolvedValue(undefined)
+    let completed = false
+    try {
+      const response = await afterInvitationAdmission(
+        invites,
+        'createInvite',
+        () => invitationHttp(f, jwt, 'create', invite.id),
+        async () => undefined,
+        async (operation) => {
+          void operation
+            .finally(() => {
+              completed = true
+            })
+            .catch(() => undefined)
+          throw new Error('Injected observation refusal')
+        }
+      )
+      expect(response.status).toBe(500)
+      expect(completed).toBe(true)
+      expect(
+        await prisma.auditLog.count({
+          where: { action: 'org.invite_created', organizationId: orgId },
+        })
+      ).toBe(1)
+      expect(mail).toHaveBeenCalledTimes(1)
+    } finally {
+      mail.mockRestore()
+    }
+  })
+
   it('F2/R11 real admitted key expires after the exact invite-row wait', async () => {
     const f = getFixture()
     const { context, prisma, pool, owner, orgId, invites, pending, truth } = f
