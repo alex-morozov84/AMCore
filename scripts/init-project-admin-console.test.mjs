@@ -81,6 +81,8 @@ describe('init-project --admin-console', () => {
     const root = copy()
     const ownedPaths = removableConsolePaths(root)
     applyProject(root, ['--admin-console=disabled'])
+    const docsIndex = readFileSync(path.join(root, 'docs/README.md'), 'utf8')
+    assert.doesNotMatch(docsIndex, /operations-console\//)
     for (const rel of ownedPaths) {
       assert.equal(existsSync(path.join(root, rel)), false, rel)
     }

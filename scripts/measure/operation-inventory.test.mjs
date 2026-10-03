@@ -35,7 +35,7 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic claims',
-        expected: 1516,
+        expected: 1518,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {

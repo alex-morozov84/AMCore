@@ -156,7 +156,7 @@ queues exist. Each `QueueName` has a descriptor:
 The descriptor map is typed `satisfies Record<QueueName, …>`, so a new enum value
 without a descriptor does not compile. `QueueModule` registers the enabled queues,
 `QueueService` receives them as one registry, the depth metrics iterate them, and
-and the optional Operations Console's Background work screen reports every descriptor
+the optional Operations Console's Background work screen reports every descriptor
 (`disabled` rows included).
 
 ### Adding a queue
