@@ -61,6 +61,13 @@ source. A separate composition can pass one shared `placement` object to Frame,
 Mount and NavigationEntry; pass data across the server/client boundary, not href
 functions. Existing root placement and compatibility exports remain available.
 
+The nested members route moves with the selected route. Its thin page renders
+`OrganizationMembersMount` from the same `index.server` entry, after awaiting
+`params.id`. The mount independently verifies membership and full TeamAccess;
+the ready overview derives the Members link from placement's `membersHref(id)`.
+An explicitly composed `OrganizationAccessClient` can supply `membersHref` or
+omit it when that downstream does not mount the reference members page.
+
 ## Explicit nonhierarchical destinations
 
 `OrganizationAccessClient` from `@/_pages/organization-access` retains its explicit
@@ -119,8 +126,11 @@ export function CrmClient({ admission, id }: { admission: ProductAccessBootstrap
         )}
         {context.state.status === 'error' && <ApiErrorAlert error={context.state.error} />}
         <Button
-          disabled={context.state.status !== 'ready' || Boolean(context.state.retryAt)}
-          onClick={context.refresh}
+          disabled={
+            ['pending', 'missing', 'changed'].includes(context.state.status) ||
+            Boolean(context.state.retryAt)
+          }
+          onClick={() => void context.refresh().catch(() => undefined)}
         >
           {t('refresh')}
         </Button>
@@ -145,7 +155,9 @@ Add every `crmContext` key to each supported catalogue, including all lifecycle
 statuses. Compose Refresh, missing-session sign-in and changed-session Reload in
 your own presentation using shared Button/RouteProgressLink. Render structured
 errors with ApiErrorAlert; disable recovery controls where the current status
-requires it. The hook exposes data only for a ready, current consumer. One parent
+requires it. Refresh remains available after a transport error or denied authority
+once Retry-After expires; missing and changed sessions use Sign in and Reload
+instead. The hook exposes data only for a ready, current consumer. One parent
 owns context and passes its result to multiple blocks; do not duplicate request
 lifecycle, call bootstrap manually in effects or refetch a disabled Query observer.
 
@@ -187,3 +199,21 @@ A changed login must hide old content and offer explicit recovery before new
 identity authority is shown. Check locales, keyboard/focus, mobile navigation,
 themes and error boundaries. Use the [managed stands](../operations/local-stands.md)
 for real sessions and membership proof. Type/lint alone do not prove these flows.
+
+## Custom member editor
+
+Use the public `useOrganizationMembers(context.controller, {page, search})` and
+`useMemberRoleAssignments(context.controller, {userId, page, search, section})`
+hooks with that same parent owner. Keep a complete assigned-set snapshot and
+its membership/ACL revision separate from paginated choices and your dirty draft.
+Call `save({expectedMemberId, expectedAclVersion, roleIds})`; inspect `committed`,
+`rejected`, `unknown`, `busy` and `retired` outcomes. A committed result includes
+follow-up status. Never turn a failed follow-up into a claimed write rollback.
+
+The executable `scripts/fixtures/organization-members-headless.mjs` creates a
+separate disposable consumer with a list and inline editor instead of the ready
+table/dialog. `--projected` also selects single-Russian routing, Console disabled
+and Storybook disabled in that fixture. It prints the managed real-stack browser
+command; no standalone sample product route is added to the starter. See the
+[members contract](organization-members.md) for permissions, complete-set/byte
+limits, truthful self-edit warnings and safe recovery.

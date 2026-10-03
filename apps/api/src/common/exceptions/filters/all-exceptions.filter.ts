@@ -97,7 +97,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       (exception as { type?: unknown }).type === 'entity.too.large'
     ) {
       return new PayloadTooLargeException('Request body exceeds the maximum allowed size', {
-        limitBytes: REQUEST_BODY_LIMIT_BYTES,
+        limitBytes:
+          typeof (exception as { limit?: unknown }).limit === 'number'
+            ? (exception as Error & { limit?: number }).limit
+            : REQUEST_BODY_LIMIT_BYTES,
       })
     }
     return exception

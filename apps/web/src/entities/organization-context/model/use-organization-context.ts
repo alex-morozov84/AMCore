@@ -9,20 +9,30 @@ import {
   organizationContextTarget,
 } from './context-input'
 import { createOrganizationContextScheduler } from './context-scheduler'
+import {
+  type AuthorityRefreshResult,
+  createOrganizationAccessController,
+} from './members/controller'
 
 import 'client-only'
 
 export function useOrganizationContext(binding: string, input: OrganizationContextInput) {
   const client = useQueryClient()
   const [initialInput] = useState(input)
+  const ownerTarget = input.kind === 'selected' ? input.id : 'list'
+  const controller = useMemo(
+    () => createOrganizationAccessController(binding, ownerTarget),
+    [binding]
+  )
   const scheduler = useMemo(
     () =>
       createOrganizationContextScheduler(binding, initialInput, {
         ...organizationContextClient,
+        beforeAuthority: controller.waitTransports,
         publish: (target, data) =>
           client.setQueryData(organizationContextKey(binding, target), data),
       }),
-    [binding, client, initialInput]
+    [binding, client, initialInput, controller]
   )
   const state = useSyncExternalStore(
     scheduler.subscribe,
@@ -38,10 +48,29 @@ export function useOrganizationContext(binding: string, input: OrganizationConte
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   })
+  controller.setRefresh(async (signal) => {
+    const captured = controller.capture()
+    const status = await scheduler.refresh(signal)
+    signal?.throwIfAborted()
+    if (!controller.current(captured) || status === 'retired') return 'retired'
+    const fresh = client.getQueryData<OrganizationContextData>(
+      organizationContextKey(binding, input)
+    )?.data
+    const ready =
+      status === 'ready' && fresh && 'canManageTeamAccess' in fresh && fresh.canManageTeamAccess
+    controller.setAuthority(Boolean(ready))
+    return (status === 'ready' && !ready ? 'denied' : status) as AuthorityRefreshResult
+  })
+  const busy = useSyncExternalStore(
+    controller.subscribe,
+    () => controller.isBusy(),
+    () => false
+  )
   const target = organizationContextTarget(input)
   useEffect(() => {
+    controller.setTarget(ownerTarget)
     scheduler.setInput(input)
-  }, [scheduler, input])
+  }, [scheduler, input, controller, ownerTarget])
   useEffect(() => {
     const visible = () => {
       if (document.visibilityState === 'visible') scheduler.activate()
@@ -49,21 +78,32 @@ export function useOrganizationContext(binding: string, input: OrganizationConte
     const pageShow = (event: PageTransitionEvent) => {
       if (event.persisted) scheduler.activate()
     }
+    controller.resume()
     scheduler.activate()
     window.addEventListener('focus', visible)
     document.addEventListener('visibilitychange', visible)
     window.addEventListener('pageshow', pageShow)
     return () => {
+      controller.retire()
       scheduler.stop()
       window.removeEventListener('focus', visible)
       document.removeEventListener('visibilitychange', visible)
       window.removeEventListener('pageshow', pageShow)
     }
-  }, [scheduler])
+  }, [scheduler, controller])
+  useEffect(() => {
+    const data = query.data?.data
+    const ready =
+      state.status === 'ready' && data && 'canManageTeamAccess' in data && data.canManageTeamAccess
+    controller.setAuthority(Boolean(ready))
+    if (state.status === 'changed' || state.status === 'missing') controller.retire()
+  }, [controller, state.status, query.data])
   return {
+    controller,
+    busy,
     state: state.target === target ? state : { target, status: 'pending' as const },
     data: state.target === target && state.status === 'ready' ? query.data : undefined,
-    refresh: () => scheduler.activate(),
+    refresh: () => controller.refresh(),
     action: scheduler.action,
   }
 }

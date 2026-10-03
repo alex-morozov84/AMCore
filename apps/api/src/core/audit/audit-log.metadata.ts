@@ -33,6 +33,10 @@ const boundedResultCount: MetadataValueRule = (value) =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100
     ? value
     : undefined
+const memberRoleCount: MetadataValueRule = (value) =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 2_147_483_647
+    ? value
+    : undefined
 /** A bounded cuid-shaped id — runId, invocationId, approvalId (Arc E). */
 const aiId = boundedString(64, /^[a-z0-9]+$/)
 /** A bounded assistant slug — lowercase alnum + hyphen (Arc F). */
@@ -165,6 +169,13 @@ const specs: Record<AuditAction, MetadataSpec> = {
   'org.invite_accepted': { actorCredentialType: true, roleId: true },
   'org.invite_created': { actorCredentialType: true, branch: true, roleId: true },
   'org.invite_revoked': { actorCredentialType: true },
+  'org.member_roles_changed': {
+    actorCredentialType: boundedString(7, /^(jwt|api_key)$/),
+    memberId: boundedString(128, /^[A-Za-z0-9_-]+$/),
+    addedCount: memberRoleCount,
+    removedCount: memberRoleCount,
+    source: boundedString(7, /^(replace|assign|remove)$/),
+  },
   // No metadata — the security event is bounded to actor + target; no chat/user id or token.
   'telegram.connection_linked': {},
   'telegram.connection_unlinked': {},

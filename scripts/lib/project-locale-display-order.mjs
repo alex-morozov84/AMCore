@@ -67,6 +67,7 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/src/app/(organization-access)/layout.tsx',
   'apps/web/src/app/(organization-access)/organizations/page.tsx',
   'apps/web/src/app/(organization-access)/organizations/[id]/page.tsx',
+  'apps/web/src/app/(organization-access)/organizations/[id]/members/page.tsx',
   'apps/web/src/app/providers.tsx',
   'apps/web/src/proxy.ts',
   'apps/web/src/i18n/routing.ts',

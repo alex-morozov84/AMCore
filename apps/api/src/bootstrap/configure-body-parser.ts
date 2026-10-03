@@ -1,5 +1,9 @@
 import type { NestExpressApplication } from '@nestjs/platform-express'
 
+import { MEMBER_REQUEST_BYTES } from '@amcore/shared'
+
+import { isMemberRoleJsonRequest } from './member-role-body-parser'
+
 /**
  * Maximum accepted size, in bytes, of a parsed request body.
  *
@@ -14,7 +18,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
  * request the limit bounds the inflated size (a small compressed body that
  * inflates past the limit is still rejected).
  *
- * The same ceiling applies to raw-body webhook routes (D4): there is no measured
+ * Except for scoped member role replacement JSON, this ceiling applies to all
+ * routes, including raw-body webhook routes (D4): there is no measured
  * payload that justifies a separate, larger webhook limit yet. Multipart uploads
  * are bounded separately by Multer and are unaffected by this value.
  */
@@ -31,7 +36,11 @@ export const REQUEST_BODY_LIMIT_BYTES = 100_000
  * e2e bootstrap call this helper so the body-size contract is identical across
  * both — there is one production-like parser setup, not per-entrypoint drift.
  */
-export function configureBodyParser(app: NestExpressApplication): void {
+export function configureBodyParser(app: NestExpressApplication, prefix = '/api/v1'): void {
+  app.useBodyParser('json', {
+    limit: MEMBER_REQUEST_BYTES,
+    type: (req) => isMemberRoleJsonRequest(req, prefix),
+  })
   app.useBodyParser('json', { limit: REQUEST_BODY_LIMIT_BYTES })
   app.useBodyParser('urlencoded', { limit: REQUEST_BODY_LIMIT_BYTES, extended: true })
 }

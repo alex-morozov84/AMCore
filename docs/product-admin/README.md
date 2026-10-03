@@ -1,7 +1,8 @@
 # Product administration foundation
 
 AMCore supplies an Organizations selector and read-only organization overview for
-signed-in members.
+signed-in members, plus a [members and role-assignment page](organization-members.md)
+for members with full TeamAccess.
 
 This product surface is independent of the [Operations Console](../operations-console/README.md), which is restricted to
 platform super-administrators. An organization role does not grant Console access.
@@ -12,7 +13,7 @@ single membership automatically, and paginates multiple memberships in groups of
 with one membership. The overview confirms organization, account and team-access
 capability. The “Your access” card reports only the verified team-access decision;
 it does not infer permissions for individual records. It does not provide
-organization, member, role or invitation CRUD. See the
+organization editing, role-definition editing or invitation management. See the
 [capability catalogue and access hints](../auth/capability-catalogue.md) for the
 separate discovery, actor and record contracts.
 

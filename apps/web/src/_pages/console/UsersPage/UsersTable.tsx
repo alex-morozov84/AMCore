@@ -9,6 +9,7 @@ import {
   toggleSortOrder,
 } from '@/features/console-discovery'
 import { getConsoleAwareUser } from '@/shared/api/console/access-token'
+import { DataTableSurface } from '@/shared/ui/data-table-surface'
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 
 import { USERS_DEFAULT_SORT_ORDER, type UsersSortableField } from './parse-query'
@@ -64,7 +65,7 @@ export async function UsersTable({
   const updatedColumnLabel = t('usersColumnUpdated')
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface-elevated shadow-md">
+    <DataTableSurface>
       <Table>
         <TableHeader>
           <TableRow className="border-line-soft hover:bg-transparent">
@@ -137,6 +138,6 @@ export async function UsersTable({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </DataTableSurface>
   )
 }

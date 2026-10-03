@@ -50,6 +50,18 @@ for why.
 | `sheet.tsx`                      | shadcn (Base UI), customized                | Pulled in as `sidebar.tsx`'s mobile-breakpoint dependency. `SheetContent` requires a caller-provided `closeLabel`, mirroring `dialog.tsx`.                                                                                                                                                                                                                                                                                                |
 | `tooltip.tsx`, `separator.tsx`   | shadcn (Base UI), stock                     | Pulled in as `sidebar.tsx` dependencies (`SidebarMenuButton`'s collapsed-state tooltip, `SidebarSeparator`). No customization needed.                                                                                                                                                                                                                                                                                                     |
 
+### Shared list surfaces
+
+`filter-panel.tsx` and `data-table-surface.tsx` provide the common bordered,
+rounded, elevated search/table surfaces used by Console inventories and product
+organization members. They contain no Console discovery, permissions, routing or
+search behavior and remain available when the Console is disabled. Import per
+module; compose headings, result counts, empty/loading states and navigation in
+the owning page/widget. `list-pagination.tsx` supplies the common inventory
+pagination frame; callers supply links or buttons and localized status.
+`ConsoleFilterPanel` delegates to the neutral FilterPanel
+and preserves its existing slot for Console consumers.
+
 ### Search field contract
 
 Import `SearchField` directly from `@/shared/ui/search-field`. It is controlled:

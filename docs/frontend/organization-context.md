@@ -7,7 +7,8 @@ An empty successful list explains how to request an invitation; it does not
 create an organization or accept invitations. One membership opens its overview
 automatically. The overview's All organizations link uses `?view=list` to avoid
 a single-organization redirect loop. Multiple memberships use cards and URL
-pagination, 20 per page. There is no search, table or organization CRUD UI.
+pagination, 20 per page. The organization selector has no search, table or
+organization CRUD UI; the separate members page supplies member search and roles.
 
 `/[locale]/organizations/[id]` confirms the company and signed-in account. Its
 read-only “Your access” / “Ваш доступ” card shows the verified
@@ -15,7 +16,8 @@ read-only “Your access” / “Ваш доступ” card shows the verified
 “Permitted” / “Разрешено” or “Not permitted” / “Не разрешено”, followed by a
 reminder that actions are checked again. It makes no claim about assigned
 records. It is a read-only landing point for future downstream
-work. Team, role and invitation screens are not included; no inactive links
+work. The [members page](../product-admin/organization-members.md) adds role assignment;
+role-definition and invitation screens are not included. No inactive links
 promise them. A missing/removed target stays unavailable at that URL; it never
 silently adopts another organization. Capability text never grants authority.
 

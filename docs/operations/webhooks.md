@@ -119,12 +119,17 @@ unthrottled public ingress is an open volumetric target.
 
 ## Request body size limit
 
-AMCore applies one explicit request-body size limit globally in the Nest
+AMCore applies a default request-body size limit in the Nest
 bootstrap: **100 000 bytes** (decimal, not 100 KiB) for both JSON and
 urlencoded parsers, including raw-body webhook routes. The limit is centralized
 in `apps/api/src/bootstrap/configure-body-parser.ts` (`REQUEST_BODY_LIMIT_BYTES`)
 and shared by production and the e2e bootstrap so the contract is identical in
 both.
+
+The sole larger JSON exception is `PATCH /api/v1/organizations/:orgId/members/:userId/roles`: **262 144 decoded bytes**,
+for complete replacement of up to 1000 role IDs. Its exact route/method parser
+runs before the default parser. Other methods, encoded paths and urlencoded
+bodies keep the default limit. Webhook limits and raw-body handling are unchanged.
 
 The limit is measured against the **decoded** body — bytes after any
 `Content-Encoding` inflation, not bytes on the wire (`inflate` defaults to true).

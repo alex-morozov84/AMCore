@@ -185,4 +185,103 @@ describe('typed context executor', () => {
     await Promise.resolve()
     expect(deps.fetch).not.toHaveBeenCalled()
   })
+  it('requires exact200 acknowledgment for member writes, rejects201/204 without replay', async () => {
+    for (const status of [201, 204]) {
+      const { deps, expected } = fixture()
+      deps.fetch = vi
+        .fn()
+        .mockResolvedValue(
+          status === 204
+            ? new Response(null, { status })
+            : Response.json({ name: 'Renamed' }, { status })
+        )
+      await expect(
+        executeContextOperation(
+          { ...operation, successStatus: 200 },
+          { expectedSession: expected, headers: new Headers() },
+          deps
+        )
+      ).rejects.toMatchObject({ status: 502, errorCode: 'INVALID_UPSTREAM_RESPONSE' })
+      expect(deps.fetch).toHaveBeenCalledTimes(1)
+    }
+  })
+  it('bounds the final response envelope including binding at1048576/1048577 bytes', async () => {
+    for (const bytes of [1048576, 1048577]) {
+      const { deps, expected } = fixture()
+      const empty = JSON.stringify({ binding: expected, data: { name: '' } })
+      deps.fetch = vi
+        .fn()
+        .mockResolvedValue(Response.json({ name: 'x'.repeat(bytes - Buffer.byteLength(empty)) }))
+      const pending = executeContextOperation(
+        { ...operation, responseBytes: 1048576 },
+        { expectedSession: expected, headers: new Headers() },
+        deps
+      )
+      if (bytes === 1048576) {
+        const result = await pending
+        expect(Buffer.byteLength(JSON.stringify(result))).toBe(bytes)
+      } else await expect(pending).rejects.toMatchObject({ status: 502 })
+      expect(deps.fetch).toHaveBeenCalledTimes(1)
+    }
+  })
+  it('canonicalizes Retry-After on safe503 while preserving uncertain write code', async () => {
+    const { deps, expected } = fixture()
+    deps.fetch = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json(
+          { errorCode: 'MEMBER_ROLES_SAVE_UNAVAILABLE' },
+          { status: 503, headers: { 'Retry-After': '2.1' } }
+        )
+      )
+    await expect(
+      executeContextOperation(
+        operation,
+        { expectedSession: expected, headers: new Headers() },
+        deps
+      )
+    ).rejects.toMatchObject({
+      status: 503,
+      errorCode: 'MEMBER_ROLES_SAVE_UNAVAILABLE',
+      retryAfterSeconds: 3,
+    })
+    expect(deps.fetch).toHaveBeenCalledTimes(1)
+  })
+  it.each(['100%', 'Legal / Finance', 'A\\B'])(
+    'preserves literal search query %s',
+    async (search) => {
+      const { deps, expected } = fixture()
+      await executeContextOperation(
+        {
+          ...operation,
+          path: operation.path.split('?')[0] + '?' + new URLSearchParams({ search }),
+        },
+        { expectedSession: expected, headers: new Headers() },
+        deps
+      )
+      const sent = new URL(String(vi.mocked(deps.fetch!).mock.calls[0]![0]))
+      expect(sent.searchParams.get('search')).toBe(search)
+      expect(deps.fetch).toHaveBeenCalledTimes(1)
+    }
+  )
+  it.each([
+    '/api/v1/../auth',
+    '/api/v1/%2e%2e/auth',
+    '/api/v1/org%2fother',
+    '/api/v1/org%5cother',
+    '/api/v1/%252e',
+    'https://evil.test/api/v1/',
+    '//evil.test/api/v1/',
+  ])('rejects malicious pathname %s before credentials', async (path) => {
+    const { deps, expected } = fixture()
+    await expect(
+      executeContextOperation(
+        { ...operation, path },
+        { expectedSession: expected, headers: new Headers() },
+        deps
+      )
+    ).rejects.toMatchObject({ status: 400 })
+    expect(deps.readSessionId).not.toHaveBeenCalled()
+    expect(deps.fetch).not.toHaveBeenCalled()
+  })
 })

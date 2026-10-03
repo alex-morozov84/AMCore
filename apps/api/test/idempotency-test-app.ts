@@ -39,7 +39,7 @@ export async function setupIdempotencyTestApp(
     .compile()
 
   const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
-  configureBodyParser(app)
+  configureBodyParser(app, '')
   app.use(cookieParser())
   app.useGlobalPipes(new ZodValidationPipe())
   await app.init()

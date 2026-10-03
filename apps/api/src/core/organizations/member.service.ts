@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import type { RequestPrincipal } from '@amcore/shared'
+import { type RequestPrincipal } from '@amcore/shared'
 
 import {
   BusinessRuleViolationException,
@@ -9,7 +9,10 @@ import {
   NotFoundException,
 } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
+import { AuditLogService } from '../audit'
 
+import { recordMemberRoles } from './member-role-audit'
+import { lockOrganizationMembers } from './organization-mutation-lock'
 import { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
 import { getSystemRoleId } from './system-role'
@@ -32,7 +35,8 @@ export class MemberService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orgsService: OrganizationsService,
-    private readonly roleAssignability: RoleAssignabilityService
+    private readonly roleAssignability: RoleAssignabilityService,
+    private readonly audit: AuditLogService
   ) {}
 
   async removeMember(
@@ -50,7 +54,7 @@ export class MemberService {
     // the same `org:last-admin:${orgId}` key so the second caller
     // observes the post-commit state of the first.
     await this.prisma.$transaction(async (tx) => {
-      await this.acquireXactLock(tx, `org:last-admin:${orgId}`)
+      await lockOrganizationMembers(tx, orgId)
 
       const member = await tx.orgMember.findUnique({
         where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
@@ -76,17 +80,18 @@ export class MemberService {
   ): Promise<void> {
     this.assertOrgContext(principal, orgId)
 
-    const member = await this.prisma.orgMember.findUnique({
-      where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
-    })
-    if (!member) throw new NotFoundException('Member not found in this organization')
-
     // OA-05: role-ownership validation + assignment in the same
     // transaction so the role's organizationId can't change between
     // check and write. Conflict detection is hoisted into the same
     // transaction for the same reason.
     // OA-12: bump aclVersion inside the same transaction.
     await this.prisma.$transaction(async (tx) => {
+      await lockOrganizationMembers(tx, orgId)
+      const member = await tx.orgMember.findUnique({
+        where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
+      })
+      if (!member) throw new NotFoundException('Member not found in this organization')
+
       await this.roleAssignability.assert(roleId, orgId, tx)
 
       const alreadyAssigned = await tx.memberRole.findUnique({
@@ -95,6 +100,17 @@ export class MemberService {
       if (alreadyAssigned) throw new ConflictException('Member already has this role')
 
       await tx.memberRole.create({ data: { memberId: member.id, roleId } })
+      await recordMemberRoles(
+        this.audit,
+        tx,
+        orgId,
+        member.id,
+        targetUserId,
+        principal,
+        1,
+        0,
+        'assign'
+      )
       await this.orgsService.bumpAclVersionTx(orgId, tx)
     })
     await this.orgsService.invalidateAclVersion(orgId)
@@ -112,7 +128,7 @@ export class MemberService {
     // transaction. See `removeMember` for the full rationale on the
     // advisory lock.
     await this.prisma.$transaction(async (tx) => {
-      await this.acquireXactLock(tx, `org:last-admin:${orgId}`)
+      await lockOrganizationMembers(tx, orgId)
 
       const member = await tx.orgMember.findUnique({
         where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
@@ -126,7 +142,19 @@ export class MemberService {
 
       // OA-12: deleteMany + bump in the same transaction so a transient
       // DB failure cannot leave the cache stale on a partial role-removal.
-      await tx.memberRole.deleteMany({ where: { memberId: member.id, roleId } })
+      const removed = await tx.memberRole.deleteMany({ where: { memberId: member.id, roleId } })
+      if (removed.count)
+        await recordMemberRoles(
+          this.audit,
+          tx,
+          orgId,
+          member.id,
+          targetUserId,
+          principal,
+          0,
+          removed.count,
+          'remove'
+        )
       await this.orgsService.bumpAclVersionTx(orgId, tx)
     })
     await this.orgsService.invalidateAclVersion(orgId)
@@ -158,15 +186,6 @@ export class MemberService {
         'Cannot remove the last administrator from an organization'
       )
     }
-  }
-
-  /**
-   * Transaction-scoped advisory lock — parameterized `$executeRaw`
-   * tagged template so the key is never string-interpolated. Mirrors
-   * the helper in `AdminService` (OA-09).
-   */
-  private async acquireXactLock(tx: PrismaTx, key: string): Promise<void> {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0)::bigint)`
   }
 
   private assertOrgContext(principal: RequestPrincipal, orgId: string): void {

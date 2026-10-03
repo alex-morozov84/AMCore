@@ -142,3 +142,12 @@ export const DEFAULT_LOCALE: SupportedLocale = 'en'
 // sides reference one literal instead of duplicating (and risking drift on)
 // the header name.
 export const AMCORE_CLIENT_IP_HEADER = 'x-amcore-client-ip'
+
+export enum OrganizationMemberErrorCode {
+  MEMBER_UNAVAILABLE = 'MEMBER_UNAVAILABLE',
+  MEMBER_ROLES_CONFLICT = 'MEMBER_ROLES_CONFLICT',
+  MEMBER_ROLE_ASSIGNMENT_DENIED = 'MEMBER_ROLE_ASSIGNMENT_DENIED',
+  ORGANIZATION_LAST_ADMIN = 'ORGANIZATION_LAST_ADMIN',
+  MEMBER_ROLES_SAVE_UNAVAILABLE = 'MEMBER_ROLES_SAVE_UNAVAILABLE',
+  MEMBER_READ_UNAVAILABLE = 'MEMBER_READ_UNAVAILABLE',
+}

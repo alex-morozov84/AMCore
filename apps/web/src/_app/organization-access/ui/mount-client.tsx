@@ -33,6 +33,7 @@ export function OrganizationAccessClientMount({
       admission={admission}
       input={id ? { kind: 'selected', id, locale } : { kind: 'list', page, locale }}
       explicitList={explicitList}
+      membersHref={hrefs.membersHref}
       contextHref={hrefs.contextHref}
       pageHref={hrefs.pageHref}
       listHref={hrefs.listHref}

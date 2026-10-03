@@ -15,6 +15,7 @@ export interface OrganizationContextState {
 }
 
 interface SchedulerDeps {
+  beforeAuthority?: () => Promise<void>
   bootstrap: (signal: AbortSignal) => Promise<ProductAccessBootstrap>
   authority: (
     input: OrganizationContextInput,
@@ -63,6 +64,8 @@ export function createOrganizationContextScheduler(
           return
         }
       }
+      current.signal.throwIfAborted()
+      await deps.beforeAuthority?.()
       current.signal.throwIfAborted()
       const data = await deps.authority(selectedInput, binding, current.signal)
       if (data.binding !== binding) {
@@ -117,6 +120,29 @@ export function createOrganizationContextScheduler(
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
+      }
+    },
+    async refresh(signal?: AbortSignal) {
+      signal?.throwIfAborted()
+      if (timer) clearTimeout(timer)
+      timer = undefined
+      const work =
+        pending ?? (!state.retryAt || Date.now() >= state.retryAt ? start(true) : undefined)
+      const captured = run
+      const cancel = () => {
+        if (run !== captured || captured?.signal.aborted) return
+        lease.retire()
+        validatedIdentity = false
+        suspend()
+      }
+      signal?.addEventListener('abort', cancel, { once: true })
+      try {
+        await work
+        signal?.throwIfAborted()
+        if (run !== captured || captured?.signal.aborted) return 'retired' as const
+        return state.status
+      } finally {
+        signal?.removeEventListener('abort', cancel)
       }
     },
     activate() {

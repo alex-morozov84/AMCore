@@ -598,3 +598,15 @@ key can never exceed its creator's access even if scoped broadly, and
 - [Sessions](./sessions.md) — rotation and revocation (incl. role-change revoke).
 - [CSRF Posture](./csrf.md) — cookie surfaces and CSRF handling.
 - [Auth API contracts](./reference.md) — error codes and environment variables.
+
+### Complete organization member role sets
+
+The [member assignment API and headless UI](../product-admin/organization-members.md)
+require full TeamAccess and current organization membership, including for
+SUPER_ADMIN. New list/snapshot/replacement endpoints are bearer-only; existing
+per-role writer credential contracts remain unchanged. Replacement uses expected
+membership identity and ACL revision, serializes parent/child writers, preserves
+the last builtin ADMIN and persists audit in the same transaction. Self-edit
+warnings cover any role change: custom DENY rules can remove access after adding
+a role. The next request evaluates fresh authority; a previously admitted write
+can still commit. UI role names do not predict the resulting permission set.
