@@ -15,6 +15,9 @@ import { AdminDetailService } from './admin-detail.service'
 import { AdminOverviewService } from './admin-overview.service'
 import { AdminOverviewResourcesService } from './admin-overview-resources.service'
 import { AdminSessionsService } from './admin-sessions.service'
+import { AdminStorageSettingController } from './admin-storage-setting.controller'
+import { AdminStorageSettingService } from './admin-storage-setting.service'
+import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard'
 
 import { HealthModule } from '@/health'
 
@@ -28,9 +31,11 @@ import { HealthModule } from '@/health'
 // everywhere" property as CleanupModule.
 @Module({
   imports: [PrismaModule, CleanupModule, AuditModule, HealthModule, GeoipModule],
-  controllers: [AdminController, AdminApiKeysController],
+  controllers: [AdminController, AdminApiKeysController, AdminStorageSettingController],
   providers: [
     AdminService,
+    AdminStorageSettingService,
+    PlatformSettingsPrincipalGuard,
     AdminApiKeysService,
     ApiKeyRevocationService,
     AdminDetailService,

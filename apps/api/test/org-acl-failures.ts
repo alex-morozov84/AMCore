@@ -1,5 +1,6 @@
 import { createClient } from '@redis/client'
 
+import { OrganizationContextResolver } from '../src/core/auth/organization-context'
 import { EnvService } from '../src/env/env.service'
 import { Prisma } from '../src/generated/prisma/client'
 import { MetricsService } from '../src/infrastructure/observability'
@@ -81,10 +82,10 @@ export function aclFailureCases(fixture: () => AclFixture): void {
       await f.grant()
       await f.assign()
       await f.read().expect(200)
-      const read = f.versions.getCurrent.bind(f.versions)
-      f.versions.getCurrent = async () => {
+      const read = f.prisma.orgMember.findUnique.bind(f.prisma.orgMember)
+      f.prisma.orgMember.findUnique = (async () => {
         throw error
-      }
+      }) as unknown as typeof read
       try {
         const res = await f
           .read()
@@ -93,7 +94,7 @@ export function aclFailureCases(fixture: () => AclFixture): void {
         expect(res.body.errorCode).toBe(code)
         if (code === 'DATABASE_POOL_TIMEOUT') expect(res.headers['retry-after']).toBe('1')
       } finally {
-        f.versions.getCurrent = read
+        f.prisma.orgMember.findUnique = read
       }
     }
   )
@@ -114,7 +115,7 @@ export function aclFailureCases(fixture: () => AclFixture): void {
       },
     } as EnvService
     const db = new PrismaService(isolated, noopPinoLogger, f.app.get(MetricsService))
-    const owner = f.versions as unknown as { prisma: PrismaService }
+    const owner = f.app.get(OrganizationContextResolver) as unknown as { prisma: PrismaService }
     const primary = owner.prisma
     owner.prisma = db
     try {

@@ -24,6 +24,11 @@ that result is still present. Copy icons appear beside safe IDs. The
 event's own ID identifies its audit record and can be copied for a support or
 investigation reference; the screen has no event-ID search field.
 
+Storage interval changes appear as **Runtime setting changed**, with target
+`RUNTIME_SETTING` / `storage_probe`, before/after interval and revisions. An env
+baseline means the override was absent; the responding process's actual baseline
+is not stored as a fleet value. A matching no-op creates no change event.
+
 ## Narrow the events
 
 1. Choose up to ten values under **Event type**. An event matches when its

@@ -45,13 +45,13 @@ function outputs(locale) {
   return new Map(E2E_UI_SURFACES.map((surface) => [surface.path, apply(surface, locale)]))
 }
 
-test('AST-aware inventory fixes the bounded 109-expectation denominator', () => {
+test('AST-aware inventory fixes the bounded 119-expectation denominator', () => {
   const count = E2E_UI_SURFACES.reduce((total, surface) => {
     const model = parseStructuralModel(surface.path, source(surface.path))
     return total + e2eUiExpectationInventory(model, surface.namespaces).count
   }, 0)
   assert.equal(count, E2E_UI_EXPECTATION_DENOMINATOR)
-  assert.equal(count, 109)
+  assert.equal(count, 119)
 })
 
 test('EN is byte-identical and RU has only concrete selected-catalogue expectations', () => {
@@ -91,7 +91,9 @@ test('every represented English localized class is rejected when restored', () =
 })
 
 test('missing, duplicated, and unsupported operation contracts fail closed', () => {
-  const surface = E2E_UI_SURFACES[1]
+  const surface = E2E_UI_SURFACES.find(
+    ({ path }) => path === 'apps/web/e2e/console-real-stack/sessions.spec.ts'
+  )
   const first = E2E_UI_PROFILES.auth[0][0]
   assert.throws(() => apply(surface, 'ru', source(surface.path).replace(first, '/changed/i')))
   assert.throws(() => apply(surface, 'ru', `${source(surface.path)}\npage.getByLabel(${first})\n`))

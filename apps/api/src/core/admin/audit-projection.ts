@@ -4,6 +4,7 @@ import {
   type AdminAuditResponse,
   auditActionCodeSchema,
   auditDisplayIdSchema,
+  auditSummarySchema,
 } from '@amcore/shared'
 
 type Item = AdminAuditResponse['items'][number]
@@ -46,6 +47,15 @@ function safeCode(value: unknown): string | undefined {
 export function auditSummary(action: string, metadata: unknown): Item['summary'] {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {}
   const m = metadata as Record<string, unknown>
+  if (action === 'admin.runtime_setting.changed') {
+    const parsed = auditSummarySchema.safeParse({
+      beforeIntervalSeconds: m.beforeIntervalSeconds,
+      afterIntervalSeconds: m.afterIntervalSeconds,
+      beforeRevision: m.beforeRevision,
+      afterRevision: m.afterRevision,
+    })
+    return parsed.success ? parsed.data : {}
+  }
   if (action === 'admin.user.system_role_changed') {
     const role = (v: unknown): 'USER' | 'SUPER_ADMIN' | undefined =>
       v === 'USER' || v === 'SUPER_ADMIN' ? v : undefined

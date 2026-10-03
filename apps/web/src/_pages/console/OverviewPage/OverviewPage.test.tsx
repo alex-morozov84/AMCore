@@ -7,6 +7,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as DeploymentIdentity from '@/shared/lib/deployment-version/identity'
 
 vi.mock('server-only', () => ({}))
+// The editor's query and mutation behavior is covered in its feature tests.
+vi.mock('@/features/console-storage-setting', () => ({
+  StorageProbeIntervalEditor: ({ observedInterval }: { observedInterval: number }) => (
+    <p>Interval {observedInterval}</p>
+  ),
+}))
 vi.mock('@/shared/lib/deployment-version/identity', async (importOriginal) => ({
   ...(await importOriginal<typeof DeploymentIdentity>()),
   DEPLOYMENT_VERSION: 'web-artifact-123',

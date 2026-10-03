@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reusable code-owned ordinary platform runtime settings with revision-checked
+  atomic audit and API/worker adoption without restart. Overview File storage
+  offers compact inline interval editing with Save/Cancel and saving feedback;
+  reset remains available through the operator API.
+
 - Implemented-action capability catalogue, validated permission presets and
   selected-organization actor/record access hints. The ready overview now shows
   the verified team-access decision; no role-management page is added.

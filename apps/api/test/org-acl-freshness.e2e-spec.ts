@@ -90,18 +90,23 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
     await f.read().expect(200)
     const old = await f.version()
     const gate = deferredGate()
-    const get = f.prisma.organization.findUnique.bind(f.prisma.organization)
+    const get = f.prisma.orgMember.findUnique.bind(f.prisma.orgMember)
     let armed = true
-    f.prisma.organization.findUnique = (async (args: Parameters<typeof get>[0]) => {
+    f.prisma.orgMember.findUnique = (async (args: Parameters<typeof get>[0]) => {
       const result = await get(args)
-      if (armed && args.where.id === f.org.id && args.select?.aclVersion) {
+      if (
+        armed &&
+        args.where.userId_organizationId?.userId === f.target.id &&
+        args.where.userId_organizationId?.organizationId === f.org.id &&
+        args.include?.organization
+      ) {
         armed = false
         await gate.pause()
       }
       return result
     }) as unknown as typeof get
     restore.push(() => {
-      f.prisma.organization.findUnique = get
+      f.prisma.orgMember.findUnique = get
     })
     const reader = f.read().then((res) => res.status)
     try {
@@ -201,7 +206,9 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
     expect(await f.version()).toBe(v + 1)
     await f.read().expect(403)
     await f.http('delete', f.base).expect(204)
-    await f.read().expect(404)
+    // Roles admission requires membership; only the context route conceals absence.
+    await f.read().expect(403)
+    await f.http('get', `${f.base}/context`, f.targetToken).expect(404)
     await f.http('get', `${f.base}/roles`, key).expect(401)
   })
 

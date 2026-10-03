@@ -4,6 +4,7 @@ export const AUDIT_ACTIONS = [
   'admin.api_keys.viewed',
   'admin.api_keys.revocation_requested',
   'admin.cleanup.executed',
+  'admin.runtime_setting.changed',
   'admin.user.session_revoked',
   'admin.user.sessions_revoked',
   'admin.user.sessions_viewed',

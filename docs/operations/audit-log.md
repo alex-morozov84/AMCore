@@ -48,6 +48,13 @@ Important data-model choices:
 - `metadata` is allowlist-driven per action, not arbitrary caller JSON.
 - AI tool/approval targets use `AI_TOOL_INVOCATION` and `AI_APPROVAL`.
 
+Runtime setting changes use `admin.runtime_setting.changed` and target
+`RUNTIME_SETTING` / `storage_probe`. The setting revision and safe before/after
+interval projection commit atomically with the setting. A matching no-op adds no
+change event; a stale revision still conflicts. Reset is recorded as a null
+interval projection and a new revision. No arbitrary setting values or secrets
+are logged. The bounded read summary exposes interval and revision changes.
+
 ## Sensitive Data Rules
 
 Audit rows must not contain:

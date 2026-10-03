@@ -1,5 +1,6 @@
 import type { AdminOverviewResponse } from '@amcore/shared'
 
+import { StorageProbeIntervalEditor } from '@/features/console-storage-setting'
 import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 import { InfoTooltip } from '@/shared/ui/info-tooltip'
 
@@ -21,7 +22,6 @@ const FAILURES = {
 export function OverviewStorage({
   overview,
   t,
-  format,
 }: {
   overview: AdminOverviewResponse
   t: OverviewTranslations
@@ -73,11 +73,7 @@ export function OverviewStorage({
               : 'overviewFilesMemory'
         )}
       </p>
-      <p className="mt-3 text-sm">
-        {t('overviewFilesCadence', {
-          minutes: format.number(storage.intervalSeconds / 60),
-        })}
-      </p>
+      <StorageProbeIntervalEditor observedInterval={storage.intervalSeconds} />
       {storage.driver === 's3' && (
         <aside className="mt-3 rounded-md border border-warning p-3 text-sm">
           <p className="font-semibold">{t('overviewFilesCostTitle')}</p>
@@ -85,7 +81,6 @@ export function OverviewStorage({
         </aside>
       )}
       {storage.failure && <p className="mt-2 text-sm">{t(FAILURES[storage.failure])}</p>}
-      <p className="mt-3 text-sm text-muted-foreground">{t('overviewFilesReadinessHelp')}</p>
     </section>
   )
 }

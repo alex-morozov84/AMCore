@@ -1,3 +1,4 @@
+import { operationsConsoleFacts } from './operations-console-ownership-facts.mjs'
 import { buildLocaleCoreFacts } from './project-locale-core-facts.mjs'
 import { buildLocaleApiSuiteFacts } from './project-locale-api-suite-facts.mjs'
 import { buildLocaleApiFixtureFacts } from './project-locale-api-fixture-facts.mjs'
@@ -12,7 +13,7 @@ import { buildLocaleE2eUiFacts } from './project-locale-e2e-ui-facts.mjs'
 export function buildProjectLocaleFacts(state) {
   if (!state.selected.locale) return []
   const locale = state.locale.base
-  return [
+  const facts = [
     ...buildLocaleCoreFacts(locale),
     ...buildLocaleApiSuiteFacts(locale),
     ...buildLocaleApiFixtureFacts(locale),
@@ -24,4 +25,9 @@ export function buildProjectLocaleFacts(state) {
     ...buildLocaleE2eRouteFacts(locale),
     ...buildLocaleE2eUiFacts(locale),
   ]
+  if (state.adminConsole?.enabled !== false) return facts
+  const removed = operationsConsoleFacts.verification
+  return facts.filter(
+    (fact) => !removed.some(({ path }) => fact.path === path || fact.path?.startsWith(`${path}/`))
+  )
 }

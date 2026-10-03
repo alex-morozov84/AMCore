@@ -18,6 +18,7 @@ import { StorageProbeService } from './storage-probe.service'
 
 import type { EnvService } from '@/env/env.service'
 import type { MetricsService } from '@/infrastructure/observability'
+import { storageProbeSettingsFixture } from '@/infrastructure/storage/storage-probe-settings.fixture'
 
 function env(values: Record<string, unknown>): EnvService {
   return { get: (key: string) => values[key] } as unknown as EnvService
@@ -66,7 +67,8 @@ describe('storage diagnostic driver I/O', () => {
         config,
         io,
         {} as MetricsService,
-        { warn: jest.fn() } as unknown as PinoLogger
+        { warn: jest.fn() } as unknown as PinoLogger,
+        ...storageProbeSettingsFixture(config)
       )
       await service.run()
       expect(service.snapshot().state).toBe('healthy')

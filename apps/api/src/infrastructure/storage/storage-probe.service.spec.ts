@@ -5,6 +5,7 @@ import { StorageProbeService } from './storage-probe.service'
 
 import type { EnvService } from '@/env/env.service'
 import type { MetricsService } from '@/infrastructure/observability'
+import { storageProbeSettingsFixture } from '@/infrastructure/storage/storage-probe-settings.fixture'
 
 const config = {
   STORAGE_DRIVER: 'memory',
@@ -17,9 +18,15 @@ function setup() {
   const metrics = { registerGauge: jest.fn() } as unknown as MetricsService
   return {
     io,
-    service: new StorageProbeService(env, io, metrics, {
-      warn: jest.fn(),
-    } as unknown as PinoLogger),
+    service: new StorageProbeService(
+      env,
+      io,
+      metrics,
+      {
+        warn: jest.fn(),
+      } as unknown as PinoLogger,
+      ...storageProbeSettingsFixture(env)
+    ),
     metrics,
   }
 }
@@ -108,7 +115,7 @@ describe('independent storage transaction', () => {
             setTimeout(() => resolve(Buffer.from('AMCore isolated storage diagnostic\n')), 5000)
           )
       )
-    service.onModuleInit()
+    await service.onModuleInit()
     expect(service.snapshot()).toMatchObject({ inProgress: true, nextScheduledAt: null })
     await jest.advanceTimersByTimeAsync(5000)
     expect(service.snapshot()).toMatchObject({
