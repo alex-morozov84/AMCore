@@ -1,4 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -34,7 +35,7 @@ function state(overrides: Partial<ReturnType<typeof useQueueSummary>> = {}) {
 }
 function view() {
   return render(
-    <NextIntlClientProvider locale="en" messages={queueMessages}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={queueMessages}>
       <QueueSummaryLive initial={mixedSummary} initialUpdatedAt={0} />
     </NextIntlClientProvider>
   )
@@ -132,7 +133,7 @@ describe('rows', () => {
       },
     }
     render(
-      <NextIntlClientProvider locale="en" messages={messages}>
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
         <QueueSummaryLive initial={mixedSummary} initialUpdatedAt={0} />
       </NextIntlClientProvider>
     )

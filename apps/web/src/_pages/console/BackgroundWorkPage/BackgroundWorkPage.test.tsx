@@ -1,4 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -31,7 +32,7 @@ vi.mock('next-intl/server', () => ({
 async function view() {
   render(
     <NextIntlClientProvider
-      locale="en"
+      locale={DEFAULT_LOCALE}
       messages={{
         ...queueMessages,
         common: {

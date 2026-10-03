@@ -12,6 +12,8 @@ import { useQueueSummary } from './use-queue-summary'
 
 vi.mock('./use-queue-summary', () => ({ useQueueSummary: vi.fn() }))
 
+const RUSSIAN = 'ru'
+
 const keys = (value: unknown, prefix = ''): string[] =>
   Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
     typeof child === 'object' && child !== null
@@ -64,7 +66,7 @@ describe('Background work catalogue', () => {
       refresh: vi.fn(),
     })
     render(
-      <NextIntlClientProvider locale="ru" messages={ru}>
+      <NextIntlClientProvider locale={RUSSIAN} messages={ru}>
         <QueueSummaryLive initial={summary([])} initialUpdatedAt={0} />
       </NextIntlClientProvider>
     )
