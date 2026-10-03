@@ -59,7 +59,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   assertExactScaffoldCounts([
     {
       name: 'console closed-root files',
-      expected: 275,
+      expected: 307,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {
