@@ -236,7 +236,10 @@ export const operationsConsoleDocSeams = [
       block(
         '<!-- AMCORE_CONSOLE_BACKGROUND_WORK_START -->',
         '<!-- AMCORE_CONSOLE_BACKGROUND_WORK_END -->'
-      )
+      ),
+      undefined,
+      // One operation per file: observability.md already has an Overview seam.
+      path.includes('observability') ? { operationKey: 'console.overview-observability' } : {}
     )
   ),
   entry(
