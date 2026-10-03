@@ -174,7 +174,11 @@ Do not register a queue yourself with `BullModule.registerQueue`, `@InjectQueue`
 `new Queue(...)`. A queue created outside the inventory is invisible to the Console,
 the metrics and `QueueService`, and nothing would say so. The guard test
 `queue-registration-coverage.spec.ts` fails with the file and line when production
-code does this; `queue.module.ts` is the only allowed place.
+code does this; `queue.module.ts` is the only allowed place. It reads the source
+through the TypeScript AST, so import aliases (`Queue as ReportQueue`), namespace
+imports and multi-line calls are caught. It cannot see queues built dynamically or
+through a re-export of `Queue` from your own module: it guards against accidents,
+not against deliberate workarounds.
 
 ### Disabling a queue
 

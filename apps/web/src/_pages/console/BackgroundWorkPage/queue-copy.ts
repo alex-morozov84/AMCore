@@ -1,12 +1,5 @@
 import type { AdminQueue, AdminQueueCounts } from '@amcore/shared'
 
-const KNOWN_QUEUES = ['email', 'default', 'notifications', 'ai-runs'] as const
-export type KnownQueue = (typeof KNOWN_QUEUES)[number]
-
-export function isKnownQueue(name: string): name is KnownQueue {
-  return (KNOWN_QUEUES as readonly string[]).includes(name)
-}
-
 /** What "Waiting" shows: BullMQ keeps priority jobs in a separate set. */
 export function queuedCount(counts: AdminQueueCounts): number {
   return counts.waiting + counts.prioritized
@@ -32,7 +25,7 @@ export function ageParts(seconds: number): { unit: AgeUnit; n: number } {
 
 export type QueueRow = AdminQueue
 
-/** All rows unavailable: the screen says so once instead of repeating it per row. */
+/** Every enabled queue is unavailable: the screen adds one notice on top of the per-row states. */
 export function allUnavailable(queues: readonly AdminQueue[]): boolean {
   const enabled = queues.filter((queue) => queue.status !== 'disabled')
   return enabled.length > 0 && enabled.every((queue) => queue.status === 'unavailable')

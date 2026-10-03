@@ -115,6 +115,37 @@ describe('rows', () => {
     expect(screen.getAllByText('Unknown').length).toBeGreaterThan(0)
   })
 
+  it("uses a downstream queue's own catalogue entry when one exists, and generic kind copy otherwise", () => {
+    state({
+      data: summary([
+        availableQueue('my-reports', { kind: 'extension' }),
+        availableQueue('my-exports', { kind: 'work' }),
+      ]),
+    })
+    const messages = {
+      ...en,
+      console: {
+        ...en.console,
+        backgroundWork: {
+          ...en.console.backgroundWork,
+          queues: {
+            ...en.console.backgroundWork.queues,
+            'my-reports': { title: 'Reports', description: 'Builds the monthly reports.' },
+          },
+        },
+      },
+    }
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <QueueSummaryLive initial={mixedSummary} initialUpdatedAt={0} />
+      </NextIntlClientProvider>
+    )
+    expect(screen.getAllByText('Reports').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Builds the monthly reports.').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Work queue').length).toBeGreaterThan(0) // my-exports: generic by kind
+    expect(screen.getAllByText('my-exports').length).toBeGreaterThan(0)
+  })
+
   it('offers both the table and the mobile cards from one data set', () => {
     view()
     expect(screen.getAllByRole('list', { name: 'Background queues' })).toHaveLength(1)

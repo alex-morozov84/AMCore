@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import en from '../../../../messages/en.json'
 import ru from '../../../../messages/ru.json'
 
-import { ageParts, allUnavailable, isEmpty, isKnownQueue, queuedCount } from './queue-copy'
+import { ageParts, allUnavailable, isEmpty, queuedCount } from './queue-copy'
 import { noCounts } from './queue-fixtures'
 
 describe('queue figures', () => {
@@ -27,9 +27,7 @@ describe('queue figures', () => {
     expect(ageParts(172_800)).toEqual({ unit: 'ageDays', n: 2 })
   })
 
-  it('knows the stock queues and nothing else', () => {
-    expect(['email', 'default', 'notifications', 'ai-runs'].every(isKnownQueue)).toBe(true)
-    expect(isKnownQueue('my-reports')).toBe(false)
+  it('reports an inventory without enabled queues as not all-unavailable', () => {
     expect(allUnavailable([])).toBe(false)
   })
 })

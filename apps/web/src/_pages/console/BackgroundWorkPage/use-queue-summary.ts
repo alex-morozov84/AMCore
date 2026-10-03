@@ -69,21 +69,35 @@ export function useQueueSummary(initial: AdminQueuesResponse, initialUpdatedAt: 
     refetchOnReconnect: true,
   })
 
-  // Re-evaluate admission when the longest cool-down elapses (a one-shot timer, not a poll loop).
+  // Each floor expires on its own clock: a short `Retry-After` frees manual refresh even while a
+  // longer automatic backoff still holds back automatic fetches. While a `Retry-After` is active
+  // the state also ticks once a second so the remaining time shown is honest.
   useEffect(() => {
-    const until = Math.max(floors.retryAfterUntil, floors.backoffUntil)
-    const wait = until - Date.now()
-    if (wait <= 0) return undefined
-    const timer = setTimeout(() => setNow(Date.now()), wait + 1)
-    return () => clearTimeout(timer)
+    const at = Date.now()
+    const ends = [floors.retryAfterUntil, floors.backoffUntil].filter((until) => until > at)
+    const timers: Array<() => void> = ends.map((until) => {
+      const timer = setTimeout(() => setNow(Date.now()), until - at + 1)
+      return () => clearTimeout(timer)
+    })
+    if (floors.retryAfterUntil > at) {
+      const ticker = setInterval(() => {
+        const current = Date.now()
+        setNow(current)
+        if (current >= floors.retryAfterUntil) clearInterval(ticker)
+      }, 1_000)
+      timers.push(() => clearInterval(ticker))
+    }
+    return () => timers.forEach((stop) => stop())
   }, [floors])
 
-  // Losing admission suppresses queued/in-flight AUTOMATIC work, including a request that
-  // TanStack left paused while offline. A manual fetch survives, except after access loss.
+  // Every transition that leaves automatic fetching unadmitted (auto off, hidden, offline,
+  // denied, cool-down) cancels queued or in-flight AUTOMATIC work, even when `admitted` was
+  // already false: a request TanStack left paused offline must not resume on reconnect after
+  // auto-refresh is switched off. A manual fetch survives, except after access loss.
   useEffect(() => {
     if (admitted || (manualInFlight.current && !denied)) return
     void queryClient.cancelQueries({ queryKey, exact: true }, { revert: true })
-  }, [admitted, denied, queryClient])
+  }, [admitted, auto, denied, visible, online, queryClient])
 
   // Success: own the degraded streak (a 200 with every queue unavailable is not a success).
   useEffect(() => {

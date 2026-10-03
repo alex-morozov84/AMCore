@@ -16,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (pausable, with backoff), never shows job contents, and is served by
   `GET /api/v1/admin/background-work/queues`.
 - One code-owned queue inventory drives queue registration, `QueueService`, the
-  depth metrics and the Console screen; a guard test fails when code creates a
-  queue outside it. Priority comments and the queue README now describe BullMQ
+  depth metrics and the Console screen; a guard test fails when ordinary code
+  registers or constructs a queue outside it. Priority comments and the queue README now describe BullMQ
   priorities correctly.
 
 - Organization pages accept one application placement for addresses, pagination

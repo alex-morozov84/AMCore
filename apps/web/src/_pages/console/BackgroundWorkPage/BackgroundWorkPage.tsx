@@ -7,9 +7,10 @@ import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fall
 import { QueueSummaryLive } from './QueueSummaryLive'
 
 /**
- * Background work: a read-only view of the queue inventory. The static heading renders first; only
- * the first snapshot depends on the backend. A transport failure of that snapshot is the explicit
- * primary-unavailable state; per-queue unavailability is data inside a successful snapshot.
+ * Background work: a read-only view of the queue inventory. The page waits for the first snapshot
+ * before returning, so the Console frame's skeleton covers the wait; the heading is part of both the
+ * loaded page and the primary-unavailable fallback. A transport failure of that snapshot is the
+ * explicit primary-unavailable state; per-queue unavailability is data inside a successful snapshot.
  */
 export async function BackgroundWorkPage() {
   const t = await getTranslations('console.backgroundWork')

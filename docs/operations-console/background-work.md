@@ -19,15 +19,15 @@ host, after the locale prefix (for example `/en/admin/background-work`).
 Each queue is one row on a wide screen and one card on a narrow one. The page
 header shows the time the data was read.
 
-| Column            | What it means                                                                                                                                               |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Queue             | A readable name, the technical name (for example `email`), and what the queue is for.                                                                       |
-| State             | **Paused** or **Not paused**. A queue with nothing in it also says **Empty**. A queue that could not be read says **Unavailable**.                          |
-| Waiting           | Jobs ready to run but not yet taken. This includes jobs with a priority.                                                                                    |
-| Active            | Jobs a worker is running right now.                                                                                                                         |
-| Delayed           | Jobs scheduled for later, including jobs waiting to be retried. Delayed work is normal and not a problem on its own.                                        |
-| Failed            | Failed jobs that are still kept. By default a queue keeps only the most recent failures (up to 1,000, for up to 24 hours), so this is not a lifetime total. |
-| Oldest queued job | How long ago the oldest queued job was created, rounded down, shown as "At least …". It is a lower bound, not the time the job has been waiting.            |
+| Column            | What it means                                                                                                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Queue             | A readable name, the technical name (for example `email`), and what the queue is for.                                                                                                                                                                                                             |
+| State             | **Paused** or **Not paused**. A queue with nothing in it also says **Empty**. A queue that could not be read says **Unavailable**.                                                                                                                                                                |
+| Waiting           | Jobs ready to run but not yet taken. This includes jobs with a priority.                                                                                                                                                                                                                          |
+| Active            | Jobs a worker is running right now.                                                                                                                                                                                                                                                               |
+| Delayed           | Jobs scheduled for later, including jobs waiting to be retried. Delayed work is normal and not a problem on its own.                                                                                                                                                                              |
+| Failed            | Failed jobs that are still kept. A queue trims old failures by age and count (by default the last 1,000, for 24 hours), but only when other jobs finish, so a quiet queue can keep older ones, and a job can carry its own setting. This is not a lifetime total and not a strict 24-hour window. |
+| Oldest queued job | How long ago the oldest queued job was created, rounded down, shown as "At least …". It is a lower bound, not the time the job has been waiting.                                                                                                                                                  |
 
 A dash means "not measured". Nothing is ever shown as zero when the queue could
 not be read.
@@ -46,15 +46,15 @@ description for its kind. See [Adding a queue](#adding-a-queue-for-developers).
 
 ## States
 
-| State       | Meaning                                                                                                                                   |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Not paused  | The queue is accepting work. This does **not** prove a worker is running: the screen cannot see workers.                                  |
-| Paused      | Someone paused the queue on purpose or by mistake. Jobs stay under **Waiting** and are not processed until the queue is resumed.          |
-| Empty       | Nothing is waiting, running, delayed or waiting on child jobs. Kept failures do not count. Empty is separate from paused and unavailable. |
-| Unavailable | The numbers could not be read in time (Redis down or too slow). This is **not** an empty queue.                                           |
-| Disabled    | This deployment switched the queue off in its queue list. Nothing is read for it.                                                         |
+| State       | Meaning                                                                                                                                                                                                                        |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Not paused  | The queue has no global pause flag. This does **not** prove a worker is running (the screen cannot see workers), and it says nothing about whether new jobs are being added.                                                   |
+| Paused      | A pause flag is set on the queue, on purpose or by mistake. Jobs can still be added and are counted under **Waiting**, but workers do not take new ones until the queue is resumed. A job a worker already started may finish. |
+| Empty       | Nothing is waiting, running, delayed or waiting on child jobs. Kept failures do not count. Empty is separate from paused and unavailable.                                                                                      |
+| Unavailable | The numbers could not be read in time (Redis down or too slow). This is **not** an empty queue.                                                                                                                                |
+| Disabled    | This deployment switched the queue off in its queue list. Nothing is read for it.                                                                                                                                              |
 
-If no queue can be read, one notice says so instead of repeating it on every row.
+If no queue can be read, a notice above the list says so. Every row still shows its own **Unavailable** state.
 
 ## Refreshing
 
@@ -71,7 +71,7 @@ itself about every 30 seconds while the browser tab is visible and online.
 - After a failed refresh, or while every queue stays unreadable, automatic
   refresh waits longer: 30 seconds, then 60, 120, 240 and at most 300 seconds. A
   rate-limit answer is honoured: **Refresh** shows when it is available again.
-- A hidden tab does not refresh. When you come back, the page refreshes once.
+- A hidden tab does not refresh itself. When you come back, the page refreshes once, unless auto-refresh is paused, you are offline, or a wait after a failure or rate limit has not ended yet. A refresh you started yourself may finish while the tab is hidden.
 - If your Console access ends (for example your role was changed), the rows
   disappear immediately and the page checks your access again.
 
@@ -94,15 +94,15 @@ Console time zone. See [the display time zone](README.md#display-time-zone).
 
 ## Reading the screen
 
-| You see                                                  | Likely meaning and what to do                                                                                                                                    |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Waiting grows, **Not paused**, Active stays at 0         | No worker is taking jobs. Check that the worker process (or the `all` role) is running. See the [queue runbook](../operations/runbooks/queues.md#backlog).       |
-| **Paused** and Waiting is above 0                        | The queue was paused. Confirm that was intended, then resume it by the controlled way described in the [queue runbook](../operations/runbooks/queues.md#paused). |
-| Waiting is high but Active is also high                  | Workers are busy. Watch whether the "Oldest queued job" keeps growing.                                                                                           |
-| **Failed** is above 0                                    | Jobs failed and are kept. Look at the worker logs for the cause; see the [email runbook](../operations/runbooks/email.md) for email.                             |
-| A row says **Unavailable**                               | Redis did not answer in time. Use **Refresh**; if it persists, follow the [Redis runbook](../operations/runbooks/redis.md).                                      |
-| Every row says **Unavailable**                           | Redis cannot be reached from the API. Nothing is known about the queues. Check Redis and the API.                                                                |
-| `notifications` or `ai-runs` is **Empty** but users wait | Look in the database state, not here. These queues only wake workers.                                                                                            |
+| You see                                                  | Likely meaning and what to do                                                                                                                                                                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Waiting grows, **Not paused**, Active stays at 0         | No worker is taking jobs. Check that the worker process (or the `all` role) is running. See the [queue runbook](../operations/runbooks/queues.md#backlog).                                                                      |
+| **Paused** and Waiting is above 0                        | The queue was paused. Confirm that was intended, then resume it by the controlled way described in the [queue runbook](../operations/runbooks/queues.md#paused).                                                                |
+| Waiting is high but Active is also high                  | Workers are busy. Watch whether the "Oldest queued job" keeps growing.                                                                                                                                                          |
+| **Failed** is above 0                                    | Jobs failed and are kept. Look at the worker logs for the cause; see the [email runbook](../operations/runbooks/email.md) for email.                                                                                            |
+| A row says **Unavailable**                               | The queue's numbers could not be read in time. Redis being down or slow is the usual cause, but not the only one. Use **Refresh**; if it persists, check the API logs and the [Redis runbook](../operations/runbooks/redis.md). |
+| Every row says **Unavailable**                           | No queue could be read. Nothing is known about the queues right now. Check Redis, the API and its logs.                                                                                                                         |
+| `notifications` or `ai-runs` is **Empty** but users wait | Look in the database state, not here. These queues only wake workers.                                                                                                                                                           |
 
 If the whole page shows "temporarily unavailable", the API could not be reached
 at all, or the session check could not complete. Use **Retry**.
@@ -120,11 +120,14 @@ Queues come from one list in code, not from scanning Redis. To add one, add its
 name to `QueueName`, then add its description to the queue inventory, as the
 [queue guide](../../apps/api/src/infrastructure/queue/README.md#adding-a-queue)
 explains. After that it is registered, counted in the metrics and shown here,
-with generic text until you add a name and description to the Console messages
-(`console.backgroundWork.queues` in `apps/web/messages/*.json`).
+with generic text for its kind. Add an entry named after its technical name under
+`console.backgroundWork.queues` in every file of `apps/web/messages/*.json` (a `title` and a
+`description`) to give it its own name and description; no code change is needed.
 
-A test fails if code creates a queue outside that list, so a queue cannot be
-added by accident and then stay invisible here.
+A test fails when ordinary code registers or constructs a BullMQ queue outside that
+list. It reads the source structurally, so import aliases and multi-line calls are
+caught, but queues built dynamically are not. A queue is therefore not added by
+accident and left invisible here.
 
 Setting `enabled: false` for a queue switches off its registration and reading,
 and the screen shows **Disabled**. It does not remove the code that sends jobs to

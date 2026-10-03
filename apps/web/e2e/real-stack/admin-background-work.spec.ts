@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 import {
   backgroundWorkDegradedJourney,
   backgroundWorkJourney,
+  backgroundWorkRetryAfterJourney,
 } from '../shared/background-work-journey'
 import { settingsProof } from '../support/runtime-settings-proof'
 
@@ -35,6 +36,14 @@ test('path-mode Background work: unreadable queues are data, not empty, and back
   test.setTimeout(180_000)
   await signInAsOperator(page, 'admin-background-work-degraded')
   await backgroundWorkDegradedJourney(page, URL)
+})
+
+test('path-mode Background work: a short Retry-After frees manual Refresh before the automatic backoff ends', async ({
+  page,
+}) => {
+  test.setTimeout(180_000)
+  await signInAsOperator(page, 'admin-background-work-retry-after')
+  await backgroundWorkRetryAfterJourney(page, URL)
 })
 
 test('path-mode Background work: an ordinary user never sees it', async ({ page }) => {

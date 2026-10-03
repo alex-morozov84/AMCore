@@ -230,9 +230,9 @@ Overview and the inventories are refreshed on request. **Background work** is th
 reference for a panel that also refreshes itself. Its pieces:
 
 - The Server Component fetches the first snapshot with `fetchBackend` (`no-store`,
-  the Console token resolver) and renders the static heading outside the data
-  region. A transport failure of that request is the primary-unavailable state;
-  a per-item failure is typed data inside a successful response.
+  the Console token resolver); the Console frame's skeleton covers that wait. A
+  transport failure of that request is the primary-unavailable state, which keeps
+  the heading; a per-item failure is typed data inside a successful response.
 - One interactive leaf in the page folder keeps the data fresh with a single
   TanStack Query observer. It starts from the server snapshot (`initialData`), so
   the first paint has no flash, and it reads a fixed Console BFF `GET`
@@ -264,8 +264,9 @@ being applied) and does not use it.
 
 The screen reads the queue inventory, a single code-owned list in
 `apps/api/src/infrastructure/queue/constants/queue-inventory.constant.ts`. A new
-queue appears on the screen after its descriptor is added there; a test fails if
-code creates a queue outside the list. See the
+queue appears on the screen after its descriptor is added there; a test fails when
+ordinary code registers or constructs a queue outside the list (a structural check:
+aliases and multi-line calls count, dynamic construction does not). See the
 [queue guide](../../apps/api/src/infrastructure/queue/README.md#adding-a-queue)
 and the [screen guide](background-work.md#adding-a-queue-for-developers). The
 backend reads Redis with plain read commands and a bounded number of pending

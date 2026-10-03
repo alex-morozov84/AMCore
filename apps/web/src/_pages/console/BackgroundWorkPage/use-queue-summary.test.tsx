@@ -211,6 +211,57 @@ describe('manual refresh', () => {
   })
 })
 
+describe('independent cool-down clocks', () => {
+  it('frees manual refresh when a short Retry-After ends, while automatic backoff still holds', async () => {
+    const { result } = mount()
+    act(() => result.current.setAuto(false))
+    await act(async () => void result.current.refresh())
+    await fail(0, new ApiRequestError(429, undefined, 2))
+    expect(result.current.canRefresh).toBe(false)
+    expect(result.current.retryAfterSeconds).toBe(2)
+    await advance(1_000)
+    expect(result.current.retryAfterSeconds).toBe(1) // an honest countdown, not a frozen number
+    await advance(1_100)
+    expect(result.current.retryAfterSeconds).toBe(0)
+    expect(result.current.canRefresh).toBe(true)
+    act(() => result.current.setAuto(true))
+    await advance(5_000)
+    expect(calls).toHaveLength(1) // the 30 s backoff still suppresses automatic fetches
+    await act(async () => void result.current.refresh())
+    expect(calls).toHaveLength(2) // while the manual refresh is available again
+  })
+
+  it('keeps manual refresh blocked for a long Retry-After and frees it exactly then', async () => {
+    const { result } = mount()
+    await act(async () => void result.current.refresh())
+    await fail(0, new ApiRequestError(429, undefined, 45))
+    await advance(30_000)
+    expect(result.current.canRefresh).toBe(false)
+    await advance(15_500)
+    expect(result.current.canRefresh).toBe(true)
+  })
+})
+
+describe('request left paused while offline', () => {
+  it('is cancelled when auto-refresh is switched off although admission was already false', async () => {
+    const { result } = mount()
+    await advance(20_000)
+    await goOffline()
+    // The paused state TanStack produces for a fetch started offline; queryFn has not run.
+    const query = client.getQueryCache().getAll()[0]
+    const key = query?.queryKey ?? []
+    void client.fetchQuery({ queryKey: key }).catch(() => undefined)
+    await advance(1)
+    expect(query?.state.fetchStatus).toBe('paused')
+    act(() => result.current.setAuto(false))
+    await advance(1)
+    expect(query?.state.fetchStatus).toBe('idle')
+    await goOnline()
+    await advance(1)
+    expect(calls).toHaveLength(0)
+  })
+})
+
 describe('degraded and failing responses', () => {
   it('backs off 30 s, 60 s, 120 s while every queue stays unavailable (typed 200)', async () => {
     mount()
