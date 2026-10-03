@@ -1,5 +1,6 @@
 import { UserCacheService } from '../../src/core/auth/user-cache.service'
 import { EmailService } from '../../src/infrastructure/email/email.service'
+import { invitationPoolQuery, trackInvitationOperation } from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
 import { invitationFence, observeInvitationWait } from '../helpers/invitation-race'
 const jest = import.meta.jest
@@ -12,9 +13,9 @@ export function registerIdentityProofs(getFixture: () => InvitationProofFixture)
     const accepting = outcome(accept(token))
     let deletion: Promise<unknown> | undefined
     try {
-      await fence.entered
-      deletion = pool.query('DELETE FROM core.users WHERE id=$1', [owner.sub])
-      await observeInvitationWait(pool, fence.pid(), 'DELETE FROM core.users')
+      await fence.waitFor(accepting)
+      deletion = invitationPoolQuery(pool, 'DELETE FROM core.users WHERE id=$1', [owner.sub])
+      await observeInvitationWait(pool, deletion!, fence.pid(), 'DELETE FROM core.users')
       fence.release()
       expect(await accepting).toBe(200)
       await deletion
@@ -36,15 +37,16 @@ export function registerIdentityProofs(getFixture: () => InvitationProofFixture)
       const id = operation === 'accept' ? recipient.sub : owner.sub
       const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
       await client.query('DELETE FROM core.users WHERE id=$1', [id])
-      const work =
+      const work = trackInvitationOperation<unknown>(() =>
         operation === 'accept'
           ? accept(token)
           : operation === 'revoke'
             ? invites.revokeInvite(orgId, invite.id, actor())
             : invites.createInvite(orgId, { email: recipient.email! }, actor())
+      )
       const result = outcome(work)
       try {
-        await observeInvitationWait(pool, pid, 'core.users')
+        await observeInvitationWait(pool, result, pid, 'core.users')
         await client.query('COMMIT')
         expect(await result).toBe(operation === 'accept' ? 400 : 401)
         expect((await truth(invite.id)).invite!.acceptedAt).toBeNull()
@@ -64,12 +66,13 @@ export function registerIdentityProofs(getFixture: () => InvitationProofFixture)
     const accepting = outcome(accept(token))
     let updating: Promise<unknown> | undefined
     try {
-      await fence.entered
-      updating = pool.query(
+      await fence.waitFor(accepting)
+      updating = invitationPoolQuery(
+        pool,
         'UPDATE core.users SET "emailVerified"=false,"emailCanonical"=$2 WHERE id=$1',
         [recipient.sub, 'changed@example.test']
       )
-      await observeInvitationWait(pool, fence.pid(), 'UPDATE core.users')
+      await observeInvitationWait(pool, updating!, fence.pid(), 'UPDATE core.users')
       fence.release()
       expect(await accepting).toBe(200)
       await updating
@@ -110,20 +113,21 @@ export function registerIdentityProofs(getFixture: () => InvitationProofFixture)
       const mail = jest
         .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
         .mockResolvedValue(undefined)
-      const work =
+      const work = trackInvitationOperation<unknown>(() =>
         operation === 'accept'
           ? accept(token)
           : operation === 'revoke'
             ? invites.revokeInvite(orgId, invite.id, actor())
             : invites.createInvite(orgId, { email: recipient.email! }, actor())
+      )
       const result = outcome(work)
       let deletion: Promise<unknown> | undefined
       try {
-        await fence.entered
-        deletion = pool.query('DELETE FROM core.users WHERE id=$1', [
+        await fence.waitFor(result)
+        deletion = invitationPoolQuery(pool, 'DELETE FROM core.users WHERE id=$1', [
           operation === 'accept' ? recipient.sub : owner.sub,
         ])
-        await observeInvitationWait(pool, fence.pid(), 'DELETE FROM core.users')
+        await observeInvitationWait(pool, deletion!, fence.pid(), 'DELETE FROM core.users')
         fence.release()
         expect(await result).toBe(200)
         await deletion

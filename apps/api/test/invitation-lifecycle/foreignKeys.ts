@@ -2,9 +2,16 @@ import { type RequestPrincipal } from '@amcore/shared'
 
 import { registerApiKeyAdmission } from '../../src/core/api-keys/api-key-admission'
 import { ApiKeysService } from '../../src/core/api-keys/api-keys.service'
+import { AbilityFactory } from '../../src/core/auth/casl/ability.factory'
 import { invitationActor } from '../../src/core/organizations/invitation-actor'
+import { OrganizationsService } from '../../src/core/organizations/organizations.service'
 import { RoleService } from '../../src/core/organizations/role.service'
 import { EmailService } from '../../src/infrastructure/email/email.service'
+import {
+  invitationClientQuery,
+  invitationPoolQuery,
+  trackInvitationOperation,
+} from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
 import { invitationFence, observeInvitationWait } from '../helpers/invitation-race'
 const jest = import.meta.jest
@@ -14,12 +21,12 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
     const { prisma, pool, orgId, pending, accept, outcome, claim } = getFixture()
     const { token } = await pending()
     const fence = claim()
-    const accepting = outcome(accept(token))
+    const accepting = outcome(trackInvitationOperation(() => accept(token)))
     let deleting: Promise<unknown> | undefined
     try {
-      await fence.entered
-      deleting = pool.query('DELETE FROM core.organizations WHERE id=$1', [orgId])
-      await observeInvitationWait(pool, fence.pid(), 'DELETE FROM core.organizations')
+      await fence.waitFor(accepting)
+      deleting = invitationPoolQuery(pool, 'DELETE FROM core.organizations WHERE id=$1', [orgId])
+      await observeInvitationWait(pool, deleting!, fence.pid(), 'DELETE FROM core.organizations')
       fence.release()
       expect(await accepting).toBe(200)
       await deleting
@@ -30,6 +37,36 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
       await Promise.allSettled([accepting, ...(deleting ? [deleting] : [])])
     }
   })
+
+  it.each([true, false])(
+    'F2/R07 supported organization remove versus accept, acceptance first=%s',
+    async (acceptFirst) => {
+      const { context, prisma, orgId, owner, pending, accept, claim, race } = getFixture()
+      const { token } = await pending()
+      const principal = {
+        ...owner,
+        aclVersion: (await prisma.organization.findUniqueOrThrow({ where: { id: orgId } }))
+          .aclVersion,
+      }
+      const ability = await context.app
+        .get(AbilityFactory)
+        .createForUser({ authenticated: principal, principal })
+      const remove = (): Promise<void> =>
+        context.app.get(OrganizationsService).remove(orgId, principal, ability)
+      const deleting = (): ReturnType<typeof invitationFence> =>
+        invitationFence(prisma, (model, method) => model === 'organization' && method === 'delete')
+      expect(
+        await race(
+          acceptFirst ? claim() : deleting(),
+          acceptFirst ? () => accept(token) : remove,
+          acceptFirst ? remove : () => accept(token)
+        )
+      ).toEqual([200, acceptFirst ? 200 : 400])
+      expect(await prisma.organization.count({ where: { id: orgId } })).toBe(0)
+      expect(await prisma.orgMember.count({ where: { organizationId: orgId } })).toBe(0)
+      expect(await prisma.orgInvite.count({ where: { organizationId: orgId } })).toBe(0)
+    }
+  )
 
   it.each([true, false])(
     'R06 supported role deletion versus accept, acceptance first=%s',
@@ -65,9 +102,9 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
     await client.query('BEGIN')
     const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
     await client.query('DELETE FROM core.organizations WHERE id=$1', [orgId])
-    const accepting = outcome(accept(token))
+    const accepting = outcome(trackInvitationOperation(() => accept(token)))
     try {
-      await observeInvitationWait(pool, pid, 'core.organizations')
+      await observeInvitationWait(pool, accepting, pid, 'core.organizations')
       await client.query('COMMIT')
       expect(await accepting).toBe(400)
       expect(await prisma.orgInvite.count({ where: { organizationId: orgId } })).toBe(0)
@@ -110,10 +147,21 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
       let status = 0
       try {
         if (createFirst) {
-          creating = outcome(invites.createInvite(orgId, { email: recipient.email! }, admitted))
-          await fence!.entered
-          deleting = client.query('DELETE FROM core.organizations WHERE id=$1', [orgId])
-          await observeInvitationWait(pool, fence!.pid(), 'DELETE FROM core.organizations')
+          creating = outcome(
+            trackInvitationOperation(() =>
+              invites.createInvite(orgId, { email: recipient.email! }, admitted)
+            )
+          )
+          await fence!.waitFor(creating)
+          deleting = invitationClientQuery(client, 'DELETE FROM core.organizations WHERE id=$1', [
+            orgId,
+          ])
+          await observeInvitationWait(
+            pool,
+            deleting!,
+            fence!.pid(),
+            'DELETE FROM core.organizations'
+          )
           fence!.release()
           status = await creating
           await deleting
@@ -121,8 +169,12 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
           await client.query('BEGIN')
           const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
           await client.query('DELETE FROM core.organizations WHERE id=$1', [orgId])
-          creating = outcome(invites.createInvite(orgId, { email: recipient.email! }, admitted))
-          await observeInvitationWait(pool, pid, 'core.organizations')
+          creating = outcome(
+            trackInvitationOperation(() =>
+              invites.createInvite(orgId, { email: recipient.email! }, admitted)
+            )
+          )
+          await observeInvitationWait(pool, creating, pid, 'core.organizations')
           await client.query('COMMIT')
           status = await creating
         }
@@ -156,13 +208,13 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
     const role = await prisma.role.create({ data: { name: 'FK probe', organizationId: orgId } })
     const { token } = await pending(role.id)
     const fence = claim()
-    const accepting = outcome(accept(token))
+    const accepting = outcome(trackInvitationOperation(() => accept(token)))
     const client = await pool.connect()
     let deletion: Promise<unknown> | undefined
     try {
-      await fence.entered
-      deletion = client.query('DELETE FROM core.roles WHERE id=$1', [role.id])
-      await observeInvitationWait(pool, fence.pid(), 'DELETE FROM core.roles')
+      await fence.waitFor(accepting)
+      deletion = invitationClientQuery(client, 'DELETE FROM core.roles WHERE id=$1', [role.id])
+      await observeInvitationWait(pool, deletion!, fence.pid(), 'DELETE FROM core.roles')
       fence.release()
       expect(await accepting).toBe(200)
       await deletion

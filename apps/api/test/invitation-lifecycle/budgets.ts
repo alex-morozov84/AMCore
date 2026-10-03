@@ -8,6 +8,7 @@ import {
 import { InviteAcceptLimiterService } from '../../src/core/organizations/invite-accept-limiter.service'
 import { PrismaClient } from '../../src/generated/prisma/client'
 import type { PrismaService } from '../../src/prisma'
+import { boundedFailure } from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
 import { deferred } from '../helpers/organization-members-race'
 const jest = import.meta.jest
@@ -44,7 +45,7 @@ export function registerBudgetsProofs(getFixture: () => InvitationProofFixture):
                   })
             await update(id)
             locked.resolve()
-            await other.promise
+            await Promise.race([other.promise, boundedFailure('Deadlock partner')])
             await update(3 - id)
           },
           { timeout: 4000 }
@@ -117,7 +118,7 @@ export function registerBudgetsProofs(getFixture: () => InvitationProofFixture):
     )
     const work = jest.fn(async () => undefined)
     try {
-      await entered.promise
+      await Promise.race([entered.promise, boundedFailure('Pool occupant')])
       const start = Date.now()
       expect(await outcome(invitationTransaction(isolated as unknown as PrismaService, work))).toBe(
         503

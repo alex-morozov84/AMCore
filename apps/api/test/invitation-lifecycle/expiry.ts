@@ -1,3 +1,4 @@
+import { boundedFailure, trackInvitationOperation } from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
 import {
   databaseClockPast,
@@ -28,7 +29,7 @@ export function registerExpiryProofs(getFixture: () => InvitationProofFixture): 
               if (!intercepted) {
                 intercepted = true
                 entered.resolve()
-                await release.promise
+                await Promise.race([release.promise, boundedFailure('Hint release')])
               }
               return value
             }) as never)
@@ -48,11 +49,18 @@ export function registerExpiryProofs(getFixture: () => InvitationProofFixture): 
         pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
         await client.query('SELECT id FROM core.organizations WHERE id=$1 FOR UPDATE', [orgId])
       }
-      const accepting = outcome(accept(token))
+      const accepting = outcome(trackInvitationOperation(() => accept(token)))
       try {
-        if (boundary === 'hint') await entered.promise
-        if (user) await user.entered
-        if (client) await observeInvitationWait(pool, pid, 'core.organizations')
+        if (boundary === 'hint')
+          await Promise.race([
+            entered.promise,
+            accepting.then(() => {
+              throw new Error('Early accept completion')
+            }),
+            boundedFailure('Hint arrival'),
+          ])
+        if (user) await user.waitFor(accepting)
+        if (client) await observeInvitationWait(pool, accepting, pid, 'core.organizations')
         await databaseClockPast(pool, expiry)
         release.resolve()
         user?.release()
@@ -83,9 +91,9 @@ export function registerExpiryProofs(getFixture: () => InvitationProofFixture): 
       invite.id,
       expiry.toISOString(),
     ])
-    const accepting = outcome(accept(token))
+    const accepting = outcome(trackInvitationOperation(() => accept(token)))
     try {
-      await observeInvitationWait(pool, pid, 'core.org_invites')
+      await observeInvitationWait(pool, accepting, pid, 'core.org_invites')
       await databaseClockPast(pool, expiry)
       await client.query('COMMIT')
       expect(await accepting).toBe(400)
@@ -103,9 +111,9 @@ export function registerExpiryProofs(getFixture: () => InvitationProofFixture): 
     const expiry = new Date(Date.now() + 500)
     await prisma.orgInvite.update({ where: { id: invite.id }, data: { expiresAt: expiry } })
     const fence = claim()
-    const accepting = outcome(accept(token))
+    const accepting = outcome(trackInvitationOperation(() => accept(token)))
     try {
-      await fence.entered
+      await fence.waitFor(accepting)
       await databaseClockPast(pool, expiry)
       fence.release()
       expect(await accepting).toBe(200)

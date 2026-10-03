@@ -17,12 +17,19 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import {
+  carryInvitationBackend,
+  observeInvitationTransactions,
+  trackInvitationOperation,
+} from './helpers/invitation-operation'
 import { invitationFence, observeInvitationWait } from './helpers/invitation-race'
+import { registerAdmittedAuthorityProofs } from './invitation-lifecycle/admitted-authority'
 import { registerAuthorityProofs } from './invitation-lifecycle/authority'
 import { registerBudgetsProofs } from './invitation-lifecycle/budgets'
 import { registerCleanupProofs } from './invitation-lifecycle/cleanup'
 import { registerDurabilityProofs } from './invitation-lifecycle/durability'
 import { registerExpiryProofs } from './invitation-lifecycle/expiry'
+import { registerFenceProofs } from './invitation-lifecycle/fences'
 import { registerForeignKeysProofs } from './invitation-lifecycle/foreignKeys'
 import { registerIdentityProofs } from './invitation-lifecycle/identity'
 import { registerTransitionsProofs } from './invitation-lifecycle/transitions'
@@ -39,7 +46,11 @@ describe('Invitation lifecycle transaction proofs', () => {
   beforeAll(async () => {
     context = await setupE2ETest()
     prisma = context.prisma
-    pool = new Pool({ connectionString: context.postgresContainer.getConnectionUri() })
+    pool = new Pool({
+      connectionString: context.postgresContainer.getConnectionUri(),
+      statement_timeout: 3000,
+      connectionTimeoutMillis: 1500,
+    })
     invites = context.app.get(InviteService)
     await seedSystemRoles(prisma)
   }, 120000)
@@ -47,7 +58,10 @@ describe('Invitation lifecycle transaction proofs', () => {
     await pool?.end()
     if (context) await teardownE2ETest(context)
   }, 120000)
+  let restoreTracking: () => void
+  afterEach(() => restoreTracking?.())
   beforeEach(async () => {
+    restoreTracking = observeInvitationTransactions(prisma)
     await cleanOrgData(prisma)
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     const org = await prisma.organization.create({
@@ -103,10 +117,13 @@ describe('Invitation lifecycle transaction proofs', () => {
     return { token, invite }
   }
   const accept = (token: string) => invites.acceptInvite(token, recipient, '127.0.0.1')
-  const outcome = async (work: Promise<unknown>) =>
-    work.then(
-      () => 200,
-      (e) => e.getStatus()
+  const outcome = (work: Promise<unknown>) =>
+    carryInvitationBackend(
+      work,
+      work.then(
+        () => 200,
+        (e) => e.getStatus()
+      )
     )
   const claim = () =>
     invitationFence(
@@ -135,12 +152,12 @@ describe('Invitation lifecycle transaction proofs', () => {
     second: () => Promise<unknown>,
     query = 'core.organizations'
   ) {
-    const winner = outcome(first())
+    const winner = outcome(trackInvitationOperation(first))
     let loser: Promise<number> | undefined
     try {
-      await fence.entered
-      loser = outcome(second())
-      await observeInvitationWait(pool, fence.pid(), query)
+      await fence.waitFor(winner)
+      loser = outcome(trackInvitationOperation(second))
+      await observeInvitationWait(pool, loser, fence.pid(), query)
       fence.release()
       return [await winner, await loser]
     } finally {
@@ -166,10 +183,12 @@ describe('Invitation lifecycle transaction proofs', () => {
     truth,
     race,
   })
+  registerFenceProofs(getFixture)
   registerTransitionsProofs(getFixture)
   registerForeignKeysProofs(getFixture)
   registerIdentityProofs(getFixture)
   registerAuthorityProofs(getFixture)
+  registerAdmittedAuthorityProofs(getFixture)
   registerExpiryProofs(getFixture)
   registerCleanupProofs(getFixture)
   registerDurabilityProofs(getFixture)

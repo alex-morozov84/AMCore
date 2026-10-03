@@ -3,6 +3,7 @@ import { Pool } from 'pg'
 import type { Prisma } from '../../src/generated/prisma/client'
 import type { PrismaService } from '../../src/prisma'
 
+import { boundedFailure, invitationBackend } from './invitation-operation'
 import { deferred } from './organization-members-race'
 const jest = import.meta.jest
 
@@ -10,20 +11,34 @@ const jest = import.meta.jest
 export function invitationFence(
   prisma: PrismaService,
   matches: (model: string, method: string, args: unknown[]) => boolean
-): { entered: Promise<void>; release: () => void; pid: () => number; restore: () => void } {
+): {
+  entered: Promise<void>
+  waitFor: (operation: Promise<unknown>) => Promise<void>
+  release: () => void
+  pid: () => number
+  restore: () => void
+} {
   const entered = deferred()
   const release = deferred()
-  const original = prisma.$transaction.bind(prisma)
+  const method = prisma.$transaction
+  const original = (jest.isMockFunction(method) ? method.getMockImplementation()! : method).bind(
+    prisma
+  )
   let captured = false
+  let fail!: (reason: unknown) => void
+  const failure = new Promise<never>((_, reject) => {
+    fail = reject
+  })
+  const arrival = Promise.race([entered.promise, failure, boundedFailure('Target fence')])
+  void arrival.catch(() => undefined)
   let pid = 0
   const spy = jest.spyOn(prisma, '$transaction').mockImplementation((async (
     work: (tx: Prisma.TransactionClient) => Promise<unknown>,
     options?: object
   ) => {
-    if (captured) return original(work, options)
-    captured = true
-    return original(async (tx) => {
-      pid = (await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`)[0]!.pid
+    return original(async (tx: Prisma.TransactionClient) => {
+      const backend = (await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`)[0]!
+        .pid
       const intercept = (model: string, target: object): object =>
         new Proxy(target, {
           get(object, method) {
@@ -31,9 +46,11 @@ export function invitationFence(
             if (typeof value !== 'function') return value
             return async (...args: unknown[]) => {
               const result = await value.apply(object, args)
-              if (matches(model, String(method), args)) {
+              if (!captured && matches(model, String(method), args)) {
+                captured = true
+                pid = backend
                 entered.resolve()
-                await release.promise
+                await Promise.race([release.promise, boundedFailure('Fence release')])
               }
               return result
             }
@@ -49,10 +66,25 @@ export function invitationFence(
           },
         })
       )
-    }, options)
+    }, options).then(
+      (value: unknown) => {
+        return value
+      },
+      (error: unknown) => {
+        if (!captured) fail(error)
+        throw error
+      }
+    )
   }) as never)
   return {
-    entered: entered.promise,
+    entered: arrival,
+    waitFor: (operation) =>
+      Promise.race([
+        arrival,
+        operation.then(() => {
+          throw new Error('Target operation completed before fence')
+        }),
+      ]),
     release: release.resolve,
     pid: () => pid,
     restore: () => {
@@ -64,18 +96,20 @@ export function invitationFence(
 
 export async function observeInvitationWait(
   pool: Pool,
+  waiter: Promise<unknown>,
   blocker: number,
   query: string
 ): Promise<number> {
+  const waiterPid = await invitationBackend(waiter)
   const deadline = Date.now() + 1500
   while (Date.now() < deadline) {
     const result = await pool.query(
-      'SELECT pid, query FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)) AND query LIKE $2',
-      [blocker, `%${query}%`]
+      'SELECT pid, query FROM pg_stat_activity WHERE pid = $1 AND $2 = ANY(pg_blocking_pids(pid)) AND query LIKE $3',
+      [waiterPid, blocker, `%${query}%`]
     )
     if (result.rowCount) return result.rows[0].pid as number
   }
-  throw new Error(`Expected waiter on backend ${blocker}: ${query}`)
+  throw new Error(`Expected exact waiter ${waiterPid} on blocker ${blocker}: ${query}`)
 }
 
 export async function databaseClockPast(pool: Pool, date: Date): Promise<void> {

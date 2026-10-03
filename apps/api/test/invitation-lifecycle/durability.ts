@@ -1,7 +1,11 @@
+import { inspect } from 'node:util'
+
 import { AuditLogService } from '../../src/core/audit'
+import { InviteAcceptService } from '../../src/core/organizations/invite-accept.service'
 import { InviteAcceptLimiterService } from '../../src/core/organizations/invite-accept-limiter.service'
 import { OrganizationsService } from '../../src/core/organizations/organizations.service'
 import { EmailService } from '../../src/infrastructure/email/email.service'
+import { boundedFailure } from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
 import { invitationFence } from '../helpers/invitation-race'
 const jest = import.meta.jest
@@ -10,7 +14,10 @@ export function registerDurabilityProofs(getFixture: () => InvitationProofFixtur
   it('R15 lost commit acknowledgment is503 with exactly one persisted grant', async () => {
     const { prisma, pending, accept, outcome, truth } = getFixture()
     const { token, invite } = await pending()
-    const original = prisma.$transaction.bind(prisma)
+    const method = prisma.$transaction
+    const original = (jest.isMockFunction(method) ? method.getMockImplementation()! : method).bind(
+      prisma
+    )
     const spy = jest.spyOn(prisma, '$transaction').mockImplementation((async (
       ...args: unknown[]
     ) => {
@@ -104,6 +111,63 @@ export function registerDurabilityProofs(getFixture: () => InvitationProofFixtur
       expect(await truth(invite.id)).toEqual(before)
     } finally {
       spy.mockRestore()
+    }
+  })
+
+  it('F1/R15 stalled reset returns acknowledged success and safely absorbs late rejection', async () => {
+    const { context, prisma, pending, accept, outcome, truth } = getFixture()
+    const { token, invite } = await pending()
+    const before = await truth(invite.id)
+    let reject!: (reason: unknown) => void
+    const stalled = new Promise<void>((_, no) => {
+      reject = no
+    })
+    const reset = jest
+      .spyOn(context.app.get(InviteAcceptLimiterService), 'reset')
+      .mockReturnValueOnce(stalled)
+    const service = context.app.get(InviteAcceptService)
+    const logger = (service as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger
+    const warning = jest.spyOn(logger, 'warn')
+    const transaction = jest.spyOn(prisma, '$transaction')
+    transaction.mockClear()
+    const unhandled: unknown[] = []
+    const record = (error: unknown): void => {
+      unhandled.push(error)
+    }
+    process.on('unhandledRejection', record)
+    try {
+      expect(
+        await Promise.race([outcome(accept(token)), boundedFailure('Acknowledged response')])
+      ).toBe(200)
+      expect(reset).toHaveBeenCalledTimes(1)
+      expect(transaction).toHaveBeenCalledTimes(1)
+      const after = await truth(invite.id)
+      expect(after.members).toHaveLength(1)
+      expect(after.members[0]!.roles.map((r) => r.roleId)).toEqual([invite.roleId])
+      expect(after.org!.aclVersion).toBe(before.org!.aclVersion + 1)
+      expect(after.audit).toHaveLength(1)
+      expect(warning).toHaveBeenCalledWith(
+        {
+          event: 'org.invite.post_commit_failed',
+          category: 'accept_limiter_reset',
+          reason: 'timeout',
+        },
+        'Invite committed; post-commit operation failed'
+      )
+      reject(new Error(token, { cause: new Error(token) }))
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(unhandled).toEqual([])
+      expect(inspect(warning.mock.calls, { depth: 10 })).not.toContain(token)
+      expect(await truth(invite.id)).toEqual(after)
+      expect(transaction).toHaveBeenCalledTimes(1)
+      expect(await outcome(accept(token))).toBe(400)
+      expect(await truth(invite.id)).toEqual(after)
+    } finally {
+      reject(new Error('safe teardown'))
+      process.off('unhandledRejection', record)
+      reset.mockRestore()
+      warning.mockRestore()
+      transaction.mockRestore()
     }
   })
 

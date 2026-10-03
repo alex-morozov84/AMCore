@@ -7,6 +7,7 @@ import { ApiKeyRevocationService } from '../../src/core/api-keys/api-key-revocat
 import { ApiKeysService } from '../../src/core/api-keys/api-keys.service'
 import { invitationActor } from '../../src/core/organizations/invitation-actor'
 import { EmailService } from '../../src/infrastructure/email/email.service'
+import { trackInvitationOperation } from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
 import {
   databaseClockPast,
@@ -208,10 +209,12 @@ export function registerAuthorityProofs(getFixture: () => InvitationProofFixture
     const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
     await client.query('SELECT id FROM core.organizations WHERE id=$1 FOR UPDATE', [orgId])
     const creating = outcome(
-      invites.createInvite(orgId, { email: recipient.email! }, invitationActor(request))
+      trackInvitationOperation(() =>
+        invites.createInvite(orgId, { email: recipient.email! }, invitationActor(request))
+      )
     )
     try {
-      await observeInvitationWait(pool, pid, 'core.organizations')
+      await observeInvitationWait(pool, creating, pid, 'core.organizations')
       await databaseClockPast(pool, expiry)
       await client.query('COMMIT')
       expect(await creating).toBe(401)

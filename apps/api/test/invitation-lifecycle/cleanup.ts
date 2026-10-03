@@ -1,5 +1,6 @@
 import { EmailService } from '../../src/infrastructure/email/email.service'
 import { CleanupService } from '../../src/infrastructure/schedule/cleanup.service'
+import { trackInvitationOperation } from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
 import { databaseClockPast, observeInvitationWait } from '../helpers/invitation-race'
 const jest = import.meta.jest
@@ -37,18 +38,20 @@ export function registerCleanupProofs(getFixture: () => InvitationProofFixture):
     const accepting = outcome(accept(token))
     let cleanup: Promise<unknown> | undefined
     try {
-      await fence.entered
+      await fence.waitFor(accepting)
       await databaseClockPast(pool, expiry)
-      cleanup = prisma.orgInvite
-        .deleteMany({
-          where: {
-            expiresAt: { lt: new Date(expiry.getTime() + 1) },
-            acceptedAt: null,
-            revokedAt: null,
-          },
-        })
-        .then((value) => value)
-      await observeInvitationWait(pool, fence.pid(), 'DELETE')
+      cleanup = trackInvitationOperation(() =>
+        prisma.$transaction((tx) =>
+          tx.orgInvite.deleteMany({
+            where: {
+              expiresAt: { lt: new Date(expiry.getTime() + 1) },
+              acceptedAt: null,
+              revokedAt: null,
+            },
+          })
+        )
+      )
+      await observeInvitationWait(pool, cleanup!, fence.pid(), 'DELETE')
       fence.release()
       expect(await accepting).toBe(200)
       await cleanup
@@ -74,9 +77,13 @@ export function registerCleanupProofs(getFixture: () => InvitationProofFixture):
     const mail = jest
       .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
       .mockResolvedValue(undefined)
-    const creating = outcome(invites.createInvite(orgId, { email: recipient.email! }, actor()))
+    const creating = outcome(
+      trackInvitationOperation(() =>
+        invites.createInvite(orgId, { email: recipient.email! }, actor())
+      )
+    )
     try {
-      await observeInvitationWait(pool, pid, 'core.org_invites')
+      await observeInvitationWait(pool, creating, pid, 'core.org_invites')
       await client.query('COMMIT')
       expect(await creating).toBe(200)
       expect(await prisma.orgInvite.count({ where: { id: invite.id } })).toBe(0)
@@ -89,6 +96,31 @@ export function registerCleanupProofs(getFixture: () => InvitationProofFixture):
     }
   })
 
+  it('F2/R13 cleanup-first accept with an existing hint fails without any grant', async () => {
+    const { prisma, pool, pending, accept, outcome, truth } = getFixture()
+    const { token, invite } = await pending()
+    await prisma.orgInvite.update({ where: { id: invite.id }, data: { expiresAt: new Date(0) } })
+    const before = await truth(invite.id)
+    const client = await pool.connect()
+    await client.query('BEGIN')
+    const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+    await client.query(
+      'DELETE FROM core.org_invites WHERE id=$1 AND "acceptedAt" IS NULL AND "revokedAt" IS NULL AND "expiresAt" < CURRENT_TIMESTAMP',
+      [invite.id]
+    )
+    const accepting = outcome(trackInvitationOperation(() => accept(token)))
+    try {
+      await observeInvitationWait(pool, accepting, pid, 'core.org_invites')
+      await client.query('COMMIT')
+      expect(await accepting).toBe(400)
+      expect(await truth(invite.id)).toEqual({ ...before, invite: null })
+    } finally {
+      await client.query('ROLLBACK')
+      client.release()
+      await accepting
+    }
+  })
+
   it('R13 rotation first makes cleanup predicate recheck preserve live invitation', async () => {
     const { context, prisma, pool, invites, orgId, recipient, actor, pending, outcome, revoked } =
       getFixture()
@@ -98,14 +130,22 @@ export function registerCleanupProofs(getFixture: () => InvitationProofFixture):
     const mail = jest
       .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
       .mockResolvedValue(undefined)
-    const creating = outcome(invites.createInvite(orgId, { email: recipient.email! }, actor()))
+    const creating = outcome(
+      trackInvitationOperation(() =>
+        invites.createInvite(orgId, { email: recipient.email! }, actor())
+      )
+    )
     let cleanup: Promise<unknown> | undefined
     try {
-      await fence.entered
-      cleanup = prisma.orgInvite
-        .deleteMany({ where: { expiresAt: { lt: new Date() }, acceptedAt: null, revokedAt: null } })
-        .then((v) => v)
-      await observeInvitationWait(pool, fence.pid(), 'DELETE')
+      await fence.waitFor(creating)
+      cleanup = trackInvitationOperation(() =>
+        prisma.$transaction((tx) =>
+          tx.orgInvite.deleteMany({
+            where: { expiresAt: { lt: new Date() }, acceptedAt: null, revokedAt: null },
+          })
+        )
+      )
+      await observeInvitationWait(pool, cleanup!, fence.pid(), 'DELETE')
       fence.release()
       expect(await creating).toBe(200)
       await cleanup

@@ -17,6 +17,7 @@ import {
   lockInvitationRole,
   lockInvitationUser,
 } from './invitation-locks'
+import { invitationPostCommit } from './invitation-post-commit'
 import { invitationFailure, invitationTransaction } from './invitation-transaction'
 import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
 import { OrganizationsService } from './organizations.service'
@@ -146,11 +147,10 @@ export class InviteAcceptService {
   }
 
   private async sideEffect(category: string, work: () => Promise<void>): Promise<void> {
-    try {
-      await work()
-    } catch {
+    const reason = await invitationPostCommit(work)
+    if (reason) {
       this.logger.warn(
-        { event: 'org.invite.post_commit_failed', category },
+        { event: 'org.invite.post_commit_failed', category, reason },
         'Invite committed; post-commit operation failed'
       )
     }

@@ -124,6 +124,9 @@ not a cached credential email. Expiry is checked against the database wall clock
 at the final claim after lock waits. The claim, membership, role link, ACL version
 and durable audit commit together. Cache invalidation or limiter-reset failure
 following a confirmed commit does not change the success response.
+These best-effort steps are awaited concurrently for at most 250 ms each;
+unfinished operations may settle later without repeating the grant or changing
+the response.
 
 ---
 
@@ -137,7 +140,7 @@ curl "https://api.amcore.dev/api/v1/organizations/:orgId/invites?page=1&limit=20
   -H "Authorization: Bearer <admin token>"
 # 200 OK
 # { "data": [],
-#   "total": 1, "page": 1, "limit": 20 }
+#   "total": 0, "page": 1, "limit": 20 }
 ```
 
 Token hashes are never included in the response.
