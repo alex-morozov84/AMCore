@@ -6,11 +6,15 @@ These alerts can be suppressed by the Redis inhibition rule in
 (see [`redis.md`](redis.md#reconnecting)) is also firing, check that first;
 these alerts being silent does not mean the backlog is fine.
 
+<!-- AMCORE_CONSOLE_BACKGROUND_WORK_START -->
+
 To see the current state of every queue (waiting, active, delayed, failed, paused,
 and a sampled age of the oldest queued job) without a metrics query, open the Operations
 Console's [Background work](../../operations-console/background-work.md) screen. It
 is read-only and shows `notifications` and `ai-runs` as wake queues: their real
 backlog is in the database, as described under [Outbox backlog](#outbox-backlog).
+
+<!-- AMCORE_CONSOLE_BACKGROUND_WORK_END -->
 
 ## Backlog
 

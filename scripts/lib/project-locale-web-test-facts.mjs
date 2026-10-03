@@ -22,6 +22,7 @@ const localeSuites = [
 export function buildLocaleWebTestFacts(locale) {
   return [
     localeDelete('apps/web/src/entities/user/api/user-sessions-locale.test.tsx'),
+    localeDelete('apps/web/src/_pages/console/BackgroundWorkPage/QueueCatalogue.locale.test.tsx'),
     localeDelete(
       'apps/web/src/features/console-user-sessions/model/use-user-sessions.locale.test.tsx'
     ),

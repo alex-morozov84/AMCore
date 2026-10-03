@@ -229,6 +229,16 @@ export const operationsConsoleDocSeams = [
     undefined,
     { operationKey: 'console.deploy-doc' }
   ),
+  ...['docs/operations/observability.md', 'docs/operations/runbooks/queues.md'].map((path) =>
+    entry(
+      `console.background-work.${path}`,
+      path,
+      block(
+        '<!-- AMCORE_CONSOLE_BACKGROUND_WORK_START -->',
+        '<!-- AMCORE_CONSOLE_BACKGROUND_WORK_END -->'
+      )
+    )
+  ),
   entry(
     'console.overview-observability',
     'docs/operations/observability.md',

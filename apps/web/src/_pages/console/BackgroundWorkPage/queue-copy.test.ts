@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import en from '../../../../messages/en.json'
-import ru from '../../../../messages/ru.json'
-
 import { ageParts, allUnavailable, isEmpty, queuedCount } from './queue-copy'
 import { noCounts } from './queue-fixtures'
 
@@ -29,34 +26,5 @@ describe('queue figures', () => {
 
   it('reports an inventory without enabled queues as not all-unavailable', () => {
     expect(allUnavailable([])).toBe(false)
-  })
-})
-
-describe('background work catalogue', () => {
-  const keys = (value: unknown, prefix = ''): string[] =>
-    Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
-      typeof child === 'object' && child !== null
-        ? keys(child, `${prefix}${key}.`)
-        : [`${prefix}${key}`]
-    )
-
-  it('has the same keys in every locale', () => {
-    expect(keys(ru.console.backgroundWork).sort()).toEqual(keys(en.console.backgroundWork).sort())
-  })
-
-  it('has copy for every stock queue and every kind', () => {
-    for (const name of ['email', 'default', 'notifications', 'ai-runs']) {
-      expect(en.console.backgroundWork.queues).toHaveProperty(name)
-    }
-    for (const kind of ['work', 'wake', 'extension']) {
-      expect(en.console.backgroundWork.kinds).toHaveProperty(kind)
-    }
-  })
-
-  it('uses ICU plurals for ages, with Russian few/many forms', () => {
-    for (const unit of ['ageSeconds', 'ageMinutes', 'ageHours', 'ageDays'] as const) {
-      expect(en.console.backgroundWork[unit]).toContain('plural')
-      expect(ru.console.backgroundWork[unit]).toMatch(/few .* many .* other/)
-    }
   })
 })

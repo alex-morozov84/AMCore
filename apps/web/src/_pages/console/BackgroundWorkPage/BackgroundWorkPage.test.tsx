@@ -5,10 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchConsoleQueues } from '@/shared/api/console/queues'
 import { BackendRequestError } from '@/shared/api/server/errors'
 
-import en from '../../../../messages/en.json'
-
 import { BackgroundWorkPage } from './BackgroundWorkPage'
 import { mixedSummary } from './queue-fixtures'
+import { queueMessages } from './queue-test-messages'
 
 vi.mock('server-only', () => ({}))
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/admin' }))
@@ -24,14 +23,23 @@ vi.mock('./QueueSummaryLive', () => ({
 }))
 vi.mock('next-intl/server', () => ({
   getTranslations: async () => {
-    const messages = en.console.backgroundWork as unknown as Record<string, string>
+    const messages = queueMessages.console.backgroundWork as unknown as Record<string, string>
     return (key: string) => messages[key] ?? key
   },
 }))
 
 async function view() {
   render(
-    <NextIntlClientProvider locale="en" messages={en}>
+    <NextIntlClientProvider
+      locale="en"
+      messages={{
+        ...queueMessages,
+        common: {
+          temporarilyUnavailable: 'This is temporarily unavailable. Please try again.',
+          retry: 'Try again',
+        },
+      }}
+    >
       {await BackgroundWorkPage()}
     </NextIntlClientProvider>
   )

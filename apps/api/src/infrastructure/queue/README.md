@@ -4,11 +4,11 @@ Production-ready job queue system built on BullMQ for handling async operations.
 
 ## Features
 
-- ✅ **Multiple Queues** — One code-owned inventory of queues (`email`, `default`, `notifications`, `ai-runs`) drives registration, `QueueService`, metrics and the Console summary
+- ✅ **Multiple Queues** — One code-owned inventory of queues (`email`, `default`, `notifications`, `ai-runs`) drives registration, `QueueService`, metrics and, with the optional Operations Console, its Background work screen
 - ✅ **Retry Logic** — Exponential backoff with configurable attempts
 - ✅ **Priority Jobs** — BullMQ priorities: a lower positive number runs first, and unprioritized jobs run before prioritized ones
 - ✅ **Delayed Jobs** — Schedule jobs for future execution
-- ✅ **Job Monitoring** — Bull Board dashboard at `/admin/queues`, and a read-only [Background work](../../../../../docs/operations-console/background-work.md) screen in the Operations Console
+- ✅ **Job Monitoring** — Bull Board dashboard at `/admin/queues`, and, with the optional Operations Console, a read-only Background work screen
 - ✅ **Type Safety** — Full TypeScript support
 - ✅ **Error Handling** — Structured logging and error tracking
 
@@ -156,8 +156,8 @@ queues exist. Each `QueueName` has a descriptor:
 The descriptor map is typed `satisfies Record<QueueName, …>`, so a new enum value
 without a descriptor does not compile. `QueueModule` registers the enabled queues,
 `QueueService` receives them as one registry, the depth metrics iterate them, and
-the Console [Background work](../../../../../docs/operations-console/background-work.md)
-screen reports every descriptor (`disabled` rows included).
+and the optional Operations Console's Background work screen reports every descriptor
+(`disabled` rows included).
 
 ### Adding a queue
 

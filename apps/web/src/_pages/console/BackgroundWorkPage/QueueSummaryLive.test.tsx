@@ -2,9 +2,6 @@ import { NextIntlClientProvider } from 'next-intl'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import en from '../../../../messages/en.json'
-import ru from '../../../../messages/ru.json'
-
 import {
   allUnavailableSummary,
   availableQueue,
@@ -12,6 +9,7 @@ import {
   mixedSummary,
   summary,
 } from './queue-fixtures'
+import { queueMessages } from './queue-test-messages'
 import { QueueSummaryLive } from './QueueSummaryLive'
 import { useQueueSummary } from './use-queue-summary'
 
@@ -34,9 +32,9 @@ function state(overrides: Partial<ReturnType<typeof useQueueSummary>> = {}) {
     ...overrides,
   })
 }
-function view(locale: 'en' | 'ru' = 'en') {
+function view() {
   return render(
-    <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : ru}>
+    <NextIntlClientProvider locale="en" messages={queueMessages}>
       <QueueSummaryLive initial={mixedSummary} initialUpdatedAt={0} />
     </NextIntlClientProvider>
   )
@@ -123,13 +121,11 @@ describe('rows', () => {
       ]),
     })
     const messages = {
-      ...en,
       console: {
-        ...en.console,
         backgroundWork: {
-          ...en.console.backgroundWork,
+          ...queueMessages.console.backgroundWork,
           queues: {
-            ...en.console.backgroundWork.queues,
+            ...queueMessages.console.backgroundWork.queues,
             'my-reports': { title: 'Reports', description: 'Builds the monthly reports.' },
           },
         },
@@ -223,18 +219,5 @@ describe('controls', () => {
     state({ canRefresh: false, retryAfterSeconds: 42 })
     view()
     expect(screen.getByText('Available in 42 seconds')).toBeInTheDocument()
-  })
-})
-
-describe('Russian', () => {
-  it('renders the same structure with Russian plural forms', () => {
-    state({
-      data: summary([
-        availableQueue('email', { age: { status: 'sample', seconds: 7300, sampled: 3 } }),
-      ]),
-    })
-    view('ru')
-    expect(screen.getByRole('table', { name: 'Фоновые очереди' })).toBeInTheDocument()
-    expect(screen.getAllByText('Не менее 2 часа').length).toBeGreaterThan(0)
   })
 })
