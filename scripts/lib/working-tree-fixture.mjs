@@ -76,9 +76,12 @@ export function createWorkingTreeCopy(sourceRoot = resolvePublicRepoRoot()) {
     )
     for (const file of tracked) copyEntry(root, copy, file, true)
     for (const file of untracked) copyEntry(root, copy, file, false)
-    return { root: copy, cleanup: () => rmSync(copy, { recursive: true, force: true }) }
+    return {
+      root: copy,
+      cleanup: () => rmSync(copy, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }),
+    }
   } catch (error) {
-    rmSync(copy, { recursive: true, force: true })
+    rmSync(copy, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
     throw error
   }
 }
