@@ -25,8 +25,8 @@ export enum QueueName {
   /**
    * AI durable-run wake queue (Track C — ADR-054, ADR-052 pattern). Carries one-attempt
    * `AI_RUN_WAKE` jobs that nudge the worker to claim due runs; Postgres owns the run
-   * lease/retry schedule, so this queue is never a retry owner. The worker executor +
-   * recovery cron arrive in Arc C.4 — C.1 only enqueues the wake.
+   * lease/retry schedule, so this queue is never a retry owner. The worker executor and the
+   * recovery cron consume it (`AiWorkerModule`).
    */
   AI_RUNS = 'ai-runs',
 }
@@ -43,6 +43,6 @@ export enum JobName {
   // Notification dispatch wake (ADR-052): "due deliveries exist, drain the batch".
   DISPATCH_DUE = 'dispatch-due',
 
-  // AI run wake (ADR-054): "a queued run exists, claim the batch". Worker-drained in Arc C.4.
+  // AI run wake (ADR-054): "a queued run exists, claim the batch". Drained by the AI worker.
   AI_RUN_WAKE = 'ai-run-wake',
 }

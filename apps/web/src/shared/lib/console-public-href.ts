@@ -10,6 +10,11 @@ export function getConsoleOverviewHref(): string {
   return '/'
 }
 
+/** Background work: read-only queue summary, same topology rule as the other panels. */
+export function getConsoleBackgroundWorkHref(): string {
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/background-work`
+}
+
 /** Same topology rule as {@link getConsoleOverviewHref}, for the Organizations panel. */
 export function getConsoleOrganizationsHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/organizations`

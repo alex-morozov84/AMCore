@@ -2,7 +2,7 @@ import { SystemRole } from '@amcore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/shared/lib/console-public-api-path', () => ({ getConsolePublicApiPath: vi.fn() }))
-vi.mock('./http-client', () => ({ apiClient: { patch: vi.fn(), post: vi.fn() } }))
+vi.mock('./http-client', () => ({ apiClient: { get: vi.fn(), patch: vi.fn(), post: vi.fn() } }))
 
 import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
 
@@ -34,6 +34,18 @@ describe('consoleApi', () => {
     expect(getConsolePublicApiPath).toHaveBeenCalledWith('/auth/step-up')
     expect(apiClient.post).toHaveBeenCalledWith('/console/auth/step-up', {
       password: 'correct-horse',
+    })
+  })
+
+  it('reads the background-work queue summary through the topology-aware path and forwards the abort signal', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ checkedAt: 'x', queues: [] } as never)
+    const controller = new AbortController()
+
+    await consoleApi.getBackgroundWorkQueues(controller.signal)
+
+    expect(getConsolePublicApiPath).toHaveBeenCalledWith('/background-work/queues')
+    expect(apiClient.get).toHaveBeenCalledWith('/console/background-work/queues', {
+      signal: controller.signal,
     })
   })
 })

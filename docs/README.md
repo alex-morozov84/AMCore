@@ -39,6 +39,7 @@ find for something, that page is under-documented; please open an issue.
 | Add a frontend test / pick the right layer                                               | [`frontend/testing.md`](frontend/testing.md)                                                                                      |
 | Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                  |
 | Initialize a downstream fork (rebrand, locale/Storybook/console shape, route-progress)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                    |
+| Check whether background queues are piling up, paused or unreadable                      | [`operations-console/background-work.md`](operations-console/background-work.md)                                                  |
 | Use, configure, deploy, or safely extend Operations Console                              | [`operations-console/`](operations-console/README.md)                                                                             |
 | Check or update the frontend bundle baseline                                             | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                          |
 | Add a navigating Link / programmatic navigation, or configure the route-progress bar     | [`frontend/route-progress.md`](frontend/route-progress.md)                                                                        |
@@ -138,7 +139,7 @@ provide an operator interface for admin session management.
   headless extension path; product-domain management UI remains downstream-owned.
 - **[Operations Console](operations-console/README.md)** — the optional
   `SUPER_ADMIN` control plane: Overview readiness, API/web identity and local
-  resources, user and organization details,
+  resources, read-only Background work queue state, user and organization details,
   Users system-role changes, bounded Audit browsing, topology,
   host-session boundary, downstream scaffolding, deployment, verification,
   and safe extension rules.

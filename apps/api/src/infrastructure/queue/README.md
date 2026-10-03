@@ -4,11 +4,11 @@ Production-ready job queue system built on BullMQ for handling async operations.
 
 ## Features
 
-- ✅ **Multiple Queues** — Separate queues for different job types (email, default)
+- ✅ **Multiple Queues** — One code-owned inventory of queues (`email`, `default`, `notifications`, `ai-runs`) drives registration, `QueueService`, metrics and the Console summary
 - ✅ **Retry Logic** — Exponential backoff with configurable attempts
-- ✅ **Priority Jobs** — Priority levels 0-10
+- ✅ **Priority Jobs** — BullMQ priorities: a lower positive number runs first, and unprioritized jobs run before prioritized ones
 - ✅ **Delayed Jobs** — Schedule jobs for future execution
-- ✅ **Job Monitoring** — Bull Board dashboard at `/admin/queues`
+- ✅ **Job Monitoring** — Bull Board dashboard at `/admin/queues`, and a read-only [Background work](../../../../../docs/operations-console/background-work.md) screen in the Operations Console
 - ✅ **Type Safety** — Full TypeScript support
 - ✅ **Error Handling** — Structured logging and error tracking
 
@@ -44,13 +44,13 @@ export class MyService {
 ### 2. Add Job with Options
 
 ```typescript
-// High priority job with custom retry
+// Custom retry; a prioritized job runs after every unprioritized job
 await this.queueService.add(
   QueueName.EMAIL,
   JobName.SEND_EMAIL,
   { to: 'user@example.com', template: 'welcome' },
   {
-    priority: 10, // High priority
+    priority: 2, // Optional. Lower numbers run first; leave it out for the normal lane
     attempts: 5, // Try 5 times
     delay: 1000, // Delay 1 second
     backoff: {
@@ -143,50 +143,47 @@ module above. See
 [`docs/backend/architecture-and-conventions.md`](../../../../../docs/backend/architecture-and-conventions.md#5-register-in-the-correct-process-role)
 and `src/app-imports.ts`.
 
-## Adding New Queues
+## The queue inventory
 
-### 1. Add Queue Name
+`constants/queue-inventory.constant.ts` is the single source of truth for which
+queues exist. Each `QueueName` has a descriptor:
 
-```typescript
-// constants/queues.constant.ts
-export enum QueueName {
-  EMAIL = 'email',
-  DEFAULT = 'default',
-  NOTIFICATIONS = 'notifications', // NEW
-}
-```
+| Field     | Meaning                                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------------- |
+| `kind`    | `work` (jobs carry the work), `wake` (one-attempt wake signals; state lives in Postgres), or `extension` |
+| `enabled` | Code-owned intent. `false` removes the registration, the Bull Board adapter and every observation read   |
 
-### 2. Register in Module
+The descriptor map is typed `satisfies Record<QueueName, …>`, so a new enum value
+without a descriptor does not compile. `QueueModule` registers the enabled queues,
+`QueueService` receives them as one registry, the depth metrics iterate them, and
+the Console [Background work](../../../../../docs/operations-console/background-work.md)
+screen reports every descriptor (`disabled` rows included).
 
-```typescript
-// queue.module.ts
-BullModule.registerQueue(
-  { name: QueueName.DEFAULT },
-  { name: QueueName.EMAIL },
-  { name: QueueName.NOTIFICATIONS }, // NEW
-),
+### Adding a queue
 
-// Bull Board
-BullBoardModule.forFeature({
-  name: QueueName.NOTIFICATIONS,
-  adapter: BullMQAdapter,
-}),
-```
+1. Add the value to `QueueName` in `constants/queues.constant.ts`.
+2. Add its descriptor to `DESCRIPTORS` in `constants/queue-inventory.constant.ts`.
+3. Add a processor in a worker-only module (see above) if jobs should be consumed.
+4. Optional: list it in `BULL_BOARD_QUEUE_NAMES` to give it a Bull Board adapter.
+   The board lists three queues today; `ai-runs` has none.
+5. Optional: add Console copy for it in `console.backgroundWork.queues` in
+   `apps/web/messages/*.json`. Without it the screen shows the technical name and
+   generic copy for its `kind`.
 
-### 3. Update QueueService Constructor
+Do not register a queue yourself with `BullModule.registerQueue`, `@InjectQueue` or
+`new Queue(...)`. A queue created outside the inventory is invisible to the Console,
+the metrics and `QueueService`, and nothing would say so. The guard test
+`queue-registration-coverage.spec.ts` fails with the file and line when production
+code does this; `queue.module.ts` is the only allowed place.
 
-```typescript
-// queue.service.ts
-constructor(
-  @InjectQueue(QueueName.DEFAULT) private readonly defaultQueue: Queue,
-  @InjectQueue(QueueName.EMAIL) private readonly emailQueue: Queue,
-  @InjectQueue(QueueName.NOTIFICATIONS) private readonly notificationsQueue: Queue,
-) {
-  this.queues.set(QueueName.DEFAULT, defaultQueue)
-  this.queues.set(QueueName.EMAIL, emailQueue)
-  this.queues.set(QueueName.NOTIFICATIONS, notificationsQueue)
-}
-```
+### Disabling a queue
+
+`enabled: false` is **not** a feature switch. It does not remove producers or
+processors, so a producer that still calls `QueueService.add` for a disabled queue
+fails at call time with `NotFoundException('Queue', name)`. Only `default` has no
+stock producer or processor and can be disabled by the flag alone. Disabling
+`email`, `notifications` or `ai-runs` also means removing the feature module that
+owns its producer and its worker module in your fork.
 
 ## Queue Management
 
@@ -274,7 +271,7 @@ Features:
 
 ```typescript
 interface JobOptions {
-  priority?: number // 0-10 (higher is better)
+  priority?: number // 0 = none; positive: lower runs first (BullMQ)
   delay?: number // Delay in ms
   attempts?: number // Retry attempts (default: 3)
   backoff?: {

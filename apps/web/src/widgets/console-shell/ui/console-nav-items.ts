@@ -4,6 +4,7 @@ import {
   Building2Icon,
   KeyRoundIcon,
   LayoutDashboardIcon,
+  ListChecksIcon,
   ScrollTextIcon,
   UsersIcon,
 } from 'lucide-react'
@@ -11,6 +12,7 @@ import {
 import {
   getConsoleApiKeysHref,
   getConsoleAuditHref,
+  getConsoleBackgroundWorkHref,
   getConsoleOrganizationsHref,
   getConsoleOverviewHref,
   getConsoleUsersHref,
@@ -28,6 +30,12 @@ export function useConsoleNavItems(): ConsoleNavItem[] {
   const t = useTranslations('console')
   return [
     { href: getConsoleOverviewHref(), label: t('overview'), icon: LayoutDashboardIcon },
+    {
+      href: getConsoleBackgroundWorkHref(),
+      label: t('backgroundWork.title'),
+      icon: ListChecksIcon,
+      prefetch: false,
+    },
     { href: getConsoleUsersHref(), label: t('users'), icon: UsersIcon },
     { href: getConsoleOrganizationsHref(), label: t('organizations'), icon: Building2Icon },
     {

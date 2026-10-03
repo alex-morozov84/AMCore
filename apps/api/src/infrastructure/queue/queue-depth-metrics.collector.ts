@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import type { JobType } from 'bullmq'
 
-import { QueueName } from './constants/queues.constant'
+import type { QueueName } from './constants/queues.constant'
 import { QueueService } from './queue.service'
+import { enabledQueueNames } from './queue-inventory'
 
 import { METRIC_NAMES, MetricsService } from '@/infrastructure/observability'
 
@@ -81,7 +82,7 @@ export class QueueDepthMetricsCollector {
     const bullStates = QUEUE_DEPTH_STATES.map(([state]) => state)
 
     return Promise.all(
-      Object.values(QueueName).map(async (queueName) => {
+      enabledQueueNames().map(async (queueName) => {
         const queue = queueService.getQueue(queueName)
         if (!queue) {
           throw new Error(`Queue "${queueName}" is not registered`)
@@ -97,7 +98,7 @@ export class QueueDepthMetricsCollector {
 
   private async collectPausedSnapshot(queueService: QueueService): Promise<QueuePausedSnapshot> {
     return Promise.all(
-      Object.values(QueueName).map(async (queueName) => {
+      enabledQueueNames().map(async (queueName) => {
         const queue = queueService.getQueue(queueName)
         if (!queue) {
           throw new Error(`Queue "${queueName}" is not registered`)

@@ -224,6 +224,53 @@ replace it with a token hash or infer authorization from the displayed device.
 Do not describe a planned panel as available. Its implementation, index link,
 and operator instructions ship together.
 
+## Live panels: Background work
+
+Overview and the inventories are refreshed on request. **Background work** is the
+reference for a panel that also refreshes itself. Its pieces:
+
+- The Server Component fetches the first snapshot with `fetchBackend` (`no-store`,
+  the Console token resolver) and renders the static heading outside the data
+  region. A transport failure of that request is the primary-unavailable state;
+  a per-item failure is typed data inside a successful response.
+- One interactive leaf in the page folder keeps the data fresh with a single
+  TanStack Query observer. It starts from the server snapshot (`initialData`), so
+  the first paint has no flash, and it reads a fixed Console BFF `GET`
+  (`app/api/console/background-work/queues`, guarded by `withConsoleHostGuard()`,
+  with no client-supplied path and no token in the response). The handler passes
+  the browser's abort on and adds its own deadline.
+- The refresh policy lives in one hook and one pure module
+  (`use-queue-summary.ts`, `queue-poll-policy.ts`). Automatic fetches (interval,
+  focus, reconnect, mount) are allowed by a single rule: auto-refresh on, access
+  intact, tab visible, browser online and every cool-down elapsed. Losing that
+  admission cancels queued or in-flight automatic work. A manual refresh joins a
+  fetch already running, honours `Retry-After`, and is never queued while offline.
+  The hook owns the failure streak, because a `200` whose items are all
+  unavailable is a success for Query but not for the operator. After `401`/`403`
+  it hides the data at once, evicts the cache and asks the Console frame to
+  admit the session again (`router.refresh()`).
+- Query state is isolated per mount (`gcTime: 0` and a per-mount key), so a
+  remount can never show older or denied data instead of the server's snapshot.
+- Build recovery after a deployment is unchanged: the global deployment check
+  reloads an old tab. A live panel uses a plain `GET`, never a Server Action, and
+  needs no version check of its own.
+
+Reuse the `use-queue-summary.ts` shape for another live panel. Promote the
+policy to `shared/lib` when a second panel needs it; the storage setting editor
+polls with different rules (fixed 2 seconds only while a saved value is still
+being applied) and does not use it.
+
+## Queues and the Background work screen
+
+The screen reads the queue inventory, a single code-owned list in
+`apps/api/src/infrastructure/queue/constants/queue-inventory.constant.ts`. A new
+queue appears on the screen after its descriptor is added there; a test fails if
+code creates a queue outside the list. See the
+[queue guide](../../apps/api/src/infrastructure/queue/README.md#adding-a-queue)
+and the [screen guide](background-work.md#adding-a-queue-for-developers). The
+backend reads Redis with plain read commands and a bounded number of pending
+requests, so a stalled Redis cannot pile up work behind the screen.
+
 ## Verification
 
 - [Frontend testing](../frontend/testing.md) explains unit, Storybook, browser,
