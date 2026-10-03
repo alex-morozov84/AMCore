@@ -13,6 +13,8 @@ import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
 import { InviteRateLimiterService } from './invite-rate-limiter.service'
 import { InvitesController } from './invites.controller'
 import { MemberService } from './member.service'
+import { MemberQueryService } from './member-query.service'
+import { MemberRoleSetService } from './member-role-set.service'
 import { MembersController } from './members.controller'
 import { OrganizationsController } from './organizations.controller'
 import { OrganizationsService } from './organizations.service'
@@ -41,6 +43,8 @@ import { RolesController } from './roles.controller'
     OrganizationsService,
     CapabilityRegistry,
     MemberService,
+    MemberQueryService,
+    MemberRoleSetService,
     RoleService,
     RoleAssignabilityService,
     InviteService,

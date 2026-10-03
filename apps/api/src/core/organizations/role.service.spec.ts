@@ -57,6 +57,7 @@ describe('RoleService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
+    prisma.$queryRaw.mockResolvedValue([{ id: 'org-1', aclVersion: 0 }])
     orgsService = {
       bumpAclVersion: jest.fn().mockResolvedValue(undefined),
       bumpAclVersionTx: jest.fn().mockResolvedValue(undefined),
@@ -354,6 +355,9 @@ describe('RoleService', () => {
   })
 
   describe('removePermission', () => {
+    beforeEach(() => {
+      prisma.role.findFirst.mockResolvedValue(mockCustomRole)
+    })
     it('deletes org-level permission and bumps aclVersion', async () => {
       prisma.rolePermission.findUnique.mockResolvedValue({
         roleId: 'role-custom',

@@ -262,3 +262,15 @@ The Console Audit read-event opt-in includes it; transition/request summaries
 are visible by default. HTTP query redaction covers search, userId,
 organizationId and id in URL and structured query. Cleanup metadata names
 `staleTerminalApiKeys`. Audit retention is independent of key metadata retention.
+
+## Organization role assignment events
+
+`org.member_roles_changed` is written transactionally for actual assignment
+transitions from atomic replacement and legacy per-role assign/remove. The USER
+actor is the credential owner; `actorCredentialType` distinguishes JWT/API key
+without using a key ID as a user identity. Metadata contains `memberId`,
+`addedCount`, `removedCount` and `source` (`replace`, `assign`, `remove`), without
+role names or complete sets. A locked replacement no-op emits no event. An audit
+insert failure rolls the assignment/revision transaction back. A lost commit
+acknowledgment can leave a persisted event and an unconfirmed client outcome;
+clients must read state before another deliberate write, rather than replay.

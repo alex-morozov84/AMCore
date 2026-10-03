@@ -51,6 +51,8 @@ describe('MemberService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
+    prisma.$queryRaw.mockResolvedValue([{ id: 'org-1', aclVersion: 0 }])
+    prisma.memberRole.deleteMany.mockResolvedValue({ count: 0 })
     orgsService = {
       bumpAclVersion: jest.fn().mockResolvedValue(undefined),
       bumpAclVersionTx: jest.fn().mockResolvedValue(undefined),
@@ -59,7 +61,8 @@ describe('MemberService', () => {
     service = new MemberService(
       prisma as unknown as PrismaService,
       orgsService as unknown as OrganizationsService,
-      new RoleAssignabilityService()
+      new RoleAssignabilityService(),
+      { record: jest.fn().mockResolvedValue(undefined) } as never
     )
     // After OA-05 the assignRole() flow executes its real work inside
     // $transaction (the role-ownership check, the conflict lookup, and

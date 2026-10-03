@@ -17,6 +17,8 @@ export async function contextRoute(
         errorCode: error.errorCode,
         message: 'Organization context request failed',
       })
+      if ((error.status === 429 || error.status === 503) && error.retryAfterSeconds !== undefined)
+        response.headers.set('retry-after', String(error.retryAfterSeconds))
       response.headers.set('cache-control', 'private, no-store')
       return response
     }

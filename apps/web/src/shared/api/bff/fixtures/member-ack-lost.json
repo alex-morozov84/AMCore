@@ -1,0 +1,50 @@
+{
+  "status": 503,
+  "body": {
+    "statusCode": 503,
+    "message": "Role save unconfirmed",
+    "errorCode": "MEMBER_ROLES_SAVE_UNAVAILABLE",
+    "timestamp": "2026-10-03T11:45:10.187Z",
+    "path": "/organizations/cmusbrw0t00060wzyxtwli846/members/cmusbrw1m00090wzy9xi2bj2p/roles",
+    "method": "PATCH",
+    "correlationId": "1dc1bcad-2663-4d26-92f4-d0cc4fe4323a"
+  },
+  "snapshot": {
+    "member": {
+      "memberId": "cmusbrw20000c0wzyv7q83g2h",
+      "user": { "id": "cmusbrw1m00090wzy9xi2bj2p", "name": null, "email": "member@example.test" }
+    },
+    "aclVersion": 2,
+    "assignedRoleCount": 0,
+    "choices": {
+      "data": [
+        {
+          "id": "cmusbrvy300020wzy420zflrk",
+          "name": "ADMIN",
+          "description": null,
+          "isSystem": true
+        },
+        {
+          "id": "cmusbrvy200010wzyqdyuwq5t",
+          "name": "MEMBER",
+          "description": null,
+          "isSystem": true
+        },
+        {
+          "id": "cmusbrvy100000wzypodmkk1q",
+          "name": "VIEWER",
+          "description": null,
+          "isSystem": true
+        }
+      ],
+      "total": 3,
+      "page": 1,
+      "limit": 20
+    },
+    "editMode": "editable",
+    "assignedRoles": []
+  },
+  "transportCount": 1,
+  "auditCount": 1,
+  "aclBefore": 1
+}

@@ -1,0 +1,30 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { localizedFrontendUrl, DEFAULT_LOCALE } from '@amcore/shared'
+import { expect, test } from '@playwright/test'
+import { expectNoAxeViolations } from '../shared/axe'
+import { activeTarget } from '../support/managed-target.mjs'
+import { directApi } from './credential-containment.helpers'
+import { TEST_PASSWORD, uniqueEmail } from './helpers'
+
+test('different inline custom UI uses public headless roles with real BFF and no ready widget', async ({ page, context }) => {
+  const target = activeTarget()
+  const email = uniqueEmail('custom-member')
+  const register = await context.request.post('/api/auth/register', { headers: { origin: target.origins.product }, data: { email, password: TEST_PASSWORD } })
+  expect(register.status()).toBe(201)
+  const login = await directApi('auth/login', { email, password: TEST_PASSWORD })
+  const org = await directApi('organizations', { name: 'Custom composition' }, login.accessToken)
+  const t = JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')).organizationMembers
+  await page.goto(new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, `organizations/${org.id}/members`)).pathname)
+  await expect(page.getByTestId('custom-headless-members')).toBeVisible()
+  await page.getByRole('button', { name: email, exact: true }).click()
+  await page.getByRole('checkbox', { name: 'MEMBER', exact: true }).check()
+  await expect(page.getByRole('button', { name: t.save, exact: true })).toBeDisabled()
+  await page.getByRole('checkbox', { name: t.selfWarning }).check()
+  const response = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/members/'))
+  await page.getByRole('button', { name: t.save, exact: true }).click()
+  expect((await response).status()).toBe(200)
+  await expect(page.getByText(t.saved, { exact: true })).toBeVisible()
+  expect(await page.getByRole('dialog').count()).toBe(0)
+  await expectNoAxeViolations(page)
+})

@@ -131,7 +131,7 @@ export async function setupE2ETest(
     app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
 
     // Apply same configuration as in main.ts
-    configureBodyParser(app)
+    configureBodyParser(app, '')
     app.use(cookieParser())
     app.useGlobalPipes(new ZodValidationPipe())
 
@@ -358,7 +358,7 @@ export async function startWebAppContext(): Promise<{
     .useValue(noopPinoLogger)
     .compile()
   const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
-  configureBodyParser(app)
+  configureBodyParser(app, '')
   app.use(cookieParser())
   app.useGlobalPipes(new ZodValidationPipe())
   await app.init()

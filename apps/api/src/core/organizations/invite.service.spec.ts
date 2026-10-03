@@ -107,6 +107,7 @@ describe('InviteService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
+    prisma.$queryRaw.mockResolvedValue([{ id: 'org-1', aclVersion: 0 }])
     orgsService = {
       bumpAclVersionTx: jest.fn().mockResolvedValue(undefined),
       invalidateAclVersion: jest.fn().mockResolvedValue(undefined),

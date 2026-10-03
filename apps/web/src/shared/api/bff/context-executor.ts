@@ -1,6 +1,9 @@
-import { isOrganizationContextId } from '@amcore/shared'
+import { isOrganizationContextId, serializedJsonBytes } from '@amcore/shared'
 import type { ZodType } from 'zod'
 
+import { parseRetryAfterSeconds } from '../retry-after'
+
+import { readContextJson } from './context-body-budget'
 import { withinContextDeadline } from './context-deadline'
 import { ContextRequestError } from './context-errors'
 import {
@@ -21,6 +24,9 @@ export interface ContextOperation<T> {
   readonly schema: ZodType<T>
   readonly organizationId?: string
   readonly body?: unknown
+  readonly successStatus?: number
+  readonly responseBytes?: number
+  readonly requestBytes?: number
 }
 
 export interface ContextExecutorDeps extends EnsureFreshSessionDeps {
@@ -40,6 +46,12 @@ export async function executeContextOperation<T>(
   input: ContextExecutorInput,
   deps: ContextExecutorDeps
 ): Promise<{ binding: string; data: T }> {
+  if (
+    operation.requestBytes &&
+    operation.body !== undefined &&
+    serializedJsonBytes(operation.body) > operation.requestBytes
+  )
+    throw new ContextRequestError(413, 'PAYLOAD_TOO_LARGE')
   const url = operationUrl(operation, deps.apiBase)
   validateExpectedContextSession(input.expectedSession)
   return withinContextDeadline(input.signal, async (signal) => {
@@ -65,7 +77,14 @@ export async function executeContextOperation<T>(
       signal,
       ...(operation.body !== undefined && { body: JSON.stringify(operation.body) }),
     })
-    const body: unknown = await response.json()
+    let body: unknown
+    try {
+      body = operation.responseBytes
+        ? await readContextJson(response.body, operation.responseBytes)
+        : await response.json()
+    } catch {
+      throw new ContextRequestError(502, 'INVALID_UPSTREAM_RESPONSE')
+    }
     signal.throwIfAborted()
     if (!response.ok) {
       const code =
@@ -75,19 +94,26 @@ export async function executeContextOperation<T>(
         typeof body.errorCode === 'string'
           ? body.errorCode
           : `HTTP_${response.status}`
-      throw new ContextRequestError(response.status, code)
+      throw new ContextRequestError(response.status, code, parseRetryAfterSeconds(response.headers))
     }
+    if (operation.successStatus !== undefined && response.status !== operation.successStatus)
+      throw new ContextRequestError(502, 'INVALID_UPSTREAM_RESPONSE')
     const parsed = operation.schema.safeParse(body)
     if (!parsed.success) throw new ContextRequestError(502, 'INVALID_UPSTREAM_RESPONSE')
-    return { binding: captured.binding, data: parsed.data }
+    const envelope = { binding: captured.binding, data: parsed.data }
+    if (operation.responseBytes && serializedJsonBytes(envelope) > operation.responseBytes)
+      throw new ContextRequestError(502, 'INVALID_UPSTREAM_RESPONSE')
+    return envelope
   })
 }
 
 function operationUrl<T>(operation: ContextOperation<T>, apiBase: string): string {
+  const pathname = operation.path.split('?')[0]!
   if (
-    !operation.path.startsWith('/api/v1/') ||
+    !pathname.startsWith('/api/v1/') ||
     operation.path.includes('#') ||
-    /[\\]|%(?:2f|5c|25)/i.test(operation.path)
+    /[\\]|%(?:2f|5c|25)/i.test(pathname) ||
+    pathname.split('/').some((part) => /^(?:\.|%2e){1,2}$/i.test(part))
   ) {
     throw new ContextRequestError(400, 'BAD_REQUEST')
   }

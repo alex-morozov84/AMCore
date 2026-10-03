@@ -18,13 +18,14 @@ export interface SearchFieldProps {
   label: string
   placeholder: string
   clearLabel: string
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
   maxLength?: number
   className?: string
 }
 
 interface SearchTextInputProps extends Pick<
   SearchFieldProps,
-  'id' | 'name' | 'value' | 'onValueChange' | 'placeholder' | 'maxLength'
+  'id' | 'name' | 'value' | 'onValueChange' | 'placeholder' | 'maxLength' | 'onKeyDown'
 > {
   inputRef: RefObject<HTMLInputElement | null>
 }
@@ -44,7 +45,7 @@ function SearchFieldLabel({ id, label }: Pick<SearchFieldProps, 'id' | 'label'>)
 }
 
 function SearchTextInput(props: SearchTextInputProps) {
-  const { inputRef, id, name, value, onValueChange, placeholder, maxLength } = props
+  const { inputRef, id, name, value, onValueChange, placeholder, maxLength, onKeyDown } = props
   return (
     <Input
       ref={inputRef}
@@ -52,6 +53,7 @@ function SearchTextInput(props: SearchTextInputProps) {
       name={name}
       type="text"
       value={value}
+      onKeyDown={onKeyDown}
       onChange={(event) => onValueChange(event.target.value)}
       placeholder={placeholder}
       maxLength={maxLength}
@@ -95,6 +97,7 @@ export function SearchField(props: SearchFieldProps) {
         onValueChange={props.onValueChange}
         placeholder={props.placeholder}
         maxLength={props.maxLength}
+        onKeyDown={props.onKeyDown}
       />
       {props.value && <SearchClearButton label={props.clearLabel} onClear={handleClear} />}
     </div>

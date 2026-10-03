@@ -1,9 +1,10 @@
 import { createHmac } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 
-import { Body, Controller, HttpCode, type INestApplication, Post, Req } from '@nestjs/common'
+import { Body, Controller, HttpCode, type INestApplication, Patch, Post, Req } from '@nestjs/common'
 import request from 'supertest'
 
-import { AuthType } from '@amcore/shared'
+import { AuthType, MEMBER_REQUEST_BYTES } from '@amcore/shared'
 
 import { REQUEST_BODY_LIMIT_BYTES } from '../src/bootstrap/configure-body-parser'
 import { Auth } from '../src/core/auth/decorators/auth.decorator'
@@ -39,6 +40,18 @@ class WebhookSizeController {
   }
 }
 
+/** Deliberately unguarded parser probe, unique fixed path avoids production controller collision. */
+@Controller('organizations/parser-probe/members/parser-user/roles')
+@SkipRateLimit()
+class MemberBodyController {
+  @Patch()
+  @HttpCode(200)
+  @Auth(AuthType.None)
+  echo(@Body() _body: unknown) {
+    return { ok: true }
+  }
+}
+
 describe('Request body size limit (e2e)', () => {
   let app: INestApplication
   let prisma: PrismaService
@@ -49,7 +62,11 @@ describe('Request body size limit (e2e)', () => {
     process.env.WEBHOOK_STRIPE_SECRET = secret
     process.env.WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = '300'
     process.env.WEBHOOK_REPLAY_DEDUPE_TTL_SECONDS = '300'
-    context = await setupWebhookTestApp([EchoController, WebhookSizeController])
+    context = await setupWebhookTestApp([
+      EchoController,
+      WebhookSizeController,
+      MemberBodyController,
+    ])
     app = context.app
     prisma = context.prisma
   }, 120000)
@@ -61,6 +78,55 @@ describe('Request body size limit (e2e)', () => {
   beforeEach(async () => {
     await cleanOrgData(prisma)
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
+  })
+
+  describe('scoped member role JSON', () => {
+    const scoped = '/organizations/parser-probe/members/parser-user/roles'
+    it('accepts262144 decoded bytes and rejects262145 before guards', async () => {
+      for (const [bytes, status] of [
+        [MEMBER_REQUEST_BYTES, 200],
+        [MEMBER_REQUEST_BYTES + 1, 413],
+      ]) {
+        const response = await request(app.getHttpServer())
+          .patch(scoped)
+          .set('Content-Type', 'application/json')
+          .send(jsonBodyOfSize(bytes!))
+          .expect(status!)
+        expect(response.body).toMatchObject(
+          status === 413 ? { errorCode: 'PAYLOAD_TOO_LARGE' } : { ok: true }
+        )
+      }
+    })
+    it('does not widen POST, encoded path or urlencoded body', async () => {
+      await request(app.getHttpServer())
+        .post(scoped)
+        .set('Content-Type', 'application/json')
+        .send(jsonBodyOfSize(100001))
+        .expect(413)
+      await request(app.getHttpServer())
+        .patch(scoped.replace('parser-user', 'parser%2Duser'))
+        .set('Content-Type', 'application/json')
+        .send(jsonBodyOfSize(100001))
+        .expect(413)
+      await request(app.getHttpServer())
+        .patch(scoped)
+        .set('Content-Type', 'application/x-www-form-urlencoded')
+        .send(urlencodedBodyOfSize(100001))
+        .expect(413)
+    })
+    it('bounds gzip inflated JSON at scoped cap', async () => {
+      for (const [bytes, status] of [
+        [MEMBER_REQUEST_BYTES, 200],
+        [MEMBER_REQUEST_BYTES + 1, 413],
+      ])
+        await request(app.getHttpServer())
+          .patch(scoped)
+          .set('Content-Type', 'application/json')
+          .set('Content-Encoding', 'gzip')
+          .serialize(() => gzipSync(jsonBodyOfSize(bytes!)) as unknown as string)
+          .send({})
+          .expect(status!)
+    })
   })
 
   describe('ordinary JSON', () => {

@@ -8,6 +8,7 @@ import {
   SortableColumnHead,
   toggleSortOrder,
 } from '@/features/console-discovery'
+import { DataTableSurface } from '@/shared/ui/data-table-surface'
 import { Table, TableBody, TableHeader, TableRow } from '@/shared/ui/table'
 
 import { OrganizationRow } from './OrganizationRow'
@@ -59,7 +60,7 @@ export async function OrganizationsTable({
   const updatedColumnLabel = t('organizationsColumnUpdated')
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface-elevated shadow-md">
+    <DataTableSurface>
       <Table>
         <TableHeader>
           <TableRow className="border-line-soft hover:bg-transparent">
@@ -127,6 +128,6 @@ export async function OrganizationsTable({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </DataTableSurface>
   )
 }

@@ -1,10 +1,13 @@
 import { type ReactNode, StrictMode } from 'react'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 
 import { server } from '@/test/msw/server'
+
+import { organizationContextClient } from '../api/context-client'
 
 import { contextAffordances } from './context-fixture'
 import type { OrganizationContextInput } from './context-input'
@@ -79,4 +82,71 @@ it('actual disabled Query observers and browser resume events preserve ordered c
   expect(events.at(-1)).toBe('bootstrap')
   unmount()
   client.clear()
+})
+
+it('owner callback ignores old refresh settlement after new target authority is established', async () => {
+  const data = (id: string) => ({
+    binding,
+    data: {
+      organization: { id, name: id, slug: id },
+      canManageTeamAccess: true,
+      ...contextAffordances,
+    },
+  })
+  const bootstrap = vi
+    .spyOn(organizationContextClient, 'bootstrap')
+    .mockResolvedValue({ binding, actor: { id: 'actor', email: 'actor@example.test' } })
+  let release!: (v: ReturnType<typeof data>) => void
+  let entered!: () => void
+  const started = new Promise<void>((done) => {
+    entered = done
+  })
+  const old = new Promise<ReturnType<typeof data>>((done) => {
+    release = done
+  })
+  const authority = vi.spyOn(organizationContextClient, 'authority').mockResolvedValue(data('A'))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  )
+  const hook = renderHook(
+    ({ id }) => useOrganizationContext(binding, { kind: 'selected', id, locale: DEFAULT_LOCALE }),
+    { wrapper, initialProps: { id: 'A' } }
+  )
+  try {
+    await waitFor(() => expect(hook.result.current.controller.allowed()).toBe(true))
+    authority.mockImplementationOnce(() => {
+      entered()
+      return old
+    })
+    let saving!: ReturnType<typeof hook.result.current.controller.save>
+    act(() => {
+      saving = hook.result.current.controller.save('member', async () => ({
+        memberId: 'member',
+        userId: 'user',
+        organizationId: 'A',
+        roleIds: [],
+        aclVersion: 2,
+        changed: true,
+      }))
+    })
+    await started
+    authority.mockResolvedValue(data('B'))
+    hook.rerender({ id: 'B' })
+    await waitFor(() =>
+      expect(hook.result.current.data?.data).toMatchObject({ organization: { id: 'B' } })
+    )
+    expect(hook.result.current.controller.allowed()).toBe(true)
+    await act(async () => {
+      release(data('A'))
+      expect(await saving).toEqual({ status: 'retired' })
+    })
+    expect(hook.result.current.controller.allowed()).toBe(true)
+    expect(hook.result.current.controller.isBusy()).toBe(false)
+  } finally {
+    hook.unmount()
+    client.clear()
+    bootstrap.mockRestore()
+    authority.mockRestore()
+  }
 })

@@ -11,18 +11,20 @@ All paths below are relative to `/api/v1`. Organizations, members, roles and
 invites declare an organization-context boundary. Each handler declares its own
 personal, discovery, exchange or organization policy.
 
-| Operation                                                      | Context and credentials                                                                  |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `POST /organizations`                                          | Personal, bearer-only; creates ADMIN membership                                          |
-| `GET /organizations`                                           | Actor-owned discovery, bearer-only                                                       |
-| `GET /organizations/:id`                                       | Existing membership discovery; accepted keys remain bound and scope-limited              |
-| `GET /organizations/:id/context`                               | Selected organization, bearer-only; current membership required even for SUPER_ADMIN     |
-| `GET /organizations/:orgId/capabilities`                       | Selected organization, bearer-only; full TeamAccess; implemented authoring metadata only |
-| `POST /organizations/:orgId/roles/:roleId/permissions/presets` | Selected organization, bearer-only; full TeamAccess and custom role                      |
-| `PATCH /organizations/:id`, `DELETE /organizations/:id`        | Selected organization; existing credential/field/TeamAccess requirements retained        |
-| Organization member/role/invite handlers                       | Path-selected organization; existing per-handler credential allowlist retained           |
-| `POST /auth/invites/accept`                                    | Personal, bearer-only                                                                    |
-| `POST /organizations/:id/switch`                               | Existing bearer-only exchange; membership-checked A→B and parent-bounded expiry retained |
+| Operation                                                                              | Context and credentials                                                                               |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `POST /organizations`                                                                  | Personal, bearer-only; creates ADMIN membership                                                       |
+| `GET /organizations`                                                                   | Actor-owned discovery, bearer-only                                                                    |
+| `GET /organizations/:id`                                                               | Existing membership discovery; accepted keys remain bound and scope-limited                           |
+| `GET /organizations/:id/context`                                                       | Selected organization, bearer-only; current membership required even for SUPER_ADMIN                  |
+| `GET /organizations/:orgId/capabilities`                                               | Selected organization, bearer-only; full TeamAccess; implemented authoring metadata only              |
+| `POST /organizations/:orgId/roles/:roleId/permissions/presets`                         | Selected organization, bearer-only; full TeamAccess and custom role                                   |
+| `GET /organizations/:orgId/members`, `GET /organizations/:orgId/members/:userId/roles` | Selected organization, bearer-only; current membership and full TeamAccess, including for SUPER_ADMIN |
+| `PATCH /organizations/:orgId/members/:userId/roles`                                    | Same admission; atomic complete-set replacement with membership identity and ACL revision checks      |
+| `PATCH /organizations/:id`, `DELETE /organizations/:id`                                | Selected organization; existing credential/field/TeamAccess requirements retained                     |
+| Legacy per-role/member-removal, role and invite handlers                               | Path-selected organization; existing per-handler credential allowlist retained                        |
+| `POST /auth/invites/accept`                                                            | Personal, bearer-only                                                                                 |
+| `POST /organizations/:id/switch`                                                       | Existing bearer-only exchange; membership-checked A→B and parent-bounded expiry retained              |
 
 `GET /organizations/:id/context` returns the safe organization summary,
 `canManageTeamAccess`, finite `actorAffordances` and actual-organization
@@ -49,8 +51,9 @@ claims remain unchanged. A previously organization-bound JWT must match the
 target for organization operations. Its discovery/exchange behavior remains
 unchanged, including exchange to another organization with current membership.
 Only explicitly marked existing handlers retain their live platform-admin
-membership bypass for legacy bound JWTs. New overview operations require
-membership. API keys retain their bound organization, current owner admission,
+membership bypass for legacy bound JWTs. The overview and new member
+list/snapshot/replacement operations require membership even for SUPER_ADMIN.
+API keys retain their bound organization, current owner admission,
 scope intersection and exact credential allowlist. Invite creation still accepts
 approved API keys; pending list, revoke and acceptance remain bearer-only.
 
@@ -99,14 +102,18 @@ a real write outside `/organizations`, tenant isolation and rollback.
 
 ## Browser and server transport
 
-Dedicated GET routes are `/api/product-access/bootstrap`,
+The foundation's dedicated GET routes are `/api/product-access/bootstrap`,
 `/api/product-access/organizations?page=1` (fixed page size 20), and
-`/api/product-access/organizations/:id/context`. Other methods explicitly return
-`405`; there is no implicit unfenced HEAD response. Responses are private/no-store.
-Server Components call the entity's `index.server.ts` DAL directly.
+`/api/product-access/organizations/:id/context`.
+Member transport adds GET `/api/product-access/organizations/:id/members`
+and GET/PATCH `/api/product-access/organizations/:id/members/:userId/roles`.
+Unsupported methods explicitly return `405`; there is no implicit unfenced HEAD
+response. Responses are private/no-store. Server Components call the entity's
+`index.server.ts` DAL directly. See the [members contract](../product-admin/organization-members.md)
+for request/response fields, byte limits and uncertain-write recovery.
 
 Bootstrap returns `{binding, actor: {id, email}}`, with no domain request or
-credential refresh. List/context calls require the bootstrap binding in
+credential refresh. List/context and member calls require the bootstrap binding in
 `X-AMCore-Context-Session`. It is a digest bound to the random login cookie ID and
 actor, not a credential or an organization selection. Login/re-login changes it;
 refresh/step-up vault version changes do not. Missing/malformed binding returns
@@ -129,6 +136,16 @@ not supplied as browser URLs. Add typed mutation wrappers with the existing
 origin guard and strict input validation. A consumer owns its publication lease;
 retired responses must not update another identity's cache, callback or toast.
 There is no server-global active organization or dependency on Console pages.
+
+Member PATCH uses the shared web-owned Origin policy: an exact trusted-origin
+check, an origin-reduced Referer fallback, and allowance when both headers are
+absent for non-browser callers. See [CSRF posture](./csrf.md) for this boundary.
+It requires JSON content type, no query parameters and no Content-Encoding. Its strict body is
+`{expectedMemberId, expectedAclVersion, roleIds}`. Successful reads and writes
+return `{binding, data}` through the BFF; the direct API returns the DTO without
+that envelope. Browser clients use their session cookie and binding, never a
+browser-held bearer token. Use the public member hooks to preserve identity
+fencing and distinguish acknowledged, rejected and unknown write outcomes.
 
 See [RBAC](./rbac.md), [API consumption](../frontend/api-consumption.md),
 [FSD guardrails](../frontend/fsd-boundaries-and-guardrails.md), and

@@ -5,4 +5,10 @@ export {
   createOrganizationContextScheduler,
   type OrganizationContextState,
 } from './model/context-scheduler'
+export {
+  type AuthorityRefreshResult,
+  type OrganizationAccessController,
+  type RoleWriteOutcome,
+} from './model/members/controller'
+export { useMemberRoleAssignments, useOrganizationMembers } from './model/members/hooks'
 export { useOrganizationContext } from './model/use-organization-context'

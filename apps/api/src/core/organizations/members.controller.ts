@@ -1,17 +1,42 @@
-import { Body, Controller, Delete, HttpCode, HttpStatus, Param, Post } from '@nestjs/common'
 import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common'
+import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOperation,
+  ApiParam,
+  ApiPayloadTooLargeResponse,
+  ApiQuery,
   ApiSecurity,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
 import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
-import { AuthType, type InviteResponse, type RequestPrincipal } from '@amcore/shared'
+import {
+  AuthType,
+  type InviteResponse,
+  type MemberRolesResponse,
+  type OrganizationMembersResponse,
+  type ReplaceMemberRolesResponse,
+  type RequestPrincipal,
+} from '@amcore/shared'
 
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -22,8 +47,18 @@ import {
 } from '../auth/organization-context/request-context-policy'
 
 import { CreateInviteDto, InviteResponseDto } from './dto'
+import {
+  MemberRolesQueryDto,
+  MemberRolesResponseDto,
+  OrganizationMembersQueryDto,
+  OrganizationMembersResponseDto,
+  ReplaceMemberRolesDto,
+  ReplaceMemberRolesResponseDto,
+} from './dto/organization-members.dto'
 import { InviteService } from './invite.service'
 import { MemberService } from './member.service'
+import { MemberQueryService } from './member-query.service'
+import { MemberRoleSetService } from './member-role-set.service'
 
 /**
  * Class-level `@Auth(AuthType.Bearer, AuthType.ApiKey)` is an explicit
@@ -36,7 +71,7 @@ import { MemberService } from './member.service'
  * the credential matrix is unchanged by the move to a non-enumerating
  * pending-invite contract. Narrowing invite to bearer-only is a
  * separate decision that would require an ADR-034 amendment and an
- * allowlist deletion. See `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OB-02.
+ * allowlist deletion. The existing credential contract remains unchanged.
  *
  * The ADR-034 allowlist in `auth-decorator-coverage.spec.ts` enumerates
  * each handler in this controller individually — adding a new handler
@@ -62,8 +97,105 @@ import { MemberService } from './member.service'
 export class MembersController {
   constructor(
     private readonly memberService: MemberService,
-    private readonly inviteService: InviteService
+    private readonly inviteService: InviteService,
+    private readonly memberQuery: MemberQueryService,
+    private readonly memberRoleSet: MemberRoleSetService
   ) {}
+
+  @ApiParam({ name: 'orgId', description: 'Current organization membership selector' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Default1; bounded offset',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Default20, maximum100' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Literal name/email contains; maximum100 Unicode code points',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid query or selector' })
+  @ApiNotFoundResponse({ description: 'Organization/member unavailable' })
+  @ApiServiceUnavailableResponse({
+    description: 'MEMBER_READ_UNAVAILABLE: serialized read budget exceeded',
+  })
+  @Get()
+  @Auth(AuthType.Bearer)
+  @RequireTeamAccess('orgId')
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
+  @ApiOperation({ summary: 'List organization members; full TeamAccess and membership required' })
+  @ZodResponse({ type: OrganizationMembersResponseDto, status: 200 })
+  list(
+    @Param('orgId') orgId: string,
+    @Query() query: OrganizationMembersQueryDto,
+    @CurrentUser() principal: RequestPrincipal
+  ): Promise<OrganizationMembersResponse> {
+    return this.memberQuery.list(orgId, principal.organizationId, query)
+  }
+
+  @ApiParam({ name: 'orgId', description: 'Current organization membership selector' })
+  @ApiParam({ name: 'userId', description: 'Target member user ID' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Default20, maximum100' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Literal role name search',
+  })
+  @ApiQuery({ name: 'section', required: false, enum: ['available', 'assigned'] })
+  @ApiBadRequestResponse({ description: 'Invalid query or selector' })
+  @ApiNotFoundResponse({ description: 'MEMBER_UNAVAILABLE' })
+  @ApiServiceUnavailableResponse({ description: 'MEMBER_READ_UNAVAILABLE' })
+  @Get(':userId/roles')
+  @Auth(AuthType.Bearer)
+  @RequireTeamAccess('orgId')
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
+  @ApiOperation({ summary: 'Read complete member assignments and paginated role choices' })
+  @ZodResponse({ type: MemberRolesResponseDto, status: 200 })
+  roles(
+    @Param('orgId') orgId: string,
+    @Param('userId') userId: string,
+    @Query() query: MemberRolesQueryDto,
+    @CurrentUser() principal: RequestPrincipal
+  ): Promise<MemberRolesResponse> {
+    return this.memberQuery.roles(orgId, userId, principal.organizationId, query)
+  }
+
+  @ApiParam({ name: 'orgId', description: 'Current organization membership selector' })
+  @ApiParam({ name: 'userId', description: 'Target member user ID' })
+  @ApiBadRequestResponse({ description: 'Validation error or ORGANIZATION_LAST_ADMIN' })
+  @ApiNotFoundResponse({ description: 'MEMBER_UNAVAILABLE' })
+  @ApiConflictResponse({
+    description:
+      'MEMBER_ROLES_CONFLICT: membership or ACL generation changed; reread, no automatic replay',
+  })
+  @ApiPayloadTooLargeResponse({
+    description: 'PAYLOAD_TOO_LARGE: decoded body exceeds262144 bytes',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      'MEMBER_ROLES_SAVE_UNAVAILABLE: outcome may be unknown; reread, never automatic replay',
+  })
+  @Patch(':userId/roles')
+  @Auth(AuthType.Bearer)
+  @RequireTeamAccess('orgId')
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
+  @ApiOperation({
+    summary:
+      'Atomically replace up to1000 roles with membership/ACL CAS; decoded JSON262144 bytes maximum',
+  })
+  @ZodResponse({ type: ReplaceMemberRolesResponseDto, status: 200 })
+  replace(
+    @Param('orgId') orgId: string,
+    @Param('userId') userId: string,
+    @Body() dto: ReplaceMemberRolesDto,
+    @CurrentUser() principal: RequestPrincipal
+  ): Promise<ReplaceMemberRolesResponse> {
+    return this.memberRoleSet.replace(orgId, userId, dto, principal)
+  }
 
   @Post('invite')
   @RequireTeamAccess('orgId')

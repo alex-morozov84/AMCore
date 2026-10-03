@@ -39,6 +39,7 @@ export function organizationAccessHrefs(placement: OrganizationAccessPlacement) 
   return {
     menuHref: path,
     listHref: `${path}?view=list`,
+    membersHref: (id: string) => `${path}/${encodeURIComponent(id)}/members`,
     contextHref: (id: string) => `${path}/${encodeURIComponent(id)}`,
     pageHref: (page: number) => `${path}?view=list&page=${page}`,
     homeHref,
