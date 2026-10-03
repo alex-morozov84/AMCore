@@ -24,6 +24,7 @@ import {
   ApiSecurity,
   ApiServiceUnavailableResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
@@ -55,6 +56,7 @@ import {
   ReplaceMemberRolesDto,
   ReplaceMemberRolesResponseDto,
 } from './dto/organization-members.dto'
+import { CurrentInvitationActor, type InvitationActor } from './invitation-actor'
 import { InviteService } from './invite.service'
 import { MemberService } from './member.service'
 import { MemberQueryService } from './member-query.service'
@@ -198,19 +200,27 @@ export class MembersController {
   }
 
   @Post('invite')
+  @ApiParam({ name: 'orgId', description: 'Target organization selector' })
+  @ApiTooManyRequestsResponse({ description: 'Invitation issuance budget exceeded' })
+  @ApiBadRequestResponse({ description: 'Invalid request' })
+  @ApiNotFoundResponse({ description: 'Organization unavailable' })
+  @ApiConflictResponse({ description: 'CONFLICT: known transaction abort' })
+  @ApiServiceUnavailableResponse({
+    description: 'Write unconfirmed; inspect pending invites before retrying',
+  })
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
   @ZodResponse({
     type: InviteResponseDto,
     status: 202,
-    description: 'Invite accepted for delivery',
+    description: 'Invitation decision committed; email delivery is best-effort',
   })
   @ApiOperation({
     summary:
       'Invite a user by email — requires full TeamAccess. Returns a uniform 202 ' +
       '{status:"invited"} regardless of whether the email already has an ' +
       'account, is already a member, or is unknown. An invite email ' +
-      'carrying the raw accept token is delivered to the recipient. The ' +
+      'carrying the raw accept token is attempted after commit. The ' +
       'pending invite is attached to a membership when the recipient ' +
       'calls POST /auth/invites/accept with that token.',
   })
@@ -222,9 +232,9 @@ export class MembersController {
   invite(
     @Param('orgId') orgId: string,
     @Body() dto: CreateInviteDto,
-    @CurrentUser() principal: RequestPrincipal
+    @CurrentInvitationActor() actor: InvitationActor
   ): Promise<InviteResponse> {
-    return this.inviteService.createInvite(orgId, dto, principal)
+    return this.inviteService.createInvite(orgId, dto, actor)
   }
 
   @Delete(':userId')

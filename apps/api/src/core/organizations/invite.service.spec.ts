@@ -1,10 +1,9 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { PinoLogger } from 'nestjs-pino'
 
-import { InviteErrorCode, type RequestPrincipal, SystemRole } from '@amcore/shared'
+import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { AppException, ForbiddenException, NotFoundException } from '../../common/exceptions'
-import { BusinessRuleViolationException } from '../../common/exceptions/domain/business-rule.exception'
+import { ForbiddenException } from '../../common/exceptions'
 import type { EnvService } from '../../env/env.service'
 import type { EmailService } from '../../infrastructure/email'
 import type { PrismaService } from '../../prisma'
@@ -12,14 +11,14 @@ import type { AuditLogService } from '../audit'
 import { EmailIdentityService } from '../auth/email-identity.service'
 import type { UserCacheService } from '../auth/user-cache.service'
 
+import { invitationActor } from './invitation-actor'
+import type { InvitationAuthorization } from './invitation-authorization'
 import { InviteService } from './invite.service'
-import type { InviteAcceptLimiterService } from './invite-accept-limiter.service'
+import type { InviteAcceptService } from './invite-accept.service'
 import type { InviteRateLimiterService } from './invite-rate-limiter.service'
-import type { OrganizationsService } from './organizations.service'
-import { RoleAssignabilityService } from './role-assignability.service'
+import type { InviteRevokeService } from './invite-revoke.service'
 
 import type { OrgInvite, OrgMember, PrismaClient, Role, User } from '@/generated/prisma/client'
-import { Prisma } from '@/generated/prisma/client'
 
 // InviteService imports EmailService, which transitively pulls the ESM-only
 // React Email / FormatJS chain. Mock the leaves so this unit suite loads
@@ -34,12 +33,8 @@ jest.mock('@formatjs/intl', () => ({
 describe('InviteService', () => {
   let service: InviteService
   let prisma: DeepMockProxy<PrismaClient>
-  let orgsService: jest.Mocked<
-    Pick<OrganizationsService, 'bumpAclVersionTx' | 'invalidateAclVersion'>
-  >
   let userCacheService: jest.Mocked<Pick<UserCacheService, 'getUser'>>
   let inviteRateLimiter: jest.Mocked<Pick<InviteRateLimiterService, 'check' | 'consume'>>
-  let acceptLimiter: jest.Mocked<Pick<InviteAcceptLimiterService, 'check' | 'consume' | 'reset'>>
   let emailService: jest.Mocked<Pick<EmailService, 'sendOrgInviteEmail'>>
   let auditLog: jest.Mocked<Pick<AuditLogService, 'record'>>
   let env: { get: jest.Mock }
@@ -88,6 +83,10 @@ describe('InviteService', () => {
     aclVersion: 0,
   }
 
+  const actor = invitationActor({
+    user: principal,
+    privilegedAdmission: { authenticated: principal, principal },
+  })
   const inviteRow: OrgInvite = {
     id: 'invite-1',
     organizationId: 'org-1',
@@ -107,20 +106,18 @@ describe('InviteService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
-    prisma.$queryRaw.mockResolvedValue([{ id: 'org-1', aclVersion: 0 }])
-    orgsService = {
-      bumpAclVersionTx: jest.fn().mockResolvedValue(undefined),
-      invalidateAclVersion: jest.fn().mockResolvedValue(undefined),
-    }
+    prisma.$queryRaw.mockImplementation((async (query: unknown) => {
+      const sql = (query as TemplateStringsArray).join('')
+      if (sql.includes('FROM core.roles'))
+        return [await prisma.role.findUnique({ where: { id: 'unused' } })] as never
+      if (sql.includes('FROM core.org_invites')) return [inviteRow] as never
+      if (sql.includes('AS value')) return [{ value: new Date() }] as never
+      return [{ id: 'org-1', aclVersion: 0 }] as never
+    }) as never)
     userCacheService = { getUser: jest.fn() }
     inviteRateLimiter = {
       check: jest.fn().mockResolvedValue(undefined),
       consume: jest.fn().mockResolvedValue(undefined),
-    }
-    acceptLimiter = {
-      check: jest.fn().mockResolvedValue(undefined),
-      consume: jest.fn().mockResolvedValue(undefined),
-      reset: jest.fn().mockResolvedValue(undefined),
     }
     emailService = { sendOrgInviteEmail: jest.fn().mockResolvedValue(undefined) }
     auditLog = { record: jest.fn().mockResolvedValue(undefined) }
@@ -135,16 +132,20 @@ describe('InviteService', () => {
 
     service = new InviteService(
       prisma as unknown as PrismaService,
-      orgsService as unknown as OrganizationsService,
       new EmailIdentityService(),
-      new RoleAssignabilityService(),
       userCacheService as unknown as UserCacheService,
       inviteRateLimiter as unknown as InviteRateLimiterService,
-      acceptLimiter as unknown as InviteAcceptLimiterService,
       emailService as unknown as EmailService,
       env as unknown as EnvService,
       auditLog as unknown as AuditLogService,
-      logger
+      logger,
+      {
+        lockActor: jest.fn().mockResolvedValue({ id: principal.sub }),
+        authorize: jest.fn().mockResolvedValue(undefined),
+        checkKeyClock: jest.fn(),
+      } as unknown as InvitationAuthorization,
+      {} as InviteAcceptService,
+      {} as InviteRevokeService
     )
     ;(prisma.$transaction as unknown as jest.Mock).mockImplementation(
       async (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma)
@@ -155,7 +156,7 @@ describe('InviteService', () => {
   describe('createInvite', () => {
     it('rejects with ForbiddenException when org context does not match', async () => {
       await expect(
-        service.createInvite('org-other', { email: 'x@example.com' }, principal)
+        service.createInvite('org-other', { email: 'x@example.com' }, actor)
       ).rejects.toThrow(ForbiddenException)
       expect(inviteRateLimiter.check).not.toHaveBeenCalled()
     })
@@ -168,11 +169,7 @@ describe('InviteService', () => {
       prisma.orgInvite.findFirst.mockResolvedValue(null)
       prisma.orgInvite.create.mockResolvedValue(inviteRow)
 
-      const result = await service.createInvite(
-        'org-1',
-        { email: 'invited@example.com' },
-        principal
-      )
+      const result = await service.createInvite('org-1', { email: 'invited@example.com' }, actor)
 
       expect(result).toEqual({ status: 'invited' })
       expect(prisma.orgInvite.create).toHaveBeenCalledTimes(1)
@@ -205,11 +202,7 @@ describe('InviteService', () => {
       prisma.orgInvite.findFirst.mockResolvedValue(null)
       prisma.orgInvite.create.mockResolvedValue(inviteRow)
 
-      const result = await service.createInvite(
-        'org-1',
-        { email: 'newperson@example.com' },
-        principal
-      )
+      const result = await service.createInvite('org-1', { email: 'newperson@example.com' }, actor)
 
       expect(result).toEqual({ status: 'invited' })
       expect(prisma.orgInvite.create).toHaveBeenCalledTimes(1)
@@ -231,11 +224,7 @@ describe('InviteService', () => {
       }
       prisma.orgMember.findUnique.mockResolvedValue(existingMember)
 
-      const result = await service.createInvite(
-        'org-1',
-        { email: 'invited@example.com' },
-        principal
-      )
+      const result = await service.createInvite('org-1', { email: 'invited@example.com' }, actor)
 
       expect(result).toEqual({ status: 'invited' })
       expect(prisma.orgInvite.create).not.toHaveBeenCalled()
@@ -260,11 +249,7 @@ describe('InviteService', () => {
       prisma.orgInvite.findFirst.mockResolvedValue({ ...inviteRow, id: 'invite-existing' })
       prisma.orgInvite.update.mockResolvedValue({ ...inviteRow, id: 'invite-existing' })
 
-      const result = await service.createInvite(
-        'org-1',
-        { email: 'invited@example.com' },
-        principal
-      )
+      const result = await service.createInvite('org-1', { email: 'invited@example.com' }, actor)
 
       expect(result).toEqual({ status: 'invited' })
       expect(prisma.orgInvite.update).toHaveBeenCalledTimes(1)
@@ -289,7 +274,7 @@ describe('InviteService', () => {
         service.createInvite(
           'org-1',
           { email: 'invited@example.com', roleId: 'role-custom-1' },
-          principal
+          actor
         )
       ).rejects.toThrow(ForbiddenException)
       expect(prisma.orgInvite.create).not.toHaveBeenCalled()
@@ -303,7 +288,7 @@ describe('InviteService', () => {
       prisma.orgInvite.findFirst.mockResolvedValue(null)
       prisma.orgInvite.create.mockResolvedValue(inviteRow)
 
-      await service.createInvite('org-1', { email: 'someone@example.com' }, principal)
+      await service.createInvite('org-1', { email: 'someone@example.com' }, actor)
 
       expect(prisma.role.findMany).toHaveBeenCalledWith({
         where: { name: 'MEMBER', organizationId: null },
@@ -322,9 +307,9 @@ describe('InviteService', () => {
       prisma.orgInvite.findFirst.mockResolvedValue(null)
       prisma.orgInvite.create.mockResolvedValue(inviteRow)
 
-      await service.createInvite('org-1', { email: 'Invited@Example.COM' }, principal)
+      await service.createInvite('org-1', { email: 'Invited@Example.COM' }, actor)
 
-      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1)
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(2)
     })
 
     it('hashes email canonical with sha256 in audit log payload — never raw', async () => {
@@ -334,7 +319,7 @@ describe('InviteService', () => {
       prisma.orgInvite.findFirst.mockResolvedValue(null)
       prisma.orgInvite.create.mockResolvedValue(inviteRow)
 
-      await service.createInvite('org-1', { email: 'leak-check@example.com' }, principal)
+      await service.createInvite('org-1', { email: 'leak-check@example.com' }, actor)
 
       const auditCall = logger.info.mock.calls.find(
         ([payload]) => (payload as { event?: string }).event === 'org.invite.created'
@@ -362,8 +347,8 @@ describe('InviteService', () => {
       auditLog.record.mockRejectedValueOnce(new Error('audit down'))
 
       await expect(
-        service.createInvite('org-1', { email: 'audit@example.com' }, principal)
-      ).rejects.toThrow('audit down')
+        service.createInvite('org-1', { email: 'audit@example.com' }, actor)
+      ).rejects.toThrow('Invitation write unconfirmed')
       expect(emailService.sendOrgInviteEmail).not.toHaveBeenCalled()
     })
   })
@@ -392,7 +377,7 @@ describe('InviteService', () => {
       prisma.orgInvite.findFirst.mockResolvedValue(null)
       prisma.orgInvite.create.mockResolvedValue(inviteRow)
 
-      await service.createInvite('org-1', { email: 'invited@example.com' }, principal)
+      await service.createInvite('org-1', { email: 'invited@example.com' }, actor)
 
       expect(emailService.sendOrgInviteEmail).toHaveBeenCalledTimes(1)
       const [to, data] = emailService.sendOrgInviteEmail.mock.calls[0]!
@@ -416,7 +401,7 @@ describe('InviteService', () => {
       prisma.orgInvite.findFirst.mockResolvedValue(null)
       prisma.orgInvite.create.mockResolvedValue(inviteRow)
 
-      await service.createInvite('org-1', { email: 'newperson@example.com' }, principal)
+      await service.createInvite('org-1', { email: 'newperson@example.com' }, actor)
 
       expect(emailService.sendOrgInviteEmail).toHaveBeenCalledTimes(1)
       const [, data] = emailService.sendOrgInviteEmail.mock.calls[0]!
@@ -431,7 +416,7 @@ describe('InviteService', () => {
       prisma.orgInvite.findFirst.mockResolvedValue({ ...inviteRow, id: 'invite-existing' })
       prisma.orgInvite.update.mockResolvedValue({ ...inviteRow, id: 'invite-existing' })
 
-      await service.createInvite('org-1', { email: 'invited@example.com' }, principal)
+      await service.createInvite('org-1', { email: 'invited@example.com' }, actor)
 
       expect(emailService.sendOrgInviteEmail).toHaveBeenCalledTimes(1)
     })
@@ -445,7 +430,7 @@ describe('InviteService', () => {
         createdAt: new Date(),
       })
 
-      await service.createInvite('org-1', { email: 'invited@example.com' }, principal)
+      await service.createInvite('org-1', { email: 'invited@example.com' }, actor)
 
       expect(emailService.sendOrgInviteEmail).not.toHaveBeenCalled()
     })
@@ -456,11 +441,7 @@ describe('InviteService', () => {
       prisma.orgInvite.create.mockResolvedValue(inviteRow)
       emailService.sendOrgInviteEmail.mockRejectedValue(new Error('queue down'))
 
-      const result = await service.createInvite(
-        'org-1',
-        { email: 'newperson@example.com' },
-        principal
-      )
+      const result = await service.createInvite('org-1', { email: 'newperson@example.com' }, actor)
 
       expect(result).toEqual({ status: 'invited' })
       const warnCall = logger.warn.mock.calls.find(
@@ -522,336 +503,6 @@ describe('InviteService', () => {
         expiresAt: expect.any(String),
         createdAt: expect.any(String),
       })
-    })
-  })
-
-  describe('revokeInvite', () => {
-    it('rejects with ForbiddenException when org context does not match', async () => {
-      await expect(service.revokeInvite('org-other', 'invite-1', principal)).rejects.toThrow(
-        ForbiddenException
-      )
-    })
-
-    it('throws 404 NotFoundException when invite is missing', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(null)
-      await expect(service.revokeInvite('org-1', 'invite-missing', principal)).rejects.toThrow(
-        NotFoundException
-      )
-    })
-
-    it('throws 404 when invite belongs to a different org (no enumeration via org leak)', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue({
-        ...inviteRow,
-        organizationId: 'org-other',
-      })
-      await expect(service.revokeInvite('org-1', inviteRow.id, principal)).rejects.toThrow(
-        NotFoundException
-      )
-    })
-
-    it('throws BusinessRuleViolation (409) when invite is already accepted', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue({
-        ...inviteRow,
-        acceptedAt: new Date(),
-      })
-      await expect(service.revokeInvite('org-1', inviteRow.id, principal)).rejects.toThrow(
-        BusinessRuleViolationException
-      )
-      expect(prisma.orgInvite.update).not.toHaveBeenCalled()
-    })
-
-    it('idempotent no-op on already-revoked invite — no write, no audit', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue({
-        ...inviteRow,
-        revokedAt: new Date(),
-      })
-      await expect(service.revokeInvite('org-1', inviteRow.id, principal)).resolves.toBeUndefined()
-      expect(prisma.orgInvite.update).not.toHaveBeenCalled()
-      expect(auditLog.record).not.toHaveBeenCalled()
-      const auditCall = logger.info.mock.calls.find(
-        ([payload]) => (payload as { event?: string }).event === 'org.invite.revoked'
-      )
-      expect(auditCall).toBeUndefined()
-    })
-
-    it('sets revokedAt + revokedById and emits audit on happy path', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(inviteRow)
-
-      await service.revokeInvite('org-1', inviteRow.id, principal)
-
-      const updateArg = prisma.orgInvite.updateMany.mock.calls[0]?.[0] as {
-        where: { id: string; organizationId: string; acceptedAt: null; revokedAt: null }
-        data: { revokedAt: Date; revokedById: string }
-      }
-      expect(updateArg.where).toEqual({
-        id: inviteRow.id,
-        organizationId: 'org-1',
-        acceptedAt: null,
-        revokedAt: null,
-      })
-      expect(updateArg.data.revokedById).toBe(principal.sub)
-      const auditCall = logger.info.mock.calls.find(
-        ([payload]) => (payload as { event?: string }).event === 'org.invite.revoked'
-      )
-      expect(auditCall?.[0]).toEqual(
-        expect.objectContaining({ actorUserId: principal.sub, inviteId: inviteRow.id })
-      )
-      expect(auditLog.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'org.invite_revoked',
-          organizationId: 'org-1',
-          targetId: inviteRow.id,
-        })
-      )
-    })
-
-    it('throws BusinessRuleViolation when concurrent accept wins before revoke update', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(inviteRow)
-      prisma.orgInvite.updateMany.mockResolvedValue({ count: 0 })
-
-      await expect(service.revokeInvite('org-1', inviteRow.id, principal)).rejects.toThrow(
-        BusinessRuleViolationException
-      )
-    })
-  })
-
-  describe('acceptInvite', () => {
-    const acceptIp = '203.0.113.5'
-    const acceptToken = 'a'.repeat(43) // base64url 32-byte token shape
-
-    const acceptUser: User = {
-      ...targetUser,
-      id: 'user-target',
-      email: 'invited@example.com',
-      emailVerified: true,
-    }
-
-    const acceptPrincipal: RequestPrincipal = {
-      ...principal,
-      sub: 'user-target',
-      email: 'invited@example.com',
-      organizationId: undefined,
-    }
-
-    it('throws 429 when limiter is saturated — DB never touched', async () => {
-      acceptLimiter.check.mockRejectedValue(
-        new AppException('too many', 429, 'RATE_LIMIT_EXCEEDED')
-      )
-
-      await expect(service.acceptInvite(acceptToken, acceptPrincipal, acceptIp)).rejects.toThrow(
-        AppException
-      )
-      expect(prisma.orgInvite.findUnique).not.toHaveBeenCalled()
-    })
-
-    it('throws INVITE_INVALID_OR_EXPIRED + consume on token not found', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(null)
-
-      const error = await service
-        .acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-        .catch((e) => e)
-      expect(error).toBeInstanceOf(AppException)
-      expect(error.errorCode).toBe(InviteErrorCode.INVITE_INVALID_OR_EXPIRED)
-      expect(acceptLimiter.consume).toHaveBeenCalledTimes(1)
-    })
-
-    it('throws INVITE_INVALID_OR_EXPIRED on expired invite', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue({
-        ...inviteRow,
-        expiresAt: new Date(Date.now() - 1000),
-      })
-      const error = await service
-        .acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-        .catch((e) => e)
-      expect(error.errorCode).toBe(InviteErrorCode.INVITE_INVALID_OR_EXPIRED)
-      expect(acceptLimiter.consume).toHaveBeenCalledTimes(1)
-    })
-
-    it('throws INVITE_INVALID_OR_EXPIRED on revoked invite', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue({
-        ...inviteRow,
-        revokedAt: new Date(),
-      })
-      const error = await service
-        .acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-        .catch((e) => e)
-      expect(error.errorCode).toBe(InviteErrorCode.INVITE_INVALID_OR_EXPIRED)
-    })
-
-    it('throws INVITE_INVALID_OR_EXPIRED on already-accepted invite', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue({
-        ...inviteRow,
-        acceptedAt: new Date(),
-      })
-      const error = await service
-        .acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-        .catch((e) => e)
-      expect(error.errorCode).toBe(InviteErrorCode.INVITE_INVALID_OR_EXPIRED)
-    })
-
-    it('throws INVITE_INVALID_OR_EXPIRED on email canonical mismatch', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue({
-        ...inviteRow,
-        emailCanonical: 'someone-else@example.com',
-      })
-      userCacheService.getUser.mockResolvedValue(acceptUser)
-
-      const error = await service
-        .acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-        .catch((e) => e)
-      expect(error.errorCode).toBe(InviteErrorCode.INVITE_INVALID_OR_EXPIRED)
-      expect(acceptLimiter.consume).toHaveBeenCalledTimes(1)
-    })
-
-    it('throws INVITE_EMAIL_NOT_VERIFIED with 403 + consume when user unverified', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(inviteRow)
-      userCacheService.getUser.mockResolvedValue({ ...acceptUser, emailVerified: false })
-
-      const error = await service
-        .acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-        .catch((e) => e)
-      expect(error).toBeInstanceOf(AppException)
-      expect(error.errorCode).toBe(InviteErrorCode.INVITE_EMAIL_NOT_VERIFIED)
-      expect(error.getStatus()).toBe(403)
-      expect(acceptLimiter.consume).toHaveBeenCalledTimes(1)
-    })
-
-    it('creates membership + role link, marks invite accepted, bumps aclVersion (happy path)', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(inviteRow)
-      userCacheService.getUser.mockResolvedValue(acceptUser)
-      prisma.role.findUnique.mockResolvedValue(memberRole) // re-check inside tx
-      prisma.orgMember.create.mockResolvedValue({
-        id: 'member-new',
-        userId: acceptUser.id,
-        organizationId: 'org-1',
-        createdAt: new Date(),
-      })
-
-      const result = await service.acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-
-      expect(result).toEqual({ organizationId: 'org-1', roleId: 'role-member' })
-      expect(prisma.orgInvite.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: inviteRow.id,
-          acceptedAt: null,
-          revokedAt: null,
-          expiresAt: { gt: expect.any(Date) },
-        },
-        data: { acceptedAt: expect.any(Date), acceptedByUserId: acceptUser.id },
-      })
-      expect(prisma.orgMember.create).toHaveBeenCalled()
-      expect(prisma.memberRole.create).toHaveBeenCalledWith({
-        data: { memberId: 'member-new', roleId: 'role-member' },
-      })
-      expect(orgsService.bumpAclVersionTx).toHaveBeenCalledWith('org-1', prisma)
-      expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
-      expect(acceptLimiter.reset).toHaveBeenCalledTimes(1)
-      const auditCall = logger.info.mock.calls.find(
-        ([payload]) => (payload as { event?: string }).event === 'org.invite.accepted'
-      )
-      expect(auditCall?.[0]).toEqual(
-        expect.objectContaining({
-          orgId: 'org-1',
-          inviteId: inviteRow.id,
-          roleId: 'role-member',
-          actorUserId: acceptUser.id,
-        })
-      )
-      expect(auditLog.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'org.invite_accepted',
-          organizationId: 'org-1',
-          targetId: inviteRow.id,
-        }),
-        expect.objectContaining({ tx: prisma })
-      )
-    })
-
-    it('falls back to system MEMBER role when invite.roleId is null', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue({ ...inviteRow, roleId: null })
-      userCacheService.getUser.mockResolvedValue(acceptUser)
-      prisma.role.findMany.mockResolvedValue([memberRole])
-      prisma.role.findUnique.mockResolvedValue(memberRole)
-      prisma.orgMember.create.mockResolvedValue({
-        id: 'member-new',
-        userId: acceptUser.id,
-        organizationId: 'org-1',
-        createdAt: new Date(),
-      })
-
-      const result = await service.acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-      expect(result.roleId).toBe(memberRole.id)
-      expect(prisma.role.findMany).toHaveBeenCalledWith({
-        where: { name: 'MEMBER', organizationId: null },
-        select: { id: true, isSystem: true },
-      })
-    })
-
-    it('throws INVITE_ALREADY_MEMBER (409) on P2002 unique violation + consume', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(inviteRow)
-      userCacheService.getUser.mockResolvedValue(acceptUser)
-      prisma.role.findUnique.mockResolvedValue(memberRole)
-      prisma.orgMember.create.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: '7.5.0',
-          meta: { target: ['userId', 'organizationId'] },
-        })
-      )
-
-      const error = await service
-        .acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-        .catch((e) => e)
-      expect(error).toBeInstanceOf(AppException)
-      expect(error.errorCode).toBe(InviteErrorCode.INVITE_ALREADY_MEMBER)
-      expect(error.getStatus()).toBe(409)
-      expect(acceptLimiter.consume).toHaveBeenCalledTimes(1)
-      expect(acceptLimiter.reset).not.toHaveBeenCalled()
-    })
-
-    it('throws INVITE_INVALID_OR_EXPIRED when concurrent revoke wins before accept claim', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(inviteRow)
-      userCacheService.getUser.mockResolvedValue(acceptUser)
-      prisma.orgInvite.updateMany.mockResolvedValue({ count: 0 })
-
-      const error = await service
-        .acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-        .catch((e) => e)
-      expect(error).toBeInstanceOf(AppException)
-      expect(error.errorCode).toBe(InviteErrorCode.INVITE_INVALID_OR_EXPIRED)
-      expect(acceptLimiter.consume).toHaveBeenCalledTimes(1)
-      expect(prisma.orgMember.create).not.toHaveBeenCalled()
-      expect(acceptLimiter.reset).not.toHaveBeenCalled()
-    })
-
-    it('does not consume limiter on infra errors (decision-vs-infra discriminator)', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(inviteRow)
-      userCacheService.getUser.mockResolvedValue(acceptUser)
-      prisma.role.findUnique.mockResolvedValue(memberRole)
-      // Simulate Prisma pool timeout — not a decision-class failure.
-      prisma.orgMember.create.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Timed out fetching a new connection', {
-          code: 'P2024',
-          clientVersion: '7.5.0',
-        })
-      )
-
-      await expect(service.acceptInvite(acceptToken, acceptPrincipal, acceptIp)).rejects.toThrow(
-        Prisma.PrismaClientKnownRequestError
-      )
-      expect(acceptLimiter.consume).not.toHaveBeenCalled()
-      expect(acceptLimiter.reset).not.toHaveBeenCalled()
-    })
-
-    it('rejects when user not found in cache (defense-in-depth) — consume + uniform 400', async () => {
-      prisma.orgInvite.findUnique.mockResolvedValue(inviteRow)
-      userCacheService.getUser.mockResolvedValue(null)
-
-      const error = await service
-        .acceptInvite(acceptToken, acceptPrincipal, acceptIp)
-        .catch((e) => e)
-      expect(error.errorCode).toBe(InviteErrorCode.INVITE_INVALID_OR_EXPIRED)
-      expect(acceptLimiter.consume).toHaveBeenCalledTimes(1)
     })
   })
 })

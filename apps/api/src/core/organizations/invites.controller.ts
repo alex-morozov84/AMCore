@@ -1,11 +1,17 @@
 import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Query } from '@nestjs/common'
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOperation,
+  ApiParam,
   ApiQuery,
+  ApiServiceUnavailableResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
@@ -28,6 +34,7 @@ import {
 } from '../auth/organization-context/request-context-policy'
 
 import { InviteListResponseDto } from './dto'
+import { CurrentInvitationActor, type InvitationActor } from './invitation-actor'
 import { InviteService } from './invite.service'
 
 /**
@@ -39,8 +46,7 @@ import { InviteService } from './invite.service'
  * matching per-handler entry in `auth-decorator-coverage.spec.ts`. The
  * invite-create route on `MembersController` stays dual-auth because
  * the credential matrix there was unchanged by the Stage C contract
- * flip; narrowing it is a separate decision. See
- * `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OB-02.
+ * flip; narrowing it is a separate decision (ADR-034).
  */
 @ApiTags('organizations')
 @ApiBearerAuth()
@@ -54,6 +60,9 @@ import { InviteService } from './invite.service'
 export class InvitesController {
   constructor(private readonly inviteService: InviteService) {}
 
+  @ApiParam({ name: 'orgId', type: String })
+  @ApiBadRequestResponse({ description: 'Invalid query or selector' })
+  @ApiNotFoundResponse({ description: 'Organization unavailable' })
   @Get()
   @RequireTeamAccess('orgId')
   @ApiOperation({
@@ -102,7 +111,16 @@ export class InvitesController {
       'returns 400 BUSINESS_RULE_VIOLATION (remove the member via ' +
       'DELETE /organizations/:orgId/members/:userId instead).',
   })
-  @ApiNoContentResponse({ description: 'Invite revoked' })
+  @ApiTooManyRequestsResponse({ description: 'Request rate limit exceeded' })
+  @ApiNoContentResponse({ description: 'Invite revoked; repeat preserves first revocation' })
+  @ApiParam({ name: 'orgId', type: String })
+  @ApiParam({ name: 'inviteId', type: String })
+  @ApiBadRequestResponse({ description: 'BUSINESS_RULE_VIOLATION: already accepted' })
+  @ApiNotFoundResponse({ description: 'Organization or invite unavailable' })
+  @ApiConflictResponse({ description: 'CONFLICT: known transaction abort' })
+  @ApiServiceUnavailableResponse({
+    description: 'Write unconfirmed; inspect state before retrying',
+  })
   @RequestContextPolicy({
     kind: 'organization',
     selector: { param: 'orgId' },
@@ -111,8 +129,8 @@ export class InvitesController {
   revokeInvite(
     @Param('orgId') orgId: string,
     @Param('inviteId') inviteId: string,
-    @CurrentUser() principal: RequestPrincipal
+    @CurrentInvitationActor() actor: InvitationActor
   ): Promise<void> {
-    return this.inviteService.revokeInvite(orgId, inviteId, principal)
+    return this.inviteService.revokeInvite(orgId, inviteId, actor)
   }
 }

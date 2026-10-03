@@ -129,6 +129,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Invitation acceptance preserves the issued role intent: deleted roles fail
+  closed, legacy null-role pending invitations are revoked by a controlled data
+  migration, and concurrent accept/reissue/revoke operations are atomic. Sender
+  authorization and exact API-key admission are rechecked under database locks;
+  provider failure details cannot expose invitation links in logs.
+
 - Replace ambient organization wildcard defaults with explicit resource/field grants;
   separate full team access administration from limited organization management.
   Enforce actual organization records/response fields and transactional PATCH

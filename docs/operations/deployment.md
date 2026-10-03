@@ -117,6 +117,12 @@ docker compose run --rm migrate                 # apply new migrations once
 docker compose up -d --no-deps api worker web   # recreate the app with the new image
 ```
 
+The invitation data repair `20261003180000_invitation_role_intent` requires
+all old invitation writers to be drained before migration. Restart only repaired
+instances; [the invitation upgrade guide](../auth/invites.md#upgrade-existing-installations)
+explains affected rows and compatible recovery. This data repair needs a
+maintenance window rather than overlapping old/new invitation writers.
+
 ### Validate the compose graph
 
 Cheap sanity check for both modes (no containers started):

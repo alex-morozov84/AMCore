@@ -37,7 +37,7 @@ export function holdMemberTransaction(
                   const value = await (target.$executeRaw as (...a: unknown[]) => Promise<unknown>)(
                     ...args
                   )
-                  trace?.push('advisory')
+                  if (String(args[0]).includes('pg_advisory_xact_lock')) trace?.push('advisory')
                   return value
                 }
               if (key === 'orgInvite' && trace)
@@ -58,6 +58,7 @@ export function holdMemberTransaction(
                 const value = await (target.$queryRaw as (...a: unknown[]) => Promise<unknown>)(
                   ...args
                 )
+                if (!String(args[0]).includes('core.organizations')) return value
                 trace?.push('parent')
                 entered.resolve()
                 await release.promise

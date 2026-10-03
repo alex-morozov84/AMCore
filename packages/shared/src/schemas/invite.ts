@@ -53,10 +53,8 @@ export type InviteResponse = z.infer<typeof inviteResponseSchema>
 /**
  * Response for `POST /auth/invites/accept` on success.
  *
- * `roleId` is always a concrete role id — never null. If the invite's
- * named custom role was deleted before accept (FK `SetNull` left
- * `invite.roleId` null), the accept handler assigns the system MEMBER
- * role as a lower-privilege fallback and returns that id.
+ * `roleId` is the concrete assigned role. Deleted or unavailable roles invalidate
+ * acceptance; MEMBER is selected only when roleId is omitted at issuance.
  */
 export const acceptInviteResponseSchema = z.object({
   organizationId: z.string(),

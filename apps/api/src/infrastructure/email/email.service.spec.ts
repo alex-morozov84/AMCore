@@ -218,6 +218,46 @@ describe('EmailService', () => {
       )
     })
 
+    it.each(['result', 'throw', 'render'] as const)(
+      'sanitizes secret-bearing %s failures without queue/log leakage',
+      async (failure) => {
+        const sentinel = 'INVITATION_SECRET_SENTINEL'
+        const data = {
+          name: 'Recipient',
+          verificationUrl: `https://example.test/verify?token=${sentinel}`,
+          expiresInHours: 24,
+        }
+        const render =
+          failure === 'render'
+            ? jest
+                .spyOn(service, 'renderTemplate')
+                .mockRejectedValueOnce(new Error(sentinel, { cause: new Error(sentinel) }))
+            : undefined
+        if (failure === 'throw')
+          emailProvider.send.mockRejectedValueOnce(
+            new Error(sentinel, { cause: new Error(sentinel) })
+          )
+        if (failure === 'result')
+          emailProvider.send.mockResolvedValueOnce({ id: '', success: false, error: sentinel })
+        try {
+          await expect(
+            service.sendNow(EmailTemplate.EMAIL_VERIFICATION, 'recipient@example.test', data)
+          ).rejects.toThrow('Direct email delivery failed')
+          expect(queueService.add).not.toHaveBeenCalled()
+          expect(
+            JSON.stringify([
+              mockLogger.info.mock.calls,
+              mockLogger.warn.mock.calls,
+              mockLogger.error.mock.calls,
+              metrics.observeEmailOperation.mock.calls,
+            ])
+          ).not.toContain(sentinel)
+        } finally {
+          render?.mockRestore()
+        }
+      }
+    )
+
     it('throws when the provider reports failure', async () => {
       emailProvider.send.mockResolvedValue({ id: '', success: false, error: 'boom' })
 
@@ -227,7 +267,7 @@ describe('EmailService', () => {
           verificationUrl: 'https://x/verify?token=xyz',
           expiresInHours: 24,
         })
-      ).rejects.toThrow('boom')
+      ).rejects.toThrow('Direct email delivery failed')
       expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
         expect.objectContaining({
           template: EmailTemplate.EMAIL_VERIFICATION,
