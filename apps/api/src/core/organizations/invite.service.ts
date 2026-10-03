@@ -25,6 +25,7 @@ import { UserCacheService } from '../auth/user-cache.service'
 
 import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
 import { InviteRateLimiterService } from './invite-rate-limiter.service'
+import { lockOrganization } from './organization-mutation-lock'
 import { OrganizationsService } from './organizations.service'
 import { RoleAssignabilityService } from './role-assignability.service'
 import { getSystemRoleId } from './system-role'
@@ -133,6 +134,7 @@ export class InviteService {
 
     const result: CreateInviteResult = await this.prisma.$transaction(async (tx) => {
       await this.acquireXactLock(tx, `org-invite:${orgId}:${emailCanonical}`)
+      await lockOrganization(tx, orgId)
 
       // OA-05: assignability inside the tx so role.organizationId can't
       // change between check and the membership/invite write.
@@ -530,6 +532,7 @@ export class InviteService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        await lockOrganization(tx, orgId)
         const acceptedAt = new Date()
         const claimed = await tx.orgInvite.updateMany({
           where: {

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Organization members and atomic multi-role assignment with reusable headless
+  hooks, a responsive ready page, debounced search, optimistic revision checks
+  and transactional audit. Shared presentation remains independent of Console.
+
 - Organization pages accept one application placement for addresses, pagination
   and both product menus; shell-free mount and public product-admin integration
   guides preserve explicit routing and independent headless composition.

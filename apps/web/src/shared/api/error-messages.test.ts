@@ -4,6 +4,7 @@ import {
   CommonErrorCode,
   InfrastructureErrorCode,
   InviteErrorCode,
+  OrganizationMemberErrorCode,
   PermissionErrorCode,
   ResourceErrorCode,
   SUPPORTED_LOCALES,
@@ -29,6 +30,7 @@ const backendCodes = [
   ...Object.values(InfrastructureErrorCode),
   ...Object.values(ApiKeyScopeErrorCode),
   ...Object.values(InviteErrorCode),
+  ...Object.values(OrganizationMemberErrorCode),
   ...Object.values(CommonErrorCode),
   ...Object.values(PermissionErrorCode),
 ]

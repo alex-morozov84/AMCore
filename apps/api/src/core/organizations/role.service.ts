@@ -15,6 +15,7 @@ import {
 } from '../auth/casl/permission-rule-validation'
 
 import type { CreateRoleDto, UpdateRoleDto } from './dto'
+import { lockOrganization } from './organization-mutation-lock'
 import { OrganizationsService } from './organizations.service'
 
 import type { Permission, Prisma, Role } from '@/generated/prisma/client'
@@ -149,7 +150,6 @@ export class RoleService {
 
   async deleteRole(orgId: string, roleId: string, principal: RequestPrincipal): Promise<void> {
     this.assertOrgContext(principal, orgId)
-    await this.findCustomRole(orgId, roleId)
     // OA-12: delete + bump in the same transaction so a transient DB
     // failure cannot leave the cache version diverged from the deleted
     // role's effect on permissions.
@@ -168,6 +168,8 @@ export class RoleService {
     //   2. now linked to no roles (`roles: { none: {} }` — survives a
     //      shared-permission case where another role still uses it).
     await this.prisma.$transaction(async (tx) => {
+      await lockOrganization(tx, orgId)
+      await this.findCustomRole(orgId, roleId, tx)
       const links = await tx.rolePermission.findMany({
         where: { roleId },
         select: { permissionId: true },
@@ -199,7 +201,6 @@ export class RoleService {
     principal: RequestPrincipal
   ): Promise<PermissionResponse> {
     this.assertOrgContext(principal, orgId)
-    await this.findCustomRole(orgId, roleId)
     validatePermissionRule(dto)
 
     // OA-12: permission create + role link + bump in the same
@@ -208,6 +209,8 @@ export class RoleService {
     // window in part — full OA-10 fix is its own stage, but the
     // transactional bump makes the rolling-back case cleaner.
     const permission = await this.prisma.$transaction(async (tx) => {
+      await lockOrganization(tx, orgId)
+      await this.findCustomRole(orgId, roleId, tx)
       const permission = await tx.permission.create({
         data: {
           action: dto.action,
@@ -235,18 +238,20 @@ export class RoleService {
   ): Promise<void> {
     this.assertOrgContext(principal, orgId)
 
-    const link = await this.prisma.rolePermission.findUnique({
-      where: { roleId_permissionId: { roleId, permissionId: permId } },
-      include: { permission: { select: { organizationId: true } } },
-    })
-    if (!link) throw new NotFoundException('Permission not found on this role')
-    if (link.permission.organizationId !== orgId) {
-      throw new ForbiddenException('Cannot remove system-level permissions')
-    }
-
     // OA-12: delete + bump in the same transaction. Deleting Permission
     // cascades to RolePermission via the FK relation.
     await this.prisma.$transaction(async (tx) => {
+      await lockOrganization(tx, orgId)
+      await this.findCustomRole(orgId, roleId, tx)
+      const link = await tx.rolePermission.findUnique({
+        where: { roleId_permissionId: { roleId, permissionId: permId } },
+        include: { permission: { select: { organizationId: true } } },
+      })
+      if (!link) throw new NotFoundException('Permission not found on this role')
+      if (link.permission.organizationId !== orgId) {
+        throw new ForbiddenException('Cannot remove system-level permissions')
+      }
+
       await tx.permission.delete({ where: { id: permId } })
       await this.orgsService.bumpAclVersionTx(orgId, tx)
     })
@@ -254,8 +259,12 @@ export class RoleService {
   }
 
   /** Only org-specific, non-system roles can be managed */
-  private async findCustomRole(orgId: string, roleId: string): Promise<Role> {
-    const role = await this.prisma.role.findFirst({ where: { id: roleId, organizationId: orgId } })
+  private async findCustomRole(
+    orgId: string,
+    roleId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma
+  ): Promise<Role> {
+    const role = await db.role.findFirst({ where: { id: roleId, organizationId: orgId } })
     if (!role) throw new NotFoundException('Custom role not found in this organization')
     if (role.isSystem) throw new ForbiddenException('System roles cannot be modified')
     return role

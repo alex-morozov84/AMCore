@@ -78,6 +78,7 @@ const topology = [
   '(organization-access)/layout.tsx',
   '(organization-access)/organizations/page.tsx',
   '(organization-access)/organizations/[id]/page.tsx',
+  '(organization-access)/organizations/[id]/members/page.tsx',
   'auth/callback/route.ts',
   'layout.tsx',
   'providers.tsx',

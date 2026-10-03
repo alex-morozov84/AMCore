@@ -58,7 +58,7 @@ describe('MembersController (invite handler — OB-02 Stage C)', () => {
     const expected: InviteResponse = { status: 'invited' }
     inviteService.createInvite.mockResolvedValue(expected)
 
-    const controller = new MembersController(memberService, inviteService)
+    const controller = new MembersController(memberService, inviteService, {} as never, {} as never)
     const dto = { email: 'target@example.com', roleId: 'role-1' } as CreateInviteDto
 
     const result = await controller.invite('org-1', dto, principal)

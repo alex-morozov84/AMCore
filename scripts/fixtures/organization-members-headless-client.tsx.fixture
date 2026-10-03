@@ -1,0 +1,63 @@
+'use client'
+
+import { useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
+import type { MemberRolesResponse, ProductAccessBootstrap } from '@amcore/shared'
+
+import { useMemberRoleAssignments, useOrganizationContext, useOrganizationMembers, type OrganizationAccessController } from '@/entities/organization-context'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+
+// Different presentation: list beside a persistent inline editor, no ready slices.
+export function CustomMembers({ admission, id }: { admission: ProductAccessBootstrap; id: string; query?: { page: number; search: string }; membersHref?: string; listHref?: string }) {
+  const locale = useLocale()
+  const t = useTranslations('organizationMembers')
+  const context = useOrganizationContext(admission.binding, { kind: 'selected', id, locale })
+  const members = useOrganizationMembers(context.controller, { page: 1, search: '' })
+  const [selected, setSelected] = useState<string>()
+  return <section className="space-y-6" data-testid="custom-headless-members">
+    <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <ApiErrorAlert error={context.state.error ?? members.error} />
+    <div className="grid gap-6 md:grid-cols-2">
+      <ul className="space-y-3">{members.ready && members.data?.data.map((member) => <li key={member.memberId}>
+        <Button variant="outline" onClick={() => setSelected(member.user.id)}>{member.user.email}</Button>
+      </li>)}</ul>
+      {selected && <InlineRoles key={selected} controller={context.controller} userId={selected} actorId={admission.actor.id} />}
+    </div>
+    <Button onClick={() => void context.refresh()} disabled={context.state.status === 'pending' || context.controller.isBusy()}>{t('refresh')}</Button>
+  </section>
+}
+function InlineRoles({ controller, userId, actorId }: { controller: OrganizationAccessController; userId: string; actorId: string }) {
+  const t = useTranslations('organizationMembers')
+  const roles = useMemberRoleAssignments(controller, { userId, page: 1, search: '', section: 'available' })
+  const [snapshot, setSnapshot] = useState<MemberRolesResponse>()
+  if (!snapshot && roles.data) setSnapshot(roles.data)
+  const [draft, setDraft] = useState<string[]>()
+  const [ack, setAck] = useState(false)
+  const [notice, setNotice] = useState<'saved' | 'savedUnavailable' | 'unknown'>()
+  const [error, setError] = useState<unknown>()
+  const selected = draft ?? snapshot?.assignedRoles?.map((role) => role.id) ?? []
+  const editable = snapshot?.editMode === 'editable'
+  const original = snapshot?.assignedRoles?.map((role) => role.id) ?? []
+  const changed = selected.length !== original.length || selected.some((id) => !original.includes(id))
+  async function save() {
+    if (!snapshot || !editable) return
+    const result = await roles.save({ expectedMemberId: snapshot.member.memberId, expectedAclVersion: snapshot.aclVersion, roleIds: selected })
+    if (result.status === 'retired') return
+    if (result.status === 'committed') { setNotice(result.followup === 'ready' ? 'saved' : 'savedUnavailable'); setDraft(undefined); setSnapshot(undefined) }
+    else if (result.status === 'unknown') setNotice('unknown')
+    else if (result.status === 'rejected') setError(result.error)
+  }
+  return <section className="space-y-4 rounded-lg border p-4">
+    <ApiErrorAlert error={error ?? roles.error} />
+    {notice && <p role="status">{t(notice)}</p>}
+    {roles.data && !editable && <p>{t(roles.data.editMode === 'oversized' ? 'oversized' : 'byteOversized')}</p>}
+    {roles.data?.choices.data.map((role) => <label key={role.id} className="flex gap-2">
+      <input type="checkbox" checked={selected.includes(role.id)} disabled={!editable || !roles.ready || roles.busy}
+        onChange={(event) => { setDraft(event.target.checked ? [...selected, role.id] : selected.filter((id) => id !== role.id)); setAck(false) }} />{role.name}
+    </label>)}
+    {selected.length === 0 && <p>{t('zero')}</p>}
+    {changed && userId === actorId && <label className="flex gap-2"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />{t('selfWarning')}</label>}
+    <Button onClick={() => void save()} disabled={!editable || !roles.ready || roles.busy || notice === 'unknown' || (changed && userId === actorId && !ack)}>{t('save')}</Button>
+  </section>
+}

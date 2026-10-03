@@ -12,6 +12,7 @@ import { OrganizationSelect } from '@/features/organization-select'
 import { Alert, AlertDescription } from '@/shared/ui/alert'
 import { BackLink } from '@/shared/ui/back-link'
 import { Button } from '@/shared/ui/button'
+import { SectionNavigation } from '@/shared/ui/section-navigation'
 import { OrganizationContextSummary } from '@/widgets/organization-context-summary'
 
 import { useAccessNavigation } from '../model/use-access-navigation'
@@ -23,6 +24,7 @@ export interface OrganizationAccessClientProps {
   admission: ProductAccessBootstrap
   input: OrganizationContextInput
   explicitList: boolean
+  membersHref?: (id: string) => string
   contextHref: (id: string) => string
   pageHref: (page: number) => string
   listHref: string
@@ -34,6 +36,7 @@ export interface OrganizationAccessClientProps {
 
 export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
   const t = useTranslations('organizationAccess')
+  const membersT = useTranslations('organizationMembers')
   const { admission, input } = props
   const { state, data, refresh } = useOrganizationContext(admission.binding, input)
   const navigation = useAccessNavigation({ ...props, state, data, refresh })
@@ -65,6 +68,23 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
           {pending ? t('checking') : t('refresh')}
         </Button>
       </div>
+      {context?.canManageTeamAccess && props.membersHref && (
+        <SectionNavigation
+          label={membersT('sections')}
+          items={[
+            {
+              label: membersT('overview'),
+              href: props.contextHref(context.organization.id),
+              active: true,
+            },
+            {
+              label: membersT('title'),
+              href: props.membersHref(context.organization.id),
+              active: false,
+            },
+          ]}
+        />
+      )}
       <div role="status" aria-live="polite" className="sr-only">
         {pending
           ? selected
@@ -96,7 +116,9 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
             dashboardHref={props.dashboardHref}
           />
         ) : context ? (
-          <OrganizationContextSummary context={context} email={admission.actor.email} />
+          <div className="space-y-4">
+            <OrganizationContextSummary context={context} email={admission.actor.email} />
+          </div>
         ) : null}
       </div>
     </section>

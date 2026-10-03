@@ -32,10 +32,9 @@ a custom omission needs its own dependency inventory, source and runtime proof.
 
 ## Adding a later module
 
-A future members module can add its own `membersPath` to the same app-owned
-placement source and expose a small module-specific adapter and menu entry. It
-reuses the explicit selected organization contract. This is a design example:
-there is no members UI or adapter today. Invitations, keys and settings do not
+The members module derives `membersHref(id)` from the same app-owned placement
+source and reuses the explicit selected organization contract. Its ready mount
+and public headless hooks are described in [organization members](organization-members.md). Invitations, keys and settings do not
 need to share a forced administration prefix. Do not introduce a global navigation
 registry or universal admin provider for ordinary composition.
 
@@ -50,7 +49,7 @@ Each later module review checks:
 
 ## Acceptance for the first mutation module
 
-The current foundation is read-only. A future write slice must supply a code-owned
+The members module is the first mutation module. Each additional write slice must supply a code-owned
 typed operation with binding, target and signal; strict BFF input and Origin checks;
 and each operation's actual response, including `204` without a JSON body.
 
@@ -60,5 +59,5 @@ retirement. Explicitly reread context/capabilities after success: a disabled Que
 observer using `skipToken` does not refetch through `invalidateQueries()`.
 Distinguish a committed write followed by failed reread from a failed write. Never
 blindly retry an ambiguous write; retirement cannot undo committed SQL. Share one
-context owner across related blocks. These requirements do not imply that a write
-transport or management CRUD is delivered now.
+context owner across related blocks. The members module supplies atomic assignment replacement; other management
+journeys remain downstream-owned.

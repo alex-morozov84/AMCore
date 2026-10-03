@@ -5,8 +5,8 @@ import {
   DiscoveryNavigationLink,
   type DiscoverySortOrder,
 } from '@/features/console-discovery'
-import { cn } from '@/shared/lib/utils'
 import { buttonVariants } from '@/shared/ui/button'
+import { ListPagination } from '@/shared/ui/list-pagination'
 
 import type { OrganizationsSortableField } from './parse-query'
 
@@ -34,17 +34,19 @@ export async function OrganizationsPagination({
   const hrefForPage = (targetPage: number) =>
     buildDiscoveryHref(baseHref, { search, sortBy, sortOrder, page: targetPage })
   return (
-    <nav
-      aria-label={t('paginationStatus', { page, totalPages })}
-      className={cn(MONO, 'flex items-center justify-between text-sm')}
-    >
-      <PageLink href={page > 1 ? hrefForPage(page - 1) : null} label={t('paginationPrevious')} />
-      <span className="text-foreground-muted">{t('paginationStatus', { page, totalPages })}</span>
-      <PageLink
-        href={page < totalPages ? hrefForPage(page + 1) : null}
-        label={t('paginationNext')}
-      />
-    </nav>
+    <ListPagination
+      className={MONO}
+      status={t('paginationStatus', { page, totalPages })}
+      previous={
+        <PageLink href={page > 1 ? hrefForPage(page - 1) : null} label={t('paginationPrevious')} />
+      }
+      next={
+        <PageLink
+          href={page < totalPages ? hrefForPage(page + 1) : null}
+          label={t('paginationNext')}
+        />
+      }
+    />
   )
 }
 
