@@ -4,6 +4,11 @@ import path from 'node:path'
 import { test } from 'node:test'
 
 import { commit, runInitProject } from './init-project-test-helpers.mjs'
+import {
+  checkRetainedSettings,
+  checkRemovedSettings,
+  checkSettingsLocale,
+} from './project-console-settings-contract.mjs'
 import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 const copyTest = 'apps/web/src/_pages/console/OverviewPage/overview-copy.test.ts'
@@ -15,6 +20,22 @@ const retained = [
   'docs/operations/runbooks/storage.md',
 ]
 const scenarios = [
+  ['multi path custom slug', ['--admin-console=path', '--admin-console-slug=panel']],
+  ['multi host custom slug', ['--admin-console=host', '--admin-console-slug=panel']],
+  [
+    'ru host custom slug without Storybook',
+    [
+      '--mode=single',
+      '--locale=ru',
+      '--admin-console=host',
+      '--admin-console-slug=panel',
+      '--storybook=disabled',
+    ],
+  ],
+  [
+    'ru disabled without Storybook',
+    ['--mode=single', '--locale=ru', '--admin-console=disabled', '--storybook=disabled'],
+  ],
   ['multi disabled', ['--admin-console=disabled']],
   [
     'en path',
@@ -56,7 +77,13 @@ for (const [name, flags] of scenarios) {
       commit(fixture.root)
       const result = runInitProject(fixture.root, [...flags, '--yes'])
       assert.equal(result.status, 0, result.stderr)
-      if (flags.includes('--admin-console=disabled')) return checkDisabled(fixture.root)
+      checkRetainedSettings(process.cwd(), fixture.root)
+      if (flags.includes('--admin-console=disabled')) {
+        checkRemovedSettings(fixture.root)
+        return checkDisabled(fixture.root)
+      }
+      if (!flags.includes('--mode=single')) return
+      checkSettingsLocale(fixture.root, flags.includes('--locale=ru') ? 'ru' : 'en')
       const locale = flags.includes('--locale=ru') ? 'ru' : 'en'
       const other = locale === 'en' ? 'ru' : 'en'
       const text = readFileSync(path.join(fixture.root, copyTest), 'utf8')

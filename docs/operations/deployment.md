@@ -368,9 +368,23 @@ Use the persistent local setup below or configure S3.
 ### Production local files
 
 File monitoring defaults to **one check every 10 minutes per API/worker instance**.
-Set `STORAGE_PROBE_INTERVAL_SECONDS` in `.env` to change it; Compose passes it to
-both roles. S3 checks incur PUT/GET/DELETE traffic independently of user requests.
-Plan the operation budget and detection delay using the
+`STORAGE_PROBE_INTERVAL_SECONDS` supplies the deployment baseline (600 by default,
+30–3600 seconds); Compose passes it to both roles. Processes validate it during
+initialization, so changing `.env` requires redeployment. A saved runtime override
+wins over that baseline and survives restart: after saving 60 seconds, changing
+the baseline from 600 to 120 seconds still leaves the effective interval at 60.
+The retained
+[operator API](../backend/settings.md#operator-api-and-rights) can also reset the
+override to each process's baseline.
+
+<!-- AMCORE_CONSOLE_STORAGE_SETTING_START -->
+
+A personal `SUPER_ADMIN` can change the inline interval on Console Overview and
+**Save** without restart. The Console has no reset button.
+<!-- AMCORE_CONSOLE_STORAGE_SETTING_END -->
+
+S3 checks incur PUT/GET/DELETE traffic independently of user requests. Plan the
+operation budget and detection delay using the
 [storage monitoring guide](../storage/configuration.md#active-file-monitoring-and-readiness).
 
 Local storage is a supported production choice. Compose shares `local_storage`
@@ -859,3 +873,35 @@ indefinitely:
 API-key retained revocation requires a drained, all-process cutover. Follow the
 [API-key lifecycle runbook](api-key-lifecycle.md) before this schema upgrade;
 mixed old/new writers and direct old-version rollback are unsupported.
+
+## Runtime settings rollout
+
+Use a drained, all-process cutover when introducing the
+[runtime settings reader](../backend/settings.md). Before deployment, verify a
+restorable database backup and align API/worker deployment baselines if reset
+must produce one interval. Apply the settings migration through the production
+one-shot migration step, then update every API, worker and web process. Admit
+runtime-setting writes only after this cutover is complete. Check startup,
+settings GET, process-local application events and Audit reads before reopening
+operator writes. The migration is additive, but the supported rollout is not a
+mixed-version compatibility guarantee.
+
+A pre-settings API/worker binary has no reader: it continues to use env and
+ignores saved overrides. Older API/web audit contracts also reject the new
+`RUNTIME_SETTING` target. Once settings audit events exist, direct rollback to a
+pre-settings release is unsupported. Reset does not restore compatibility: it
+preserves earlier events and can create another settings event. Prefer forward
+repair. Any rollback needs a separately tested compatible API/web/worker set and
+an explicit backup/data-impact plan; preserving the table alone is insufficient.
+Do not delete audit events, rewind revisions or reverse migrations as a workaround.
+
+For settings-aware releases, check definition/schema-version compatibility before
+rollout or rollback; incompatible readers keep last-confirmed state or use an
+unconfirmed baseline and require remediation. After restoring an older database
+backup, restart every API/worker reader to initialize its revision from that
+backup. See [runtime recovery](../backend/settings.md#rollout-and-recovery).
+
+After a completed rollout, saved changes need no process restart under healthy
+reconciliation. A successful operator response certifies the commit and reports
+only the responding API's applied state. Console frontend removal leaves this
+backend capability, contracts and migration intact.

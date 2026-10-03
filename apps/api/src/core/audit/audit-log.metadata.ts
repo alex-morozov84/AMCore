@@ -120,6 +120,13 @@ const specs: Record<AuditAction, MetadataSpec> = {
     affectedCount: boundedResultCount,
     reason: aiCode,
   },
+  'admin.runtime_setting.changed': {
+    settingKey: true,
+    beforeIntervalSeconds: true,
+    afterIntervalSeconds: true,
+    beforeRevision: true,
+    afterRevision: true,
+  },
   'admin.cleanup.executed': { counts: cleanupCounts },
   'admin.user.session_revoked': { sessionId: true, count: true },
   'admin.user.sessions_revoked': { count: true, reason: true },

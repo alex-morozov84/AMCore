@@ -2,6 +2,8 @@ import type {
   AdminApiKeyRevokeResponse,
   AdminSessionsListResponse,
   AdminUserResponse,
+  StorageProbeSettingResponse,
+  StorageProbeSettingUpdate,
   SupportedLocale,
   SystemRole,
 } from '@amcore/shared'
@@ -18,6 +20,12 @@ import { apiClient } from './http-client'
  * `getConsolePublicApiPath()` so it resolves correctly in both topologies.
  */
 export const consoleApi = {
+  getStorageProbeSetting: (): Promise<StorageProbeSettingResponse> =>
+    apiClient.get(getConsolePublicApiPath('/runtime-settings/storage-probe')),
+  updateStorageProbeSetting: (
+    input: StorageProbeSettingUpdate
+  ): Promise<StorageProbeSettingResponse> =>
+    apiClient.patch(getConsolePublicApiPath('/runtime-settings/storage-probe'), input),
   revokeApiKey: (id: string): Promise<AdminApiKeyRevokeResponse> =>
     apiClient.delete<AdminApiKeyRevokeResponse>(
       getConsolePublicApiPath(`/api-keys/${encodeURIComponent(id)}`)

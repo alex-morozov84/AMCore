@@ -1,6 +1,10 @@
 import { localeContent, localeDelete } from './project-locale-fact-helpers.mjs'
 
 const catalogueFixtures = [
+  [
+    'apps/web/src/features/console-storage-setting/ui/StorageProbeIntervalEditor.test.tsx',
+    'storage-setting',
+  ],
   ['apps/web/src/_pages/console/OverviewPage/overview-copy.test.ts', 'errors'],
   ['apps/web/src/shared/api/error-messages.test.ts', 'errors'],
   ['apps/web/src/_pages/settings/SessionsPage/SessionsTable.test.tsx', 'sessions'],

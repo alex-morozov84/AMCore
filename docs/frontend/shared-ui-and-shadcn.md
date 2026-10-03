@@ -66,6 +66,34 @@ stories cover empty and populated clear/refocus states.
 For the full field API and feature-level recipes, see
 [Frontend search](./search/README.md).
 
+### Inline setting field contract
+
+Import `InlineSettingField` from `@/shared/ui/inline-setting-field` for a small
+setting edited on the same screen. Place it inside the feature's form, supply
+an accessible field through `children`, concise `prefix`/`suffix` text and
+caller-localized help/action labels. Keep section help about the section, and
+field help about its value and effect; avoid repeating the same explanation.
+For reactive draft comparisons use React Hook Form `useWatch`, rather than
+imperative `form.watch`, so conditional actions update under React Compiler.
+A compact field and nearby help stay visible;
+Save/Cancel appear when `changed` is true. Desktop keeps actions beside the field;
+small screens wrap without a full-width numeric input.
+
+The feature owns validation, authoritative saved value, draft and cancellation.
+Saving is explicit: neither blur nor typing commits. Set `saving` for the loader
+and accessible progress text, `disabled` to prevent duplicate save, and
+`cancelDisabled` while committing or waiting for authentication. After successful
+save, acknowledge the value and hide actions. On cancellation restore the saved
+value. Keep a draft across conflicts or uncertain outcomes and show a concise
+recoverable message. Essential validation and errors remain visible; tooltip is
+for explanation, not the only source of an error or required action.
+
+The primitive knows no setting keys, revisions, backend, authorization or query
+cache. The storage interval feature is the first application recipe; its form
+and step-up/reread logic stay in the feature. The controlled field slot supports
+numeric or text inputs without assigning a domain type, persistence policy or
+permission to the primitive.
+
 ## Base UI, not Radix
 
 `apps/web/components.json`'s `style` is `base-nova` — components generated

@@ -30,6 +30,9 @@ export function validateProjectLocaleOwnership(root, steps, locale) {
     ...validateOwnership(root, localeOwnership, { contents }),
     manifest: localeOwnership,
   }
-  assertLocaleSemanticProjection(locale, contents)
+  const removed = new Set(
+    steps.filter((step) => step.kind === 'delete').map((step) => relative(root, step.target))
+  )
+  assertLocaleSemanticProjection(locale, contents, removed)
   return validation
 }

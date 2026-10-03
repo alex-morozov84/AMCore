@@ -6,11 +6,11 @@ import { E2E_UI_PROFILES, E2E_UI_SURFACES } from './project-locale-e2e-ui-surfac
 import { localeSeam } from './locale-ownership-seam.mjs'
 
 const routeSeams = [...E2E_ROUTE_SURFACES, OAUTH_E2E_ROUTE_SURFACE].map(
-  ([path, occurrences], index) =>
+  ([path, occurrences, , identifiers = ['/en', '/ru', '/(en|ru)']], index) =>
     localeSeam(
       `locale.e2e-route-${index + 1}`,
       path,
-      { identifiers: ['/en', '/ru', '/(en|ru)'] },
+      { identifiers },
       ['locale-prefixed-route'],
       'locale.e2e-route-topology',
       { occurrences }

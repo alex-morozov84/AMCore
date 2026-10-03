@@ -53,6 +53,10 @@ CQRS bus only in a bounded context with a large, measured read/write asymmetry
 that must scale independently, or an event-sourcing requirement — decide that for
 that context alone, never globally.
 
+The [runtime settings foundation](settings.md) covers code-owned ordinary
+platform settings, typed definitions, CAS/audit and local runtime reconciliation.
+It remains available independently of the optional Console frontend.
+
 ## Decide the state model first
 
 Before writing code, classify where each piece of your module's state lives — this

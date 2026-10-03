@@ -3,9 +3,14 @@ import { randomUUID } from 'node:crypto'
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { type AdminOverviewStorage } from '@amcore/shared'
+import { type AdminOverviewStorage, type StorageProbeSettingResponse } from '@amcore/shared'
+
+import type { SettingSnapshot } from '../settings/setting-definition'
+import { SettingsReader } from '../settings/settings-reader'
+import { StorageSettingDefinition } from '../settings/storage-setting.definition'
 
 import { StorageProbeIo } from './storage-probe.io'
+import { StorageProbeSchedule } from './storage-probe.schedule'
 
 import { EnvService } from '@/env/env.service'
 import { MetricsService } from '@/infrastructure/observability'
@@ -18,10 +23,11 @@ export type StorageProbeFailure = NonNullable<AdminOverviewStorage['failure']>
 @Injectable()
 export class StorageProbeService implements OnModuleInit, OnModuleDestroy {
   private readonly key = `${randomUUID()}.bin`
-  private timer?: NodeJS.Timeout
+  private readonly schedule: StorageProbeSchedule
+  private applied: SettingSnapshot<number>
+  private unsubscribe?: () => void
   private active?: Promise<void>
   private stopped = false
-  private nextScheduledAt: number | null = null
   private result: Pick<StorageProbeSnapshot, 'checkedAt' | 'failure' | 'stage'> = {
     checkedAt: null,
     failure: null,
@@ -32,10 +38,17 @@ export class StorageProbeService implements OnModuleInit, OnModuleDestroy {
     private readonly env: EnvService,
     private readonly io: StorageProbeIo,
     private readonly metrics: MetricsService,
-    private readonly logger: PinoLogger
-  ) {}
+    private readonly logger: PinoLogger,
+    private readonly settings: SettingsReader,
+    private readonly definition: StorageSettingDefinition
+  ) {
+    this.applied = settings.snapshot(definition)
+    this.schedule = new StorageProbeSchedule(this.applied.value, () => {
+      void this.run()
+    })
+  }
 
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
     this.metrics.registerGauge({
       name: METRIC_NAMES.storageProbeState,
       help: 'Cached per-instance synthetic file transaction state; exactly one state is 1.',
@@ -47,23 +60,23 @@ export class StorageProbeService implements OnModuleInit, OnModuleDestroy {
         }
       },
     })
-    this.nextScheduledAt = Date.now() + this.intervalMs()
+    this.unsubscribe = this.settings.subscribe(this.definition, () => this.applySetting())
+    await this.settings.initialize()
+    if (this.stopped) return
+    this.applySetting()
+    this.schedule.enable()
     void this.run()
-    this.timer = setInterval(() => {
-      this.nextScheduledAt = Date.now() + this.intervalMs()
-      void this.run()
-    }, this.intervalMs())
-    this.timer.unref()
   }
 
   onModuleDestroy(): void {
     this.stopped = true
-    clearInterval(this.timer)
+    this.unsubscribe?.()
+    this.schedule.stop()
     this.io.destroy()
   }
 
   snapshot(): StorageProbeSnapshot {
-    const staleAfterSeconds = this.env.get('STORAGE_PROBE_INTERVAL_SECONDS') * 3
+    const staleAfterSeconds = this.applied.value * 3
     const age = this.result.checkedAt ? Date.now() - Date.parse(this.result.checkedAt) : 0
     const state = !this.result.checkedAt
       ? 'unknown'
@@ -76,10 +89,7 @@ export class StorageProbeService implements OnModuleInit, OnModuleDestroy {
       ...this.result,
       state,
       inProgress: Boolean(this.active),
-      nextScheduledAt:
-        !this.active && !this.stopped && this.nextScheduledAt !== null
-          ? new Date(this.nextScheduledAt).toISOString()
-          : null,
+      nextScheduledAt: this.schedule.nextScheduledAt,
       driver: this.env.get('STORAGE_DRIVER'),
       intervalSeconds: this.intervalMs() / 1000,
       staleAfterSeconds,
@@ -90,8 +100,10 @@ export class StorageProbeService implements OnModuleInit, OnModuleDestroy {
   run(): Promise<void> {
     if (this.stopped) return Promise.resolve()
     if (this.active) return this.active
+    this.schedule.started()
     this.active = this.transaction().finally(() => {
       this.active = undefined
+      this.schedule.settled()
     })
     return this.active
   }
@@ -158,8 +170,37 @@ export class StorageProbeService implements OnModuleInit, OnModuleDestroy {
     this.result = { checkedAt: new Date().toISOString(), failure, stage: failure ? stage : null }
   }
 
+  settingSnapshot(): StorageProbeSettingResponse['applied'] {
+    const observed = this.settings.snapshot(this.definition)
+    return {
+      intervalSeconds: this.applied.value,
+      revision: this.applied.revision,
+      source: this.applied.source,
+      lastConfirmedAt: observed.lastConfirmedAt,
+      refreshStatus:
+        observed.revision === this.applied.revision ? observed.refreshStatus : 'failed',
+      nextScheduledAt: this.schedule.nextScheduledAt,
+    }
+  }
+
+  private applySetting(): void {
+    const next = this.settings.snapshot(this.definition)
+    this.schedule.apply(next.value)
+    if (next.revision !== this.applied.revision || next.source !== this.applied.source) {
+      this.logger.info({
+        event: 'runtime_setting_applied',
+        key: this.definition.key,
+        revision: next.revision,
+        intervalSeconds: next.value,
+        processRole: this.env.get('PROCESS_ROLE'),
+        instanceId: this.key,
+      })
+    }
+    this.applied = next
+  }
+
   private intervalMs(): number {
-    return this.env.get('STORAGE_PROBE_INTERVAL_SECONDS') * 1000
+    return this.applied.value * 1000
   }
 }
 

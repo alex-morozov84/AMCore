@@ -127,7 +127,7 @@ describe('Audit capture points (e2e)', () => {
     })
     expect(findAudit(rows, 'api_key.revoked')?.metadata).toMatchObject({
       pinoEvent: 'api_key.revoked',
-      reason: 'user_revoked',
+      reason: 'owner_revoked',
     })
     expect(JSON.stringify(rows)).not.toContain(created.body.key as string)
     expect(JSON.stringify(rows)).not.toContain('shortToken')

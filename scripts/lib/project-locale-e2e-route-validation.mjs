@@ -9,9 +9,10 @@ import {
   OAUTH_E2E_ROUTE_SURFACE,
 } from './project-locale-e2e-route-surfaces.mjs'
 
-export function e2eRouteResiduals(contents) {
+export function e2eRouteResiduals(contents, removed = new Set()) {
   const residuals = []
   for (const [pathname] of [...E2E_ROUTE_SURFACES, OAUTH_E2E_ROUTE_SURFACE]) {
+    if (removed.has(pathname)) continue
     const content = contents.get(pathname)
     if (content === undefined) {
       residuals.push(`${pathname}:missing projected verification surface`)

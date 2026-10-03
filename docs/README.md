@@ -28,6 +28,7 @@ find for something, that page is under-documented; please open an issue.
 
 | I want to…                                                                               | Go to                                                                                                                             |
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Store or extend typed ordinary runtime settings                                          | [`backend/settings.md`](backend/settings.md)                                                                                      |
 | Add a backend module the AMCore way                                                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                              |
 | Add a route/page on the frontend the AMCore way                                          | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                 |
 | Add local or URL-backed frontend search                                                  | [`frontend/search/README.md`](frontend/search/README.md)                                                                          |

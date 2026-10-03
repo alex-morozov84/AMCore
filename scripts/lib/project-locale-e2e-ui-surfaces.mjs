@@ -27,6 +27,12 @@ export const E2E_UI_PROFILES = Object.freeze({
     ['/sign in/i', '/войти/i'],
     ['/sign out/i', '/выйти/i'],
   ],
+  storageSetting: [
+    ["'File storage'", "'Файловое хранилище'"],
+    ["'Probe interval (seconds)'", "'Интервал проверки (секунды)'"],
+    ["'Save'", "'Сохранить'"],
+    ["'Cancel'", "'Отмена'"],
+  ],
   consoleSessions: [
     ["'Sessions (2 total)'", "'Сессии (всего: 2)'"],
     ["'Refresh'", "'Обновить'"],
@@ -68,6 +74,9 @@ const surface = (path, namespaces, expectedReferences) => ({
 })
 
 export const E2E_UI_SURFACES = Object.freeze([
+  surface('apps/web/e2e/shared/storage-setting-journey.ts', ['storageSetting'], 6),
+  surface('apps/web/e2e/real-stack/storage-runtime-settings.spec.ts', ['storageSetting'], 1),
+  surface('apps/web/e2e/console-real-stack/storage-runtime-settings.spec.ts', ['console'], 3),
   surface(
     'apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts',
     ['auth', 'consoleSessions'],

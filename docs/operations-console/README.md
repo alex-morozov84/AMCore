@@ -7,19 +7,21 @@ their organization role.
 
 ## Contents
 
-| Screen                            | Use it to                                                                                        |
-| --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [Overview](overview.md)           | Check API readiness, file storage and local resources; identify the responding web server build. |
-| [Users](users.md)                 | Find users, inspect details/memberships, change system roles, and view or revoke sessions.       |
-| [Organizations](organizations.md) | Inspect organizations, members and their roles without changing them.                            |
-| [API keys](api-keys.md)           | Inspect credential metadata and irreversibly revoke one or selected keys.                        |
-| [Audit](audit.md)                 | Browse recent system events and narrow them by action, identity, or time.                        |
+| Screen                            | Use it to                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| [Overview](overview.md)           | Check API readiness, file storage and resources; edit the probe interval; identify builds. |
+| [Users](users.md)                 | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |
+| [Organizations](organizations.md) | Inspect organizations, members and their roles without changing them.                      |
+| [API keys](api-keys.md)           | Inspect credential metadata and irreversibly revoke one or selected keys.                  |
+| [Audit](audit.md)                 | Browse recent system events and narrow them by action, identity, or time.                  |
 
 The Console also has a [configuration and deployment guide](configuration.md)
 for operators who set it up and a [development guide](development.md) for teams
 adding panels. The [persistent audit log guide](../operations/audit-log.md)
 describes how events are recorded and protected across the application; the
-[Audit screen guide](audit.md) explains how to browse them.
+[Audit screen guide](audit.md) explains how to browse them. The
+[retained runtime settings guide](../backend/settings.md) covers the operator API,
+runtime recovery and extension contract independently of the optional Console.
 
 ## Get access
 

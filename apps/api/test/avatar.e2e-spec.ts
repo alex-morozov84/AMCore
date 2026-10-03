@@ -90,10 +90,17 @@ describe('Avatar storage (e2e)', () => {
   })
 
   // Version is rendered `v-<generation>-<rand>` (the monotonic fence prefix).
-  const avatarUrlPattern = (userId: string): RegExp =>
-    new RegExp(
-      `^https://cdn\\.example\\.test/assets/avatars/${userId}/v-[0-9]+-[0-9a-z]+/avatar-256\\.webp$`
-    )
+  const avatarKeyPattern = (userId: string): RegExp =>
+    new RegExp(`^avatars/${userId}/v-[0-9]+-[0-9a-z]+/avatar-256\\.webp$`)
+
+  const avatarKey = (avatarUrl: string): string => {
+    const url = new URL(avatarUrl)
+    expect(url.origin).toBe('https://cdn.example.test')
+    expect(url.pathname).toBe('/assets')
+    expect([...url.searchParams.keys()]).toEqual(['key'])
+    expect(url.hash).toBe('')
+    return url.searchParams.get('key')!
+  }
 
   it('uploads a validated public avatar derivative and persists avatarUrl', async () => {
     const { accessToken, userId } = await registerUser()
@@ -104,7 +111,7 @@ describe('Avatar storage (e2e)', () => {
       .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
       .expect(201)
 
-    expect(response.body.avatarUrl).toMatch(avatarUrlPattern(userId))
+    expect(avatarKey(response.body.avatarUrl)).toMatch(avatarKeyPattern(userId))
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
     expect(user.avatarUrl).toBe(response.body.avatarUrl)
@@ -131,7 +138,7 @@ describe('Avatar storage (e2e)', () => {
       .attach('file', PNG_1X1, { filename: 'avatar.png', contentType: 'image/png' })
       .expect(201)
 
-    expect(second.body.avatarUrl).toMatch(avatarUrlPattern(userId))
+    expect(avatarKey(second.body.avatarUrl)).toMatch(avatarKeyPattern(userId))
     expect(second.body.avatarUrl).not.toBe(first.body.avatarUrl)
   })
 
@@ -194,11 +201,10 @@ describe('Avatar storage (e2e)', () => {
   // Resolve the local file backing a public avatar URL so concurrency tests can
   // assert the surviving DB pointer references storage that actually exists. The
   // local driver stores object bytes under `<root>/objects/<key>`; the public
-  // base URL maps to that `objects/` mount (see LocalStorageConfig.publicBaseUrl).
-  const STORAGE_PUBLIC_PREFIX = 'https://cdn.example.test/assets/'
+  // URL carries the normalized object key in its query, not its pathname.
   const STORAGE_OBJECTS_DIR = 'objects'
   const fileFor = (avatarUrl: string): string =>
-    path.join(storageRoot, STORAGE_OBJECTS_DIR, avatarUrl.slice(STORAGE_PUBLIC_PREFIX.length))
+    path.join(storageRoot, STORAGE_OBJECTS_DIR, avatarKey(avatarUrl))
 
   it('serializes concurrent uploads: the surviving avatarUrl resolves to live storage', async () => {
     const { accessToken, userId } = await registerUser()
@@ -215,7 +221,7 @@ describe('Avatar storage (e2e)', () => {
 
     // The DB winner must point to a file that still exists (no cross-version sweep).
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-    expect(user.avatarUrl).toMatch(avatarUrlPattern(userId))
+    expect(avatarKey(user.avatarUrl as string)).toMatch(avatarKeyPattern(userId))
     await expect(access(fileFor(user.avatarUrl as string))).resolves.toBeUndefined()
 
     // The loser's published derivative was swept: exactly one version still has a
@@ -243,7 +249,7 @@ describe('Avatar storage (e2e)', () => {
       )
     ).filter((dir): dir is string => dir !== undefined)
     expect(liveVersions).toHaveLength(1)
-    expect(user.avatarUrl).toContain(`/${liveVersions[0]}/`)
+    expect(avatarKey(user.avatarUrl as string)).toContain(`/${liveVersions[0]}/`)
   })
 
   it('keeps the store consistent under a concurrent upload and delete', async () => {

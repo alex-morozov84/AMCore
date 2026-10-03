@@ -40,6 +40,7 @@ export const adminAuditQuerySchema = z
         'AI_APPROVAL',
         'AI_ASSISTANT',
         'AI_CONVERSATION',
+        'RUNTIME_SETTING',
       ])
       .optional(),
     organizationId: auditDisplayIdSchema.optional(),
@@ -81,6 +82,10 @@ const summaryCode = z
   .regex(/^[a-z][a-z0-9_]*$/)
 export const auditSummarySchema = z
   .object({
+    beforeIntervalSeconds: z.number().int().min(30).max(3600).nullable().optional(),
+    afterIntervalSeconds: z.number().int().min(30).max(3600).nullable().optional(),
+    beforeRevision: z.number().int().min(0).max(2147483647).optional(),
+    afterRevision: z.number().int().min(0).max(2147483647).optional(),
     beforeSystemRole: z.enum(['USER', 'SUPER_ADMIN']).optional(),
     afterSystemRole: z.enum(['USER', 'SUPER_ADMIN']).optional(),
     count: z.number().int().min(0).max(1_000_000).optional(),
