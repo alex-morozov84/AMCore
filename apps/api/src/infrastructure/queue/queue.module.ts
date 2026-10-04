@@ -1,10 +1,11 @@
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
 import { ExpressAdapter } from '@bull-board/express'
 import { BullBoardModule } from '@bull-board/nestjs'
-import { BullModule } from '@nestjs/bullmq'
+import { BullModule, getQueueToken } from '@nestjs/bullmq'
 import { Module } from '@nestjs/common'
+import type { Queue } from 'bullmq'
 
-import { QueueName } from './constants/queues.constant'
+import { QUEUE_REGISTRY } from './constants/queue-inventory.constant'
 import { createBullBoardAuthMiddleware } from './dashboard/bull-board-auth.middleware'
 import { BullBoardAuthModule } from './dashboard/bull-board-auth.module'
 import { BullBoardAuthService } from './dashboard/bull-board-auth.service'
@@ -12,6 +13,8 @@ import { isBullBoardEnabled, isBullBoardReadOnly } from './dashboard/bull-board-
 import { DashboardController } from './dashboard/dashboard.controller'
 import { DEFAULT_JOB_OPTIONS } from './interfaces/job-options.interface'
 import { QueueService } from './queue.service'
+import { boardQueueNames, enabledQueueNames } from './queue-inventory'
+import { QueueObservationService } from './queue-observation.service'
 import { buildBullConnection } from './redis-connection.config'
 
 import { EnvModule } from '@/env/env.module'
@@ -56,21 +59,13 @@ const bullBoardImports = bullBoardEnabled
           middleware: createBullBoardAuthMiddleware(auth),
         }),
       }),
-      BullBoardModule.forFeature({
-        name: QueueName.DEFAULT,
-        adapter: BullMQAdapter,
-        options: { readOnlyMode: bullBoardReadOnly },
-      }),
-      BullBoardModule.forFeature({
-        name: QueueName.EMAIL,
-        adapter: BullMQAdapter,
-        options: { readOnlyMode: bullBoardReadOnly },
-      }),
-      BullBoardModule.forFeature({
-        name: QueueName.NOTIFICATIONS,
-        adapter: BullMQAdapter,
-        options: { readOnlyMode: bullBoardReadOnly },
-      }),
+      ...boardQueueNames().map((name) =>
+        BullBoardModule.forFeature({
+          name,
+          adapter: BullMQAdapter,
+          options: { readOnlyMode: bullBoardReadOnly },
+        })
+      ),
     ]
   : []
 
@@ -92,19 +87,23 @@ const bullBoardImports = bullBoardEnabled
       },
     }),
 
-    // Register all queues
-    BullModule.registerQueue(
-      { name: QueueName.DEFAULT },
-      { name: QueueName.EMAIL },
-      { name: QueueName.NOTIFICATIONS },
-      { name: QueueName.AI_RUNS }
-    ),
+    // Register every enabled queue of the single inventory (constants/queue-inventory.constant.ts).
+    BullModule.registerQueue(...enabledQueueNames().map((name) => ({ name }))),
 
     // Bull Board dashboard — mounted + auth-protected only when enabled.
     ...bullBoardImports,
   ],
   controllers: bullBoardEnabled ? [DashboardController] : [],
-  providers: [QueueService],
-  exports: [QueueService],
+  providers: [
+    {
+      provide: QUEUE_REGISTRY,
+      inject: enabledQueueNames().map((name) => getQueueToken(name)),
+      useFactory: (...queues: Queue[]) =>
+        new Map(enabledQueueNames().map((name, index) => [name, queues[index]] as const)),
+    },
+    QueueService,
+    QueueObservationService,
+  ],
+  exports: [QueueService, QueueObservationService],
 })
 export class QueueModule {}

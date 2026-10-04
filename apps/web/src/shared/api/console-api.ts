@@ -1,5 +1,6 @@
 import type {
   AdminApiKeyRevokeResponse,
+  AdminQueuesResponse,
   AdminSessionsListResponse,
   AdminUserResponse,
   StorageProbeSettingResponse,
@@ -20,6 +21,9 @@ import { apiClient } from './http-client'
  * `getConsolePublicApiPath()` so it resolves correctly in both topologies.
  */
 export const consoleApi = {
+  /** Live refresh of Background work; the signal cancels the browser request on unmount. */
+  getBackgroundWorkQueues: (signal?: AbortSignal): Promise<AdminQueuesResponse> =>
+    apiClient.get(getConsolePublicApiPath('/background-work/queues'), { signal }),
   getStorageProbeSetting: (): Promise<StorageProbeSettingResponse> =>
     apiClient.get(getConsolePublicApiPath('/runtime-settings/storage-probe')),
   updateStorageProbeSetting: (

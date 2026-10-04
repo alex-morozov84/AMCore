@@ -85,6 +85,7 @@ const EXPECTED: Record<string, Expected> = {
   'get /admin/organizations': { status: '200', kind: 'json' },
   'get /admin/organizations/{id}': { status: '200', kind: 'json' },
   'get /admin/overview': { status: '200', kind: 'json' },
+  'get /admin/background-work/queues': { status: '200', kind: 'json' },
   'get /admin/runtime-settings/storage-probe': { status: '200', kind: 'json' },
   'patch /admin/runtime-settings/storage-probe': { status: '200', kind: 'json' },
   'get /storage/public': { status: '200', kind: 'binary' },
@@ -403,6 +404,27 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation?.responses).toHaveProperty('401')
     expect(operation?.responses).toHaveProperty('403')
     expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
+  })
+
+  it('documents the bearer-only background-work queue summary away from the Bull Board path', () => {
+    const operation = document.paths['/admin/background-work/queues']?.get
+
+    expect(operation?.security).toEqual([{ bearer: [] }])
+    expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
+    for (const status of ['200', '401', '403', '429']) {
+      expect(operation?.responses).toHaveProperty(status)
+    }
+    // `/admin/queues**` is the Bull Board mount; the summary must never live under it.
+    expect(Object.keys(document.paths).filter((path) => path.startsWith('/admin/queues/'))).toEqual(
+      []
+    )
+    const response = operation?.responses?.['200'] as {
+      content?: { 'application/json'?: { schema?: { $ref?: string } } }
+    }
+    const ref = response.content?.['application/json']?.schema?.$ref
+    expect(ref).toBeDefined()
+    const schema = document.components?.schemas?.[ref!.split('/').at(-1)!]
+    expect(schema).toMatchObject({ required: expect.arrayContaining(['checkedAt', 'queues']) })
   })
 
   it('documents the bearer-only Console Overview endpoint with its failure statuses', () => {

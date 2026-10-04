@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
 import {
   getConsoleAuditHref,
+  getConsoleBackgroundWorkHref,
   getConsoleDetailAuditHref,
   getConsoleOrganizationsHref,
   getConsoleOverviewHref,
@@ -128,5 +129,15 @@ describe('getConsoleAuditHref', () => {
     expect(getConsoleAuditHref()).toBe('/operations/audit')
     mutableConfig.mode = 'host'
     expect(getConsoleAuditHref()).toBe('/audit')
+  })
+})
+
+describe('getConsoleBackgroundWorkHref', () => {
+  it('follows the topology rule in every mode', () => {
+    mutableConfig.mode = 'path'
+    mutableConfig.slug = 'operations'
+    expect(getConsoleBackgroundWorkHref()).toBe('/operations/background-work')
+    mutableConfig.mode = 'host'
+    expect(getConsoleBackgroundWorkHref()).toBe('/background-work')
   })
 })

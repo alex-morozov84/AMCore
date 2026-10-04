@@ -12,7 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Organization members and atomic multi-role assignment with reusable headless
   hooks, a responsive ready page, debounced search, optimistic revision checks
   and transactional audit. Shared presentation remains independent of Console.
-
+- Operations Console **Background work**: a read-only screen for background
+  queue state. It shows waiting, active, delayed and retained failed jobs, the
+  pause flag, a sampled age of the oldest queued job, and distinct empty,
+  unavailable and disabled states. It refreshes itself about every 30 seconds
+  (pausable, with backoff), never shows job contents, and is served by
+  `GET /api/v1/admin/background-work/queues`.
+- One code-owned queue inventory drives queue registration, `QueueService`, the
+  depth metrics and the Console screen; a guard test fails when ordinary code
+  registers or constructs a queue outside it. Priority comments and the queue README now describe BullMQ
+  priorities correctly.
 - Organization pages accept one application placement for addresses, pagination
   and both product menus; shell-free mount and public product-admin integration
   guides preserve explicit routing and independent headless composition.

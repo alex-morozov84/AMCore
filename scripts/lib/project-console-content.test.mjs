@@ -24,6 +24,12 @@ test('removes a mixed-document Console block and preserves surrounding content',
   assert.ok(after.includes('## Quick start'))
 })
 
+test('disabled Console removes its queue and API-key guide rows from the docs index', () => {
+  const after = materialize('docs/README.md', 'docs-index-console')
+  assert.doesNotMatch(after, /operations-console\/(?:background-work|api-keys)\.md/)
+  assert.match(after, /frontend\/architecture-and-conventions\.md/)
+})
+
 test('disabled Console docs retain Settings pending proof and its runnable command', () => {
   const after = materialize('docs/frontend/testing.md', 'console.sessions-readability-guide')
   assert.match(after, /Settings covers both themes/)
