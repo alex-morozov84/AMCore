@@ -3,12 +3,17 @@
 import { useTranslations } from 'next-intl'
 import type { AdminQueuesResponse } from '@amcore/shared'
 
+import { getConsoleQueueBoardHref } from '@/shared/lib/console-public-href'
 import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 
+import { queueBoardHref, resolveBoardEntryState } from './board-entry-state'
+import { QUEUE_BOARD_GUIDE_HREF } from './board-guide-link'
+import { BoardEntry } from './BoardEntry'
 import { allUnavailable } from './queue-copy'
 import { QueueCards } from './QueueCards'
 import { QueueSummaryControls } from './QueueSummaryControls'
 import { QueueTable } from './QueueTable'
+import { useBoardOpenNotice } from './use-board-open-notice'
 import { useQueueSummary } from './use-queue-summary'
 
 /**
@@ -19,12 +24,17 @@ import { useQueueSummary } from './use-queue-summary'
 export function QueueSummaryLive({
   initial,
   initialUpdatedAt,
+  boardOpenFailed = false,
 }: {
   initial: AdminQueuesResponse
   initialUpdatedAt: number
+  /** A page load of the queue board just failed (`?board=unavailable`): a one-shot, historical marker. */
+  boardOpenFailed?: boolean
 }) {
   const summary = useQueueSummary(initial, initialUpdatedAt)
   const { data } = summary
+  const openNotice = useBoardOpenNotice(boardOpenFailed, data?.board.state ?? null)
+  const entryState = resolveBoardEntryState(data?.board, openNotice.failed)
 
   return (
     <>
@@ -45,12 +55,24 @@ export function QueueSummaryLive({
           />
         )}
       </div>
-      {data && <QueueRows queues={data.queues} />}
+      <BoardEntry
+        state={entryState}
+        href={getConsoleQueueBoardHref()}
+        guideHref={QUEUE_BOARD_GUIDE_HREF}
+        onOpen={openNotice.clear}
+      />
+      {data && <QueueRows queues={data.queues} boardAvailable={data.board.state === 'available'} />}
     </>
   )
 }
 
-function QueueRows({ queues }: { queues: AdminQueuesResponse['queues'] }) {
+function QueueRows({
+  queues,
+  boardAvailable,
+}: {
+  queues: AdminQueuesResponse['queues']
+  boardAvailable: boolean
+}) {
   const t = useTranslations('console.backgroundWork')
   if (queues.length === 0) return <p className="text-sm text-muted-foreground">{t('noQueues')}</p>
   return (
@@ -60,8 +82,8 @@ function QueueRows({ queues }: { queues: AdminQueuesResponse['queues'] }) {
           {t('allUnavailable')}
         </p>
       )}
-      <QueueTable queues={queues} />
-      <QueueCards queues={queues} />
+      <QueueTable queues={queues} boardHrefOf={(queue) => queueBoardHref(queue, boardAvailable)} />
+      <QueueCards queues={queues} boardHrefOf={(queue) => queueBoardHref(queue, boardAvailable)} />
     </>
   )
 }

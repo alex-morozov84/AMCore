@@ -33,10 +33,10 @@ function state(overrides: Partial<ReturnType<typeof useQueueSummary>> = {}) {
     ...overrides,
   })
 }
-function view() {
+function view(props: { boardOpenFailed?: boolean } = {}) {
   return render(
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={queueMessages}>
-      <QueueSummaryLive initial={mixedSummary} initialUpdatedAt={0} />
+      <QueueSummaryLive initial={mixedSummary} initialUpdatedAt={0} {...props} />
     </NextIntlClientProvider>
   )
 }
@@ -220,5 +220,90 @@ describe('controls', () => {
     state({ canRefresh: false, retryAfterSeconds: 42 })
     view()
     expect(screen.getByText('Available in 42 seconds')).toBeInTheDocument()
+  })
+})
+
+describe('queue board entry on the live summary', () => {
+  const boardLinks = () => screen.queryAllByRole('link').map((link) => link.getAttribute('href'))
+
+  it('shows the button and a deep link for every queue that is in the board, while it is available', () => {
+    view()
+    expect(screen.getByRole('link', { name: /Open queue board/ })).toHaveAttribute(
+      'href',
+      '/api/console/bull-board/'
+    )
+    const rowLinks = within(table()).getAllByRole('link', { name: /Open in queue board/ })
+    expect(rowLinks.map((link) => link.getAttribute('href'))).toEqual([
+      '/api/console/bull-board/queue/email',
+      '/api/console/bull-board/queue/default',
+      '/api/console/bull-board/queue/notifications',
+    ])
+    // ai-runs has no board adapter: no link, ever.
+    expect(boardLinks().join(' ')).not.toContain('ai-runs')
+  })
+
+  it('shows the same row links in the mobile cards', () => {
+    view()
+    const cards = screen.getByRole('list', { name: 'Background queues' })
+    expect(within(cards).getAllByRole('link', { name: /Open in queue board/ })).toHaveLength(3)
+  })
+
+  it('removes the button and every row link, and explains how to enable it, when the board is disabled', () => {
+    state({ data: { ...mixedSummary, board: { state: 'disabled' } } })
+    view()
+    expect(boardLinks().filter((href) => href?.includes('bull-board'))).toEqual([])
+    expect(screen.getByText('Queue board is not enabled')).toBeInTheDocument()
+    expect(document.body.textContent).toContain('ENABLE_BULL_BOARD=true')
+  })
+
+  it('follows a restart of the API on the live page: available, disabled, available again', () => {
+    const { rerender } = view()
+    expect(screen.getByRole('link', { name: /Open queue board/ })).toBeInTheDocument()
+    state({ data: { ...mixedSummary, board: { state: 'disabled' } } })
+    rerender(
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={queueMessages}>
+        <QueueSummaryLive initial={mixedSummary} initialUpdatedAt={0} />
+      </NextIntlClientProvider>
+    )
+    expect(screen.queryByRole('link', { name: /Open queue board/ })).toBeNull()
+    expect(screen.getByText('Queue board is not enabled')).toBeInTheDocument()
+    state({ data: mixedSummary })
+    rerender(
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={queueMessages}>
+        <QueueSummaryLive initial={mixedSummary} initialUpdatedAt={0} />
+      </NextIntlClientProvider>
+    )
+    expect(screen.getByRole('link', { name: /Open queue board/ })).toBeInTheDocument()
+    expect(screen.queryByText('Queue board is not enabled')).toBeNull()
+  })
+
+  it('shows only the standing note, never disabled or failed, while access is being re-verified', () => {
+    state({ data: null as never, denied: true })
+    view({ boardOpenFailed: true })
+    expect(screen.getByText('Queue board is view-only')).toBeInTheDocument()
+    expect(screen.queryByText('Queue board is not enabled')).toBeNull()
+    expect(screen.queryByText('Could not open the queue board')).toBeNull()
+    expect(boardLinks()).toEqual([])
+  })
+
+  it('shows the failed-open notice with the button when the board is available but the last attempt failed', () => {
+    view({ boardOpenFailed: true })
+    expect(screen.getByRole('status')).toHaveTextContent('Could not open the queue board')
+    expect(screen.getByRole('link', { name: /Open queue board/ })).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('ENABLE_BULL_BOARD')
+  })
+
+  it('lets the fresh disabled confirmation win over a failed-open marker', () => {
+    state({ data: { ...mixedSummary, board: { state: 'disabled' } } })
+    view({ boardOpenFailed: true })
+    expect(screen.getByText('Queue board is not enabled')).toBeInTheDocument()
+    expect(screen.queryByText('Could not open the queue board')).toBeNull()
+  })
+
+  it('does not turn a failed refresh into a board state: it keeps the last confirmed one', () => {
+    state({ refreshFailed: true })
+    view()
+    expect(screen.getByRole('link', { name: /Open queue board/ })).toBeInTheDocument()
+    expect(screen.queryByText('Queue board is not enabled')).toBeNull()
   })
 })

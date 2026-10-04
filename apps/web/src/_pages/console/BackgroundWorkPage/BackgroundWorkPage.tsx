@@ -12,7 +12,9 @@ import { QueueSummaryLive } from './QueueSummaryLive'
  * loaded page and the primary-unavailable fallback. A transport failure of that snapshot is the
  * explicit primary-unavailable state; per-queue unavailability is data inside a successful snapshot.
  */
-export async function BackgroundWorkPage() {
+export async function BackgroundWorkPage({
+  boardOpenFailed = false,
+}: { boardOpenFailed?: boolean } = {}) {
   const t = await getTranslations('console.backgroundWork')
   // Rejected 4xx or malformed 2xx deliberately propagate to the real error boundary.
   const outcome = resolvePrimary(await fetchConsoleQueues(), { source: 'console-queues' })
@@ -33,6 +35,7 @@ export async function BackgroundWorkPage() {
           key={outcome.data.checkedAt}
           initial={outcome.data}
           initialUpdatedAt={Date.parse(outcome.data.checkedAt)}
+          boardOpenFailed={boardOpenFailed}
         />
       )}
     </section>

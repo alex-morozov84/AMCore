@@ -33,3 +33,19 @@ export const Destructive: Story = {
     </Alert>
   ),
 }
+
+// A standing, non-urgent note: `role="note"` replaces the default assertive `role="alert"` (props are
+// spread after it), and `line-clamp-none` lets a long title wrap instead of being clipped at one line.
+export const InformationalNote: Story = {
+  render: () => (
+    <Alert role="note" className="w-80">
+      <Terminal aria-hidden />
+      <AlertTitle className="line-clamp-none">
+        A long title that must wrap on a narrow screen instead of being cut off
+      </AlertTitle>
+      <AlertDescription>
+        Calm, permanent information that is not announced as an alert.
+      </AlertDescription>
+    </Alert>
+  ),
+}

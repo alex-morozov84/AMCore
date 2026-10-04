@@ -16,6 +16,20 @@ export const queueMessages = {
         'Read-only view of the background queues: whether work is piling up, paused or cannot be read.',
       scope:
         'Figures come from the queues of the Redis configured for this API, shared by every API and worker process. They show where work is waiting, not whether workers are running.',
+      board: {
+        noteTitle: 'Queue board is view-only',
+        noteBody:
+          'Browse queue status and job details. Retrying or deleting jobs and managing queues is not available here, and some job details are hidden.',
+        openLink: 'Open queue board',
+        openLinkNewTab: '(opens in a new tab)',
+        rowLink: 'Open in queue board',
+        disabledTitle: 'Queue board is not enabled',
+        disabledBody:
+          'The board is off because <code>ENABLE_BULL_BOARD</code> is not <code>true</code> in the environment of the API process. To turn it on, set <code>ENABLE_BULL_BOARD=true</code> in the API process environment (not in the <code>.env</code> file) and restart the API. Turning it on does not change what the board allows: it stays view-only.',
+        disabledGuideLink: 'Queue board guide',
+        unavailableTitle: 'Could not open the queue board',
+        unavailableBody: 'Check that the API is available and try again.',
+      },
       checkedAt: 'Checked',
       refresh: 'Refresh',
       refreshing: 'Refreshing' + ELLIPSIS,
