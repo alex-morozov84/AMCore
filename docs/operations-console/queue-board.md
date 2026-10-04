@@ -86,13 +86,13 @@ The board shows what an operator needs to find a stuck or failing job and hides 
 a secret. The rule is a closed list, applied on the server: a field that is not on the list is
 not sent.
 
-| Shown                                                                                 | Not shown                                                                                                          |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Queues, their state and counts, job lists and pages                                   | Job payloads and return values: the board shows `[hidden]`                                                         |
-| For a job: id, name, times, attempts, delay, whether it failed                        | The failure message and stack trace: the board says that failure details are not displayed                         |
-| Job options for retries and retention (attempts, backoff, delay, priority, retention) | Job logs: the board says that logs are not displayed                                                               |
-| For a **welcome email** job: template, locale and the user id                         | Recipient address and name. Workers, Redis details, metrics, schedulers, flows and default job options are hidden. |
-| For a **notification** wake job: the notification id                                  |                                                                                                                    |
+| Shown                                                                                        | Not shown                                                                                                          |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Queues, their state and counts, job lists and pages                                          | Job payloads and return values: the board shows `[hidden]`                                                         |
+| For a job: id, name, times, attempts, delay, whether it failed                               | The failure message and stack trace: the board says that failure details are not displayed                         |
+| Job options for retries and retention (attempts, backoff, delay, priority, retention)        | Job logs: the board says that logs are not displayed                                                               |
+| For a **welcome email** job: template, locale and the user id                                | Recipient address and name. Workers, Redis details, metrics, schedulers, flows and default job options are hidden. |
+| For a **notification** wake job: the notification id; for an **AI run** wake job: the run id |                                                                                                                    |
 
 Payloads of the `default` queue and of any queue you add are hidden entirely, because the
 starter cannot know what they contain. This is a closed list for a trusted operator, **not a
@@ -100,8 +100,11 @@ promise that no secret can exist** in a queue. The rule that matters is the one 
 a secret (a reset or verification link, a token) must never be put in a queue; the starter sends
 those emails directly. See [Email security](../email/security.md).
 
-`ai-runs` has no page in the board: it holds only wake-up signals, and the state of AI runs lives
-in the database. Background work shows that queue without a link.
+Every enabled queue is on the board, the same rule that gives it a row in Background work: register
+a queue in the inventory and it appears in both. Its jobs show only identifiers, names and times
+until a projection names the fields to show. For an **AI run** wake job that is the run id. A wake
+queue only nudges a worker, and the state of the run lives in the database, so `ai-runs` is usually
+empty here.
 
 ### Showing the payload of your own queue
 

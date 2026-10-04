@@ -137,13 +137,14 @@ describe('Admin background-work queues (e2e)', () => {
       paused: false,
       inBoard: true,
     })
-    // The board is mounted in this (non-production) harness; `ai-runs` has no board adapter.
+    // The board is mounted in this (non-production) harness; every enabled queue has a board adapter.
     expect(body.board).toEqual({ state: 'available' })
-    expect(body.queues.find((queue) => queue.name === 'ai-runs')?.inBoard).toBe(false)
+    expect(body.queues.find((queue) => queue.name === 'ai-runs')?.inBoard).toBe(true)
     expect(body.queues.filter((queue) => queue.inBoard).map((queue) => queue.name)).toEqual([
       'email',
       'default',
       'notifications',
+      'ai-runs',
     ])
     const observed = row?.status === 'available' ? row : undefined
     expect(observed?.counts.waiting).toBeGreaterThanOrEqual(1)

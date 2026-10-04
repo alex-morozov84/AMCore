@@ -30,6 +30,7 @@ const emailCandidate = z.object({
 })
 
 const notificationCandidate = z.object({ notificationId: identifier })
+const aiRunWakeCandidate = z.object({ runId: identifier })
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -59,7 +60,14 @@ export const projectNotificationJobData: BoardDataProjection = (data) => {
   return parsed.success ? { notificationId: parsed.data.notificationId } : null
 }
 
+/** AI run wake job: `{ runId }` (`AiRunWakeJob`). */
+export const projectAiRunWakeJobData: BoardDataProjection = (data) => {
+  const parsed = aiRunWakeCandidate.safeParse(data)
+  return parsed.success ? { runId: parsed.data.runId } : null
+}
+
 export const BOARD_DATA_PROJECTIONS: Readonly<Partial<Record<string, BoardDataProjection>>> = {
   [QueueName.EMAIL]: projectEmailJobData,
   [QueueName.NOTIFICATIONS]: projectNotificationJobData,
+  [QueueName.AI_RUNS]: projectAiRunWakeJobData,
 }

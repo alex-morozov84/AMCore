@@ -164,8 +164,9 @@ the optional Operations Console's Background work screen reports every descripto
 1. Add the value to `QueueName` in `constants/queues.constant.ts`.
 2. Add its descriptor to `DESCRIPTORS` in `constants/queue-inventory.constant.ts`.
 3. Add a processor in a worker-only module (see above) if jobs should be consumed.
-4. Optional: list it in `BULL_BOARD_QUEUE_NAMES` to give it a Bull Board adapter.
-   The board lists three queues today; `ai-runs` has none.
+4. Nothing to add for the board: every enabled queue gets a read-only Bull Board adapter and
+   shows in Background work. Its job data stays hidden until you add a projection to
+   `BOARD_DATA_PROJECTIONS`.
 5. Optional: add Console copy for it in `console.backgroundWork.queues` in
    `apps/web/messages/*.json`. Without it the screen shows the technical name and
    generic copy for its `kind`.

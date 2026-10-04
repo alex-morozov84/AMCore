@@ -103,6 +103,11 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
       { notificationId: 'ntf-1' },
       { delay: HOUR, jobId: 'ntf-job-1' }
     )
+    await queueOf(app, 'ai-runs').add(
+      'ai-run-wake',
+      { runId: 'run-1', prompt: CANARY },
+      { delay: HOUR, jobId: 'ai-job-1' }
+    )
     const failed = await failOneJob(
       queueOf(app, 'default'),
       { token: CANARY, nested: { deep: CANARY } },
@@ -148,6 +153,13 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
     const res = await get('/api/queues?activeQueue=notifications&status=delayed').expect(200)
     const queue = res.body.queues.find((q: { name: string }) => q.name === 'notifications')
     expect(queue.jobs[0].data).toEqual({ notificationId: 'ntf-1' })
+  })
+
+  it('shows an AI run wake job as its opaque run id and nothing else', async () => {
+    const res = await get('/api/queues?activeQueue=ai-runs&status=delayed').expect(200)
+    const queue = res.body.queues.find((q: { name: string }) => q.name === 'ai-runs')
+    expect(queue.jobs[0].data).toEqual({ runId: 'run-1' })
+    expect(JSON.stringify(queue)).not.toContain(CANARY)
   })
 
   it('hides the whole payload of the downstream default queue and every failure detail', async () => {

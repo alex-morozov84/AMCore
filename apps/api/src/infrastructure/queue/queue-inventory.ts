@@ -1,8 +1,4 @@
-import {
-  BULL_BOARD_QUEUE_NAMES,
-  QUEUE_INVENTORY,
-  type QueueDescriptor,
-} from './constants/queue-inventory.constant'
+import { QUEUE_INVENTORY, type QueueDescriptor } from './constants/queue-inventory.constant'
 import type { QueueName } from './constants/queues.constant'
 
 /** Names that are registered with BullMQ and observed. */
@@ -12,23 +8,22 @@ export function enabledQueueNames(
   return inventory.filter((queue) => queue.enabled).map((queue) => queue.name)
 }
 
-/** Bull Board adapters exist only for enabled queues, or its bootstrap would resolve a missing token. */
+/**
+ * Queues that get a Bull Board adapter: exactly the enabled queues, the same rule that puts a row in
+ * Background work. A disabled queue is not registered, so the board would resolve a missing token.
+ * Registering a queue in the inventory is therefore enough to see it in the board; its job data stays
+ * hidden until `BOARD_DATA_PROJECTIONS` names the fields to show.
+ */
 export function boardQueueNames(
-  inventory: readonly QueueDescriptor[] = QUEUE_INVENTORY,
-  boardQueues: readonly QueueName[] = BULL_BOARD_QUEUE_NAMES
+  inventory: readonly QueueDescriptor[] = QUEUE_INVENTORY
 ): QueueName[] {
-  const enabled = new Set(enabledQueueNames(inventory))
-  return boardQueues.filter((name) => enabled.has(name))
+  return enabledQueueNames(inventory)
 }
 
 /**
- * Whether the queue has an adapter in the read-only queue board. An enabled queue only: a disabled
- * queue is not registered, so the board has nothing to show. Says nothing about the board being
+ * Whether the queue has an adapter in the read-only queue board. Says nothing about the board being
  * mounted (see `BULL_BOARD_MOUNT`).
  */
-export function isOnBoard(
-  descriptor: QueueDescriptor,
-  boardQueues: readonly QueueName[] = BULL_BOARD_QUEUE_NAMES
-): boolean {
-  return descriptor.enabled && boardQueues.includes(descriptor.name)
+export function isOnBoard(descriptor: QueueDescriptor): boolean {
+  return descriptor.enabled
 }

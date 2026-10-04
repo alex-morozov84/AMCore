@@ -40,7 +40,7 @@ describe('queue board — production without the process flag', () => {
     const { AdminQueuesService } = await import('../src/core/admin/admin-queues.service')
     const summary = await graph.module.get(AdminQueuesService, { strict: false }).list()
     expect(summary.board).toEqual({ state: 'disabled' })
-    expect(summary.queues.filter((queue) => queue.inBoard).length).toBe(3)
+    expect(summary.queues.filter((queue) => queue.inBoard).length).toBe(4)
   })
 
   it('documents no board operation', async () => {

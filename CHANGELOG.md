@@ -30,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   browser) in path and host mode, with a permanent view-only mark, per-queue links, and
   an honest state when the board is off (how to enable it, only when that cause is
   confirmed). `GET /api/v1/admin/background-work/queues` now reports `board.state` and
-  `inBoard`.
+  `inBoard`. Every enabled queue (including `ai-runs`) is on the board automatically,
+  with job data hidden until a projection is added.
 
 ### Added
 

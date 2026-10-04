@@ -1,4 +1,9 @@
-import { projectEmailJobData, projectNotificationJobData } from './bull-board-data-projections'
+import {
+  BOARD_DATA_PROJECTIONS,
+  projectAiRunWakeJobData,
+  projectEmailJobData,
+  projectNotificationJobData,
+} from './bull-board-data-projections'
 
 const REAL_EMAIL_JOB = {
   template: 'welcome',
@@ -80,5 +85,32 @@ describe('notification wake projection', () => {
   it('drops extra keys instead of passing them through', () => {
     const shown = projectNotificationJobData({ notificationId: 'n1', secret: 'CANARY' })
     expect(serialized(shown)).not.toContain('CANARY')
+  })
+})
+
+describe('AI run wake projection', () => {
+  it('shows the opaque run id', () => {
+    expect(projectAiRunWakeJobData({ runId: 'run_123-abc' })).toEqual({ runId: 'run_123-abc' })
+  })
+
+  it.each([
+    ['no id', {}],
+    ['a URL', { runId: 'https://x.example/?t=1' }],
+    ['an object', { runId: { a: 1 } }],
+    ['too long', { runId: 'a'.repeat(65) }],
+    ['null data', null],
+  ])('hides %s', (_label, data) => {
+    expect(projectAiRunWakeJobData(data)).toBeNull()
+  })
+
+  it('drops extra keys instead of passing them through', () => {
+    expect(serialized(projectAiRunWakeJobData({ runId: 'r1', prompt: 'CANARY' }))).not.toContain(
+      'CANARY'
+    )
+  })
+
+  it('is registered for the ai-runs queue and for no queue by default', () => {
+    expect(BOARD_DATA_PROJECTIONS['ai-runs']).toBe(projectAiRunWakeJobData)
+    expect(BOARD_DATA_PROJECTIONS['default']).toBeUndefined()
   })
 })
