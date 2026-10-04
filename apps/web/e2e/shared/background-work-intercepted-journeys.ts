@@ -7,9 +7,11 @@ import { QUEUES_ROUTE, row } from './background-work-journey'
 export async function backgroundWorkDegradedJourney(page: Page, url: string): Promise<void> {
   const unavailable = {
     checkedAt: new Date().toISOString(),
+    board: { state: 'available' },
     queues: ['email', 'default', 'notifications', 'ai-runs'].map((name) => ({
       name,
       kind: name === 'email' ? 'work' : name === 'default' ? 'extension' : 'wake',
+      inBoard: name !== 'ai-runs',
       status: 'unavailable',
     })),
   }
@@ -69,4 +71,70 @@ export async function backgroundWorkRetryAfterJourney(page: Page, url: string): 
   expect(calls).toBe(1) // the 30 s automatic backoff has not ended
   await refresh.click()
   await expect.poll(() => calls).toBe(2)
+}
+
+/**
+ * The queue board entry follows what the live summary confirms. The first snapshot is the real one
+ * (the board is mounted on the stand); the polls are real answers with only `board.state` replaced,
+ * which is what a restart of the API with and without `ENABLE_BULL_BOARD` looks like to the page.
+ */
+export async function backgroundWorkBoardStatesJourney(page: Page, url: string): Promise<void> {
+  let board: 'available' | 'disabled' = 'disabled'
+  await page.route(QUEUES_ROUTE, async (route) => {
+    const response = await route.fetch()
+    const json = (await response.json()) as Record<string, unknown>
+    await route.fulfill({ response, json: { ...json, board: { state: board } } })
+  })
+  await page.clock.install()
+  // A bookmark of a failed open: the marker is a one-shot, the board is available at load.
+  await page.goto(`${url}?board=unavailable`)
+  await expect(page.getByRole('heading', { level: 1, name: 'Background work' })).toBeVisible()
+  const open = page.getByRole('link', { name: /Open queue board/ })
+  const rowLinks = page.getByRole('table', { name: 'Background queues' }).getByRole('link', {
+    name: /Open in queue board/,
+  })
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Could not open the queue board' })
+  ).toBeVisible()
+  await expect(open).toBeVisible()
+  await expect(rowLinks).toHaveCount(3)
+  await expect(page).not.toHaveURL(/board=/)
+  await expect(page.getByText('ENABLE_BULL_BOARD')).toHaveCount(0)
+
+  // The API restarted without the flag: the fresh confirmation replaces the stale notice.
+  await page.clock.runFor(31_000)
+  await expect(page.getByText('Queue board is not enabled')).toBeVisible()
+  await expect(page.getByText('Could not open the queue board')).toHaveCount(0)
+  await expect(open).toHaveCount(0)
+  await expect(rowLinks).toHaveCount(0)
+  const disabled = page
+    .getByText('Queue board is not enabled')
+    .locator('xpath=ancestor::*[@data-slot="alert"]')
+  await expect(disabled).toContainText('ENABLE_BULL_BOARD=true')
+  await expect(disabled).toContainText('restart the API')
+  await expect(disabled).toContainText('it stays view-only')
+  await expect(disabled.getByRole('link', { name: /Queue board guide/ })).toHaveAttribute(
+    'target',
+    '_blank'
+  )
+  await expectNoAxeViolations(page)
+
+  // And again with the flag: the entry returns, and the old failed-open notice does not.
+  board = 'available'
+  await page.clock.runFor(31_000)
+  await expect(open).toBeVisible()
+  await expect(rowLinks).toHaveCount(3)
+  await expect(page.getByText('Queue board is not enabled')).toHaveCount(0)
+  await expect(page.getByText('Could not open the queue board')).toHaveCount(0)
+  await expect(page.getByText('ENABLE_BULL_BOARD')).toHaveCount(0)
+
+  // The standing note stays in every state, calm (a note, not an alert), and wraps on a phone.
+  await page.setViewportSize({ width: 320, height: 800 })
+  const note = page
+    .getByText('Queue board is view-only')
+    .locator('xpath=ancestor::*[@data-slot="alert"]')
+  await expect(note).toHaveAttribute('role', 'note')
+  const box = await note.boundingBox()
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(320)
+  await expectNoAxeViolations(page)
 }

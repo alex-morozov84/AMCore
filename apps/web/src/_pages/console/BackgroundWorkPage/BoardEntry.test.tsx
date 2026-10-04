@@ -7,7 +7,7 @@ import type { BoardEntryState } from './board-entry-state'
 import { BoardEntry } from './BoardEntry'
 import { queueMessages } from './queue-test-messages'
 
-const HREF = '/api/console/bull-board/'
+const HREF = '/api/console/bull-board'
 const GUIDE = 'https://docs.example.test/queue-board#enabling-the-board'
 
 function view(state: BoardEntryState, onOpen = vi.fn()) {

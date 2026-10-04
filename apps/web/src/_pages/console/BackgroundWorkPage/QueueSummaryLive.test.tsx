@@ -230,7 +230,7 @@ describe('queue board entry on the live summary', () => {
     view()
     expect(screen.getByRole('link', { name: /Open queue board/ })).toHaveAttribute(
       'href',
-      '/api/console/bull-board/'
+      '/api/console/bull-board'
     )
     const rowLinks = within(table()).getAllByRole('link', { name: /Open in queue board/ })
     expect(rowLinks.map((link) => link.getAttribute('href'))).toEqual([

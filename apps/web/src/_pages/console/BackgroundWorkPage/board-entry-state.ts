@@ -29,5 +29,5 @@ export function resolveBoardEntryState(
  */
 export function queueBoardHref(queue: AdminQueue, boardAvailable: boolean): string | null {
   if (!boardAvailable || !queue.inBoard) return null
-  return `${getConsoleQueueBoardHref()}queue/${encodeURIComponent(queue.name)}`
+  return `${getConsoleQueueBoardHref()}/queue/${encodeURIComponent(queue.name)}`
 }

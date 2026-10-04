@@ -26,9 +26,13 @@ export function getConsoleQueueBoardBasePath(): string {
   return ADMIN_CONSOLE_CONFIG.mode === 'host' ? '/api/bull-board' : '/api/console/bull-board'
 }
 
-/** Entry address of the queue board (the page, not an API). */
+/**
+ * Entry address of the queue board (the page, not an API). No trailing slash: Next.js redirects
+ * `/…/bull-board/` to `/…/bull-board`, so that is the canonical address (the page's `<base>` is an
+ * absolute path with a slash, so its assets are unaffected).
+ */
 export function getConsoleQueueBoardHref(): string {
-  return `${getConsoleQueueBoardBasePath()}/`
+  return getConsoleQueueBoardBasePath()
 }
 
 /** Same topology rule as {@link getConsoleOverviewHref}, for the Organizations panel. */

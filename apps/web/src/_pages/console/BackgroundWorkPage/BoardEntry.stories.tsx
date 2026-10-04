@@ -8,7 +8,7 @@ const meta = {
   component: BoardEntry,
   args: {
     state: 'available',
-    href: '/api/console/bull-board/',
+    href: '/api/console/bull-board',
     guideHref: 'https://docs.example.test/queue-board#enabling-the-board',
     onOpen: fn(),
   },

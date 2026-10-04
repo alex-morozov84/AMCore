@@ -150,13 +150,13 @@ describe('queue board address', () => {
     for (const slug of ['admin', 'operations']) {
       mutableConfig.slug = slug
       expect(getConsoleQueueBoardBasePath()).toBe('/api/console/bull-board')
-      expect(getConsoleQueueBoardHref()).toBe('/api/console/bull-board/')
+      expect(getConsoleQueueBoardHref()).toBe('/api/console/bull-board')
     }
   })
 
   it('has no console segment in host mode: the edge maps /api/* to /api/console/*', () => {
     mutableConfig.mode = 'host'
     expect(getConsoleQueueBoardBasePath()).toBe('/api/bull-board')
-    expect(getConsoleQueueBoardHref()).toBe('/api/bull-board/')
+    expect(getConsoleQueueBoardHref()).toBe('/api/bull-board')
   })
 })
