@@ -3,6 +3,8 @@ import { DEFAULT_LOCALE } from '@amcore/shared'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { getConsoleQueueBoardBasePath } from '@/shared/lib/console-public-href'
+
 import {
   allUnavailableSummary,
   availableQueue,
@@ -228,16 +230,15 @@ describe('queue board entry on the live summary', () => {
 
   it('shows the button and a deep link for every queue that is in the board, while it is available', () => {
     view()
-    expect(screen.getByRole('link', { name: /Open queue board/ })).toHaveAttribute(
-      'href',
-      '/api/console/bull-board'
-    )
+    // The board's public address depends on the Console topology, so it is derived, not spelled out.
+    const board = getConsoleQueueBoardBasePath()
+    expect(screen.getByRole('link', { name: /Open queue board/ })).toHaveAttribute('href', board)
     const rowLinks = within(table()).getAllByRole('link', { name: /Open in queue board/ })
     expect(rowLinks.map((link) => link.getAttribute('href'))).toEqual([
-      '/api/console/bull-board/queue/email',
-      '/api/console/bull-board/queue/default',
-      '/api/console/bull-board/queue/notifications',
-      '/api/console/bull-board/queue/ai-runs',
+      `${board}/queue/email`,
+      `${board}/queue/default`,
+      `${board}/queue/notifications`,
+      `${board}/queue/ai-runs`,
     ])
   })
 

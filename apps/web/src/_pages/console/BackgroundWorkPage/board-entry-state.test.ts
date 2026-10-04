@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { getConsoleQueueBoardBasePath } from '@/shared/lib/console-public-href'
+
 import { queueBoardHref, resolveBoardEntryState } from './board-entry-state'
 import { availableQueue, disabledQueue, unavailableQueue } from './queue-fixtures'
 
@@ -25,20 +27,19 @@ describe('resolveBoardEntryState', () => {
   })
 })
 
+// The board's public address depends on the Console topology, so it is derived, not spelled out.
+const board = getConsoleQueueBoardBasePath()
+
 describe('queueBoardHref', () => {
   it('links a queue that is in the board while the board is available', () => {
-    expect(queueBoardHref(availableQueue('email'), true)).toBe(
-      '/api/console/bull-board/queue/email'
-    )
+    expect(queueBoardHref(availableQueue('email'), true)).toBe(`${board}/queue/email`)
     expect(queueBoardHref(unavailableQueue('notifications'), true)).toBe(
-      '/api/console/bull-board/queue/notifications'
+      `${board}/queue/notifications`
     )
   })
 
   it('links every queue the API reports as in the board, including a wake queue', () => {
-    expect(queueBoardHref(availableQueue('ai-runs'), true)).toBe(
-      '/api/console/bull-board/queue/ai-runs'
-    )
+    expect(queueBoardHref(availableQueue('ai-runs'), true)).toBe(`${board}/queue/ai-runs`)
   })
 
   it('has no link for a queue that is not in the board', () => {
@@ -51,7 +52,7 @@ describe('queueBoardHref', () => {
 
   it('encodes the queue name as one path segment', () => {
     expect(queueBoardHref({ ...availableQueue('email'), name: 'a/b' }, true)).toBe(
-      '/api/console/bull-board/queue/a%2Fb'
+      `${board}/queue/a%2Fb`
     )
   })
 })

@@ -10,7 +10,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 vi.mock('./authenticated-proxy', () => ({ resolveConsoleAccessToken: vi.fn() }))
 
-import { getConsoleBackgroundWorkHref } from '@/shared/lib/console-public-href'
+import {
+  getConsoleBackgroundWorkHref,
+  getConsoleQueueBoardBasePath,
+} from '@/shared/lib/console-public-href'
 
 import { resolveConsoleAccessToken } from './authenticated-proxy'
 import { handleConsoleBoard } from './board-handler'
@@ -98,7 +101,7 @@ describe('board bridge — what reaches the API', () => {
       Buffer.from(headers.get(BULL_BOARD_CONTEXT_HEADER)!, 'base64url').toString('utf8')
     )
     expect(context).toEqual({
-      basePath: '/api/console/bull-board',
+      basePath: getConsoleQueueBoardBasePath(),
       locale: DEFAULT_LOCALE,
       returnHref: expectedReturnHref(DEFAULT_LOCALE),
     })

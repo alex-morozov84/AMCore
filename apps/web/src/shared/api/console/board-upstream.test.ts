@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 
-import { getConsoleBackgroundWorkHref } from '@/shared/lib/console-public-href'
+import {
+  getConsoleBackgroundWorkHref,
+  getConsoleQueueBoardBasePath,
+} from '@/shared/lib/console-public-href'
 
 import {
   BOARD_UPSTREAM_PATH,
@@ -80,7 +83,7 @@ describe('board render context', () => {
     (locale) => {
       const prefix = SUPPORTED_LOCALES.length > 1 ? `/${locale}` : ''
       expect(buildBoardRenderContext(request(`NEXT_LOCALE=${locale}`))).toEqual({
-        basePath: '/api/console/bull-board',
+        basePath: getConsoleQueueBoardBasePath(),
         locale,
         returnHref: `${prefix}${getConsoleBackgroundWorkHref()}`,
       })
