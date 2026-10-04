@@ -1,9 +1,11 @@
+import { readdirSync } from 'node:fs'
 import path from 'node:path'
 
 import { ESLint } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
-const eslint = new ESLint({ cwd: path.resolve(import.meta.dirname, '../..') })
+const webRoot = path.resolve(import.meta.dirname, '../..')
+const eslint = new ESLint({ cwd: webRoot })
 
 async function violations(code: string, filePath = 'e2e/real-stack/alert-fixture.spec.ts') {
   const [result] = await eslint.lintText(code, { filePath })
@@ -32,7 +34,18 @@ describe('E2E alert selector guard', () => {
   })
 
   it('covers every browser lane', async () => {
-    for (const lane of ['mocked', 'server-mocked', 'real-stack', 'console-real-stack'])
+    const e2eRoot = path.join(webRoot, 'e2e')
+    const lanes = readdirSync(e2eRoot, { withFileTypes: true })
+      .filter(
+        (entry) =>
+          entry.isDirectory() &&
+          readdirSync(path.join(e2eRoot, entry.name), { recursive: true }).some((file) =>
+            String(file).endsWith('.spec.ts')
+          )
+      )
+      .map((entry) => entry.name)
+    expect(lanes.length).toBeGreaterThan(0)
+    for (const lane of lanes)
       expect(
         await violations("page.getByRole('alert')", `e2e/${lane}/fixture.spec.ts`)
       ).toHaveLength(1)
