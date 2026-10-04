@@ -2,23 +2,14 @@
 
 import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
-import { ExternalLink, Info, TriangleAlert } from 'lucide-react'
+import { ExternalLink, TriangleAlert } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { buttonVariants } from '@/shared/ui/button'
+import { InfoTooltip } from '@/shared/ui/info-tooltip'
 
 import type { BoardEntryState } from './board-entry-state'
-
-interface BoardEntryProps {
-  state: BoardEntryState
-  /** Where the board opens (the Console BFF route of this topology). */
-  href: string
-  /** Operator guide that explains how to enable the board. */
-  guideHref: string
-  /** The visitor is trying again: the stale "could not open" notice goes away. */
-  onOpen: () => void
-}
 
 /** Opens in a new tab: said to everyone, not only to those who can see the icon. */
 function NewTabLink({
@@ -48,52 +39,58 @@ function NewTabLink({
 }
 
 /**
- * Entry to the read-only queue board on Background work. A standing, calm note (never a modal, never
- * a warning) says what the board is; then, depending on what the live summary confirms, a button, the
- * way to enable it, or a note that the last attempt failed. The caller computes the state
+ * The way into the read-only queue board, placed with the page actions: a button plus the same kind of
+ * help icon as Auto-refresh, which carries the standing "view-only" explanation. Shown only while the
+ * live summary confirms the board is available (or just failed to open, so the visitor can retry).
+ */
+export function BoardOpenAction({ href, onOpen }: { href: string; onOpen: () => void }) {
+  const t = useTranslations('console.backgroundWork.board')
+  return (
+    <>
+      <NewTabLink href={href} onClick={onOpen} className={cn(buttonVariants(), 'gap-2')}>
+        {t('openLink')}
+        <ExternalLink aria-hidden className="size-4" />
+      </NewTabLink>
+      <InfoTooltip label={t('noteBody')} />
+    </>
+  )
+}
+
+/**
+ * Only what needs the visitor's attention, above the table: the board is not enabled (with the way to
+ * enable it) or the last attempt to open it failed. The caller computes the state
  * (`resolveBoardEntryState`) from the same observer that feeds the queue rows.
  */
-export function BoardEntry({ state, href, guideHref, onOpen }: BoardEntryProps) {
+export function BoardNotices({ state, guideHref }: { state: BoardEntryState; guideHref: string }) {
   const t = useTranslations('console.backgroundWork.board')
-  const canOpen = state === 'available' || state === 'open-failed'
-  return (
-    <div className="flex flex-col gap-3">
+  if (state === 'disabled') {
+    return (
       <Alert role="note">
-        <Info aria-hidden />
-        <AlertTitle className="line-clamp-none">{t('noteTitle')}</AlertTitle>
-        <AlertDescription>{t('noteBody')}</AlertDescription>
+        <TriangleAlert aria-hidden />
+        <AlertTitle className="line-clamp-none">{t('disabledTitle')}</AlertTitle>
+        <AlertDescription>
+          <p>
+            {t.rich('disabledBody', {
+              code: (chunks) => (
+                <code className="rounded bg-muted px-1 font-console-mono text-xs">{chunks}</code>
+              ),
+            })}
+          </p>
+          <NewTabLink href={guideHref} className="underline">
+            {t('disabledGuideLink')}
+          </NewTabLink>
+        </AlertDescription>
       </Alert>
-      {state === 'disabled' && (
-        <Alert role="note">
-          <TriangleAlert aria-hidden />
-          <AlertTitle className="line-clamp-none">{t('disabledTitle')}</AlertTitle>
-          <AlertDescription>
-            <p>
-              {t.rich('disabledBody', {
-                code: (chunks) => (
-                  <code className="rounded bg-muted px-1 font-console-mono text-xs">{chunks}</code>
-                ),
-              })}
-            </p>
-            <NewTabLink href={guideHref} className="underline">
-              {t('disabledGuideLink')}
-            </NewTabLink>
-          </AlertDescription>
-        </Alert>
-      )}
-      {state === 'open-failed' && (
-        <Alert variant="destructive" role="status">
-          <TriangleAlert aria-hidden />
-          <AlertTitle className="line-clamp-none">{t('unavailableTitle')}</AlertTitle>
-          <AlertDescription>{t('unavailableBody')}</AlertDescription>
-        </Alert>
-      )}
-      {canOpen && (
-        <NewTabLink href={href} onClick={onOpen} className={cn(buttonVariants(), 'w-fit gap-2')}>
-          {t('openLink')}
-          <ExternalLink aria-hidden className="size-4" />
-        </NewTabLink>
-      )}
-    </div>
-  )
+    )
+  }
+  if (state === 'open-failed') {
+    return (
+      <Alert variant="destructive" role="status">
+        <TriangleAlert aria-hidden />
+        <AlertTitle className="line-clamp-none">{t('unavailableTitle')}</AlertTitle>
+        <AlertDescription>{t('unavailableBody')}</AlertDescription>
+      </Alert>
+    )
+  }
+  return null
 }

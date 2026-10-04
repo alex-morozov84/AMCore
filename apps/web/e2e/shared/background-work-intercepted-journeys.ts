@@ -11,7 +11,7 @@ export async function backgroundWorkDegradedJourney(page: Page, url: string): Pr
     queues: ['email', 'default', 'notifications', 'ai-runs'].map((name) => ({
       name,
       kind: name === 'email' ? 'work' : name === 'default' ? 'extension' : 'wake',
-      inBoard: name !== 'ai-runs',
+      inBoard: true,
       status: 'unavailable',
     })),
   }
@@ -97,7 +97,7 @@ export async function backgroundWorkBoardStatesJourney(page: Page, url: string):
     page.getByRole('status').filter({ hasText: 'Could not open the queue board' })
   ).toBeVisible()
   await expect(open).toBeVisible()
-  await expect(rowLinks).toHaveCount(3)
+  await expect(rowLinks).toHaveCount(4)
   await expect(page).not.toHaveURL(/board=/)
   await expect(page.getByText('ENABLE_BULL_BOARD')).toHaveCount(0)
 
@@ -123,18 +123,17 @@ export async function backgroundWorkBoardStatesJourney(page: Page, url: string):
   board = 'available'
   await page.clock.runFor(31_000)
   await expect(open).toBeVisible()
-  await expect(rowLinks).toHaveCount(3)
+  await expect(rowLinks).toHaveCount(4)
   await expect(page.getByText('Queue board is not enabled')).toHaveCount(0)
   await expect(page.getByText('Could not open the queue board')).toHaveCount(0)
   await expect(page.getByText('ENABLE_BULL_BOARD')).toHaveCount(0)
 
-  // The standing note stays in every state, calm (a note, not an alert), and wraps on a phone.
+  // The page says in its description that the board is view-only, and the help icon beside the
+  // button carries the full explanation; on a phone the actions wrap instead of overflowing.
+  await expect(page.getByText('To look at the jobs themselves, open the queue board')).toBeVisible()
+  await expect(page.getByLabel(/Retrying or deleting jobs and managing queues/)).toBeVisible()
   await page.setViewportSize({ width: 320, height: 800 })
-  const note = page
-    .getByText('Queue board is view-only')
-    .locator('xpath=ancestor::*[@data-slot="alert"]')
-  await expect(note).toHaveAttribute('role', 'note')
-  const box = await note.boundingBox()
+  const box = await open.boundingBox()
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(320)
   await expectNoAxeViolations(page)
 }

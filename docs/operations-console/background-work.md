@@ -124,18 +124,20 @@ that does show job ids, names and times, and a reviewed part of some payloads. I
 
 ## Queue board entry
 
-Above the queue list the screen shows a standing note that the board is view-only, and then one
-of three things, depending on what the API confirmed in the latest reading:
+The page description says that the jobs themselves are in the queue board and that it is
+view-only. Depending on what the API confirmed in the latest reading:
 
-- **Open queue board** and, on every queue that has a board page, **Open in queue board**. Both
-  open in a new tab.
+- **Open queue board** sits with the page actions (next to Auto-refresh and Refresh), with a help
+  icon that explains what the board does not allow. Every queue that has a board page also has
+  **Open in queue board**. Both open in a new tab.
 - **Queue board is not enabled**: the board was not mounted when the API started, with the steps
-  to enable it ([Enabling the board](queue-board.md#enabling-the-board)). Buttons and row links
+  to enable it ([Enabling the board](queue-board.md#enabling-the-board)). The button and row links
   are not shown.
 - **Could not open the queue board**: the last attempt to open it failed while the board is
-  available now. It disappears when you try again or when the board's state changes.
+  available now; the button stays. It disappears when you try again or when the board's state
+  changes.
 
-While your access is being re-verified only the note is shown.
+While your access is being re-verified no board entry is shown.
 
 ## Adding a queue (for developers)
 
@@ -192,7 +194,7 @@ An observed Redis problem is part of a normal 200 response, never an error:
       },
       "age": { "status": "sample", "seconds": 245, "sampled": 14 }
     },
-    { "name": "ai-runs", "kind": "wake", "inBoard": false, "status": "unavailable" },
+    { "name": "ai-runs", "kind": "wake", "inBoard": true, "status": "unavailable" },
     { "name": "default", "kind": "extension", "inBoard": false, "status": "disabled" }
   ]
 }
@@ -200,7 +202,7 @@ An observed Redis problem is part of a normal 200 response, never an error:
 
 `board.state` is `available` or `disabled`. `disabled` means one confirmed thing: the queue
 board was not mounted when the API started (production without `ENABLE_BULL_BOARD=true` in the
-process environment). `inBoard` says that the queue has a page in the board; it does not say
+process environment). `inBoard` says that the queue has a page in the board (true for every enabled queue); it does not say
 that the board is on, so the screen offers a link only when both hold.
 
 `counts.waiting` and `counts.prioritized` are separate fields; the screen's

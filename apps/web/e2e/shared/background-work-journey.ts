@@ -133,10 +133,10 @@ export async function queueBoardJourney(
   addFailedDefaultQueueJob()
   try {
     await page.goto(pageUrl)
-    const note = page
-      .getByText('Queue board is view-only')
-      .locator('xpath=ancestor::*[@data-slot="alert"]')
-    await expect(note).toHaveAttribute('role', 'note')
+    await expect(
+      page.getByText('To look at the jobs themselves, open the queue board')
+    ).toBeVisible()
+    await expect(page.getByLabel(/Retrying or deleting jobs and managing queues/)).toBeVisible()
     const entry = page.getByRole('link', { name: /Open queue board/ })
     await expect(entry).toHaveAttribute('href', boardPath)
     await expect(entry).toHaveAttribute('target', '_blank')
@@ -144,7 +144,7 @@ export async function queueBoardJourney(
     const rowLinks = page.getByRole('table', { name: 'Background queues' }).getByRole('link', {
       name: /Open in queue board/,
     })
-    await expect(rowLinks).toHaveCount(3)
+    await expect(rowLinks).toHaveCount(4)
     await expect(rowLinks.first()).toHaveAttribute('href', `${boardPath}/queue/email`)
     await expectNoAxeViolations(page)
 

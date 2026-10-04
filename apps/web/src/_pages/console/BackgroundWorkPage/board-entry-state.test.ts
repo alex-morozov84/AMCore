@@ -35,8 +35,13 @@ describe('queueBoardHref', () => {
     )
   })
 
-  it('has no link for a queue without a board adapter', () => {
-    expect(queueBoardHref(availableQueue('ai-runs'), true)).toBeNull()
+  it('links every queue the API reports as in the board, including a wake queue', () => {
+    expect(queueBoardHref(availableQueue('ai-runs'), true)).toBe(
+      '/api/console/bull-board/queue/ai-runs'
+    )
+  })
+
+  it('has no link for a queue that is not in the board', () => {
     expect(queueBoardHref(disabledQueue('default'), true)).toBeNull()
   })
 

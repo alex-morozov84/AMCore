@@ -237,15 +237,14 @@ describe('queue board entry on the live summary', () => {
       '/api/console/bull-board/queue/email',
       '/api/console/bull-board/queue/default',
       '/api/console/bull-board/queue/notifications',
+      '/api/console/bull-board/queue/ai-runs',
     ])
-    // ai-runs has no board adapter: no link, ever.
-    expect(boardLinks().join(' ')).not.toContain('ai-runs')
   })
 
   it('shows the same row links in the mobile cards', () => {
     view()
     const cards = screen.getByRole('list', { name: 'Background queues' })
-    expect(within(cards).getAllByRole('link', { name: /Open in queue board/ })).toHaveLength(3)
+    expect(within(cards).getAllByRole('link', { name: /Open in queue board/ })).toHaveLength(4)
   })
 
   it('removes the button and every row link, and explains how to enable it, when the board is disabled', () => {
@@ -277,10 +276,9 @@ describe('queue board entry on the live summary', () => {
     expect(screen.queryByText('Queue board is not enabled')).toBeNull()
   })
 
-  it('shows only the standing note, never disabled or failed, while access is being re-verified', () => {
+  it('shows no board entry, never disabled or failed, while access is being re-verified', () => {
     state({ data: null as never, denied: true })
     view({ boardOpenFailed: true })
-    expect(screen.getByText('Queue board is view-only')).toBeInTheDocument()
     expect(screen.queryByText('Queue board is not enabled')).toBeNull()
     expect(screen.queryByText('Could not open the queue board')).toBeNull()
     expect(boardLinks()).toEqual([])

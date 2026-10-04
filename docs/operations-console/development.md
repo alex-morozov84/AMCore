@@ -274,11 +274,12 @@ requests, so a stalled Redis cannot pile up work behind the screen.
 
 ## Queue board
 
-The board entry on Background work is a page-owned composition (`BoardEntry`, with its state
-rule in `board-entry-state.ts`) rendered inside the live leaf, so it follows the same snapshot as
-the rows. It uses the shared `Alert` as it is: `role="note"` for a standing note (the component
-sets `role="alert"` first and spreads your props after it) and `className="line-clamp-none"` so a
-long title wraps. Its texts are props from the page's catalogue keys
+The board entry on Background work is a page-owned composition (`BoardOpenAction` with the page
+actions and `BoardNotices` above the table, with the state rule in `board-entry-state.ts`)
+rendered inside the live leaf, so it follows the same snapshot as the rows. The button carries the
+standing view-only explanation in the shared `InfoTooltip`, as Auto-refresh does. The notices use
+the shared `Alert` as it is: `role="note"` (the component sets `role="alert"` first and spreads
+your props after it) and `className="line-clamp-none"` so a long title wraps. Its texts are props from the page's catalogue keys
 (`console.backgroundWork.board.*`); `shared/ui` holds no message keys and no access logic.
 
 The board is reached only through `app/api/console/bull-board/[[...path]]/route.ts` and

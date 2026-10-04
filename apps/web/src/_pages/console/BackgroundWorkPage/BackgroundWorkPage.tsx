@@ -27,6 +27,7 @@ export async function BackgroundWorkPage({
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">{t('title')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t('scope')}</p>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t('boardPointer')}</p>
       </header>
       {outcome.status === 'unavailable' ? (
         <PrimaryUnavailableFallback reason={outcome.reason} />

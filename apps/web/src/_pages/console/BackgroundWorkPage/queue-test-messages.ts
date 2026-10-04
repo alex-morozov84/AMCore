@@ -14,10 +14,10 @@ export const queueMessages = {
       eyebrow: 'Queues',
       description:
         'Read-only view of the background queues: whether work is piling up, paused or cannot be read.',
+      boardPointer: 'To look at the jobs themselves, open the queue board. It is view-only.',
       scope:
         'Figures come from the queues of the Redis configured for this API, shared by every API and worker process. They show where work is waiting, not whether workers are running.',
       board: {
-        noteTitle: 'Queue board is view-only',
         noteBody:
           'Browse queue status and job details. Retrying or deleting jobs and managing queues is not available here, and some job details are hidden.',
         openLink: 'Open queue board',

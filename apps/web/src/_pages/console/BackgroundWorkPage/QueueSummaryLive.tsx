@@ -8,7 +8,7 @@ import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 
 import { queueBoardHref, resolveBoardEntryState } from './board-entry-state'
 import { QUEUE_BOARD_GUIDE_HREF } from './board-guide-link'
-import { BoardEntry } from './BoardEntry'
+import { BoardNotices, BoardOpenAction } from './BoardEntry'
 import { allUnavailable } from './queue-copy'
 import { QueueCards } from './QueueCards'
 import { QueueSummaryControls } from './QueueSummaryControls'
@@ -35,6 +35,7 @@ export function QueueSummaryLive({
   const { data } = summary
   const openNotice = useBoardOpenNotice(boardOpenFailed, data?.board.state ?? null)
   const entryState = resolveBoardEntryState(data?.board, openNotice.failed)
+  const canOpenBoard = entryState === 'available' || entryState === 'open-failed'
 
   return (
     <>
@@ -52,15 +53,15 @@ export function QueueSummaryLive({
             canRefresh={summary.canRefresh}
             online={summary.online}
             retryAfterSeconds={summary.retryAfterSeconds}
+            leading={
+              canOpenBoard && (
+                <BoardOpenAction href={getConsoleQueueBoardHref()} onOpen={openNotice.clear} />
+              )
+            }
           />
         )}
       </div>
-      <BoardEntry
-        state={entryState}
-        href={getConsoleQueueBoardHref()}
-        guideHref={QUEUE_BOARD_GUIDE_HREF}
-        onOpen={openNotice.clear}
-      />
+      <BoardNotices state={entryState} guideHref={QUEUE_BOARD_GUIDE_HREF} />
       {data && <QueueRows queues={data.queues} boardAvailable={data.board.state === 'available'} />}
     </>
   )

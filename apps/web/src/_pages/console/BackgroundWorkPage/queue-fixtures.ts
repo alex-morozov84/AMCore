@@ -21,7 +21,7 @@ export function availableQueue(
   return {
     name,
     kind: name === 'email' ? 'work' : name === 'default' ? 'extension' : 'wake',
-    inBoard: name !== 'ai-runs',
+    inBoard: true,
     status: 'available',
     sampledAt: CHECKED_AT,
     paused: false,
@@ -34,7 +34,7 @@ export function availableQueue(
 export const unavailableQueue = (name: string): AdminQueue => ({
   name,
   kind: 'wake',
-  inBoard: name !== 'ai-runs',
+  inBoard: true,
   status: 'unavailable',
 })
 
