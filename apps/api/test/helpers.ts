@@ -10,6 +10,7 @@ import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redi
 import type { Cache } from 'cache-manager'
 import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
 
@@ -83,8 +84,23 @@ export async function setupE2ETestInfrastructure(): Promise<
  * builder BEFORE compile — used to inject a **test-only** provider (e.g. a SENSITIVE demo tool via the
  * `AI_TOOLS` token) that must never exist in production DI. Production code paths are untouched.
  */
+export interface E2ESetupOptions {
+  /**
+   * Register the HTTP pieces in the order, and with the global prefix, `main.ts` uses (board guard,
+   * body parser, cookies, Helmet, CORS, `api/v1`) instead of the prefix-less default.
+   */
+  productionOrder?: boolean
+  /**
+   * Take the queue board's mount decision as a production process WITHOUT `ENABLE_BULL_BOARD` in its
+   * real environment (it is taken when its module first loads), then restore the test environment and
+   * set the flag the way a later `.env` load would, before the application itself loads.
+   */
+  productionAtImport?: { lateEnableBullBoard: string }
+}
+
 export async function setupE2ETest(
-  configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder
+  configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+  options: E2ESetupOptions = {}
 ): Promise<E2ETestContext> {
   const { postgresContainer, redisContainer } = await setupE2ETestInfrastructure()
 
@@ -117,6 +133,18 @@ export async function setupE2ETest(
     // Dynamic import AFTER process.env is set — otherwise AppModule's
     // ConfigModule.forRoot() evaluates at static-import time with the .env file
     // values and ignores our testcontainer URLs. See @nestjs/config issue #245.
+    if (options.productionAtImport) {
+      // The mount decision is taken the first time its module loads. Load it as a production process
+      // without the flag would, then restore the test environment (the application's own production
+      // environment rules, TLS to the database among them, are not what this proves) and set the flag
+      // the way a later `.env` load would.
+      const previousNodeEnv = process.env.NODE_ENV
+      process.env.NODE_ENV = 'production'
+      delete process.env.ENABLE_BULL_BOARD
+      await import('../src/infrastructure/queue/dashboard/bull-board-mount-state')
+      process.env.NODE_ENV = previousNodeEnv
+      process.env.ENABLE_BULL_BOARD = options.productionAtImport.lateEnableBullBoard
+    }
     const { AppModule } = await import('../src/app.module')
 
     // Create testing module with real AppModule (no mocks!). Only PinoLogger is
@@ -131,8 +159,17 @@ export async function setupE2ETest(
     app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
 
     // Apply same configuration as in main.ts
-    configureBodyParser(app, '')
+    // Loaded here, not at the top: it reads the board's mount decision, which a suite may need to take first.
+    const { configureBullBoardEdge } = await import('../src/bootstrap/configure-bull-board-edge')
+    const prefix = options.productionOrder ? '/api/v1' : ''
+    configureBullBoardEdge(app, prefix)
+    configureBodyParser(app, prefix)
     app.use(cookieParser())
+    if (options.productionOrder) {
+      app.use(helmet())
+      app.enableCors({ origin: ['https://app.example.test'], credentials: true })
+      app.setGlobalPrefix('api/v1')
+    }
     app.useGlobalPipes(new ZodValidationPipe())
 
     await app.init()

@@ -1,4 +1,9 @@
-import { finalizeResult, safeErrorResult, withFinalBoundary } from './bull-board-errors'
+import {
+  clientErrorStatus,
+  finalizeResult,
+  safeErrorResult,
+  withFinalBoundary,
+} from './bull-board-errors'
 
 const CANARY = 'CANARY_VALIDATOR_SECRET'
 
@@ -65,5 +70,19 @@ describe('final boundary for board responses', () => {
     const value = { status: 200 as const, body: { ok: true } }
     expect(await withFinalBoundary(() => value)(undefined)).toBe(value)
     expect(await withFinalBoundary(() => Promise.resolve(value))(undefined)).toBe(value)
+  })
+
+  it.each([
+    [{ status: 400 }, 400],
+    [{ statusCode: 413 }, 400],
+    [{ status: 415 }, 400],
+    [{ status: 404 }, 404],
+    [{ status: 405 }, 405],
+    [{ status: 500 }, 500],
+    [{ status: 302 }, 500],
+    [new Error('CANARY'), 500],
+    [null, 500],
+  ])('keeps only the class of a framework failure: %j -> %s', (error, expected) => {
+    expect(clientErrorStatus(error)).toBe(expected)
   })
 })

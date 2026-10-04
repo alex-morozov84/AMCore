@@ -42,7 +42,7 @@ export type AdminQueueAge = z.infer<typeof adminQueueAgeSchema>
 
 /**
  * `inBoard`: the queue has an adapter in the read-only queue board (Bull Board). It says nothing about
- * whether the board is mounted (see `adminQueuesBoardSchema`); `ai-runs` has no adapter today.
+ * whether the board is mounted (see `adminQueuesBoardSchema`). Every enabled queue has one.
  */
 const identity = {
   name: adminQueueNameSchema,

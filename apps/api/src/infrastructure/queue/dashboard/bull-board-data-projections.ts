@@ -66,8 +66,13 @@ export const projectAiRunWakeJobData: BoardDataProjection = (data) => {
   return parsed.success ? { runId: parsed.data.runId } : null
 }
 
-export const BOARD_DATA_PROJECTIONS: Readonly<Partial<Record<string, BoardDataProjection>>> = {
-  [QueueName.EMAIL]: projectEmailJobData,
-  [QueueName.NOTIFICATIONS]: projectNotificationJobData,
-  [QueueName.AI_RUNS]: projectAiRunWakeJobData,
-}
+/**
+ * A `Map`, not an object literal: an object inherits `constructor`, `toString` and friends, so a queue
+ * with such a name would pick up a built-in function as its "projection" and show its raw payload.
+ * A `Map` answers only for the names listed here.
+ */
+export const BOARD_DATA_PROJECTIONS: ReadonlyMap<string, BoardDataProjection> = new Map([
+  [QueueName.EMAIL, projectEmailJobData],
+  [QueueName.NOTIFICATIONS, projectNotificationJobData],
+  [QueueName.AI_RUNS, projectAiRunWakeJobData],
+])

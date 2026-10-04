@@ -1,7 +1,11 @@
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
+
 import { BULL_BOARD_ADAPTER } from '@bull-board/nestjs'
 import { jest } from '@jest/globals'
 import type { INestApplication } from '@nestjs/common'
 import { Job, Queue } from 'bullmq'
+import express from 'express'
 import request from 'supertest'
 
 import type { PrismaService } from '../src/prisma'
@@ -157,10 +161,35 @@ describe('Bull Board is read-only (e2e)', () => {
   })
 
   describe('the Board router itself, without the HTTP boundary in front', () => {
-    it.each(CASES)('denies %s %s through the Board hooks', async (verb, path, body) => {
+    // One explicit IPv4 listener for the whole block (not a temporary one per request), closed by the
+    // block. An unexpected answer reports which listener answered and the shape of the reply, with
+    // no cookie, token or payload, so the cause can be found instead of retried.
+    let routerServer: Server
+    let routerBase: string
+
+    beforeAll(async () => {
       const adapter = app.get(BULL_BOARD_ADAPTER, { strict: false }) as { getRouter(): never }
-      const res = await request(adapter.getRouter())[verb](path).send(body)
-      expect([404, 405]).toContain(res.status)
+      routerServer = createServer(express().use(adapter.getRouter()))
+      await new Promise<void>((resolve) => routerServer.listen(0, '127.0.0.1', resolve))
+      routerBase = `http://127.0.0.1:${(routerServer.address() as AddressInfo).port}`
+    })
+
+    afterAll(async () => {
+      await new Promise((resolve) => routerServer.close(resolve))
+    })
+
+    it.each(CASES)('denies %s %s through the Board hooks', async (verb, path, body) => {
+      const res = await request(routerBase)[verb](path).send(body)
+      const seen = JSON.stringify({
+        listener: routerBase,
+        status: res.status,
+        contentType: res.headers['content-type'],
+        poweredBy: res.headers['x-powered-by'],
+        bodyKeys: Object.keys((res.body ?? {}) as object),
+      })
+      if (res.status !== 404 && res.status !== 405) {
+        throw new Error(`the Board router answered ${res.status} instead of 404/405: ${seen}`)
+      }
       expect(res.status === 405 ? Object.keys(res.body as object) : ['error']).toEqual(['error'])
       expect(commandCalls()).toBe(0)
     })

@@ -111,6 +111,9 @@ describe('closed job projection', () => {
     expect(pickJob(rawJob(), 'default', context).data).toBe('[hidden]')
     expect(pickJob(rawJob(), 'my-reports', context).data).toBe('[hidden]')
     expect(pickJob(rawJob(), undefined, context).data).toBe('[hidden]')
+    for (const inherited of ['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf']) {
+      expect(pickJob(rawJob(), inherited, context).data).toBe('[hidden]')
+    }
   })
 
   it('drops the optional fields it does not list', () => {

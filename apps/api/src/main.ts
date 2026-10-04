@@ -7,6 +7,7 @@ import { Logger } from 'nestjs-pino'
 
 import { AppModule } from './app.module'
 import { configureBodyParser } from './bootstrap/configure-body-parser'
+import { configureBullBoardEdge } from './bootstrap/configure-bull-board-edge'
 import { EnvService } from './env/env.service'
 import { ShutdownService } from './shutdown.service'
 import { API_GLOBAL_PREFIX, buildApiDocument } from './swagger.config'
@@ -60,6 +61,8 @@ async function bootstrap(): Promise<void> {
   // Explicit request-body size limit for JSON + urlencoded (keeps webhook
   // raw-body capture intact). Shared with the e2e bootstrap so the body-size
   // contract is identical in tests and production.
+  // The queue board's own guard comes first: parser, Helmet and CORS must not answer its requests.
+  configureBullBoardEdge(app, `/${API_GLOBAL_PREFIX}`)
   configureBodyParser(app)
 
   // Cookie parser for refresh tokens

@@ -110,7 +110,14 @@ describe('AI run wake projection', () => {
   })
 
   it('is registered for the ai-runs queue and for no queue by default', () => {
-    expect(BOARD_DATA_PROJECTIONS['ai-runs']).toBe(projectAiRunWakeJobData)
-    expect(BOARD_DATA_PROJECTIONS['default']).toBeUndefined()
+    expect(BOARD_DATA_PROJECTIONS.get('ai-runs')).toBe(projectAiRunWakeJobData)
+    expect(BOARD_DATA_PROJECTIONS.get('default')).toBeUndefined()
   })
+
+  it.each(['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf'])(
+    'has no projection for the inherited name %s',
+    (name) => {
+      expect(BOARD_DATA_PROJECTIONS.get(name)).toBeUndefined()
+    }
+  )
 })

@@ -4,7 +4,7 @@ import type { Request, Response } from 'express'
 
 import type { BoardRequestLocals } from './bull-board-boundary.middleware'
 import { boardCopy, boardLanguage } from './bull-board-copy'
-import { safeErrorResult, withFinalBoundary } from './bull-board-errors'
+import { clientErrorStatus, safeErrorResult, withFinalBoundary } from './bull-board-errors'
 
 const ENVIRONMENT_COLOR = { color: '#334155', textColor: '#f8fafc' } as const
 
@@ -41,7 +41,7 @@ export class QueueBoardAdapter extends ExpressAdapter {
   }
 
   override setErrorHandler(_handler: Parameters<ExpressAdapter['setErrorHandler']>[0]): this {
-    return super.setErrorHandler(() => safeErrorResult(500))
+    return super.setErrorHandler((error) => safeErrorResult(clientErrorStatus(error)))
   }
 
   override setEntryRoute(routeDef: AppViewRoute): ExpressAdapter {

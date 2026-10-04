@@ -1,4 +1,4 @@
-import type { BullBoardRequest, ControllerHandlerReturnType } from '@bull-board/api/typings/app'
+import type { BullBoardRequest } from '@bull-board/api/typings/app'
 
 import { BOARD_LOCALE_HEADER } from './bull-board-boundary.middleware'
 import { boardCopy } from './bull-board-copy'
@@ -43,12 +43,12 @@ describe('board hooks', () => {
   describe('after', () => {
     const queueBody = {
       queues: [{ name: 'email', counts: {}, jobs: [], extra: CANARY }],
-    } as unknown as ControllerHandlerReturnType
+    }
 
     it('rebuilds the queues response with the closed projection', async () => {
       const result = await after(
         { method: 'get', route: '/api/queues', request: request() },
-        { status: 200, body: queueBody.body }
+        { status: 200, body: queueBody }
       )
       expect(JSON.stringify(result.body)).not.toContain(CANARY)
       expect(result.status).toBe(200)

@@ -283,8 +283,14 @@ children, which can span other queues) get a fixed, schema-valid reply without a
 Schedulers, default job options, rate limits, workers, Redis details and metrics are closed (the
 UI is configured not to ask for them). Per job it returns id, name, times, attempts, delay, whether it failed and a short list of
 retry/retention options; payloads, return values, failure text and stack traces are replaced.
-`data` of a queue is shown only through a projection registered in `BOARD_DATA_PROJECTIONS`
-(`email` and `notifications` ship with one); the `default` queue and any other queue are hidden.
+`data` of a queue is shown only through a projection registered in `BOARD_DATA_PROJECTIONS`, a `Map`
+that answers only for the names listed (`email`, `notifications` and `ai-runs` ship with one: template,
+locale and user id; notification id; run id); the `default` queue and any other queue, whatever its name,
+are hidden.
+
+The one write the board's reads can cause is BullMQ's own: counting a queue may remove a pre-v5 legacy
+marker from the end of a waiting list. It is measured by the disclosure e2e suite. No queue or job state
+is changed through the board.
 
 An error never carries a message or a stack: after the Board's own response validation every status
 `>= 400` is reduced to `{ "error": { "key": "ERRORS.…" } }`. The board's HTML page is rendered with
@@ -297,7 +303,12 @@ route or a field fails `bull-board-upgrade-guard.spec.ts` until it is reviewed.
 
 ### Response headers
 
-Every answer of the mount carries `Cache-Control: private, no-store` (`no-cache` for static files),
+Every answer of the mount carries the board's headers, including a refusal of the admission
+middleware, an error and the answer of a request that the global parser or CORS would have answered
+first: a guard registered before them (`configureBullBoardEdge`) answers every method but `GET`/`HEAD`
+(a CORS preflight included) with `405` and `Allow: GET, HEAD`, ignores the body of a `GET`, and
+re-applies the board's headers when the response head is written, replacing Helmet's and removing any
+CORS headers. The answers are `Cache-Control: private, no-store` (`no-cache` for static files),
 `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`,
 `Cross-Origin-Resource-Policy: same-origin` and the board's own `Content-Security-Policy`
 (`BULL_BOARD_CONTENT_SECURITY_POLICY` in `@amcore/shared`): its own scripts only, no framing, no

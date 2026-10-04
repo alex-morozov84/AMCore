@@ -121,7 +121,8 @@ export function pickOpts(raw: unknown): Json {
 
 /** The board queue name maps back to a code-owned queue name; anything else hides its payloads. */
 function projectData(queueName: unknown, data: unknown): unknown {
-  const projection = typeof queueName === 'string' ? BOARD_DATA_PROJECTIONS[queueName] : undefined
+  const projection =
+    typeof queueName === 'string' ? BOARD_DATA_PROJECTIONS.get(queueName) : undefined
   if (!projection) return BOARD_HIDDEN
   return projection(data) ?? BOARD_HIDDEN
 }

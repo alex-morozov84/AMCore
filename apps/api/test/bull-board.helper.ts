@@ -20,10 +20,11 @@ export function queueOf(app: INestApplication, name: string): Queue {
 export async function superAdminCookie(
   app: INestApplication,
   prisma: PrismaService,
-  email = 'board-admin@example.com'
+  email = 'board-admin@example.com',
+  prefix = ''
 ): Promise<string> {
   const res = await request(app.getHttpServer())
-    .post('/auth/register')
+    .post(`${prefix}/auth/register`)
     .send({ email, password: 'StrongP@ss123' })
     .expect(201)
   const setCookie = res.headers['set-cookie'] as unknown as string[]

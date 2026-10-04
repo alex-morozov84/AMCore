@@ -24,6 +24,20 @@ export function safeErrorResult(status: HTTPStatus, key?: unknown): ControllerHa
   return { status, body: { error: { key: known ?? KEY_BY_STATUS[status] ?? FALLBACK_KEY } } }
 }
 
+/**
+ * The status of a request-level failure the framework already classified as the client's (a body
+ * parser's 400/413/415, a 404): the board's own statuses are kept, any other 4xx is a 400, everything
+ * else is a 500. Only the status survives, never the message.
+ */
+export function clientErrorStatus(error: unknown): HTTPStatus {
+  const status =
+    typeof error === 'object' && error !== null
+      ? ((error as { status?: unknown }).status ?? (error as { statusCode?: unknown }).statusCode)
+      : undefined
+  if (status === 403 || status === 404 || status === 405) return status
+  return typeof status === 'number' && status >= 400 && status < 500 ? 400 : 500
+}
+
 function errorKeyOf(body: unknown): unknown {
   if (typeof body !== 'object' || body === null) return undefined
   const error = (body as { error?: unknown }).error

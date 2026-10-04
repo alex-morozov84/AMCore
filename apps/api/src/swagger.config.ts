@@ -63,15 +63,24 @@ export function addQueueBoardOperation(
         'read-only: only GET and HEAD are served and any other method is answered with 405. ' +
         'Authentication is a middleware, not a Nest guard: a live SUPER_ADMIN bearer access token ' +
         '(sent by the Console BFF) or the browser `refresh_token` cookie; API keys are rejected. ' +
-        'Job payloads, return values, error text, stack traces and logs are not displayed.',
+        'Raw job payloads, return values, error text, stack traces and logs are not displayed; a job ' +
+        'shows its id, name and times and, for a queue with a reviewed projection, a few identifiers ' +
+        '(template, locale and user id for email; notification id; AI run id). Errors carry only a ' +
+        'fixed translation key.',
       security: [{ bearer: [] }, { cookie: [] }],
       responses: {
         '200': {
           description: 'The board page',
           content: { 'text/html': { schema: { type: 'string' } } },
         },
+        '400': { description: 'The render context header of a bearer request is invalid' },
         '401': { description: 'No valid credential, or an API key was sent' },
         '403': { description: 'SUPER_ADMIN required' },
+        '405': {
+          description: 'Only GET and HEAD are served',
+          headers: { Allow: { schema: { type: 'string' } } },
+        },
+        '500': { description: 'The page could not be rendered (fixed error body, no detail)' },
         '503': { description: 'Access could not be verified' },
       },
     },
