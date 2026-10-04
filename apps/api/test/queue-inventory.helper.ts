@@ -32,12 +32,37 @@ export const STOCK_QUEUES = ['email', 'default', 'notifications', 'ai-runs']
  * gate is a pure function covered by `bull-board-mount-gate.spec.ts`; the absent-board graph is
  * exercised here through the `worker` role, which takes the same module branch.
  */
-export async function compileQueueGraph(role: 'web' | 'worker'): Promise<CompiledQueueGraph> {
-  process.env.DATABASE_URL ??= 'postgresql://u:p@localhost:5432/test?schema=public'
+export interface QueueGraphOptions {
+  /**
+   * Evaluate the mount gate as PRODUCTION: `NODE_ENV=production` while the modules are imported (that
+   * is when the gate reads the environment), with the few values production validation insists on.
+   * It is switched back to `test` before the graph is compiled.
+   */
+  productionAtImport?: boolean
+  /**
+   * Set AFTER the modules are imported, the way a `.env` loaded by `ConfigModule` later would: the
+   * mount decision is already taken and must not change.
+   */
+  lateEnableBullBoard?: string
+}
+
+export async function compileQueueGraph(
+  role: 'web' | 'worker',
+  options: QueueGraphOptions = {}
+): Promise<CompiledQueueGraph> {
+  const production = options.productionAtImport === true
+  process.env.DATABASE_URL = production
+    ? 'postgresql://u:p@localhost:5432/test?sslmode=require&schema=public'
+    : (process.env.DATABASE_URL ?? 'postgresql://u:p@localhost:5432/test?schema=public')
   process.env.JWT_SECRET ??= 'test-only-jwt-secret-at-least-32-characters-long'
   const redis = await new RedisContainer('redis:7-alpine').start()
   process.env.REDIS_URL = redis.getConnectionUrl()
-  process.env.NODE_ENV = 'test'
+  process.env.NODE_ENV = production ? 'production' : 'test'
+  if (production) {
+    process.env.CORS_ORIGIN = 'https://app.example.com'
+    // Production would default to S3 and then demand a bucket and keys: irrelevant to the mount gate.
+    process.env.STORAGE_DRIVER = 'local'
+  }
   process.env.PROCESS_ROLE = role
   delete process.env.ENABLE_BULL_BOARD
 
@@ -47,6 +72,11 @@ export async function compileQueueGraph(role: 'web' | 'worker'): Promise<Compile
       : (await import('../src/worker.module')).WorkerModule
   const { QueueService } = await import('../src/infrastructure/queue')
   const { BULL_BOARD_ADAPTER } = await import('@bull-board/nestjs')
+  // The decision is taken; from here on the process looks like a later `.env` load happened.
+  process.env.NODE_ENV = 'test'
+  if (options.lateEnableBullBoard !== undefined) {
+    process.env.ENABLE_BULL_BOARD = options.lateEnableBullBoard
+  }
   const module = await Test.createTestingModule({ imports: [root] })
     .overrideProvider(PinoLogger)
     .useValue(noopLogger)
