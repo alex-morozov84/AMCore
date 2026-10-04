@@ -1,20 +1,16 @@
 // @vitest-environment node
-import { BULL_BOARD_CONTENT_SECURITY_POLICY, BULL_BOARD_CONTEXT_HEADER } from '@amcore/shared'
+import {
+  BULL_BOARD_CONTENT_SECURITY_POLICY,
+  BULL_BOARD_CONTEXT_HEADER,
+  DEFAULT_LOCALE,
+  SUPPORTED_LOCALES,
+} from '@amcore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
-vi.mock('./board-locale', () => {
-  // The language and the path back to Background work, as the locale module answers them in a
-  // multi-locale build; its own tests cover the real thing in whichever mode is generated.
-  const readBoardLocale = (request: Request) =>
-    (request.headers.get('cookie') ?? '').includes('NEXT_LOCALE=ru') ? 'ru' : 'en'
-  return {
-    readBoardLocale,
-    consoleBackgroundWorkPath: (request: Request) =>
-      `/${readBoardLocale(request)}/admin/background-work`,
-  }
-})
 vi.mock('./authenticated-proxy', () => ({ resolveConsoleAccessToken: vi.fn() }))
+
+import { getConsoleBackgroundWorkHref } from '@/shared/lib/console-public-href'
 
 import { resolveConsoleAccessToken } from './authenticated-proxy'
 import { handleConsoleBoard } from './board-handler'
@@ -22,8 +18,15 @@ import { handleConsoleBoard } from './board-handler'
 const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
 
+const VISITOR_LOCALE = SUPPORTED_LOCALES[SUPPORTED_LOCALES.length - 1]!
+const expectedReturnHref = (locale: string) =>
+  `${SUPPORTED_LOCALES.length > 1 ? `/${locale}` : ''}${getConsoleBackgroundWorkHref()}`
+
 const PAGE = new Request('https://app.example.test/api/console/bull-board/', {
-  headers: { accept: 'text/html', cookie: 'NEXT_LOCALE=ru; amcore_session=secret-vault-id' },
+  headers: {
+    accept: 'text/html',
+    cookie: `NEXT_LOCALE=${VISITOR_LOCALE}; amcore_session=secret-vault-id`,
+  },
 })
 
 function expectBoardErrorHeaders(response: Response): void {
@@ -96,14 +99,16 @@ describe('board bridge — what reaches the API', () => {
     )
     expect(context).toEqual({
       basePath: '/api/console/bull-board',
-      locale: 'en',
-      returnHref: '/en/admin/background-work',
+      locale: DEFAULT_LOCALE,
+      returnHref: expectedReturnHref(DEFAULT_LOCALE),
     })
   })
 
   it('sends the locale of the visitor and conditional headers for assets', async () => {
     await handleConsoleBoard(
-      asset('static/js/a.js', { headers: { cookie: 'NEXT_LOCALE=ru', 'if-none-match': '"abc"' } }),
+      asset('static/js/a.js', {
+        headers: { cookie: `NEXT_LOCALE=${VISITOR_LOCALE}`, 'if-none-match': '"abc"' },
+      }),
       ['static', 'js', 'a.js']
     )
     const headers = new Headers((fetchMock.mock.calls[0]?.[1] as RequestInit).headers)
@@ -111,7 +116,7 @@ describe('board bridge — what reaches the API', () => {
     const context = JSON.parse(
       Buffer.from(headers.get(BULL_BOARD_CONTEXT_HEADER)!, 'base64url').toString('utf8')
     )
-    expect(context.locale).toBe('ru')
+    expect(context.locale).toBe(VISITOR_LOCALE)
   })
 
   it.each([[['..']], [['a%2Fb']], [['x', 'y', 'z', 'a', 'b', 'c', 'd']]])(
@@ -287,7 +292,9 @@ describe('board bridge — states', () => {
       arrange()
       const response = await handleConsoleBoard(PAGE, [])
       expect(response.status).toBe(302)
-      expect(response.headers.get('location')).toBe('/ru/admin/background-work?board=unavailable')
+      expect(response.headers.get('location')).toBe(
+        `${expectedReturnHref(VISITOR_LOCALE)}?board=unavailable`
+      )
       expect(response.headers.get('cache-control')).toBe('no-store')
     }
   )

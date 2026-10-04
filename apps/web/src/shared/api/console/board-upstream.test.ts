@@ -1,18 +1,10 @@
 // @vitest-environment node
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
-vi.mock('./board-locale', () => {
-  // The language and the path back to Background work, as the locale module answers them in a
-  // multi-locale build; its own tests cover the real thing in whichever mode is generated.
-  const readBoardLocale = (request: Request) =>
-    (request.headers.get('cookie') ?? '').includes('NEXT_LOCALE=ru') ? 'ru' : 'en'
-  return {
-    readBoardLocale,
-    consoleBackgroundWorkPath: (request: Request) =>
-      `/${readBoardLocale(request)}/admin/background-work`,
-  }
-})
+
+import { getConsoleBackgroundWorkHref } from '@/shared/lib/console-public-href'
 
 import {
   BOARD_UPSTREAM_PATH,
@@ -83,16 +75,20 @@ describe('board render context', () => {
       headers: cookie ? { cookie } : {},
     })
 
-  it('uses the public path, the locale of the cookie and the Background work page', () => {
-    expect(buildBoardRenderContext(request('NEXT_LOCALE=ru'))).toEqual({
-      basePath: '/api/console/bull-board',
-      locale: 'ru',
-      returnHref: '/ru/admin/background-work',
-    })
-  })
+  it.each(SUPPORTED_LOCALES)(
+    'uses the public path, the cookie locale (%s) and the Background work page',
+    (locale) => {
+      const prefix = SUPPORTED_LOCALES.length > 1 ? `/${locale}` : ''
+      expect(buildBoardRenderContext(request(`NEXT_LOCALE=${locale}`))).toEqual({
+        basePath: '/api/console/bull-board',
+        locale,
+        returnHref: `${prefix}${getConsoleBackgroundWorkHref()}`,
+      })
+    }
+  )
 
   it('encodes as base64url JSON the API can read back', () => {
-    const context = buildBoardRenderContext(request('NEXT_LOCALE=en'))!
+    const context = buildBoardRenderContext(request(`NEXT_LOCALE=${DEFAULT_LOCALE}`))!
     const header = encodeBoardRenderContext(context)
     expect(header).toMatch(/^[A-Za-z0-9_-]+$/)
     expect(JSON.parse(Buffer.from(header, 'base64url').toString('utf8'))).toEqual(context)
