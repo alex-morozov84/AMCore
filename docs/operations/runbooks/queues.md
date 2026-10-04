@@ -193,8 +193,8 @@ escalate per your organization's on-call process.
    logs for the cause). For `notifications`,
    distinguish `notification.delivery.dead_letter` (a durable DB delivery,
    not a BullMQ job) from `notification.dispatch_job_failed`. For `ai-runs`,
-   inspect `ai.run.wake_job_failed`; the shipped Bull Board does not register
-   the `ai-runs` queue.
+   inspect `ai.run.wake_job_failed`; the view-only Bull Board lists the queue
+   (only the run id of a job) but the state of the run is in the database.
 3. Open the **"Dead-letter rate"** dashboard panel (Queues & outbox row) to
    see whether this is an isolated job or a burst across many jobs in the
    same short window.

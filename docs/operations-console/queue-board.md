@@ -108,7 +108,7 @@ empty here.
 
 ### Showing the payload of your own queue
 
-Add a projection for it to `BOARD_DATA_PROJECTIONS` in
+Add an entry for its name to the `BOARD_DATA_PROJECTIONS` map in
 `apps/api/src/infrastructure/queue/dashboard/bull-board-data-projections.ts`. A projection
 receives the raw payload and returns a small object rebuilt only from fields it validated (type,
 length and format), or `null` to hide it. Return identifiers and categories, never addresses,
@@ -132,6 +132,8 @@ names, tokens or free text, and add tests like those beside the shipped ones.
   (never payloads). Treat them as operational data.
 - Everything the board answers carries its own security policy: only its own scripts, no
   framing, no referrer. This is separate from the Console's policy.
+- The board changes no queue or job state. Counting a queue can make BullMQ itself remove a pre-v5
+  legacy marker from the end of a waiting list; that is the one write its reads can cause.
 - The board is a snapshot of Redis state. Its numbers can differ slightly from Background work
   taken at another moment.
 - With the Console switched off (`pnpm init:project --admin-console=disabled`) the API keeps the

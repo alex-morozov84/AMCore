@@ -20,6 +20,10 @@ including `/api/*` Route Handlers and static files):
 | `X-Frame-Options`           | `DENY` (legacy companion to CSP's `frame-ancestors`)                                                                                       |
 | `Strict-Transport-Security` | `max-age=63072000; includeSubDomains`, no `preload` — see [HSTS](#hsts) below                                                              |
 
+The one exception is the read-only queue board (`/api/console/bull-board/…`): a later rule in the same
+`headers()` sets `Referrer-Policy: no-referrer` for it (when two rules set the same key the last wins),
+matching the policy the API and the bridge send for the board's own pages.
+
 **Content-Security-Policy** (`apps/web/src/proxy.ts`, HTML/navigation
 requests only — the next-intl matcher excludes `/api/*`, `_next`,
 `_vercel`, and any dotted path):

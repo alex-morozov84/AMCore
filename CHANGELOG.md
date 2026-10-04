@@ -108,9 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Bull Board is read-only by construction: read-only adapters, only `GET`/`HEAD` on a
-  closed list of paths, a closed projection of every response (no payloads, return values,
-  failure text, stack traces, logs or flows), every error reduced to a translation key, and its
-  own Content-Security-Policy. The generic product proxy no longer reaches the board.
+  closed list of paths, a closed projection of every response (no raw payloads, return values,
+  failure text, stack traces, logs or flows; only a few reviewed identifiers per queue, and
+  nothing for a queue without a projection), every error reduced to a translation key, and its
+  own Content-Security-Policy and headers on every answer of the mount, refusals included. The generic product proxy no longer reaches the board.
   A live `SUPER_ADMIN` access token is admitted next to the cookie, checked against the
   signed claim and the current database role on every request.
 
