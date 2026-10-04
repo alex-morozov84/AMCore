@@ -74,6 +74,25 @@ describe('ResendEmailProvider', () => {
   })
 
   describe('send', () => {
+    it.each(['return', 'throw'])('never logs or returns provider payloads (%s)', async (mode) => {
+      const secret = 'token-secret-sentinel'
+      const failure = {
+        name: secret,
+        message: `https://example.test/accept?token=${secret}`,
+        body: { secret },
+      }
+      if (mode === 'return') mockSend.mockResolvedValue({ error: failure })
+      else mockSend.mockRejectedValue(Object.assign(new Error(failure.message), failure))
+      const result = await provider.send({
+        to: 'test@example.test',
+        subject: 'Invitation',
+        html: secret,
+      })
+      expect(
+        JSON.stringify([result, mockLogger.warn.mock.calls, mockLogger.error.mock.calls])
+      ).not.toContain(secret)
+      expect(result).toMatchObject({ success: false, error: 'provider_failure', retryable: true })
+    })
     it('should send email successfully', async () => {
       const mockEmailId = 'email_abc123'
 
@@ -142,7 +161,7 @@ describe('ResendEmailProvider', () => {
       expect(result).toEqual({
         id: '',
         success: false,
-        error: 'Invalid API key',
+        error: 'invalid_api_key',
         retryable: false,
       })
       // Per-attempt failures log at warn, not error — the processor owns the
@@ -193,7 +212,7 @@ describe('ResendEmailProvider', () => {
       expect(result).toEqual({
         id: '',
         success: false,
-        error: 'Network error',
+        error: 'provider_failure',
         retryable: true,
       })
       expect(mockLogger.warn).toHaveBeenCalled()

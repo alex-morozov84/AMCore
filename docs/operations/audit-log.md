@@ -89,11 +89,11 @@ AMCore writes audit rows one of three ways:
 
 Current examples:
 
-- In-transaction: admin system-role change, invite create/accept, API key
+- In-transaction: admin system-role change, invite create/accept/revoke, API key
   create/revoke, AI approval lifecycle events (`ai.approval.requested`,
   `ai.approval.approved`, `ai.approval.rejected`, `ai.approval.expired`).
 - Best-effort: admin cleanup, admin session revocation, step-up
-  success/failure, invite revoke, AI tool execution events (`ai.tool.invoked`,
+  success/failure, AI tool execution events (`ai.tool.invoked`,
   `ai.tool.execution_failed`).
 
 ## Add an audited action

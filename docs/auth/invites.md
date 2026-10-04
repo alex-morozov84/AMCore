@@ -5,10 +5,11 @@ whether or not that person already has an AMCore account. The recipient
 gets an email with a link, signs in (or signs up), and accepts. On accept,
 the server creates their membership with the role the admin chose.
 
-This flow is **non-enumerating**: the create endpoint returns the exact
-same `202 { "status": "invited" }` no matter what — so an admin cannot use
-it to discover whether an email is registered, already a member, or
-unknown.
+The create endpoint returns the same `202 { "status": "invited" }` status
+and body whether the recipient has an account, is already a member, or is
+unknown. This is not a constant-time guarantee. Organization administrators
+can inspect pending invitations; rate limits remain necessary. A `202` confirms
+a committed invitation decision, not email delivery.
 
 ---
 
@@ -16,7 +17,7 @@ unknown.
 
 ```
 Admin invites email  →  202 { status: "invited" }  (always uniform)
-                         + invite email sent to the recipient
+                         + best-effort invite email delivery attempted
 
 Recipient clicks link →  signs in / signs up  →  POST /auth/invites/accept
                          → membership created with the assigned role
@@ -41,16 +42,16 @@ curl -X POST https://api.amcore.dev/api/v1/organizations/:orgId/members/invite \
 ```
 
 `roleId` is optional — when omitted, the invitee is assigned the system
-`MEMBER` role on accept.
+`MEMBER` role resolved and stored when the invite is issued.
 
 **What happens under the hood:**
 
-| Recipient state              | DB effect                   | Email sent? |
-| ---------------------------- | --------------------------- | ----------- |
-| Already a member             | nothing (silent no-op)      | no          |
-| Has an account, not member   | pending invite created      | yes         |
-| No account yet               | pending invite created      | yes         |
-| Already has a pending invite | token rotated, expiry reset | yes         |
+| Recipient state              | DB effect                           | Email attempted? |
+| ---------------------------- | ----------------------------------- | ---------------- |
+| Already a member             | no invite/member change; audit only | no               |
+| Has an account, not member   | pending invite created              | yes              |
+| No account yet               | pending invite created              | yes              |
+| Already has a pending invite | token rotated, expiry reset         | yes              |
 
 Every case returns the same `202 { "status": "invited" }`. Only the
 recipient — in their own mailbox — sees whether the email says "sign in"
@@ -109,12 +110,23 @@ Requirements:
   `INVITE_EMAIL_NOT_VERIFIED`.
 
 Every other failure — token not found, expired, revoked, already accepted,
-or email mismatch — collapses to the same `400`
+deleted/missing role, or email mismatch — collapses to the same `400`
 `INVITE_INVALID_OR_EXPIRED`, so a leaked or guessed token cannot be probed
 across identities.
 
-If the invite's custom role was deleted between create and accept, the
-server falls back to the system `MEMBER` role and returns that id.
+If the assigned role was deleted, the invitation remains visible with a null
+`roleId` until expiry, revocation or reissue, but acceptance returns the same
+`400 INVITE_INVALID_OR_EXPIRED`. It never substitutes another role. Reissue
+requires a concrete valid role (or selects `MEMBER` when omitted).
+
+Acceptance reads the current primary email and verification state under a lock,
+not a cached credential email. Expiry is checked against the database wall clock
+at the final claim after lock waits. The claim, membership, role link, ACL version
+and durable audit commit together. Cache invalidation or limiter-reset failure
+following a confirmed commit does not change the success response.
+These best-effort steps are awaited concurrently for at most 250 ms each;
+unfinished operations may settle later without repeating the grant or changing
+the response.
 
 ---
 
@@ -124,11 +136,11 @@ List active (pending, not expired) invites — bearer-only, requires full TeamAc
 paginated:
 
 ```bash
-curl https://api.amcore.dev/api/v1/organizations/:orgId/invites?page=1&limit=20 \
+curl "https://api.amcore.dev/api/v1/organizations/:orgId/invites?page=1&limit=20" \
   -H "Authorization: Bearer <admin token>"
 # 200 OK
-# { "data": [ { "id", "email", "roleId", "invitedById", "expiresAt", "createdAt" } ],
-#   "total": 1, "page": 1, "limit": 20 }
+# { "data": [],
+#   "total": 0, "page": 1, "limit": 20 }
 ```
 
 Token hashes are never included in the response.
@@ -148,10 +160,52 @@ curl -X DELETE https://api.amcore.dev/api/v1/organizations/:orgId/invites/:invit
 
 ---
 
+## Authorization and concurrency
+
+Creating and revoking recheck the sender's primary identity, current membership
+and complete normalized permissions in the write transaction. Full
+`manage:TeamAccess` is required; a role called `Manager` or `ADMIN` does not
+itself confer authority. An explicit trusted manager can invite any assignable
+organization role. Relevant DENYs veto full team authority before API-key scopes
+are applied. Platform privilege requires both admitted and currently locked
+`SUPER_ADMIN` authority; a newly promoted credential does not gain a bypass.
+
+A create request authenticated by API key rechecks the exact cryptographically
+admitted key, its organization/owner binding, revocation, expiry and exact
+`manage:TeamAccess` scope. Membership is mandatory even for a platform owner.
+The key identifier is request-local evidence, never a client-supplied principal
+field. Once issued, an invitation belongs to the organization: later sender
+removal, demotion or key revocation does not invalidate its recipient link.
+
+Writes lock actor user, organization, assigned role (when needed), then invitation.
+Creation also acquires its per-email advisory lock before the organization and
+locks an admitted API key after the organization. This ordering accommodates
+foreign-key deletion actions. There are no automatic transaction retries.
+
+Only one concurrent acceptance creates access. A successful revoke prevents
+acceptance; acceptance first makes revoke return the accepted-invite error.
+Repeated revocation preserves the first timestamp and revoker and adds no audit.
+Reissue rotates the current pending token; after revocation it creates a new row.
+Infrastructure failures return `409 CONFLICT` for a known transaction abort or
+`503` for an unavailable/unconfirmed write. After `503`, inspect current membership
+and invitations before retrying: commit acknowledgment may have been lost.
+
+## Upgrade existing installations
+
+Drain all old invitation writers before applying migration
+`20261003180000_invitation_role_intent` and restarting with the repaired version.
+The migration atomically revokes legacy null-role nonterminal invitations,
+including expired ones, with a common UTC timestamp and no fabricated human
+revoker. Concrete-role invitations and accepted/revoked history are unchanged.
+Reinvite affected recipients with a concrete role. Do not roll back to code
+that substitutes a role for a null assignment; maintenance-window recovery must
+restore a compatible application/database pair.
+
 ## Expiry and cleanup
 
 - Invites expire **7 days** after they are created (or last rotated).
-- The nightly cleanup job deletes **expired pending** invites immediately.
+- The daily 02:00 cleanup job eventually deletes **expired pending** invites;
+  acceptance rejects them at expiry without waiting for cleanup.
 - **Terminal** invites (accepted or revoked) are kept for a **30-day**
   audit window after reaching their terminal state, then garbage-collected.
 
@@ -159,9 +213,13 @@ curl -X DELETE https://api.amcore.dev/api/v1/organizations/:orgId/invites/:invit
 
 ## Error codes
 
-| Code                        | Status | When                                                            |
-| --------------------------- | ------ | --------------------------------------------------------------- |
-| `INVITE_INVALID_OR_EXPIRED` | 400    | Token not found / expired / revoked / accepted / email mismatch |
-| `INVITE_EMAIL_NOT_VERIFIED` | 403    | Caller's email is not verified                                  |
-| `INVITE_ALREADY_MEMBER`     | 409    | Caller is already a member (race on accept)                     |
-| `BUSINESS_RULE_VIOLATION`   | 400    | Revoking an already-accepted invite                             |
+| Code                        | Status | When                                                                           |
+| --------------------------- | ------ | ------------------------------------------------------------------------------ |
+| `INVITE_INVALID_OR_EXPIRED` | 400    | Token not found / expired / revoked / accepted / deleted role / email mismatch |
+| `INVITE_EMAIL_NOT_VERIFIED` | 403    | Caller's email is not verified                                                 |
+| `INVITE_ALREADY_MEMBER`     | 409    | Caller is already a member (race on accept)                                    |
+| `BUSINESS_RULE_VIOLATION`   | 400    | Revoking an already-accepted invite                                            |
+
+A known transaction abort uses `409 CONFLICT`. `503 SERVICE_UNAVAILABLE` means
+an unavailable or unconfirmed write; `DATABASE_POOL_TIMEOUT` identifies a known
+pool timeout. Infrastructure failures do not consume the negative-token budget.

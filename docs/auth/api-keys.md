@@ -26,7 +26,9 @@ request. Common privilege admission reuses that result; it does not perform a
 second privileged-role read. Live organization membership and scope intersection
 remain required even for a SUPER_ADMIN owner. Keys cannot use `/switch` or enter
 bearer-only Console/FreshAuth routes. Invite creation retains key support; pending
-invite list/revoke and acceptance remain bearer-only.
+invite list/revoke and acceptance remain bearer-only. Invitation creation also
+rechecks the exact admitted key and complete owner trust under transaction locks;
+see [Invitation authorization](invites.md#authorization-and-concurrency).
 
 ## Scopes
 

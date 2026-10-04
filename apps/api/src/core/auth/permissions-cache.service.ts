@@ -3,6 +3,8 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
 
+import { memberPermissionSnapshot } from './member-permission-snapshot'
+
 import type { Permission } from '@/generated/prisma/client'
 import { Prisma } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
@@ -181,93 +183,26 @@ export class PermissionsCacheService {
     // The supplied version is a cache-selection fence, not the exact revision
     // of this snapshot. Concurrent changes may yield newer coherent rules under
     // an old fence; later requests select the newly committed version instead.
-    const member = await this.prisma.$transaction(
-      (tx) =>
-        tx.orgMember.findUnique({
-          where: {
-            userId_organizationId: {
-              userId,
-              organizationId,
-            },
-          },
-          include: {
-            roles: {
-              include: {
-                role: {
-                  include: {
-                    permissions: {
-                      include: {
-                        permission: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        }),
+    const snapshot = await this.prisma.$transaction(
+      (tx) => memberPermissionSnapshot(tx, userId, organizationId),
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead }
     )
-
-    if (!member) {
+    if (!snapshot.memberId) {
       this.logger.warn({ userId, organizationId }, 'User is not a member of org')
       return []
     }
-
-    // OA-05 defense-in-depth: mirror the rule in
-    // `MemberService.assertRoleAssignable` so this filter doesn't
-    // silently pass shapes that the primary path would reject.
-    //
-    // A role is safe iff:
-    //   - it is a system role: `isSystem === true && organizationId === null`, or
-    //   - it is owned by the requested org: `organizationId === organizationId`.
-    //
-    // Everything else is dropped:
-    //   - foreign-org custom roles (`organizationId === foreign`)
-    //   - malformed rows where `organizationId === null` but
-    //     `isSystem !== true` (impossible via the primary API path,
-    //     but raw-SQL or migration mistakes could produce them; the
-    //     filter must not pass them)
-    //
-    // A dropped row reaching this point is a signal worth surfacing
-    // — we warn with metadata sufficient to identify the membership
-    // and the unsafe role without leaking PII.
-    const isSafeRole = (mr: (typeof member.roles)[number]): boolean => {
-      const { isSystem, organizationId: roleOrgId } = mr.role
-      if (isSystem && roleOrgId === null) return true
-      if (roleOrgId === organizationId) return true
-      return false
-    }
-    const unsafeRoles = member.roles.filter((mr) => !isSafeRole(mr))
-    if (unsafeRoles.length > 0) {
+    if (snapshot.unsafe.length > 0)
       this.logger.warn(
         {
           userId,
           organizationId,
-          roleIds: unsafeRoles.map((mr) => mr.role.id),
-          roleOrganizationIds: unsafeRoles.map((mr) => mr.role.organizationId),
-          roleIsSystem: unsafeRoles.map((mr) => mr.role.isSystem),
+          roleIds: snapshot.unsafe.map(({ role }) => role.id),
+          roleOrganizationIds: snapshot.unsafe.map(({ role }) => role.organizationId),
+          roleIsSystem: snapshot.unsafe.map(({ role }) => role.isSystem),
         },
         'OA-05: dropping role(s) that fail the role-assignability rule'
       )
-    }
-    const safeMemberRoles = member.roles.filter(isSafeRole)
-
-    const permissions: Permission[] = []
-    const seenPermissionIds = new Set<string>()
-
-    for (const memberRole of safeMemberRoles) {
-      for (const rolePermission of memberRole.role.permissions) {
-        const permission = rolePermission.permission
-
-        if (!seenPermissionIds.has(permission.id)) {
-          seenPermissionIds.add(permission.id)
-          permissions.push(permission)
-        }
-      }
-    }
-
-    return permissions
+    return snapshot.permissions
   }
 
   private getPermissionsKey(userId: string, organizationId: string, aclVersion: number): string {

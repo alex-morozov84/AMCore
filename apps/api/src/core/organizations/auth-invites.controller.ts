@@ -1,5 +1,15 @@
 import { Body, Controller, Post, Req } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiForbiddenResponse,
+  ApiOperation,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+  ApiTooManyRequestsResponse,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger'
 import type { Request } from 'express'
 import { ZodResponse } from 'nestjs-zod'
 
@@ -45,6 +55,18 @@ export class AuthInvitesController {
   constructor(private readonly inviteService: InviteService) {}
 
   @Post('accept')
+  @ApiBadRequestResponse({
+    description: 'INVITE_INVALID_OR_EXPIRED: invalid, deleted-role or expired at final claim',
+  })
+  @ApiUnauthorizedResponse({ description: 'Bearer authentication required' })
+  @ApiForbiddenResponse({ description: 'INVITE_EMAIL_NOT_VERIFIED' })
+  @ApiConflictResponse({
+    description: 'INVITE_ALREADY_MEMBER or CONFLICT (known transaction abort)',
+  })
+  @ApiTooManyRequestsResponse({ description: 'Invitation acceptance attempts limited' })
+  @ApiServiceUnavailableResponse({
+    description: 'Write unconfirmed; inspect membership before retrying',
+  })
   @ZodResponse({ type: AcceptInviteResponseDto, status: 200, description: 'Invite accepted' })
   @ApiOperation({
     summary:
@@ -53,7 +75,7 @@ export class AuthInvitesController {
       'invite was issued for and must have a verified email address. On ' +
       'success creates the org membership and returns { organizationId, ' +
       'roleId }. Negative paths (token missing / expired / revoked / ' +
-      'already accepted / email mismatch) all return 400 with errorCode ' +
+      'already accepted / deleted role / email mismatch) all return 400 with errorCode ' +
       'INVITE_INVALID_OR_EXPIRED.',
   })
   @RequestContextPolicy({ kind: 'personal' })

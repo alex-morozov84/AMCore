@@ -8,6 +8,7 @@ import request from 'supertest'
 import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
 
 import { AuditLogService } from '../src/core/audit'
+import { invitationActor } from '../src/core/organizations/invitation-actor'
 import { InviteService } from '../src/core/organizations/invite.service'
 import { MemberService } from '../src/core/organizations/member.service'
 import { MemberQueryService } from '../src/core/organizations/member-query.service'
@@ -163,6 +164,13 @@ describe('Organization member reads and atomic role set (real DB)', () => {
       organizationId: orgId,
       aclVersion: 0,
     }
+  }
+  function inviteActor() {
+    const actor = principal()
+    return invitationActor({
+      user: actor,
+      privilegedAdmission: { authenticated: actor, principal: actor },
+    })
   }
   it.each(['assign', 'remove', 'delete'] as const)(
     'R2 replacement then legacy%s locks the same org before children',
@@ -693,10 +701,11 @@ describe('Organization member reads and atomic role set (real DB)', () => {
         const email = `fence-${kind}-${inviteFirst}@example.test`
         const invites = context.app.get(InviteService)
         if (kind === 'reissue')
-          await invites.createInvite(orgId, { email, roleId: role.id }, principal())
+          await invites.createInvite(orgId, { email, roleId: role.id }, inviteActor())
         const trace: string[] = []
         const hold = holdMemberTransaction(prisma, false, trace)
-        const inviting = () => invites.createInvite(orgId, { email, roleId: role.id }, principal())
+        const inviting = () =>
+          invites.createInvite(orgId, { email, roleId: role.id }, inviteActor())
         const deleting = () => context.app.get(RoleService).deleteRole(orgId, role.id, principal())
         const first = (inviteFirst ? inviting() : deleting()).then(
           () => 'ok',

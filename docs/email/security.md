@@ -34,6 +34,13 @@ Application logs must not contain:
 - token URLs;
 - provider request bodies.
 
+Provider error names/messages are untrusted: they can echo a rendered token URL.
+The Resend adapter returns and logs only a finite safe failure category, never
+raw error messages, arbitrary error names or causes. `sendNow()` also sanitizes
+render/custom-provider throws and failed results. Custom adapters must enforce
+the same rule inside their own logging; an outer catch cannot remove a log
+already emitted by a provider.
+
 ## Bull Board Implication
 
 Bull Board can display job payloads to authorized operators. Therefore the
