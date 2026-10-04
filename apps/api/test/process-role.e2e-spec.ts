@@ -21,6 +21,8 @@ let AppModule: Token
 let WebModule: Token
 let WorkerModule: Token
 let AdminController: Token
+let AdminQueuesController: Token
+let QueueObservationService: Token
 let AuthController: Token
 let EmailProcessor: Token
 let NotificationDispatchProcessor: Token
@@ -124,6 +126,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       await import('../src/core/notifications/notification-stream.controller')
     const observability = await import('../src/infrastructure/observability')
     const queue = await import('../src/infrastructure/queue')
+    const adminQueuesController = await import('../src/core/admin/admin-queues.controller')
     const tgController =
       await import('../src/core/notifications/channels/telegram/telegram.controller')
     const tgWebhookController =
@@ -182,6 +185,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     MetricsService = observability.MetricsService
     QueueDepthMetricsCollector = queue.QueueDepthMetricsCollector
     QueueService = queue.QueueService
+    QueueObservationService = queue.QueueObservationService
+    AdminQueuesController = adminQueuesController.AdminQueuesController
     TelegramController = tgController.TelegramController
     TelegramWebhookController = tgWebhookController.TelegramWebhookController
     TelegramChannelDeliverer = tgDeliverer.TelegramChannelDeliverer
@@ -227,6 +232,11 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, QueueService)
       present(m, AuthController)
       present(m, AdminController)
+    })
+
+    it('observes queues read-only and serves the Console summary (no worker needed)', () => {
+      present(m, QueueObservationService)
+      present(m, AdminQueuesController)
     })
 
     it('has NO BullMQ worker and NO scheduler (so @Cron never fires)', () => {
@@ -319,6 +329,11 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     it('has NO business controllers (probe/scrape-only HTTP surface)', () => {
       absent(m, AuthController)
       absent(m, AdminController)
+      absent(m, AdminQueuesController)
+    })
+
+    it('keeps the shared queue inventory/observation provider with the core queue module', () => {
+      present(m, QueueObservationService)
     })
 
     it('may publish realtime hints but holds NO subscriber, hub, or stream route', () => {
@@ -387,6 +402,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, NotificationRetentionService)
       present(m, QueueDepthMetricsCollector)
       present(m, SchedulerRegistry)
+      present(m, QueueObservationService)
+      present(m, AdminQueuesController)
     })
 
     it('composes the realtime publisher, subscriber, hub, and stream route', () => {

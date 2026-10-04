@@ -7,13 +7,14 @@ their organization role.
 
 ## Contents
 
-| Screen                            | Use it to                                                                                  |
-| --------------------------------- | ------------------------------------------------------------------------------------------ |
-| [Overview](overview.md)           | Check API readiness, file storage and resources; edit the probe interval; identify builds. |
-| [Users](users.md)                 | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |
-| [Organizations](organizations.md) | Inspect organizations, members and their roles without changing them.                      |
-| [API keys](api-keys.md)           | Inspect credential metadata and irreversibly revoke one or selected keys.                  |
-| [Audit](audit.md)                 | Browse recent system events and narrow them by action, identity, or time.                  |
+| Screen                                | Use it to                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [Overview](overview.md)               | Check API readiness, file storage and resources; edit the probe interval; identify builds. |
+| [Background work](background-work.md) | See whether background queues are piling up, paused or unreadable. Read-only.              |
+| [Users](users.md)                     | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |
+| [Organizations](organizations.md)     | Inspect organizations, members and their roles without changing them.                      |
+| [API keys](api-keys.md)               | Inspect credential metadata and irreversibly revoke one or selected keys.                  |
+| [Audit](audit.md)                     | Browse recent system events and narrow them by action, identity, or time.                  |
 
 The Console also has a [configuration and deployment guide](configuration.md)
 for operators who set it up and a [development guide](development.md) for teams
@@ -59,7 +60,7 @@ timestamps or the instants submitted in Audit queries.
 
 ## Scope
 
-The Console has the five areas above, with full user and organization detail
+The Console has the six areas above, with full user and organization detail
 pages accessible from the lists and from current identities in Audit. It has
-no historical metrics, queues, or AI control panels. Product administration belongs in a
+no historical metrics or AI control panels, and no actions on queues. Product administration belongs in a
 separate area with its own roles and permissions.

@@ -1,11 +1,11 @@
-import { InjectQueue } from '@nestjs/bullmq'
-import { HttpStatus, Injectable, type OnModuleInit } from '@nestjs/common'
+import { HttpStatus, Inject, Injectable, type OnModuleInit } from '@nestjs/common'
 import type { Job, Queue } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AppException, NotFoundException } from '../../common/exceptions'
 
-import { QueueName } from './constants/queues.constant'
+import { QUEUE_REGISTRY } from './constants/queue-inventory.constant'
+import type { QueueName } from './constants/queues.constant'
 import type { JobOptions } from './interfaces/job-options.interface'
 import { DEFAULT_JOB_OPTIONS } from './interfaces/job-options.interface'
 import type { IQueueService } from './interfaces/queue.interface'
@@ -14,22 +14,16 @@ import { MetricsService } from '@/infrastructure/observability'
 
 @Injectable()
 export class QueueService implements IQueueService, OnModuleInit {
-  private readonly queues = new Map<QueueName, Queue>()
+  private readonly queues: ReadonlyMap<QueueName, Queue>
 
   constructor(
-    @InjectQueue(QueueName.DEFAULT) defaultQueue: Queue,
-    @InjectQueue(QueueName.EMAIL) emailQueue: Queue,
-    @InjectQueue(QueueName.NOTIFICATIONS) notificationsQueue: Queue,
-    @InjectQueue(QueueName.AI_RUNS) aiRunsQueue: Queue,
+    @Inject(QUEUE_REGISTRY) queues: ReadonlyMap<QueueName, Queue>,
     private readonly logger: PinoLogger,
     private readonly metrics: MetricsService
   ) {
     this.logger.setContext(QueueService.name)
-    // Register all queues for easy access
-    this.queues.set(QueueName.DEFAULT, defaultQueue)
-    this.queues.set(QueueName.EMAIL, emailQueue)
-    this.queues.set(QueueName.NOTIFICATIONS, notificationsQueue)
-    this.queues.set(QueueName.AI_RUNS, aiRunsQueue)
+    // One registry built from the enabled inventory; the public add/get API is unchanged.
+    this.queues = queues
 
     this.logger.info({ count: this.queues.size }, `Initialized ${this.queues.size} queues`)
   }

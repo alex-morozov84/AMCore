@@ -185,6 +185,7 @@ are the hard contract every label must satisfy.
   counted as `waiting`. Use `queue_paused` below for pause/resume observability.
 - `queue_paused{queue,role}` — `1` if the queue is currently paused, `0`
   otherwise, from `Queue.isPaused()`.
+  The series cover every queue enabled in the code-owned queue inventory.
 - `queue_events_total{queue,event,role}` —
   `event=job_added|redis_error|redis_reconnecting|worker_error|dead_letter`. Job
   IDs and job names are never labels.
@@ -200,6 +201,15 @@ waiting_human`) and `ai_run_due` (no labels) — the same pattern for the
   `ai-runs` wake-job queue (ADR-054) over `ai_runs` rows. `_due` excludes
   `waiting_approval`/`waiting_human` (intentionally parked for a human, not
   stuck).
+
+<!-- AMCORE_CONSOLE_BACKGROUND_WORK_START -->
+
+The Operations Console [Background work](../operations-console/background-work.md)
+screen reads the same queues but shows **Waiting** as `waiting` plus `prioritized`
+(BullMQ keeps priority jobs in a separate set); the metric meanings above are
+unchanged. Its "Oldest queued job" is a sampled creation age and has no metric.
+
+<!-- AMCORE_CONSOLE_BACKGROUND_WORK_END -->
 
 **Cache**
 

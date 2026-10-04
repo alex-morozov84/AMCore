@@ -1,4 +1,3 @@
-import { getQueueToken } from '@nestjs/bullmq'
 import { Test, TestingModule } from '@nestjs/testing'
 import type { Job, Queue } from 'bullmq'
 import { EventEmitter } from 'events'
@@ -6,6 +5,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { AppException, NotFoundException } from '../../common/exceptions'
 
+import { QUEUE_REGISTRY } from './constants/queue-inventory.constant'
 import { QueueName } from './constants/queues.constant'
 import { QueueService } from './queue.service'
 
@@ -57,20 +57,13 @@ describe('QueueService', () => {
       providers: [
         QueueService,
         {
-          provide: getQueueToken(QueueName.DEFAULT),
-          useValue: defaultQueue,
-        },
-        {
-          provide: getQueueToken(QueueName.EMAIL),
-          useValue: emailQueue,
-        },
-        {
-          provide: getQueueToken(QueueName.NOTIFICATIONS),
-          useValue: notificationsQueue,
-        },
-        {
-          provide: getQueueToken(QueueName.AI_RUNS),
-          useValue: aiRunsQueue,
+          provide: QUEUE_REGISTRY,
+          useValue: new Map([
+            [QueueName.DEFAULT, defaultQueue],
+            [QueueName.EMAIL, emailQueue],
+            [QueueName.NOTIFICATIONS, notificationsQueue],
+            [QueueName.AI_RUNS, aiRunsQueue],
+          ]),
         },
         {
           provide: PinoLogger,

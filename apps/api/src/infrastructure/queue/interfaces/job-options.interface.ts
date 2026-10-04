@@ -5,8 +5,11 @@ import type { JobsOptions, KeepJobs } from 'bullmq'
  */
 export interface JobOptions extends Partial<JobsOptions> {
   /**
-   * Priority (0-10, higher is better)
-   * @default 5
+   * BullMQ priority. `0` or unset means no explicit priority, and such jobs run before any
+   * prioritized job. Among prioritized jobs a lower positive number runs first. No stock
+   * producer sets one. Prioritized jobs sit in a separate set, so the Console counts them
+   * together with waiting jobs.
+   * @default 0
    */
   priority?: number
 

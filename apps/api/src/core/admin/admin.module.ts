@@ -14,12 +14,15 @@ import { AdminAuditService } from './admin-audit.service'
 import { AdminDetailService } from './admin-detail.service'
 import { AdminOverviewService } from './admin-overview.service'
 import { AdminOverviewResourcesService } from './admin-overview-resources.service'
+import { AdminQueuesController } from './admin-queues.controller'
+import { AdminQueuesService } from './admin-queues.service'
 import { AdminSessionsService } from './admin-sessions.service'
 import { AdminStorageSettingController } from './admin-storage-setting.controller'
 import { AdminStorageSettingService } from './admin-storage-setting.service'
 import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard'
 
 import { HealthModule } from '@/health'
+import { QueueModule } from '@/infrastructure/queue'
 
 // Imports CleanupModule (not ScheduleModule): AdminController's manual
 // POST /admin/cleanup needs CleanupService, but must NOT pull in the scheduler
@@ -30,8 +33,13 @@ import { HealthModule } from '@/health'
 // here for AdminSessionsService's location lookups carries the same "safe
 // everywhere" property as CleanupModule.
 @Module({
-  imports: [PrismaModule, CleanupModule, AuditModule, HealthModule, GeoipModule],
-  controllers: [AdminController, AdminApiKeysController, AdminStorageSettingController],
+  imports: [PrismaModule, CleanupModule, AuditModule, HealthModule, GeoipModule, QueueModule],
+  controllers: [
+    AdminController,
+    AdminApiKeysController,
+    AdminStorageSettingController,
+    AdminQueuesController,
+  ],
   providers: [
     AdminService,
     AdminStorageSettingService,
@@ -43,6 +51,7 @@ import { HealthModule } from '@/health'
     AdminOverviewResourcesService,
     AdminAuditService,
     AdminSessionsService,
+    AdminQueuesService,
   ],
 })
 export class AdminModule {}

@@ -66,6 +66,20 @@ export const operationsConsoleDiscoverySeams = [
     { operationKey: 'docs-index-console' }
   ),
   entry(
+    'console.docs-background-work',
+    'docs/README.md',
+    { text: '(operations-console/background-work.md)' },
+    undefined,
+    { operationKey: 'docs-index-console' }
+  ),
+  entry(
+    'console.docs-api-keys',
+    'docs/README.md',
+    { text: '(operations-console/api-keys.md)' },
+    undefined,
+    { operationKey: 'docs-index-console' }
+  ),
+  entry(
     'console.docs-index',
     'docs/README.md',
     block('- **[Operations Console](operations-console/README.md)**', 'and safe extension rules.'),
