@@ -53,6 +53,21 @@ The bundled worker caches only install icons; it must not serve old HTML, RSC,
 API/version responses or chunks as an offline application. See the
 [deployment contract](../operations/deployment.md#open-tabs-after-a-web-deployment).
 
+## Application alert selectors
+
+Next.js also renders a `role="alert"` route-announcer live region. Browser tests
+must distinguish it from the application's error message. Use
+`page.locator('[data-slot="alert"][role="alert"]')` for the shared Alert, or scope
+the query to the relevant component. Keep assertions for the expected message
+and for absence of private diagnostics; do not resolve ambiguity with `.first()`.
+
+`pnpm --filter web lint` rejects direct `page.getByRole('alert')` calls without
+options and direct `page.locator()` calls with the bare literal selectors
+`[role="alert"]`, `[role='alert']` or `[role=alert]` in every `e2e/` lane.
+The guard runs without Docker or a browser. It is a targeted syntax check, not
+proof that every selector is unique: aliases, computed selectors and options
+still require review and browser verification.
+
 ## Unit and component tests
 
 Unchanged, already the largest layer (55+ files). Two established mocking
