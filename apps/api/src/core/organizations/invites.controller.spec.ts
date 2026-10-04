@@ -19,6 +19,7 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
  */
 import { AuthInvitesController } from './auth-invites.controller'
 import type { AcceptInviteDto, CreateInviteDto } from './dto'
+import { invitationActor } from './invitation-actor'
 import { InviteService } from './invite.service'
 import { InvitesController } from './invites.controller'
 import type { MemberService } from './member.service'
@@ -42,6 +43,11 @@ const principal: RequestPrincipal = {
   aclVersion: 0,
 }
 
+const actor = invitationActor({
+  user: principal,
+  privilegedAdmission: { authenticated: principal, principal },
+})
+
 function mockInviteService(): jest.Mocked<InviteService> {
   return {
     createInvite: jest.fn(),
@@ -61,10 +67,10 @@ describe('MembersController (invite handler — OB-02 Stage C)', () => {
     const controller = new MembersController(memberService, inviteService, {} as never, {} as never)
     const dto = { email: 'target@example.com', roleId: 'role-1' } as CreateInviteDto
 
-    const result = await controller.invite('org-1', dto, principal)
+    const result = await controller.invite('org-1', dto, actor)
 
     expect(result).toBe(expected)
-    expect(inviteService.createInvite).toHaveBeenCalledWith('org-1', dto, principal)
+    expect(inviteService.createInvite).toHaveBeenCalledWith('org-1', dto, actor)
     expect(inviteService.createInvite).toHaveBeenCalledTimes(1)
   })
 })
@@ -89,8 +95,8 @@ describe('InvitesController (OB-02 Stage C)', () => {
     inviteService.revokeInvite.mockResolvedValue(undefined)
 
     const controller = new InvitesController(inviteService)
-    await expect(controller.revokeInvite('org-1', 'invite-1', principal)).resolves.toBeUndefined()
-    expect(inviteService.revokeInvite).toHaveBeenCalledWith('org-1', 'invite-1', principal)
+    await expect(controller.revokeInvite('org-1', 'invite-1', actor)).resolves.toBeUndefined()
+    expect(inviteService.revokeInvite).toHaveBeenCalledWith('org-1', 'invite-1', actor)
   })
 })
 

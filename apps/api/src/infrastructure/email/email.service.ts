@@ -146,11 +146,13 @@ export class EmailService {
     to: string,
     data: RenderableEmailData
   ): Promise<void> {
-    const { html, text, subject } = await this.renderTemplate(template, data, 'direct')
-    const result = await this.send({ to, subject, html, text }, { template, mode: 'direct' })
-
-    if (!result.success) {
-      throw new Error(result.error || 'Email sending failed')
+    try {
+      const { html, text, subject } = await this.renderTemplate(template, data, 'direct')
+      const result = await this.send({ to, subject, html, text }, { template, mode: 'direct' })
+      if (!result.success) throw new Error('Email sending failed')
+    } catch {
+      // Renderers and providers may echo live URLs in messages/causes.
+      throw new Error('Direct email delivery failed')
     }
 
     this.logger.info({ template, to: redactEmail(to) }, 'Email sent (direct, not queued)')

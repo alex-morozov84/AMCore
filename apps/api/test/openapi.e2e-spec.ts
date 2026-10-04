@@ -350,6 +350,23 @@ describe('OpenAPI success surface (e2e)', () => {
     return item?.[method!]?.security ?? []
   }
 
+  it('documents invitation role intent, bounded errors and credential boundaries', () => {
+    const accept = document.paths['/auth/invites/accept']!.post!
+    for (const status of ['200', '400', '401', '403', '409', '429', '503'])
+      expect(accept.responses[status]).toBeDefined()
+    expect(accept.security).toEqual([{ bearer: [] }])
+    const create = document.paths['/organizations/{orgId}/members/invite']!.post!
+    for (const status of ['202', '400', '401', '403', '404', '409', '429', '503'])
+      expect(create.responses[status]).toBeDefined()
+    expect(create.responses['202']).toEqual(
+      expect.objectContaining({ description: expect.stringContaining('best-effort') })
+    )
+    const revoke = document.paths['/organizations/{orgId}/invites/{inviteId}']!.delete!
+    for (const status of ['204', '400', '401', '403', '404', '409', '429', '503'])
+      expect(revoke.responses[status]).toBeDefined()
+    expect(revoke.security).toEqual([{ bearer: [] }])
+  })
+
   it('documents the apiKeyBearer security scheme on exactly the ADR-034 allowlisted operations', () => {
     // Guards against a dangling security reference: every @ApiSecurity('apiKeyBearer')
     // reference below is meaningless if the scheme itself isn't registered in

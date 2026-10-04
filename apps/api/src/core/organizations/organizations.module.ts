@@ -8,9 +8,12 @@ import { AuthModule } from '../auth/auth.module'
 import { AuthInvitesController } from './auth-invites.controller'
 import { CapabilitiesController } from './capabilities.controller'
 import { CapabilityRegistry } from './capability-registry.service'
+import { InvitationAuthorization } from './invitation-authorization'
 import { InviteService } from './invite.service'
+import { InviteAcceptService } from './invite-accept.service'
 import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
 import { InviteRateLimiterService } from './invite-rate-limiter.service'
+import { InviteRevokeService } from './invite-revoke.service'
 import { InvitesController } from './invites.controller'
 import { MemberService } from './member.service'
 import { MemberQueryService } from './member-query.service'
@@ -48,6 +51,9 @@ import { RolesController } from './roles.controller'
     RoleService,
     RoleAssignabilityService,
     InviteService,
+    InviteAcceptService,
+    InviteRevokeService,
+    InvitationAuthorization,
     InviteRateLimiterService,
     InviteAcceptLimiterService,
   ],

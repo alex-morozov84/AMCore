@@ -5,6 +5,7 @@ import type { RequestPrincipal } from '@amcore/shared'
 
 import { PrismaService } from '../../../prisma'
 import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service'
+import { registerApiKeyAdmission } from '../api-key-admission'
 import { ApiKeysService } from '../api-keys.service'
 
 @Injectable()
@@ -88,6 +89,7 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     request.user = principal
+    registerApiKeyAdmission(request, apiKey.id, principal)
 
     void this.apiKeysService.touchLastUsed(apiKey.id)
 

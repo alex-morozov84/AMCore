@@ -13,7 +13,9 @@ single membership automatically, and paginates multiple memberships in groups of
 with one membership. The overview confirms organization, account and team-access
 capability. The “Your access” card reports only the verified team-access decision;
 it does not infer permissions for individual records. It does not provide
-organization editing, role-definition editing or invitation management. See the
+organization editing, role-definition editing or invitation management. The
+[backend invitation lifecycle](../auth/invites.md) provides issuance, acceptance
+and revocation contracts for downstream invitation screens. See the
 [capability catalogue and access hints](../auth/capability-catalogue.md) for the
 separate discovery, actor and record contracts.
 

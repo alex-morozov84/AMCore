@@ -80,19 +80,21 @@ export class ResendEmailProvider implements EmailProvider {
 
       if (error) {
         const retryable = !DETERMINISTIC_RESEND_ERROR_CODES.has(error.name)
+        const errorCode =
+          DETERMINISTIC_RESEND_ERROR_CODES.has(error.name) ||
+          ['rate_limit_exceeded', 'application_error', 'internal_server_error'].includes(error.name)
+            ? error.name
+            : 'provider_failure'
         // warn, not error: a single attempt failing is not a terminal incident.
         // The processor owns the error-level `email.job.dead_letter` signal once
         // a job is truly terminal (EQS-03); error here would alert on every
         // transient retry.
-        this.logger.warn(
-          { to, subject, errorCode: error.name, error: error.message, retryable },
-          'Failed to send email via Resend'
-        )
+        this.logger.warn({ to, subject, errorCode, retryable }, 'Failed to send email via Resend')
 
         return {
           id: '',
           success: false,
-          error: error.message,
+          error: errorCode,
           retryable,
         }
       }
@@ -103,8 +105,8 @@ export class ResendEmailProvider implements EmailProvider {
         id: data?.id || '',
         success: true,
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
+    } catch {
+      const message = 'provider_failure'
 
       // Thrown (network/timeout/unexpected) — transient by default, retry.
       // warn, not error (per-attempt; the processor owns the terminal signal).

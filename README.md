@@ -47,7 +47,8 @@ The [product administration foundation](docs/product-admin/README.md) includes a
 minimal [organization selector and read-only context
 overview](docs/frontend/organization-context.md), separate from Operations Console.
 Its headless lifecycle and ready blocks can be mounted in a downstream shell;
-member lists and atomic multi-role assignment are reusable; role-definition and
+member lists, atomic multi-role assignment and the
+[backend invitation lifecycle](docs/auth/invites.md) are reusable; role-definition and
 invitation screens remain downstream work.
 The API also publishes a bounded [implemented-action catalogue and access
 hints](docs/auth/capability-catalogue.md) for future product role editors and

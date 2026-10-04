@@ -145,7 +145,7 @@ provide an operator interface for admin session management.
   and safe extension rules.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
   sessions, OAuth, [RBAC](auth/rbac.md), [capability catalogue and access
-  hints](auth/capability-catalogue.md), [API keys](auth/api-keys.md), invites,
+  hints](auth/capability-catalogue.md), [API keys](auth/api-keys.md), [invitations](auth/invites.md),
   CSRF, and the [auth contracts reference](auth/reference.md).
 - **[Email](email/README.md)** — `EmailService` vs `NotificationsService`, React
   Email templates, delivery classes, and secret-link rules.

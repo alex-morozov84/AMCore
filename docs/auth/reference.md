@@ -66,9 +66,11 @@ These behaviors are contracts, not incidental, and are easy to miss from shapes
 alone:
 
 - **Enumeration-safe responses.** `POST /auth/forgot-password`,
-  `POST /auth/resend-verification`, and the org invite endpoint return the same
-  success response whether or not the account/email exists — callers cannot probe
-  for registered users.
+  `POST /auth/resend-verification` return the same success response whether or not
+  the account/email exists. The org invite endpoint likewise uses the same `202`
+  status and body for existing and unknown recipients; this does not promise
+  constant-time execution or indistinguishable email delivery. See the
+  [invitation contract](invites.md) for its precise limits.
 - **`POST /auth/logout` always returns `204`,** even without a valid cookie.
 - **`POST /auth/reset-password` side effects:** the token is consumed atomically
   (single-use under concurrency), all sessions are revoked, the account email is
