@@ -198,5 +198,6 @@ test('empty discovery and pagination remain distinct from failed authority', asy
   await page.getByRole('button', { name: ui.text('refresh'), exact: true }).click()
   await expect(page.getByText(ui.text('emptyTitle'))).toHaveCount(0)
   await expect(page.getByText('private diagnostic')).toHaveCount(0)
-  await expect(page.locator('[role="alert"]')).toBeVisible()
+  // Next's route announcer also has role="alert"; assert the application's Alert.
+  await expect(page.locator('[data-slot="alert"][role="alert"]')).toBeVisible()
 })

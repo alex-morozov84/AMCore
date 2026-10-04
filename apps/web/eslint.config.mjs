@@ -503,6 +503,25 @@ export default [
     },
   },
 
+  // A global alert can include Next's accessibility route announcer.
+  {
+    name: 'project/e2e-alert-selectors',
+    files: ['e2e/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='page'][callee.property.name='getByRole'][arguments.length=1][arguments.0.value='alert']",
+          message: 'Scope application alerts with data-slot="alert" or a component locator; Next also renders an alert route announcer.',
+        },
+        ...['[role="alert"]', "[role='alert']", '[role=alert]'].map((value) => ({
+          selector: `CallExpression[callee.object.name='page'][callee.property.name='locator'][arguments.0.value=${JSON.stringify(value)}]`,
+          message: 'Scope application alerts with data-slot="alert" or a component locator; Next also renders an alert route announcer.',
+        })),
+      ],
+    },
+  },
+
   // Next.js rules
   {
     name: 'project/nextjs',
