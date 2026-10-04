@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 
-import { BULL_BOARD_CONTEXT_HEADER } from '@amcore/shared'
+import { BULL_BOARD_CONTEXT_HEADER, SUPPORTED_LOCALES } from '@amcore/shared'
 
 import { createBullBoardAuthMiddleware } from './bull-board-auth.middleware'
 import type { BullBoardAccess, BullBoardAuthService } from './bull-board-auth.service'
@@ -9,8 +9,9 @@ import type { BoardEvent } from './bull-board-events'
 
 const CONTEXT = {
   basePath: '/api/console/bull-board',
-  locale: 'ru',
-  returnHref: '/ru/admin/background-work',
+  // A supported locale, not a spelled-out one: a fork that keeps a single locale supports only that.
+  locale: SUPPORTED_LOCALES[SUPPORTED_LOCALES.length - 1],
+  returnHref: '/admin/background-work',
 }
 const encode = (value: unknown): string => Buffer.from(JSON.stringify(value)).toString('base64url')
 

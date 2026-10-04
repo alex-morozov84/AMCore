@@ -5,7 +5,7 @@ import { Queue } from 'bullmq'
 import IORedis from 'ioredis'
 import request from 'supertest'
 
-import { BULL_BOARD_CONTENT_SECURITY_POLICY } from '@amcore/shared'
+import { BULL_BOARD_CONTENT_SECURITY_POLICY, SUPPORTED_LOCALES } from '@amcore/shared'
 
 import { BOARD_HOOKS } from '../src/infrastructure/queue/dashboard/bull-board-hooks'
 import type { PrismaService } from '../src/prisma'
@@ -23,11 +23,13 @@ import {
  * What the board shows, proven on the RAW JSON of the real mount: every channel carries a canary and
  * the canary must never come back. Not a DOM check, not a formatter check.
  */
+// A supported locale, not a spelled-out one: a fork that keeps a single locale supports only that.
+const JOB_LOCALE = SUPPORTED_LOCALES[SUPPORTED_LOCALES.length - 1]
 const REAL_EMAIL_JOB = {
   template: 'welcome',
   to: `${CANARY}@example.com`,
   userId: 'user-1',
-  data: { name: `Name ${CANARY}`, email: `${CANARY}@example.com`, locale: 'ru' },
+  data: { name: `Name ${CANARY}`, email: `${CANARY}@example.com`, locale: JOB_LOCALE },
 }
 const HOUR = 3_600_000
 const EXPECTED_QUEUE_KEYS = [
@@ -144,7 +146,11 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
     expect(raw).not.toContain('@example.com')
     const queue = res.body.queues.find((q: { name: string }) => q.name === 'email')
     expect(queue.jobs).toHaveLength(1)
-    expect(queue.jobs[0].data).toEqual({ template: 'welcome', locale: 'ru', userId: 'user-1' })
+    expect(queue.jobs[0].data).toEqual({
+      template: 'welcome',
+      locale: JOB_LOCALE,
+      userId: 'user-1',
+    })
     expect(queue.jobs[0].returnValue).toBe('[hidden]')
     expect(queue.jobs[0].stacktrace).toEqual([])
   })

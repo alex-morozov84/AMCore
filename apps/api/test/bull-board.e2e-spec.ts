@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import request from 'supertest'
 
-import { BULL_BOARD_CONTEXT_HEADER } from '@amcore/shared'
+import { BULL_BOARD_CONTEXT_HEADER, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 
 import { PrivilegedRoleService } from '../src/core/auth/privileged-role.service'
 import type { PrismaService } from '../src/prisma'
@@ -132,11 +132,18 @@ describe('Bull Board (e2e)', () => {
 
   describe('bearer admission (the Console BFF)', () => {
     const API = `${ROUTE}/api/queues`
+    // Supported locales, not spelled-out ones: a fork that keeps a single locale supports only that.
     const CONTEXT = {
       basePath: '/api/console/bull-board',
-      locale: 'en',
-      returnHref: '/en/admin/background-work',
+      locale: DEFAULT_LOCALE,
+      returnHref: '/admin/background-work',
     }
+    const OTHER_LOCALE = SUPPORTED_LOCALES.at(-1) ?? DEFAULT_LOCALE
+    /** What the board shows for a locale: its read-only label and its language tag. */
+    const expectedFor = (locale: string) =>
+      locale === 'ru'
+        ? { label: 'ТОЛЬКО ПРОСМОТР', language: 'ru-RU' }
+        : { label: 'READ-ONLY', language: 'en-US' }
     const encode = (value: unknown): string =>
       Buffer.from(JSON.stringify(value)).toString('base64url')
 
@@ -240,24 +247,20 @@ describe('Bull Board (e2e)', () => {
       const res = await get(`${ROUTE}/`, token)
         .set(
           BULL_BOARD_CONTEXT_HEADER,
-          encode({ ...CONTEXT, locale: 'ru', returnHref: '/ru/admin/background-work' })
+          encode({ ...CONTEXT, locale: OTHER_LOCALE, returnHref: '/back/to/console' })
         )
         .expect(200)
       expect(res.text).toContain('<base href="/api/console/bull-board/"')
-      expect(res.text).toContain('ТОЛЬКО ПРОСМОТР')
-      expect(res.text).toContain('/ru/admin/background-work')
-      expect(res.text).toContain('ru-RU')
+      expect(res.text).toContain(expectedFor(OTHER_LOCALE).label)
+      expect(res.text).toContain('/back/to/console')
+      expect(res.text).toContain(expectedFor(OTHER_LOCALE).language)
     })
 
     it('does not mix the render contexts of concurrent requests', async () => {
       const { token } = await actor('ctx-concurrent@example.com', 'SUPER_ADMIN', 'SUPER_ADMIN')
       const contexts = [
-        {
-          basePath: '/api/console/bull-board',
-          locale: 'en',
-          returnHref: '/en/admin/background-work',
-        },
-        { basePath: '/api/bull-board', locale: 'ru', returnHref: '/ru/background-work' },
+        { basePath: '/api/console/bull-board', locale: DEFAULT_LOCALE, returnHref: '/back/one' },
+        { basePath: '/api/bull-board', locale: OTHER_LOCALE, returnHref: '/back/two' },
       ]
       const pages = await Promise.all(
         Array.from({ length: 8 }, (_unused, index) => {
@@ -270,7 +273,7 @@ describe('Bull Board (e2e)', () => {
       for (const { context, text } of pages) {
         expect(text).toContain(`<base href="${context.basePath}/"`)
         expect(text).toContain(context.returnHref)
-        expect(text).toContain(context.locale === 'ru' ? 'ТОЛЬКО ПРОСМОТР' : 'READ-ONLY')
+        expect(text).toContain(expectedFor(context.locale).label)
         const other = contexts.find((candidate) => candidate !== context)!
         expect(text).not.toContain(`<base href="${other.basePath}/"`)
       }

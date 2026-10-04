@@ -1,3 +1,5 @@
+import { SUPPORTED_LOCALES } from '@amcore/shared'
+
 import {
   BOARD_DATA_PROJECTIONS,
   projectAiRunWakeJobData,
@@ -5,11 +7,14 @@ import {
   projectNotificationJobData,
 } from './bull-board-data-projections'
 
+// A supported locale, not a spelled-out one: a fork that keeps a single locale supports only that.
+const LOCALE = SUPPORTED_LOCALES[SUPPORTED_LOCALES.length - 1]
+
 const REAL_EMAIL_JOB = {
   template: 'welcome',
   to: 'alice@example.com',
   userId: 'user_01HZ',
-  data: { name: 'Alice Example', email: 'alice@example.com', locale: 'ru' },
+  data: { name: 'Alice Example', email: 'alice@example.com', locale: LOCALE },
 }
 
 function serialized(value: unknown): string {
@@ -20,7 +25,7 @@ describe('email job projection', () => {
   it('shows only template, locale and the opaque user id of a real job', () => {
     expect(projectEmailJobData(REAL_EMAIL_JOB)).toEqual({
       template: 'welcome',
-      locale: 'ru',
+      locale: LOCALE,
       userId: 'user_01HZ',
     })
   })
