@@ -247,9 +247,38 @@ export async function queueBoardJourney(
       expect(document.headers['set-cookie']).toBeUndefined()
     }
 
+    const html = await board.evaluate(async (path) => (await fetch(path)).text(), `${boardPath}/`)
+    const relativeScript = /(?:src|href)="([^"]*static[^"]+\.js)"/.exec(html)?.[1]
+    expect(relativeScript).toBeDefined()
+    const assetUrl = relativeScript!.startsWith('/')
+      ? relativeScript!
+      : `${boardPath}/${relativeScript!}`
+    // Static files revalidate; a file that does not exist is a plain 404 whose body is the Console's own
+    // standard error with a fixed message (the bridge never relays the API's body, so no framework text
+    // such as "Cannot GET" and no stack).
+    // The API's own fixed body and cache header for that case are proved by its mounted e2e suite.
+    const files = await board.evaluate(
+      async ({ path, script }) => {
+        const found = await fetch(script)
+        const missing = await fetch(`${path}/static/js/does-not-exist.js`)
+        return {
+          foundCache: found.headers.get('cache-control'),
+          foundStatus: found.status,
+          missingStatus: missing.status,
+          missingBody: await missing.text(),
+        }
+      },
+      { path: boardPath, script: assetUrl }
+    )
+    expect(files.foundStatus).toBe(200)
+    expect(files.foundCache).toBe('private, no-cache')
+    expect(files.missingStatus).toBe(404)
+    expect(JSON.parse(files.missingBody)).toMatchObject({ message: 'Queue board unavailable' })
+    expect(files.missingBody).not.toContain('Cannot GET')
+    expect(files.missingBody).not.toContain('stack')
+
     // CSP: in EVERY document the only violation is the known Google Fonts stylesheet, by its exact URL
     // and directive, exactly once; and nothing is ever received from a Google font host.
-    const html = await board.evaluate(async (path) => (await fetch(path)).text(), `${boardPath}/`)
     const stylesheet = /href="(https:\/\/fonts\.googleapis\.com\/[^"]+)"/.exec(html)?.[1]
     expect(stylesheet).toBeDefined()
     expect(violations.length).toBeGreaterThanOrEqual(3)
@@ -257,11 +286,15 @@ export async function queueBoardJourney(
       expect(violation.directive).toBe(KNOWN_FONT_DIRECTIVE)
       expect(violation.blockedUri).toBe(stylesheet)
     }
-    const perDocument = new Map<string, number>()
-    for (const violation of violations) {
-      perDocument.set(violation.documentUri, (perDocument.get(violation.documentUri) ?? 0) + 1)
-    }
-    expect([...perDocument.values()].filter((count) => count !== 1)).toEqual([])
+    // One violation per loaded document instance: for each URL, as many violations as document loads.
+    const count = (values: string[]) =>
+      values.reduce(
+        (acc, value) => acc.set(value, (acc.get(value) ?? 0) + 1),
+        new Map<string, number>()
+      )
+    expect(count(violations.map((violation) => violation.documentUri))).toEqual(
+      count(documents.map((document) => document.url))
+    )
     expect(responses.filter((response) => GOOGLE_FONTS.test(response.url))).toEqual([])
     await board.close()
   } finally {
