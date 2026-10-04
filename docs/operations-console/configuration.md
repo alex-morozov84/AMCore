@@ -171,6 +171,32 @@ operator input that may reveal personal or organizational information:
   that matters for your privacy posture, configure your proxy's own log
   format to omit or truncate query strings for console routes.
 
+## Queue board
+
+The [queue board](queue-board.md) is opened from Background work through a fixed bridge in
+the Console's own server; it has no setting of its own besides the API's `ENABLE_BULL_BOARD`.
+
+- **Address.** Path mode serves it at `/api/console/bull-board/` on the product host. Host mode
+  serves it at `/api/bull-board/` on the Console host: the reference nginx and Caddy
+  configurations already map `/api/*` to `/api/console/*` there, so the board needs no extra rule.
+  The mapping must rewrite only the leading `/api/`, because the board's own data paths
+  (`/api/bull-board/api/queues`) contain a second one; the references do (anchored in nginx,
+  `uri replace … 1` in Caddy), and the board's root `/api/bull-board/` is mapped to the slashless
+  physical route by an explicit rule in both (otherwise Next.js's own trailing-slash redirect would
+  expose `/api/console/`). Keep both, and no caching, in a custom edge.
+- **Enabling.** In production set `ENABLE_BULL_BOARD=true` in the environment of the API process
+  and restart it; `.env` cannot enable it. The board is never served by the `worker` role.
+  Enabling it does not allow any action.
+- **What reaches the API.** The bridge reaches only the board's own mount
+  (`/api/v1/admin/queues`) with your Console session's bearer token. It forwards only `GET` and
+  `HEAD`, checks the path and the four query keys the board uses, drops every browser cookie and
+  header except a few, follows no redirect and serves nothing that does not carry the board's own
+  security policy. The generic product proxy refuses that path.
+- **Session.** In host mode the Console's own session is used and the product session is not
+  accepted; in path mode the product session is used, as for every other Console route. A
+  `SUPER_ADMIN` demotion applies on the next request; revoking the API session from elsewhere can
+  take up to the access token's lifetime (see [who can open it](queue-board.md#who-can-open-it)).
+
 ## Troubleshooting
 
 - Startup fails in host mode: confirm the generated mode is `host` and
@@ -182,3 +208,7 @@ operator input that may reveal personal or organizational information:
   validation assumes the proxy and private container network are the boundary.
 - A valid account receives not found: verify it has the current
   `SystemRole.SUPER_ADMIN` and that the API access probe is reachable.
+- Background work says the queue board is not enabled: see
+  [Enabling the board](queue-board.md#enabling-the-board). If it says it could not be opened,
+  check that the API is reachable from the web server and that nothing caches or rewrites
+  `/api/bull-board/` (host mode) or `/api/console/bull-board/` (path mode).

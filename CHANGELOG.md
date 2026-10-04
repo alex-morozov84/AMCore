@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Organization pages accept one application placement for addresses, pagination
   and both product menus; shell-free mount and public product-admin integration
   guides preserve explicit routing and independent headless composition.
+- Operations Console **queue board**: the view-only Bull Board opens from Background work
+  in a new tab with the Console session alone (no second sign-in, no API token in the
+  browser) in path and host mode, with a permanent view-only mark, per-queue links, and
+  an honest state when the board is off (how to enable it, only when that cause is
+  confirmed). `GET /api/v1/admin/background-work/queues` now reports `board.state` and
+  `inBoard`.
 
 ### Added
 
@@ -89,6 +95,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   include historical rows with lifecycle status/filter. Cleanup response category
   `expiredApiKeys` is renamed `staleTerminalApiKeys`. Schema cutover requires stopped
   old writers; backup restore must replay revocations or invalidate restored keys.
+- **Breaking for `BULL_BOARD_READ_ONLY`:** the variable is removed and ignored whatever its
+  value. Bull Board never allowed retry, promote, clean or remove from this release on, and
+  no setting adds them. A start with the variable still set logs one
+  `bull_board.legacy_read_only_flag_ignored` warning; delete it. Retry, pause and clean from
+  the Console are planned as separate audited actions.
+- `ENABLE_BULL_BOARD` keeps its meaning (off in production unless set in the API process
+  environment, never on the worker); the decision is now one startup snapshot that the
+  summary reports, so a value that only `.env` supplies can no longer be reported as on.
+
+### Security
+
+- Bull Board is read-only by construction: read-only adapters, only `GET`/`HEAD` on a
+  closed list of paths, a closed projection of every response (no payloads, return values,
+  failure text, stack traces, logs or flows), every error reduced to a translation key, and its
+  own Content-Security-Policy. The generic product proxy no longer reaches the board.
+  A live `SUPER_ADMIN` access token is admitted next to the cookie, checked against the
+  signed claim and the current database role on every request.
 
 ## [0.10.1] - 2026-09-29
 

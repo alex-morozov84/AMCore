@@ -120,12 +120,14 @@ SET "systemRole" = 'SUPER_ADMIN'
 WHERE email = 'admin@yourdomain.com';
 ```
 
-`SUPER_ADMIN` also unlocks the Bull Board queue dashboard at `/admin/queues`.
-**Bull Board is disabled in production unless `ENABLE_BULL_BOARD=true`, is never
-mounted on the `worker` role, requires a `SUPER_ADMIN` session cookie, and
-defaults to read-only (`BULL_BOARD_READ_ONLY=true`).** Set it writable only when
-operators need to retry/promote/clean jobs. Because it is cookie-backed, it is
-in scope for the CSRF policy — see [CSRF Posture](./csrf.md).
+`SUPER_ADMIN` also unlocks the view-only Bull Board queue dashboard at `/admin/queues`.
+**Bull Board is disabled in production unless `ENABLE_BULL_BOARD=true` is set in the API
+process environment, is never mounted on the `worker` role, and requires a `SUPER_ADMIN`
+credential: a live access token (sent by the Operations Console's server, when that is
+present) or, for direct access, a session cookie. It is always read-only — no setting turns on retry, promote, clean or remove,
+and the retired `BULL_BOARD_READ_ONLY` variable is ignored.** The role is checked against the
+database on every request, and API keys are rejected. The cookie path is in scope for the CSRF
+policy — see [CSRF Posture](./csrf.md).
 
 ---
 

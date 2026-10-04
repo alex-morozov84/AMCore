@@ -11,6 +11,7 @@ their organization role.
 | ------------------------------------- | ------------------------------------------------------------------------------------------ |
 | [Overview](overview.md)               | Check API readiness, file storage and resources; edit the probe interval; identify builds. |
 | [Background work](background-work.md) | See whether background queues are piling up, paused or unreadable. Read-only.              |
+| [Queue board](queue-board.md)         | Look at the jobs of the background queues (view-only), opened from Background work.        |
 | [Users](users.md)                     | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |
 | [Organizations](organizations.md)     | Inspect organizations, members and their roles without changing them.                      |
 | [API keys](api-keys.md)               | Inspect credential metadata and irreversibly revoke one or selected keys.                  |

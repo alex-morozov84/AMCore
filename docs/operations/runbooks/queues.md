@@ -76,8 +76,9 @@ has been paused for at least a minute).
 
 **Likely causes, ranked:**
 
-1. Someone paused the queue deliberately via Bull Board (or the BullMQ API
-   directly) and this alert is a confirmation, not a surprise.
+1. Someone paused the queue deliberately through the BullMQ API (the queue
+   board is view-only and cannot pause) and this alert is a confirmation, not a
+   surprise.
 2. The pause was accidental (a script or manual action targeting the wrong
    queue).
 3. An automated process paused it as a safety measure and the underlying
@@ -91,8 +92,9 @@ has been paused for at least a minute).
    amcore_queue_paused == 1
    ```
 
-2. Check Bull Board (or your team's change log / deploy history) for who or
-   what paused the queue and why.
+2. Check your team's change log / deploy history for who or what paused the
+   queue and why (the view-only queue board shows that a queue is paused, not
+   who paused it).
 3. Open the **"Queue paused"** dashboard panel (Queues & outbox row) to see
    the pause duration and whether other queues are affected too.
 
@@ -100,9 +102,9 @@ has been paused for at least a minute).
 
 - If deliberate and still needed: no action — this alert exists precisely so
   an intentional pause doesn't go unnoticed as "delivery silently stopped."
-- If accidental or no longer needed: resume the queue via Bull Board only
-  when it is explicitly enabled and writable, or use the BullMQ API through
-  your controlled operational tooling.
+- If accidental or no longer needed: resume the queue with the BullMQ API
+  through your controlled operational tooling. The queue board cannot resume
+  a queue, and no setting makes it able to.
 
 **Escalation:** this is `severity: page` specifically because a paused queue
 is silent, user-facing delivery stop if it wasn't deliberate — treat every
@@ -185,8 +187,10 @@ escalate per your organization's on-call process.
    increase(amcore_queue_events_total{event="dead_letter"}[5m])
    ```
 
-2. Branch on the `queue` label and structured event. For `email`, Bull Board
-   may retain the failed job for 24h or 1000 jobs. For `notifications`,
+2. Branch on the `queue` label and structured event. For `email`, the view-only
+   Bull Board may list the retained failed job for 24h or 1000 jobs (it shows
+   that it failed, when and after how many attempts, not why: use the worker
+   logs for the cause). For `notifications`,
    distinguish `notification.delivery.dead_letter` (a durable DB delivery,
    not a BullMQ job) from `notification.dispatch_job_failed`. For `ai-runs`,
    inspect `ai.run.wake_job_failed`; the shipped Bull Board does not register
@@ -201,9 +205,9 @@ escalate per your organization's on-call process.
   queue-specific event; do not assume every signal has a Bull Board record.
 - If a burst: identify the shared cause (a handler bug, a downstream
   dependency outage during the burst window) and fix that. Manually retry a
-  retained BullMQ job only when Bull Board is explicitly enabled and writable
-  (`ENABLE_BULL_BOARD=true`, `BULL_BOARD_READ_ONLY=false`) and the job remains
-  valid; durable notification/AI work is recovered by its dispatcher cron.
+  retained BullMQ job with the BullMQ API through your controlled operational
+  tooling, only while the job remains valid (the Bull Board is view-only);
+  durable notification/AI work is recovered by its dispatcher cron.
 
 **Escalation:** `Ticket` (any single signal) — inspect the queue-specific
 record while available, but not urgent otherwise. `Page` (>10 in 5m) means a

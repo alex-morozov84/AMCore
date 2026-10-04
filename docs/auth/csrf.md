@@ -19,7 +19,7 @@ Cookie-backed browser surfaces are intentionally narrow:
 - `POST /auth/logout`
 - `POST /auth/refresh`
 - `POST /auth/oauth/exchange`
-- Bull Board at `/admin/queues`
+- Bull Board at `/admin/queues` (view-only, `GET`/`HEAD` only)
 
 The backend refresh cookie is `httpOnly` and `SameSite=Strict`, so browsers do
 not send it on normal cross-site requests. That is the primary CSRF layer for
@@ -78,8 +78,12 @@ not substitutes for this exact-origin check.
 ## Bull Board
 
 Bull Board is not mounted in production unless explicitly enabled, and it is never
-mounted on the `worker` HTTP role. If it is enabled, the secure default is
-read-only mode; writable queue actions require explicit operator opt-in.
+mounted on the `worker` HTTP role. It has no writable mode: every other method than
+`GET`/`HEAD` is refused with `405` by the server, whatever the environment, so a
+cookie-backed request cannot change a queue and there is no state-changing request to forge.
+The cookie only authorizes reading. The board is also reached with a bearer token by a server-side client (the
+Operations Console's server, when it is present); that path involves no ambient browser
+credential.
 
 ## OAuth note
 
