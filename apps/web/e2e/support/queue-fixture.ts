@@ -34,7 +34,43 @@ export function addDefaultQueueJob(id: string): void {
   redis('LPUSH', key('wait'), id)
 }
 
+/** A value that must never appear anywhere the queue board shows or sends. */
+export const BOARD_CANARY = 'E2E_BOARD_CANARY_5c1d'
+const FAILED_ID = 'e2e-failed'
+
+/**
+ * A failed job as BullMQ writes it, with the canary in every channel the board could leak: payload,
+ * failure text and stack trace (with a file path). The board must show none of them.
+ */
+export function addFailedDefaultQueueJob(): string {
+  const now = String(Date.now())
+  redis(
+    'HSET',
+    key(FAILED_ID),
+    'name',
+    'e2e',
+    'data',
+    JSON.stringify({ token: BOARD_CANARY }),
+    'opts',
+    '{"attempts":1}',
+    'timestamp',
+    now,
+    'processedOn',
+    now,
+    'finishedOn',
+    now,
+    'attemptsMade',
+    '1',
+    'failedReason',
+    `boom ${BOARD_CANARY}`,
+    'stacktrace',
+    JSON.stringify([`Error: boom ${BOARD_CANARY}\n    at /srv/app/secret.js:1`])
+  )
+  redis('ZADD', key('failed'), now, FAILED_ID)
+  return FAILED_ID
+}
+
 export function clearDefaultQueue(): void {
-  const jobKeys = [...ids(50), 'e2e-extra'].map((id) => key(id))
-  redis('DEL', key('wait'), key('meta'), ...jobKeys)
+  const jobKeys = [...ids(50), 'e2e-extra', FAILED_ID].map((id) => key(id))
+  redis('DEL', key('wait'), key('meta'), key('failed'), ...jobKeys)
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { Pause, Play, RefreshCw } from 'lucide-react'
 
@@ -15,6 +16,7 @@ export function QueueSummaryControls({
   canRefresh,
   online,
   retryAfterSeconds,
+  leading,
 }: {
   auto: boolean
   onAutoChange: (next: boolean) => void
@@ -23,12 +25,15 @@ export function QueueSummaryControls({
   canRefresh: boolean
   online: boolean
   retryAfterSeconds: number
+  /** An action placed before the refresh controls (the queue board entry). */
+  leading?: ReactNode
 }) {
   const t = useTranslations('console.backgroundWork')
   const blocked = !canRefresh
   return (
     <div className="flex flex-col items-start gap-1 sm:items-end">
       <div className="flex flex-wrap items-center gap-2">
+        {leading}
         <Button variant="outline" aria-pressed={auto} onClick={() => onAutoChange(!auto)}>
           {auto ? (
             <Pause aria-hidden="true" className="size-4" />

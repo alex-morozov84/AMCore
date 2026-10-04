@@ -272,6 +272,23 @@ and the [screen guide](background-work.md#adding-a-queue-for-developers). The
 backend reads Redis with plain read commands and a bounded number of pending
 requests, so a stalled Redis cannot pile up work behind the screen.
 
+## Queue board
+
+The board entry on Background work is a page-owned composition (`BoardOpenAction` with the page
+actions and `BoardNotices` above the table, with the state rule in `board-entry-state.ts`)
+rendered inside the live leaf, so it follows the same snapshot as the rows. The button carries the
+standing view-only explanation in the shared `InfoTooltip`, as Auto-refresh does. The notices use
+the shared `Alert` as it is: `role="note"` (the component sets `role="alert"` first and spreads
+your props after it) and `className="line-clamp-none"` so a long title wraps. Its texts are props from the page's catalogue keys
+(`console.backgroundWork.board.*`); `shared/ui` holds no message keys and no access logic.
+
+The board is reached only through `app/api/console/bull-board/[[...path]]/route.ts` and
+`shared/api/console/board-handler.ts`: a fixed bridge, not a proxy. Do not add a second route to
+the API's `/admin/queues` mount, and do not widen the allowed paths or query keys without
+extending the API's own list (`bull-board-route-policy.ts`). To show the payload of your own
+queue in the board, add a projection (see
+[Showing the payload of your own queue](queue-board.md#showing-the-payload-of-your-own-queue)).
+
 ## Verification
 
 - [Frontend testing](../frontend/testing.md) explains unit, Storybook, browser,

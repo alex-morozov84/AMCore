@@ -18,7 +18,7 @@ describe('queue inventory — stock graph, worker role (board never mounted)', (
     expect(graph.registered).toEqual(STOCK_QUEUES)
   })
 
-  it('does not mount the Bull Board placeholder for this role', () => {
+  it('does not mount the Bull Board for this role', () => {
     expect(graph.boardMounted).toBe(false)
   })
 })

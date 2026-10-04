@@ -33,8 +33,9 @@ Covers `docs/operations/prometheus/amcore-alerts.yml`'s `amcore-email` group.
 2. The exact recipient is deliberately not in the metric (redacted by
    design) — check structured logs in your deployment's log destination
    (correlate by `template` and timestamp) or, when Bull Board is enabled, its
-   job record. Failed jobs are retained for only 24h or 1000 jobs, whichever
-   comes first.
+   job record (the view-only board shows the template, locale and user id, not the
+   recipient or the error). Failed jobs are retained for only 24h or 1000 jobs,
+   whichever comes first.
 3. Open the **"Dead-letter rate"** dashboard panel (Email row) for the trend
    and scale, and the **"Operations by result"** panel (Email row) for the
    surrounding `send`/`dispatch` error rate — a correlated rise there points
@@ -49,8 +50,8 @@ Covers `docs/operations/prometheus/amcore-alerts.yml`'s `amcore-email` group.
   worse in the meantime.
 - If template-specific: fix the template's content/rendering (a malformed
   address field, a broken merge tag). Re-queue a retained job only after the
-  fix, and only when Bull Board is explicitly enabled and writable
-  (`ENABLE_BULL_BOARD=true`, `BULL_BOARD_READ_ONLY=false`).
+  fix, with the BullMQ API through your controlled operational tooling (the
+  Bull Board is view-only and cannot retry).
 - If bounce-driven: this is expected steady-state noise for the affected
   flow, not an incident — no mitigation needed beyond normal address-hygiene
   practices upstream of AMCore.

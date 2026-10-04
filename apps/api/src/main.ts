@@ -4,13 +4,13 @@ import { SwaggerModule } from '@nestjs/swagger'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import { Logger } from 'nestjs-pino'
-import { cleanupOpenApiDoc } from 'nestjs-zod'
 
 import { AppModule } from './app.module'
 import { configureBodyParser } from './bootstrap/configure-body-parser'
+import { configureBullBoardEdge } from './bootstrap/configure-bull-board-edge'
 import { EnvService } from './env/env.service'
 import { ShutdownService } from './shutdown.service'
-import { buildSwaggerConfig } from './swagger.config'
+import { API_GLOBAL_PREFIX, buildApiDocument } from './swagger.config'
 import { WebModule } from './web.module'
 import { WorkerModule } from './worker.module'
 
@@ -61,6 +61,8 @@ async function bootstrap(): Promise<void> {
   // Explicit request-body size limit for JSON + urlencoded (keeps webhook
   // raw-body capture intact). Shared with the e2e bootstrap so the body-size
   // contract is identical in tests and production.
+  // The queue board's own guard comes first: parser, Helmet and CORS must not answer its requests.
+  configureBullBoardEdge(app, `/${API_GLOBAL_PREFIX}`)
   configureBodyParser(app)
 
   // Cookie parser for refresh tokens
@@ -76,12 +78,11 @@ async function bootstrap(): Promise<void> {
   })
 
   // Global prefix
-  app.setGlobalPrefix('api/v1')
+  app.setGlobalPrefix(API_GLOBAL_PREFIX)
 
   // Swagger - only in development, and never on the worker (health-only surface)
   if (!isProduction && !isWorker) {
-    const document = SwaggerModule.createDocument(app, buildSwaggerConfig())
-    SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document))
+    SwaggerModule.setup('docs', app, buildApiDocument(app, API_GLOBAL_PREFIX))
   }
 
   // Native shutdown: Nest listens for SIGTERM/SIGINT, then awaits lifecycle hooks.

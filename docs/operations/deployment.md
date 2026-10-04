@@ -464,6 +464,14 @@ image differing only by `PROCESS_ROLE` (and replica count). The worker listens o
 liveness/readiness probe to health and Prometheus scrape config to metrics.
 For a single-process setup, set `PROCESS_ROLE=all` and run no separate worker.
 
+**Queue board.** The API serves a view-only Bull Board under `/api/v1/admin/queues` on the roles
+`web` and `all`, never on `worker`. In production it is off until `ENABLE_BULL_BOARD=true` is set
+in the environment of the API process (a `.env` file cannot enable it: the decision is taken
+before `.env` is read) and the API is restarted. Enabling it does not allow any action; the
+retired `BULL_BOARD_READ_ONLY` variable is ignored. A proxy in front of the API must not cache
+that path. See the
+[queue guide](../../apps/api/src/infrastructure/queue/README.md#bull-board-dashboard).
+
 Multi-instance safety is already in place, and the two cron flavors are
 deliberate. The nightly **cleanup** and **notification-retention** sweeps are
 Redis-lock-guarded (only one replica runs each; a skipped run self-repairs the
@@ -721,9 +729,18 @@ For the console hostname, both reference proxies apply the same mapping:
 | ----------------------------------- | -------------------------------------------------------------------- |
 | `/{locale}/.../`                    | external `308` to the same public path without `/` (query preserved) |
 | `/{locale}/...`                     | `/{locale}/admin/...`                                                |
-| `/api/...`                          | `/api/console/...`                                                   |
+| `/api/...`                          | `/api/console/...` (the leading `/api/` only)                        |
 | `/api/csp-report`                   | unchanged                                                            |
 | `/_next/...` and top-level metadata | unchanged                                                            |
+
+The mapping rewrites only the leading `/api/`: the queue board's own data paths
+(`/api/bull-board/api/queues`) contain a second one that must reach the application unchanged.
+The nginx reference anchors its rewrite at the start of the path; the Caddy reference gives
+`uri replace` a limit of 1 (without it Caddy replaces every occurrence). Keep both properties in a
+custom edge. One exception is explicit in both references: the board's root `/api/bull-board/`
+(with the slash, its page base) is mapped straight to `/api/console/bull-board`, because Next.js
+would otherwise redirect it to the slashless address and that redirect would name the physical
+`/api/console/` path.
 
 `docker/nginx/operations-console.conf` is the nginx reference include. Its
 default TLS vhost rejects unmatched hosts, and both vhosts forward the exact

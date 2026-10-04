@@ -1,11 +1,10 @@
 import { type INestApplication, RequestMethod } from '@nestjs/common'
-import { type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
-import { cleanupOpenApiDoc } from 'nestjs-zod'
+import { type OpenAPIObject } from '@nestjs/swagger'
 
 import { ADMIN_ORGANIZATION_SORT_FIELDS, ADMIN_USER_SORT_FIELDS } from '@amcore/shared'
 
 import { ADR_034_APIKEY_ALLOWLIST } from '../src/core/auth/decorators/adr-034-api-key-allowlist'
-import { buildSwaggerConfig } from '../src/swagger.config'
+import { addQueueBoardOperation, buildApiDocument } from '../src/swagger.config'
 
 import type { E2ETestContext } from './helpers'
 import { setupE2ETest, teardownE2ETest } from './helpers'
@@ -14,7 +13,7 @@ import { setupE2ETest, teardownE2ETest } from './helpers'
  * Arc C — OpenAPI success-surface completeness (ADR-050).
  *
  * Generates the OpenAPI document the same way `main.ts` does (shared
- * `buildSwaggerConfig()` + `cleanupOpenApiDoc`) from the fully-booted
+ * `buildApiDocument()`) from the fully-booted
  * AppModule, then asserts the documented success response of every public
  * operation **exactly** matches an explicit expected inventory: the precise
  * success status code and the body kind (typed JSON schema / 204 no-content /
@@ -34,7 +33,7 @@ import { setupE2ETest, teardownE2ETest } from './helpers'
  * the class-vs-method security metadata leak risk described in
  * `organizations.controller.ts`'s class doc-comment).
  */
-type BodyKind = 'json' | 'none' | 'redirect' | 'text' | 'stream' | 'binary'
+type BodyKind = 'json' | 'none' | 'redirect' | 'text' | 'html' | 'stream' | 'binary'
 interface Expected {
   status: string
   kind: BodyKind
@@ -86,6 +85,8 @@ const EXPECTED: Record<string, Expected> = {
   'get /admin/organizations/{id}': { status: '200', kind: 'json' },
   'get /admin/overview': { status: '200', kind: 'json' },
   'get /admin/background-work/queues': { status: '200', kind: 'json' },
+  // the read-only queue board: an Express-mounted UI documented programmatically
+  'get /admin/queues': { status: '200', kind: 'html' },
   'get /admin/runtime-settings/storage-probe': { status: '200', kind: 'json' },
   'patch /admin/runtime-settings/storage-probe': { status: '200', kind: 'json' },
   'get /storage/public': { status: '200', kind: 'binary' },
@@ -186,7 +187,8 @@ describe('OpenAPI success surface (e2e)', () => {
     context = await setupE2ETest()
     app = context.app
 
-    document = cleanupOpenApiDoc(SwaggerModule.createDocument(app, buildSwaggerConfig()))
+    // The harness applies no global prefix, so the document is built without one.
+    document = buildApiDocument(app, '')
   }, 120000)
 
   afterAll(async () => {
@@ -230,6 +232,8 @@ describe('OpenAPI success surface (e2e)', () => {
       ?.schema
   const textSchema = (response: Record<string, unknown> | undefined): object | undefined =>
     (response?.content as Record<string, { schema?: object }> | undefined)?.['text/plain']?.schema
+  const htmlSchema = (response: Record<string, unknown> | undefined): object | undefined =>
+    (response?.content as Record<string, { schema?: object }> | undefined)?.['text/html']?.schema
   const eventStreamSchema = (response: Record<string, unknown> | undefined): object | undefined =>
     (response?.content as Record<string, { schema?: object }> | undefined)?.['text/event-stream']
       ?.schema
@@ -297,6 +301,11 @@ describe('OpenAPI success surface (e2e)', () => {
         case 'text':
           if (!nonEmpty(textSchema(response))) {
             violations.push(`${key}: ${code} has no text/plain body schema`)
+          }
+          break
+        case 'html':
+          if (!nonEmpty(htmlSchema(response))) {
+            violations.push(`${key}: ${code} has no text/html body schema`)
           }
           break
         case 'stream':
@@ -666,5 +675,52 @@ describe('OpenAPI success surface (e2e)', () => {
     }
 
     expect(violations).toEqual([])
+  })
+
+  describe('queue board operation', () => {
+    it('is documented once, as HTML, with bearer OR cookie authentication', () => {
+      const operation = document.paths['/admin/queues']?.get
+      expect(operation).toBeDefined()
+      expect(operation?.security).toEqual([{ bearer: [] }, { cookie: [] }])
+      expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
+      for (const status of ['200', '401', '403', '503']) {
+        expect(operation?.responses).toHaveProperty(status)
+      }
+      expect(operation?.description).toContain('405')
+    })
+
+    it('references only security schemes that exist, with the cookie name inside the scheme', () => {
+      const schemes = document.components?.securitySchemes ?? {}
+      const operation = document.paths['/admin/queues']?.get
+      for (const requirement of operation?.security ?? []) {
+        for (const name of Object.keys(requirement)) expect(schemes).toHaveProperty(name)
+      }
+      expect(schemes['cookie']).toMatchObject({
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'refresh_token',
+      })
+      expect(schemes).not.toHaveProperty('refresh_token')
+    })
+
+    it('carries the global prefix when the API is started with one, and only then', () => {
+      const prefixed = addQueueBoardOperation(
+        { ...document, paths: {} },
+        { mounted: true },
+        'api/v1'
+      )
+      expect(Object.keys(prefixed.paths)).toEqual(['/api/v1/admin/queues'])
+      const slashed = addQueueBoardOperation(
+        { ...document, paths: {} },
+        { mounted: true },
+        '/api/v1/'
+      )
+      expect(Object.keys(slashed.paths)).toEqual(['/api/v1/admin/queues'])
+    })
+
+    it('documents nothing when the board is not mounted', () => {
+      const without = addQueueBoardOperation({ ...document, paths: {} }, { mounted: false }, '')
+      expect(without.paths).toEqual({})
+    })
   })
 })

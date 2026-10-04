@@ -214,6 +214,11 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `docs/frontend/architecture-and-conventions.md`,
   `docs/frontend/brand-theme-and-tokens.md`,
   `docs/frontend/fsd-boundaries-and-guardrails.md`.
+- **Turborepo reference:** before changing Turborepo configuration, tasks or CLI
+  usage, resolve the installed `turbo` package and read its `docs/README.md`
+  followed by the relevant bundled docs. Name the pages checked in the plan or
+  handoff. Root `turbo.json` sets `agentGuidance: false` so commands do not
+  automatically edit this file; the documentation rule is maintained here.
 - **Next.js reference: read the installed docs, not training data — and say
   which ones.** For any change touching `apps/web/next.config.ts`,
   `apps/web/src/app/**`, `apps/web/src/proxy.ts`, routing, caching/`use cache`,

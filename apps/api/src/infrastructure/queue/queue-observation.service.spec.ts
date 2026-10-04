@@ -106,14 +106,14 @@ describe('QueueObservationService', () => {
   it('reports disabled queues without any lookup or Redis read', async () => {
     const { service, clients } = await ready()
     const [row] = await service.observe([descriptor('email', false)])
-    expect(row).toEqual({ name: 'email', kind: 'work', status: 'disabled' })
+    expect(row).toEqual({ name: 'email', kind: 'work', inBoard: false, status: 'disabled' })
     expect(clients.get('email')?.execs).toHaveLength(0)
   })
 
   it('is unavailable with zero commands before the client resolved (cold start)', async () => {
     const { service, clients } = setup() // onModuleInit never ran: no retained handle
     expect(await service.observe([descriptor('email')])).toEqual([
-      { name: 'email', kind: 'work', status: 'unavailable' },
+      { name: 'email', kind: 'work', inBoard: true, status: 'unavailable' },
     ])
     expect(clients.get('email')?.execs).toHaveLength(0)
   })
@@ -158,6 +158,7 @@ describe('QueueObservationService', () => {
     expect(row).toEqual({
       name: 'email',
       kind: 'work',
+      inBoard: true,
       status: 'available',
       sampledAt: '2026-10-03T12:00:00.000Z',
       paused: true,
@@ -232,7 +233,12 @@ describe('QueueObservationService', () => {
       const pending = service.observe([descriptor('email')])
       await flush()
       clients.get('email')?.execs[0]?.resolve(replies)
-      expect((await pending)[0]).toEqual({ name: 'email', kind: 'work', status: 'unavailable' })
+      expect((await pending)[0]).toEqual({
+        name: 'email',
+        kind: 'work',
+        inBoard: true,
+        status: 'unavailable',
+      })
     }
   })
 
@@ -306,7 +312,7 @@ describe('QueueObservationService', () => {
     const [row] = await pending
     expect(JSON.stringify(row)).not.toContain('secret-id')
     expect(Object.keys(row as object).sort()).toEqual(
-      ['age', 'counts', 'kind', 'name', 'paused', 'sampledAt', 'status'].sort()
+      ['age', 'counts', 'inBoard', 'kind', 'name', 'paused', 'sampledAt', 'status'].sort()
     )
   })
 })

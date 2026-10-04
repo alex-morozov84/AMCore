@@ -40,7 +40,15 @@ export const adminQueueAgeSchema = z.discriminatedUnion('status', [
 ])
 export type AdminQueueAge = z.infer<typeof adminQueueAgeSchema>
 
-const identity = { name: adminQueueNameSchema, kind: z.enum(ADMIN_QUEUE_KINDS) }
+/**
+ * `inBoard`: the queue has an adapter in the read-only queue board (Bull Board). It says nothing about
+ * whether the board is mounted (see `adminQueuesBoardSchema`). Every enabled queue has one.
+ */
+const identity = {
+  name: adminQueueNameSchema,
+  kind: z.enum(ADMIN_QUEUE_KINDS),
+  inBoard: z.boolean(),
+}
 
 export const adminQueueSchema = z.discriminatedUnion('status', [
   z.object({
@@ -57,11 +65,21 @@ export const adminQueueSchema = z.discriminatedUnion('status', [
 export type AdminQueue = z.infer<typeof adminQueueSchema>
 
 /**
+ * `disabled` is reported ONLY for a confirmed cause: the board was not mounted at API startup
+ * (production without `ENABLE_BULL_BOARD=true`). It is not inferred from a request failure.
+ */
+export const ADMIN_QUEUES_BOARD_STATES = ['available', 'disabled'] as const
+export const adminQueuesBoardSchema = z.object({ state: z.enum(ADMIN_QUEUES_BOARD_STATES) })
+export type AdminQueuesBoard = z.infer<typeof adminQueuesBoardSchema>
+
+/**
  * A successful observation is HTTP 200 even when Redis could not be read: a
  * failing row is `unavailable`, never zeros. Request-level failures stay 401/403/429/5xx.
  */
 export const adminQueuesResponseSchema = z.object({
   checkedAt: instant,
+  /** Whether the read-only queue board is mounted in this deployment, decided once at API startup. */
+  board: adminQueuesBoardSchema,
   queues: z.array(adminQueueSchema),
 })
 export type AdminQueuesResponse = z.infer<typeof adminQueuesResponseSchema>

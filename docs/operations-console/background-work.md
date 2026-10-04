@@ -7,7 +7,8 @@ emails to send, wake-up signals for notifications and AI runs, and any queue you
 own code adds. Open it when something feels late, for example "emails are slow",
 and you want to know whether work is piling up, stuck behind a pause, or cannot
 be read at all. The screen is read-only. It cannot pause, resume, retry or delete
-anything, and it never shows what a job contains.
+anything, and it never shows what a job contains. To look at the jobs themselves, open
+the [queue board](queue-board.md) from this screen.
 
 Console access requires a current platform `SUPER_ADMIN`. API keys cannot read
 this screen, and an organization role does not grant access. The page is at
@@ -97,15 +98,15 @@ Console time zone. See [the display time zone](README.md#display-time-zone).
 
 ## Reading the screen
 
-| You see                                                  | Likely meaning and what to do                                                                                                                                                                                                   |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Waiting grows, **Not paused**, Active stays at 0         | No worker is taking jobs. Check that the worker process (or the `all` role) is running. See the [queue runbook](../operations/runbooks/queues.md#backlog).                                                                      |
-| **Paused** and Waiting is above 0                        | The queue was paused. Confirm that was intended, then resume it by the controlled way described in the [queue runbook](../operations/runbooks/queues.md#paused).                                                                |
-| Waiting is high but Active is also high                  | Workers are busy. Watch whether the "Oldest queued job" keeps growing.                                                                                                                                                          |
-| **Failed** is above 0                                    | Jobs failed and are kept. Look at the worker logs for the cause; see the [email runbook](../operations/runbooks/email.md) for email.                                                                                            |
-| A row says **Unavailable**                               | The queue's numbers could not be read in time. Redis being down or slow is the usual cause, but not the only one. Use **Refresh**; if it persists, check the API logs and the [Redis runbook](../operations/runbooks/redis.md). |
-| Every row says **Unavailable**                           | No queue could be read. Nothing is known about the queues right now. Check Redis, the API and its logs.                                                                                                                         |
-| `notifications` or `ai-runs` is **Empty** but users wait | Look in the database state, not here. These queues only wake workers.                                                                                                                                                           |
+| You see                                                  | Likely meaning and what to do                                                                                                                                                                                                                                 |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Waiting grows, **Not paused**, Active stays at 0         | No worker is taking jobs. Check that the worker process (or the `all` role) is running. See the [queue runbook](../operations/runbooks/queues.md#backlog).                                                                                                    |
+| **Paused** and Waiting is above 0                        | The queue was paused. Confirm that was intended, then resume it by the controlled way described in the [queue runbook](../operations/runbooks/queues.md#paused).                                                                                              |
+| Waiting is high but Active is also high                  | Workers are busy. Watch whether the "Oldest queued job" keeps growing.                                                                                                                                                                                        |
+| **Failed** is above 0                                    | Jobs failed and are kept. Open the [queue board](queue-board.md) to see which jobs, when and after how many attempts; the cause is in the worker logs (the board hides failure messages). See the [email runbook](../operations/runbooks/email.md) for email. |
+| A row says **Unavailable**                               | The queue's numbers could not be read in time. Redis being down or slow is the usual cause, but not the only one. Use **Refresh**; if it persists, check the API logs and the [Redis runbook](../operations/runbooks/redis.md).                               |
+| Every row says **Unavailable**                           | No queue could be read. Nothing is known about the queues right now. Check Redis, the API and its logs.                                                                                                                                                       |
+| `notifications` or `ai-runs` is **Empty** but users wait | Look in the database state, not here. These queues only wake workers.                                                                                                                                                                                         |
 
 If the whole page shows "temporarily unavailable", the API could not be reached
 at all, or the session check could not complete. Use **Retry**.
@@ -116,6 +117,27 @@ The screen shows counts, a pause flag and an age. It never shows job contents,
 job IDs, job names, error messages or Redis keys. It reads queue state without
 writing anything. The browser talks only to the Console's own server, which holds
 the credentials; the browser never receives an API token.
+
+The [queue board](queue-board.md) that this screen links to is a separate, view-only page
+that does show job ids, names and times, and a reviewed part of some payloads. Its
+[data rules](queue-board.md#what-the-board-shows) are separate from this screen's promise.
+
+## Queue board entry
+
+The page description says that the jobs themselves are in the queue board and that it is
+view-only. Depending on what the API confirmed in the latest reading:
+
+- **Open queue board** sits with the page actions (next to Auto-refresh and Refresh), with a help
+  icon that explains what the board does not allow. Every queue that has a board page also has
+  **Open in queue board**. Both open in a new tab.
+- **Queue board is not enabled**: the board was not mounted when the API started, with the steps
+  to enable it ([Enabling the board](queue-board.md#enabling-the-board)). The button and row links
+  are not shown.
+- **Could not open the queue board**: the last attempt to open it failed while the board is
+  available now; the button stays. It disappears when you try again or when the board's state
+  changes.
+
+While your access is being re-verified no board entry is shown.
 
 ## Adding a queue (for developers)
 
@@ -153,10 +175,12 @@ An observed Redis problem is part of a normal 200 response, never an error:
 ```json
 {
   "checkedAt": "2026-10-03T12:00:00.000Z",
+  "board": { "state": "available" },
   "queues": [
     {
       "name": "email",
       "kind": "work",
+      "inBoard": true,
       "status": "available",
       "sampledAt": "2026-10-03T12:00:00.000Z",
       "paused": false,
@@ -170,11 +194,16 @@ An observed Redis problem is part of a normal 200 response, never an error:
       },
       "age": { "status": "sample", "seconds": 245, "sampled": 14 }
     },
-    { "name": "ai-runs", "kind": "wake", "status": "unavailable" },
-    { "name": "default", "kind": "extension", "status": "disabled" }
+    { "name": "ai-runs", "kind": "wake", "inBoard": true, "status": "unavailable" },
+    { "name": "default", "kind": "extension", "inBoard": false, "status": "disabled" }
   ]
 }
 ```
+
+`board.state` is `available` or `disabled`. `disabled` means one confirmed thing: the queue
+board was not mounted when the API started (production without `ENABLE_BULL_BOARD=true` in the
+process environment). `inBoard` says that the queue has a page in the board (true for every enabled queue); it does not say
+that the board is on, so the screen offers a link only when both hold.
 
 `counts.waiting` and `counts.prioritized` are separate fields; the screen's
 **Waiting** is their sum. `age.status` is `sample`, `none` (nothing queued) or

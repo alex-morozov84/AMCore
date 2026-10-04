@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test'
 
 import {
+  backgroundWorkBoardStatesJourney,
   backgroundWorkDegradedJourney,
   backgroundWorkRetryAfterJourney,
 } from '../shared/background-work-intercepted-journeys'
-import { backgroundWorkJourney } from '../shared/background-work-journey'
+import { backgroundWorkJourney, queueBoardJourney } from '../shared/background-work-journey'
 import { settingsProof } from '../support/runtime-settings-proof'
 
 import { setSystemRole } from './admin-helpers'
@@ -44,6 +45,42 @@ test('path-mode Background work: a short Retry-After frees manual Refresh before
   test.setTimeout(180_000)
   await signInAsOperator(page, 'admin-background-work-retry-after')
   await backgroundWorkRetryAfterJourney(page, URL)
+})
+
+test('path-mode queue board: opens from the Console session, read-only, nothing hidden leaks', async ({
+  page,
+}) => {
+  test.setTimeout(240_000)
+  await signInAsOperator(page, 'admin-queue-board')
+  await queueBoardJourney(page, { pageUrl: URL, boardPath: '/api/console/bull-board' })
+})
+
+test('path-mode queue board entry follows the live summary: failed open, disabled, enabled again', async ({
+  page,
+}) => {
+  test.setTimeout(180_000)
+  await signInAsOperator(page, 'admin-queue-board-states')
+  await backgroundWorkBoardStatesJourney(page, URL)
+})
+
+test('path-mode queue board: an ordinary user and a signed-out visitor get a plain 404', async ({
+  page,
+  request,
+}) => {
+  const signedOut = await request.get('/api/console/bull-board/', {
+    headers: { accept: 'text/html' },
+  })
+  expect(signedOut.status()).toBe(404)
+  const email = uniqueEmail('admin-queue-board-user')
+  await registerViaUi(page, email)
+  await expect(page).toHaveURL(/\/en\/?$/)
+  const response = await page.goto('/api/console/bull-board/')
+  expect(response?.status()).toBe(404)
+  await expect(page.getByText('READ-ONLY')).toHaveCount(0)
+  // The generic product proxy never reaches the board either.
+  const viaProxy = await page.request.get('/api/admin/queues/api/queues')
+  expect([401, 404]).toContain(viaProxy.status())
+  expect(await viaProxy.text()).not.toContain('"queues"')
 })
 
 test('path-mode Background work: an ordinary user never sees it', async ({ page }) => {

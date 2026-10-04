@@ -16,13 +16,13 @@ function Figure({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Card({ queue }: { queue: AdminQueue }) {
+function Card({ queue, boardHref }: { queue: AdminQueue; boardHref: string | null }) {
   const t = useTranslations('console.backgroundWork')
   const figures = useQueueFigures(queue)
   return (
     <li className="rounded-lg border bg-surface-elevated p-4 shadow-md">
       <div className="flex items-start justify-between gap-3">
-        <QueueIdentity queue={queue} />
+        <QueueIdentity queue={queue} boardHref={boardHref} />
         <QueueStatus queue={queue} />
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-3">
@@ -40,12 +40,18 @@ function Card({ queue }: { queue: AdminQueue }) {
 }
 
 /** Mobile presentation (below md): one card per queue. */
-export function QueueCards({ queues }: { queues: AdminQueue[] }) {
+export function QueueCards({
+  queues,
+  boardHrefOf = () => null,
+}: {
+  queues: AdminQueue[]
+  boardHrefOf?: (queue: AdminQueue) => string | null
+}) {
   const t = useTranslations('console.backgroundWork')
   return (
     <ul aria-label={t('tableLabel')} className="flex flex-col gap-3 md:hidden">
       {queues.map((queue) => (
-        <Card key={queue.name} queue={queue} />
+        <Card key={queue.name} queue={queue} boardHref={boardHrefOf(queue)} />
       ))}
     </ul>
   )

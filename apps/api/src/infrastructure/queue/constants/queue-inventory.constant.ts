@@ -33,15 +33,5 @@ export const QUEUE_INVENTORY: readonly QueueDescriptor[] = Object.values(QueueNa
   ...DESCRIPTORS[name],
 }))
 
-/**
- * Queues that have a Bull Board adapter today. `ai-runs` is deliberately absent; the board's
- * inventory and access are unchanged by the inventory above, which only filters by `enabled`.
- */
-export const BULL_BOARD_QUEUE_NAMES: readonly QueueName[] = [
-  QueueName.DEFAULT,
-  QueueName.EMAIL,
-  QueueName.NOTIFICATIONS,
-]
-
 /** DI token for the `name -> Queue` map built from the enabled inventory. */
 export const QUEUE_REGISTRY = Symbol('QUEUE_REGISTRY')

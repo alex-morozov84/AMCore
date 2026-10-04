@@ -164,8 +164,9 @@ the optional Operations Console's Background work screen reports every descripto
 1. Add the value to `QueueName` in `constants/queues.constant.ts`.
 2. Add its descriptor to `DESCRIPTORS` in `constants/queue-inventory.constant.ts`.
 3. Add a processor in a worker-only module (see above) if jobs should be consumed.
-4. Optional: list it in `BULL_BOARD_QUEUE_NAMES` to give it a Bull Board adapter.
-   The board lists three queues today; `ai-runs` has none.
+4. Nothing to add for the board: every enabled queue gets a read-only Bull Board adapter and
+   shows in Background work. Its job data stays hidden until you add a projection to
+   `BOARD_DATA_PROJECTIONS`.
 5. Optional: add Console copy for it in `console.backgroundWork.queues` in
    `apps/web/messages/*.json`. Without it the screen shows the technical name and
    generic copy for its `kind`.
@@ -235,41 +236,85 @@ await this.queueService.cleanQueue(QueueName.DEFAULT, 86400, 'failed')
 
 ## Bull Board Dashboard
 
-Access the Bull Board UI under the **`/admin/queues`** route. It is mounted as
-Express middleware by `@bull-board/nestjs`; the exact reachable URL follows the
-app's global prefix (the adapter base path is `getGlobalPrefix() + route`), so a
-production app started with `setGlobalPrefix('api/v1')` serves it under
-`/api/v1/admin/queues`, while the e2e harness (no global prefix) serves it at
-`/admin/queues`. Confirm the path for your bootstrap if you change the prefix.
+The API can serve the [Bull Board](https://github.com/felixmosh/bull-board) UI as a **view-only**
+queue board under **`/admin/queues`** (with the global prefix: `/api/v1/admin/queues`). It lists
+queues, their jobs and one job's details. It cannot change anything, and no setting can make it:
+every adapter is built read-only, the HTTP boundary answers any method other than `GET`/`HEAD`
+with `405`, and every response is rebuilt from a closed list of fields. The operator-facing guide
+is in the Operations Console documentation (`docs/operations-console/queue-board.md`) when the
+Console is present; this section is the contract for developers.
 
-Features:
+### Mounting
 
-- View all queues and their stats
-- Monitor active, waiting, completed, and failed jobs
-- Retry failed jobs
-- Clean up old jobs
-- View job details and logs
+- **Production:** not mounted unless `ENABLE_BULL_BOARD=true` is a real **process** environment
+  variable when the API starts. A value that only a `.env` file supplies does nothing, because the
+  decision is taken before `.env` is loaded.
+- **Other environments:** always mounted (and still authenticated).
+- **`worker` role:** never. Roles `web` and `all` serve it.
+- The decision is one frozen snapshot (`BULL_BOARD_MOUNT`, `dashboard/bull-board-mount-state.ts`)
+  read by the module graph, by `GET /admin/background-work/queues` (`board.state`) and by the
+  OpenAPI document, so what is reported is always what is mounted.
+- `BULL_BOARD_READ_ONLY` is **retired and ignored**, whatever its value. A start with it set (roles
+  `web`/`all`) logs `bull_board.legacy_read_only_flag_ignored` once. Remove it.
 
-**Access control (EQS-01):**
+### Access
 
-- **Mount gate** — not mounted in production unless `ENABLE_BULL_BOARD=true`;
-  the router and placeholder controller are absent from the module graph by
-  default (zero attack surface). Mounted by default in non-production, but
-  still protected.
-- **Auth** — enforcement is `createBullBoardAuthMiddleware` (runs before the
-  router), **not** the `DashboardController` `@SystemRoles` guard (that
-  controller is a Swagger-only placeholder and never sees the UI's requests).
-  The middleware rejects API-key / `x-api-key` machine credentials and requires
-  a valid `refresh_token` cookie belonging to a `SUPER_ADMIN` user
-  (read-only verification — no session rotation). Browser UI only; there is no
-  bearer-token path. See ADR-034 amendment 2026-05-29.
-- **Auth coverage is path-independent.** The auth middleware and the Bull Board
-  router are bound in the _same_ registration call
-  (`consumer.apply(middleware, router).forRoutes(route)`), so they always mount
-  at the identical path — whatever the global prefix resolves to, the
-  middleware gates the router and all of its subroutes (incl. the data API that
-  exposes job payloads). The e2e proves this for `/admin/queues` and
-  `/admin/queues/api/queues`.
+Authentication is an Express middleware in front of the router, not a Nest guard (the router never
+passes through Nest's guards). Two ways in, never mixed: a request with any `Authorization` header
+is judged only as a bearer; without one, the browser cookie is judged.
+
+- **Bearer (the Console BFF):** a live `SUPER_ADMIN` access token. The role in the signed claim must
+  be `SUPER_ADMIN` **and** the current role in the database must still be, on every request
+  (`PrivilegedAdmissionService`, the same rule as other privileged routes). `401` for an invalid,
+  expired or unknown-user token, `403` for a non-administrator or demoted user, `503` when the
+  database cannot be asked. API keys (`amcore_` bearer or `x-api-key`) are always `401`.
+- **Cookie (direct access, no Console):** a `refresh_token` cookie of a `SUPER_ADMIN` user, checked
+  read-only against the session table (no rotation). Browser only; it is not a bearer.
+
+A bearer request may carry `X-AMCore-Board-Context`, a strict base64url JSON with the public base
+path, the locale and the way back to the Console. It is presentation only and is ignored on a
+cookie request; an invalid one is `400`.
+
+### What it allows and shows
+
+Only `GET`/`HEAD` of the page, its static files, `GET /api/queues` (bounded query: `activeQueue`,
+`status`, `page`, `jobsPerPage` up to 50) and one job. Job logs and a job's flow (parents and
+children, which can span other queues) get a fixed, schema-valid reply without anything being read.
+Schedulers, default job options, rate limits, workers, Redis details and metrics are closed (the
+UI is configured not to ask for them). Per job it returns id, name, times, attempts, delay, whether it failed and a short list of
+retry/retention options; payloads, return values, failure text and stack traces are replaced.
+`data` of a queue is shown only through a projection registered in `BOARD_DATA_PROJECTIONS`, a `Map`
+that answers only for the names listed (`email`, `notifications` and `ai-runs` ship with one: template,
+locale and user id; notification id; run id); the `default` queue and any other queue, whatever its name,
+are hidden.
+
+The one write the board's reads can cause is BullMQ's own: counting a queue may remove a pre-v5 legacy
+marker from the end of a waiting list. It is measured by the disclosure e2e suite. No queue or job state
+is changed through the board.
+
+An error never carries a message or a stack: after the Board's own response validation every status
+`>= 400` is reduced to `{ "error": { "key": "ERRORS.…" } }`. The board's HTML page is rendered with
+a callback, so a failing render is answered with the same fixed `500`. The router ends with a terminal `404` and an error handler, and the guard refuses an undecodable path with a `400`, so a missing static file or a malformed address gets the same fixed body instead of the application's general not-found response (which names the requested URL).
+
+To show the payload of a queue you add, write a projection that rebuilds a small object from
+validated fields (identifiers and categories, never addresses, names, tokens or free text) and add
+tests next to `bull-board-data-projections.spec.ts`. An upgrade of `@bull-board/*` that adds a
+route or a field fails `bull-board-upgrade-guard.spec.ts` until it is reviewed.
+
+### Response headers
+
+Every answer of the mount carries the board's headers, including a refusal of the admission
+middleware, an error and the answer of a request that the global parser or CORS would have answered
+first: a guard registered before them (`configureBullBoardEdge`) answers every method but `GET`/`HEAD`
+(a CORS preflight included) with `405` and `Allow: GET, HEAD`, ignores the body of a `GET`, and
+re-applies the board's headers when the response head is written, replacing Helmet's and removing any
+CORS headers. The answers are `Cache-Control: private, no-store` (`no-cache` for static files),
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`,
+`Cross-Origin-Resource-Policy: same-origin` and the board's own `Content-Security-Policy`
+(`BULL_BOARD_CONTENT_SECURITY_POLICY` in `@amcore/shared`): its own scripts only, no framing, no
+reporting endpoint. The unmodified board page links a Google Fonts stylesheet that this policy
+blocks (a known message in the browser console; system fonts are used and nothing is requested from
+Google).
 
 ## Job Options Reference
 

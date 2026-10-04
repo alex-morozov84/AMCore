@@ -7,6 +7,8 @@ import {
   getConsoleDetailAuditHref,
   getConsoleOrganizationsHref,
   getConsoleOverviewHref,
+  getConsoleQueueBoardBasePath,
+  getConsoleQueueBoardHref,
   getConsoleUserDetailHref,
   getConsoleUsersHref,
   parseConsoleReturnHref,
@@ -139,5 +141,22 @@ describe('getConsoleBackgroundWorkHref', () => {
     expect(getConsoleBackgroundWorkHref()).toBe('/operations/background-work')
     mutableConfig.mode = 'host'
     expect(getConsoleBackgroundWorkHref()).toBe('/background-work')
+  })
+})
+
+describe('queue board address', () => {
+  it('is the Console BFF route under the product host in path mode, whatever the slug', () => {
+    mutableConfig.mode = 'path'
+    for (const slug of ['admin', 'operations']) {
+      mutableConfig.slug = slug
+      expect(getConsoleQueueBoardBasePath()).toBe('/api/console/bull-board')
+      expect(getConsoleQueueBoardHref()).toBe('/api/console/bull-board')
+    }
+  })
+
+  it('has no console segment in host mode: the edge maps /api/* to /api/console/*', () => {
+    mutableConfig.mode = 'host'
+    expect(getConsoleQueueBoardBasePath()).toBe('/api/bull-board')
+    expect(getConsoleQueueBoardHref()).toBe('/api/bull-board')
   })
 })

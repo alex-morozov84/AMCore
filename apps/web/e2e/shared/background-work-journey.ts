@@ -1,6 +1,13 @@
+import { BULL_BOARD_CONTENT_SECURITY_POLICY } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
-import { addDefaultQueueJob, clearDefaultQueue, seedDefaultQueue } from '../support/queue-fixture'
+import {
+  addDefaultQueueJob,
+  addFailedDefaultQueueJob,
+  BOARD_CANARY,
+  clearDefaultQueue,
+  seedDefaultQueue,
+} from '../support/queue-fixture'
 
 import { expectNoAxeViolations } from './axe'
 
@@ -55,7 +62,8 @@ export async function backgroundWorkJourney(page: Page, url: string): Promise<vo
     await page.getByRole('button', { name: 'Refresh', exact: true }).click()
     await manual
 
-    // Read-only: no control can change a queue, and no board link is offered.
+    // Read-only: no control can change a queue. The board is reached only through its own Console
+    // route; the API's own mount (`/admin/queues`) is never linked.
     await expect(
       page.getByRole('button', {
         name: /^(retry|clean|resume|promote|delete|pause queue|obliterate)/i,
@@ -77,6 +85,233 @@ export async function backgroundWorkJourney(page: Page, url: string): Promise<vo
     expect(box).not.toBeNull()
     expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(375)
     await expectNoAxeViolations(page)
+  } finally {
+    clearDefaultQueue()
+  }
+}
+
+const GOOGLE_FONTS = /fonts\.(googleapis|gstatic)\.com/
+/** The one stylesheet the unmodified board page links; the board's CSP blocks it by `style-src-elem`. */
+const KNOWN_FONT_DIRECTIVE = 'style-src-elem'
+const ACTIONS = /retry|clean|promote|remove|pause|resume|obliterate|add job|delete|empty/i
+
+interface CspViolation {
+  documentUri: string
+  directive: string
+  blockedUri: string
+}
+
+declare global {
+  interface Window {
+    __reportCsp?: (violation: CspViolation) => void
+  }
+}
+
+/**
+ * The queue board in a real browser through the Console session: it opens in a new tab with no login
+ * and no token in the browser, renders under the public base path in both topologies, shows a
+ * permanent read-only mark (also on a bookmark and after a reload), offers no action, hides every
+ * payload/failure channel, and keeps to its own narrow CSP — the one known exception being the
+ * Google Fonts stylesheet that the unmodified board page links, which the CSP blocks.
+ */
+export async function queueBoardJourney(
+  page: Page,
+  { pageUrl, boardPath }: { pageUrl: string; boardPath: string }
+): Promise<void> {
+  const context = page.context()
+  const requests: Array<{ url: string; authorization: boolean }> = []
+  const responses: Array<{ url: string; status: number }> = []
+  const bodies: string[] = []
+  const documents: Array<{ url: string; headers: Record<string, string> }> = []
+  const violations: CspViolation[] = []
+  context.on('request', (request) =>
+    requests.push({ url: request.url(), authorization: Boolean(request.headers().authorization) })
+  )
+  context.on('response', async (response) => {
+    responses.push({ url: response.url(), status: response.status() })
+    if (response.request().resourceType() === 'document' && response.url().includes(boardPath)) {
+      documents.push({ url: response.url(), headers: response.headers() })
+    }
+    if (response.url().includes('/bull-board/') || response.url().includes(boardPath)) {
+      bodies.push(await response.text().catch(() => ''))
+    }
+  })
+  // Reported from every document as it happens: a navigation or reload cannot lose an earlier one.
+  await context.exposeBinding('__reportCsp', (_source, violation: CspViolation) => {
+    violations.push(violation)
+  })
+  await context.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (event) => {
+      window.__reportCsp?.({
+        documentUri: event.documentURI,
+        directive: event.violatedDirective,
+        blockedUri: event.blockedURI,
+      })
+    })
+  })
+  seedDefaultQueue({ waiting: 2, oldestSeconds: 60, paused: false })
+  addFailedDefaultQueueJob()
+  try {
+    await page.goto(pageUrl)
+    await expect(
+      page.getByText('To look at the jobs themselves, open the queue board')
+    ).toBeVisible()
+    await expect(page.getByLabel(/Retrying or deleting jobs and managing queues/)).toBeVisible()
+    const entry = page.getByRole('link', { name: /Open queue board/ })
+    await expect(entry).toHaveAttribute('href', boardPath)
+    await expect(entry).toHaveAttribute('target', '_blank')
+    await expect(entry).toHaveAttribute('rel', 'noopener noreferrer')
+    const rowLinks = page.getByRole('table', { name: 'Background queues' }).getByRole('link', {
+      name: /Open in queue board/,
+    })
+    await expect(rowLinks).toHaveCount(4)
+    await expect(rowLinks.first()).toHaveAttribute('href', `${boardPath}/queue/email`)
+    await expectNoAxeViolations(page)
+
+    // The board opens in a new tab, signed in by the Console session alone.
+    const popup = page.waitForEvent('popup')
+    await entry.click()
+    const board = await popup
+    await board.waitForLoadState('domcontentloaded')
+    expect(new URL(board.url()).pathname).toBe(boardPath)
+    await expect(board.getByText('READ-ONLY').first()).toBeVisible()
+    await expect(board.getByText('email').first()).toBeVisible()
+    await expect(board.getByRole('button', { name: ACTIONS })).toHaveCount(0)
+
+    // The way back to the Console is the last action of the board's header menu, in the visitor's language.
+    const back = board.getByText('Back to Console')
+    await board.getByRole('banner').getByRole('listitem').last().getByRole('button').click()
+    await expect(back).toBeVisible()
+    await expect(board.locator(`a[href="${pageUrl}"]`)).toHaveCount(1)
+    await board.keyboard.press('Escape')
+
+    // A queue page, its failed job and the job's detail: nothing hidden leaks, nothing errors.
+    await board.getByRole('navigation').getByRole('link', { name: 'default' }).click()
+    await expect(board).toHaveURL(new RegExp(`${boardPath}/queue/default`))
+    await board.getByText('Failed').first().click()
+    await expect(board.getByText('e2e-failed').first()).toBeVisible()
+    await board.getByText('e2e-failed').first().click()
+    await expect(board.getByText('Failure details are not displayed in this board.')).toBeVisible()
+    await board.getByRole('tab', { name: 'Data' }).click()
+    await expect(board.getByText('[hidden]').first()).toBeVisible()
+    await board.getByRole('tab', { name: 'Logs' }).click()
+    await expect(board.getByText('Logs are not displayed in this board.')).toBeVisible()
+    await expect(board.locator('body')).not.toContainText(BOARD_CANARY)
+    await expect(board.locator('body')).not.toContainText('secret.js')
+
+    // The mark survives a reload, and a bookmark (a direct load of a deep link) works.
+    await board.reload()
+    await expect(board.getByText('READ-ONLY').first()).toBeVisible()
+    await board.goto(`${new URL(board.url()).origin}${boardPath}/queue/email`)
+    await expect(board.getByText('READ-ONLY').first()).toBeVisible()
+    await expect(board.getByText('email').first()).toBeVisible()
+
+    // Document response, fetched by the page itself (cookies as a browser sends them): the board's own
+    // policy and no caching. `Set-Cookie` is never readable by script; the BFF unit tests prove it is
+    // stripped, and the cookie checks below prove no backend cookie reached the browser.
+    const entryDocument = await board.evaluate(async (path) => {
+      const response = await fetch(path, { headers: { accept: 'text/html' } })
+      return {
+        status: response.status,
+        csp: response.headers.get('content-security-policy'),
+        cache: response.headers.get('cache-control'),
+      }
+    }, `${boardPath}/`)
+    expect(entryDocument.status).toBe(200)
+    expect(entryDocument.csp).toContain("script-src 'self'")
+    expect(entryDocument.csp).toContain("frame-ancestors 'none'")
+    expect(entryDocument.cache).toBe('private, no-store')
+
+    // Containment: no token in any request, no backend cookie readable, no payload in any body.
+    expect(requests.filter((request) => request.authorization)).toEqual([])
+    const names = (await context.cookies()).map((cookie) => cookie.name)
+    expect(names).not.toContain('refresh_token')
+    expect(await board.evaluate(() => document.cookie)).not.toContain('refresh_token')
+    expect(bodies.join('\n')).not.toContain(BOARD_CANARY)
+    expect(bodies.join('\n')).not.toContain('secret.js')
+
+    // Every data request the board's UI made was answered: no closed route is one the UI depends on.
+    const refused = responses.filter(
+      (response) => response.url.includes(`${boardPath}/api/`) && response.status >= 400
+    )
+    expect(refused).toEqual([])
+
+    // Every board document the browser loaded (the popup, the reload, the bookmark) carried exactly one
+    // Content-Security-Policy, the board's own, and the same fixed security headers.
+    expect(documents.length).toBeGreaterThanOrEqual(3)
+    for (const document of documents) {
+      expect(document.headers['content-security-policy']).toBe(BULL_BOARD_CONTENT_SECURITY_POLICY)
+      expect(document.headers['referrer-policy']).toBe('no-referrer')
+      expect(document.headers['x-content-type-options']).toBe('nosniff')
+      expect(document.headers['cache-control']).toBe('private, no-store')
+      expect(document.headers['set-cookie']).toBeUndefined()
+    }
+
+    const html = await board.evaluate(async (path) => (await fetch(path)).text(), `${boardPath}/`)
+    const relativeScript = /(?:src|href)="([^"]*static[^"]+\.js)"/.exec(html)?.[1]
+    expect(relativeScript).toBeDefined()
+    const assetUrl = relativeScript!.startsWith('/')
+      ? relativeScript!
+      : `${boardPath}/${relativeScript!}`
+    // Static files revalidate; a file that does not exist is a plain 404 whose body is the Console's own
+    // standard error with a fixed message (the bridge never relays the API's body, so no framework text
+    // such as "Cannot GET" and no stack).
+    // Both the API and the bridge's independently created error forbid storing the failed answer.
+    const files = await board.evaluate(
+      async ({ path, script }) => {
+        const found = await fetch(script)
+        const missing = await fetch(`${path}/static/js/does-not-exist.js`)
+        const head = await fetch(`${path}/static/js/does-not-exist.js`, { method: 'HEAD' })
+        return {
+          foundCache: found.headers.get('cache-control'),
+          foundStatus: found.status,
+          missingStatus: missing.status,
+          missingBody: await missing.text(),
+          missingCache: missing.headers.get('cache-control'),
+          missingCsp: missing.headers.get('content-security-policy'),
+          missingCorp: missing.headers.get('cross-origin-resource-policy'),
+          headStatus: head.status,
+          headCache: head.headers.get('cache-control'),
+          headCsp: head.headers.get('content-security-policy'),
+          headBody: await head.text(),
+        }
+      },
+      { path: boardPath, script: assetUrl }
+    )
+    expect(files.foundStatus).toBe(200)
+    expect(files.foundCache).toBe('private, no-cache')
+    expect(files.missingStatus).toBe(404)
+    expect(files.missingCache).toBe('private, no-store')
+    expect(files.missingCsp).toBe(BULL_BOARD_CONTENT_SECURITY_POLICY)
+    expect(files.missingCorp).toBe('same-origin')
+    expect(files.headStatus).toBe(404)
+    expect(files.headCache).toBe('private, no-store')
+    expect(files.headCsp).toBe(BULL_BOARD_CONTENT_SECURITY_POLICY)
+    expect(files.headBody).toBe('')
+    expect(JSON.parse(files.missingBody)).toMatchObject({ message: 'Queue board unavailable' })
+    expect(files.missingBody).not.toContain('Cannot GET')
+    expect(files.missingBody).not.toContain('stack')
+
+    // CSP: in EVERY document the only violation is the known Google Fonts stylesheet, by its exact URL
+    // and directive, exactly once; and nothing is ever received from a Google font host.
+    const stylesheet = /href="(https:\/\/fonts\.googleapis\.com\/[^"]+)"/.exec(html)?.[1]
+    expect(stylesheet).toBeDefined()
+    expect(violations.length).toBeGreaterThanOrEqual(3)
+    for (const violation of violations) {
+      expect(violation.directive).toBe(KNOWN_FONT_DIRECTIVE)
+      expect(violation.blockedUri).toBe(stylesheet)
+    }
+    // One violation per loaded document instance: for each URL, as many violations as document loads.
+    const count = (values: string[]) =>
+      values.reduce(
+        (acc, value) => acc.set(value, (acc.get(value) ?? 0) + 1),
+        new Map<string, number>()
+      )
+    expect(count(violations.map((violation) => violation.documentUri))).toEqual(
+      count(documents.map((document) => document.url))
+    )
+    expect(responses.filter((response) => GOOGLE_FONTS.test(response.url))).toEqual([])
+    await board.close()
   } finally {
     clearDefaultQueue()
   }

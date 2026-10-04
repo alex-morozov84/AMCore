@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import type { AdminQueuesResponse } from '@amcore/shared'
 
-import { QueueObservationService } from '@/infrastructure/queue'
+import { BULL_BOARD_MOUNT, QueueObservationService } from '@/infrastructure/queue'
 
 /**
  * Console Background work summary. A failing row is typed `unavailable` data inside a 200,
@@ -15,6 +15,11 @@ export class AdminQueuesService {
 
   async list(): Promise<AdminQueuesResponse> {
     const queues = await this.observation.observe()
-    return { checkedAt: new Date().toISOString(), queues }
+    // `board.state` is the ONE startup decision about mounting, never a re-read of the environment.
+    return {
+      checkedAt: new Date().toISOString(),
+      board: { state: BULL_BOARD_MOUNT.mounted ? 'available' : 'disabled' },
+      queues,
+    }
   }
 }

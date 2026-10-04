@@ -43,9 +43,22 @@
 		}
 	}
 
+	# The queue board's root has a trailing slash (its page base). Next.js would redirect it to the
+	# slashless address and that redirect names the physical /api/console/ path, so the root is
+	# mapped to the slashless physical route here, query preserved.
+	@consoleBoardRoot path /api/bull-board/
+	handle @consoleBoardRoot {
+		rewrite * /api/console/bull-board
+		reverse_proxy web:3000 {
+			header_up Host {host}
+		}
+	}
+
 	@consoleApi path /api/*
 	handle @consoleApi {
-		uri replace /api/ /api/console/
+		# Only the FIRST /api/: the queue board's own data paths (/api/bull-board/api/queues) contain a
+		# second one, and Caddy replaces every occurrence unless it is given a limit.
+		uri replace /api/ /api/console/ 1
 		reverse_proxy web:3000 {
 			header_up Host {host}
 		}

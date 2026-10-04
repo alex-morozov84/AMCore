@@ -3,10 +3,15 @@
  *
  * Pure decision so it is unit-testable without importing the heavy queue
  * module. Disabled in production unless `ENABLE_BULL_BOARD=true` — the router
- * and placeholder controller are then absent from the module graph (zero
- * attack surface). Always enabled outside production, but still auth-protected
- * by the Bull Board middleware. **Never** mounted on the `worker` role, which
- * exposes a health-only HTTP surface.
+ * is then absent from the module graph (zero attack surface). Always enabled
+ * outside production, but still auth-protected by the Bull Board middleware.
+ * **Never** mounted on the `worker` role, which exposes a health-only HTTP
+ * surface.
+ *
+ * The Board has no writable mode: every adapter is built read-only and the
+ * HTTP boundary rejects everything but GET/HEAD (see "Bull Board Dashboard" in
+ * the queue README). There is no flag that changes this; the retired
+ * `BULL_BOARD_READ_ONLY` variable is ignored (see `bull-board-legacy-flag.ts`).
  */
 export function isBullBoardEnabled(
   nodeEnv: string | undefined,
@@ -15,16 +20,4 @@ export function isBullBoardEnabled(
 ): boolean {
   if (processRole === 'worker') return false
   return nodeEnv !== 'production' || enableFlag === 'true'
-}
-
-/**
- * Bull Board read-only mode (ADR-047). Secure default: the dashboard renders
- * **read-only** unless an operator explicitly opts into write actions
- * (retry / promote / clean / remove jobs) with `BULL_BOARD_READ_ONLY=false`.
- * Fail-safe — any value other than the literal `'false'` (incl. unset) stays
- * read-only. Read from `process.env` at module-construction time, like the mount
- * gate, so it cannot rely on `EnvService`/`ConfigModule`.
- */
-export function isBullBoardReadOnly(readOnlyFlag: string | undefined): boolean {
-  return readOnlyFlag !== 'false'
 }

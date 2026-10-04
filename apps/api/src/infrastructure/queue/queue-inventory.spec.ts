@@ -1,8 +1,4 @@
-import {
-  BULL_BOARD_QUEUE_NAMES,
-  QUEUE_INVENTORY,
-  type QueueDescriptor,
-} from './constants/queue-inventory.constant'
+import { QUEUE_INVENTORY, type QueueDescriptor } from './constants/queue-inventory.constant'
 import { QueueName } from './constants/queues.constant'
 import { boardQueueNames, enabledQueueNames } from './queue-inventory'
 
@@ -32,16 +28,14 @@ describe('queue inventory', () => {
     expect(enabledQueueNames(disable(QueueName.DEFAULT))).not.toContain(QueueName.DEFAULT)
   })
 
-  it('keeps the stock Bull Board membership unchanged and never adds ai-runs', () => {
-    expect(boardQueueNames()).toEqual([QueueName.DEFAULT, QueueName.EMAIL, QueueName.NOTIFICATIONS])
-    expect(BULL_BOARD_QUEUE_NAMES).not.toContain(QueueName.AI_RUNS)
+  it('puts every enabled queue on the board, the same rule as the Background work rows', () => {
+    expect(boardQueueNames()).toEqual(enabledQueueNames())
+    expect(boardQueueNames()).toContain(QueueName.AI_RUNS)
   })
 
   it('drops a board adapter for a disabled queue so the board cannot resolve a missing token', () => {
-    expect(boardQueueNames(disable(QueueName.DEFAULT))).toEqual([
-      QueueName.EMAIL,
-      QueueName.NOTIFICATIONS,
-    ])
-    expect(boardQueueNames(disable(QueueName.AI_RUNS))).toEqual(boardQueueNames())
+    expect(boardQueueNames(disable(QueueName.DEFAULT))).not.toContain(QueueName.DEFAULT)
+    expect(boardQueueNames(disable(QueueName.AI_RUNS))).not.toContain(QueueName.AI_RUNS)
+    expect(boardQueueNames(disable(QueueName.AI_RUNS))).toContain(QueueName.EMAIL)
   })
 })

@@ -12,12 +12,12 @@ import { QueueStatus } from './QueueStatus'
 
 const NUMERIC = 'text-right tabular-nums'
 
-function Row({ queue }: { queue: AdminQueue }) {
+function Row({ queue, boardHref }: { queue: AdminQueue; boardHref: string | null }) {
   const figures = useQueueFigures(queue)
   return (
     <TableRow>
       <TableCell className="align-top whitespace-normal">
-        <QueueIdentity queue={queue} />
+        <QueueIdentity queue={queue} boardHref={boardHref} />
       </TableCell>
       <TableCell className="align-top">
         <QueueStatus queue={queue} />
@@ -43,7 +43,13 @@ function HeadWithHelp({ label, help }: { label: string; help: string }) {
 }
 
 /** Desktop presentation (md and up). Hidden with `display: none` below, so assistive tech reads one list. */
-export function QueueTable({ queues }: { queues: AdminQueue[] }) {
+export function QueueTable({
+  queues,
+  boardHrefOf = () => null,
+}: {
+  queues: AdminQueue[]
+  boardHrefOf?: (queue: AdminQueue) => string | null
+}) {
   const t = useTranslations('console.backgroundWork')
   return (
     <div className="hidden rounded-lg border bg-surface-elevated shadow-md md:block">
@@ -67,7 +73,7 @@ export function QueueTable({ queues }: { queues: AdminQueue[] }) {
         </TableHeader>
         <TableBody>
           {queues.map((queue) => (
-            <Row key={queue.name} queue={queue} />
+            <Row key={queue.name} queue={queue} boardHref={boardHrefOf(queue)} />
           ))}
         </TableBody>
       </Table>

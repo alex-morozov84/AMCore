@@ -2,10 +2,11 @@ import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import {
+  backgroundWorkBoardStatesJourney,
   backgroundWorkDegradedJourney,
   backgroundWorkRetryAfterJourney,
 } from '../shared/background-work-intercepted-journeys'
-import { backgroundWorkJourney } from '../shared/background-work-journey'
+import { backgroundWorkJourney, queueBoardJourney } from '../shared/background-work-journey'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { setSystemRole } from './helpers'
@@ -45,6 +46,30 @@ test('host-mode Background work: snapshot, live refresh, containment, responsive
   const { page, close } = await operator(browser, 'console-background-work')
   try {
     await backgroundWorkJourney(page, '/en/background-work')
+  } finally {
+    await close()
+  }
+})
+
+test('host-mode queue board: opens from the Console session, read-only, nothing hidden leaks', async ({
+  browser,
+}) => {
+  test.setTimeout(240_000)
+  const { page, close } = await operator(browser, 'console-queue-board')
+  try {
+    await queueBoardJourney(page, { pageUrl: '/en/background-work', boardPath: '/api/bull-board' })
+  } finally {
+    await close()
+  }
+})
+
+test('host-mode queue board entry follows the live summary: failed open, disabled, enabled again', async ({
+  browser,
+}) => {
+  test.setTimeout(180_000)
+  const { page, close } = await operator(browser, 'console-queue-board-states')
+  try {
+    await backgroundWorkBoardStatesJourney(page, '/en/background-work')
   } finally {
     await close()
   }

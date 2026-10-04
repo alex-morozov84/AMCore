@@ -8,6 +8,7 @@ import { ensureFreshSession } from './ensure-fresh-session'
 import { isClosedOrganizationFamily } from './organization-family'
 import { isTrustedOrigin } from './origin-guard'
 import { forwardRequestHeaders, forwardResponseHeaders } from './proxy-headers'
+import { isQueueBoardRoute } from './queue-board-route'
 import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultLock } from './session-lock'
 import { redisVaultStore } from './session-vault-store'
@@ -34,6 +35,7 @@ export async function proxyToBackend(
   const upstreamUrl = buildUpstreamUrl(pathSegments, request)
   if (
     isCredentialRoute(upstreamUrl) ||
+    isQueueBoardRoute(upstreamUrl) ||
     isClosedOrganizationFamily(upstreamUrl, organizationFamilies, API_URL)
   ) {
     return apiErrorResponse(request, { statusCode: 404, message: 'Not found' })

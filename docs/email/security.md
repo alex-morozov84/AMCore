@@ -43,9 +43,12 @@ already emitted by a provider.
 
 ## Bull Board Implication
 
-Bull Board can display job payloads to authorized operators. Therefore the
-primary safety rule is stronger than "protect Bull Board": secret-bearing
-templates must never be enqueued at all.
+Bull Board lists queued jobs for authorized operators. It is view-only and
+shows a closed list of fields (for a welcome email: template, locale and the
+user id; never the recipient, the name, a failure message or a stack trace), but
+that list is a second line of defence. The primary safety rule is stronger than
+"protect Bull Board" or "filter what it shows": secret-bearing templates must never
+be enqueued at all.
 
 ## Extension Checklist
 

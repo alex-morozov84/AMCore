@@ -21,6 +21,7 @@ export function availableQueue(
   return {
     name,
     kind: name === 'email' ? 'work' : name === 'default' ? 'extension' : 'wake',
+    inBoard: true,
     status: 'available',
     sampledAt: CHECKED_AT,
     paused: false,
@@ -33,17 +34,23 @@ export function availableQueue(
 export const unavailableQueue = (name: string): AdminQueue => ({
   name,
   kind: 'wake',
+  inBoard: true,
   status: 'unavailable',
 })
 
 export const disabledQueue = (name: string): AdminQueue => ({
   name,
   kind: 'extension',
+  inBoard: false,
   status: 'disabled',
 })
 
-export function summary(queues: AdminQueue[], checkedAt: string = CHECKED_AT): AdminQueuesResponse {
-  return { checkedAt, queues }
+export function summary(
+  queues: AdminQueue[],
+  checkedAt: string = CHECKED_AT,
+  boardState: AdminQueuesResponse['board']['state'] = 'available'
+): AdminQueuesResponse {
+  return { checkedAt, board: { state: boardState }, queues }
 }
 
 /** All four stock queues, one of each interesting state. */
