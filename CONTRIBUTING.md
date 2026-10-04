@@ -178,6 +178,9 @@ chore: unify github repository url
    in the PR description or handoff, or say explicitly why none applied. This
    is a review expectation, not a CI check — reviewers should expect to see
    this list for a Next.js-specific PR, not find it enforced automatically.
+   For Turborepo configuration, tasks or CLI changes, likewise list the relevant
+   bundled docs pages checked from the installed `turbo` package (see root
+   `AGENTS.md` → _Turborepo reference_).
 7. **CSP-affecting changes** (a new third-party script/style origin, a
    `shared/ui` addition using `ScrollArea`/`Tabs.Indicator`/`Slider.Thumb`/
    `Select` with `alignItemWithTrigger`, or anything touching
