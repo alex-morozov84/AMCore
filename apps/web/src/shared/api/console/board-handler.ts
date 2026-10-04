@@ -80,6 +80,11 @@ function responseHeaders(upstream: Response): Headers {
   )
   headers.set('Content-Security-Policy', BULL_BOARD_CONTENT_SECURITY_POLICY)
   headers.set('Cross-Origin-Resource-Policy', 'same-origin')
+  // The board's own fixed policy, not the application's general one: a full Referer must never leave
+  // a board page, and the document is neither sniffed nor framed.
+  headers.set('Referrer-Policy', 'no-referrer')
+  headers.set('X-Content-Type-Options', 'nosniff')
+  headers.set('X-Frame-Options', 'DENY')
   return headers
 }
 

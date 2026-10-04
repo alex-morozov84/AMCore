@@ -1,3 +1,4 @@
+import { BULL_BOARD_CONTENT_SECURITY_POLICY } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
 import {
@@ -90,12 +91,19 @@ export async function backgroundWorkJourney(page: Page, url: string): Promise<vo
 }
 
 const GOOGLE_FONTS = /fonts\.(googleapis|gstatic)\.com/
-const KNOWN_FONT_VIOLATION = /^style-src-elem https:\/\/fonts\.googleapis\.com\//
+/** The one stylesheet the unmodified board page links; the board's CSP blocks it by `style-src-elem`. */
+const KNOWN_FONT_DIRECTIVE = 'style-src-elem'
 const ACTIONS = /retry|clean|promote|remove|pause|resume|obliterate|add job|delete|empty/i
+
+interface CspViolation {
+  documentUri: string
+  directive: string
+  blockedUri: string
+}
 
 declare global {
   interface Window {
-    __boardCsp?: string[]
+    __reportCsp?: (violation: CspViolation) => void
   }
 }
 
@@ -114,19 +122,31 @@ export async function queueBoardJourney(
   const requests: Array<{ url: string; authorization: boolean }> = []
   const responses: Array<{ url: string; status: number }> = []
   const bodies: string[] = []
+  const documents: Array<{ url: string; headers: Record<string, string> }> = []
+  const violations: CspViolation[] = []
   context.on('request', (request) =>
     requests.push({ url: request.url(), authorization: Boolean(request.headers().authorization) })
   )
   context.on('response', async (response) => {
     responses.push({ url: response.url(), status: response.status() })
+    if (response.request().resourceType() === 'document' && response.url().includes(boardPath)) {
+      documents.push({ url: response.url(), headers: response.headers() })
+    }
     if (response.url().includes('/bull-board/') || response.url().includes(boardPath)) {
       bodies.push(await response.text().catch(() => ''))
     }
   })
+  // Reported from every document as it happens: a navigation or reload cannot lose an earlier one.
+  await context.exposeBinding('__reportCsp', (_source, violation: CspViolation) => {
+    violations.push(violation)
+  })
   await context.addInitScript(() => {
-    window.__boardCsp = []
     document.addEventListener('securitypolicyviolation', (event) => {
-      window.__boardCsp?.push(`${event.violatedDirective} ${event.blockedURI}`)
+      window.__reportCsp?.({
+        documentUri: event.documentURI,
+        directive: event.violatedDirective,
+        blockedUri: event.blockedURI,
+      })
     })
   })
   seedDefaultQueue({ waiting: 2, oldestSeconds: 60, paused: false })
@@ -216,11 +236,32 @@ export async function queueBoardJourney(
     )
     expect(refused).toEqual([])
 
-    // CSP: the only violation is the known Google Fonts stylesheet, once per document, and nothing is
-    // ever received from a Google font host.
-    const violations = (await board.evaluate(() => window.__boardCsp ?? [])) as string[]
-    expect(violations.filter((violation) => !KNOWN_FONT_VIOLATION.test(violation))).toEqual([])
-    expect(violations.length).toBeLessThanOrEqual(1)
+    // Every board document the browser loaded (the popup, the reload, the bookmark) carried exactly one
+    // Content-Security-Policy, the board's own, and the same fixed security headers.
+    expect(documents.length).toBeGreaterThanOrEqual(3)
+    for (const document of documents) {
+      expect(document.headers['content-security-policy']).toBe(BULL_BOARD_CONTENT_SECURITY_POLICY)
+      expect(document.headers['referrer-policy']).toBe('no-referrer')
+      expect(document.headers['x-content-type-options']).toBe('nosniff')
+      expect(document.headers['cache-control']).toBe('private, no-store')
+      expect(document.headers['set-cookie']).toBeUndefined()
+    }
+
+    // CSP: in EVERY document the only violation is the known Google Fonts stylesheet, by its exact URL
+    // and directive, exactly once; and nothing is ever received from a Google font host.
+    const html = await board.evaluate(async (path) => (await fetch(path)).text(), `${boardPath}/`)
+    const stylesheet = /href="(https:\/\/fonts\.googleapis\.com\/[^"]+)"/.exec(html)?.[1]
+    expect(stylesheet).toBeDefined()
+    expect(violations.length).toBeGreaterThanOrEqual(3)
+    for (const violation of violations) {
+      expect(violation.directive).toBe(KNOWN_FONT_DIRECTIVE)
+      expect(violation.blockedUri).toBe(stylesheet)
+    }
+    const perDocument = new Map<string, number>()
+    for (const violation of violations) {
+      perDocument.set(violation.documentUri, (perDocument.get(violation.documentUri) ?? 0) + 1)
+    }
+    expect([...perDocument.values()].filter((count) => count !== 1)).toEqual([])
     expect(responses.filter((response) => GOOGLE_FONTS.test(response.url))).toEqual([])
     await board.close()
   } finally {

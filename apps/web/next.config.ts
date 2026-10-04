@@ -132,6 +132,14 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // The queue board's own document policy: its pages are never to leak a full URL, even same-origin,
+      // so this later rule replaces the baseline's referrer policy for the board only (when two rules
+      // set the same key the last one wins). The bridge sets the same value; without this rule the
+      // baseline would overwrite it on the wire.
+      {
+        source: '/api/console/bull-board/:path*',
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      },
       {
         source: '/sw.js',
         headers: [

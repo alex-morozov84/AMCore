@@ -4,7 +4,7 @@ import { getConsoleQueueBoardHref } from '@/shared/lib/console-public-href'
 
 /**
  * What the queue board entry shows. One rule decides it, top to bottom, first match wins:
- * 1. `none`: no live data (access is being re-verified or was lost) — only the standing note.
+ * 1. `none`: no live data (access is being re-verified or was lost) — no board entry at all.
  *    Losing access is never turned into "disabled" or "could not open".
  * 2. `disabled`: the FRESH summary confirms the board was not mounted at API startup. It outranks
  *    the historical "could not open" marker, which only says an earlier attempt failed.

@@ -134,6 +134,9 @@ describe('board bridge — what reaches the browser', () => {
     expect(response.headers.get('content-security-policy')).toBe(BULL_BOARD_CONTENT_SECURITY_POLICY)
     expect(response.headers.get('cache-control')).toBe('private, no-store')
     expect(response.headers.get('cross-origin-resource-policy')).toBe('same-origin')
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer')
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(response.headers.get('x-frame-options')).toBe('DENY')
     expect(response.headers.get('content-type')).toBe('application/json')
     for (const name of ['set-cookie', 'location', 'x-powered-by']) {
       expect(response.headers.get(name)).toBeNull()
