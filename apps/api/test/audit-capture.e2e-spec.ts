@@ -159,7 +159,7 @@ describe('Audit capture points (e2e)', () => {
     expect(createdAudit?.metadata).toMatchObject({
       actorCredentialType: 'jwt',
       branch: 'pending_known_user',
-      emailHash: expect.any(String),
+      emailHash: createHash('sha256').update('invitee@example.com').digest('hex'),
       pinoEvent: 'org.invite.created',
     })
 
@@ -173,7 +173,7 @@ describe('Audit capture points (e2e)', () => {
       findAudit(await auditRowsSince(revokeBaseline), 'org.invite_revoked')?.metadata
     ).toMatchObject({
       actorCredentialType: 'jwt',
-      emailHash: expect.any(String),
+      emailHash: createHash('sha256').update('invitee@example.com').digest('hex'),
       pinoEvent: 'org.invite.revoked',
     })
 
@@ -189,7 +189,7 @@ describe('Audit capture points (e2e)', () => {
       findAudit(await auditRowsSince(acceptBaseline), 'org.invite_accepted')?.metadata
     ).toMatchObject({
       actorCredentialType: 'jwt',
-      emailHash: expect.any(String),
+      emailHash: createHash('sha256').update('invitee@example.com').digest('hex'),
       pinoEvent: 'org.invite.accepted',
       roleId: expect.any(String),
     })
@@ -215,7 +215,7 @@ describe('Audit capture points (e2e)', () => {
     expect(await auditRowsSince(baseline)).toHaveLength(0)
   })
 
-  it('keeps best-effort actions successful when audit persistence fails', async () => {
+  it('rolls back invitation revocation when transactional audit persistence fails', async () => {
     const admin = await register('best-effort@example.com')
     const orgId = await createOrganization(admin.token)
     const orgToken = await switchOrganization(admin.token, orgId)
@@ -227,7 +227,6 @@ describe('Audit capture points (e2e)', () => {
 
     const invite = await prisma.orgInvite.findFirstOrThrow({
       where: { organizationId: orgId, emailCanonical: 'pending@example.com' },
-      select: { id: true, revokedAt: true },
     })
     const baseline = await prisma.auditLog.count()
     await blockAuditInserts()
@@ -235,13 +234,12 @@ describe('Audit capture points (e2e)', () => {
     await request(app.getHttpServer())
       .delete(`/organizations/${orgId}/invites/${invite.id}`)
       .set('Authorization', `Bearer ${orgToken}`)
-      .expect(204)
+      .expect(503)
 
     const revoked = await prisma.orgInvite.findUniqueOrThrow({
       where: { id: invite.id },
-      select: { revokedAt: true },
     })
-    expect(revoked.revokedAt).not.toBeNull()
+    expect(revoked).toEqual(invite)
     expect(await auditRowsSince(baseline)).toHaveLength(0)
   })
 
@@ -296,13 +294,14 @@ describe('Audit capture points (e2e)', () => {
 
   async function seedInvite(orgId: string, invitedById: string, email: string) {
     const rawToken = randomBytes(32).toString('base64url')
+    const role = await prisma.role.findFirstOrThrow({ where: { name: 'MEMBER', isSystem: true } })
     await prisma.orgInvite.create({
       data: {
         organizationId: orgId,
         email,
         emailCanonical: email,
         invitedById,
-        roleId: null,
+        roleId: role.id,
         tokenHash: createHash('sha256').update(rawToken).digest('hex'),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },

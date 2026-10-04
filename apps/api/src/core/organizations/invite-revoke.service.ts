@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { Injectable } from '@nestjs/common'
 
 import {
@@ -51,7 +53,11 @@ export class InviteRevokeService {
           organizationId: orgId,
           targetId: inviteId,
           targetType: AuditTargetType.ORG_INVITE,
-          metadata: { actorCredentialType: actor.principal.type, pinoEvent: 'org.invite.revoked' },
+          metadata: {
+            actorCredentialType: actor.principal.type,
+            emailHash: createHash('sha256').update(invite.emailCanonical).digest('hex'),
+            pinoEvent: 'org.invite.revoked',
+          },
         },
         { tx }
       )

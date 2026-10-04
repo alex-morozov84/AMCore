@@ -135,7 +135,11 @@ export function registerTransitionsProofs(getFixture: () => InvitationProofFixtu
           actorId: owner.sub,
           organizationId: orgId,
           targetId: invite.id,
-          metadata: { actorCredentialType: 'jwt', pinoEvent: 'org.invite.revoked' },
+          metadata: {
+            actorCredentialType: 'jwt',
+            emailHash: createHash('sha256').update(invite.emailCanonical).digest('hex'),
+            pinoEvent: 'org.invite.revoked',
+          },
         }),
       ])
       const issuance = await prisma.auditLog.findMany({

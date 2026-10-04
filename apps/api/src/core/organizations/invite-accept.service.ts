@@ -137,6 +137,7 @@ export class InviteAcceptService {
         targetType: AuditTargetType.ORG_INVITE,
         metadata: {
           actorCredentialType: actor.type,
+          emailHash: createHash('sha256').update(invite.emailCanonical).digest('hex'),
           roleId: claimed[0].roleId,
           pinoEvent: 'org.invite.accepted',
         },
