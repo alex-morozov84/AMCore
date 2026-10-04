@@ -1,11 +1,8 @@
 import { type BoardRenderContext, parseBoardRenderContext } from '@amcore/shared'
 
-import { getPathname } from '@/i18n/navigation'
-import { routing } from '@/i18n/routing'
-import {
-  getConsoleBackgroundWorkHref,
-  getConsoleQueueBoardBasePath,
-} from '@/shared/lib/console-public-href'
+import { getConsoleQueueBoardBasePath } from '@/shared/lib/console-public-href'
+
+import { consoleBackgroundWorkPath, readBoardLocale } from './board-locale'
 
 import 'server-only'
 
@@ -49,22 +46,11 @@ export function buildBoardUpstreamUrl(
   return url
 }
 
-function readLocale(request: Request): (typeof routing.locales)[number] {
-  const cookie = request.headers.get('cookie') ?? ''
-  const value = /(?:^|;\s*)NEXT_LOCALE=([^;]*)/.exec(cookie)?.[1]
-  return routing.locales.find((locale) => locale === value) ?? routing.defaultLocale
-}
-
-/** Where a failed or hidden open sends a document navigation back to: the Background work page. */
-export function consoleBackgroundWorkPath(request: Request): string {
-  return getPathname({ href: getConsoleBackgroundWorkHref(), locale: readLocale(request) })
-}
-
 /** The render context the API needs: public base path, language and the way back to the Console. */
 export function buildBoardRenderContext(request: Request): BoardRenderContext | null {
   return parseBoardRenderContext({
     basePath: getConsoleQueueBoardBasePath(),
-    locale: readLocale(request),
+    locale: readBoardLocale(request),
     returnHref: consoleBackgroundWorkPath(request),
   })
 }

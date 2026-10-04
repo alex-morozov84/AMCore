@@ -2,15 +2,22 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
-vi.mock('@/i18n/navigation', () => ({
-  getPathname: ({ href, locale }: { href: string; locale: string }) => `/${locale}${href}`,
-}))
+vi.mock('./board-locale', () => {
+  // The language and the path back to Background work, as the locale module answers them in a
+  // multi-locale build; its own tests cover the real thing in whichever mode is generated.
+  const readBoardLocale = (request: Request) =>
+    (request.headers.get('cookie') ?? '').includes('NEXT_LOCALE=ru') ? 'ru' : 'en'
+  return {
+    readBoardLocale,
+    consoleBackgroundWorkPath: (request: Request) =>
+      `/${readBoardLocale(request)}/admin/background-work`,
+  }
+})
 
 import {
   BOARD_UPSTREAM_PATH,
   buildBoardRenderContext,
   buildBoardUpstreamUrl,
-  consoleBackgroundWorkPath,
   encodeBoardRenderContext,
 } from './board-upstream'
 
@@ -82,16 +89,6 @@ describe('board render context', () => {
       locale: 'ru',
       returnHref: '/ru/admin/background-work',
     })
-  })
-
-  it('falls back to the default locale for an absent or unknown cookie value', () => {
-    for (const cookie of [undefined, 'NEXT_LOCALE=de', 'NEXT_LOCALE=', 'other=1']) {
-      expect(buildBoardRenderContext(request(cookie))?.locale).toBe('en')
-    }
-  })
-
-  it('points a document that cannot be shown at the same page', () => {
-    expect(consoleBackgroundWorkPath(request('NEXT_LOCALE=ru'))).toBe('/ru/admin/background-work')
   })
 
   it('encodes as base64url JSON the API can read back', () => {

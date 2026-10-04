@@ -5,10 +5,10 @@ import { AMCORE_CLIENT_IP_HEADER } from '@/shared/api/bff/proxy-headers'
 import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
 
 import { resolveConsoleAccessToken } from './authenticated-proxy'
+import { consoleBackgroundWorkPath } from './board-locale'
 import {
   buildBoardRenderContext,
   buildBoardUpstreamUrl,
-  consoleBackgroundWorkPath,
   encodeBoardRenderContext,
 } from './board-upstream'
 

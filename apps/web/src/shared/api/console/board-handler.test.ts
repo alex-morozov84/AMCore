@@ -3,9 +3,17 @@ import { BULL_BOARD_CONTENT_SECURITY_POLICY, BULL_BOARD_CONTEXT_HEADER } from '@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
-vi.mock('@/i18n/navigation', () => ({
-  getPathname: ({ href, locale }: { href: string; locale: string }) => `/${locale}${href}`,
-}))
+vi.mock('./board-locale', () => {
+  // The language and the path back to Background work, as the locale module answers them in a
+  // multi-locale build; its own tests cover the real thing in whichever mode is generated.
+  const readBoardLocale = (request: Request) =>
+    (request.headers.get('cookie') ?? '').includes('NEXT_LOCALE=ru') ? 'ru' : 'en'
+  return {
+    readBoardLocale,
+    consoleBackgroundWorkPath: (request: Request) =>
+      `/${readBoardLocale(request)}/admin/background-work`,
+  }
+})
 vi.mock('./authenticated-proxy', () => ({ resolveConsoleAccessToken: vi.fn() }))
 
 import { resolveConsoleAccessToken } from './authenticated-proxy'
