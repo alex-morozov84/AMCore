@@ -15,6 +15,22 @@ export function getConsoleBackgroundWorkHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/background-work`
 }
 
+/**
+ * Where the browser reaches the read-only queue board. It is served by the Console BFF route
+ * `app/api/console/bull-board`; in host mode the edge maps `/api/*` to `/api/console/*`, so the
+ * public path has no `console` segment. Not configurable by an environment variable: the board
+ * renders under this path, so changing it means changing this function, the BFF route and the proxy
+ * rules together. No trailing slash: the page's `<base>` adds it.
+ */
+export function getConsoleQueueBoardBasePath(): string {
+  return ADMIN_CONSOLE_CONFIG.mode === 'host' ? '/api/bull-board' : '/api/console/bull-board'
+}
+
+/** Entry address of the queue board (the page, not an API). */
+export function getConsoleQueueBoardHref(): string {
+  return `${getConsoleQueueBoardBasePath()}/`
+}
+
 /** Same topology rule as {@link getConsoleOverviewHref}, for the Organizations panel. */
 export function getConsoleOrganizationsHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/organizations`
