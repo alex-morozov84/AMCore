@@ -294,7 +294,7 @@ is changed through the board.
 
 An error never carries a message or a stack: after the Board's own response validation every status
 `>= 400` is reduced to `{ "error": { "key": "ERRORS.…" } }`. The board's HTML page is rendered with
-a callback, so a failing render is answered with the same fixed `500`.
+a callback, so a failing render is answered with the same fixed `500`. The router ends with a terminal `404` and an error handler, and the guard refuses an undecodable path with a `400`, so a missing static file or a malformed address gets the same fixed body instead of the application's general not-found response (which names the requested URL).
 
 To show the payload of a queue you add, write a projection that rebuilds a small object from
 validated fields (identifiers and categories, never addresses, names, tokens or free text) and add

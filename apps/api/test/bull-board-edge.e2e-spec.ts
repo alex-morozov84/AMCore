@@ -1,6 +1,8 @@
+import { jest } from '@jest/globals'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
+import { AllExceptionsFilter } from '../src/common/exceptions/filters/all-exceptions.filter'
 import type { PrismaService } from '../src/prisma'
 
 import { CANARY, superAdminCookie } from './bull-board.helper'
@@ -35,11 +37,11 @@ describe('queue board — early responses of the mount (production order)', () =
 
   const server = () => request(app.getHttpServer())
 
-  function expectBoardHeaders(headers: Record<string, string>): void {
+  function expectBoardHeaders(headers: Record<string, string>, cache = 'private, no-store'): void {
     expect(headers['content-security-policy']).toContain("script-src 'self'")
     expect(headers['content-security-policy']).toContain("frame-ancestors 'none'")
     expect(headers['referrer-policy']).toBe('no-referrer')
-    expect(headers['cache-control']).toBe('private, no-store')
+    expect(headers['cache-control']).toBe(cache)
     expect(headers['cross-origin-resource-policy']).toBe('same-origin')
     expect(headers['x-frame-options']).toBe('DENY')
     expect(headers['access-control-allow-origin']).toBeUndefined()
@@ -109,5 +111,54 @@ describe('queue board — early responses of the mount (production order)', () =
     expect(res.status).toBe(400)
     expect(res.headers['content-security-policy'] ?? '').not.toContain("script-src 'self'")
     expect(res.headers['cache-control'] ?? '').not.toBe('private, no-store')
+  })
+
+  describe('static files of the board', () => {
+    let asset: string
+
+    beforeAll(async () => {
+      const page = await server().get(BOARD_ROOT).set('Cookie', cookie)
+      const relative = /(?:src|href)="([^"]*static[^"]+\.js)"/.exec(page.text)?.[1]
+      if (!relative) throw new Error('the board page links no static script')
+      asset = relative.startsWith('/') ? relative : `${BOARD_ROOT}/${relative}`
+    })
+
+    afterEach(() => jest.restoreAllMocks())
+
+    it('serves an existing file, GET and HEAD, revalidating and with the board headers', async () => {
+      const res = await server().get(asset).set('Cookie', cookie)
+      expect(res.status).toBe(200)
+      expect(res.headers['content-type']).toMatch(/javascript/)
+      expectBoardHeaders(res.headers, 'private, no-cache')
+      const head = await server().head(asset).set('Cookie', cookie)
+      expect(head.status).toBe(200)
+      expect(head.text ?? '').toBe('')
+      expectBoardHeaders(head.headers, 'private, no-cache')
+    })
+
+    it('answers a missing file with the board error, not the application filter', async () => {
+      const filter = jest.spyOn(AllExceptionsFilter.prototype, 'catch')
+      const url = `${BOARD_ROOT}/static/js/${CANARY}.js`
+      const res = await server().get(url).set('Cookie', cookie)
+      expect(res.status).toBe(404)
+      expect(res.body).toEqual({ error: { key: 'ERRORS.QUEUE_NOT_FOUND' } })
+      expect(res.text).not.toContain(CANARY)
+      expect(res.text).not.toContain('Cannot GET')
+      expectBoardHeaders(res.headers)
+      const head = await server().head(url).set('Cookie', cookie)
+      expect(head.status).toBe(404)
+      expect(head.text ?? '').toBe('')
+      expectBoardHeaders(head.headers)
+      expect(filter).not.toHaveBeenCalled()
+    })
+
+    it('answers an undecodable path with the board error too', async () => {
+      const filter = jest.spyOn(AllExceptionsFilter.prototype, 'catch')
+      const res = await server().get(`${BOARD_ROOT}/static/%E0%A4%A.js`).set('Cookie', cookie)
+      expect(res.status).toBe(400)
+      expect(res.body).toEqual({ error: { key: 'ERRORS.INVALID_QUERY_PARAM' } })
+      expectBoardHeaders(res.headers)
+      expect(filter).not.toHaveBeenCalled()
+    })
   })
 })

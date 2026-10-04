@@ -24,6 +24,15 @@ async function serve(): Promise<{ base: string; server: Server; parsed: () => nu
     }
     next()
   })
+  app.get('/admin/queues/static/ok.js', (_req, res) => {
+    // What the boundary does for a static file before the static middleware answers.
+    res.setHeader('Cache-Control', 'private, no-cache')
+    res.type('js').send('1')
+  })
+  app.get('/admin/queues/static/missing.js', (_req, res) => {
+    res.setHeader('Cache-Control', 'private, no-cache')
+    res.status(404).json({ error: { key: 'ERRORS.QUEUE_NOT_FOUND' } })
+  })
   app.all('/admin/queues/*path', (req, res) => {
     parsed += 1
     res.status(200).json({ ok: true })
@@ -90,6 +99,28 @@ describe('board edge guard', () => {
     expect(res.headers.get('cross-origin-resource-policy')).toBe('same-origin')
     expect(res.headers.get('access-control-allow-origin')).toBeNull()
     expect(res.headers.get('access-control-allow-credentials')).toBeNull()
+  })
+
+  it('refuses an undecodable path with the board error, before the routing layer', async () => {
+    const res = await fetch(`${ctx.base}/admin/queues/static/%E0%A4%A.js`)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: { key: 'ERRORS.INVALID_QUERY_PARAM' } })
+    expect(res.headers.get('cache-control')).toBe('private, no-store')
+  })
+
+  it('keeps the one cache choice the board makes: a successful static file revalidates', async () => {
+    const ok = await fetch(`${ctx.base}/admin/queues/static/ok.js`)
+    expect(ok.status).toBe(200)
+    expect(ok.headers.get('cache-control')).toBe('private, no-cache')
+    expect(ok.headers.get('referrer-policy')).toBe('no-referrer')
+    const head = await fetch(`${ctx.base}/admin/queues/static/ok.js`, { method: 'HEAD' })
+    expect(head.headers.get('cache-control')).toBe('private, no-cache')
+  })
+
+  it('never stores a failed static answer, even if the boundary had marked it revalidating', async () => {
+    const missing = await fetch(`${ctx.base}/admin/queues/static/missing.js`)
+    expect(missing.status).toBe(404)
+    expect(missing.headers.get('cache-control')).toBe('private, no-store')
   })
 
   it('leaves every other path alone', async () => {

@@ -21,8 +21,10 @@ export const BOARD_LOCALE_HEADER = 'x-amcore-board-locale'
  * Headers every response of the mount carries. `setHeader` (not append) so the board's policy
  * replaces whatever an earlier global middleware (e.g. Helmet) already set.
  */
-export function applyBoardHeaders(res: Response): void {
-  res.setHeader('Cache-Control', 'private, no-store')
+export function applyBoardHeaders(res: Response, revalidate = false): void {
+  // `revalidate` is the board's static files (own scripts and styles): the browser may keep them but
+  // must ask again before using them. Everything else, refusals and errors included, is never stored.
+  res.setHeader('Cache-Control', revalidate ? 'private, no-cache' : 'private, no-store')
   res.setHeader('Content-Security-Policy', BULL_BOARD_CONTENT_SECURITY_POLICY)
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('Referrer-Policy', 'no-referrer')

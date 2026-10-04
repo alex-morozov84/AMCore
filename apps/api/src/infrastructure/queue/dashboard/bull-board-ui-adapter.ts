@@ -1,6 +1,6 @@
 import type { AppControllerRoute, AppViewRoute, UIConfig } from '@bull-board/api/typings/app'
 import { ExpressAdapter } from '@bull-board/express'
-import type { Request, Response } from 'express'
+import type { NextFunction, Request, Response } from 'express'
 
 import type { BoardRequestLocals } from './bull-board-boundary.middleware'
 import { boardCopy, boardLanguage } from './bull-board-copy'
@@ -20,7 +20,7 @@ function sendHtml(res: Response, html: string): void {
 }
 
 /**
- * The queue board's Express adapter: the stock `ExpressAdapter` plus three seams.
+ * The queue board's Express adapter: the stock `ExpressAdapter` plus four seams.
  *
  * 1. `setApiRoutes` wraps every route handler in the FINAL boundary (`withFinalBoundary`), which sees
  *    the result after the Board's response validation and reduces any error to `{ error: { key } }`.
@@ -29,8 +29,32 @@ function sendHtml(res: Response, html: string): void {
  *    read-only label and the way back to the Console come from the request's validated render context
  *    (never from global state), and a render failure — synchronous or asynchronous — is answered with
  *    a fixed 500 instead of being handed to `next(err)`.
+ * 4. `getRouter` ends the router with a terminal 404 and an error handler. A request that no board
+ *    route and no static file answers (a missing asset) would otherwise fall out of the mount into the
+ *    application's general not-found handling, whose answer names the requested URL.
  */
 export class QueueBoardAdapter extends ExpressAdapter {
+  private terminated = false
+
+  override getRouter(): ReturnType<ExpressAdapter['getRouter']> {
+    const router = super.getRouter()
+    if (!this.terminated) {
+      this.terminated = true
+      router.use((_req: Request, res: Response) => {
+        res.status(404).json(safeErrorResult(404).body)
+      })
+      router.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+        if (res.headersSent) {
+          next(error)
+          return
+        }
+        const status = clientErrorStatus(error)
+        res.status(status).json(safeErrorResult(status).body)
+      })
+    }
+    return router
+  }
+
   override setApiRoutes(routes: AppControllerRoute[]): ExpressAdapter {
     return super.setApiRoutes(
       routes.map((route) => ({
