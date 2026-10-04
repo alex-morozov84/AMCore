@@ -90,6 +90,16 @@ describe('board boundary middleware', () => {
     expect(reached).toEqual([])
   })
 
+  it('answers the job flow with the board\'s own "not part of a flow" reply, without the router', async () => {
+    const { app, reached } = appWith()
+    const res = await request(app).get(
+      '/admin/queues/api/queues/email/job-7/flow?root=node&depth=3'
+    )
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ nodeId: 'job-7', isFlowNode: false, flowRoot: null })
+    expect(reached).toEqual([])
+  })
+
   it('sets the board headers on every response and replaces an earlier CSP', async () => {
     const { app } = appWith()
     app.use((_req, res, next) => {

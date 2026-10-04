@@ -75,7 +75,6 @@ const CLOSED_PATHS = [
   '/api/queues/email/rate-limit',
   '/api/queues/email/job-data-schema',
   '/api/queues/email/job-schedulers',
-  '/api/queues/default/JOBID/flow',
   '/api/metrics/history',
   '/api/metrics/latency',
   '/metrics-history',
@@ -188,6 +187,13 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
     expect(res.body).toEqual(['Logs are not displayed in this board.'])
     expect(JSON.stringify(res.body)).not.toContain(CANARY)
     expect(readLogs).not.toHaveBeenCalled()
+  })
+
+  it('answers the job flow with the board\'s own "not part of a flow" reply, reading nothing', async () => {
+    const readJob = jest.spyOn(Queue.prototype, 'getJob')
+    const res = await get(`/api/queues/default/${failedJobId}/flow`).expect(200)
+    expect(res.body).toEqual({ nodeId: failedJobId, isFlowNode: false, flowRoot: null })
+    expect(readJob).not.toHaveBeenCalled()
   })
 
   it.each(CLOSED_PATHS)('keeps %s closed', async (path) => {

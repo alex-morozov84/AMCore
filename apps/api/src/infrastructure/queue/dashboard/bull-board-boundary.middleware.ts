@@ -64,7 +64,14 @@ export function createBullBoardBoundary(
       return
     }
     if (decision.kind === 'synthetic') {
-      res.status(200).json([boardCopy(locals.boardContext?.locale).logsHidden])
+      // The board's own "this job is not part of a flow" reply; nothing is read.
+      res
+        .status(200)
+        .json(
+          decision.channel === 'logs'
+            ? [boardCopy(locals.boardContext?.locale).logsHidden]
+            : { nodeId: decision.jobId, isFlowNode: false, flowRoot: null }
+        )
       return
     }
     if (req.path.startsWith('/static/')) res.setHeader('Cache-Control', 'private, no-cache')

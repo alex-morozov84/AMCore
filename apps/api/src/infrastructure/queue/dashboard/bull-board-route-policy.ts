@@ -5,13 +5,15 @@ import { BOARD_STATUSES } from './bull-board-projection'
  * Board code runs). Everything not listed is closed: a route a newer Board version adds is a 404
  * until it is reviewed and added here (`bull-board-upgrade-guard.spec.ts` pins the installed set).
  *
- * The board is a view: only GET/HEAD exist. It shows queues with their jobs and one job's details;
- * job logs are answered with a fixed message without reading them; flows, schedulers, default
- * options, rate limits, workers, Redis stats and metrics are closed.
+ * The board is a view: only GET/HEAD exist. It shows queues with their jobs and one job's details.
+ * Job logs and a job's flow (parents/children, which can span other queues) are answered with a fixed,
+ * schema-valid reply WITHOUT reading anything: the board's job page asks for both. Schedulers,
+ * default options, rate limits, workers, Redis stats and metrics are closed (the UI is configured not
+ * to ask for them).
  */
 export type BoardRouteDecision =
   | { readonly kind: 'pass'; readonly entry: boolean }
-  | { readonly kind: 'synthetic'; readonly channel: 'logs' }
+  | { readonly kind: 'synthetic'; readonly channel: 'logs' | 'flow'; readonly jobId: string }
   | { readonly kind: 'reject'; readonly status: 400 | 404 }
 
 const QUEUE_SEGMENT = /^[A-Za-z0-9:_-]{1,64}$/
@@ -92,7 +94,7 @@ export function decideBoardRoute(path: string, query: URLSearchParams): BoardRou
     if (rest.length > 0 || !queue || !QUEUE_SEGMENT.test(queue)) return REJECT_404
     if (!job || !JOB_SEGMENT.test(job) || RESERVED_JOB_SEGMENTS.has(job)) return REJECT_404
     if (leaf === undefined) return { kind: 'pass', entry: false }
-    if (leaf === 'logs') return { kind: 'synthetic', channel: 'logs' }
+    if (leaf === 'logs' || leaf === 'flow') return { kind: 'synthetic', channel: leaf, jobId: job }
   }
   return REJECT_404
 }

@@ -23,15 +23,17 @@ describe('board route policy', () => {
     expect(decideBoardRoute(path, none)).toEqual(pass(entry))
   })
 
-  it('answers job logs with a fixed message instead of reading them', () => {
-    expect(decideBoardRoute('/api/queues/email/42/logs', none)).toEqual({
-      kind: 'synthetic',
-      channel: 'logs',
-    })
+  it('answers job logs and the job flow with a fixed reply instead of reading them', () => {
+    for (const channel of ['logs', 'flow'] as const) {
+      expect(decideBoardRoute(`/api/queues/email/42/${channel}`, none)).toEqual({
+        kind: 'synthetic',
+        channel,
+        jobId: '42',
+      })
+    }
   })
 
   it.each([
-    '/api/queues/email/42/flow',
     '/api/queues/email/workers',
     '/api/queues/email/metrics',
     '/api/queues/email/default-job-options',
