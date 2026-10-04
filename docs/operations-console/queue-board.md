@@ -132,6 +132,9 @@ names, tokens or free text, and add tests like those beside the shipped ones.
   (never payloads). Treat them as operational data.
 - Everything the board answers carries its own security policy: only its own scripts, no
   framing, no referrer. This is separate from the Console's policy.
+- For a data or asset request that fails, the Console builds its own JSON error with a fixed
+  message and the path you requested; it never forwards the API's error body. These errors carry
+  the board's security policy and `Cache-Control: private, no-store`, including on `HEAD`.
 - The board changes no queue or job state. Counting a queue can make BullMQ itself remove a pre-v5
   legacy marker from the end of a waiting list; that is the one write its reads can cause.
 - The board is a snapshot of Redis state. Its numbers can differ slightly from Background work

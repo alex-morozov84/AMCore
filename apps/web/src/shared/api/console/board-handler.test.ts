@@ -18,6 +18,17 @@ const PAGE = new Request('https://app.example.test/api/console/bull-board/', {
   headers: { accept: 'text/html', cookie: 'NEXT_LOCALE=ru; amcore_session=secret-vault-id' },
 })
 
+function expectBoardErrorHeaders(response: Response): void {
+  expect(response.headers.get('cache-control')).toBe('private, no-store')
+  expect(response.headers.get('content-security-policy')).toBe(BULL_BOARD_CONTENT_SECURITY_POLICY)
+  expect(response.headers.get('cross-origin-resource-policy')).toBe('same-origin')
+  expect(response.headers.get('referrer-policy')).toBe('no-referrer')
+  expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+  expect(response.headers.get('x-frame-options')).toBe('DENY')
+  expect(response.headers.get('set-cookie')).toBeNull()
+  expect(response.headers.get('location')).toBeNull()
+}
+
 function asset(path = 'api/queues', init: RequestInit = {}): Request {
   return new Request(`https://app.example.test/api/console/bull-board/${path}`, {
     headers: {
@@ -100,6 +111,7 @@ describe('board bridge — what reaches the API', () => {
     async (segments) => {
       const response = await handleConsoleBoard(asset(), segments)
       expect(response.status).toBe(404)
+      expectBoardErrorHeaders(response)
       expect(resolveConsoleAccessToken).not.toHaveBeenCalled()
       expect(fetchMock).not.toHaveBeenCalled()
     }
@@ -107,7 +119,9 @@ describe('board bridge — what reaches the API', () => {
 
   it('answers 404 for a query the board never sends', async () => {
     const request = new Request('https://app.example.test/api/console/bull-board/api/queues?x=1')
-    expect((await handleConsoleBoard(request, ['api', 'queues'])).status).toBe(404)
+    const response = await handleConsoleBoard(request, ['api', 'queues'])
+    expect(response.status).toBe(404)
+    expectBoardErrorHeaders(response)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -175,6 +189,7 @@ describe('board bridge — what reaches the browser', () => {
       fetchMock.mockResolvedValue(boardResponse({ csp }))
       const response = await handleConsoleBoard(asset(), ['api', 'queues'])
       expect(response.status).toBe(503)
+      expectBoardErrorHeaders(response)
       expect(await response.text()).not.toContain('"queues":[]')
     }
   )
@@ -190,11 +205,45 @@ describe('board bridge — what reaches the browser', () => {
 })
 
 describe('board bridge — states', () => {
+  it.each([401, 403, 404, 500, 503])(
+    'gives a refused data request its own error policy, GET and HEAD (upstream %i)',
+    async (status) => {
+      fetchMock.mockResolvedValue(new Response('RAW_UPSTREAM_ERROR', { status }))
+      const expected = status === 500 ? 503 : status
+      for (const method of ['GET', 'HEAD']) {
+        const request = asset('static/missing.js', { method })
+        const response = await handleConsoleBoard(request, ['static', 'missing.js'])
+        expect(response.status).toBe(expected)
+        expectBoardErrorHeaders(response)
+        const body = await response.text()
+        if (method === 'HEAD') expect(body).toBe('')
+        else {
+          expect(JSON.parse(body)).toMatchObject({
+            statusCode: expected,
+            message: 'Queue board unavailable',
+            path: new URL(request.url).pathname,
+          })
+          expect(body).not.toContain('RAW_UPSTREAM_ERROR')
+        }
+      }
+    }
+  )
+
+  it('never stores its own invalid-path HEAD answer', async () => {
+    const response = await handleConsoleBoard(asset('a%2Fb', { method: 'HEAD' }), ['a%2Fb'])
+    expect(response.status).toBe(404)
+    expectBoardErrorHeaders(response)
+    expect(await response.text()).toBe('')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('answers a data request without a session with the session failure', async () => {
     vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
       failure: new Response(null, { status: 401 }),
     })
-    expect((await handleConsoleBoard(asset(), ['api', 'queues'])).status).toBe(401)
+    const response = await handleConsoleBoard(asset(), ['api', 'queues'])
+    expect(response.status).toBe(401)
+    expectBoardErrorHeaders(response)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

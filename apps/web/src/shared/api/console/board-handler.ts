@@ -49,7 +49,16 @@ function hidden(): Response {
 
 function failure(request: Request, document: boolean, status: 401 | 403 | 404 | 503): Response {
   if (document) return status === 401 || status === 403 ? hidden() : backToConsole(request)
-  return apiErrorResponse(request, { statusCode: status, message: 'Queue board unavailable' })
+  return boardError(request, status, 'Queue board unavailable')
+}
+
+/** Our own errors need the same board policy as a forwarded response, without its upstream body. */
+function boardError(request: Request, status: number, message: string): Response {
+  const response = apiErrorResponse(request, { statusCode: status, message })
+  return new Response(request.method === 'HEAD' ? null : response.body, {
+    status,
+    headers: responseHeaders(response),
+  })
 }
 
 function upstreamHeaders(request: Request, token: string, context: string): Headers {
@@ -99,7 +108,7 @@ export async function handleConsoleBoard(
 ): Promise<Response> {
   const document = isDocumentNavigation(request)
   const upstreamUrl = buildBoardUpstreamUrl(API_URL, segments, new URL(request.url).search)
-  if (!upstreamUrl) return apiErrorResponse(request, { statusCode: 404, message: 'Not found' })
+  if (!upstreamUrl) return boardError(request, 404, 'Not found')
 
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) {

@@ -256,16 +256,24 @@ export async function queueBoardJourney(
     // Static files revalidate; a file that does not exist is a plain 404 whose body is the Console's own
     // standard error with a fixed message (the bridge never relays the API's body, so no framework text
     // such as "Cannot GET" and no stack).
-    // The API's own fixed body and cache header for that case are proved by its mounted e2e suite.
+    // Both the API and the bridge's independently created error forbid storing the failed answer.
     const files = await board.evaluate(
       async ({ path, script }) => {
         const found = await fetch(script)
         const missing = await fetch(`${path}/static/js/does-not-exist.js`)
+        const head = await fetch(`${path}/static/js/does-not-exist.js`, { method: 'HEAD' })
         return {
           foundCache: found.headers.get('cache-control'),
           foundStatus: found.status,
           missingStatus: missing.status,
           missingBody: await missing.text(),
+          missingCache: missing.headers.get('cache-control'),
+          missingCsp: missing.headers.get('content-security-policy'),
+          missingCorp: missing.headers.get('cross-origin-resource-policy'),
+          headStatus: head.status,
+          headCache: head.headers.get('cache-control'),
+          headCsp: head.headers.get('content-security-policy'),
+          headBody: await head.text(),
         }
       },
       { path: boardPath, script: assetUrl }
@@ -273,6 +281,13 @@ export async function queueBoardJourney(
     expect(files.foundStatus).toBe(200)
     expect(files.foundCache).toBe('private, no-cache')
     expect(files.missingStatus).toBe(404)
+    expect(files.missingCache).toBe('private, no-store')
+    expect(files.missingCsp).toBe(BULL_BOARD_CONTENT_SECURITY_POLICY)
+    expect(files.missingCorp).toBe('same-origin')
+    expect(files.headStatus).toBe(404)
+    expect(files.headCache).toBe('private, no-store')
+    expect(files.headCsp).toBe(BULL_BOARD_CONTENT_SECURITY_POLICY)
+    expect(files.headBody).toBe('')
     expect(JSON.parse(files.missingBody)).toMatchObject({ message: 'Queue board unavailable' })
     expect(files.missingBody).not.toContain('Cannot GET')
     expect(files.missingBody).not.toContain('stack')
