@@ -1,6 +1,7 @@
 export type { QueueDescriptor, QueueKind } from './constants/queue-inventory.constant'
 export { QUEUE_INVENTORY } from './constants/queue-inventory.constant'
 export { JobName, QueueName } from './constants/queues.constant'
+export { BULL_BOARD_MOUNT } from './dashboard/bull-board-mount-state'
 export type { JobOptions } from './interfaces/job-options.interface'
 export type { IQueueService } from './interfaces/queue.interface'
 export { QueueModule } from './queue.module'

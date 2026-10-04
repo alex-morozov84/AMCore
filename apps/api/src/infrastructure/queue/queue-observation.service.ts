@@ -5,6 +5,7 @@ import type { AdminQueue, AdminQueueAge, AdminQueueCounts } from '@amcore/shared
 
 import { QUEUE_INVENTORY, type QueueDescriptor } from './constants/queue-inventory.constant'
 import { QueueService } from './queue.service'
+import { isOnBoard } from './queue-inventory'
 
 /** Absolute budget of one collection unit; callers never wait longer. */
 export const QUEUE_OBSERVATION_DEADLINE_MS = 1000
@@ -49,6 +50,7 @@ interface Unit {
 const unavailable = (d: QueueDescriptor): AdminQueue => ({
   name: d.name,
   kind: d.kind,
+  inBoard: isOnBoard(d),
   status: 'unavailable',
 })
 
@@ -93,7 +95,12 @@ export class QueueObservationService implements OnModuleInit {
 
   private async observeQueue(descriptor: QueueDescriptor): Promise<AdminQueue> {
     if (!descriptor.enabled) {
-      return { name: descriptor.name, kind: descriptor.kind, status: 'disabled' }
+      return {
+        name: descriptor.name,
+        kind: descriptor.kind,
+        inBoard: isOnBoard(descriptor),
+        status: 'disabled',
+      }
     }
     const queue = this.queues.getQueue(descriptor.name)
     const client = this.clients.get(descriptor.name)
@@ -188,6 +195,7 @@ export class QueueObservationService implements OnModuleInit {
     return {
       name: descriptor.name,
       kind: descriptor.kind,
+      inBoard: isOnBoard(descriptor),
       status: 'available',
       sampledAt: stage.sampledAt,
       paused: stage.paused,

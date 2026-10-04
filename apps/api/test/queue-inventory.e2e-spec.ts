@@ -18,7 +18,7 @@ describe('queue inventory — stock graph, web role (board mounted outside produ
     expect(graph.registered).toEqual(STOCK_QUEUES)
   })
 
-  it('mounts the Bull Board placeholder for this role', () => {
+  it('mounts the Bull Board for this role', () => {
     expect(graph.boardMounted).toBe(true)
   })
 })

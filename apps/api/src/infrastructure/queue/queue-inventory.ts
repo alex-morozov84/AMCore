@@ -20,3 +20,15 @@ export function boardQueueNames(
   const enabled = new Set(enabledQueueNames(inventory))
   return boardQueues.filter((name) => enabled.has(name))
 }
+
+/**
+ * Whether the queue has an adapter in the read-only queue board. An enabled queue only: a disabled
+ * queue is not registered, so the board has nothing to show. Says nothing about the board being
+ * mounted (see `BULL_BOARD_MOUNT`).
+ */
+export function isOnBoard(
+  descriptor: QueueDescriptor,
+  boardQueues: readonly QueueName[] = BULL_BOARD_QUEUE_NAMES
+): boolean {
+  return descriptor.enabled && boardQueues.includes(descriptor.name)
+}

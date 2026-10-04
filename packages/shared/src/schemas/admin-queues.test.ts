@@ -6,6 +6,7 @@ const counts = { waiting: 1, prioritized: 0, active: 0, delayed: 0, failed: 0, w
 const available = {
   name: 'email',
   kind: 'work',
+  inBoard: true,
   status: 'available',
   sampledAt: '2026-10-03T12:00:00.000Z',
   paused: false,
@@ -17,10 +18,11 @@ describe('admin queues contract', () => {
   it('accepts every row status', () => {
     const response = {
       checkedAt: '2026-10-03T12:00:00.000Z',
+      board: { state: 'available' },
       queues: [
         available,
-        { name: 'ai-runs', kind: 'wake', status: 'unavailable' },
-        { name: 'default', kind: 'extension', status: 'disabled' },
+        { name: 'ai-runs', kind: 'wake', inBoard: false, status: 'unavailable' },
+        { name: 'default', kind: 'extension', inBoard: true, status: 'disabled' },
       ],
     }
     expect(adminQueuesResponseSchema.parse(response)).toEqual(response)
@@ -40,7 +42,7 @@ describe('admin queues contract', () => {
   })
 
   it('does not carry counts or age on unavailable/disabled rows', () => {
-    const row = { name: 'email', kind: 'work', status: 'unavailable', counts }
+    const row = { name: 'email', kind: 'work', inBoard: true, status: 'unavailable', counts }
     expect(adminQueueSchema.parse(row)).not.toHaveProperty('counts')
   })
 
@@ -58,5 +60,28 @@ describe('admin queues contract', () => {
   it('has no literal validation message so the localized UI is not forced into English', () => {
     const result = adminQueueSchema.safeParse({ ...available, kind: 'nope' })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('queue board state in the summary', () => {
+  const base = { checkedAt: '2026-10-03T12:00:00.000Z', queues: [available] }
+
+  it('accepts only the two confirmed board states', () => {
+    for (const state of ['available', 'disabled'])
+      expect(adminQueuesResponseSchema.safeParse({ ...base, board: { state } }).success).toBe(true)
+    for (const state of ['unavailable', 'unknown', '', 1])
+      expect(adminQueuesResponseSchema.safeParse({ ...base, board: { state } }).success).toBe(false)
+  })
+
+  it('requires the board state and the per-queue board membership', () => {
+    expect(adminQueuesResponseSchema.safeParse(base).success).toBe(false)
+    const { inBoard: _omitted, ...withoutMembership } = available
+    expect(
+      adminQueuesResponseSchema.safeParse({
+        ...base,
+        board: { state: 'available' },
+        queues: [withoutMembership],
+      }).success
+    ).toBe(false)
   })
 })

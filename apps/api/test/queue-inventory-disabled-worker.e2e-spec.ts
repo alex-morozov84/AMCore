@@ -19,7 +19,7 @@ describe('queue inventory — default disabled, worker role', () => {
     expect(graph.registered).toEqual(['email', 'notifications', 'ai-runs'])
   })
 
-  it('does not mount the Bull Board placeholder for this role', () => {
+  it('does not mount the Bull Board for this role', () => {
     expect(graph.boardMounted).toBe(false)
   })
 })

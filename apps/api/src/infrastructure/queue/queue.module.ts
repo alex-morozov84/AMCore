@@ -1,16 +1,24 @@
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
-import { ExpressAdapter } from '@bull-board/express'
 import { BullBoardModule } from '@bull-board/nestjs'
 import { BullModule, getQueueToken } from '@nestjs/bullmq'
 import { Module } from '@nestjs/common'
 import type { Queue } from 'bullmq'
+import { PinoLogger } from 'nestjs-pino'
 
 import { QUEUE_REGISTRY } from './constants/queue-inventory.constant'
 import { createBullBoardAuthMiddleware } from './dashboard/bull-board-auth.middleware'
 import { BullBoardAuthModule } from './dashboard/bull-board-auth.module'
 import { BullBoardAuthService } from './dashboard/bull-board-auth.service'
-import { isBullBoardEnabled, isBullBoardReadOnly } from './dashboard/bull-board-mount-gate'
-import { DashboardController } from './dashboard/dashboard.controller'
+import { BullBoardBearerAuthService } from './dashboard/bull-board-bearer-auth.service'
+import {
+  chainBoardMiddleware,
+  createBullBoardBoundary,
+} from './dashboard/bull-board-boundary.middleware'
+import type { BoardEvent } from './dashboard/bull-board-events'
+import { BOARD_HOOKS, BOARD_UI_CONFIG } from './dashboard/bull-board-hooks'
+import { BullBoardLegacyFlagWarning } from './dashboard/bull-board-legacy-flag'
+import { BULL_BOARD_MOUNT } from './dashboard/bull-board-mount-state'
+import { QueueBoardAdapter } from './dashboard/bull-board-ui-adapter'
 import { DEFAULT_JOB_OPTIONS } from './interfaces/job-options.interface'
 import { QueueService } from './queue.service'
 import { boardQueueNames, enabledQueueNames } from './queue-inventory'
@@ -20,50 +28,57 @@ import { buildBullConnection } from './redis-connection.config'
 import { EnvModule } from '@/env/env.module'
 import { EnvService } from '@/env/env.service'
 
+/** Content-free board events go to the structured log; never a payload, token or job id. */
+function boardEventSink(logger: PinoLogger): (event: BoardEvent) => void {
+  logger.setContext('BullBoard')
+  return (event) => {
+    if (event.event === 'bull_board.access_denied') logger.warn(event, event.event)
+    else logger.info(event, event.event)
+  }
+}
+
 /**
- * Bull Board mount gate (EQS-01).
+ * The queue board (Bull Board) is read-only by construction: every adapter is built read-only, the
+ * HTTP boundary lets through only GET/HEAD on a short list of paths, and every response is rebuilt
+ * by a closed projection (see `dashboard/`). Nothing configurable changes that.
  *
- * Disabled in production unless `ENABLE_BULL_BOARD=true` — when disabled the
- * dashboard router and its placeholder controller are absent from the module
- * graph entirely (zero attack surface), not merely guarded. In non-production
- * it is mounted but still protected by `BullBoardAuthMiddleware` (SUPER_ADMIN
- * cookie auth).
- *
- * Read from `process.env` at module-construction time — this runs before
- * `EnvService` is injectable AND before `ConfigModule` loads the `.env` file.
- * Consequence: a production opt-in must be a **real process env var**
- * (Docker/k8s/shell/CI); `ENABLE_BULL_BOARD` placed only in the `.env` file
- * will NOT enable the dashboard in production. In non-production the dashboard
- * is enabled regardless of the flag, so the distinction is moot locally.
- * Documented in `.env.example` and the `env.ts` schema comment.
+ * Whether it is mounted is the ONE startup decision in `BULL_BOARD_MOUNT`: absent from the module
+ * graph entirely in production unless `ENABLE_BULL_BOARD=true` is a real process environment
+ * variable (the decision is taken before `ConfigModule` loads `.env`), never on the worker role.
  */
-const bullBoardEnabled = isBullBoardEnabled(
-  process.env.NODE_ENV,
-  process.env.ENABLE_BULL_BOARD,
-  process.env.PROCESS_ROLE
-)
-
-// Secure default: render read-only unless an operator opts into write actions
-// (ADR-047). Read from `process.env` at module-construction, like the mount gate.
-const bullBoardReadOnly = isBullBoardReadOnly(process.env.BULL_BOARD_READ_ONLY)
-
-const bullBoardImports = bullBoardEnabled
+const bullBoardImports = BULL_BOARD_MOUNT.mounted
   ? [
-      // Auth middleware runs before the mounted Bull Board router.
+      // Authentication and the read-only boundary run before the mounted Bull Board router.
       BullBoardModule.forRootAsync({
         imports: [BullBoardAuthModule],
-        inject: [BullBoardAuthService],
-        useFactory: (auth: BullBoardAuthService) => ({
-          route: '/admin/queues',
-          adapter: ExpressAdapter,
-          middleware: createBullBoardAuthMiddleware(auth),
-        }),
+        inject: [BullBoardAuthService, BullBoardBearerAuthService, PinoLogger],
+        useFactory: (
+          cookieAuth: BullBoardAuthService,
+          bearerAuth: BullBoardBearerAuthService,
+          logger: PinoLogger
+        ) => {
+          const events = boardEventSink(logger)
+          return {
+            route: '/admin/queues',
+            adapter: QueueBoardAdapter,
+            middleware: chainBoardMiddleware(
+              createBullBoardAuthMiddleware(cookieAuth, bearerAuth, events),
+              createBullBoardBoundary(events)
+            ),
+            boardOptions: {
+              // Checks the projected response against the Board's schema; a mismatch fails closed.
+              validateResponses: true,
+              handlerHooks: BOARD_HOOKS,
+              uiConfig: BOARD_UI_CONFIG,
+            },
+          }
+        },
       }),
       ...boardQueueNames().map((name) =>
         BullBoardModule.forFeature({
           name,
           adapter: BullMQAdapter,
-          options: { readOnlyMode: bullBoardReadOnly },
+          options: { readOnlyMode: true, allowRetries: false },
         })
       ),
     ]
@@ -93,7 +108,6 @@ const bullBoardImports = bullBoardEnabled
     // Bull Board dashboard — mounted + auth-protected only when enabled.
     ...bullBoardImports,
   ],
-  controllers: bullBoardEnabled ? [DashboardController] : [],
   providers: [
     {
       provide: QUEUE_REGISTRY,
@@ -103,6 +117,7 @@ const bullBoardImports = bullBoardEnabled
     },
     QueueService,
     QueueObservationService,
+    BullBoardLegacyFlagWarning,
   ],
   exports: [QueueService, QueueObservationService],
 })

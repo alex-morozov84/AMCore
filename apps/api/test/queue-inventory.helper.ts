@@ -19,7 +19,7 @@ export interface CompiledQueueGraph {
   redis: StartedRedisContainer
   /** Queues registered with BullMQ and known to `QueueService`. */
   registered: string[]
-  /** Whether the Bull Board placeholder controller (the mount gate's marker) is in the graph. */
+  /** Whether the Bull Board adapter (the mount gate's marker: no mount, no provider) is in the graph. */
   boardMounted: boolean
 }
 
@@ -46,8 +46,7 @@ export async function compileQueueGraph(role: 'web' | 'worker'): Promise<Compile
       ? (await import('../src/web.module')).WebModule
       : (await import('../src/worker.module')).WorkerModule
   const { QueueService } = await import('../src/infrastructure/queue')
-  const { DashboardController } =
-    await import('../src/infrastructure/queue/dashboard/dashboard.controller')
+  const { BULL_BOARD_ADAPTER } = await import('@bull-board/nestjs')
   const module = await Test.createTestingModule({ imports: [root] })
     .overrideProvider(PinoLogger)
     .useValue(noopLogger)
@@ -58,7 +57,7 @@ export async function compileQueueGraph(role: 'web' | 'worker'): Promise<Compile
   }
   let boardMounted = true
   try {
-    module.get(DashboardController, { strict: false })
+    module.get(BULL_BOARD_ADAPTER, { strict: false })
   } catch {
     boardMounted = false
   }

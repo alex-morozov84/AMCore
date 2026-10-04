@@ -131,7 +131,20 @@ describe('Admin background-work queues (e2e)', () => {
       'ai-runs',
     ])
     const row = body.queues.find((queue) => queue.name === 'default')
-    expect(row).toMatchObject({ status: 'available', kind: 'extension', paused: false })
+    expect(row).toMatchObject({
+      status: 'available',
+      kind: 'extension',
+      paused: false,
+      inBoard: true,
+    })
+    // The board is mounted in this (non-production) harness; `ai-runs` has no board adapter.
+    expect(body.board).toEqual({ state: 'available' })
+    expect(body.queues.find((queue) => queue.name === 'ai-runs')?.inBoard).toBe(false)
+    expect(body.queues.filter((queue) => queue.inBoard).map((queue) => queue.name)).toEqual([
+      'email',
+      'default',
+      'notifications',
+    ])
     const observed = row?.status === 'available' ? row : undefined
     expect(observed?.counts.waiting).toBeGreaterThanOrEqual(1)
     expect(['sample', 'unknown']).toContain(observed?.age.status)
