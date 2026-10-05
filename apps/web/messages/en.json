@@ -42,7 +42,8 @@
     "ORGANIZATION_LAST_ADMIN": "The last organization administrator must retain the ADMIN role.",
     "MEMBER_ROLES_SAVE_UNAVAILABLE": "The role save could not be confirmed.",
     "MEMBER_READ_UNAVAILABLE": "Member data could not be loaded within the size limit. Try a smaller page.",
-    "SETTING_REVISION_CONFLICT": "The saved setting changed. Your draft is preserved; review the current revision before saving again."
+    "SETTING_REVISION_CONFLICT": "The saved setting changed. Your draft is preserved; review the current revision before saving again.",
+    "AI_RUN_IDEMPOTENCY_CONFLICT": "This idempotency key was already used for a different request. Use a new key, or repeat the original request unchanged."
   },
   "validation": {
     "required": "This field is required.",

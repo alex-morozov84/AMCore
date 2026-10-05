@@ -43,6 +43,7 @@ export enum ResourceErrorCode {
   RESOURCE_ALREADY_EXISTS = 'RESOURCE_ALREADY_EXISTS',
   API_KEY_ALREADY_EXISTS = 'API_KEY_ALREADY_EXISTS',
   SETTING_REVISION_CONFLICT = 'SETTING_REVISION_CONFLICT',
+  AI_RUN_IDEMPOTENCY_CONFLICT = 'AI_RUN_IDEMPOTENCY_CONFLICT',
 }
 
 // Infrastructure error codes — transient backend failures the client may retry
