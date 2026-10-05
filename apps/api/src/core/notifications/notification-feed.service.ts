@@ -11,6 +11,7 @@ import {
 import { PrismaService } from '../../prisma'
 
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
+import { inAppFeedWhere } from './notification-feed.predicate'
 import { decodeFeedCursor, encodeFeedCursor } from './notification-feed-cursor'
 import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
@@ -39,18 +40,19 @@ export class NotificationFeedService {
     const locale = await this.recipientLocale(userId)
 
     const rows = await this.prisma.notification.findMany({
-      where: {
-        recipientUserId: userId,
-        archivedAt: null,
+      where: inAppFeedWhere(
+        userId,
         ...(cursor
-          ? {
-              OR: [
-                { createdAt: { lt: cursor.createdAt } },
-                { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-              ],
-            }
-          : {}),
-      },
+          ? [
+              {
+                OR: [
+                  { createdAt: { lt: cursor.createdAt } },
+                  { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+                ],
+              },
+            ]
+          : [])
+      ),
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: query.limit + 1,
     })
@@ -68,15 +70,14 @@ export class NotificationFeedService {
   }
 
   getUnreadCount(userId: string): Promise<number> {
-    return this.prisma.notification.count({
-      where: { recipientUserId: userId, readAt: null, archivedAt: null },
-    })
+    return this.prisma.notification.count({ where: inAppFeedWhere(userId, { readAt: null }) })
   }
 
   async markRead(userId: string, notificationId: string): Promise<void> {
-    // Scoped to the recipient and idempotent: a foreign or already-read id is a no-op.
+    // Scoped to the recipient's FEED and idempotent: a foreign, archived, ineligible (not an
+    // in-app delivery) or already-read id is a no-op with no realtime hint.
     const { count } = await this.prisma.notification.updateMany({
-      where: { id: notificationId, recipientUserId: userId, readAt: null },
+      where: inAppFeedWhere(userId, { id: notificationId, readAt: null }),
       data: { readAt: new Date() },
     })
     // Realtime hint only on a real state change (ADR-053); a no-op makes no noise.
@@ -85,7 +86,7 @@ export class NotificationFeedService {
 
   async markAllRead(userId: string): Promise<number> {
     const { count } = await this.prisma.notification.updateMany({
-      where: { recipientUserId: userId, readAt: null, archivedAt: null },
+      where: inAppFeedWhere(userId, { readAt: null }),
       data: { readAt: new Date() },
     })
     // Aggregate hint (no single id) for cross-device/tab unread sync, only if any row changed.
@@ -95,7 +96,7 @@ export class NotificationFeedService {
 
   async archive(userId: string, notificationId: string): Promise<void> {
     const { count } = await this.prisma.notification.updateMany({
-      where: { id: notificationId, recipientUserId: userId, archivedAt: null },
+      where: inAppFeedWhere(userId, { id: notificationId }),
       data: { archivedAt: new Date() },
     })
     if (count > 0) void this.realtime.publish(userId, 'archived', notificationId)
