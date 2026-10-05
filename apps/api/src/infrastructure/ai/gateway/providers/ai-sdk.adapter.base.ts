@@ -1,6 +1,7 @@
 import { generateObject, generateText, type LanguageModel } from 'ai'
 import type { ZodType } from 'zod'
 
+import { AiGatewayException } from '../ai-gateway.error'
 import type {
   AiAdapterCall,
   AiObjectResult,
@@ -37,6 +38,7 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
   protected abstract resolveLanguageModel(call: AiAdapterCall): LanguageModel
 
   async generateText(call: AiAdapterCall): Promise<AiTextResult> {
+    assertNotAborted(call)
     const hasTools = call.tools !== undefined && call.tools.length > 0
     try {
       const result = await generateText({
@@ -49,18 +51,19 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
         tools: hasTools ? toSdkTools(call.tools!) : undefined,
         toolChoice: hasTools ? 'auto' : undefined,
         maxOutputTokens: call.maxOutputTokens,
-        abortSignal: AbortSignal.timeout(call.timeoutMs),
+        abortSignal: callSignal(call),
         // The SDK must not retry: retry is Postgres-owned at the durable-run layer (Arc C,
         // ADR-052). Hidden SDK retries would double-count attempts and fight that schedule.
         maxRetries: 0,
       })
       return mapTextResult(result, call)
     } catch (error) {
-      throw mapProviderError(error, call.model.provider.type)
+      throw mapAdapterError(error, call)
     }
   }
 
   async generateObject<T>(call: AiAdapterCall, schema: ZodType<T>): Promise<AiObjectResult<T>> {
+    assertNotAborted(call)
     try {
       const result = await generateObject({
         model: this.resolveLanguageModel(call),
@@ -68,7 +71,7 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
         system: call.system,
         messages: toModelMessages(call.messages),
         maxOutputTokens: call.maxOutputTokens,
-        abortSignal: AbortSignal.timeout(call.timeoutMs),
+        abortSignal: callSignal(call),
         maxRetries: 0,
       })
       return {
@@ -78,7 +81,30 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
         providerType: call.model.provider.type,
       }
     } catch (error) {
-      throw mapProviderError(error, call.model.provider.type)
+      throw mapAdapterError(error, call)
     }
+  }
+}
+
+/** The call's abort signal: the per-call timeout merged with the caller-owned abort (if any). */
+function callSignal(call: AiAdapterCall): AbortSignal {
+  const timeout = AbortSignal.timeout(call.timeoutMs)
+  return call.abortSignal ? AbortSignal.any([timeout, call.abortSignal]) : timeout
+}
+
+/**
+ * Normalize an SDK failure. A caller abort (run deadline / shutdown) is surfaced as the
+ * non-retryable `aborted` error — never as a provider timeout that an ordinary retry would repeat.
+ */
+function mapAdapterError(error: unknown, call: AiAdapterCall): AiGatewayException {
+  if (call.abortSignal?.aborted === true)
+    return AiGatewayException.aborted(call.model.provider.type)
+  return mapProviderError(error, call.model.provider.type)
+}
+
+/** An already-aborted caller signal makes no provider request (the SDK does not check it up front). */
+function assertNotAborted(call: AiAdapterCall): void {
+  if (call.abortSignal?.aborted === true) {
+    throw AiGatewayException.aborted(call.model.provider.type)
   }
 }

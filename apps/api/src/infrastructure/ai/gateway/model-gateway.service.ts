@@ -144,6 +144,7 @@ export class ModelGateway {
       tools: request.tools,
       maxOutputTokens: request.maxOutputTokens ?? model.maxOutputTokens ?? undefined,
       timeoutMs: this.env.get('AI_REQUEST_TIMEOUT_MS'),
+      abortSignal: request.abortSignal,
     }
     return { model, adapter, call }
   }
