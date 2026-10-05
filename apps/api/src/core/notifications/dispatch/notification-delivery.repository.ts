@@ -11,8 +11,13 @@ import {
   NotificationTerminalReason,
 } from '../notification-dispatch.constants'
 
-import { applyRetryAfterFloor, computeNextAttemptAt } from './notification-backoff'
+import {
+  applyRetryAfterFloor,
+  computeNextAttemptAt,
+  resolveRetryFloor,
+} from './notification-backoff'
 import type { ClaimedDelivery, FinalizeResult, ReapResult } from './notification-dispatch.types'
+import { CUTOFF, type Cutoff, NotificationShutdownLatch } from './notification-shutdown.latch'
 
 import {
   NotificationAttemptOutcome,
@@ -58,34 +63,45 @@ interface AttemptFinalization {
  * `(id, leaseToken)`, so a stale lease holder can never overwrite newer state, and the
  * delivery + attempt updates are always one transaction. No provider I/O happens here —
  * the dispatcher does that between `claimDueBatch` and the finalize call.
+ *
+ * Every transaction runs through the shutdown latch's guarded client: once sealed, the next
+ * query throws, the transaction rolls back as a whole (a claim without its attempt, or a
+ * terminal delivery with an open attempt, can never be committed) and the call returns
+ * `CUTOFF` / `{ state: 'cutoff' }`. Lease expiry is computed by Postgres (`clock_timestamp()`),
+ * never from this process's clock.
  */
 @Injectable()
 export class NotificationDeliveryRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly latch: NotificationShutdownLatch
+  ) {}
 
   /**
    * Atomically claim up to `limit` due deliveries: lease them (`PROCESSING`), bump
    * `attemptCount`, and insert one in-flight attempt row each — all in one short
    * transaction with no external I/O. Due = `PENDING`/`RETRY_SCHEDULED` whose
    * `availableAt`/`nextAttemptAt` have arrived. `SKIP LOCKED` lets every worker/replica
-   * drain disjoint rows without blocking.
+   * drain disjoint rows without blocking. The dispatcher claims ONE row per lane so a leased
+   * row starts immediately instead of waiting behind a batch.
    *
    * `NotificationDeliveryBacklogCollector.collectDue()` mirrors this exact
    * predicate for the `amcore_notification_delivery_due` gauge — change one,
    * change the other, or the alertable count silently stops matching what
    * this claims.
    */
-  async claimDueBatch(limit: number = NOTIFICATION_CLAIM_BATCH_LIMIT): Promise<ClaimedDelivery[]> {
+  async claimDueBatch(
+    limit: number = NOTIFICATION_CLAIM_BATCH_LIMIT
+  ): Promise<ClaimedDelivery[] | Cutoff> {
     const leaseToken = randomUUID()
-    const now = new Date()
-    const leaseExpiresAt = new Date(now.getTime() + NOTIFICATION_LEASE_TTL_MS)
+    const leaseSeconds = NOTIFICATION_LEASE_TTL_MS / 1000
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.latch.transaction(this.prisma, async (tx) => {
       const rows = await tx.$queryRaw<ClaimedRow[]>(Prisma.sql`
         UPDATE "notifications"."notification_deliveries" AS d
         SET status = 'PROCESSING'::"notifications"."NotificationDeliveryStatus",
             "leaseToken" = ${leaseToken},
-            "leaseExpiresAt" = ${leaseExpiresAt},
+            "leaseExpiresAt" = clock_timestamp() + make_interval(secs => ${leaseSeconds}::double precision),
             "attemptCount" = d."attemptCount" + 1,
             "updatedAt" = now()
         FROM (
@@ -108,13 +124,14 @@ export class NotificationDeliveryRepository {
       if (rows.length === 0) return []
 
       // Attempt ids are Prisma-generated cuids (the `@default(cuid())` is client-side, not
-      // a DB default), so insert via the client rather than the raw statement above.
+      // a DB default), so insert via the client rather than the raw statement above. The attempt's
+      // `startedAt` is history (Prisma stamps it with the process clock); only the LEASE expiry
+      // above is lease-validity state and therefore database-derived.
       await tx.notificationDeliveryAttempt.createMany({
         data: rows.map((row) => ({
           deliveryId: row.id,
           attemptNumber: row.attemptCount,
           leaseToken,
-          startedAt: now,
         })),
       })
 
@@ -151,13 +168,16 @@ export class NotificationDeliveryRepository {
       },
       { outcome: NotificationAttemptOutcome.DELIVERED, providerMessageId, durationMs }
     )
-    return won ? { state: 'delivered' } : { state: 'lease_lost' }
+    return this.toResult(won, { state: 'delivered' })
   }
 
   /**
    * Transient failure: reschedule with backoff if budget remains, else fail (exhausted).
-   * `retryAfterMs` is an optional provider-requested floor applied over the normal backoff
-   * (corr. E) — the next attempt is the later of the two, clamped to the 24h defensive max.
+   * `retryAfterMs` is an optional provider-requested floor, normalized ONCE before branching
+   * (`resolveRetryFloor`, clamped to the 24 h ADR-052 policy maximum): a retry is scheduled at
+   * the later of the jittered backoff and the floor; an exhausted terminal row keeps the floor
+   * in `nextAttemptAt` ("earliest permitted next attempt") so a future manual retry cannot
+   * bypass a fresh provider restriction. A `FAILED` row is never claimed regardless of that date.
    */
   async finalizeTransient(
     claim: ClaimedDelivery,
@@ -166,6 +186,7 @@ export class NotificationDeliveryRepository {
     retryAfterMs?: number
   ): Promise<FinalizeResult> {
     const now = new Date()
+    const floorAt = resolveRetryFloor(retryAfterMs, now)
     const attemptFinal: AttemptFinalization = {
       outcome: NotificationAttemptOutcome.TRANSIENT_FAILURE,
       errorCode,
@@ -180,18 +201,17 @@ export class NotificationDeliveryRepository {
           failedAt: now,
           lastErrorCode: errorCode,
           terminalReasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
+          nextAttemptAt: floorAt ?? null,
           leaseToken: null,
           leaseExpiresAt: null,
         },
         attemptFinal
       )
-      return won
-        ? {
-            state: 'failed',
-            reasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
-            deadLettered: true,
-          }
-        : { state: 'lease_lost' }
+      return this.toResult(won, {
+        state: 'failed',
+        reasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
+        deadLettered: true,
+      })
     }
 
     const nextAttemptAt = applyRetryAfterFloor(
@@ -210,7 +230,7 @@ export class NotificationDeliveryRepository {
       },
       attemptFinal
     )
-    return won ? { state: 'retry_scheduled', nextAttemptAt } : { state: 'lease_lost' }
+    return this.toResult(won, { state: 'retry_scheduled', nextAttemptAt })
   }
 
   /** Permanent failure: terminal `FAILED`, never retried. */
@@ -226,18 +246,17 @@ export class NotificationDeliveryRepository {
         failedAt: new Date(),
         lastErrorCode: errorCode,
         terminalReasonCode: NotificationTerminalReason.PERMANENT_FAILURE,
+        nextAttemptAt: null,
         leaseToken: null,
         leaseExpiresAt: null,
       },
       { outcome: NotificationAttemptOutcome.PERMANENT_FAILURE, errorCode, durationMs }
     )
-    return won
-      ? {
-          state: 'failed',
-          reasonCode: NotificationTerminalReason.PERMANENT_FAILURE,
-          deadLettered: true,
-        }
-      : { state: 'lease_lost' }
+    return this.toResult(won, {
+      state: 'failed',
+      reasonCode: NotificationTerminalReason.PERMANENT_FAILURE,
+      deadLettered: true,
+    })
   }
 
   /**
@@ -246,10 +265,13 @@ export class NotificationDeliveryRepository {
    * worker's finalize CAS serialize on them, then — in the SAME transaction — transitions
    * the delivery (reschedule if budget remains, else fail) and closes the open attempt
    * `ABANDONED`. Holding the row lock first is what makes the delivery+attempt update
-   * atomic and prevents a stale holder from corrupting attempt history.
+   * atomic and prevents a stale holder from corrupting attempt history. The whole pass is one
+   * transaction: a shutdown seal mid-pass rolls the pass back and the next one redoes it.
    */
-  async reapExpiredLeases(limit: number = NOTIFICATION_REAP_BATCH_LIMIT): Promise<ReapResult> {
-    return this.prisma.$transaction(async (tx) => {
+  async reapExpiredLeases(
+    limit: number = NOTIFICATION_REAP_BATCH_LIMIT
+  ): Promise<ReapResult | Cutoff> {
+    return this.latch.transaction(this.prisma, async (tx) => {
       const now = new Date()
       const expired = await tx.$queryRaw<ReapRow[]>(Prisma.sql`
         SELECT id, "attemptCount", "maxAttempts", "leaseToken"
@@ -275,6 +297,7 @@ export class NotificationDeliveryRepository {
                 failedAt: now,
                 lastErrorCode: NotificationErrorCode.LEASE_EXPIRED,
                 terminalReasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
+                nextAttemptAt: null,
                 leaseToken: null,
                 leaseExpiresAt: null,
               }
@@ -313,15 +336,15 @@ export class NotificationDeliveryRepository {
   /**
    * Atomically finalize a claimed delivery: CAS the delivery on `(id, status=PROCESSING,
    * leaseToken)` and, only if we still own it, close the attempt — both in one
-   * transaction so a crash can never leave a `DELIVERED` row with an `outcome: null`
-   * attempt. Returns false (lease lost) if the CAS matched no row.
+   * transaction so a crash (or a shutdown seal between the two writes) can never leave a
+   * `DELIVERED` row with an `outcome: null` attempt. `lost` = the CAS matched no row.
    */
   private async finalizeInTx(
     claim: ClaimedDelivery,
     deliveryData: Prisma.NotificationDeliveryUpdateManyMutationInput,
     finalization: AttemptFinalization
-  ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx) => {
+  ): Promise<'won' | 'lost' | Cutoff> {
+    return this.latch.transaction(this.prisma, async (tx) => {
       const { count } = await tx.notificationDelivery.updateMany({
         where: {
           id: claim.id,
@@ -330,7 +353,7 @@ export class NotificationDeliveryRepository {
         },
         data: deliveryData,
       })
-      if (count !== 1) return false
+      if (count !== 1) return 'lost' as const
 
       await tx.notificationDeliveryAttempt.updateMany({
         where: {
@@ -346,7 +369,12 @@ export class NotificationDeliveryRepository {
           durationMs: finalization.durationMs ?? null,
         },
       })
-      return true
+      return 'won' as const
     })
+  }
+
+  private toResult(outcome: 'won' | 'lost' | Cutoff, won: FinalizeResult): FinalizeResult {
+    if (outcome === CUTOFF) return { state: 'cutoff' }
+    return outcome === 'won' ? won : { state: 'lease_lost' }
   }
 }

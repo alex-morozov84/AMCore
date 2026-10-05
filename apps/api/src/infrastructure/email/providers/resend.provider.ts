@@ -3,6 +3,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { Resend } from 'resend'
 
 import type { EmailProvider, SendEmailParams, SendEmailResult } from '../email.types'
+import { parseRetryAfterMs } from '../retry-after'
 
 import { EnvService } from '@/env/env.service'
 
@@ -57,14 +58,20 @@ export class ResendEmailProvider implements EmailProvider {
     }
 
     this.resend = new Resend(apiKey)
+    // The SDK's private `logError` prints the RAW parsed provider error (message text and all)
+    // to the console whenever NODE_ENV !== 'production'. Neutralize it on THIS instance — no
+    // global console patch, no NODE_ENV mutation — so the no-raw-provider-text invariant
+    // (docs/email/security.md) also holds through the real SDK in development/test. Pinned by a
+    // real-SDK contract test that fails if a future SDK changes this surface.
+    ;(this.resend as unknown as { logError: () => void }).logError = () => undefined
     this.logger.info('Resend provider initialized')
   }
 
   async send(params: SendEmailParams): Promise<SendEmailResult> {
-    const { to, subject, html, text, from, replyTo, idempotencyKey } = params
+    const { to, subject, html, text, from, replyTo, idempotencyKey, signal } = params
 
     try {
-      const { data, error } = await this.resend.emails.send(
+      const { data, error, headers } = await this.resend.emails.send(
         {
           from: from || this.env.get('EMAIL_FROM'),
           to: [to],
@@ -73,9 +80,18 @@ export class ResendEmailProvider implements EmailProvider {
           text,
           replyTo,
         },
-        // Forwarded as the `Idempotency-Key` header so retries de-duplicate at
-        // Resend (EQS-03). Undefined when the caller did not set one.
-        idempotencyKey ? { idempotencyKey } : undefined
+        // The SECOND argument of `emails.send(payload, options)` — spread into `fetch`. The
+        // `Idempotency-Key` header lets retries de-duplicate at Resend (EQS-03); `signal` lets
+        // the delivery attempt's timeout/shutdown abort the request. `signal` is untyped in the
+        // SDK's `PostOptions` (hence the cast) and undocumented, so capacity correctness never
+        // depends on it — the dispatcher holds its slot until the call settles regardless.
+        // Undefined when neither is set.
+        idempotencyKey || signal
+          ? ({
+              ...(idempotencyKey ? { idempotencyKey } : {}),
+              ...(signal ? { signal } : {}),
+            } as { idempotencyKey?: string })
+          : undefined
       )
 
       if (error) {
@@ -91,11 +107,16 @@ export class ResendEmailProvider implements EmailProvider {
         // transient retry.
         this.logger.warn({ to, subject, errorCode, retryable }, 'Failed to send email via Resend')
 
+        // Only the normalized delay crosses the boundary (flat lowercase header map in the
+        // installed SDK); a deterministic error never carries one.
+        const retryAfterMs = retryable ? parseRetryAfterMs(headers?.['retry-after']) : undefined
+
         return {
           id: '',
           success: false,
           error: errorCode,
           retryable,
+          ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
         }
       }
 

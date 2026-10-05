@@ -14,6 +14,8 @@ import { EnvService } from '@/env/env.service'
 export interface TelegramSendMessageInput {
   chatId: string
   text: string
+  /** The delivery attempt's abort signal (dispatcher timeout / shutdown), combined with the client's own timeout. */
+  signal?: AbortSignal
 }
 
 /**
@@ -60,7 +62,11 @@ export class TelegramBotApiClient {
   constructor(private readonly env: EnvService) {}
 
   async sendMessage(input: TelegramSendMessageInput): Promise<TelegramSendResult> {
-    const outcome = await this.call('sendMessage', { chat_id: input.chatId, text: input.text })
+    const outcome = await this.call(
+      'sendMessage',
+      { chat_id: input.chatId, text: input.text },
+      input.signal
+    )
     if (outcome === 'transport_error') {
       return { status: 'transient', errorCode: TelegramDeliveryError.PROVIDER_TRANSIENT }
     }
@@ -87,7 +93,11 @@ export class TelegramBotApiClient {
    * network/timeout/oversize. A received-but-unparseable body keeps the status (so e.g. a degraded
    * 429 still classifies as rate-limited) with an empty projection.
    */
-  private async call(method: string, payload: object): Promise<BotApiCall> {
+  private async call(
+    method: string,
+    payload: object,
+    externalSignal?: AbortSignal
+  ): Promise<BotApiCall> {
     const token = this.env.get('TELEGRAM_BOT_TOKEN')
     const baseUrl = (
       this.env.get('TELEGRAM_API_BASE_URL') ?? DEFAULT_TELEGRAM_API_BASE_URL
@@ -99,7 +109,9 @@ export class TelegramBotApiClient {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: controller.signal,
+        signal: externalSignal
+          ? AbortSignal.any([controller.signal, externalSignal])
+          : controller.signal,
       })
       const text = await readBounded(response)
       if (text === undefined) return 'transport_error'

@@ -27,7 +27,11 @@ import { NotificationPreferenceRepository } from './notification-preference.repo
 import { NotificationPreferenceResolver } from './notification-preference.resolver'
 import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
-import { NotificationDeliveryStatus, type Prisma } from '@/generated/prisma/client'
+import {
+  NotificationDeliveryStatus,
+  Prisma,
+  type TelegramConnectionStatus,
+} from '@/generated/prisma/client'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '@/infrastructure/queue/queue.service'
 
@@ -216,7 +220,14 @@ export class NotificationsService {
     })
 
     // One extra indexed lookup, only when the definition can target Telegram — so an
-    // unrelated notification never queries the connection table (Arc D).
+    // unrelated notification never queries the connection table (Arc D). It is a `FOR SHARE`
+    // read on the supplied client: the share lock lives until the caller's commit, covering
+    // read-through-delivery-insert, so a concurrent unlink/relink/block (which takes the row
+    // `FOR UPDATE` BEFORE cancelling deliveries) either waits and then cancels the committed
+    // delivery, or committed first and this read finds no row (→ `SKIPPED telegram_not_linked`).
+    // A locked read locks existing rows, not the absence of a generation: a relink committing
+    // microseconds later is ordered after this notification — safe, never a stale target.
+    // Assumes the default READ COMMITTED isolation for `notifyTx` callers.
     const supportsTelegram = definition.supportedChannels.includes(NotificationChannel.TELEGRAM)
     const [masterEnabled, userPreferences, user, telegram] = await Promise.all([
       this.preferences.getMasterToggle(input.recipientUserId, client),
@@ -227,10 +238,15 @@ export class NotificationsService {
         select: { locale: true, email: true, emailCanonical: true, emailVerified: true },
       }),
       supportsTelegram
-        ? client.telegramConnection.findUnique({
-            where: { userId: input.recipientUserId },
-            select: { id: true, chatId: true, status: true },
-          })
+        ? client
+            .$queryRaw<{ id: string; chatId: string; status: TelegramConnectionStatus }[]>(
+              Prisma.sql`
+                SELECT id, "chatId", status FROM "notifications"."telegram_connections"
+                WHERE "userId" = ${input.recipientUserId}
+                FOR SHARE
+              `
+            )
+            .then((rows) => rows[0] ?? null)
         : Promise.resolve(null),
     ])
 

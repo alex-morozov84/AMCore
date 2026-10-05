@@ -238,6 +238,11 @@ services:
       # firewalling/access control for that port yourself. See
       # docs/operations/deployment.md → "BFF client-IP relay".
       - '${API_PUBLISH_HOST:-127.0.0.1}:5002:5002'
+    # Docker sends SIGTERM and kills the container after this long (the default is 10 s). The
+    # API's own shutdown (HTTP drain, queue/Redis/DB teardown) needs more than that; the worker
+    # below additionally gives in-flight notification deliveries up to 15 s before it stops
+    # starting new work. See docs/operations/deployment.md → "Graceful shutdown".
+    stop_grace_period: 30s
     environment:
       <<: *app-env
       PROCESS_ROLE: web
@@ -264,6 +269,10 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    # See the note on `api`: the worker's notification dispatcher closes (no new claims or sends),
+    # waits up to ~15 s for in-flight deliveries to record their result, then the database is
+    # torn down. The default 10 s kill timer would cut that short.
+    stop_grace_period: 30s
     environment:
       <<: *app-env
       PROCESS_ROLE: worker

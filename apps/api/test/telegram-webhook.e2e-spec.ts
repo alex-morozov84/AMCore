@@ -124,6 +124,72 @@ describe('Telegram webhook (e2e)', () => {
     expect(cancelled.terminalReasonCode).toBe('telegram_connection_replaced')
   })
 
+  it('relink cancels a PROCESSING delivery of the prior connection too (no resurrection by the old holder)', async () => {
+    const userId = await createTgUser(tg.prisma)
+    await postUpdate(tg.app, startUpdate(700, 6101, await issueTokenRow(tg.prisma, userId))).expect(
+      200
+    )
+    const oldConn = await tg.prisma.telegramConnection.findUniqueOrThrow({ where: { userId } })
+    await seedPendingTelegramDelivery(tg.prisma, userId, oldConn.id, '6101')
+    const seeded = await tg.prisma.notificationDelivery.findFirstOrThrow({
+      where: { targetRef: oldConn.id },
+    })
+    await tg.prisma.notificationDelivery.update({
+      where: { id: seeded.id },
+      data: {
+        status: 'PROCESSING',
+        leaseToken: 'old-holder',
+        leaseExpiresAt: new Date(Date.now() + 60_000),
+        attemptCount: 1,
+      },
+    })
+    await tg.prisma.notificationDeliveryAttempt.create({
+      data: { deliveryId: seeded.id, attemptNumber: 1, leaseToken: 'old-holder' },
+    })
+
+    await postUpdate(tg.app, startUpdate(701, 6102, await issueTokenRow(tg.prisma, userId))).expect(
+      200
+    )
+
+    const cancelled = await tg.prisma.notificationDelivery.findUniqueOrThrow({
+      where: { id: seeded.id },
+    })
+    expect(cancelled.status).toBe('CANCELLED')
+    expect(cancelled.terminalReasonCode).toBe('telegram_connection_replaced')
+    expect(cancelled.leaseToken).toBeNull() // the old holder's finalize CAS can no longer match
+    const attempt = await tg.prisma.notificationDeliveryAttempt.findFirstOrThrow({
+      where: { deliveryId: seeded.id },
+    })
+    expect(attempt.outcome).toBe('ABANDONED')
+    expect(attempt.errorCode).toBe('delivery_cancelled')
+  })
+
+  it('two simultaneous relinks of one user converge: no 500, exactly one connection, nothing left active on the old one', async () => {
+    const userId = await createTgUser(tg.prisma)
+    await postUpdate(tg.app, startUpdate(710, 6201, await issueTokenRow(tg.prisma, userId))).expect(
+      200
+    )
+    const oldConn = await tg.prisma.telegramConnection.findUniqueOrThrow({ where: { userId } })
+    await seedPendingTelegramDelivery(tg.prisma, userId, oldConn.id, '6201')
+    const upd1 = startUpdate(711, 6202, await issueTokenRow(tg.prisma, userId))
+    const upd2 = startUpdate(712, 6203, await issueTokenRow(tg.prisma, userId))
+
+    const first = await Promise.all([postUpdate(tg.app, upd1), postUpdate(tg.app, upd2)])
+    // The accepted ADR-052 path: a unique-constraint race becomes a bounded 503 (Telegram retries).
+    for (const r of first) expect([200, 503]).toContain(r.status)
+    if (first[0]!.status === 503) await postUpdate(tg.app, upd1).expect(200)
+    if (first[1]!.status === 503) await postUpdate(tg.app, upd2).expect(200)
+
+    expect(await tg.prisma.telegramConnection.count({ where: { userId } })).toBe(1)
+    const active = await tg.prisma.notificationDelivery.count({
+      where: {
+        targetRef: oldConn.id,
+        status: { in: ['PENDING', 'RETRY_SCHEDULED', 'PROCESSING'] },
+      },
+    })
+    expect(active).toBe(0)
+  })
+
   /**
    * ADR-073 regression: `@RateLimit({ rate: 600, per: 60_000, burst: 30 })`
    * on this route requires an explicit `burst` — omitting it defaults to

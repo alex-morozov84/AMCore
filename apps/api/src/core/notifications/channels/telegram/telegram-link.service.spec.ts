@@ -77,18 +77,31 @@ describe('TelegramLinkService', () => {
   })
 
   describe('unlink', () => {
-    it('cancels due deliveries, deletes the connection, and audits — in one tx', async () => {
-      prisma.telegramConnection.findUnique.mockResolvedValue({ id: 'conn-1' } as never)
+    it('locks the connection, cancels ALL active deliveries (incl. PROCESSING), deletes and audits — in one tx', async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ id: 'conn-1' }] as never) // the connection, FOR UPDATE
+        .mockResolvedValueOnce([{ id: 'd-processing' }] as never) // cancelled ids
 
       await service.unlink('user-1')
 
-      expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith(
+      const lockSql = prisma.$queryRaw.mock.calls[0]![0] as unknown as {
+        sql: string
+        values: unknown[]
+      }
+      expect(lockSql.sql).toContain('FOR UPDATE')
+      expect(lockSql.values).toContain('user-1')
+      const cancelSql = prisma.$queryRaw.mock.calls[1]![0] as unknown as {
+        sql: string
+        values: unknown[]
+      }
+      expect(cancelSql.sql).toContain("'PROCESSING'")
+      expect(cancelSql.values).toEqual(
+        expect.arrayContaining(['telegram_connection_unlinked', 'telegram', 'conn-1'])
+      )
+      expect(prisma.notificationDeliveryAttempt.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ targetRef: 'conn-1', channel: 'telegram' }),
-          data: expect.objectContaining({
-            status: 'CANCELLED',
-            terminalReasonCode: 'telegram_connection_unlinked',
-          }),
+          where: { deliveryId: { in: ['d-processing'] }, outcome: null },
+          data: expect.objectContaining({ outcome: 'ABANDONED', errorCode: 'delivery_cancelled' }),
         })
       )
       expect(prisma.telegramConnection.delete).toHaveBeenCalledWith({ where: { id: 'conn-1' } })
@@ -103,8 +116,8 @@ describe('TelegramLinkService', () => {
       )
     })
 
-    it('is a no-op when the user has no connection', async () => {
-      prisma.telegramConnection.findUnique.mockResolvedValue(null)
+    it('is a no-op when the user has no connection (also for a concurrent second unlink)', async () => {
+      prisma.$queryRaw.mockResolvedValue([] as never)
       await service.unlink('user-1')
       expect(prisma.telegramConnection.delete).not.toHaveBeenCalled()
       expect(audit.record).not.toHaveBeenCalled()

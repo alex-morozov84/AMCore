@@ -80,7 +80,7 @@ model NotificationDelivery {
   locale              String
   status              NotificationDeliveryStatus @default(PENDING)
   availableAt         DateTime                   @default(now()) // policy delay
-  nextAttemptAt       DateTime? // retry schedule (Arc B)
+  nextAttemptAt       DateTime? // earliest permitted next attempt: the retry schedule of a RETRY_SCHEDULED row (the later of backoff and a provider `Retry-After`/`retry_after` floor, clamped to 24 h); on a terminal FAILED row, the retained provider restriction (never makes the row claimable — status decides). Null otherwise.
   attemptCount        Int                        @default(0)
   maxAttempts         Int
   leaseToken          String? // Arc B: ownership/CAS token for row state

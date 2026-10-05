@@ -23,17 +23,42 @@ export const NOTIFICATION_LEASE_TTL_MS = 2 * 60 * 1000 // 2 min
 /** Bounded provider I/O timeout per delivery attempt (well under the lease TTL). */
 export const NOTIFICATION_PROVIDER_TIMEOUT_MS = 10 * 1000 // 10 s
 
-/** Max deliveries claimed per SKIP-LOCKED pass; the drain loops until a pass is short. */
+/**
+ * Upper bound on rows a repository claim call may take. The dispatcher itself always claims
+ * ONE row per lane (a row is claimed only when a slot can start it immediately), so the
+ * lease never ages while a row waits in a batch; the bound only caps direct repository use.
+ */
 export const NOTIFICATION_CLAIM_BATCH_LIMIT = 50
 
 /** Max expired-lease rows reaped per pass (bounded, like the claim). */
 export const NOTIFICATION_REAP_BATCH_LIMIT = 50
 
 /**
- * Upper bound on claim batches drained per dispatch invocation, so a single wake/cron
- * run cannot loop unbounded under a large backlog (the next run continues the drain).
+ * Process-wide cap on concurrently executing deliveries (physical provider calls) per
+ * worker process, shared by the BullMQ wake path and the recovery cron. A starter default
+ * tuned by code change like the other dispatch constants — NOT a provider rate limiter:
+ * replicas multiply it and a provider quota (e.g. Resend's per-team limit) is account-wide.
+ * Two slots reduce head-of-line blocking when one provider call hangs; they do not isolate
+ * channels from each other.
  */
-export const NOTIFICATION_MAX_DRAIN_CYCLES = 20
+export const NOTIFICATION_DISPATCH_CONCURRENCY = 2
+
+/**
+ * Upper bound on deliveries one dispatch invocation processes across all its lanes, so a
+ * single wake/cron run cannot loop unbounded under a large backlog (the next run continues).
+ */
+export const NOTIFICATION_MAX_DRAIN_DELIVERIES = 1000
+
+/**
+ * Shutdown grace: after the dispatcher is closed, in-flight lane work may finish for this
+ * long, then the shutdown latch is sealed (no new DB/transport work starts and waiters are
+ * released). Bounds notification waiters only — not Redis, other queues, Prisma teardown
+ * or the platform's own termination grace.
+ */
+export const NOTIFICATION_SHUTDOWN_GRACE_MS = NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 * 1000
+
+/** Postgres `lock_timeout` for the actual-start admission transaction (fails closed). */
+export const NOTIFICATION_ADMISSION_LOCK_TIMEOUT_MS = 2 * 1000
 
 /** Exponential backoff schedule for `RETRY_SCHEDULED` (Postgres owns the schedule). */
 export const NOTIFICATION_BACKOFF_BASE_MS = 30 * 1000 // 30 s → 60 → 120 → 240
@@ -41,10 +66,12 @@ export const NOTIFICATION_BACKOFF_CAP_MS = 15 * 60 * 1000 // 15 min
 export const NOTIFICATION_BACKOFF_JITTER = 0.2 // ±20% full jitter
 
 /**
- * Defensive max for a provider-requested retry **floor** (e.g. Telegram `retry_after`). A
- * legitimate flood-wait can be minutes; we honor it as a floor over the normal backoff, but
- * clamp a corrupt/absurd value so a row never parks indefinitely. Deliberately NOT the
- * 15-min normal-backoff cap (corr. E) — that would retry before the provider's requested delay.
+ * Policy maximum for a provider-requested retry **floor** (e.g. Telegram `retry_after`,
+ * email `Retry-After`). A legitimate flood-wait can be minutes; we honor it as a floor over the
+ * normal backoff, but ADR-052 accepts clamping a larger value to 24 h so a row never parks
+ * indefinitely. This is a deliberate, documented exception to "never earlier than the provider
+ * asked": a valid 48 h request is retried after 24 h. Deliberately NOT the 15-min
+ * normal-backoff cap (corr. E) — that would retry before the provider's requested delay.
  */
 export const NOTIFICATION_RETRY_AFTER_MAX_MS = 24 * 60 * 60 * 1000 // 24 h
 
@@ -64,6 +91,10 @@ export const NotificationTerminalReason = {
  * here; a channel adapter may add its own bounded codes (e.g. email) in its module.
  */
 export const NotificationErrorCode = {
+  /** An in-flight attempt closed because its delivery was cancelled (target revoked/blocked). */
+  DELIVERY_CANCELLED: 'delivery_cancelled',
+  /** An attempt refused at actual-start admission because its target was no longer valid. */
+  TARGET_REVOKED: 'target_revoked',
   LEASE_EXPIRED: 'lease_expired',
   NO_ADAPTER: 'no_adapter',
   NOTIFICATION_MISSING: 'notification_missing',

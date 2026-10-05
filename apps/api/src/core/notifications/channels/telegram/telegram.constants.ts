@@ -21,11 +21,14 @@ export const TelegramTerminalReason = {
 } as const
 
 /**
- * Bounded `CANCELLED` reasons applied to a connection's still-due deliveries
- * (`PENDING`/`RETRY_SCHEDULED`) when its destination is torn down or fenced, so no
- * in-flight delivery survives to message a stale/relinked chat.
+ * Bounded `CANCELLED` reasons applied to a connection's still-active deliveries
+ * (`PENDING`/`RETRY_SCHEDULED`/`PROCESSING`) when its destination is torn down or fenced, so no
+ * delivery survives to start a NEW send to a stale/relinked chat (a send already in flight may
+ * still complete — ADR-052 at-least-once).
  */
 export const TelegramCancelReason = {
+  /** Actual-start admission found the target absent, a prior generation, or a different owner/chat. */
+  TARGET_REVOKED: 'telegram_target_revoked',
   /** Relink: the owner's prior connection was replaced by a fresh `/start` bind. */
   CONNECTION_REPLACED: 'telegram_connection_replaced',
   /** Explicit unlink (`DELETE …/connection`). */
