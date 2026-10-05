@@ -147,6 +147,24 @@ describe('NotificationShutdownLatch', () => {
       await expect(latch.run(async () => Promise.reject(new Error('boom')))).rejects.toThrow('boom')
     })
 
+    it('releases a caller when the operation seals synchronously during startup', async () => {
+      let settle!: (value: number) => void
+      const pending = new Promise<number>((resolve) => {
+        settle = resolve
+      })
+      const waited = latch.run(() => {
+        latch.seal()
+        return pending
+      })
+
+      await expect(waited).resolves.toBe(CUTOFF)
+      expect(latch.outstandingCount).toBe(1)
+      settle(7)
+      await pending
+      expect(latch.outstandingCount).toBe(0)
+      await expect(waited).resolves.toBe(CUTOFF)
+    })
+
     it('tracks outstanding operations and clears them on settle', async () => {
       let resolve!: () => void
       const waited = latch.run(

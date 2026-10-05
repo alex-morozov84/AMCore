@@ -299,14 +299,19 @@ recorded `ABANDONED` and counts against the budget).
 
 **Graceful shutdown.** On `SIGTERM` the dispatcher first **closes** — no new
 claims, admissions or recovery passes — and lets work already in flight record its
-result. After a grace of `NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s` (15 s) it
+result. Within `NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s` (15 s), or earlier once
+the logical work finishes, it
 **seals**: nothing new starts, every wait on in-flight work is released, and a
 database transaction cut between two dependent writes is rolled back as a whole,
 never half-applied. This happens **before** the database pool is closed
 (`PrismaService` runs registered shutdown barriers first). A row whose result was
-not recorded is recovered through lease expiry and the reaper; a delivery that did
-finish needs nothing. Pending provider calls are not killed — they end with the
-process — so the platform's termination grace must exceed this bound plus your
+not recorded after its claim committed is recovered through lease expiry and the
+reaper. An issued transaction may still commit or roll back after the seal: its
+outcome is unknown until it settles. A rolled-back claim stays pending; a committed
+finalize needs no reaper. Shutdown attempts to abort provider calls; adapters may
+ignore abort, and an already accepted message cannot be recalled. Calls still
+pending when the process terminates end with it, so the platform's termination
+grace must exceed this bound plus your
 other shutdown steps; see [Graceful shutdown](../operations/deployment.md#graceful-shutdown).
 
 ## Preferences & mandatory channels

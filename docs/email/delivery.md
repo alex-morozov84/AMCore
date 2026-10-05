@@ -97,8 +97,8 @@ Provider responsibilities:
 - return `success`, provider `id`, optional `error`, optional `retryable`, and — only
   when the transport exposes one — a normalized `retryAfterMs` (a number of
   milliseconds; never headers or error text). `ResendEmailProvider` reads the
-  `Retry-After` header (whole seconds, or a strict HTTP-date) and ignores values it
-  cannot parse;
+  `Retry-After` header (positive whole seconds with at most 10 ASCII digits, or an
+  IMF-fixdate). Zero, past dates and unsupported values use ordinary backoff;
 - classify deterministic provider/config/payload failures as
   `retryable: false`;
 - never log rendered HTML, plaintext bodies, raw payloads, or token URLs.

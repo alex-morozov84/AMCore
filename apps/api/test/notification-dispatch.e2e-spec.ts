@@ -1,16 +1,29 @@
 import { jest } from '@jest/globals'
 import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
+import { PinoLogger } from 'nestjs-pino'
 
+import { ChannelDelivererRegistry } from '../src/core/notifications/channels/channel-deliverer.registry'
+import { EmailChannelDeliverer } from '../src/core/notifications/channels/email-channel.deliverer'
 import { NotificationAttemptAdmission } from '../src/core/notifications/dispatch/notification-attempt-admission'
 import { NotificationDeliveryRepository } from '../src/core/notifications/dispatch/notification-delivery.repository'
+import { NotificationDispatchGate } from '../src/core/notifications/dispatch/notification-dispatch.gate'
 import { NotificationDispatchService } from '../src/core/notifications/dispatch/notification-dispatch.service'
 import type {
   ClaimedDelivery,
   ReapResult,
 } from '../src/core/notifications/dispatch/notification-dispatch.types'
-import { CUTOFF } from '../src/core/notifications/dispatch/notification-shutdown.latch'
+import {
+  CUTOFF,
+  NotificationShutdownLatch,
+} from '../src/core/notifications/dispatch/notification-shutdown.latch'
 import { NotificationChannel } from '../src/core/notifications/notification.constants'
+import { NotificationDefinitionRegistry } from '../src/core/notifications/notification-definition.registry'
+import { EnvService } from '../src/env/env.service'
+import { EmailService } from '../src/infrastructure/email/email.service'
+import { ResendEmailProvider } from '../src/infrastructure/email/providers/resend.provider'
+import { MetricsService } from '../src/infrastructure/observability'
+import { QueueService } from '../src/infrastructure/queue/queue.service'
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
@@ -261,6 +274,67 @@ describe('Notification dispatch (e2e)', () => {
     expect(row.attemptCount).toBeGreaterThanOrEqual(1)
     const attempts = await prisma.notificationDeliveryAttempt.count({ where: { deliveryId } })
     expect(attempts).toBeGreaterThanOrEqual(1)
+  })
+
+  it('persists real-SDK Retry-After through rendering, email admission and dispatch without enqueueing', async () => {
+    const userId = await createUser()
+    const deliveryId = await createDelivery(await createNotification(userId))
+    const env = app.get(EnvService)
+    const logger = app.get<PinoLogger>(PinoLogger, { strict: false })
+    const metrics = app.get(MetricsService)
+    const queue = app.get(QueueService)
+    const provider = new ResendEmailProvider(
+      {
+        get: (key: string) =>
+          key === 'RESEND_API_KEY' ? 're_test_contract' : env.get('EMAIL_FROM'),
+      } as EnvService,
+      logger
+    )
+    const email = new EmailService(provider, queue, env, logger, metrics)
+    const adapter = new EmailChannelDeliverer(app.get(NotificationDefinitionRegistry), email, env)
+    const latch = new NotificationShutdownLatch(logger)
+    const localRepository = new NotificationDeliveryRepository(prisma, latch)
+    const service = new NotificationDispatchService(
+      prisma,
+      localRepository,
+      new ChannelDelivererRegistry([adapter]),
+      metrics,
+      logger,
+      latch,
+      new NotificationDispatchGate(latch),
+      new NotificationAttemptAdmission(prisma, latch)
+    )
+    const enqueue = jest.spyOn(queue, 'add')
+    const fetch = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ name: 'rate_limit_exceeded', message: 'contract sentinel' }),
+          { status: 429, headers: { 'retry-after': '600', 'content-type': 'application/json' } }
+        )
+      )
+    try {
+      const before = Date.now()
+      await service.drainDueBatches()
+      const row = await prisma.notificationDelivery.findUniqueOrThrow({ where: { id: deliveryId } })
+      expect(row.status).toBe(NotificationDeliveryStatus.RETRY_SCHEDULED)
+      expect(row.nextAttemptAt!.getTime()).toBeGreaterThanOrEqual(before + 600_000)
+      expect(row.nextAttemptAt!.getTime()).toBeLessThanOrEqual(Date.now() + 600_000)
+      expect(fetch).toHaveBeenCalledTimes(1)
+      expect(fetch.mock.calls[0]![1]!.signal).toBeInstanceOf(AbortSignal)
+      expect(enqueue).not.toHaveBeenCalled()
+      expect(await localRepository.claimDueBatch(1)).toEqual([])
+      // Move the stored floor to the due boundary; the same claim query can now acquire it.
+      await prisma.notificationDelivery.update({
+        where: { id: deliveryId },
+        data: { nextAttemptAt: new Date(Date.now() - 1) },
+      })
+      expect(await localRepository.claimDueBatch(1)).toHaveLength(1)
+    } finally {
+      fetch.mockRestore()
+      enqueue.mockRestore()
+      await service.shutdown()
+    }
   })
 
   it('reaps an expired lease to FAILED when the retry budget is exhausted', async () => {

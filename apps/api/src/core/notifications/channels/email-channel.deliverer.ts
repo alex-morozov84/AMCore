@@ -35,7 +35,7 @@ const EmailDeliveryError = {
  * otherwise a neutral summary that never touches the raw payload — and sends it via
  * `EmailService.send()` with a stable provider idempotency key
  * (`notification-delivery:<id>`), which mitigates the at-least-once duplicate-send risk
- * (the dispatcher's timeout does not abort an in-flight provider call). It NEVER uses
+ * (abort is best-effort and cannot recall an accepted provider request). It NEVER uses
  * `EmailService.queue()` — a notification email must not enter the EMAIL queue.
  */
 @Injectable()

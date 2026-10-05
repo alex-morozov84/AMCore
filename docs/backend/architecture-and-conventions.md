@@ -289,10 +289,11 @@ plus these seams:
    attempted afterwards, even if a barrier or the disconnect fails. Registration is
    rejected once teardown has started. Not every existing drain participates (AI
    runs do not yet), and none of this bounds Redis cleanup, other queues or the HTTP
-   server. Interactive transactions that a barrier must be able to interrupt use the
-   notification shutdown latch (`NotificationShutdownLatch.transaction`), whose
-   guarded client makes the next query throw after the seal so the transaction rolls
-   back whole.
+   server. The notification dispatcher uses its own shutdown latch
+   (`NotificationShutdownLatch.transaction`): its guarded client makes the next
+   query throw after the seal so the transaction rolls back whole. Other domains
+   implement their own bounded drain and transaction interruption mechanism;
+   registering a barrier does not require a dependency on notifications.
 5. **Process role.** Put the module in the right list (see step 5 of the module
    recipe): a producer/shared client → `coreImports`; a consumer that only runs work
    → a worker-only module.

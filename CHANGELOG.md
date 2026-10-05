@@ -99,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   production, and the notification dispatcher logs no error text.
 
 - Worker shutdown: the notification dispatcher now stops taking new work, gives
-  in-flight deliveries about 15 seconds to record their result and releases every wait
+  in-flight deliveries up to 15 seconds to record their result and releases every wait
   on them, before the database is closed; an interrupted transaction rolls back as a
   whole. `PrismaService.registerShutdownBarrier` lets a worker-side drain finish before
   database teardown, and the reference Compose `api` and `worker` services now set

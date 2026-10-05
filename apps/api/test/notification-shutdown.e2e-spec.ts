@@ -5,6 +5,9 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { ChannelDelivererRegistry } from '../src/core/notifications/channels/channel-deliverer.registry'
 import type { ChannelDeliverer } from '../src/core/notifications/channels/channel-deliverer.types'
+import { TelegramDeliveryError } from '../src/core/notifications/channels/telegram/telegram.constants'
+import type { TelegramBotApiClient } from '../src/core/notifications/channels/telegram/telegram-bot-api.client'
+import { TelegramChannelDeliverer } from '../src/core/notifications/channels/telegram/telegram-channel.deliverer'
 import { NotificationAttemptAdmission } from '../src/core/notifications/dispatch/notification-attempt-admission'
 import { NotificationDeliveryRepository } from '../src/core/notifications/dispatch/notification-delivery.repository'
 import { NotificationDispatchGate } from '../src/core/notifications/dispatch/notification-dispatch.gate'
@@ -15,11 +18,17 @@ import {
   NotificationShutdownLatch,
 } from '../src/core/notifications/dispatch/notification-shutdown.latch'
 import { NotificationChannel } from '../src/core/notifications/notification.constants'
+import { NotificationDefinitionRegistry } from '../src/core/notifications/notification-definition.registry'
+import { EnvService } from '../src/env/env.service'
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
-import { NotificationAttemptOutcome, NotificationDeliveryStatus } from '@/generated/prisma/client'
+import {
+  NotificationAttemptOutcome,
+  NotificationDeliveryStatus,
+  TelegramConnectionStatus,
+} from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 
 /**
@@ -161,6 +170,85 @@ describe('Notification shutdown atomicity (e2e, real Postgres)', () => {
   const newLatch = (): NotificationShutdownLatch => new NotificationShutdownLatch(logger)
 
   describe('cutoff BETWEEN dependent writes rolls the whole transaction back', () => {
+    it('Telegram fence: connection block then sibling cancel — both roll back across cutoff', async () => {
+      const deliveryId = await seedDelivery()
+      const { notification } = await prisma.notificationDelivery.findUniqueOrThrow({
+        where: { id: deliveryId },
+        include: { notification: true },
+      })
+      const connection = await prisma.telegramConnection.create({
+        data: {
+          userId: notification.recipientUserId,
+          chatId: '777',
+          telegramUserId: '777',
+        },
+      })
+      await prisma.notificationDelivery.update({
+        where: { id: deliveryId },
+        data: {
+          channel: NotificationChannel.TELEGRAM,
+          targetRef: connection.id,
+          targetKey: connection.chatId,
+        },
+      })
+      const siblingNotification = await prisma.notification.create({
+        data: {
+          recipientUserId: notification.recipientUserId,
+          type: notification.type,
+          category: notification.category,
+          schemaVersion: 1,
+          payload: { updatedFields: ['name'] },
+          idempotencyKey: `${notification.idempotencyKey}:sibling`,
+          idempotencyFingerprint: 'sibling-fingerprint',
+          occurredAt: new Date(),
+        },
+      })
+      const sibling = await prisma.notificationDelivery.create({
+        data: {
+          notificationId: siblingNotification.id,
+          channel: NotificationChannel.TELEGRAM,
+          targetKey: connection.chatId,
+          targetRef: connection.id,
+          locale: 'en',
+          maxAttempts: 5,
+          availableAt: new Date(Date.now() + 600_000),
+        },
+      })
+      const setup = new NotificationDeliveryRepository(prisma, newLatch())
+      const [claim] = (await setup.claimDueBatch(1)) as ClaimedDelivery[]
+      expect(claim!.id).toBe(deliveryId)
+      const latch = newLatch()
+      const hooked = hookedPrisma({ 'telegramConnection.updateMany': () => latch.seal() })
+      const client = {
+        sendMessage: jest.fn(async () => ({
+          status: 'permanent',
+          errorCode: TelegramDeliveryError.BLOCKED,
+        })),
+      } as unknown as TelegramBotApiClient
+      const adapter = new TelegramChannelDeliverer(
+        app.get(NotificationDefinitionRegistry),
+        client,
+        hooked,
+        app.get(EnvService),
+        latch
+      )
+      const admission = new NotificationAttemptAdmission(hooked, latch).create(
+        { delivery: claim!, notification },
+        adapter,
+        { signal: new AbortController().signal, onTransportStarted: () => undefined }
+      )
+      await adapter.deliver({ delivery: claim!, notification }, admission)
+      // This query waits on the real connection lock until Prisma has completed rollback.
+      const after = await prisma.$queryRaw<{ status: string }[]>`
+        SELECT status FROM "notifications"."telegram_connections"
+        WHERE id = ${connection.id} FOR UPDATE`
+      expect(after[0]!.status).toBe(TelegramConnectionStatus.ACTIVE)
+      expect((await snapshot(sibling.id)).delivery.status).toBe(NotificationDeliveryStatus.PENDING)
+      expect((await snapshot(deliveryId)).attempts[0]!.outcome).toBeNull()
+      expect(latch.sealed).toBe(true)
+      expect(client.sendMessage).toHaveBeenCalledTimes(1)
+    })
+
     it('finalize: delivery update then attempt close — nothing is committed', async () => {
       const deliveryId = await seedDelivery()
       const setup = new NotificationDeliveryRepository(prisma, newLatch())

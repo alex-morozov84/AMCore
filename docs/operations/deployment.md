@@ -496,7 +496,8 @@ What the worker does within that budget:
 
 1. The **notification dispatcher closes**: it starts no new claims, sends or
    recovery passes, and lets deliveries already in flight record their result.
-2. After about **15 seconds** (`NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s`) it
+2. Within **15 seconds** (`NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s`), or earlier
+   once the logical work finishes, it
    **seals**: nothing new starts and every wait on in-flight work is released, so
    the BullMQ worker is not held open by notification work. A database transaction
    interrupted between two dependent writes is rolled back as a whole.
@@ -505,8 +506,13 @@ What the worker does within that budget:
 
 A delivery whose result was not recorded is recovered by lease expiry and the
 lease reaper on the next worker (it may be sent again — notification delivery is
-at-least-once). Pending provider requests are not cancelled by shutdown; they end
-with the process. The 15 s bound covers notification work only: it does not bound
+at-least-once), provided its claim committed. An issued transaction may still
+commit or roll back after the seal; its outcome is unknown until it settles. A
+rolled-back claim leaves the delivery pending, and a committed finalize needs no
+reaper. Shutdown attempts to abort provider requests, but an adapter may
+ignore abort and an already accepted message cannot be recalled. Requests still
+pending at process termination end with the process. The 15 s bound covers
+notification work only: it does not bound
 Redis cleanup, other queues, the HTTP server or the database disconnect, so budget
 those separately inside the platform's grace period.
 

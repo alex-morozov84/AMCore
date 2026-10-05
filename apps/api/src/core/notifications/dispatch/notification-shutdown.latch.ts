@@ -145,7 +145,10 @@ export class NotificationShutdownLatch {
         released = true
         resolve(CUTOFF)
       }
-      this.waiters.add(waiter)
+      // Starting an operation may synchronously seal the latch before this waiter exists.
+      // Still observe its raw settlement, but release the caller immediately in that case.
+      if (this.sealedFlag) waiter()
+      else this.waiters.add(waiter)
       pending.then(
         (value) => {
           this.outstanding -= 1
