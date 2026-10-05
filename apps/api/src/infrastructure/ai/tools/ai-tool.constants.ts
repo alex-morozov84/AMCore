@@ -53,6 +53,14 @@ export const AiToolErrorCode = {
   TOOL_ARGS_INVALID: 'tool_args_invalid',
   /** The tool's `execute` threw or exceeded `AI_TOOL_EXECUTION_TIMEOUT_MS`. */
   TOOL_EXECUTION_FAILED: 'tool_execution_failed',
+  /** The tool declared (via `AiToolRejectedError`) that it refused the call with no external effect. */
+  TOOL_REJECTED_NO_EFFECT: 'tool_rejected_no_effect',
+  /** The tool declared (via `AiToolRetryableError`) a no-effect failure that a later retry may fix. */
+  TOOL_RETRYABLE_NO_EFFECT: 'tool_retryable_no_effect',
+  /** A side-effecting tool timed out / failed unclassified: its external effect may have happened. */
+  TOOL_EFFECT_UNKNOWN: 'tool_effect_unknown',
+  /** The stored input no longer parses to itself under the current tool schema; never executed. */
+  TOOL_SCHEMA_INCOMPATIBLE: 'tool_schema_incompatible',
 } as const
 export type AiToolErrorCodeValue = (typeof AiToolErrorCode)[keyof typeof AiToolErrorCode]
 

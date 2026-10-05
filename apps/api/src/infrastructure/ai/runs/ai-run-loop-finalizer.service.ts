@@ -7,6 +7,7 @@ import type { AiTextResult } from '../gateway/ai-gateway.types'
 import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
+import { AiRunGuard, RunLeaseLostError } from './ai-run-guard.service'
 import {
   providerCallStep,
   type RunStepSpec,
@@ -14,34 +15,29 @@ import {
   writeRunSteps,
   writeUsageLedger,
 } from './ai-run-loop-persistence'
-import {
-  ConversationSupersededError,
-  isBotOwnershipStale,
-  lockAndAssertBotOwnership,
-  readBotOwnership,
-} from './ai-run-ownership-fence'
 import type { RunPlan } from './ai-run-plan'
+import { AiRunStopSignal } from './ai-run-provider-call'
+import { AiRunTransitions, applyStop } from './ai-run-transitions.service'
 import { sanitizeGuardrailCategories } from './guardrail-step-detail'
 
 import { AiRunStepType, Prisma } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
-import { PrismaService } from '@/prisma'
-
-/** Thrown inside a finalize transaction when the CAS finds no row → roll back the transcript. */
-class RunLeaseLostError extends Error {}
 
 /**
- * Owns every terminal (and per-call) durable write for the bounded tool loop (Track C — ADR-054, Arc
- * E.4b, worker role only), so `AiRunLoopExecutor` stays pure orchestration. Each provider call commits
- * exactly one `PROVIDER_CALL` step + run-attributed `AiUsageLedger` row (invariant 13); the terminal
- * transition is the Arc C CAS in the SAME transaction, so a lost lease rolls the whole transcript back
- * (recovery re-runs). Nothing here logs prompt/response content; the loop-steps metric is bounded.
+ * Owns every terminal (and per-call) durable write of the bounded tool loop (Track C — ADR-054, Arc E,
+ * worker role only), so `AiRunLoopExecutor` stays pure orchestration. Every write runs inside the run
+ * guard in `record` mode: a stale holder writes nothing, the lease/epoch are verified under row locks
+ * with fresh database time, and each terminal transition also closes the attempt-history row. When a stop
+ * cause (cancel, takeover, deadline) is visible, the call's provider step and usage ledger row are still
+ * recorded — that spend happened — but no assistant turn is written and the run terminalizes as the stop.
+ * Nothing here logs prompt/response content; the loop-steps metric is bounded.
  */
 @Injectable()
 export class AiRunLoopFinalizer {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly guard: AiRunGuard,
     private readonly repository: AiRunRepository,
+    private readonly transitions: AiRunTransitions,
     private readonly metrics: MetricsService,
     private readonly logger: PinoLogger
   ) {
@@ -56,22 +52,23 @@ export class AiRunLoopFinalizer {
     durationMs: number,
     providerCalls: number
   ): Promise<void> {
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await writeAssistantTurn(tx, claim, result.text)
-        await writeRunSteps(tx, claim.id, this.successSteps(plan, result, durationMs))
+    const outcome = await this.guard.record(claim, async (tx, ctx) => {
+      if (ctx.stop) {
+        await writeRunSteps(tx, claim.id, [providerCallStep(result, durationMs)])
         await writeUsageLedger(tx, claim, plan.attribution, plan.modelSlug, result)
-        if (!(await this.repository.finalizeCompleted(tx, claim))) throw new RunLeaseLostError()
-      })
-      this.metrics.observeAiToolLoopSteps('completed', providerCalls)
-    } catch (error) {
-      // A human took over during the final write (ADR-049 fence, Arc F): the assistant turn rolled
-      // back — abandon the run superseded rather than authoring into a human-owned conversation.
-      if (error instanceof ConversationSupersededError) {
-        await this.repository.finalizeSuperseded(this.prisma, claim)
-        return
+        await applyStop(tx, this.repository, claim, ctx.stop)
+        return false
       }
-      this.handleFinalizeError(error, claim)
+      await writeAssistantTurn(tx, claim, result.text)
+      await writeRunSteps(tx, claim.id, this.successSteps(plan, result, durationMs))
+      await writeUsageLedger(tx, claim, plan.attribution, plan.modelSlug, result)
+      if (!(await this.repository.finalizeCompleted(tx, claim))) throw new RunLeaseLostError()
+      return true
+    })
+    if (outcome.kind === 'ok' && outcome.value) {
+      this.metrics.observeAiToolLoopSteps('completed', providerCalls)
+    } else {
+      this.logNotCommitted(claim, outcome.kind)
     }
   }
 
@@ -84,62 +81,28 @@ export class AiRunLoopFinalizer {
     reason: string,
     providerCalls: number
   ): Promise<void> {
-    const committed = await this.fencedWrite(claim, async (tx) => {
+    const outcome = await this.guard.record(claim, async (tx, ctx) => {
       await writeRunSteps(tx, claim.id, [providerCallStep(result, durationMs)])
       await writeUsageLedger(tx, claim, plan.attribution, plan.modelSlug, result)
+      if (ctx.stop) return applyStop(tx, this.repository, claim, ctx.stop)
       if (
         !(await this.repository.finalizeFailed(tx, claim, AiRunErrorCode.TOOL_LOOP_FAILED, reason))
       ) {
         throw new RunLeaseLostError()
       }
     })
-    if (committed) this.metrics.observeAiToolLoopSteps('failed', providerCalls)
-  }
-
-  /**
-   * Intermediate provider call that led to a SAFE tool dispatch: its own step + ledger tx (no CAS),
-   * fenced. Returns `false` when a human took over (the run is already terminalized superseded) so the
-   * loop stops before dispatching the tool.
-   */
-  async recordProviderCall(
-    claim: ClaimedRun,
-    plan: RunPlan,
-    result: AiTextResult,
-    durationMs: number
-  ): Promise<boolean> {
-    return this.fencedWrite(claim, async (tx) => {
-      await writeRunSteps(tx, claim.id, [providerCallStep(result, durationMs)])
-      await writeUsageLedger(tx, claim, plan.attribution, plan.modelSlug, result)
-    })
+    if (outcome.kind === 'ok') this.metrics.observeAiToolLoopSteps('failed', providerCalls)
+    else this.logNotCommitted(claim, outcome.kind)
   }
 
   /** Step bound hit before a call this iteration → terminal FAILED (no provider call to ledger). */
   async exhausted(claim: ClaimedRun, providerCalls: number): Promise<void> {
-    const committed = await this.fencedWrite(claim, async (tx) => {
-      if (
-        !(await this.repository.finalizeFailed(
-          tx,
-          claim,
-          AiRunErrorCode.TOOL_LOOP_FAILED,
-          AiRunTerminalReason.TOOL_LOOP_EXHAUSTED
-        ))
-      ) {
-        throw new RunLeaseLostError()
-      }
-    })
-    if (committed) this.metrics.observeAiToolLoopSteps('exhausted', providerCalls)
-  }
-
-  /** The SAFE tool failed host-side (its invocation is already durable): terminal FAILED CAS. */
-  async dispatchFailed(claim: ClaimedRun, reason: string, providerCalls: number): Promise<void> {
-    const committed = await this.fencedWrite(claim, async (tx) => {
-      if (
-        !(await this.repository.finalizeFailed(tx, claim, AiRunErrorCode.TOOL_LOOP_FAILED, reason))
-      ) {
-        throw new RunLeaseLostError()
-      }
-    })
-    if (committed) this.metrics.observeAiToolLoopSteps('failed', providerCalls)
+    const result = await this.transitions.failed(
+      claim,
+      AiRunErrorCode.TOOL_LOOP_FAILED,
+      AiRunTerminalReason.TOOL_LOOP_EXHAUSTED
+    )
+    if (result === 'applied') this.metrics.observeAiToolLoopSteps('exhausted', providerCalls)
   }
 
   /** Output guard blocked the model text (Arc D): discard it, canned refusal, terminal FAILED. */
@@ -148,37 +111,37 @@ export class AiRunLoopFinalizer {
     categories: GuardrailStepCategory[],
     providerCalls: number
   ): Promise<void> {
-    await this.repository.finalizeRefusal(claim, {
+    const result = await this.transitions.refusal(claim, {
       reasonCode: AiRunTerminalReason.GUARDRAIL_OUTPUT_BLOCKED,
       checkStepType: AiRunStepType.OUTPUT_VALIDATION,
       categories,
     })
-    this.metrics.observeAiToolLoopSteps('failed', providerCalls)
+    if (result === 'applied') this.metrics.observeAiToolLoopSteps('failed', providerCalls)
   }
 
-  /** Map a gateway failure to a retry (retryable) or terminal FAILED (permanent), mirroring Arc C. */
+  /**
+   * Map a provider failure to a retry (retryable) or terminal FAILED (permanent), mirroring Arc C. A visible
+   * stop cause (a takeover or a recorded cancel during the failing call) wins: the guard terminalizes the
+   * stop instead of scheduling a retry or writing a stale FAILED. An abort the caller itself caused (run
+   * deadline) is handled by the loop before this is reached and is never retried as a provider fault.
+   */
   async gatewayError(claim: ClaimedRun, error: unknown): Promise<void> {
-    // Fence (ADR-049, Arc F): a takeover during the failing provider call → abandon superseded rather
-    // than schedule a retry or write a stale FAILED terminal on a taken-over conversation.
-    if (
-      isBotOwnershipStale(
-        await readBotOwnership(this.prisma, claim.conversationId),
-        claim.ownershipGeneration
-      )
-    ) {
-      await this.repository.finalizeSuperseded(this.prisma, claim)
-      return
-    }
     if (error instanceof AiGatewayException) {
-      if (error.retryable) await this.repository.finalizeRetry(this.prisma, claim, error.code)
-      else await this.repository.finalizeFailed(this.prisma, claim, error.code)
+      if (error.retryable) await this.transitions.retry(claim, error.code)
+      else await this.transitions.failed(claim, error.code)
       return
     }
     this.logger.error(
       { event: 'ai.run.unexpected_error', runId: claim.id },
       'Unexpected non-gateway error during AI run loop; scheduling retry'
     )
-    await this.repository.finalizeRetry(this.prisma, claim, AiRunErrorCode.UNKNOWN_ERROR)
+    await this.transitions.retry(claim, AiRunErrorCode.UNKNOWN_ERROR)
+  }
+
+  /** The caller's own abort fired during a provider call: terminalize the (precedence-resolved) stop. */
+  async callerAborted(claim: ClaimedRun, signal: AiRunStopSignal): Promise<void> {
+    if (signal === 'shutdown') return // sealed: nothing is written; lease expiry recovers the run
+    await this.transitions.settleStop(claim, 'expired')
   }
 
   /** Success step trail: an optional flagged input `GUARDRAIL_CHECK`, then this call + finalization. */
@@ -195,51 +158,11 @@ export class AiRunLoopFinalizer {
     return steps
   }
 
-  // (providerCallStep moved to ai-run-loop-persistence so AiRunApprovalParker shares it — Arc E.5.)
-
-  /**
-   * Run a fenced durable-write transaction (ADR-049 fence, Arc F): lock the conversation + assert the
-   * run still owns it (bot control, matching generation) BEFORE writing steps/ledger/terminal CAS, then
-   * `write(tx)`. A human takeover rolls the write back and terminalizes the run superseded; a lost lease
-   * / other fault is left for recovery. Returns whether the write committed — terminal callers ignore it
-   * (the loop returns after them), the intermediate `recordProviderCall` caller stops the loop on false.
-   */
-  private async fencedWrite(
-    claim: ClaimedRun,
-    write: (tx: Prisma.TransactionClient) => Promise<void>
-  ): Promise<boolean> {
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await lockAndAssertBotOwnership(tx, claim.conversationId, claim.ownershipGeneration)
-        await write(tx)
-      })
-      return true
-    } catch (error) {
-      if (error instanceof ConversationSupersededError) {
-        await this.repository.finalizeSuperseded(this.prisma, claim)
-        return false
-      }
-      this.handleFinalizeError(error, claim)
-      return false
-    }
-  }
-
-  /** A lost lease is not a failure (recovery owns the run); any other finalize fault stays retryable. */
-  private handleFinalizeError(error: unknown, claim: ClaimedRun): void {
-    if (error instanceof RunLeaseLostError) {
-      this.logger.warn(
-        { event: 'ai.run.finalize_lease_lost', runId: claim.id },
-        'AI run lease lost during finalization; transcript rolled back'
-      )
-      return
-    }
-    this.logger.error(
-      {
-        event: 'ai.run.finalize_failed',
-        runId: claim.id,
-        error: error instanceof Error ? error.name : 'unknown',
-      },
-      'AI run loop finalization failed after a successful provider call; left non-terminal for recovery'
+  /** A lost lease is not a failure (recovery owns the run); log it with bounded fields only. */
+  private logNotCommitted(claim: ClaimedRun, kind: string): void {
+    this.logger.warn(
+      { event: 'ai.run.finalize_not_committed', runId: claim.id, kind },
+      'AI run finalization not committed (lease lost, shutdown or stop); nothing was written'
     )
   }
 }

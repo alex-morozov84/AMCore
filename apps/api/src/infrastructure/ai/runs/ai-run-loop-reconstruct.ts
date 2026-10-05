@@ -1,65 +1,47 @@
 import { AI_TOOL_REJECTION_NOTICE } from '../tools/ai-tool.constants'
 
 import type { CompletedToolRound } from './ai-run-transcript'
+import { INVOCATION_SELECT, type InvocationRow } from './ai-tool-invocation.store'
 
-import {
-  AiRunStepType,
-  AiToolInvocationStatus,
-  type AiToolRiskClass,
-  type Prisma,
-} from '@/generated/prisma/client'
+import { AiRunStepType, AiToolInvocationStatus, type Prisma } from '@/generated/prisma/client'
 import type { PrismaService } from '@/prisma'
 
 /**
- * An approval-gated invocation whose owner decision has landed but whose effect is not yet applied to
- * the transcript (Arc E.5): status `APPROVED` (execute on resume), `EXECUTING` (a crashed execution to
- * re-apply idempotently on reclaim), or `REJECTED` with no `TOOL_INVOCATION` step yet (feed the rejection
- * notice on resume). Carries the approved `riskClass` + persisted `argsSnapshot` for re-validation.
+ * The run's single unresolved tool action, if any (E12 recovery). At the start of every epoch — BEFORE
+ * the model is asked again — recovery evaluates the latest invocation that still needs an action:
+ * `REQUESTED`/`APPROVED` (start it), `EXECUTING` (same epoch: exit; older epoch: adopt a read-only one,
+ * fail a side-effecting one uncertain), `REJECTED`/`SUCCEEDED` whose application marker is unset,
+ * `OUTCOME_UNKNOWN` and a `FAILED` row on a still-running run (apply its terminal policy). `null` means
+ * nothing is pending (the normal loop). `AWAITING_APPROVAL`/`SKIPPED`/applied rows are never selected.
  */
-export interface PendingApprovalInvocation {
-  id: string
-  toolId: string
-  riskClass: AiToolRiskClass
-  status: AiToolInvocationStatus
-  argsSnapshot: Prisma.JsonValue
-}
-
-/**
- * The run's single pending-application invocation, if any (Arc E.5, worker resume). `APPROVED` and a
- * stranded `EXECUTING` (worker crashed after the execution gate, before the SUCCEEDED commit) both need
- * execution; `REJECTED` is pending only until its `TOOL_INVOCATION` step is written. Returns `null` when
- * there is nothing to apply (normal E.4b loop).
- */
-export async function findPendingApproval(
+export async function findUnresolvedAction(
   prisma: PrismaService,
   runId: string
-): Promise<PendingApprovalInvocation | null> {
-  const inv = await prisma.aiToolInvocation.findFirst({
+): Promise<InvocationRow | null> {
+  return prisma.aiToolInvocation.findFirst({
     where: {
       runId,
-      status: {
-        in: [
-          AiToolInvocationStatus.APPROVED,
-          AiToolInvocationStatus.EXECUTING,
-          AiToolInvocationStatus.REJECTED,
-        ],
-      },
+      OR: [
+        {
+          status: {
+            in: [
+              AiToolInvocationStatus.REQUESTED,
+              AiToolInvocationStatus.APPROVED,
+              AiToolInvocationStatus.EXECUTING,
+              AiToolInvocationStatus.OUTCOME_UNKNOWN,
+              AiToolInvocationStatus.FAILED,
+            ],
+          },
+        },
+        {
+          status: { in: [AiToolInvocationStatus.SUCCEEDED, AiToolInvocationStatus.REJECTED] },
+          appliedAt: null,
+        },
+      ],
     },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, toolId: true, riskClass: true, status: true, argsSnapshot: true },
+    select: INVOCATION_SELECT,
   })
-  if (inv === null) return null
-  if (inv.status !== AiToolInvocationStatus.REJECTED) return inv // APPROVED / EXECUTING → execute on resume
-  // REJECTED is applied once its ordering step exists — then reconstruction replays it (not this path).
-  const step = await prisma.aiRunStep.findFirst({
-    where: {
-      runId,
-      type: AiRunStepType.TOOL_INVOCATION,
-      detail: { path: ['invocationId'], equals: inv.id },
-    },
-    select: { id: true },
-  })
-  return step === null ? inv : null
 }
 
 /**

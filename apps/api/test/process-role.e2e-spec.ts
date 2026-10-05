@@ -46,7 +46,10 @@ let AiRunLoopExecutor: Token
 let AiRunApprovalParker: Token
 let AiApprovalExpiryService: Token
 let AiToolRegistry: Token
-let AiToolDispatcher: Token
+let AiToolActionService: Token
+let AiToolRecoveryService: Token
+let AiRunGuard: Token
+let AiRunTransitions: Token
 let AiRunDispatchProcessor: Token
 let AiRunRecoveryService: Token
 let AiRunRealtimePublisher: Token
@@ -142,8 +145,10 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const aiParker = await import('../src/infrastructure/ai/runs/ai-run-approval-parker.service')
     const aiExpiry = await import('../src/infrastructure/ai/runs/ai-approval-expiry.service')
     const aiToolRegistry = await import('../src/infrastructure/ai/tools/ai-tool-registry.service')
-    const aiToolDispatcher =
-      await import('../src/infrastructure/ai/runs/ai-tool-dispatcher.service')
+    const aiToolAction = await import('../src/infrastructure/ai/runs/ai-tool-action.service')
+    const aiToolRecovery = await import('../src/infrastructure/ai/runs/ai-tool-recovery.service')
+    const aiRunGuard = await import('../src/infrastructure/ai/runs/ai-run-guard.service')
+    const aiTransitions = await import('../src/infrastructure/ai/runs/ai-run-transitions.service')
     const aiProcessor = await import('../src/infrastructure/ai/runs/ai-run-dispatch.processor')
     const aiRecovery = await import('../src/infrastructure/ai/runs/ai-run-recovery.service')
     const aiPublisher = await import('../src/core/ai/realtime/ai-run-realtime.publisher')
@@ -198,7 +203,10 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     AiRunApprovalParker = aiParker.AiRunApprovalParker
     AiApprovalExpiryService = aiExpiry.AiApprovalExpiryService
     AiToolRegistry = aiToolRegistry.AiToolRegistry
-    AiToolDispatcher = aiToolDispatcher.AiToolDispatcher
+    AiToolActionService = aiToolAction.AiToolActionService
+    AiToolRecoveryService = aiToolRecovery.AiToolRecoveryService
+    AiRunGuard = aiRunGuard.AiRunGuard
+    AiRunTransitions = aiTransitions.AiRunTransitions
     AiRunDispatchProcessor = aiProcessor.AiRunDispatchProcessor
     AiRunRecoveryService = aiRecovery.AiRunRecoveryService
     AiRunRealtimePublisher = aiPublisher.AiRunRealtimePublisher
@@ -298,7 +306,11 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, AiRunApprovalParker)
       absent(m, AiApprovalExpiryService)
       absent(m, AiToolRegistry)
-      absent(m, AiToolDispatcher)
+      absent(m, AiToolActionService)
+      absent(m, AiToolRecoveryService)
+      // The ownership guard + transitions fence every durable run write: worker-only like the loop.
+      absent(m, AiRunGuard)
+      absent(m, AiRunTransitions)
       // The publisher is worker-only (only the worker emits run-status hints in Arc C).
       absent(m, AiRunRealtimePublisher)
     })
@@ -360,7 +372,10 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, AiRunApprovalParker)
       present(m, AiApprovalExpiryService)
       present(m, AiToolRegistry)
-      present(m, AiToolDispatcher)
+      present(m, AiToolActionService)
+      present(m, AiToolRecoveryService)
+      present(m, AiRunGuard)
+      present(m, AiRunTransitions)
       present(m, AiRunDispatchProcessor)
       present(m, AiRunRecoveryService)
       // It publishes run-status hints, but hosts no AI HTTP surface and no SSE receive side.

@@ -11,8 +11,34 @@
  */
 export const AI_RUN_LEASE_TTL_MS = 10 * 60 * 1000 // 10 min
 
-/** Max runs claimed per SKIP-LOCKED pass (runs are heavier than notifications → smaller batch). */
-export const AI_RUN_CLAIM_BATCH_LIMIT = 20
+/**
+ * Runs executed concurrently per worker process, shared by the wake job and the recovery tick (a
+ * per-process capacity gate, not a fleet quota or rate limit). Each lane claims ONE run at a time, so
+ * a lease starts when its work starts and never ages in a batch tail. A slot is held until the
+ * physical provider/tool call has settled. Tuned by code change, not env (starter convention).
+ */
+export const AI_RUN_DISPATCH_CONCURRENCY = 2
+
+/** Max runs claimed per SKIP-LOCKED pass: one per lane (see `AI_RUN_DISPATCH_CONCURRENCY`). */
+export const AI_RUN_CLAIM_BATCH_LIMIT = 1
+
+/**
+ * Hard cap on lease epochs (execution attempts) per run, checked BEFORE a claim so the attempt
+ * history stays bounded without ever evicting rows. Legal sequences fit with wide margin: at most
+ * `maxAttempts` (3) executions plus one resume per approval park (≤ `AI_TOOL_LOOP_MAX_STEPS`, max 50).
+ * A run at the cap is failed `attempts_exhausted` instead of being claimed again.
+ */
+export const AI_RUN_MAX_EPOCHS = 128
+
+/** Bounded wait for the conversation/run row locks of a guarded write (fails closed, never stalls a lane). */
+export const AI_RUN_GUARD_LOCK_TIMEOUT_MS = 5 * 1000
+
+/**
+ * Shutdown grace for the AI dispatcher: after the latch closes, in-flight lanes get this long before the
+ * cutoff seals (aborting calls); below the Prisma barrier safety cap. A run interrupted by the seal is
+ * recovered through lease expiry — the seal never writes.
+ */
+export const AI_RUN_SHUTDOWN_GRACE_MS = 15 * 1000
 
 /** Max expired-lease runs reaped per pass, and overdue-deadline runs expired per pass. */
 export const AI_RUN_REAP_BATCH_LIMIT = 20
@@ -84,6 +110,17 @@ export const AiRunTerminalReason = {
    * a disable that races an already-queued run.
    */
   ASSISTANT_DISABLED: 'assistant_disabled',
+  /**
+   * A side-effecting tool may or may not have produced its external effect (timeout, crash or an
+   * unclassified error). The run stops: no new tool action, no new model request. Terminal, non-retryable.
+   */
+  TOOL_EFFECT_UNKNOWN: 'tool_effect_unknown',
+  /** Durable tool state is inconsistent (e.g. a result without its application step); fail closed. */
+  TOOL_STATE_INCONSISTENT: 'tool_state_inconsistent',
+  /** The same requested action reappeared with different normalized input; fail closed, no tool call. */
+  ACTION_INPUT_CONFLICT: 'action_input_conflict',
+  /** A stored tool input no longer parses to itself under the current tool schema; never executed. */
+  TOOL_SCHEMA_INCOMPATIBLE: 'tool_schema_incompatible',
 } as const
 
 /**
@@ -122,6 +159,8 @@ export const AiRunErrorCode = {
   TOOL_LOOP_FAILED: 'tool_loop_failed',
   /** The conversation's bound assistant was disabled before execution (Arc F.4 kill-switch). */
   ASSISTANT_DISABLED: 'assistant_disabled',
+  /** The run reached `AI_RUN_MAX_EPOCHS` execution attempts; its history is full, so it is failed. */
+  ATTEMPT_HISTORY_EXHAUSTED: 'attempt_history_exhausted',
 } as const
 
 /**
