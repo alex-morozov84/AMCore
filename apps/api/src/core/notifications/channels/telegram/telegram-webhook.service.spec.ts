@@ -49,8 +49,15 @@ describe('TelegramWebhookService', () => {
     prisma.telegramConnection.create.mockResolvedValue({ id: 'conn-new' } as never)
   })
 
+  /**
+   * Raw query order inside the bind transaction: (1) the token lock, (2) the owner's existing
+   * connection lock `FOR UPDATE` (relink fence), (3) the cancel statement's `RETURNING` ids.
+   * Later calls default to "no rows".
+   */
   const lockToken = (row: { id: string; userId: string } | null): void => {
-    prisma.$queryRaw.mockResolvedValue(row ? [row] : ([] as never))
+    prisma.$queryRaw.mockReset()
+    prisma.$queryRaw.mockResolvedValueOnce(row ? [row] : ([] as never))
+    prisma.$queryRaw.mockResolvedValue([] as never)
   }
 
   it('acks without a receipt when there is no safe update_id', async () => {
@@ -123,17 +130,22 @@ describe('TelegramWebhookService', () => {
 
   it('relink: cancels the old connection deliveries and deletes it before the new bind', async () => {
     lockToken({ id: 'tok-1', userId: 'user-1' })
-    prisma.telegramConnection.findUnique
-      .mockResolvedValueOnce(null) // owner by chatId (new chat)
-      .mockResolvedValueOnce({ id: 'old-conn' } as never) // existing by userId
+    prisma.telegramConnection.findUnique.mockResolvedValueOnce(null) // owner by chatId (new chat)
+    prisma.$queryRaw
+      .mockReset()
+      .mockResolvedValueOnce([{ id: 'tok-1', userId: 'user-1' }] as never) // token lock
+      .mockResolvedValueOnce([{ id: 'old-conn' }] as never) // old connection, FOR UPDATE
+      .mockResolvedValueOnce([{ id: 'old-delivery' }] as never) // cancelled ids
 
     await service.processUpdate(startBody())
 
-    expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ targetRef: 'old-conn', channel: 'telegram' }),
-        data: expect.objectContaining({ terminalReasonCode: 'telegram_connection_replaced' }),
-      })
+    // Cancel runs as ONE statement over PENDING/RETRY_SCHEDULED/PROCESSING, after the lock.
+    const cancelSql = prisma.$queryRaw.mock.calls[2]![0] as unknown as { values: unknown[] }
+    expect(cancelSql.values).toEqual(
+      expect.arrayContaining(['telegram_connection_replaced', 'telegram', 'old-conn'])
+    )
+    expect(prisma.notificationDeliveryAttempt.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { deliveryId: { in: ['old-delivery'] }, outcome: null } })
     )
     expect(prisma.telegramConnection.delete).toHaveBeenCalledWith({ where: { id: 'old-conn' } })
     expect(prisma.telegramConnection.create).toHaveBeenCalled()

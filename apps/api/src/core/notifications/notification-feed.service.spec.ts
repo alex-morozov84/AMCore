@@ -3,6 +3,7 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PrismaService } from '../../prisma'
 
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
+import { inAppFeedWhere } from './notification-feed.predicate'
 import { NotificationFeedService } from './notification-feed.service'
 import { decodeFeedCursor } from './notification-feed-cursor'
 import type { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
@@ -72,8 +73,22 @@ describe('NotificationFeedService', () => {
 
       await service.getFeed('user-1', { cursor: `v1.${cursor}`, limit: 20 })
 
-      const where = prisma.notification.findMany.mock.calls[0]![0]!.where as { OR?: unknown }
-      expect(where.OR).toBeDefined()
+      const where = prisma.notification.findMany.mock.calls[0]![0]!.where as {
+        AND: Array<{ OR?: unknown }>
+      }
+      // The cursor is ANDed AFTER the feed-membership base (it can never override it).
+      expect(where.AND.at(-1)!.OR).toBeDefined()
+      expect(where.AND[0]).toEqual((inAppFeedWhere('user-1').AND as unknown[])[0])
+    })
+
+    it('filters by feed membership in SQL BEFORE the page limit (no post-render filtering)', async () => {
+      prisma.notification.findMany.mockResolvedValue([] as never)
+
+      await service.getFeed('user-1', { limit: 20 })
+
+      expect(prisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: inAppFeedWhere('user-1'), take: 21 })
+      )
     })
 
     it('falls back to a neutral rendering for an unregistered type', async () => {
@@ -90,22 +105,22 @@ describe('NotificationFeedService', () => {
   })
 
   describe('mutations', () => {
-    it('counts only unread, non-archived notifications', async () => {
+    it('counts only unread, non-archived, FEED-eligible notifications', async () => {
       prisma.notification.count.mockResolvedValue(3)
 
       expect(await service.getUnreadCount('user-1')).toBe(3)
       expect(prisma.notification.count).toHaveBeenCalledWith({
-        where: { recipientUserId: 'user-1', readAt: null, archivedAt: null },
+        where: inAppFeedWhere('user-1', { readAt: null }),
       })
     })
 
-    it('marks one read scoped to the recipient and unread state, then hints', async () => {
+    it('marks one read scoped to the recipient feed and unread state, then hints', async () => {
       prisma.notification.updateMany.mockResolvedValue({ count: 1 } as never)
 
       await service.markRead('user-1', 'n1')
 
       expect(prisma.notification.updateMany).toHaveBeenCalledWith({
-        where: { id: 'n1', recipientUserId: 'user-1', readAt: null },
+        where: inAppFeedWhere('user-1', { id: 'n1', readAt: null }),
         data: { readAt: expect.any(Date) },
       })
       expect(realtime.publish).toHaveBeenCalledWith('user-1', 'read', 'n1')
@@ -139,7 +154,7 @@ describe('NotificationFeedService', () => {
       await service.archive('user-1', 'n1')
 
       expect(prisma.notification.updateMany).toHaveBeenCalledWith({
-        where: { id: 'n1', recipientUserId: 'user-1', archivedAt: null },
+        where: inAppFeedWhere('user-1', { id: 'n1' }),
         data: { archivedAt: expect.any(Date) },
       })
       expect(realtime.publish).toHaveBeenCalledWith('user-1', 'archived', 'n1')

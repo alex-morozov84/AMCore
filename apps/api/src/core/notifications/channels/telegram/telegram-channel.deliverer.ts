@@ -3,11 +3,22 @@ import { Injectable } from '@nestjs/common'
 import { coerceSupportedLocale, localizedFrontendUrl, type SupportedLocale } from '@amcore/shared'
 
 import { PrismaService } from '../../../../prisma'
+import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation'
+import type { ClaimedDelivery } from '../../dispatch/notification-dispatch.types'
+import { NotificationShutdownLatch } from '../../dispatch/notification-shutdown.latch'
 import { NotificationChannel } from '../../notification.constants'
 import { resolveExternalMode } from '../../notification-content-policy'
 import { NotificationDefinitionRegistry } from '../../notification-definition.registry'
 import type { RenderedNotificationContent } from '../../notification-definition.types'
-import type { ChannelDeliverer, DeliveryContext, DeliveryResult } from '../channel-deliverer.types'
+import {
+  type ChannelDeliverer,
+  type DeliveryAdmission,
+  type DeliveryContext,
+  type DeliveryResult,
+  isNotStarted,
+  type NotStarted,
+  type TargetRefusal,
+} from '../channel-deliverer.types'
 
 import {
   TELEGRAM_FENCING_ERROR_CODES,
@@ -18,7 +29,13 @@ import { TelegramBotApiClient } from './telegram-bot-api.client'
 import { telegramGenericMessages } from './telegram-messages'
 
 import { EnvService } from '@/env/env.service'
-import { NotificationDeliveryStatus, TelegramConnectionStatus } from '@/generated/prisma/client'
+import { Prisma, TelegramConnectionStatus } from '@/generated/prisma/client'
+
+interface ConnectionRow {
+  userId: string
+  chatId: string
+  status: string
+}
 
 /**
  * Telegram channel deliverer (ADR-052 / Arc D, worker-only). Mirrors the email deliverer:
@@ -26,7 +43,11 @@ import { NotificationDeliveryStatus, TelegramConnectionStatus } from '@/generate
  * `projectExternal('telegram')` + `renderTelegram` allowlist (enforced external boundary), sent as
  * **plain text** (no `parse_mode`) by `TelegramBotApiClient`. On a permanent **destination** error
  * (blocked / chat-not-found / migrated) it fences the exact connection (conditional block + cancel
- * its other due deliveries); a non-destination permanent never disables a user's connection.
+ * its other active deliveries); a non-destination permanent never disables a user's connection.
+ *
+ * Target generation: `targetRef` is the connection id, a fresh row per link/relink. Actual-start
+ * admission re-checks it under `FOR SHARE` (`checkTarget`), so a delivery whose connection was
+ * unlinked, replaced, blocked or never belonged to this recipient/chat makes NO provider call.
  */
 @Injectable()
 export class TelegramChannelDeliverer implements ChannelDeliverer {
@@ -36,10 +57,14 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
     private readonly registry: NotificationDefinitionRegistry,
     private readonly client: TelegramBotApiClient,
     private readonly prisma: PrismaService,
-    private readonly env: EnvService
+    private readonly env: EnvService,
+    private readonly latch: NotificationShutdownLatch
   ) {}
 
-  async deliver(context: DeliveryContext): Promise<DeliveryResult> {
+  async deliver(
+    context: DeliveryContext,
+    admission: DeliveryAdmission
+  ): Promise<DeliveryResult | NotStarted> {
     const { delivery, notification } = context
     const locale = coerceSupportedLocale(delivery.locale)
 
@@ -52,7 +77,10 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
     }
 
     const text = this.composeText(content, notification.action !== null, locale)
-    const result = await this.client.sendMessage({ chatId: delivery.targetKey, text })
+    const result = await admission.send((signal) =>
+      this.client.sendMessage({ chatId: delivery.targetKey, text, signal })
+    )
+    if (isNotStarted(result)) return result
 
     if (result.status === 'delivered') {
       return { status: 'delivered', providerMessageId: result.providerMessageId }
@@ -61,9 +89,40 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
       return { status: 'transient', errorCode: result.errorCode, retryAfterMs: result.retryAfterMs }
     }
     if (TELEGRAM_FENCING_ERROR_CODES.has(result.errorCode)) {
-      await this.fenceConnection(delivery.targetRef, delivery.targetKey)
+      await this.fenceConnection(delivery)
     }
     return { status: 'permanent', errorCode: result.errorCode }
+  }
+
+  /**
+   * Admission-time target check (inside the admission transaction, connection lock first): the
+   * connection must exist by `targetRef`, belong to this recipient, still be this chat, and be
+   * `ACTIVE`. Never swallows a query error.
+   */
+  async checkTarget(
+    tx: Prisma.TransactionClient,
+    context: DeliveryContext
+  ): Promise<TargetRefusal | null> {
+    const { delivery, notification } = context
+    if (!delivery.targetRef) return { reason: TelegramCancelReason.TARGET_REVOKED }
+    const rows = await tx.$queryRaw<ConnectionRow[]>(Prisma.sql`
+      SELECT "userId", "chatId", status
+      FROM "notifications"."telegram_connections"
+      WHERE id = ${delivery.targetRef}
+      FOR SHARE
+    `)
+    const connection = rows[0]
+    if (
+      !connection ||
+      connection.userId !== notification.recipientUserId ||
+      connection.chatId !== delivery.targetKey
+    ) {
+      return { reason: TelegramCancelReason.TARGET_REVOKED }
+    }
+    if (connection.status !== TelegramConnectionStatus.ACTIVE) {
+      return { reason: TelegramCancelReason.CONNECTION_BLOCKED }
+    }
+    return null
   }
 
   /** Plain-text message: title + body, plus the trusted app link when a first-party action exists. */
@@ -80,31 +139,37 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
   }
 
   /**
-   * Conditionally block the exact connection used by this delivery and cancel its other due
-   * deliveries. The `id + chatId + status=ACTIVE` predicate is the generation fence: a late old
-   * leased send (its `targetRef` is the prior, deleted id) matches **no** row, so it cannot
-   * disable a freshly relinked connection (ADR-049). Idempotent and self-contained.
+   * Conditionally block the exact connection used by this delivery and cancel its OTHER active
+   * deliveries, in one guarded transaction (connection lock first, so it serializes with unlink/
+   * relink/producer/admission). The initiating delivery is excluded: it keeps its own permanent
+   * failure trail when it wins its finalize CAS (the winning CAS decides history — an independent
+   * unlink/reaper may win first). The `id + chatId + status=ACTIVE` predicate is the generation
+   * fence: a late old leased send (its `targetRef` is the prior, deleted id) matches **no** row,
+   * so it cannot disable a freshly relinked connection (ADR-049). After the shutdown seal this
+   * does nothing. Idempotent and self-contained.
    */
-  private async fenceConnection(connectionId: string | null, chatId: string): Promise<void> {
+  private async fenceConnection(delivery: ClaimedDelivery): Promise<void> {
+    const connectionId = delivery.targetRef
     if (!connectionId) return
-    await this.prisma.$transaction(async (tx) => {
+    await this.latch.transaction(this.prisma, async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT id FROM "notifications"."telegram_connections" WHERE id = ${connectionId} FOR UPDATE
+      `)
+      if (locked.length === 0) return
       const blocked = await tx.telegramConnection.updateMany({
-        where: { id: connectionId, chatId, status: TelegramConnectionStatus.ACTIVE },
+        where: {
+          id: connectionId,
+          chatId: delivery.targetKey,
+          status: TelegramConnectionStatus.ACTIVE,
+        },
         data: { status: TelegramConnectionStatus.BLOCKED },
       })
       if (blocked.count === 0) return
-      await tx.notificationDelivery.updateMany({
-        where: {
-          targetRef: connectionId,
-          channel: NotificationChannel.TELEGRAM,
-          status: {
-            in: [NotificationDeliveryStatus.PENDING, NotificationDeliveryStatus.RETRY_SCHEDULED],
-          },
-        },
-        data: {
-          status: NotificationDeliveryStatus.CANCELLED,
-          terminalReasonCode: TelegramCancelReason.CONNECTION_BLOCKED,
-        },
+      await cancelActiveDeliveries(tx, {
+        channel: NotificationChannel.TELEGRAM,
+        targetRef: connectionId,
+        reason: TelegramCancelReason.CONNECTION_BLOCKED,
+        exceptDeliveryId: delivery.id,
       })
     })
   }

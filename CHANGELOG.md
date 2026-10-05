@@ -71,6 +71,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Console filter reset uses a shared navigation control and avoids starting route
   progress for repeated resets of the current unfiltered page.
 
+- Notification delivery no longer lets a queued row age out its lease while it waits
+  behind others: each worker runs at most two deliveries at a time (shared by the wake
+  job and the recovery cron), and every attempt is admitted just before its provider
+  call — with fresh database time for the lease and, for Telegram, a check that the
+  connection is still the same generation, owner, chat and status. An expired,
+  reclaimed or revoked attempt makes no provider call.
+
+- A revoked Telegram chat is no longer messaged by a retry. Unlinking, relinking or a
+  permanent destination error now cancels every active delivery of the connection,
+  including one being processed, and the producer and the unlink/relink/fence paths
+  serialize on the connection row, so a late failure of an old link can neither resend
+  nor disable a freshly linked one.
+
+- The in-app feed, unread count, mark-read, read-all and archive now share one rule: a
+  notification is listed only if it was delivered in-app. Notifications produced for
+  external channels only, or while in-app was switched off, no longer appear in the feed
+  or its count; pages are filtered before the limit. Mark-read on an archived or
+  non-feed id is now a no-op.
+
+- A provider retry delay is kept as the earliest next attempt, also on a notification
+  that ran out of attempts, and Resend's `Retry-After` is now honored for notification
+  email (other email providers keep the ordinary backoff). A requested delay above 24
+  hours is still clamped to 24 hours.
+
+- The Resend SDK no longer prints the raw provider error to the console outside
+  production, and the notification dispatcher logs no error text.
+
+- Worker shutdown: the notification dispatcher now stops taking new work, gives
+  in-flight deliveries up to 15 seconds to record their result and releases every wait
+  on them, before the database is closed; an interrupted transaction rolls back as a
+  whole. `PrismaService.registerShutdownBarrier` lets a worker-side drain finish before
+  database teardown, and the reference Compose `api` and `worker` services now set
+  `stop_grace_period: 30s`.
+
 ### Changed
 
 - Advanced permission writes reject unsupported conditions, fields and principal

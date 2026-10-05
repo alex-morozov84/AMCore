@@ -22,6 +22,12 @@ export interface SendEmailParams {
    * post-accept network blip does not double-send. Ignored by the mock provider.
    */
   idempotencyKey?: string
+  /**
+   * Optional in-memory abort signal for this single send (set by the notification email
+   * deliverer so its attempt timeout / shutdown can abort the request). Never serialized — it
+   * is not part of any queue payload or schema — and ignored by providers that cannot use it.
+   */
+  signal?: AbortSignal
 }
 
 /**
@@ -38,6 +44,13 @@ export interface SendEmailResult {
    * bounded by `attempts`, then dead-letter). Undefined on success.
    */
   retryable?: boolean
+  /**
+   * Provider-requested minimum delay before a retry, in ms, normalized from the transport's
+   * `Retry-After` signal when it exposes one (Resend does on a rate-limit response). Absent when
+   * the transport gave no usable signal — the caller then uses its ordinary backoff. Only this
+   * normalized number crosses the boundary: no headers, body or provider error text.
+   */
+  retryAfterMs?: number
 }
 
 /**

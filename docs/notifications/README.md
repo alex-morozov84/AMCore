@@ -56,6 +56,19 @@ uses **cursor** pagination (the documented exception to the project's offset
 envelope — the feed is append-heavy, so offsets would skip/duplicate rows);
 `GET /notifications/capabilities` advertises only currently active channels.
 
+**What is in the feed.** A notification is feed-visible only if it has a
+`DELIVERED` `in_app` delivery — that is, the in-app channel was selected when it
+was produced (mandatory, or optional with the master toggle and the category
+preference on). A notification delivered only externally, or produced while in-app
+was off, keeps its canonical record (and its external deliveries) but is never
+listed, counted, marked read or archived through the feed. The list, the unread
+count, mark-read, read-all and archive all use this one rule, so they cannot
+disagree, and pages are filtered **before** the limit (`hasMore`/`nextCursor`
+describe feed items only). Eligibility is fixed at produce time: switching a
+preference later neither hides earlier items nor reveals ones that were never
+delivered in-app. Mark-read on an archived or ineligible id is a `204` no-op with
+no realtime hint.
+
 ## Add a notification definition
 
 A definition is a code-owned record — identifier, payload schema, default and
@@ -225,6 +238,81 @@ AMCore doesn't ship one.
 URL path of every request, so whoever terminates TLS on the relay gets full
 control of the bot (read/send messages, change the webhook). Never point it at
 a third-party or public Bot API mirror.
+
+## Delivery guarantees and operating limits
+
+These are the current guarantees of the worker-side dispatcher (a worker process
+runs both the BullMQ wake path and the recovery cron through the same code).
+
+**At-least-once, never exactly-once.** A send can be accepted by the provider and
+the worker can still lose its lease or time out before recording it, so a
+recipient can occasionally receive a message twice. Email sends carry the stable
+idempotency key `notification-delivery:<deliveryId>` (Resend honors it for 24 h);
+Telegram has no equivalent, so its duplicate risk is real. A timeout is an
+**ambiguous** outcome — the message may have been sent — and is retried.
+
+**Capacity is per process.** A worker runs at most `NOTIFICATION_DISPATCH_CONCURRENCY`
+(default 2, a code constant in `notification-dispatch.constants.ts`) deliveries at
+once, shared by the wake job and the cron. A row is claimed only when a slot can
+start it immediately, so a lease never ages while a row waits behind others, and a
+slot stays occupied until the provider call has actually ended (even after its
+attempt timed out). This is **not** a rate limiter and not a fairness guarantee:
+replicas multiply it, one hung call still occupies a slot, and a provider's quota
+(for example Resend's per-team limit) is account-wide.
+
+**Start fence.** Immediately before each provider call the attempt is admitted in
+one short database transaction: the delivery lease must still belong to this
+worker (checked with fresh database time, after any lock wait) and, for Telegram,
+the connection must still exist as the same generation, owner, chat and `ACTIVE`
+status. A holder whose lease expired, a reaped-and-reclaimed attempt, an attempt
+whose timeout already fired, or a revoked target makes **no provider call**. The
+limit that remains: after a successful admission a process pause can still
+delay the request, and a call already admitted or on the wire is not recalled
+(see at-least-once above).
+
+**Revoked Telegram targets.** Unlinking, relinking, or a permanent destination
+error cancels every active delivery of that connection — `PENDING`,
+`RETRY_SCHEDULED` and the one being processed — with a bounded reason, closing its
+open attempt. A retry or the lease reaper therefore cannot send to the old chat,
+and a freshly linked connection is never disabled by a late failure of the old
+one. The producer reads the connection under a share lock, so a notification
+produced at the same instant as an unlink is either cancelled with it or skipped
+(`telegram_not_linked`). `notifyTx` callers: the default `READ COMMITTED`
+isolation is assumed; do not pre-lock delivery rows or lock several recipients in
+inconsistent order. Under stricter isolation a concurrent unlink may surface a
+serialization failure to your transaction.
+
+**Retry-After.** A provider's retry delay (Telegram `retry_after`, Resend
+`Retry-After` on a rate-limit response) is a floor: the next attempt is the later
+of the jittered backoff and the requested delay, and a delivery that runs out of
+attempts keeps that time in `nextAttemptAt` ("earliest permitted next attempt";
+status, not that date, decides whether a row is claimable). A delay longer than
+**24 hours is clamped to 24 hours** — a deliberate exception to "never earlier
+than the provider asked". An email transport that exposes no delay (the mock
+provider, other providers you add) simply uses the ordinary backoff; support for
+other providers is not promised. Quota-exhausted errors stay permanent.
+
+**Recovery and Redis.** Postgres owns state; a lost wake, a Redis outage or a
+missed realtime hint is recovered by the 30-second cron and by clients refetching.
+A crashed worker's lease expires and the reaper reclaims the row (the attempt is
+recorded `ABANDONED` and counts against the budget).
+
+**Graceful shutdown.** On `SIGTERM` the dispatcher first **closes** — no new
+claims, admissions or recovery passes — and lets work already in flight record its
+result. Within `NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s` (15 s), or earlier once
+the logical work finishes, it
+**seals**: nothing new starts, every wait on in-flight work is released, and a
+database transaction cut between two dependent writes is rolled back as a whole,
+never half-applied. This happens **before** the database pool is closed
+(`PrismaService` runs registered shutdown barriers first). A row whose result was
+not recorded after its claim committed is recovered through lease expiry and the
+reaper. An issued transaction may still commit or roll back after the seal: its
+outcome is unknown until it settles. A rolled-back claim stays pending; a committed
+finalize needs no reaper. Shutdown attempts to abort provider calls; adapters may
+ignore abort, and an already accepted message cannot be recalled. Calls still
+pending when the process terminates end with it, so the platform's termination
+grace must exceed this bound plus your
+other shutdown steps; see [Graceful shutdown](../operations/deployment.md#graceful-shutdown).
 
 ## Preferences & mandatory channels
 

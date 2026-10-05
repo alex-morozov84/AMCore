@@ -204,6 +204,7 @@ describe('NotificationsService', () => {
     await service.notify(VALID_INPUT)
 
     expect(prisma.telegramConnection.findUnique).not.toHaveBeenCalled()
+    expect(prisma.$queryRaw).not.toHaveBeenCalled()
   })
 
   it('materializes a PENDING Telegram delivery for an ACTIVE linked connection', async () => {
@@ -217,15 +218,19 @@ describe('NotificationsService', () => {
       realtime,
       logger
     )
-    prisma.telegramConnection.findUnique.mockResolvedValue({
-      id: 'conn-1',
-      chatId: '999000',
-      status: 'ACTIVE',
-    } as never)
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'conn-1', chatId: '999000', status: 'ACTIVE' },
+    ] as never)
     prisma.notification.createManyAndReturn.mockResolvedValue([{ id: 'n1' }] as never)
     prisma.notificationDelivery.createMany.mockResolvedValue({ count: 2 } as never)
 
     const result = await telegramService.notify({ ...VALID_INPUT, type: 'account.telegram_test' })
+
+    // The connection is read `FOR SHARE` on the supplied client (held to the caller's commit), so a
+    // concurrent unlink/relink/block either waits and cancels this delivery or committed first.
+    const readSql = prisma.$queryRaw.mock.calls[0]![0] as unknown as { sql: string }
+    expect(readSql.sql).toContain('FOR SHARE')
+    expect(prisma.telegramConnection.findUnique).not.toHaveBeenCalled()
 
     expect(result.channels).toEqual([NotificationChannel.IN_APP, NotificationChannel.TELEGRAM])
     const createManyArg = prisma.notificationDelivery.createMany.mock.calls[0]![0] as {

@@ -603,6 +603,194 @@ describe('Notifications (e2e)', () => {
     })
   })
 
+  describe('feed membership = a persisted DELIVERED in_app delivery (C2)', () => {
+    const turnMasterToggle = (user: RegisteredUser, enabled: boolean) =>
+      request(app.getHttpServer())
+        .patch('/notifications/settings')
+        .set('Authorization', user.authHeader)
+        .send({ notificationsEnabled: enabled })
+        .expect(204)
+
+    const disableInApp = (user: RegisteredUser) =>
+      request(app.getHttpServer())
+        .put('/notifications/preferences')
+        .set('Authorization', user.authHeader)
+        .send({
+          category: NotificationCategory.ACCOUNT,
+          channel: NotificationChannel.IN_APP,
+          enabled: false,
+        })
+        .expect(204)
+
+    const feedIds = async (user: RegisteredUser, query = ''): Promise<string[]> => {
+      const res = await request(app.getHttpServer())
+        .get(`/notifications${query}`)
+        .set('Authorization', user.authHeader)
+        .expect(200)
+      return (res.body.data as Array<{ id: string }>).map((item) => item.id)
+    }
+
+    const unread = async (user: RegisteredUser): Promise<number> => {
+      const res = await request(app.getHttpServer())
+        .get('/notifications/unread-count')
+        .set('Authorization', user.authHeader)
+        .expect(200)
+      return res.body.unread as number
+    }
+
+    /** Persist a canonical notification with NO in-app delivery (what an opted-out produce writes). */
+    async function seedIneligible(userId: string, createdAt?: Date): Promise<string> {
+      const result = await seed(userId)
+      await prisma.notificationDelivery.deleteMany({
+        where: { notificationId: result.notificationId },
+      })
+      if (createdAt) {
+        await prisma.notification.update({
+          where: { id: result.notificationId },
+          data: { createdAt },
+        })
+      }
+      return result.notificationId
+    }
+
+    it('an optional notification produced with the MASTER toggle off keeps its record but is not in the feed', async () => {
+      const user = await registerUser(app)
+      await turnMasterToggle(user, false)
+
+      const { notificationId } = await seed(user.userId)
+
+      expect(await prisma.notification.count({ where: { id: notificationId } })).toBe(1) // canonical stays
+      expect(
+        await prisma.notificationDelivery.count({ where: { notificationId, channel: 'in_app' } })
+      ).toBe(0)
+      expect(await feedIds(user)).toEqual([])
+      expect(await unread(user)).toBe(0)
+    })
+
+    it('an optional notification with its CATEGORY/in_app preference off is not in the feed (external-only)', async () => {
+      const user = await registerUser(app)
+      await disableInApp(user)
+
+      const { notificationId } = await seed(user.userId)
+
+      expect(await feedIds(user)).toEqual([])
+      expect(await unread(user)).toBe(0)
+      expect(await prisma.notification.count({ where: { id: notificationId } })).toBe(1)
+    })
+
+    it('a MANDATORY in-app notification is in the feed even with the master toggle off', async () => {
+      const user = await registerUser(app)
+      await turnMasterToggle(user, false)
+
+      const result = await notifications.notify({
+        recipientUserId: user.userId,
+        type: 'account.password_changed',
+        payload: { changedAt: new Date().toISOString() },
+        idempotencyKey: `account.password_changed:feed-${Date.now()}`,
+      })
+
+      expect(await feedIds(user)).toEqual([result.notificationId])
+      expect(await unread(user)).toBe(1)
+    })
+
+    it('later preference toggles neither hide earlier eligible rows nor reveal ineligible ones', async () => {
+      const user = await registerUser(app)
+      const eligible = (await seed(user.userId)).notificationId // produced with the toggle ON
+      await turnMasterToggle(user, false)
+      const ineligible = (await seed(user.userId)).notificationId // produced with the toggle OFF
+
+      expect(await feedIds(user)).toEqual([eligible]) // still visible while OFF
+      await turnMasterToggle(user, true)
+      expect(await feedIds(user)).toEqual([eligible]) // ineligible NOT revealed by switching ON
+      expect(await prisma.notification.count({ where: { id: ineligible } })).toBe(1)
+      expect(await unread(user)).toBe(1)
+    })
+
+    it('legacy / no-delivery and non-DELIVERED in_app rows are excluded', async () => {
+      const user = await registerUser(app)
+      const noDelivery = await seedIneligible(user.userId)
+      const failedInApp = (await seed(user.userId)).notificationId
+      await prisma.notificationDelivery.updateMany({
+        where: { notificationId: failedInApp },
+        data: { status: NotificationDeliveryStatus.FAILED },
+      })
+      const eligible = (await seed(user.userId)).notificationId
+
+      expect(await feedIds(user)).toEqual([eligible])
+      expect(await unread(user)).toBe(1)
+      void noDelivery
+    })
+
+    it('mutations on foreign, archived or ineligible ids are 204 no-ops (state unchanged)', async () => {
+      const user = await registerUser(app)
+      const ineligible = await seedIneligible(user.userId)
+      const archivedEligible = (await seed(user.userId)).notificationId
+      await request(app.getHttpServer())
+        .post(`/notifications/${archivedEligible}/archive`)
+        .set('Authorization', user.authHeader)
+        .expect(204)
+
+      for (const id of [ineligible, archivedEligible]) {
+        await request(app.getHttpServer())
+          .post(`/notifications/${id}/read`)
+          .set('Authorization', user.authHeader)
+          .expect(204)
+      }
+      await request(app.getHttpServer())
+        .post(`/notifications/${ineligible}/archive`)
+        .set('Authorization', user.authHeader)
+        .expect(204)
+      const readAll = await request(app.getHttpServer())
+        .post('/notifications/read-all')
+        .set('Authorization', user.authHeader)
+        .expect(200)
+
+      expect(readAll.body.updated).toBe(0)
+      const ineligibleRow = await prisma.notification.findUniqueOrThrow({
+        where: { id: ineligible },
+      })
+      expect(ineligibleRow.readAt).toBeNull()
+      expect(ineligibleRow.archivedAt).toBeNull()
+      const archivedRow = await prisma.notification.findUniqueOrThrow({
+        where: { id: archivedEligible },
+      })
+      expect(archivedRow.readAt).toBeNull() // an archived row is not in the feed: read is a no-op
+    })
+
+    it('paginates ONLY eligible rows: correct hasMore/nextCursor and no duplicates among ineligible interleaving', async () => {
+      const user = await registerUser(app)
+      const base = Date.now() - 60_000
+      const eligibleIds: string[] = []
+      for (let i = 0; i < 5; i += 1) {
+        const id = (await seed(user.userId)).notificationId
+        await prisma.notification.update({
+          where: { id },
+          data: { createdAt: new Date(base + i * 2_000) },
+        })
+        eligibleIds.push(id)
+        await seedIneligible(user.userId, new Date(base + i * 2_000 + 1_000)) // interleaved ineligible
+      }
+      const expectedNewestFirst = [...eligibleIds].reverse()
+
+      const seen: string[] = []
+      let cursor: string | null = null
+      let pages = 0
+      do {
+        const res = await request(app.getHttpServer())
+          .get(`/notifications?limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`)
+          .set('Authorization', user.authHeader)
+          .expect(200)
+        seen.push(...(res.body.data as Array<{ id: string }>).map((item) => item.id))
+        expect(res.body.hasMore).toBe(res.body.nextCursor !== null)
+        cursor = res.body.nextCursor as string | null
+        pages += 1
+      } while (cursor && pages < 10)
+
+      expect(seen).toEqual(expectedNewestFirst) // exactly the eligible rows, in order, no duplicates
+      expect(pages).toBe(3) // 2 + 2 + 1
+    })
+  })
+
   describe('Producer atomicity and idempotency', () => {
     it('rolls back a notifyTx write when the caller transaction throws', async () => {
       const user = await registerUser(app)

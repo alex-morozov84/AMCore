@@ -5,18 +5,14 @@ import { Injectable } from '@nestjs/common'
 import type { TelegramConnectionResponse, TelegramLinkResponse } from '@amcore/shared'
 
 import { PrismaService } from '../../../../prisma'
+import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation'
 import { NotificationChannel } from '../../notification.constants'
 
 import { TELEGRAM_LINK_TOKEN_TTL_MS, TelegramCancelReason } from './telegram.constants'
 
 import { AuditLogService } from '@/core/audit/audit-log.service'
 import { EnvService } from '@/env/env.service'
-import {
-  AuditActorType,
-  AuditTargetType,
-  NotificationDeliveryStatus,
-  Prisma,
-} from '@/generated/prisma/client'
+import { AuditActorType, AuditTargetType, Prisma } from '@/generated/prisma/client'
 
 /** SHA-256 hex of a raw token — only the hash is ever stored (mirrors reset-token hygiene). */
 function hashToken(raw: string): string {
@@ -63,19 +59,26 @@ export class TelegramLinkService {
   }
 
   /**
-   * Unlink: transactionally hard-delete the connection and cancel its due deliveries (bounded
-   * reason) so no in-flight delivery survives to message a torn-down chat. The unavoidable residual
-   * for an already `PROCESSING` send is the documented ADR-052 at-least-once semantics. No-op if
-   * the user has no connection.
+   * Unlink: transactionally hard-delete the connection and cancel ALL its active deliveries
+   * (`PENDING`, `RETRY_SCHEDULED` and `PROCESSING`; bounded reason) so no delivery survives to
+   * start a NEW send to a torn-down chat or to resurrect through a transient/reaper path. The
+   * connection row is locked `FOR UPDATE` first (global lock order: connection → deliveries), so a
+   * producer holding `FOR SHARE` commits its delivery before the cancel sees it, and a concurrent
+   * unlink/relink finds no row and is a no-op. The unavoidable residual for a send already admitted
+   * or on the wire is the documented ADR-052 at-least-once semantics. No-op if the user has no
+   * connection.
    */
   async unlink(userId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      const connection = await tx.telegramConnection.findUnique({
-        where: { userId },
-        select: { id: true },
-      })
+      const [connection] = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT id FROM "notifications"."telegram_connections" WHERE "userId" = ${userId} FOR UPDATE
+      `)
       if (!connection) return
-      await this.cancelDueDeliveries(tx, connection.id, TelegramCancelReason.CONNECTION_UNLINKED)
+      await cancelActiveDeliveries(tx, {
+        channel: NotificationChannel.TELEGRAM,
+        targetRef: connection.id,
+        reason: TelegramCancelReason.CONNECTION_UNLINKED,
+      })
       await tx.telegramConnection.delete({ where: { id: connection.id } })
       await this.audit.record(
         {
@@ -87,24 +90,6 @@ export class TelegramLinkService {
         },
         { tx }
       )
-    })
-  }
-
-  /** Cancel a connection's `PENDING`/`RETRY_SCHEDULED` telegram deliveries with a bounded reason. */
-  private async cancelDueDeliveries(
-    tx: Prisma.TransactionClient,
-    connectionId: string,
-    reason: string
-  ): Promise<void> {
-    await tx.notificationDelivery.updateMany({
-      where: {
-        targetRef: connectionId,
-        channel: NotificationChannel.TELEGRAM,
-        status: {
-          in: [NotificationDeliveryStatus.PENDING, NotificationDeliveryStatus.RETRY_SCHEDULED],
-        },
-      },
-      data: { status: NotificationDeliveryStatus.CANCELLED, terminalReasonCode: reason },
     })
   }
 }

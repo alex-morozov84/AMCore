@@ -482,6 +482,40 @@ needed), and Postgres `FOR UPDATE SKIP LOCKED` is the coordinator, so replicas
 drain disjoint rows without double-sending. The throttler is Redis-backed and
 BullMQ workers consume one shared queue. Add worker replicas freely.
 
+### Graceful shutdown
+
+On `SIGTERM` Nest runs the destroy hooks, then the platform kills the process once
+its **termination grace** runs out. The reference `docker-compose.yml` sets
+`stop_grace_period: 30s` on `api` and `worker` (Docker's default is 10 s, which is
+shorter than the worker needs); in Kubernetes the pod default is
+`terminationGracePeriodSeconds: 30`. Set it explicitly for your own platform and
+raise it if you add slow shutdown steps — nothing in the repository can verify a
+live deployment's value.
+
+What the worker does within that budget:
+
+1. The **notification dispatcher closes**: it starts no new claims, sends or
+   recovery passes, and lets deliveries already in flight record their result.
+2. Within **15 seconds** (`NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s`), or earlier
+   once the logical work finishes, it
+   **seals**: nothing new starts and every wait on in-flight work is released, so
+   the BullMQ worker is not held open by notification work. A database transaction
+   interrupted between two dependent writes is rolled back as a whole.
+3. Only then does `PrismaService` disconnect (it runs registered shutdown barriers,
+   capped at 20 s, before closing the pool).
+
+A delivery whose result was not recorded is recovered by lease expiry and the
+lease reaper on the next worker (it may be sent again — notification delivery is
+at-least-once), provided its claim committed. An issued transaction may still
+commit or roll back after the seal; its outcome is unknown until it settles. A
+rolled-back claim leaves the delivery pending, and a committed finalize needs no
+reaper. Shutdown attempts to abort provider requests, but an adapter may
+ignore abort and an already accepted message cannot be recalled. Requests still
+pending at process termination end with the process. The 15 s bound covers
+notification work only: it does not bound
+Redis cleanup, other queues, the HTTP server or the database disconnect, so budget
+those separately inside the platform's grace period.
+
 ## TLS & reverse proxy
 
 AMCore's Node process speaks plain HTTP; TLS terminates at the **edge** — a

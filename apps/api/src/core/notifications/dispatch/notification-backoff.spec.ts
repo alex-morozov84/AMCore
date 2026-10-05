@@ -5,7 +5,11 @@ import {
   NOTIFICATION_RETRY_AFTER_MAX_MS,
 } from '../notification-dispatch.constants'
 
-import { applyRetryAfterFloor, computeNextAttemptAt } from './notification-backoff'
+import {
+  applyRetryAfterFloor,
+  computeNextAttemptAt,
+  resolveRetryFloor,
+} from './notification-backoff'
 
 describe('computeNextAttemptAt', () => {
   const now = new Date('2026-06-18T00:00:00.000Z')
@@ -68,5 +72,41 @@ describe('applyRetryAfterFloor', () => {
   it('clamps an absurd floor to the 24h defensive max, never parking indefinitely', () => {
     const result = applyRetryAfterFloor(backoffAt, 99 * 24 * 60 * 60_000, now)
     expect(result.getTime()).toBe(now.getTime() + NOTIFICATION_RETRY_AFTER_MAX_MS)
+  })
+})
+
+describe('resolveRetryFloor (normalized once, before any branching)', () => {
+  const now = new Date('2026-10-05T00:00:00.000Z')
+  const H = 60 * 60_000
+
+  it.each([undefined, 0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    'yields no floor for %s (ordinary backoff)',
+    (value) => {
+      expect(resolveRetryFloor(value, now)).toBeUndefined()
+    }
+  )
+
+  it('honors a valid delay up to exactly 24 h as the earliest permitted next attempt', () => {
+    expect(resolveRetryFloor(5 * 60_000, now)!.getTime()).toBe(now.getTime() + 5 * 60_000)
+    expect(resolveRetryFloor(24 * H, now)!.getTime()).toBe(now.getTime() + 24 * H)
+  })
+
+  it('clamps a valid delay above 24 h to 24 h — the ADR-052-accepted exception, asserted explicitly', () => {
+    // A valid 24 h + 1 s and a valid 48 h Retry-After are retried at 24 h, i.e. possibly EARLIER
+    // than the provider asked. This is the documented policy, not a bug.
+    expect(resolveRetryFloor(24 * H + 1_000, now)!.getTime()).toBe(now.getTime() + 24 * H)
+    expect(resolveRetryFloor(48 * H, now)!.getTime()).toBe(now.getTime() + 24 * H)
+  })
+
+  it('jitter can never lower the floor: the later of backoff and floor wins', () => {
+    const backoffAt = new Date(now.getTime() + 60_000)
+    const floorMs = 120_000
+    for (const random of [0, 0.5, 1]) {
+      jest.spyOn(Math, 'random').mockReturnValue(random)
+      const next = applyRetryAfterFloor(computeNextAttemptAt(2, now), floorMs, now)
+      expect(next.getTime()).toBeGreaterThanOrEqual(now.getTime() + floorMs)
+    }
+    jest.restoreAllMocks()
+    expect(applyRetryAfterFloor(backoffAt, floorMs, now).getTime()).toBe(now.getTime() + floorMs)
   })
 })
