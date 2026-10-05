@@ -213,3 +213,45 @@ escalate per your organization's on-call process.
 record while available, but not urgent otherwise. `Page` (>10 in 5m) means a
 burst, very likely systemic — escalate per your organization's on-call
 process.
+
+## AI run recovery
+
+**Symptom:** AI runs are slow to start or finish, a run is stuck `running`,
+`amcore_ai_run_admission_total{outcome="lease_lost"}` is rising, or a run ended
+`tool_effect_unknown` / `tool_state_inconsistent`.
+
+**What the system guarantees:** a worker holds a run only through a lease. A
+worker that stalls past it is replaced, and its late writes are refused (they show
+as `lease_lost`); the reaper requeues or ends the run. A run is never left
+`running` forever: a lost lease is reclaimed within the reaper interval plus the
+lease length (10 minutes).
+
+**Diagnostic steps:**
+
+1. `amcore_ai_run_due` and `amcore_ai_run_backlog{status}` show whether runs are
+   waiting (see the due/backlog sections above). Each worker process executes at
+   most two runs at a time; add worker replicas for more capacity.
+2. A rising `lease_lost` rate means provider calls or tools outlast the lease
+   (`AI_REQUEST_TIMEOUT_MS` is bounded below it) or workers are starved — check
+   worker CPU/event-loop health and provider latency.
+3. `failed` runs: `terminalReasonCode` names the cause (see the
+   [terminal reasons](../../ai/runs.md#terminal-reasons)).
+   `attempts_exhausted` with `errorCode=lease_expired` means the worker kept
+   dying mid-run.
+4. **`tool_effect_unknown`:** a side-effecting tool timed out, failed unclassified
+   or was interrupted, so its effect may or may not have happened. AMCore stops the
+   run and does **not** repeat the call or ask the model again. Reconcile in the
+   downstream system using the action's idempotency key (`ai-tool:<invocation id>`,
+   the `ai_tool_invocations` row with status `OUTCOME_UNKNOWN`); then, if the
+   action should be repeated, have the user start a new run.
+5. **`tool_state_inconsistent`:** durable tool state does not add up (a recorded
+   result with no application step). Nothing was executed; inspect the run's
+   invocations and steps before any manual repair.
+
+**Do not** reset a run's status or counters directly in SQL: the retry budget, the
+attempt history and the tool records are one state machine, and a hand edit can
+re-run a side effect. Use the cancel endpoint to stop a run; start a new run to
+repeat work.
+
+**Escalation:** `Ticket` for isolated unknown outcomes; `Page` when
+`lease_lost` stays elevated together with a growing `ai_run_due`.

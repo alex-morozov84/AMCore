@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
 
 import {
@@ -40,7 +40,21 @@ export class AiRunsController {
   ) {}
 
   @Post()
-  @ApiOperation({ summary: 'Queue an AI run on a conversation' })
+  @ApiOperation({
+    summary: 'Queue an AI run on a conversation',
+    description:
+      'Creates a durable run and returns it; the worker executes it. With an `idempotencyKey` the request is idempotent per conversation: repeating it with the SAME input returns the original run and creates nothing, while the same key with a DIFFERENT input is rejected with `AI_RUN_IDEMPOTENCY_CONFLICT`. Every run gets an immutable server-side lifetime (`AI_RUN_DEADLINE_MS`, default 48 h) counted from creation, including queue time, retries and approval waits.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'The conversation does not exist or is not owned by the caller',
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      '`AI_RUN_IDEMPOTENCY_CONFLICT` (the idempotency key was already used for a different request) or the conversation is under human control / closed',
+  })
+  @ApiResponse({ status: 503, description: 'No AI model is configured (`model_not_configured`)' })
   @ZodResponse({ type: AiRunResponseDto, status: 201, description: 'Queued (or replayed) run' })
   create(@CurrentUser('sub') userId: string, @Body() body: CreateAiRunDto): Promise<AiRunResponse> {
     return this.producer.create(userId, body)
@@ -70,7 +84,12 @@ export class AiRunsController {
 
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cancel an owned AI run (cooperative)' })
+  @ApiOperation({
+    summary: 'Cancel an owned AI run (cooperative)',
+    description:
+      'Decided under the run lock, so a cancel is never lost to a racing approval or park. A queued run is cancelled at once; a run waiting for approval is cancelled and its pending approval voided; a RUNNING run records `cancellationRequested` and the worker stops before its next provider call or tool start — the status stays `running` until it does (an in-flight provider call or tool is not aborted, so the delay is bounded by its timeout); a finished run is an idempotent no-op.',
+  })
+  @ApiResponse({ status: 404, description: 'The run does not exist or is not owned by the caller' })
   @ZodResponse({
     type: AiRunCancelResponseDto,
     status: 200,

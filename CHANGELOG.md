@@ -62,6 +62,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- AI runs now execute correctly under load, cancellation, deadlines and crashes.
+  Every durable write is fenced by a lease verified with the database clock, so a
+  stalled or replaced worker writes nothing; each worker runs at most two runs at a
+  time and claims one at a time, so a queued run no longer loses its lease or
+  retries while waiting; a cancel is decided under the run lock and can no longer be
+  lost to a racing approval; cancel and the run lifetime are checked before every
+  provider call and tool start, and the lifetime aborts an in-flight call; a
+  cancel, takeover or deadline seen mid-call keeps the call's usage and the tool's
+  outcome instead of discarding them. Every run now has an immutable lifetime
+  (`AI_RUN_DEADLINE_MS`, default 48 h, including approval waits) and an attempt
+  history; the retry budget counts consumed retries, so an approval resume or a
+  claim that never started spends none. Replaying a create with the same
+  `idempotencyKey` and a different input is now `409 AI_RUN_IDEMPOTENCY_CONFLICT`.
+  A side-effecting tool is never repeated after an uncertain outcome: one requested
+  action is one durable record, a timeout, crash or unclassified error ends the run
+  `tool_effect_unknown`, and tools can throw `AiToolRejectedError` /
+  `AiToolRetryableError` to state a certain no-effect failure. **Upgrade requires a
+  short maintenance stop of every `web`, `worker` and `all` process before
+  migrating** — see Deployment → AI run engine upgrade.
 - Keep empty optional backend environment values absent after validation, so
   Compose's unset heap override preserves the default readiness and liveness limits.
 

@@ -123,6 +123,42 @@ instances; [the invitation upgrade guide](../auth/invites.md#upgrade-existing-in
 explains affected rows and compatible recovery. This data repair needs a
 maintenance window rather than overlapping old/new invitation writers.
 
+#### AI run engine upgrade (maintenance stop)
+
+The migrations `20261005120000_ai_run_ownership_and_effect_identity` and
+`20261005120100_ai_run_legacy_state_conversion` change what an AI run's retry
+counter, lease and tool records mean, and convert existing rows. They must not
+overlap an old process that can still write AI state — that is **every** `web`,
+`worker` and `all`-role process, not only workers (the HTTP handlers also create
+runs, cancel them and decide approvals). Use a short maintenance stop; there is no
+rolling mix and no down migration (roll back by restoring the pre-migration
+backup, see [Backup & restore](./backup-restore.md)).
+
+1. Stop **all** old API processes of every role and keep them (and any
+   auto-restart policy) stopped for the whole migration. A stopped worker's lease
+   expiring does not prove a remote tool effect stopped: such effects stay
+   uncertain (below).
+2. Verify nothing old is connected:
+   `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND application_name IN ('amcore-web', 'amcore-worker', 'amcore-all');`
+   must return `0`.
+3. Run `docker compose run --rm migrate`. The first migration repeats that check
+   itself and **fails before changing anything** if an old process is still
+   connected to a database that holds AI data (a fresh install skips it). If it
+   fails: stop the writer, mark the failed migration rolled back with
+   `docker compose run --rm migrate ./node_modules/.bin/prisma migrate resolve --rolled-back 20261005120000_ai_run_ownership_and_effect_identity`,
+   then run `docker compose run --rm migrate` again (until it is resolved, Prisma
+   refuses further deploys with `P3009`).
+4. Start **only** the new version, `web` and `worker`/`all` together.
+
+What the conversion does to existing data: a run's retry counter is converted to
+"consumed retries" (queued runs keep it; running and waiting runs drop their
+current claim); tool results and rejections that were already applied are marked
+applied; an interrupted side-effecting tool call (`EXECUTING`) on any run, and an
+ambiguous failure on an open run, become **outcome unknown** — a run holding one
+fails `tool_effect_unknown` instead of asking the model again, and no history
+is invented for attempts that happened before the upgrade. Terminal runs keep
+their status and evidence.
+
 ### Validate the compose graph
 
 Cheap sanity check for both modes (no containers started):
@@ -494,13 +530,15 @@ live deployment's value.
 
 What the worker does within that budget:
 
-1. The **notification dispatcher closes**: it starts no new claims, sends or
-   recovery passes, and lets deliveries already in flight record their result.
-2. Within **15 seconds** (`NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s`), or earlier
-   once the logical work finishes, it
-   **seals**: nothing new starts and every wait on in-flight work is released, so
-   the BullMQ worker is not held open by notification work. A database transaction
-   interrupted between two dependent writes is rolled back as a whole.
+1. The **notification dispatcher** and the **AI run dispatcher close**: each
+   starts no new claims, sends, runs or recovery passes, and lets work already in
+   flight record its result.
+2. Within **15 seconds** (`NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s` for
+   notifications, 15 s for AI runs), or earlier once the logical work finishes, each
+   dispatcher **seals**: nothing new starts and every wait on in-flight work is
+   released, so the BullMQ worker is not held open by that work. A database
+   transaction interrupted between two dependent writes is rolled back as a whole.
+   Sealing also aborts in-flight AI provider calls.
 3. Only then does `PrismaService` disconnect (it runs registered shutdown barriers,
    capped at 20 s, before closing the pool).
 
@@ -511,8 +549,11 @@ commit or roll back after the seal; its outcome is unknown until it settles. A
 rolled-back claim leaves the delivery pending, and a committed finalize needs no
 reaper. Shutdown attempts to abort provider requests, but an adapter may
 ignore abort and an already accepted message cannot be recalled. Requests still
-pending at process termination end with the process. The 15 s bound covers
-notification work only: it does not bound
+pending at process termination end with the process. An AI run whose result was
+not recorded keeps its lease and is recovered by lease expiry on the next worker
+(the model call may be repeated; a tool call whose effect may have happened is
+**not** repeated — the run fails `tool_effect_unknown`). The 15 s bounds cover
+notification and AI run work only: they do not bound
 Redis cleanup, other queues, the HTTP server or the database disconnect, so budget
 those separately inside the platform's grace period.
 

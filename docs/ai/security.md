@@ -45,6 +45,21 @@ residual risk: contained by channel separation, never claimed eliminated.
 AMCore does not ship malware scanning, OCR, DLP, moderation, or AV product
 integration.
 
+## Execution Integrity
+
+- Every durable write of a run is fenced by a lease verified with the database's
+  clock inside the writing transaction; a stalled or replaced worker writes
+  nothing (see [Runs](./runs.md#ownership-only-the-current-worker-writes)).
+- A side-effecting tool is never replayed after an uncertain outcome; the run
+  stops with `tool_effect_unknown` and the uncertain action stays visible
+  (see [Tools and approvals](./tools-and-approvals.md#side-effects-and-uncertain-outcomes)).
+- Run diagnostics are bounded codes only: attempt history, terminal reasons and
+  the guard's admission metric carry no prompt, output, tool data or identifiers.
+- Cancellation is cooperative. A provider call or tool already in flight is not
+  forcibly stopped; the worker waits at most its timeout, records the outcome and
+  starts nothing further. Abort signals are forwarded to providers and tools, but a
+  provider that ignores them may still complete or bill the call.
+
 ## Audit
 
 Audit metadata is content-free. It carries bounded ids/codes, never prompts,
