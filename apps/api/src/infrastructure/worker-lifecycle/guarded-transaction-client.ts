@@ -8,7 +8,7 @@ import type { Prisma } from '@/generated/prisma/client'
  */
 export class ShutdownCutoffError extends Error {
   constructor() {
-    super('notification_shutdown_cutoff')
+    super('worker_shutdown_cutoff')
     this.name = 'ShutdownCutoffError'
   }
 }
