@@ -72,6 +72,17 @@ describe('AiRunTransitions', () => {
     expect(repository.finalizeFailed).toHaveBeenCalledWith({}, CLAIM, 'input_missing', undefined)
   })
 
+  it.each(['superseded', 'expired'] as const)(
+    'a cancel recorded after admission wins over the earlier %s verdict',
+    async (earlierCause) => {
+      stop = 'cancelled'
+      expect(await transitions.stop(CLAIM, earlierCause)).toBe('applied')
+      expect(repository.finalizeCancelled).toHaveBeenCalledTimes(1)
+      expect(repository.finalizeSuperseded).not.toHaveBeenCalled()
+      expect(repository.finalizeExpired).not.toHaveBeenCalled()
+    }
+  )
+
   it('a visible stop WINS over a failure, a refusal and a retry (nothing is written over a cancel/takeover)', async () => {
     stop = 'cancelled'
 

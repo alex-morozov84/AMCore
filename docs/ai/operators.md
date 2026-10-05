@@ -55,7 +55,7 @@ missing or not-visible conversations return no-leak `404`.
 - Taking control supersedes unleased queued/waiting bot runs and voids pending
   approvals in the same transaction.
 - Leased running runs are left to the worker fence; they cannot commit stale
-  transcript/progress rows after ownership changes. A tool that was already
+  transcript turns after ownership changes. A tool that was already
   running keeps its recorded outcome (or its uncertainty) — takeover stops the
   conversation from progressing, it does not pretend the effect did not happen;
   nothing is applied to the human-owned transcript and the run ends

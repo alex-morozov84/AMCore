@@ -126,10 +126,12 @@ describe('AiRunDispatchService', () => {
       expect(gate.free).toBe(2)
     })
 
-    it('holds the slot until the physical call SETTLES, even after the lane finished', async () => {
+    it('holds the slot for a later pending tool after the provider settled and the lane finished', async () => {
       const physical = deferred()
       executor.execute.mockImplementationOnce(
         async (_claim: ClaimedRun, runtime: AttemptRuntime) => {
+          runtime.onTransportStarted(Promise.resolve())
+          await runtime.whenSettled()
           runtime.onTransportStarted(physical.promise) // a call the adapter keeps running after we gave up
         }
       )
@@ -137,6 +139,8 @@ describe('AiRunDispatchService', () => {
       build(1)
       executor.execute.mockImplementationOnce(
         async (_claim: ClaimedRun, runtime: AttemptRuntime) => {
+          runtime.onTransportStarted(Promise.resolve())
+          await runtime.whenSettled()
           runtime.onTransportStarted(physical.promise)
         }
       )

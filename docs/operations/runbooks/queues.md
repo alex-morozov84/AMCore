@@ -245,8 +245,9 @@ lease length (10 minutes).
    the `ai_tool_invocations` row with status `OUTCOME_UNKNOWN`); then, if the
    action should be repeated, have the user start a new run.
 5. **`tool_state_inconsistent`:** durable tool state does not add up (a recorded
-   result with no application step). Nothing was executed; inspect the run's
-   invocations and steps before any manual repair.
+   result with no application step). A tool may already have executed; recovery
+   starts no additional call. Inspect the run's invocations, steps and downstream
+   effects before any manual repair or new run.
 
 **Do not** reset a run's status or counters directly in SQL: the retry budget, the
 attempt history and the tool records are one state machine, and a hand edit can

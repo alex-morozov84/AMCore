@@ -54,7 +54,7 @@ export class AiRunTransitions {
 
   /** Terminalize for a stop cause the caller already observed (e.g. a refused admission). */
   stop(claim: ClaimedRun, cause: StopCause): Promise<TransitionResult> {
-    return this.apply(claim, (tx) => applyStop(tx, this.repository, claim, cause))
+    return this.apply(claim, (tx, stop) => applyStop(tx, this.repository, claim, stop ?? cause))
   }
 
   /** Terminalize for the stop cause visible under the locks, or `fallback` when none is (a caller abort). */

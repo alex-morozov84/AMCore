@@ -47,14 +47,15 @@ integration.
 
 ## Execution Integrity
 
-- Every durable write of a run is fenced by a lease verified with the database's
-  clock inside the writing transaction; a stalled or replaced worker writes
+- Every durable executor write of a leased run is fenced by a lease verified with
+  the database's clock inside the writing transaction; a stalled or replaced worker writes
   nothing (see [Runs](./runs.md#ownership-only-the-current-worker-writes)).
 - A side-effecting tool is never replayed after an uncertain outcome; the run
   stops with `tool_effect_unknown` and the uncertain action stays visible
   (see [Tools and approvals](./tools-and-approvals.md#side-effects-and-uncertain-outcomes)).
-- Run diagnostics are bounded codes only: attempt history, terminal reasons and
-  the guard's admission metric carry no prompt, output, tool data or identifiers.
+- Attempt history and terminal reasons carry bounded codes without prompt,
+  output or tool arguments. History is keyed by run and epoch; the guard's
+  admission metric has no run, conversation or user identifiers in its labels.
 - Cancellation is cooperative. A provider call or tool already in flight is not
   forcibly stopped; the worker waits at most its timeout, records the outcome and
   starts nothing further. Abort signals are forwarded to providers and tools, but a

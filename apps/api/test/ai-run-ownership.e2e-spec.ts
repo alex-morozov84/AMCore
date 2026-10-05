@@ -156,6 +156,33 @@ describe('AI run ownership, cancel/deadline and tool effects (e2e)', () => {
   }
 
   describe('E1 — capacity and lease start (no batch-tail waste)', () => {
+    it('keeps both slots for timed-out tools after their provider calls settled; the tail stays unclaimed', async () => {
+      const queued = await Promise.all(
+        Array.from({ length: 6 }, () => queue('__mock_tool__:archive_document'))
+      )
+      const release = deferred()
+      controls.afterEffect = () => release.promise // ignores abort and remains physically pending
+      const drain = dispatch.drainDueBatches()
+      try {
+        await until(() => controls.toolCalls.length >= 2)
+        await drain // the local tool timeout ends logical work, not physical execution
+        expect(controls.toolCalls).toHaveLength(2)
+        expect(controls.providerCalls).toBe(2)
+        const tail = await prisma.aiRun.findMany({
+          where: { id: { in: queued.map((q) => q.runId) }, status: AiRunStatus.QUEUED },
+        })
+        expect(tail).toHaveLength(4)
+        expect(tail.every((r) => r.leaseEpoch === 0 && r.attemptCount === 0)).toBe(true)
+        expect(
+          await prisma.aiRunAttempt.count({ where: { runId: { in: tail.map((r) => r.id) } } })
+        ).toBe(0)
+      } finally {
+        release.resolve()
+        await drain
+        await new Promise((resolve) => setImmediate(resolve))
+      }
+    })
+
     it('claims one run per lane: untouched runs keep zero epochs, attempts and retries while two lanes are busy', async () => {
       const queued = await Promise.all(Array.from({ length: 6 }, () => queue('hello')))
       const release = deferred()
@@ -526,30 +553,33 @@ describe('AI run ownership, cancel/deadline and tool effects (e2e)', () => {
     }
 
     it('accepted-but-timeout: the effect happens once, the outcome is UNKNOWN, the run stops uncertain, nothing is replayed', async () => {
-      controls.afterEffect = async () => {
-        await new Promise((resolve) => setTimeout(resolve, 900)) // the service answers AFTER the 400 ms tool timeout
+      const lateReply = deferred()
+      controls.afterEffect = () => lateReply.promise
+      try {
+        const { runId } = await runToTool()
+
+        expect(controls.effects).toHaveLength(1)
+        const [inv] = await invocations(runId)
+        expect(inv!.status).toBe(AiToolInvocationStatus.OUTCOME_UNKNOWN)
+        expect(inv!.errorCode).toBe('tool_effect_unknown')
+        const run = await getRun(runId)
+        expect(run.status).toBe(AiRunStatus.FAILED)
+        expect(run.terminalReasonCode).toBe('tool_effect_unknown')
+        expect((await attempts(runId)).map((a) => a.outcome)).toEqual([
+          AiRunAttemptOutcome.EFFECT_UNKNOWN,
+        ])
+
+        // Recovery later: no new model request, no new invocation, no second effect.
+        const providerCallsBefore = controls.providerCalls
+        await dispatch.runDispatchCycle()
+        await dispatch.runDispatchCycle()
+        expect(controls.providerCalls).toBe(providerCallsBefore)
+        expect(await invocations(runId)).toHaveLength(1)
+        expect(controls.effects).toHaveLength(1)
+      } finally {
+        lateReply.resolve()
+        await new Promise((resolve) => setImmediate(resolve))
       }
-
-      const { runId } = await runToTool()
-
-      expect(controls.effects).toHaveLength(1)
-      const [inv] = await invocations(runId)
-      expect(inv!.status).toBe(AiToolInvocationStatus.OUTCOME_UNKNOWN)
-      expect(inv!.errorCode).toBe('tool_effect_unknown')
-      const run = await getRun(runId)
-      expect(run.status).toBe(AiRunStatus.FAILED)
-      expect(run.terminalReasonCode).toBe('tool_effect_unknown')
-      expect((await attempts(runId)).map((a) => a.outcome)).toEqual([
-        AiRunAttemptOutcome.EFFECT_UNKNOWN,
-      ])
-
-      // Recovery later: no new model request, no new invocation, no second effect.
-      const providerCallsBefore = controls.providerCalls
-      await dispatch.runDispatchCycle()
-      await dispatch.runDispatchCycle()
-      expect(controls.providerCalls).toBe(providerCallsBefore)
-      expect(await invocations(runId)).toHaveLength(1)
-      expect(controls.effects).toHaveLength(1)
     })
 
     it('crash after an accepted effect (EXECUTING stranded, lease expires): recovery fails UNCERTAIN — zero replay calls, no new model request', async () => {
@@ -623,6 +653,7 @@ describe('AI run ownership, cancel/deadline and tool effects (e2e)', () => {
     it('a read-only EXECUTING stranded by a crash is ADOPTED by the next epoch and re-run safely (one more call)', async () => {
       const queued = await queue('__mock_tool__:lookup_item')
       const crashed = deferred()
+      const executing = deferred()
       controls.beforeEffect = async () => {
         await prisma.aiRun.update({
           where: { id: queued.runId },
@@ -632,10 +663,11 @@ describe('AI run ownership, cancel/deadline and tool effects (e2e)', () => {
       controls.afterEffect = async () => {
         controls.afterEffect = undefined // the second execution is not blocked
         controls.beforeEffect = undefined
+        executing.resolve()
         await crashed.promise
       }
       const drain = dispatch.drainDueBatches()
-      await until(() => controls.toolCalls.length === 1)
+      await executing.promise // the lease-expiry write completed before the reaper runs
       await dispatch.reap()
       await prisma.aiRun.update({
         where: { id: queued.runId },

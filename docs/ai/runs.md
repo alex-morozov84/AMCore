@@ -51,11 +51,11 @@ Send an `idempotencyKey` (up to the schema limit) when a client may retry a
 create — a lost response, a double click, a queue redelivery. The key is scoped
 to the conversation.
 
-| Request                               | Result                                                                   |
-| ------------------------------------- | ------------------------------------------------------------------------ |
-| New key                               | A new run is queued.                                                     |
-| Same key, **same** `inputParts`       | The original run is returned. Nothing is created, bound or woken.        |
-| Same key, **different** `inputParts`  | `409 AI_RUN_IDEMPOTENCY_CONFLICT`. Use a new key or repeat the original.  |
+| Request                              | Result                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| New key                              | A new run is queued.                                                     |
+| Same key, **same** `inputParts`      | The original run is returned. Nothing is created, bound or woken.        |
+| Same key, **different** `inputParts` | `409 AI_RUN_IDEMPOTENCY_CONFLICT`. Use a new key or repeat the original. |
 
 "Same input" means the same ordered `inputParts`, artifact ids included
 (object key order is irrelevant; part order is not). The comparison never
@@ -74,9 +74,10 @@ queued → running → completed
    └────────┘
 ```
 
-Terminal states are `completed`, `failed`, `cancelled` and `expired`. Every
-terminal run carries a bounded `terminalReasonCode`; failures also carry an
-`errorCode`. Neither ever contains prompt text, provider output or tool data.
+Terminal states are `completed`, `failed`, `cancelled` and `expired`. A stopped or
+failed run carries a bounded `terminalReasonCode`; a completed run has no terminal
+reason. Failures also carry an `errorCode`. Neither code contains prompt text,
+provider output or tool data.
 
 Key behavior:
 
@@ -85,21 +86,22 @@ Key behavior:
   write and the usage ledger write.
 - A run executes in one or more **attempts** (see below). A parked run that is
   approved resumes in a new attempt.
-- Provider and tool effects are at-least-once under a crash; the durable AMCore
-  outcome is exactly-once per attempt, and one requested tool action is exactly
-  one durable action (see [Tools and approvals](./tools-and-approvals.md)).
+- Provider calls may repeat after a crash. An interrupted read-only tool may also
+  repeat; a side-effecting tool stops on uncertainty. Run transitions and tool
+  result application are atomic, and one requested tool action has one durable
+  identity (see [Tools and approvals](./tools-and-approvals.md)).
 
 ## Cancellation
 
 `POST /ai/runs/:id/cancel` is cooperative and is decided under the run's lock,
 so a cancel is never lost to an approval, a park or a worker claim racing it.
 
-| Run is…               | Effect                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------ |
-| `queued`              | Cancelled immediately. An approved tool that never started is skipped and never runs.            |
-| `waiting_approval`    | Cancelled immediately; the pending approval is voided and audited.                               |
-| `running`             | The request is recorded (`cancellationRequested: true`); the status stays `running` until the worker stops. |
-| terminal              | No-op; the response reports the final status.                                                    |
+| Run is…            | Effect                                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `queued`           | Cancelled immediately. An approved tool that never started is skipped and never runs.                       |
+| `waiting_approval` | Cancelled immediately; the pending approval is voided and audited.                                          |
+| `running`          | The request is recorded (`cancellationRequested: true`); the status stays `running` until the worker stops. |
+| terminal           | No-op; the response reports the final status.                                                               |
 
 A recorded request is **not** a terminal state. The worker checks before every
 provider call and every tool start, so after a cancel it starts no further model
@@ -144,7 +146,8 @@ epoch. Attempts and retries are different things:
 
 ## Ownership: Only the Current Worker Writes
 
-Every durable write of a run happens inside one guarded transaction that:
+Every durable write by the executor of a leased run happens inside one guarded
+transaction that:
 
 1. locks the conversation, then the run;
 2. verifies the lease (token and epoch) **with the database's current time** and
@@ -192,31 +195,31 @@ resources return no-leak `404`.
 
 `terminalReasonCode` is one of a fixed set. The most useful for clients:
 
-| Code                                                              | Meaning                                                                    |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `cancelled_by_user`                                               | The owner cancelled.                                                       |
-| `superseded_by_human`                                             | A human took over the conversation; the bot run was abandoned.             |
-| `deadline_exceeded`                                               | The run lifetime ended.                                                    |
-| `attempts_exhausted`                                              | The retry budget (or the attempt history cap) was used up.                 |
-| `permanent_failure`                                               | A non-retryable provider or input failure; see `errorCode`.                |
-| `guardrail_input_blocked` / `_input_too_large` / `_output_blocked` | A guardrail refused the turn; a fixed refusal message is written.          |
-| `tool_loop_exhausted`, `too_many_tool_calls`, `tool_not_allowed`, `tool_args_invalid`, `tool_execution_failed` | The bounded tool loop stopped on policy or a known tool failure. |
-| `approval_expired`                                                | The approval TTL elapsed.                                                  |
-| `tool_effect_unknown`                                             | A side-effecting tool may or may not have taken effect; the run stopped without repeating it. |
-| `tool_state_inconsistent`, `action_input_conflict`, `tool_schema_incompatible` | A tool action could not be continued safely; nothing was executed. |
-| `assistant_disabled`                                              | The bound assistant was disabled before the run started.                   |
+| Code                                                                                                           | Meaning                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `cancelled_by_user`                                                                                            | The owner cancelled.                                                                                                           |
+| `superseded_by_human`                                                                                          | A human took over the conversation; the bot run was abandoned.                                                                 |
+| `deadline_exceeded`                                                                                            | The run lifetime ended.                                                                                                        |
+| `attempts_exhausted`                                                                                           | The retry budget (or the attempt history cap) was used up.                                                                     |
+| `permanent_failure`                                                                                            | A non-retryable provider or input failure; see `errorCode`.                                                                    |
+| `guardrail_input_blocked` / `_input_too_large` / `_output_blocked`                                             | A guardrail refused the turn; a fixed refusal message is written.                                                              |
+| `tool_loop_exhausted`, `too_many_tool_calls`, `tool_not_allowed`, `tool_args_invalid`, `tool_execution_failed` | The bounded tool loop stopped on policy or a known tool failure.                                                               |
+| `approval_expired`                                                                                             | The approval TTL elapsed.                                                                                                      |
+| `tool_effect_unknown`                                                                                          | A side-effecting tool may or may not have taken effect; the run stopped without repeating it.                                  |
+| `tool_state_inconsistent`, `action_input_conflict`, `tool_schema_incompatible`                                 | A tool action could not be continued safely. Inspect its recorded outcome; an earlier execution may already have taken effect. |
+| `assistant_disabled`                                                                                           | The bound assistant was disabled before the run started.                                                                       |
 
 ## Configuration
 
-| Env var                                                           | Purpose                                                                    |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `AI_RUN_DEADLINE_MS`                                              | Immutable lifetime of a run from creation (default 48 h).                  |
-| `AI_REQUEST_TIMEOUT_MS`                                           | Provider-call timeout.                                                     |
-| `AI_APPROVAL_TTL_MS`                                              | How long a run may wait for approval (see Tools and approvals).            |
-| `AI_REALTIME_NAMESPACE`                                           | Redis channel namespace for run SSE.                                       |
-| `AI_REALTIME_HEARTBEAT_MS` / `AI_REALTIME_MAX_STREAM_LIFETIME_MS` | SSE keepalive / hard lifetime.                                             |
-| `AI_REALTIME_MAX_PER_USER` / `AI_REALTIME_MAX_CONNECTIONS`        | Per-user/global SSE caps.                                                  |
-| `AI_REALTIME_QUEUE_DEPTH`                                         | Per-connection write buffer before slow-consumer close.                    |
+| Env var                                                           | Purpose                                                         |
+| ----------------------------------------------------------------- | --------------------------------------------------------------- |
+| `AI_RUN_DEADLINE_MS`                                              | Immutable lifetime of a run from creation (default 48 h).       |
+| `AI_REQUEST_TIMEOUT_MS`                                           | Provider-call timeout.                                          |
+| `AI_APPROVAL_TTL_MS`                                              | How long a run may wait for approval (see Tools and approvals). |
+| `AI_REALTIME_NAMESPACE`                                           | Redis channel namespace for run SSE.                            |
+| `AI_REALTIME_HEARTBEAT_MS` / `AI_REALTIME_MAX_STREAM_LIFETIME_MS` | SSE keepalive / hard lifetime.                                  |
+| `AI_REALTIME_MAX_PER_USER` / `AI_REALTIME_MAX_CONNECTIONS`        | Per-user/global SSE caps.                                       |
+| `AI_REALTIME_QUEUE_DEPTH`                                         | Per-connection write buffer before slow-consumer close.         |
 
 The lease length, worker capacity, retry backoff and attempt-history cap are
 starter defaults tuned by code, not environment variables.
