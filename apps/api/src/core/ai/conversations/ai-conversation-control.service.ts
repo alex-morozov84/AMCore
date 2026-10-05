@@ -5,6 +5,7 @@ import type { AiConversationResponse } from '@amcore/shared'
 
 import { ConflictException, NotFoundException } from '../../../common/exceptions'
 import { AI_RUN_SUPERSEDED_BY_HUMAN } from '../ai-run.constants'
+import { lockWaitingRunsOfConversation } from '../ai-run-locks'
 import { ApprovalRaceError } from '../approvals/ai-approval-expiry'
 import { toAiConversationResponse } from '../runs/ai-run.mapper'
 
@@ -252,9 +253,8 @@ export class AiConversationControlService {
 
   /**
    * Void every `WAITING_APPROVAL` run of the conversation and its `PENDING` gate, under the SAME
-   * approval-driven `FOR UPDATE OF a, r` lock the decide (`AiApprovalService`) / cancel
-   * (`AiRunService.cancelWaitingApproval`) / expiry paths take — so takeover shares one lock order and
-   * can never deadlock with a concurrent approve. Ordered by `a.id` for a deterministic multi-approval
+   * run-then-approval lock order the decide (`AiApprovalService`) / cancel (`AiRunService`) / expiry
+   * paths take — so takeover shares one lock order and can never deadlock with a concurrent approve. Ordered by `a.id` for a deterministic multi-approval
    * lock sequence. Per locked pair: CAS run → `CANCELLED`/`superseded_by_human`, approval → `EXPIRED`,
    * invocation → `SKIPPED` (each count-enforced; any ≠1 → `ApprovalRaceError` rolls the takeover back),
    * then a per-approval content-free `ai.approval.expired` audit (`reasonCode=superseded_by_human`) —
@@ -267,6 +267,9 @@ export class AiConversationControlService {
     conversationId: string,
     now: Date
   ): Promise<{ approvalId: string; runId: string }[]> {
+    // Lock order run → approval (see `ai-run-locks`): the conversation lock is already held; take every
+    // waiting run of it before the approval join, so takeover cannot lock-cycle with decide/cancel/expiry.
+    await lockWaitingRunsOfConversation(tx, conversationId)
     const locked = await tx.$queryRaw<{ approvalId: string; runId: string }[]>(Prisma.sql`
       SELECT a.id AS "approvalId", a."runId"
       FROM "ai"."ai_approvals" a
@@ -316,6 +319,16 @@ export class AiConversationControlService {
     conversationId: string,
     now: Date
   ): Promise<number> {
+    // An approved-but-not-started tool of a run being cancelled never runs: skip it (a started effect is kept).
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE "ai"."ai_tool_invocations"
+      SET status = 'SKIPPED'::"ai"."AiToolInvocationStatus", "updatedAt" = now()
+      WHERE status IN ('REQUESTED'::"ai"."AiToolInvocationStatus", 'APPROVED'::"ai"."AiToolInvocationStatus")
+        AND "runId" IN (
+          SELECT id FROM "ai"."ai_runs"
+          WHERE "conversationId" = ${conversationId} AND status = 'QUEUED'::"ai"."AiRunStatus"
+        )
+    `)
     const { count } = await tx.aiRun.updateMany({
       where: { conversationId, status: AiRunStatus.QUEUED },
       data: {

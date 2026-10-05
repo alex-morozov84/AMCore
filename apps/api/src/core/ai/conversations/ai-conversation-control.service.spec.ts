@@ -127,9 +127,14 @@ describe('AiConversationControlService', () => {
 
       await service.takeControl(owner, 'conv-1')
 
-      // The second $queryRaw is the approval-driven lock — assert the FOR UPDATE OF a, r path exists.
-      const voidQuery = (prisma.$queryRaw as unknown as jest.Mock).mock.calls[1]![0]
-      expect((voidQuery.strings as string[]).join('')).toContain('FOR UPDATE OF a, r')
+      // Lock order run → approval: the waiting runs of the conversation are locked (ordered) BEFORE the
+      // approval join that takes the approval locks.
+      const calls = (prisma.$queryRaw as unknown as jest.Mock).mock.calls
+      const runLock = (calls[1]![0].strings as string[]).join('')
+      expect(runLock).toContain('"ai"."ai_runs"')
+      expect(runLock).toContain('ORDER BY id')
+      expect(runLock).toContain('FOR UPDATE')
+      expect((calls[2]![0].strings as string[]).join('')).toContain('FOR UPDATE OF a, r')
 
       expect(prisma.aiRun.updateMany).toHaveBeenNthCalledWith(
         1,
