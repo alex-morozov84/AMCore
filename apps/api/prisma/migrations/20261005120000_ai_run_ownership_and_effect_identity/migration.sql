@@ -4,11 +4,14 @@
 -- ownership fencing, tool outcome handling). Old application code must not write AI state while it
 -- is applied. Stop every old `web`, `worker` and `all` process first; this check then fails the
 -- migration BEFORE any change if one is still connected (application names are set per process role).
+-- It only applies when there is AI data to convert: a fresh install (empty AI tables) skips it.
 -- If it trips: stop the writer, run `prisma migrate resolve --rolled-back
 -- 20261005120000_ai_run_ownership_and_effect_identity`, then deploy again.
 DO $$
 BEGIN
-  IF EXISTS (
+  IF (
+    EXISTS (SELECT 1 FROM "ai"."ai_runs") OR EXISTS (SELECT 1 FROM "ai"."ai_tool_invocations")
+  ) AND EXISTS (
     SELECT 1 FROM pg_stat_activity
     WHERE datname = current_database()
       AND application_name IN ('amcore-web', 'amcore-worker', 'amcore-all')

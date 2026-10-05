@@ -6,6 +6,7 @@ import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.servic
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
+import { AiRunTransitions } from '../src/infrastructure/ai/runs/ai-run-transitions.service'
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
@@ -33,6 +34,7 @@ describe('AI run durable worker (e2e)', () => {
   let producer: AiRunProducerService
   let dispatch: AiRunDispatchService
   let repository: AiRunRepository
+  let transitions: AiRunTransitions
 
   beforeAll(async () => {
     context = await setupE2ETest()
@@ -41,6 +43,7 @@ describe('AI run durable worker (e2e)', () => {
     producer = app.get(AiRunProducerService, { strict: false })
     dispatch = app.get(AiRunDispatchService, { strict: false })
     repository = app.get(AiRunRepository, { strict: false })
+    transitions = app.get(AiRunTransitions, { strict: false })
     // Stop every scheduled cron (recovery/retention/cleanup) so nothing drains in the background.
     const scheduler = app.get(SchedulerRegistry, { strict: false })
     for (const job of scheduler.getCronJobs().values()) job.stop()
@@ -234,7 +237,7 @@ describe('AI run durable worker (e2e)', () => {
 
       const run = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })
       expect(run.status).toBe(AiRunStatus.QUEUED)
-      expect(run.attemptCount).toBe(1)
+      expect(run.attemptCount).toBe(1) // one retry consumed
       expect(run.errorCode).toBe('provider_unavailable')
       expect(run.nextAttemptAt).toBeInstanceOf(Date)
       expect(run.nextAttemptAt!.getTime()).toBeGreaterThan(Date.now())
@@ -272,15 +275,23 @@ describe('AI run durable worker (e2e)', () => {
         where: { id: { in: ids }, status: AiRunStatus.RUNNING },
       })
       expect(running).toHaveLength(6)
-      expect(running.every((r) => r.attemptCount === 1 && r.leaseToken !== null)).toBe(true)
+      // A claim bumps the lease EPOCH (history identity), never the retry budget.
+      expect(
+        running.every((r) => r.attemptCount === 0 && r.leaseEpoch === 1 && r.leaseToken !== null)
+      ).toBe(true)
+      expect(
+        await prisma.aiRunAttempt.count({ where: { runId: { in: ids }, endedAt: null } })
+      ).toBe(6)
     })
 
-    it('uses a single lease token per claim batch', async () => {
+    it('gives every claim its own lease token and epoch', async () => {
       await Promise.all([createQueuedRunDirect(), createQueuedRunDirect()])
-      const claimed = await repository.claimDueBatch(10)
-      expect(claimed).toHaveLength(2)
-      expect(new Set(claimed.map((c) => c.leaseToken)).size).toBe(1)
-      expect(claimed[0]!.leaseToken).toBeTruthy()
+      const first = await repository.claimDueBatch(1)
+      const second = await repository.claimDueBatch(1)
+      expect(first).toHaveLength(1)
+      expect(second).toHaveLength(1)
+      expect(first[0]!.leaseToken).not.toBe(second[0]!.leaseToken)
+      expect(first[0]!.epoch).toBe(1)
     })
 
     it('rejects a stale lease holder via CAS after the lease is reaped', async () => {
@@ -300,9 +311,8 @@ describe('AI run durable worker (e2e)', () => {
       expect(afterReap.status).toBe(AiRunStatus.QUEUED)
       expect(afterReap.leaseToken).toBeNull()
 
-      // The stale holder now tries to commit success — its CAS must match 0 rows.
-      const won = await repository.finalizeCompleted(prisma, claim!)
-      expect(won).toBe(false)
+      // The stale holder now tries to commit success — the guard refuses it before any write.
+      expect(await transitions.failed(claim!, 'provider_rejected')).toBe('lease_lost')
 
       const afterStale = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })
       expect(afterStale.status).toBe(AiRunStatus.QUEUED)
@@ -313,7 +323,9 @@ describe('AI run durable worker (e2e)', () => {
 
     it('reaps an expired lease to FAILED once the retry budget is exhausted', async () => {
       const runId = await createQueuedRunDirect({ maxAttempts: 1 })
-      await repository.claimDueBatch(1) // attemptCount → 1 (== maxAttempts)
+      await repository.claimDueBatch(1) // epoch 1; this attempt may have started I/O
+      await prisma.aiRunAttempt.updateMany({ where: { runId }, data: { ioStartedAt: new Date() } })
+      await prisma.aiRun.update({ where: { id: runId }, data: { attemptCount: 0 } })
       await prisma.aiRun.update({
         where: { id: runId },
         data: { leaseExpiresAt: new Date(Date.now() - 60_000) },
