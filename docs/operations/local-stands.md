@@ -136,6 +136,14 @@ a marker, so failed startup and a broken database remain removable. Unproved
 resources are preserved with recovery metadata. No prune, default-project cleanup
 or automatic adoption of legacy resources is supported.
 
+A container additionally needs evidence that this Compose allocation created it:
+because a container inherits its image's labels, a `docker create` from one of the
+stand's own images would otherwise look owned. A container must carry the
+`com.docker.compose.container-number` label and a `com.docker.compose.project.working_dir`
+equal to the stand source snapshot (or one of its earlier approved snapshots), labels
+Compose sets on containers it creates and an image never carries. A container without
+them is not adopted: cleanup refuses and preserves it and the images it uses.
+
 ### Built images and unresolved builds
 
 The images a stand builds (`migrate`, `api`, `worker`, `web`) carry the same ownership

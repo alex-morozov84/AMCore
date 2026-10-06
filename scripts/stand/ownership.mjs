@@ -25,6 +25,15 @@ export function owned(m, resource, kind) {
     const service = tags['com.docker.compose.service']
     if (!m.services.includes(service) || resource.HostConfig.NetworkMode === 'host')
       throw new Error('Foreign container service/network')
+    // A container inherits its image's labels (the ownership tuple and the Compose
+    // project/service), so labels alone cannot show that THIS Compose allocation created
+    // it. Labels that Compose sets on containers it creates and an image never carries can.
+    const snapshots = [m.snapshot, ...(m.approvedSnapshots ?? [])]
+    if (
+      !tags['com.docker.compose.container-number'] ||
+      !snapshots.includes(tags['com.docker.compose.project.working_dir'])
+    )
+      throw new Error('Container lacks Compose creation evidence')
     for (const mount of resource.Mounts ?? []) {
       if (
         mount.Type === 'bind' &&

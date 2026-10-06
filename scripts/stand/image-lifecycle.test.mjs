@@ -250,10 +250,21 @@ test('a foreign alias or a foreign container refuses removal; retry after cleanu
     assert.equal((await census(m)).length, 2, 'nothing was removed')
     await docker(m, ['image', 'rm', alias])
 
+    // The ordinary unmanaged case: `docker create` from a stand image with NO label
+    // override. The container inherits the stand tuple and Compose project/service, but
+    // not the labels Compose sets on containers it creates, so it must not be adopted.
+    const inherited = `amcore-image-proof-ctr-${randomUUID().slice(0, 8)}`
+    extra.push(['container', inherited])
+    await docker(m, ['create', '--name', inherited, `${m.project}-web`, '/f'])
+    await assert.rejects(() => cleanup(m, true), /Container lacks Compose creation evidence/)
+    assert.equal((await census(m)).length, 2, 'the image is preserved')
+    await docker(m, ['container', 'inspect', inherited]) // and so is the container
+    await docker(m, ['rm', inherited])
+
+    // A container that carries another stand's label is outside this stand's census; the
+    // image reference check still refuses removal.
     const container = `amcore-image-proof-ctr-${randomUUID().slice(0, 8)}`
     extra.push(['container', container])
-    // A container inherits its image's labels, so a container from this image would look
-    // like the stand's own. Override the stand label to make it genuinely foreign.
     await docker(m, [
       ...['create', '--name', container, '--label', 'org.amcore.stand=foreign-stand'],
       `${m.project}-web`,
