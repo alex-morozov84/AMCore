@@ -1,5 +1,7 @@
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+
+import { test } from '../shared/auth-test'
 
 const passwordHints = {
   en: 'Use at least 8 characters, including one uppercase Latin letter (A–Z) and one digit (0–9).',
@@ -43,6 +45,11 @@ test('login form rejects an invalid submission without calling the BFF', async (
   })
 
   await page.goto('/en/login')
+  // A real visibility interaction establishes hydration before submitting invalid data.
+  await page.getByRole('button', { name: /^show password$/i }).click()
+  await expect(page.locator('input[name="password"]')).toHaveAttribute('type', 'text')
+  await page.getByRole('button', { name: /^hide password$/i }).click()
+  await expect(page.locator('input[name="password"]')).toHaveAttribute('type', 'password')
 
   await page.getByRole('textbox', { name: /email/i }).fill('not-an-email')
   // Password left empty — required field.

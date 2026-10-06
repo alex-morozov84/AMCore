@@ -64,6 +64,8 @@ for (const [route, retained] of [
     assert.doesNotMatch(output, /resolveLocaleParam|setRequestLocale|locale: string/)
     if (route.includes('flow/')) assert.match(output, /flowId: string/)
     if (route.includes('bootstrap/')) assert.match(output, /pendingId: string/)
+    if (route.endsWith('route.ts')) assert.match(output,
+      /^import \{ DEFAULT_LOCALE \} from '@amcore\/shared'\n\nimport \{ invitationHandlers \}/)
     if (route.includes('unusable/')) assert.doesNotMatch(output, /params:/)
   })
 }

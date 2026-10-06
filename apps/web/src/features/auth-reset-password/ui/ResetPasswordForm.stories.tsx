@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import messages from '../../../../messages/en.json'
+
 import { ResetPasswordForm } from './ResetPasswordForm'
 
 const meta = {
@@ -38,10 +40,17 @@ export const Submitting: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.type(canvas.getByLabelText(/new password/i), 'NewPassword1')
-    await userEvent.click(canvas.getByRole('button'))
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.newPassword, { exact: true }),
+      'NewPassword1'
+    )
+    const submit = canvas.getByRole('button', {
+      name: messages.auth.resetPasswordSubmit,
+      exact: true,
+    })
+    await userEvent.click(submit)
 
-    await waitFor(() => expect(canvas.getByRole('button')).toBeDisabled())
+    await waitFor(() => expect(submit).toBeDisabled())
   },
 }
 
@@ -51,15 +60,20 @@ export const Success: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.type(canvas.getByLabelText(/new password/i), 'NewPassword1')
-    await userEvent.click(canvas.getByRole('button'))
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.newPassword, { exact: true }),
+      'NewPassword1'
+    )
+    const submit = canvas.getByRole('button', {
+      name: messages.auth.resetPasswordSubmit,
+      exact: true,
+    })
+    await userEvent.click(submit)
 
     await waitFor(() =>
-      expect(
-        canvas.getByText('Your password has been reset. Please sign in with your new password.')
-      ).toBeInTheDocument()
+      expect(canvas.getByText(messages.auth.resetPasswordSuccess)).toBeInTheDocument()
     )
-    expect(canvas.getByRole('link', { name: /sign in/i })).toBeInTheDocument()
+    expect(canvas.getByRole('link', { name: messages.auth.login, exact: true })).toBeInTheDocument()
   },
 }
 
@@ -79,11 +93,16 @@ export const TokenAlreadyUsed: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.type(canvas.getByLabelText(/new password/i), 'NewPassword1')
-    await userEvent.click(canvas.getByRole('button'))
-
-    await waitFor(() =>
-      expect(canvas.getByText('This link is invalid or has expired.')).toBeInTheDocument()
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.newPassword, { exact: true }),
+      'NewPassword1'
     )
+    const submit = canvas.getByRole('button', {
+      name: messages.auth.resetPasswordSubmit,
+      exact: true,
+    })
+    await userEvent.click(submit)
+
+    await waitFor(() => expect(canvas.getByText(messages.errors.TOKEN_INVALID)).toBeInTheDocument())
   },
 }

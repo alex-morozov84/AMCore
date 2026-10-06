@@ -1,4 +1,7 @@
 export const LOCALE_DISPLAY_ORDER = [
+  'apps/web/src/features/auth-login/ui/LoginForm.stories.tsx',
+  'apps/web/src/features/auth-register/ui/RegisterForm.stories.tsx',
+  'apps/web/src/features/auth-reset-password/ui/ResetPasswordForm.stories.tsx',
   'apps/web/src/_pages/invitation-recipient/ui/recipient-auth.stories.tsx',
   'apps/web/src/_pages/invitation-recipient/ui/recipient-status.stories.tsx',
   'apps/web/src/features/invitation-acceptance/ui/invitation-consent.stories.tsx',

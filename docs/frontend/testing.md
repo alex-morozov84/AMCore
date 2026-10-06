@@ -162,6 +162,11 @@ fixture (`next/experimental/testmode/playwright/msw`, gated behind
 `webServer.env` sets, never a real dev/prod boot) for server-side fetches
 `page.route()` can't reach.
 
+Public-auth scenarios import `test` from `e2e/shared/auth-test.ts`. Its auto fixture
+returns an explicit enabled public signup policy through the server-side proxy;
+a browser `page.route()` cannot supply that SSR policy. Scenarios testing closed
+or unavailable signup must override that endpoint with their intended response.
+
 Current flows: locale redirect, login/register client-side validation
 (no network call reaches the BFF), a mocked API failure rendering the
 localized `ApiErrorAlert` fallback, stored-theme persistence/no-flash, the

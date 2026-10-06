@@ -112,6 +112,16 @@ function e2eRoutes(model, params, ctx) {
   const claimed =
     params.surface === 'oauth' ? rewriteOAuthAssertions(model, params.locale, ctx) : []
   claimed.push(...rewriteExactRootAssertions(model, ctx))
+  const originReferences = findAllNodes(model, (node) =>
+    ts.isIdentifier(node) && node.text === 'escapeOrigin'
+  )
+  if (originReferences.length > 0 && originReferences.every((node) =>
+    (ts.isFunctionDeclaration(node.parent) && node.parent.name === node) || covered(node, claimed)
+  )) {
+    const helper = findUniqueNode(model, (node) =>
+      ts.isFunctionDeclaration(node) && node.name?.text === 'escapeOrigin', ctx)
+    model.removeNode(helper, ctx)
+  }
   claimed.push(...removeUnavailableUiCase(model, params.unavailableUiCases, ctx))
   for (const reference of inventory.references) {
     const node = reference.kind === 'comment' ? commentRange(reference) : reference.node

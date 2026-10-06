@@ -11,7 +11,7 @@ describe('operation inventory against the real plans', () => {
     assertExactScaffoldCounts([
       // Counts include board and invitation routes, selected-catalogue fixtures and story removals.
       // They are measured from every real plan, not estimated from file counts.
-      { name: 'measured operations', expected: 645, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 648, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -30,17 +30,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 894,
+        expected: 903,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1577,
+        expected: 1586,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 629,
+        expected: 632,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

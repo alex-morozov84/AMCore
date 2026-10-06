@@ -100,6 +100,9 @@ export const localeOwnershipFacts = {
   verification: [
     ...e2eVerification,
     ...localeOnlyVerification,
+    one('apps/web/src/features/auth-login/ui/LoginForm.stories.tsx', { disposition: 'rewrite' }),
+    one('apps/web/src/features/auth-register/ui/RegisterForm.stories.tsx', { disposition: 'rewrite' }),
+    one('apps/web/src/features/auth-reset-password/ui/ResetPasswordForm.stories.tsx', { disposition: 'rewrite' }),
     one('apps/web/src/_pages/invitation-recipient/ui/recipient-auth.stories.tsx', {
       disposition: 'rewrite',
     }),

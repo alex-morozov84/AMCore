@@ -19,7 +19,9 @@ function invitationRoute(model, _params, ctx) {
     fn
   )
   if (fn.name?.text === 'GET') {
-    model.replaceNode(localeImport, "import { DEFAULT_LOCALE } from '@amcore/shared'", ctx)
+    const handlerImport = uniqueImport(model, '@/_app/invitation-flow/index.server', ctx)
+    model.replaceNode(handlerImport, "import { DEFAULT_LOCALE } from '@amcore/shared'\n", ctx)
+    model.replaceNode(localeImport, handlerImport.getText(), ctx)
     if (fn.body.statements.length === 1) {
       model.removeNode(fn.parameters[1], ctx)
       model.replaceNode(resolve.parent, 'DEFAULT_LOCALE', ctx)

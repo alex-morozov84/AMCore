@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test'
+import { expect } from '@playwright/test'
+
+import { test } from '../shared/auth-test'
 
 /**
  * A real POST to `/api/auth/login` intercepted browser-side — proves the
@@ -19,7 +21,7 @@ test('an unrecognized API failure renders the localized fallback message', async
 
   await page.goto('/en/login')
   await page.getByRole('textbox', { name: /email/i }).fill('spike-e2e@example.com')
-  await page.getByLabel(/password/i).fill('correct-horse-battery')
+  await page.getByLabel(/^password$/i).fill('correct-horse-battery')
   await page.getByRole('button', { name: /sign in/i }).click()
 
   // Scoped to `data-slot="alert"` (`shared/ui/alert.tsx`) — a plain

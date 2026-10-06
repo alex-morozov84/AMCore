@@ -2,6 +2,8 @@ export const E2E_UI_PROFILES = Object.freeze({
   auth: [
     ['/password/i', '/пароль/i'],
     ['/^password$/i', '/^пароль$/i'],
+    ['/^show password$/i', '/^показать пароль$/i'],
+    ['/^hide password$/i', '/^скрыть пароль$/i'],
     ['/name/i', '/имя/i'],
     ['/sign in/i', '/войти/i'],
     ['/sign up/i', '/регистрация/i'],
@@ -87,7 +89,7 @@ export const E2E_UI_SURFACES = Object.freeze([
   surface('apps/web/e2e/console-real-stack/session-isolation.spec.ts', ['console'], 5),
   surface('apps/web/e2e/mocked/accessibility.spec.ts', ['auth'], 2),
   surface('apps/web/e2e/mocked/api-error-rendering.spec.ts', ['auth', 'common'], 3),
-  surface('apps/web/e2e/mocked/login-validation.spec.ts', ['auth'], 5),
+  surface('apps/web/e2e/mocked/login-validation.spec.ts', ['auth'], 7),
   surface('apps/web/e2e/mocked/route-progress-bar.spec.ts', ['auth'], 5),
   surface('apps/web/e2e/server-mocked/oauth-visibility.spec.ts', ['auth'], 2),
   surface('apps/web/e2e/real-stack/helpers.ts', ['auth'], 5),
