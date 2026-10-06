@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { access, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   acceptBuildRisk,
   assertBuildsResolved,
@@ -155,7 +158,10 @@ test('acceptance with nothing pending is a no-op and never touches settled entri
 test('exit 0 after our own signal is not E1: real executor, child handles SIGTERM and exits 0', async () => {
   const m = stand()
   const { persist } = recorder()
-  const child = `process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000)`
+  // The child reports readiness once its handler is installed, so the signal is sent
+  // only when the SIGTERM -> exit 0 behaviour is actually in place (no fixed delay).
+  const ready = join(tmpdir(), `amcore-signal-ready-${randomUUID()}`)
+  const child = `process.on('SIGTERM', () => process.exit(0)); require('node:fs').writeFileSync(${JSON.stringify(ready)}, '1'); setInterval(() => {}, 1000)`
   const running = runBuild(
     m,
     () => run(process.execPath, ['-e', child], { capture: true }),
@@ -165,10 +171,24 @@ test('exit 0 after our own signal is not E1: real executor, child handles SIGTER
     () => undefined,
     (error) => error
   )
-  await new Promise((resolve) => setTimeout(resolve, 700))
-  requestCancellation()
-  await stopChildren()
-  allowCleanup()
+  try {
+    for (
+      let i = 0;
+      i < 400 &&
+      !(await access(ready).then(
+        () => true,
+        () => false
+      ));
+      i++
+    )
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    await access(ready) // fails the test if the child never became ready
+    requestCancellation()
+    await stopChildren()
+  } finally {
+    allowCleanup()
+    await rm(ready, { force: true })
+  }
   const error = await outcome
   assert.equal(error?.code, 'BUILD_SIGNALLED', 'the build call returned 0 but was signalled')
   assert.equal(m.builds[0].state, 'pending')
