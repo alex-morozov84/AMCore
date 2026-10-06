@@ -37,7 +37,7 @@ export const Submitting: Story = {
       canvas.getByLabelText(messages.auth.password, { exact: true }),
       'Correct1Horse'
     )
-    const submit = canvas.getByRole('button', { name: messages.auth.register, exact: true })
+    const submit = canvas.getByRole('button', { name: messages.auth.register })
     await userEvent.click(submit)
 
     await waitFor(() => expect(submit).toBeDisabled())
@@ -67,7 +67,7 @@ export const EmailAlreadyExists: Story = {
       canvas.getByLabelText(messages.auth.password, { exact: true }),
       'Correct1Horse'
     )
-    const submit = canvas.getByRole('button', { name: messages.auth.register, exact: true })
+    const submit = canvas.getByRole('button', { name: messages.auth.register })
     await userEvent.click(submit)
 
     await waitFor(() =>

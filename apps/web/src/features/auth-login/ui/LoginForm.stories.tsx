@@ -40,7 +40,7 @@ export const Submitting: Story = {
       canvas.getByLabelText(messages.auth.password, { exact: true }),
       'hunter2hunter2'
     )
-    const submit = canvas.getByRole('button', { name: messages.auth.login, exact: true })
+    const submit = canvas.getByRole('button', { name: messages.auth.login })
     await userEvent.click(submit)
 
     await waitFor(() => expect(submit).toBeDisabled())
@@ -68,7 +68,7 @@ export const InvalidCredentials: Story = {
       canvas.getByLabelText(messages.auth.password, { exact: true }),
       'wrong-password'
     )
-    const submit = canvas.getByRole('button', { name: messages.auth.login, exact: true })
+    const submit = canvas.getByRole('button', { name: messages.auth.login })
     await userEvent.click(submit)
 
     // Translated by errorCode, never the backend's English message — see

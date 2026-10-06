@@ -46,7 +46,6 @@ export const Submitting: Story = {
     )
     const submit = canvas.getByRole('button', {
       name: messages.auth.resetPasswordSubmit,
-      exact: true,
     })
     await userEvent.click(submit)
 
@@ -66,14 +65,13 @@ export const Success: Story = {
     )
     const submit = canvas.getByRole('button', {
       name: messages.auth.resetPasswordSubmit,
-      exact: true,
     })
     await userEvent.click(submit)
 
     await waitFor(() =>
       expect(canvas.getByText(messages.auth.resetPasswordSuccess)).toBeInTheDocument()
     )
-    expect(canvas.getByRole('link', { name: messages.auth.login, exact: true })).toBeInTheDocument()
+    expect(canvas.getByRole('link', { name: messages.auth.login })).toBeInTheDocument()
   },
 }
 
@@ -99,7 +97,6 @@ export const TokenAlreadyUsed: Story = {
     )
     const submit = canvas.getByRole('button', {
       name: messages.auth.resetPasswordSubmit,
-      exact: true,
     })
     await userEvent.click(submit)
 
