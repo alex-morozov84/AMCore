@@ -149,10 +149,14 @@ backup, see [Backup & restore](./backup-restore.md)).
    the connection name, not a permanent fence: it cannot see a client with another
    name, so keep every old process and auto-restart stopped until the new version
    starts. In local development, stop `pnpm dev` / the local API before
-   `pnpm --filter api db:migrate` for the same reason. If it
-   fails: stop the writer, mark the failed migration rolled back with
-   `docker compose run --rm migrate ./node_modules/.bin/prisma migrate resolve --rolled-back 20261005120000_ai_run_ownership_and_effect_identity`,
-   then run `docker compose run --rm migrate` again (until it is resolved, Prisma
+   `pnpm --filter api db:migrate` for the same reason. If a migration
+   fails, read its name from Prisma's failure output. Stop the writer, then mark
+   that failed migration rolled back with
+   `docker compose run --rm migrate ./node_modules/.bin/prisma migrate resolve --rolled-back <failed-migration-name>`.
+   The name is `20261005120000_ai_run_ownership_and_effect_identity` or
+   `20261005120100_ai_run_legacy_state_conversion`; use the reported failed name,
+   because the preceding migration may already have succeeded. Then run
+   `docker compose run --rm migrate` again (until the failure is resolved, Prisma
    refuses further deploys with `P3009`). Test harnesses migrate a fresh database
    **before** starting the application for exactly this reason.
 4. Start **only** the new version, `web` and `worker`/`all` together.
