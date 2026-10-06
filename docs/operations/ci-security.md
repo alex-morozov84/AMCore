@@ -84,7 +84,9 @@ of workflow self-hardening to keep the example forkable.
   drift a scaffolding fixture (this job exists because exactly that
   happened — `apps/web` and `docs/` changes drifted `scripts/lib/*.mjs`
   fixtures across several PRs with nothing in CI to catch it).
-- **Scaffolding contract (full)** — job id `scaffolding-contract-full` keeps
+- **Scaffolding contract (full)** — job id `scaffolding-contract-full` has a bounded
+  25-minute job budget including installation, the full matrix and artifact/cleanup
+  overhead. It keeps
   its required display name unchanged and runs
   `pnpm test:scripts:generated`, the generated-project half of the local
   `pnpm test:scripts` aggregate. Its six independent repositories cover

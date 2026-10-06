@@ -531,7 +531,9 @@ there are no independent endpoint overrides. See
   rides on a documented baseline rather than a CI-enforced gate today.
 
 Invited-registration browser scenarios share one IP in the serial managed real-stack
-lane. Their fixture resets only `ratelimit:v1:invite-register-ip:*` through the
-lease-checked Redis command before each scenario. Per-email and other budgets
+lane. Their fixture resets only `ratelimit:v1:invite-register-ip:*` and the matching
+`InvitationPublicController.register` global IP bucket through lease-checked Redis
+commands before each scenario. The global bucket uses the guard’s existing SHA-256
+controller/handler/IP identity. Per-email and other budgets
 remain intact; production limits are unchanged. Rate-limit enforcement is checked
 separately in API tests. This fixture cannot run against an owner preview.
