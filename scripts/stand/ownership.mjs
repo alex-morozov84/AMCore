@@ -7,7 +7,7 @@ import { label, validateModel } from './config.mjs'
 import { save } from './state.mjs'
 import { assertNoSurvivors } from './survivors.mjs'
 import { disposeImages } from './image-census.mjs'
-import { acceptBuildRisk, assertBuildsResolved, unresolvedBuilds } from './build-intent.mjs'
+import { acceptBuildRisk, assertBuildsResolved } from './build-intent.mjs'
 
 export function owned(m, resource, kind) {
   const tags = resource.Config?.Labels ?? resource.Labels
@@ -131,7 +131,28 @@ export async function dataAdmission(m, bootstrap = false) {
     await save(m)
   })
 }
+// Every entry point (down, recover, the e2e finally, the bind-race retry and closeout)
+// goes through here, so a failed or incomplete cleanup is recorded the same way: the
+// latest attempt replaces any earlier state, including a stale `purged`. An unresolved
+// build is distinguishable from an ordinary removal conflict by `state` and `cleanup.code`.
+const unresolvedCodes = ['BUILD_UNRESOLVED', 'BUILD_REASON_REQUIRED']
 export async function cleanup(m, purge, { acceptReason } = {}) {
+  try {
+    await removeOwned(m, purge, acceptReason)
+  } catch (error) {
+    m.state = unresolvedCodes.includes(error.code) ? 'cleanup-incomplete' : 'cleanup-failed'
+    m.cleanup = {
+      incomplete: true,
+      failedAt: new Date().toISOString(),
+      code: error.code,
+      reason: error.message,
+    }
+    await save(m).catch(() => {}) // never mask the original failure
+    throw error
+  }
+}
+
+async function removeOwned(m, purge, acceptReason) {
   await assertNoSurvivors(m)
   await discover(m)
   for (const id of m.resources.network) {
@@ -167,9 +188,10 @@ async function concludeCleanup(m, purge, acceptReason) {
   // Acceptance only when the owner passed a reason; without it an unresolved build is
   // reported as unresolved, never as a missing-reason error.
   if (purge && acceptReason !== undefined) await acceptBuildRisk(m, acceptReason)
-  const unresolved = purge && unresolvedBuilds(m).length > 0
-  m.state = unresolved ? 'cleanup-incomplete' : purge ? 'purged' : 'stopped'
+  // Proved-owned resources are already gone; an unresolved build keeps the record and
+  // source for recovery (cleanup() records `cleanup-incomplete`) and never reads as purged.
+  if (purge) assertBuildsResolved(m)
+  m.state = purge ? 'purged' : 'stopped'
+  m.cleanup = { verifiedAt: new Date().toISOString(), purge }
   await save(m)
-  // Proved-owned resources are already gone; the record and source stay for recovery.
-  if (unresolved) assertBuildsResolved(m)
 }

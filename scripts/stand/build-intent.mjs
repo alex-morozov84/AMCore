@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { builtServices } from './config.mjs'
+import { signalsSent } from './process.mjs'
 import { save } from './state.mjs'
 
 // Write-ahead record of every `compose build` invocation. A build that is not proved
@@ -49,18 +50,34 @@ export async function settleBuild(m, entry, persist = save) {
 
 // Persist intent, run the build, settle only if it returned. A rejection (non-zero exit,
 // signal, spawn error) leaves the entry pending on purpose; nothing here classifies it.
-export async function runBuild(m, build, persist = save) {
+export async function runBuild(m, build, persist = save, signals = signalsSent) {
   assertBuildsResolved(m)
   const entry = await beginBuild(m, persist)
+  const before = signals()
   await build()
+  // E1 is a successful, UNSIGNALLED return. A build that exits 0 after this process
+  // signalled any managed group while it ran (cancellation) proves nothing about the
+  // daemon-side export, so the entry stays pending.
+  if (signals() !== before) {
+    const error = new Error(
+      `Build attempt ${entry.invocation} was signalled while it ran; its completion is unproved`
+    )
+    error.code = 'BUILD_SIGNALLED'
+    throw error
+  }
   await settleBuild(m, entry, persist)
 }
 
 export async function acceptBuildRisk(m, reason, persist = save) {
   const pending = unresolvedBuilds(m)
   if (!pending.length) return
-  if (typeof reason !== 'string' || reason.trim().length < 10)
-    throw new Error('Accepting an unresolved build requires a written reason (10+ characters)')
+  if (typeof reason !== 'string' || reason.trim().length < 10) {
+    const error = new Error(
+      'Accepting an unresolved build requires a written reason (10+ characters)'
+    )
+    error.code = 'BUILD_REASON_REQUIRED'
+    throw error
+  }
   for (const entry of pending)
     Object.assign(entry, {
       state: 'accepted-risk',

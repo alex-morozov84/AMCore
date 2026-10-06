@@ -118,6 +118,7 @@ test('ordinary stop keeps images; an unresolved build keeps the record until acc
     await assert.rejects(() => cleanup(m, true), { code: 'BUILD_UNRESOLVED' })
     assert.deepEqual(await census(m), [], 'proved-owned images are still removed')
     assert.equal((await load(m.id)).state, 'cleanup-incomplete')
+    assert.equal((await load(m.id)).cleanup.code, 'BUILD_UNRESOLVED')
     assert.equal((await load(m.id)).builds[0].state, 'pending')
     await assert.rejects(() => closeoutStand(m), { code: 'BUILD_UNRESOLVED' })
     assert.equal((await load(m.id)).closeout.incomplete, true)
@@ -126,12 +127,117 @@ test('ordinary stop keeps images; an unresolved build keeps the record until acc
       () => cleanup(m, true, { acceptReason: 'short' }),
       /requires a written reason/
     )
+    assert.equal(m.state, 'cleanup-incomplete', 'a refused acceptance is still incomplete')
     await cleanup(m, true, { acceptReason: 'integration proof accepts the unresolved attempt' })
     assert.equal(m.state, 'purged')
     assert.equal(m.builds[0].state, 'accepted-risk')
+    assert.equal(m.cleanup.incomplete, undefined, 'the latest result replaced the failure')
     await closeoutStand(m)
-    assert.ok((await load(m.id)).closeout.verifiedAt)
+    const stored = (await load(m.id)).closeout
+    assert.ok(stored.verifiedAt)
+    assert.equal(stored.acceptedRisk[0].invocation, 'unresolved')
+    assert.match(stored.acceptedRisk[0].reason, /accepts the unresolved attempt/)
   })
+})
+
+test('a proved build disposition leaves no accepted-risk record in the closeout result', async () => {
+  await withStand('image-proved', async (m, context) => {
+    await buildOwned(m, context, ['api'])
+    m.builds = [{ invocation: 'proved', state: 'settled', outcome: 'succeeded' }]
+    await save(m)
+    await closeoutStand(m)
+    const stored = (await load(m.id)).closeout
+    assert.ok(stored.verifiedAt)
+    assert.equal(stored.acceptedRisk, undefined)
+  })
+})
+
+test('an image exported after an empty census is found by the next purge, never by luck', async () => {
+  await withStand('image-late', async (m, context) => {
+    m.builds = [{ invocation: 'late', state: 'pending', startedAt: new Date().toISOString() }]
+    await save(m)
+    await assert.rejects(() => cleanup(m, true), { code: 'BUILD_UNRESOLVED' })
+    assert.deepEqual(await census(m), [], 'nothing existed yet: an empty census proves nothing')
+    assert.equal((await load(m.id)).state, 'cleanup-incomplete', 'the record outlives it')
+
+    await buildOwned(m, context, ['api', 'web']) // the daemon finishes exporting later
+    assert.equal((await census(m)).length, 2)
+    await assert.rejects(() => closeoutStand(m), { code: 'BUILD_UNRESOLVED' })
+    assert.deepEqual(await census(m), [], 'the late images are proved and removed')
+    assert.equal((await load(m.id)).state, 'cleanup-incomplete')
+    await cleanup(m, true, { acceptReason: 'late export test accepts after removal' })
+    assert.equal(m.state, 'purged')
+  })
+})
+
+test('a removal conflict is recorded as failed, replaces a stale purged state and is retryable', async () => {
+  await withStand('image-conflict', async (m, context, extra) => {
+    await cleanup(m, true)
+    assert.equal(m.state, 'purged')
+    assert.ok(m.cleanup.verifiedAt)
+
+    await buildOwned(m, context, ['api']) // a late export for an already purged allocation
+    const alias = `amcore-image-proof-alias-${randomUUID().slice(0, 8)}:keep`
+    extra.push(['image', alias])
+    await docker(m, ['image', 'tag', `${m.project}-api`, alias])
+    await assert.rejects(() => cleanup(m, true), /Foreign image reference/)
+    for (const record of [m, await load(m.id)]) {
+      assert.equal(record.state, 'cleanup-failed', 'never a stale purged')
+      assert.equal(record.cleanup.incomplete, true)
+      assert.equal(record.cleanup.code, undefined, 'a conflict is not an unresolved build')
+      assert.match(record.cleanup.reason, /Foreign image reference/)
+    }
+    await assert.rejects(() => closeoutStand(m), /Foreign image reference/)
+    assert.equal((await load(m.id)).state, 'cleanup-failed')
+    assert.equal((await load(m.id)).closeout.incomplete, true)
+
+    await docker(m, ['image', 'rm', alias])
+    await cleanup(m, true)
+    assert.equal(m.state, 'purged')
+    assert.equal(m.cleanup.incomplete, undefined)
+    assert.deepEqual(await census(m), [])
+  })
+})
+
+test('closeout output separates verified absence from accepted unresolved-build risk', async () => {
+  const fixture = await mkdtemp(join(tmpdir(), 'amcore-risk-closeout-'))
+  await mkdir(`${fixture}/scripts`)
+  await symlink(`${root}/node_modules`, `${fixture}/node_modules`)
+  await cp(`${root}/scripts/stand`, `${fixture}/scripts/stand`, {
+    recursive: true,
+    filter: (path) => !path.endsWith('.test.mjs'),
+  })
+  const program = `
+    import { randomUUID } from 'node:crypto';
+    const { root, save } = await import('./scripts/stand/state.mjs');
+    const { closeout } = await import('./scripts/stand/closeout.mjs');
+    for (const [id, builds] of [
+      ['proved', [{ invocation: 'inv-proved', state: 'settled', outcome: 'succeeded' }]],
+      ['risky', [{ invocation: 'inv-risky', state: 'accepted-risk',
+        acceptance: { reason: 'owner accepted after manual daemon check', at: 'now' } }]],
+    ]) {
+      const attempt = randomUUID();
+      await save({ version: 1, id, uuid: randomUUID(), attempt, worktree: root, purpose: 'e2e',
+        topology: 'path', mocked: true, state: 'allocated', builds,
+        snapshot: root + '/.amcore/stands/' + id + '/source-' + attempt });
+    }
+    await closeout();
+  `
+  try {
+    const output = await run(process.execPath, ['--input-type=module', '-e', program], {
+      cwd: fixture,
+      capture: true,
+    })
+    assert.match(output, /risky: processes\/resources removed\n\s+ACCEPTED RISK \(not proof/)
+    assert.match(output, /inv-risky: owner accepted after manual daemon check/)
+    assert.doesNotMatch(output, /inv-proved/)
+    assert.match(
+      output,
+      /Closeout verified physical absence only; unresolved-build risk was ACCEPTED for 1/
+    )
+  } finally {
+    await rm(fixture, { recursive: true, force: true })
+  }
 })
 
 test('a foreign alias or a foreign container refuses removal; retry after cleanup succeeds', async () => {

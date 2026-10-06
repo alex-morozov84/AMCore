@@ -9,6 +9,7 @@ import {
   settleBuild,
   unresolvedBuilds,
 } from './build-intent.mjs'
+import { allowCleanup, requestCancellation, run, stopChildren } from './process.mjs'
 
 const stand = () => ({
   id: 'stand-1',
@@ -149,6 +150,37 @@ test('acceptance with nothing pending is a no-op and never touches settled entri
   await acceptBuildRisk(m, undefined, persist)
   assert.deepEqual(m.builds, before)
   assert.equal(events.length, saves)
+})
+
+test('exit 0 after our own signal is not E1: real executor, child handles SIGTERM and exits 0', async () => {
+  const m = stand()
+  const { persist } = recorder()
+  const child = `process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000)`
+  const running = runBuild(
+    m,
+    () => run(process.execPath, ['-e', child], { capture: true }),
+    persist
+  )
+  const outcome = running.then(
+    () => undefined,
+    (error) => error
+  )
+  await new Promise((resolve) => setTimeout(resolve, 700))
+  requestCancellation()
+  await stopChildren()
+  allowCleanup()
+  const error = await outcome
+  assert.equal(error?.code, 'BUILD_SIGNALLED', 'the build call returned 0 but was signalled')
+  assert.equal(m.builds[0].state, 'pending')
+  assert.equal(unresolvedBuilds(m).length, 1)
+  assert.throws(() => assertBuildsResolved(m), { code: 'BUILD_UNRESOLVED' })
+})
+
+test('a build that finishes without any signal still settles with the real executor', async () => {
+  const m = stand()
+  const { persist } = recorder()
+  await runBuild(m, () => run(process.execPath, ['-e', '0'], { capture: true }), persist)
+  assert.equal(m.builds[0].state, 'settled')
 })
 
 test('no code path can write a settled failure without engine-side evidence', async () => {

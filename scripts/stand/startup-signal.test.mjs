@@ -54,7 +54,8 @@ for (const [state, signal] of [
       if (unresolvedBuilds(m).length) {
         // Interrupted while `compose build` ran: nothing proves Docker finished exporting,
         // so the record is kept and purge reports incomplete until risk is accepted.
-        assert.notEqual(m.state, 'purged')
+        assert.equal(m.state, 'cleanup-incomplete', 'the e2e finally keeps the precise state')
+        assert.equal(m.cleanup.code, 'BUILD_UNRESOLVED')
         await assert.rejects(() => cleanup(m, true), { code: 'BUILD_UNRESOLVED' })
         await cleanup(m, true, {
           acceptReason: 'startup signal proof accepts an interrupted build',

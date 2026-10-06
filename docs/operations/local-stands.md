@@ -160,8 +160,10 @@ the disk actually recovered depends on shared layers, and the BuildKit build cac
 (including the pnpm cache mounts below) is a separate store these commands do not touch.
 
 Before `compose build` runs, the stand records the attempt in its manifest. Only a
-successful, unsignalled return of the command (exit 0) settles it. A non-zero exit, a
-signal such as Ctrl-C, a spawn or transport error, or a crash leaves the attempt
+successful, unsignalled return of the command (exit 0) settles it; an exit 0 that
+follows a signal this process sent to any managed group while the build ran (for
+example Ctrl-C) does not count. A non-zero exit, a signal such as Ctrl-C, a spawn or
+transport error, or a crash leaves the attempt
 **unresolved**, because a host-side result does not show whether the Docker daemon is
 still exporting an image for this stand. Purge still removes everything it can
 prove, but reports cleanup incomplete, keeps the stand record and its source, and
@@ -177,11 +179,27 @@ pnpm stand recover --id <stand-id> --purge --accept-unresolved-build "<reason>"
 Use `down` after a cleanup failure with a released lease and `recover` after an
 interrupted run that retained its lease. Neither runs migrations, needs the database
 marker or an intact original source. The reason is stored in the manifest as an
-acceptance record, not as proof of completion, and closeout reports it as such. It is
-a maintainer decision: agents must not pass the flag on their own authority. Engine-
-side build status (a Docker build-history record per service) could prove that a
-build finished, but it needs a newer buildx plugin and has short retention, so it
-is not used yet.
+acceptance record, not as proof of completion. `closeout` verifies physical absence
+as usual and reports every accepted attempt and its reason separately (`ACCEPTED RISK`
+lines, the manifest's `closeout.acceptedRisk`, and a final message that says only
+physical absence was verified): acceptance does not prove that no late image export
+remains. It is a maintainer decision: agents must not pass the flag on their own
+authority. Engine-side build status (a Docker build-history record per service)
+could prove that a build finished, but it needs a newer buildx plugin and has short
+retention, so it is not used yet.
+
+An ordinary removal failure is a different case and is never resolved by accepting
+risk: a foreign tag or alias on a stand image, a foreign container that still uses it,
+or a failed or unverified removal. Purge keeps what it has already removed
+(containers, networks, volumes, proved images), records `cleanup-failed` with the
+reason in the manifest (replacing any earlier state, including `purged`), keeps the
+record and source, and exits non-zero. Remove or resolve the foreign reference (for
+example `docker image rm <alias>` or `docker rm <container>`) and rerun
+`pnpm stand down --id <stand-id> --purge`, or `recover --id <stand-id> --purge` when a
+lease was retained; retries are safe. An unresolved build records `cleanup-incomplete`
+instead, so the two are distinguishable. Every purge entry point (`down`, `recover`,
+orphan purge, the end of an e2e run, the bind-race retry and `closeout`) records its
+latest result the same way.
 
 A lease covers startup, admission, tests and cleanup. Competing mutation commands
 refuse. SIGINT/SIGTERM stops and awaits proved-owned process groups, including

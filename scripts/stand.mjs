@@ -2,7 +2,7 @@ import { snapshot } from './stand/snapshot.mjs'
 import { refresh } from './stand/refresh.mjs'
 import { randomUUID } from 'node:crypto'
 import { create } from './stand/create.mjs'
-import { root, load, lease, save } from './stand/state.mjs'
+import { root, load, lease } from './stand/state.mjs'
 import { boot } from './stand/boot.mjs'
 import { cleanup, dataAdmission } from './stand/ownership.mjs'
 import { test } from './stand/playwright.mjs'
@@ -136,10 +136,8 @@ async function execute() {
     let cleanupError
     if (m && action === 'e2e' && lane !== 'mocked') {
       try {
-        await cleanup(m, true)
+        await cleanup(m, true) // records its own failure/incomplete state
       } catch (e) {
-        m.state = 'cleanup-failed'
-        await save(m)
         cleanupError = e
       }
     }
