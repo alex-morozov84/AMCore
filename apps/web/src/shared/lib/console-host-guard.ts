@@ -1,14 +1,15 @@
 import { headers } from 'next/headers'
 
 import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
-import { getConsoleHostname } from './admin-console-config'
+import { getConsoleOrigin } from './admin-console-config'
 
 import 'server-only'
 
 export function isConsoleHost(host: string | null): boolean {
   if (!ADMIN_CONSOLE_CONFIG.enabled) return false
   if (ADMIN_CONSOLE_CONFIG.mode !== 'host') return true
-  return host === getConsoleHostname()
+  // Caddy preserves the public port; compare against the validated origin authority.
+  return host === new URL(getConsoleOrigin()!).host
 }
 
 export async function hasCanonicalConsoleHost(): Promise<boolean> {

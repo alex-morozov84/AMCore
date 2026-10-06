@@ -21,6 +21,11 @@ const STRIP_REQUEST_HEADERS = new Set([
   'referer',
   'x-amcore-organization-id',
   'x-amcore-context-session',
+  'x-invitation-continuation',
+  'x-invitation-attempt-id',
+  'x-invitation-auth-attempt-id',
+  'x-invitation-handoff-key',
+  'x-invitation-operation-id',
 ])
 
 // Forwarded/client-IP signals a browser could set on its own request to

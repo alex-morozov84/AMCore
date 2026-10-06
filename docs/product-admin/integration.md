@@ -76,6 +76,11 @@ props: `admission`, `input`, `explicitList`, `contextHref`, `pageHref`, `listHre
 supply independent destinations and callbacks. Obtain safe admission through the
 public entity server DAL and keep the page-level server gate. Use
 `useRouteProgressRouter()` and `RouteProgressLink` for internal navigation.
+Optional `initialOrganizationName`/`initialCanManageTeamAccess` props may seed
+selected-page presentation only from a fresh server context read with the same
+expected admission binding. They do not authorize client commands. The reference
+mount supplies these values so tab navigation does not flash a generic heading;
+subsequent authority failures hide protected data.
 If customizing login links here, align your own server gate too; the ordinary
 mount's server login destination remains `/login`.
 
@@ -190,6 +195,40 @@ example, not a delivered CRM screen. See the
 [capability guide](../auth/capability-catalogue.md) for `recordRequired` and
 field decisions.
 
+## Custom invitation forms
+
+Keep invitation state and presentation separate. The public browser transport in
+`@/entities/invitation-flow` sends strict flow bindings, validates safe responses,
+and exposes receipt recovery independently of an expired invitation flow.
+`createInvitationAcceptJournal` stores only the operation ID and inspected
+invitation ID/generation in tab storage. It stores no password, token, cookie,
+continuation credential or permission to join. If storage is disabled, retain
+the descriptor in memory and explain that reload recovery is limited.
+
+The ready `RecipientAuth`, `RecipientStatus`, `RecipientFrame` and
+`RecipientSkeleton` components from `@/_pages/invitation-recipient` are optional
+presentation. `InvitationConsent` from `@/features/invitation-acceptance` renders
+the complete inspected role set, expiry and explicit actions. A downstream may
+replace these components with its own fields, cards or layout while retaining
+the transport and continuation protocol.
+
+Existing `LoginForm` and `RegisterForm` accept a cohesive
+`CredentialFormAdapter` from `@/shared/lib/credential-form-adapter`. Application
+composition supplies `submit`, `isCurrent` and `onSuccess`; invited registration
+also supplies `fixedEmail`. Use `createInvitationCredentialAdapters` from
+`@/_app/invitation-flow/index.client` to compose the ready forms. It authenticates
+once, reports the safe pending handoff, sends a separate acknowledgment, and
+resolves only after confirmation. The registration request derives its email
+from the server-held invitation, regardless of client form contents.
+
+Keep one continuation owner for the screen. Its callbacks show progress,
+refresh safe state after failure, and retire stale results on account or flow
+changes. Recreate forms/adapters when the authoritative flow revision changes;
+do not resend an authentication request whose outcome is unknown. Recover the
+same handoff acknowledgment instead. Authentication, verification and screen
+mounting never accept organization membership. Joining requires a separate
+explicit action with the inspected intent and a stable operation ID.
+
 ## Validate your composition
 
 Check menu links from dashboard and organization frame, direct list/id entry,
@@ -217,3 +256,28 @@ and Storybook disabled in that fixture. It prints the managed real-stack browser
 command; no standalone sample product route is added to the starter. See the
 [members contract](organization-members.md) for permissions, complete-set/byte
 limits, truthful self-edit warnings and safe recovery.
+
+## Custom invitation manager
+
+Run `node scripts/fixtures/organization-invitations-headless.mjs` to prepare a
+disposable consumer with a persistent inline form beside an invitation list.
+It imports the public organization-context hooks, without the ready invitation
+page, widget or form. The printed managed command exercises create, repeat and
+revoke through the real BFF, the concrete default role, primary/secondary read
+faults, committed-write/failed-refresh recovery, session retirement and accessibility.
+The fixture distinguishes `list.ready` (authority) from `list.available` (the
+current primary read succeeded). Gate writes and cached row presentation with
+`available`; pending/error is not authorization to act on old data. Keep secondary
+role choices independent of revoke. The role-choices hook registers a secondary
+refresh: its failure remains in the local role error and does not fail an
+otherwise successful primary write followup. Display committed success separately from
+followup failure and offer `operation.controller.review()` to refresh current state
+without sending the original command again. Unknown results use `recover()`.
+`--projected` prepares single-Russian routing with Console and Storybook removed
+and route progress disabled. Install dependencies and run the printed browser
+command in that separate copy; preparing it alone does not verify the projection.
+
+This small fixture demonstrates composition, not a complete replacement manager.
+For your product, add your own search/paging, complete-set draft review and
+confirmation UI while retaining the headless operation's identity, generation
+and recovery semantics. See [invitation reuse](invitations.md#reuse-with-your-own-design).

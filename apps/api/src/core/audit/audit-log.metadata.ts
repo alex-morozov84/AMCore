@@ -173,9 +173,15 @@ const specs: Record<AuditAction, MetadataSpec> = {
   'api_key.revoked': { reason: true },
   'auth.step_up_failed': { reason: true },
   'auth.step_up_succeeded': { sessionId: true },
-  'org.invite_accepted': { actorCredentialType: true, roleId: true },
-  'org.invite_created': { actorCredentialType: true, branch: true, roleId: true },
-  'org.invite_revoked': { actorCredentialType: true },
+  'org.invite_accepted': {
+    actorCredentialType: true,
+    branch: true,
+    generation: true,
+    roleIds: 'string[]',
+  },
+  'org.invite_created': { actorCredentialType: true, branch: true, roleIds: 'string[]' },
+  'org.invite_revoked': { actorCredentialType: true, generation: true },
+  'org.invite_reissued': { actorCredentialType: true, branch: true, roleIds: 'string[]' },
   'org.member_roles_changed': {
     actorCredentialType: boundedString(7, /^(jwt|api_key)$/),
     memberId: boundedString(128, /^[A-Za-z0-9_-]+$/),

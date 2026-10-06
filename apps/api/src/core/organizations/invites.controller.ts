@@ -1,9 +1,22 @@
-import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Query } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common'
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiConflictResponse,
   ApiForbiddenResponse,
+  ApiHeader,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOperation,
@@ -14,123 +27,162 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
+import { ZodResponse, ZodValidationPipe } from 'nestjs-zod'
 
-import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
-import {
-  AuthType,
-  type InviteListResponse,
-  PAGINATION,
-  type RequestPrincipal,
-} from '@amcore/shared'
+import { AuthType, ORGANIZATION_CONTEXT_FAMILY, type ReissueInviteInput } from '@amcore/shared'
 
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
 } from '../auth/organization-context/request-context-policy'
+import { InvitationRequestGuard } from '../invitations/invitation-request.guard'
 
-import { InviteListResponseDto } from './dto'
+import { CreateInviteDto, InviteListResponseDto, InviteResponseDto } from './dto'
+import {
+  InviteListQueryDto,
+  InviteRoleChoicesQueryDto,
+  InviteRoleChoicesResponseDto,
+  ReissueInviteDto,
+  RevokeInviteQueryDto,
+} from './dto/invitation-management.dto'
 import { CurrentInvitationActor, type InvitationActor } from './invitation-actor'
+import { parseInvitationOperationId } from './invitation-operation'
 import { InviteService } from './invite.service'
 
-/**
- * Pending-invite management for org admins (OB-02 Stage C).
- *
- * Class-level `@Auth(AuthType.Bearer)` — bearer-only. Listing or
- * revoking outstanding invites is an interactive admin action; adding
- * `AuthType.ApiKey` here would require both an ADR-034 amendment and a
- * matching per-handler entry in `auth-decorator-coverage.spec.ts`. The
- * invite-create route on `MembersController` stays dual-auth because
- * the credential matrix there was unchanged by the Stage C contract
- * flip; narrowing it is a separate decision (ADR-034).
- */
 @ApiTags('organizations')
 @ApiBearerAuth()
-@ApiUnauthorizedResponse({ description: 'Missing or invalid accepted credential' })
-@ApiForbiddenResponse({
-  description: 'FORBIDDEN: target, record/field or full TeamAccess authority denied',
-})
+@ApiParam({ name: 'orgId', type: String })
+@ApiUnauthorizedResponse({ description: 'Personal bearer authentication required' })
+@ApiForbiddenResponse({ description: 'Actual membership and full TeamAccess required' })
+@ApiBadRequestResponse({ description: 'Invalid strict request/query/header' })
+@ApiNotFoundResponse({ description: 'Organization or invitation unavailable' })
+@ApiConflictResponse({ description: 'Generation, settlement or operation conflict' })
+@ApiTooManyRequestsResponse({ description: 'Invitation request budget exceeded' })
+@ApiServiceUnavailableResponse({ description: 'Read unavailable or command outcome unconfirmed' })
 @Controller('organizations/:orgId/invites')
 @Auth(AuthType.Bearer)
 @OrganizationContextBoundary(ORGANIZATION_CONTEXT_FAMILY)
+@RequireTeamAccess('orgId')
+@UseGuards(InvitationRequestGuard)
 export class InvitesController {
   constructor(private readonly inviteService: InviteService) {}
 
-  @ApiParam({ name: 'orgId', type: String })
-  @ApiBadRequestResponse({ description: 'Invalid query or selector' })
-  @ApiNotFoundResponse({ description: 'Organization unavailable' })
-  @Get()
   @RequireTeamAccess('orgId')
-  @ApiOperation({
-    summary: 'List active pending invites for the organization — requires full TeamAccess',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    minimum: 1,
-    example: PAGINATION.DEFAULT_PAGE,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    minimum: 1,
-    maximum: PAGINATION.MAX_LIMIT,
-    example: PAGINATION.DEFAULT_LIMIT,
-  })
-  @ZodResponse({
-    type: InviteListResponseDto,
-    status: 200,
-    description: 'Paginated pending invites',
-  })
-  @RequestContextPolicy({
-    kind: 'organization',
-    selector: { param: 'orgId' },
-    legacyPlatformMembershipBypass: true,
-  })
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
+  @Get()
+  @ApiOperation({ summary: 'List pending/retained expired invitations with complete role intent' })
+  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1, maximum: 10000 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 100 })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'expired', 'all'] })
+  @ZodResponse({ type: InviteListResponseDto, status: 200 })
   listInvites(
     @Param('orgId') orgId: string,
-    @CurrentUser() principal: RequestPrincipal,
-    @Query() pagination: PaginationQueryDto
-  ): Promise<InviteListResponse> {
-    return this.inviteService.listInvites(orgId, principal, pagination.page, pagination.limit)
+    @CurrentInvitationActor() actor: InvitationActor,
+    @Query() query: InviteListQueryDto
+  ): ReturnType<InviteService['listInvites']> {
+    return this.inviteService.listInvites(orgId, actor, query)
   }
 
-  @Delete(':inviteId')
-  @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
+  @Get('role-choices')
   @ApiOperation({
-    summary:
-      'Revoke a pending invite — requires full TeamAccess. Idempotent: revoking an ' +
-      'already-revoked invite returns 204. Revoking an accepted invite ' +
-      'returns 400 BUSINESS_RULE_VIOLATION (remove the member via ' +
-      'DELETE /organizations/:orgId/members/:userId instead).',
+    summary: 'Discover compact assignable roles and complete default MEMBER projection',
   })
-  @ApiTooManyRequestsResponse({ description: 'Request rate limit exceeded' })
-  @ApiNoContentResponse({ description: 'Invite revoked; repeat preserves first revocation' })
-  @ApiParam({ name: 'orgId', type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number, maximum: 100 })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ZodResponse({ type: InviteRoleChoicesResponseDto, status: 200 })
+  roleChoices(
+    @Param('orgId') orgId: string,
+    @CurrentInvitationActor() actor: InvitationActor,
+    @Query() query: InviteRoleChoicesQueryDto
+  ): ReturnType<InviteService['roleChoices']> {
+    return this.inviteService.roleChoices(orgId, actor, query)
+  }
+
+  @RequireTeamAccess('orgId')
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
+  @Post()
+  @HttpCode(202)
+  @ApiOperation({
+    summary: 'Issue an invitation; uniform acknowledgment, no delivery/account disclosure',
+  })
+  @ApiHeader({
+    name: 'X-Invitation-Operation-Id',
+    required: true,
+    description: 'UUIDv7; first execution within24h, replay30d',
+  })
+  @ZodResponse({
+    type: InviteResponseDto,
+    status: 202,
+    description: 'Decision committed; email delivery is best-effort',
+  })
+  create(
+    @Param('orgId') orgId: string,
+    @Body() dto: CreateInviteDto,
+    @CurrentInvitationActor() actor: InvitationActor,
+    @Headers('x-invitation-operation-id') operation: string
+  ): ReturnType<InviteService['createInvite']> {
+    return this.inviteService.createInvite(orgId, dto, actor, parseInvitationOperationId(operation))
+  }
+
+  @RequireTeamAccess('orgId')
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
+  @Post(':inviteId/reissue')
+  @ApiBody({ type: ReissueInviteDto })
+  @HttpCode(202)
+  @ApiOperation({
+    summary: 'Reissue a generation with explicit repeat or complete replacement intent',
+  })
   @ApiParam({ name: 'inviteId', type: String })
-  @ApiBadRequestResponse({ description: 'BUSINESS_RULE_VIOLATION: already accepted' })
-  @ApiNotFoundResponse({ description: 'Organization or invite unavailable' })
-  @ApiConflictResponse({ description: 'CONFLICT: known transaction abort' })
-  @ApiServiceUnavailableResponse({
-    description: 'Write unconfirmed; inspect state before retrying',
+  @ApiHeader({ name: 'X-Invitation-Operation-Id', required: true })
+  @ZodResponse({
+    type: InviteResponseDto,
+    status: 202,
+    description: 'Decision committed; email delivery is best-effort',
   })
-  @RequestContextPolicy({
-    kind: 'organization',
-    selector: { param: 'orgId' },
-    legacyPlatformMembershipBypass: true,
-  })
+  reissue(
+    @Param('orgId') orgId: string,
+    @Param('inviteId') id: string,
+    @Body(new ZodValidationPipe(ReissueInviteDto)) dto: ReissueInviteInput,
+    @CurrentInvitationActor() actor: InvitationActor,
+    @Headers('x-invitation-operation-id') operation: string
+  ): ReturnType<InviteService['reissueInvite']> {
+    return this.inviteService.reissueInvite(
+      orgId,
+      id,
+      dto,
+      actor,
+      parseInvitationOperationId(operation)
+    )
+  }
+
+  @RequireTeamAccess('orgId')
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
+  @Delete(':inviteId')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Revoke the expected generation; this never removes membership' })
+  @ApiParam({ name: 'inviteId', type: String })
+  @ApiQuery({ name: 'expectedGeneration', required: true, type: Number })
+  @ApiHeader({ name: 'X-Invitation-Operation-Id', required: true })
+  @ApiNoContentResponse({ description: 'Revocation committed; empty body' })
   revokeInvite(
     @Param('orgId') orgId: string,
-    @Param('inviteId') inviteId: string,
-    @CurrentInvitationActor() actor: InvitationActor
-  ): Promise<void> {
-    return this.inviteService.revokeInvite(orgId, inviteId, actor)
+    @Param('inviteId') id: string,
+    @Query() query: RevokeInviteQueryDto,
+    @CurrentInvitationActor() actor: InvitationActor,
+    @Headers('x-invitation-operation-id') operation: string
+  ): ReturnType<InviteService['revokeInvite']> {
+    return this.inviteService.revokeInvite(
+      orgId,
+      id,
+      query.expectedGeneration,
+      actor,
+      parseInvitationOperationId(operation)
+    )
   }
 }

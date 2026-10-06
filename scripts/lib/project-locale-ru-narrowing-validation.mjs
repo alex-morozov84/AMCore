@@ -51,8 +51,8 @@ const contracts = [
   },
   {
     path: `${ROOT}/organizations/invite.service.spec.ts`,
-    required: ["expect(data.locale).toBe('ru')"],
-    forbidden: ["expect(data.locale).toBe('en')"],
+    required: ["locale: known ? 'ru' : null"],
+    forbidden: ["locale: known ? 'en' : null"],
   },
   {
     path: `${ROOT}/notifications/notification-feed.service.spec.ts`,

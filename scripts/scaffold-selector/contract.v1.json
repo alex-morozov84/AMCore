@@ -26,6 +26,7 @@
       "locale.email-template-test",
       "locale.frontend-url-test",
       "locale.global-types",
+      "locale.invitation-route",
       "locale.message-map",
       "locale.navigation-adapter",
       "locale.navigation-call",

@@ -17,6 +17,7 @@ import {
 import type { CreateRoleDto, UpdateRoleDto } from './dto'
 import { lockOrganization } from './organization-mutation-lock'
 import { OrganizationsService } from './organizations.service'
+import { assignableRolesWhere } from './role-assignability-policy'
 
 import type { Permission, Prisma, Role } from '@/generated/prisma/client'
 
@@ -55,7 +56,7 @@ export class RoleService {
     // `isSystem DESC, name ASC, id ASC` — system roles first as a
     // stable section header for the client, alphabetical within
     // each section, id as the final deterministic tie-break.
-    const where = { OR: [{ organizationId: orgId }, { isSystem: true, organizationId: null }] }
+    const where = assignableRolesWhere(orgId)
     const skip = (page - 1) * limit
     const [rows, total] = await Promise.all([
       this.prisma.role.findMany({

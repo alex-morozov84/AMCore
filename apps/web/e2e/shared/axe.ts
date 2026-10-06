@@ -2,6 +2,8 @@ import { AxeBuilder } from '@axe-core/playwright'
 import { expect, type Page } from '@playwright/test'
 import type { Result } from 'axe-core'
 
+import { waitForVisualStability } from './visual-stability'
+
 /**
  * Automated a11y scan for one page/state (Track 7 FINAL PLAN §5,
  * `ai/models-talk.md`). WCAG A/AA tags through 2.2 — `wcag22aa` confirmed
@@ -15,11 +17,23 @@ import type { Result } from 'axe-core'
  * the static token-contrast-pair suite in `theme.test.ts`, does not
  * replace a manual pass.
  */
-export async function expectNoAxeViolations(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-    .analyze()
+/** Scoped checks retain their rules and pass evidence while sharing readiness. */
+export async function scanAccessibility(
+  page: Page,
+  options: { include?: string; rules?: string[]; tags?: string[] } = {}
+) {
+  await waitForVisualStability(page)
+  const builder = new AxeBuilder({ page })
+  if (options.include) builder.include(options.include)
+  if (options.rules) builder.withRules(options.rules)
+  if (options.tags) builder.withTags(options.tags)
+  return builder.analyze()
+}
 
+export async function expectNoAxeViolations(page: Page): Promise<void> {
+  const results = await scanAccessibility(page, {
+    tags: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+  })
   expect(results.violations, formatViolations(results.violations)).toEqual([])
 }
 
@@ -30,19 +44,7 @@ function formatViolations(violations: Result[]): string {
     .join('\n')
 }
 
-/**
- * Popups (`shared/ui/dropdown-menu.tsx`, `dialog.tsx`, ...) fade/zoom in
- * over `duration-100`. Scanning mid-animation caught a real-looking but
- * false `color-contrast` violation — axe sampled the partially-transparent
- * frame, not the settled color (confirmed live: `getComputedStyle` on the
- * settled element reports the full-strength token color). Wait for the Web
- * Animations API to report nothing running, rather than a fixed sleep tied
- * to today's `duration-100`.
- */
+/** Retained for callers that explicitly assert a popup's settled state. */
 export async function waitForAnimationsToFinish(page: Page, selector: string): Promise<void> {
-  await page.waitForFunction((sel) => {
-    const el = document.querySelector(sel)
-    if (!el) return false
-    return el.getAnimations().every((animation) => animation.playState !== 'running')
-  }, selector)
+  await waitForVisualStability(page, selector)
 }

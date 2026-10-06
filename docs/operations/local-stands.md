@@ -50,6 +50,14 @@ these managed lanes.
 `pnpm test:console-session-e2e` remains its entry point.
 <!-- AMCORE_CONSOLE_STAND_COMMANDS_END -->
 
+### CI lane reproduction
+
+`node scripts/e2e-ci.mjs --all` runs the complete Web E2E contract locally with
+CI settings through the same entrypoint as each GitHub lane. Local execution is
+sequential; GitHub lanes have independent runners and fresh stands. See
+[frontend testing](../frontend/testing.md#complete-ci-e2e-locally) for group
+selection and inventory proof. These commands never reuse owner preview data.
+
 ### API Testcontainers
 
 Backend Jest E2E uses `pnpm --filter api test:e2e`; scope it with
@@ -81,7 +89,8 @@ invocation-scoped lease/target capability. Bootstrap is a separate bounded step.
 Manual preview always uses `demo.user@preview.amcore.test` (USER) and
 `demo.super-admin@preview.amcore.test` (SUPER_ADMIN when enabled), with the public
 demo password `Demo!AMCore2026`. Recreating the stand preserves these credentials.
-Preview login checks use the checkout's base-locale catalogue.
+Preview login checks use the checkout's base-locale catalogue for the login form
+and accept the account's saved supported locale on the product home page.
 Tests that need unique users or password changes create separate test accounts;
 technical DB/JWT secrets remain random. Production never seeds these accounts.
 
@@ -173,6 +182,11 @@ from successful disposal.
 Each Docker stand has unique `.localhost` hostnames: cookies do not isolate by
 port. Product HTTP preview is the default.
 
+Managed HTTP stands set `WEB_INVITATION_LOCAL_HTTP_ORIGIN` to their exact admitted
+product origin for invitation continuation cookies. HTTPS stands leave it empty
+and use the secure prefixed cookie. This local exception is independent of
+`NODE_ENV`; an arbitrary HTTP Host or forwarded protocol cannot enable it.
+
 <!-- AMCORE_CONSOLE_STAND_ORIGIN_START -->
 
 Console host tests build a sanitized host-mode copy without changing the source
@@ -229,6 +243,30 @@ docker compose --project-directory . -f docker/compose/dev.yml up -d
 Production/BYO/backup/observability instructions remain in their existing guides;
 managed local commands do not replace those deployment contracts.
 
+## Image build cache and network use
+
+The `apps/api` and `apps/web` Dockerfiles keep the pnpm store (and, for the api
+`deploy` step, pnpm's registry-metadata cache) in BuildKit cache mounts
+(`id=pnpm-store`, `id=pnpm-metadata`), not in image layers. The mounts are shared by
+every build on the machine, so all worktrees and stands reuse one set of downloaded
+packages. A lockfile, manifest or `apps/api/prisma` change that invalidates the
+install layer re-links packages from disk instead of downloading them again; a
+source-only change costs no package traffic. This matters on metered connections:
+a cold api+web build downloads a few hundred MB once, later builds download close
+to nothing. Integrity checking is unchanged — `--frozen-lockfile` still verifies
+every package against the lockfile hashes.
+
+pnpm 11 reads these settings from `pnpm_config_*` variables; `npm_config_*` and
+`PNPM_STORE_DIR` are ignored, which silently disables the cache mount. Check
+`Content-addressable store is at: /pnpm/store/v11` in the build log if a build
+downloads everything again.
+
+`docker builder prune` (and `docker system prune -a`) removes these cache mounts and
+the next build downloads packages again. Prefer a size cap such as
+`docker builder prune --keep-storage <size>` over a full prune, and never prune base
+images (`postgres`, `redis`, `node`, `testcontainers/ryuk`) that Testcontainers and
+the stands expect to find locally.
+
 ## Closeout before removing a checkout
 
 Run `pnpm stand closeout` in the task checkout before deleting its worktree. It
@@ -239,6 +277,8 @@ Kernel cwd inspection also blocks removal for an unobserved, reparented child
 under the stand source: `/proc` on Linux and `lsof` on macOS. Inventory failure is
 an incomplete check, never proof of absence. Such a child is recorded for manual
 inspection, not automatically signalled from its cwd alone.
+The common mocked CI runner allows up to ten seconds for natural child exit
+before closeout; a survivor still fails the lane and preserves recovery records.
 Also verify any external
 fixture checkout recorded by the task's specialized proofs. Never delete the
 worktree or its recovery records after a failure: closeout is incomplete until

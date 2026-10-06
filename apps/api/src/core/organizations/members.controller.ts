@@ -24,7 +24,6 @@ import {
   ApiSecurity,
   ApiServiceUnavailableResponse,
   ApiTags,
-  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import { ZodResponse } from 'nestjs-zod'
@@ -32,7 +31,6 @@ import { ZodResponse } from 'nestjs-zod'
 import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 import {
   AuthType,
-  type InviteResponse,
   type MemberRolesResponse,
   type OrganizationMembersResponse,
   type ReplaceMemberRolesResponse,
@@ -47,7 +45,6 @@ import {
   RequestContextPolicy,
 } from '../auth/organization-context/request-context-policy'
 
-import { CreateInviteDto, InviteResponseDto } from './dto'
 import {
   MemberRolesQueryDto,
   MemberRolesResponseDto,
@@ -56,37 +53,11 @@ import {
   ReplaceMemberRolesDto,
   ReplaceMemberRolesResponseDto,
 } from './dto/organization-members.dto'
-import { CurrentInvitationActor, type InvitationActor } from './invitation-actor'
-import { InviteService } from './invite.service'
 import { MemberService } from './member.service'
 import { MemberQueryService } from './member-query.service'
 import { MemberRoleSetService } from './member-role-set.service'
 
-/**
- * Class-level `@Auth(AuthType.Bearer, AuthType.ApiKey)` is an explicit
- * dual-auth opt-in registered in ADR-034's allowlist. API keys may
- * invite/remove/assign roles within their bound organization subject to
- * the CASL `userPerms ∩ scopes` model; the per-handler `@RequireTeamAccess`
- * decorators are the actual authorization gate.
- *
- * OB-02 Stage C deliberately preserves dual-auth on the invite handler —
- * the credential matrix is unchanged by the move to a non-enumerating
- * pending-invite contract. Narrowing invite to bearer-only is a
- * separate decision that would require an ADR-034 amendment and an
- * allowlist deletion. The existing credential contract remains unchanged.
- *
- * The ADR-034 allowlist in `auth-decorator-coverage.spec.ts` enumerates
- * each handler in this controller individually — adding a new handler
- * also requires an allowlist entry (via ADR amendment) for the
- * metadata test to pass. See OA-11.
- *
- * `@ApiSecurity('apiKeyBearer')` (Swagger-visible counterpart of the
- * allowlist) is applied per-handler rather than at class level, matching
- * the convention in `organizations.controller.ts` — `@nestjs/swagger`
- * concatenates class + method `security` arrays rather than allowing a
- * method to opt out, so per-handler application is the only pattern that
- * stays safe if a future handler here ever needs a bearer-only override.
- */
+/** Member writes retain the independently allowlisted API-key policy. */
 @ApiTags('organizations')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid accepted credential' })
@@ -99,7 +70,6 @@ import { MemberRoleSetService } from './member-role-set.service'
 export class MembersController {
   constructor(
     private readonly memberService: MemberService,
-    private readonly inviteService: InviteService,
     private readonly memberQuery: MemberQueryService,
     private readonly memberRoleSet: MemberRoleSetService
   ) {}
@@ -197,44 +167,6 @@ export class MembersController {
     @CurrentUser() principal: RequestPrincipal
   ): Promise<ReplaceMemberRolesResponse> {
     return this.memberRoleSet.replace(orgId, userId, dto, principal)
-  }
-
-  @Post('invite')
-  @ApiParam({ name: 'orgId', description: 'Target organization selector' })
-  @ApiTooManyRequestsResponse({ description: 'Invitation issuance budget exceeded' })
-  @ApiBadRequestResponse({ description: 'Invalid request' })
-  @ApiNotFoundResponse({ description: 'Organization unavailable' })
-  @ApiConflictResponse({ description: 'CONFLICT: known transaction abort' })
-  @ApiServiceUnavailableResponse({
-    description: 'Write unconfirmed; inspect pending invites before retrying',
-  })
-  @RequireTeamAccess('orgId')
-  @ApiSecurity('apiKeyBearer')
-  @ZodResponse({
-    type: InviteResponseDto,
-    status: 202,
-    description: 'Invitation decision committed; email delivery is best-effort',
-  })
-  @ApiOperation({
-    summary:
-      'Invite a user by email — requires full TeamAccess. Returns a uniform 202 ' +
-      '{status:"invited"} regardless of whether the email already has an ' +
-      'account, is already a member, or is unknown. An invite email ' +
-      'carrying the raw accept token is attempted after commit. The ' +
-      'pending invite is attached to a membership when the recipient ' +
-      'calls POST /auth/invites/accept with that token.',
-  })
-  @RequestContextPolicy({
-    kind: 'organization',
-    selector: { param: 'orgId' },
-    legacyPlatformMembershipBypass: true,
-  })
-  invite(
-    @Param('orgId') orgId: string,
-    @Body() dto: CreateInviteDto,
-    @CurrentInvitationActor() actor: InvitationActor
-  ): Promise<InviteResponse> {
-    return this.inviteService.createInvite(orgId, dto, actor)
   }
 
   @Delete(':userId')

@@ -65,7 +65,8 @@ describe('Session metadata transport boundary', () => {
       )
       vi.stubGlobal('fetch', fetchMock)
       const headers = browserHeaders()
-      headers.set('cookie', 'oauth_state=binding')
+      const nonceName = provider === 'apple' ? 'oauth_state_apple' : 'oauth_state'
+      headers.set('cookie', `${nonceName}=binding; unrelated=must-not-forward`)
       headers.set('accept-language', 'ru')
       if (method === 'POST') headers.set('content-type', 'application/x-www-form-urlencoded')
       await proxyOAuthCallback(
@@ -80,7 +81,7 @@ describe('Session metadata transport boundary', () => {
       assertMetadata(init)
       expect(init.method).toBe(method)
       expect(init.redirect).toBe('manual')
-      expect(new Headers(init.headers).get('cookie')).toBe('oauth_state=binding')
+      expect(new Headers(init.headers).get('cookie')).toBe(`${nonceName}=binding`)
       expect(new Headers(init.headers).get('accept-language')).toBe('ru')
       if (method === 'POST')
         expect(await new Response(init.body).text()).toBe('code=probe&state=binding')

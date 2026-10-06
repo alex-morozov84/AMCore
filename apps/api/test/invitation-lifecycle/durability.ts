@@ -1,5 +1,7 @@
 import { inspect } from 'node:util'
 
+import { createInvitationOperationId } from '@amcore/shared'
+
 import { AuditLogService } from '../../src/core/audit'
 import { InviteAcceptService } from '../../src/core/organizations/invite-accept.service'
 import { InviteAcceptLimiterService } from '../../src/core/organizations/invite-accept-limiter.service'
@@ -44,12 +46,23 @@ export function registerDurabilityProofs(getFixture: () => InvitationProofFixtur
       .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
       .mockResolvedValue(undefined)
     try {
-      expect(await outcome(invites.revokeInvite(orgId, invite.id, actor()))).toBe(503)
+      expect(
+        await outcome(
+          invites.revokeInvite(orgId, invite.id, 1, actor(), createInvitationOperationId())
+        )
+      ).toBe(503)
       expect(await prisma.orgInvite.findUniqueOrThrow({ where: { id: invite.id } })).toEqual(
         original
       )
       expect(
-        await outcome(invites.createInvite(orgId, { email: 'new@example.test' }, actor()))
+        await outcome(
+          invites.createInvite(
+            orgId,
+            { email: 'new@example.test' },
+            actor(),
+            createInvitationOperationId()
+          )
+        )
       ).toBe(503)
       expect(await prisma.orgInvite.count({ where: { emailCanonical: 'new@example.test' } })).toBe(
         0
@@ -143,7 +156,9 @@ export function registerDurabilityProofs(getFixture: () => InvitationProofFixtur
       expect(transaction).toHaveBeenCalledTimes(1)
       const after = await truth(invite.id)
       expect(after.members).toHaveLength(1)
-      expect(after.members[0]!.roles.map((r) => r.roleId)).toEqual([invite.roleId])
+      expect(after.members[0]!.roles.map((r) => r.roleId)).toEqual([
+        invite.roleIntents[0]?.liveRoleId,
+      ])
       expect(after.org!.aclVersion).toBe(before.org!.aclVersion + 1)
       expect(after.audit).toHaveLength(1)
       expect(warning).toHaveBeenCalledWith(

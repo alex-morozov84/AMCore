@@ -9,9 +9,14 @@ interface LoginPageProps {
   oauthProviders: string[]
   /** The raw `?oauthError=` query value — see `OAuthErrorAlert` for normalization/allowlisting. */
   oauthError?: string | string[]
+  publicSignupEnabled?: boolean | null
 }
 
-export function LoginPage({ oauthProviders, oauthError }: LoginPageProps) {
+export function LoginPage({
+  oauthProviders,
+  oauthError,
+  publicSignupEnabled = true,
+}: LoginPageProps) {
   const t = useTranslations('auth')
 
   return (
@@ -26,16 +31,18 @@ export function LoginPage({ oauthProviders, oauthError }: LoginPageProps) {
         <OAuthErrorAlert code={oauthError} className="mb-4" />
         <OAuthSection providers={oauthProviders} />
         <LoginForm />
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          {t('noAccount')}{' '}
-          {/* `underline`, not `hover:underline`: a link inside body text needs
+        {publicSignupEnabled === true && (
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            {t('noAccount')}{' '}
+            {/* `underline`, not `hover:underline`: a link inside body text needs
           a non-color way to be told apart from plain text at rest, not only
           on hover/focus (axe `link-in-text-block`) — this text/link pair is
           also below the 3:1 contrast ratio the color-only cue would need. */}
-          <RouteProgressLink href="/register" className="text-primary underline">
-            {t('register')}
-          </RouteProgressLink>
-        </p>
+            <RouteProgressLink href="/register" className="text-primary underline">
+              {t('register')}
+            </RouteProgressLink>
+          </p>
+        )}
       </CardContent>
     </Card>
   )

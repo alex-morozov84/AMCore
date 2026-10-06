@@ -16,6 +16,8 @@ const entry = (path, key) => ({
 })
 
 export const operationsConsoleStandSeams = [
+  entry('scripts/e2e-ci-plan.mjs', 'CI_LANES'),
+  entry('scripts/e2e-ci.mjs', 'CI_COMMAND'),
   entry('scripts/stand.mjs', 'LANES'),
   entry('scripts/stand.mjs', 'PROXY_SMOKE'),
   entry('scripts/stand/create.mjs', 'HOST_IMPORTS'),

@@ -2,6 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 
 import { MEMBER_REQUEST_BYTES } from '@amcore/shared'
 
+import { configureInvitationBoundary, invitationJsonLimit } from './invitation-request-boundary'
 import { isMemberRoleJsonRequest } from './member-role-body-parser'
 
 /**
@@ -37,6 +38,19 @@ export const REQUEST_BODY_LIMIT_BYTES = 100_000
  * both — there is one production-like parser setup, not per-entrypoint drift.
  */
 export function configureBodyParser(app: NestExpressApplication, prefix = '/api/v1'): void {
+  configureInvitationBoundary(app, prefix)
+  for (const limit of [2048, 16384])
+    app.useBodyParser('json', {
+      limit,
+      type: (req) => {
+        const type = req.headers['content-type']
+        return (
+          typeof type === 'string' &&
+          /^application\/json(?:\s*;|$)/i.test(type) &&
+          invitationJsonLimit(req.url ?? '', prefix) === limit
+        )
+      },
+    })
   app.useBodyParser('json', {
     limit: MEMBER_REQUEST_BYTES,
     type: (req) => isMemberRoleJsonRequest(req, prefix),

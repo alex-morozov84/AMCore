@@ -37,3 +37,26 @@ export async function readContextJson(
     throw new ContextRequestError(400, 'BAD_REQUEST')
   }
 }
+
+/** Next may supply an empty stream for a bodyless DELETE; stream presence is not payload. */
+export async function assertContextEmptyBody(body: ReadableStream<Uint8Array> | null) {
+  if (!body) return
+  const reader = body.getReader()
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    void reader.cancel().catch(() => undefined)
+  }, 5000)
+  try {
+    for (;;) {
+      const next = await reader.read()
+      if (timedOut) throw new ContextRequestError(408, 'BAD_REQUEST')
+      if (next.done) return
+      if (next.value.byteLength) throw new ContextRequestError(400, 'BAD_REQUEST')
+    }
+  } finally {
+    clearTimeout(timer)
+    await reader.cancel().catch(() => undefined)
+    reader.releaseLock()
+  }
+}

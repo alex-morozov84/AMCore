@@ -252,6 +252,36 @@ describe('FSD boundaries', () => {
       true,
     ],
     [
+      'composition may enter named invitation server API',
+      'src/_app/product-api/probe.ts',
+      "'@/entities/invitation-flow/index.server'",
+      false,
+    ],
+    [
+      'composition cannot enter invitation server internals',
+      'src/_app/product-api/probe.ts',
+      "'@/entities/invitation-flow/api/admission.server'",
+      true,
+    ],
+    [
+      'shared cannot import invitation server API',
+      'src/shared/lib/probe.ts',
+      "'@/entities/invitation-flow/index.server'",
+      true,
+    ],
+    [
+      'routing may enter named invitation composition server API',
+      'src/app/api/probe.ts',
+      "'@/_app/invitation-flow/index.server'",
+      false,
+    ],
+    [
+      'routing cannot enter invitation composition internals',
+      'src/app/api/probe.ts',
+      "'@/_app/invitation-flow/ui/mount'",
+      true,
+    ],
+    [
       'shared cannot import an entity server API',
       'src/shared/lib/probe.ts',
       "'@/entities/organization-context/index.server'",

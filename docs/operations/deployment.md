@@ -105,6 +105,21 @@ Compose supplies `STORAGE_DRIVER=local` when it is unset, even with
 For production files on the same VPS instead, use the
 [local storage setup](#production-local-files) below.
 
+### Invitation signup and local browser configuration
+
+`AUTH_PUBLIC_SIGNUP_ENABLED` is passed to both backend process roles. Set it to
+`false` to close ordinary email/new-account OAuth signup while retaining valid
+invitation signup and existing-account login. The API enforces the decision;
+frontend visibility is a projection of that policy.
+
+Invitation browser entry requires HTTPS by default. For local HTTP Compose only,
+set both `WEB_TRUSTED_ORIGINS` and `WEB_INVITATION_LOCAL_HTTP_ORIGIN` to the exact
+origin you actually open, such as `http://localhost:3000`. For bare Next development
+use its port3002 instead. The local setting is empty on HTTPS deployments; it
+cannot authorize public HTTP hosts. Both settings are forwarded to the web service.
+See [cookie policy](../frontend/browser-security-and-csp.md#invitation-browser-proof)
+and [invitation scenarios](../product-admin/invitations.md).
+
 ### Upgrades (new migrations in a release)
 
 The `migrate` service is one-shot; `docker compose up` does not re-run a container
@@ -117,11 +132,13 @@ docker compose run --rm migrate                 # apply new migrations once
 docker compose up -d --no-deps api worker web   # recreate the app with the new image
 ```
 
-The invitation data repair `20261003180000_invitation_role_intent` requires
-all old invitation writers to be drained before migration. Restart only repaired
-instances; [the invitation upgrade guide](../auth/invites.md#upgrade-existing-installations)
-explains affected rows and compatible recovery. This data repair needs a
-maintenance window rather than overlapping old/new invitation writers.
+Invitation upgrades require draining old invitation writers before migration.
+The earlier `20261003180000_invitation_role_intent` repair is followed by
+`20261004190000_invitation_intent_and_settlement`, which introduces complete role
+intent, generations and durable recovery. Restart only the matching application;
+[the invitation upgrade guide](../auth/invites.md#upgrade-an-existing-installation)
+explains legacy rows, removed routes and compatible rollback. Use a maintenance
+window rather than overlapping old/new invitation writers.
 
 #### AI run engine upgrade (maintenance stop)
 
@@ -194,6 +211,15 @@ This supports replacing one live web version, including rollback. It does not
 keep old web containers or make an obsolete Action succeed against a new build.
 Tabs loaded before this protection shipped require an initial manual refresh.
 Malformed external `next-action` requests are outside this recovery mechanism.
+
+### Build dependency lock
+
+The API and web Docker build stages enforce a frozen pnpm lockfile for both the
+explicit dependency installation and any automatic installation before a script.
+pnpm 11 can recheck dependencies after source files are copied into a cached
+install layer. That recheck must preserve the checked-in dependency versions;
+manifest/lockfile disagreement fails the build instead of resolving new versions.
+Dependency changes require updating and reviewing `pnpm-lock.yaml` first.
 
 ### Build identity
 
@@ -720,7 +746,7 @@ server {
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
     }
 
     # SSE endpoints (see "Realtime SSE behind a proxy" below) need buffering
@@ -731,7 +757,7 @@ server {
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_buffering off;
         proxy_read_timeout 75s;
     }
@@ -830,7 +856,10 @@ would otherwise redirect it to the slashless address and that redirect would nam
 
 `docker/nginx/operations-console.conf` is the nginx reference include. Its
 default TLS vhost rejects unmatched hosts, and both vhosts forward the exact
-`Host` header. `docker/caddy/Caddyfile.console-host` carries the equivalent
+`Host` header, including an explicit external port. The web BFF matches this
+authority against configured trusted origins; preserve it (`$http_host` in nginx,
+`{hostport}` in Caddy) instead of stripping a non-default port or trusting
+browser-supplied forwarded headers. `docker/caddy/Caddyfile.console-host` carries the equivalent
 Caddy block and rejects unmatched HTTP hosts before proxying.
 The trailing-slash redirect runs before the internal page mapping, so an
 upstream redirect cannot expose `/{locale}/admin/...` as a public location.

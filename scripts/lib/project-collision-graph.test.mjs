@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import { after, describe, it } from 'node:test'
 
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 import {
   assertExpectedCollisionGraph,
   buildCollisionGraph,
   EXPECTED_SHARED_COLLISION_GRAPH,
 } from './project-collision-graph.mjs'
 
-const copy = createRealRepoCopy()
+const copy = createWorkingTreeCopy()
 after(() => copy.cleanup())
 
 describe('generated remaining-provider collision graph', () => {

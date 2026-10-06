@@ -7,6 +7,7 @@ import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
 import type {
+  InvitedRegisterInput,
   LoginInput,
   RegisterInput,
   RequestPrincipal,
@@ -26,6 +27,18 @@ import { EnvService } from '../../env/env.service'
 import { EmailService } from '../../infrastructure/email'
 import { PrismaService } from '../../prisma'
 import { AuditLogService } from '../audit'
+import {
+  type InvitationHandoffProof,
+  lockInvitationAuthAttempt,
+} from '../invitations/invitation-auth-handoff'
+import { InvitationContinuationService } from '../invitations/invitation-continuation.service'
+import { invitationCredentialHint } from '../invitations/invitation-credential'
+import {
+  invalidInvitation,
+  invitationClock,
+  lockInvitationSignupEmail,
+  lockInvitationUser,
+} from '../invitations/invitation-locks'
 import { NotificationsService } from '../notifications/notifications.service'
 
 import { EmailIdentityService } from './email-identity.service'
@@ -35,15 +48,17 @@ import { TokenService } from './token.service'
 import { TokenManagerService } from './token-manager.service'
 import { UserCacheService } from './user-cache.service'
 
-import { AuditActorType, AuditTargetType } from '@/generated/prisma/client'
+import { AuditActorType, AuditTargetType, type User } from '@/generated/prisma/client'
 
-interface AuthResult {
+export interface AuthResult {
   user: UserResponse
   accessToken: string
   refreshToken: string
 }
 
-interface RequestInfo {
+export interface RequestInfo {
+  handoff?: InvitationHandoffProof
+  invitationCredential?: string
   userAgent?: string
   ipAddress?: string
   /**
@@ -73,13 +88,27 @@ export class AuthService {
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly loginRateLimiter: LoginRateLimiterService,
     private readonly notifications: NotificationsService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly invitation: InvitationContinuationService
   ) {
     this.logger.setContext(AuthService.name)
   }
 
   /** Register new user */
   async register(input: RegisterInput, requestInfo: RequestInfo): Promise<AuthResult> {
+    if (requestInfo.handoff) {
+      const credential = requestInfo.invitationCredential ?? ''
+      const { email } = await this.invitation.context(credential)
+      if (this.emailIdentity.canonicalize(input.email) !== this.emailIdentity.canonicalize(email))
+        throw invalidInvitation()
+      return this.registerInvited(
+        { password: input.password, name: input.name, locale: input.locale },
+        credential,
+        requestInfo
+      )
+    }
+    if (!this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED'))
+      throw new AppException('Public signup is disabled', 403, AuthErrorCode.PUBLIC_SIGNUP_DISABLED)
     const email = this.emailIdentity.normalizeForStorage(input.email)
     const emailCanonical = this.emailIdentity.canonicalize(input.email)
 
@@ -131,6 +160,79 @@ export class AuthService {
       sid: session.id,
     })
 
+    await this.sendRegistrationVerification(user)
+    return { user: this.mapUserToResponse(user), accessToken, refreshToken }
+  }
+
+  /** Scoped signup never accepts an editable email or creates organization access. */
+  async registerInvited(
+    input: InvitedRegisterInput,
+    credential: string,
+    requestInfo: RequestInfo
+  ): Promise<AuthResult> {
+    // Password work stays outside the bounded, generation-checked transaction.
+    const passwordHash = await argon2.hash(input.password)
+    const created = await this.prisma
+      .$transaction(
+        async (tx) => {
+          await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
+          if (requestInfo.handoff) await lockInvitationAuthAttempt(tx, requestInfo.handoff)
+          const hint = await invitationCredentialHint(tx, { continuation: credential })
+          await lockInvitationSignupEmail(tx, hint.invite.emailCanonical)
+          const { invite, expiresAt } = await this.invitation.lockValid(tx, {
+            continuation: credential,
+          })
+          const existing = await tx.user.findUnique({
+            where: { emailCanonical: invite.emailCanonical },
+            select: { id: true },
+          })
+          if (existing)
+            throw new AppException('Email already exists', 409, AuthErrorCode.EMAIL_ALREADY_EXISTS)
+          const locale = input.locale ?? requestInfo.acceptedLocale
+          const user = await tx.user.create({
+            data: {
+              email: invite.email,
+              emailCanonical: invite.emailCanonical,
+              passwordHash,
+              name: input.name,
+              ...(locale ? { locale } : {}),
+              lastLoginAt: new Date(),
+            },
+          })
+          const session = await this.sessionService.createSession(
+            {
+              userId: user.id,
+              userAgent: requestInfo.userAgent,
+              ipAddress: requestInfo.ipAddress,
+              handoff: requestInfo.handoff,
+            },
+            tx
+          )
+          if (expiresAt <= (await invitationClock(tx))) throw invalidInvitation()
+          return { user, ...session }
+        },
+        { maxWait: 2000, timeout: 4000 }
+      )
+      .catch((error: unknown) => {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002')
+          throw new AppException('Email already exists', 409, AuthErrorCode.EMAIL_ALREADY_EXISTS)
+        throw error
+      })
+    const accessToken = this.tokenService.generateAccessToken({
+      sub: created.user.id,
+      email: created.user.email,
+      systemRole: created.user.systemRole,
+      sid: created.session.id,
+    })
+    await this.sendRegistrationVerification(created.user)
+    return {
+      user: this.mapUserToResponse(created.user),
+      accessToken,
+      refreshToken: created.refreshToken,
+    }
+  }
+
+  private async sendRegistrationVerification(user: User): Promise<void> {
     // Generate verification token synchronously so the row is committed
     // before HTTP 201 returns. Calling resendVerificationEmail here would
     // race with any immediately-following user action that creates a token
@@ -169,14 +271,6 @@ export class AuthService {
         locale: userLocale,
       })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send verification email'))
-
-    this.logger.info({ userId: user.id }, 'User registered successfully')
-
-    return {
-      user: this.mapUserToResponse(user),
-      accessToken,
-      refreshToken,
-    }
   }
 
   /** Login user */
@@ -216,18 +310,38 @@ export class AuthService {
     await this.loginRateLimiter.reset(emailCanonical, ip)
 
     // Update last login
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    })
+    if (!requestInfo.handoff)
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      })
 
     // Create the session first so the access token can carry its id as `sid`
     // (OB-06b / ADR-037 step-up freshness).
-    const { session, refreshToken } = await this.sessionService.createSession({
+    const params = {
       userId: user.id,
       userAgent: requestInfo.userAgent,
       ipAddress: requestInfo.sessionIpAddress,
-    })
+      handoff: requestInfo.handoff,
+    }
+    const { session, refreshToken } = requestInfo.handoff
+      ? await this.prisma.$transaction(
+          async (tx) => {
+            await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
+            await lockInvitationAuthAttempt(tx, requestInfo.handoff!)
+            await lockInvitationUser(tx, user.id, true)
+            const { invite } = await this.invitation.lockValid(tx, {
+              continuation: requestInfo.invitationCredential ?? '',
+            })
+            if (invite.emailCanonical !== user.emailCanonical)
+              throw new AppException('Invitation account mismatch', 400, 'INVITE_ACCOUNT_MISMATCH')
+            const result = await this.sessionService.createSession(params, tx)
+            await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+            return result
+          },
+          { maxWait: 2000, timeout: 4000 }
+        )
+      : await this.sessionService.createSession(params)
 
     const accessToken = this.tokenService.generateAccessToken({
       sub: user.id,

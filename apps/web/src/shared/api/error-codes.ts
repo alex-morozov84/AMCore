@@ -14,6 +14,15 @@ export const ClientErrorCode = {
   NETWORK_ERROR: 'NETWORK_ERROR',
   TIMEOUT: 'TIMEOUT',
   UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+  AUTH_CONTINUATION_CHANGED: 'AUTH_CONTINUATION_CHANGED',
 } as const
 
 export type ClientErrorCodeValue = (typeof ClientErrorCode)[keyof typeof ClientErrorCode]
+
+/** A local state failure carries no fabricated HTTP response or backend diagnostics. */
+export class ClientStateError extends Error {
+  constructor(public readonly code: ClientErrorCodeValue) {
+    super(code)
+    this.name = 'ClientStateError'
+  }
+}

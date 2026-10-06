@@ -35,10 +35,10 @@ export const localeApiNotificationSeams = [
     'locale.api-fixture'
   ),
   localeSeam(
-    'locale.invite-unknown-recipient-locale',
+    'locale.invite-issuance-snapshot-locale',
     'apps/api/src/core/organizations/invite.service.spec.ts',
-    { identifiers: ['sends an org invite email with hasAccount=false for an unknown email'] },
-    ['sends an org invite email with hasAccount=false for an unknown email'],
+    { identifiers: ['acknowledges known=%s nonmembers uniformly and captures truthful email intent'] },
+    ['acknowledges known=%s nonmembers uniformly and captures truthful email intent'],
     'locale.api-link-fixture'
   ),
   localeSeam(

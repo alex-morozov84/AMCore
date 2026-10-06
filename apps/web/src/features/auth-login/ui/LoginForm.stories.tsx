@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import messages from '../../../../messages/en.json'
+
 import { LoginForm } from './LoginForm'
 
 const meta = {
@@ -30,11 +32,18 @@ export const Submitting: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.type(canvas.getByLabelText(/email/i), 'user@amcore.dev')
-    await userEvent.type(canvas.getByLabelText(/password/i), 'hunter2hunter2')
-    await userEvent.click(canvas.getByRole('button'))
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.email, { exact: true }),
+      'user@amcore.dev'
+    )
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.password, { exact: true }),
+      'hunter2hunter2'
+    )
+    const submit = canvas.getByRole('button', { name: messages.auth.login })
+    await userEvent.click(submit)
 
-    await waitFor(() => expect(canvas.getByRole('button')).toBeDisabled())
+    await waitFor(() => expect(submit).toBeDisabled())
   },
 }
 
@@ -51,14 +60,21 @@ export const InvalidCredentials: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.type(canvas.getByLabelText(/email/i), 'user@amcore.dev')
-    await userEvent.type(canvas.getByLabelText(/password/i), 'wrong-password')
-    await userEvent.click(canvas.getByRole('button'))
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.email, { exact: true }),
+      'user@amcore.dev'
+    )
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.password, { exact: true }),
+      'wrong-password'
+    )
+    const submit = canvas.getByRole('button', { name: messages.auth.login })
+    await userEvent.click(submit)
 
     // Translated by errorCode, never the backend's English message — see
     // shared/ui/api-error-alert.stories.tsx.
     await waitFor(() =>
-      expect(canvas.getByText('Incorrect email or password.')).toBeInTheDocument()
+      expect(canvas.getByText(messages.errors.INVALID_CREDENTIALS)).toBeInTheDocument()
     )
   },
 }

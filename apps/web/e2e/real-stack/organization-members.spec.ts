@@ -70,6 +70,15 @@ test('members: real BFF, complete draft, Enter filtering, self-warning, responsi
     expect((await ack).status()).toBe(200)
     await expect(dialog).toHaveCount(0)
     await expect(page.getByRole('heading', { name: t.title })).toBeFocused()
+    const editAction = page
+      .getByRole('button', { name: t.edit, exact: true })
+      .filter({ visible: true })
+    await expect(editAction).toBeEnabled()
+    await expect
+      .poll(() =>
+        editAction.evaluate((el) => el.getAnimations().every((a) => a.playState !== 'running'))
+      )
+      .toBe(true)
     await expectNoAxeViolations(page)
     await page.setViewportSize({ width: 375, height: 812 })
     await expect(

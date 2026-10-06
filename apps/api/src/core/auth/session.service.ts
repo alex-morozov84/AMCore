@@ -7,13 +7,19 @@ import { AuthErrorCode, type SessionsListResponse, type SupportedLocale } from '
 import { AppException, NotFoundException } from '../../common/exceptions'
 import { GeoIpService } from '../../infrastructure/geoip/geoip.service'
 import { acquireXactLock, PrismaService } from '../../prisma'
+import {
+  type InvitationHandoffProof,
+  lockInvitationAuthAttempt,
+} from '../invitations/invitation-auth-handoff'
+import { invitationClock } from '../invitations/invitation-locks'
 
 import { sessionCoordinationLockKey } from './session-lock-key'
 import { TokenService } from './token.service'
 
-import type { Session, User } from '@/generated/prisma/client'
+import type { Prisma, Session, User } from '@/generated/prisma/client'
 
-interface CreateSessionParams {
+export interface CreateSessionParams {
+  handoff?: InvitationHandoffProof
   userId: string
   userAgent?: string
   ipAddress?: string
@@ -44,13 +50,48 @@ export class SessionService {
     this.logger.setContext(SessionService.name)
   }
 
+  /** Server ticket correlation must refer to its current pending durable handoff. */
+  async assertInvitationExchange(
+    attemptId: string,
+    sessionId: string,
+    actorId: string
+  ): Promise<void> {
+    const handoff = await this.prisma.invitationAuthHandoff.findUnique({ where: { attemptId } })
+    const now = await invitationClock(this.prisma)
+    if (
+      !handoff ||
+      handoff.sessionId !== sessionId ||
+      handoff.actorId !== actorId ||
+      handoff.status !== 'pending' ||
+      handoff.deadline <= now
+    )
+      throw new AppException('Invalid OAuth exchange', 401, AuthErrorCode.OAUTH_TICKET_INVALID)
+  }
+
   /** Create new session, return session row and raw refresh token */
-  async createSession(params: CreateSessionParams): Promise<CreateSessionResult> {
+  async createSession(
+    params: CreateSessionParams,
+    tx?: Prisma.TransactionClient
+  ): Promise<CreateSessionResult> {
+    if (tx) return this.createSessionTx(params, tx)
+    if (params.handoff)
+      return this.prisma.$transaction((inner) => this.createSessionTx(params, inner), {
+        maxWait: 2000,
+        timeout: 4000,
+      })
+    return this.createSessionTx(params, this.prisma)
+  }
+
+  private async createSessionTx(
+    params: CreateSessionParams,
+    tx: Prisma.TransactionClient
+  ): Promise<CreateSessionResult> {
+    if (params.handoff) await lockInvitationAuthAttempt(tx, params.handoff)
     const refreshToken = this.tokenService.generateRefreshToken()
     const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
     const expiresAt = this.tokenService.getRefreshTokenExpiration()
 
-    const session = await this.prisma.session.create({
+    const session = await tx.session.create({
       data: {
         userId: params.userId,
         familyId: params.familyId ?? this.generateSessionFamilyId(),
@@ -65,6 +106,17 @@ export class SessionService {
       },
     })
 
+    if (params.handoff) {
+      const now = await invitationClock(tx)
+      await tx.invitationAuthHandoff.create({
+        data: {
+          ...params.handoff,
+          sessionId: session.id,
+          actorId: params.userId,
+          deadline: new Date(now.getTime() + 60_000),
+        },
+      })
+    }
     this.logger.info({ sessionId: session.id, userId: params.userId }, 'Session created')
 
     return { session, refreshToken }
@@ -162,6 +214,17 @@ export class SessionService {
           AuthErrorCode.TOKEN_INVALID
         )
       }
+
+      // Lock the tagged handoff before touching the session: pending cannot rotate
+      // into an unmarked child session, including during abort/confirmation races.
+      const [handoff] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM core.invitation_auth_handoffs WHERE "sessionId" = ${existing.id} FOR UPDATE`
+      if (handoff && handoff.status !== 'confirmed')
+        throw new AppException(
+          'Authentication handoff incomplete',
+          401,
+          AuthErrorCode.AUTH_HANDOFF_INVALID
+        )
 
       if (existing.expiresAt < new Date()) {
         await tx.session.deleteMany({

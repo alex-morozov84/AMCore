@@ -11,12 +11,26 @@ FROM node:24-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d52
 
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
+# The pnpm content-addressed store lives in a BuildKit cache mount (see the
+# `--mount=type=cache,id=pnpm-store` steps below), not in an image layer. It
+# persists across builds and is shared by every build on the machine — api and
+# web, every worktree and stand — so a lockfile/prisma change that invalidates
+# the install layer re-links packages from disk instead of re-downloading them.
+# The store is integrity-addressed (lockfile hashes), so `--frozen-lockfile`
+# verification is unchanged. Keep the store out of the image: it is not needed
+# at runtime and would only inflate the layer.
+ENV pnpm_config_store_dir=/pnpm/store
+ENV pnpm_config_cache_dir=/pnpm/cache
+
 WORKDIR /app
 
 # ===========================================
 # Build — install (incl. dev), generate, build, deploy
 # ===========================================
 FROM base AS build
+
+# pnpm 11 may reinstall before scripts after COPY; every install must keep the lockfile frozen.
+ENV pnpm_config_frozen_lockfile=true
 
 # Prisma CLI runs in this build/migrator stage. Install OpenSSL explicitly so
 # Prisma can resolve the Debian libssl target instead of falling back.
@@ -35,7 +49,8 @@ COPY apps/api/package.json ./apps/api/
 COPY apps/api/prisma.config.ts ./apps/api/
 COPY apps/api/prisma ./apps/api/prisma
 
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Source, then build the shared package and the API.
 COPY packages ./packages
@@ -58,7 +73,16 @@ RUN BUILD_SOURCE_COMMIT="$BUILD_SOURCE_COMMIT" pnpm --filter api build
 # generate during deploy); sharp/argon2 resolve prebuilt binaries at runtime and
 # need no install script here. The Prisma client is source-generated before the
 # API build, so the deployed app does not need the Prisma CLI.
-RUN pnpm --filter api deploy --prod --legacy --ignore-scripts /prod/api
+#
+# `deploy` imports packages from the pnpm store, which now lives in the cache
+# mount rather than the image layer, so it needs the same mount. `--legacy`
+# re-resolves the dependency graph, which fetches registry metadata for every
+# package on each run of this layer (it sits after `COPY apps/api`, so any
+# source edit re-runs it). That metadata lives in pnpm's separate cache dir, so
+# it gets its own cache mount; otherwise each source-only rebuild re-downloads it.
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    --mount=type=cache,id=pnpm-metadata,target=/pnpm/cache \
+    pnpm --filter api deploy --prod --legacy --ignore-scripts /prod/api
 
 # pnpm still materializes Prisma's optional CLI peer variant in `.pnpm` when the
 # workspace has the dev-only `prisma` package installed. The app imports only the

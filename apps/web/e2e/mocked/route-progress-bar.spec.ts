@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test'
+import { expect } from '@playwright/test'
+
+import { test } from '../shared/auth-test'
 
 /**
  * The one thing neither route-progress-controller.test.ts (fake timers, no

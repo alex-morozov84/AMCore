@@ -1,0 +1,9 @@
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  root: FIXTURE_ROOT,
+  plugins: [react()],
+  resolve: { alias: { '@': WEB_SOURCE_ROOT } },
+  test: { environment: 'jsdom', include: ['play.test.tsx'] },
+})

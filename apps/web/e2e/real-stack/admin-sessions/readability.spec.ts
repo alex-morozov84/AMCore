@@ -1,7 +1,6 @@
-import { AxeBuilder } from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
-import { expectNoAxeViolations } from '../../shared/axe'
+import { expectNoAxeViolations, scanAccessibility } from '../../shared/axe'
 import { setSystemRole } from '../admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from '../helpers'
 import { holdSessionRefetch, waitForSessionTransitions } from '../sessions-readability'
@@ -33,10 +32,10 @@ for (const theme of ['light', 'dark']) {
       await waitForSessionTransitions(card)
       const badgeSelector = 'header span[class~="bg-console-accent/8"]'
       await expect(page.locator(badgeSelector)).toHaveText('CO')
-      const contrast = await new AxeBuilder({ page })
-        .include(badgeSelector)
-        .withRules(['color-contrast'])
-        .analyze()
+      const contrast = await scanAccessibility(page, {
+        include: badgeSelector,
+        rules: ['color-contrast'],
+      })
       expect(contrast.violations).toEqual([])
       expect(contrast.passes.find((rule) => rule.id === 'color-contrast')?.nodes).toHaveLength(1)
       const retained = await rows.innerText()

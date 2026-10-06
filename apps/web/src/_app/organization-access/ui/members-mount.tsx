@@ -28,12 +28,14 @@ export async function OrganizationMembersMount({
 }) {
   if (!isOrganizationContextId(id)) notFound()
   let admission
+  let initialOrganizationName: string
   try {
     admission = await safeOrganizationAdmission()
     const context = await readOrganizationContext(id, {
       headers: await headers(),
       expectedSession: admission.binding,
     })
+    initialOrganizationName = context.data.organization.name
     if (!context.data.canManageTeamAccess) notFound()
   } catch (error) {
     if (
@@ -57,9 +59,11 @@ export async function OrganizationMembersMount({
     <OrganizationMembersClient
       admission={admission}
       organizationId={id}
+      initialOrganizationName={initialOrganizationName}
       query={query}
       backHref={organizationAccessHrefs(placement).contextHref(id)}
       membersHref={organizationAccessHrefs(placement).membersHref(id)}
+      invitationsHref={organizationAccessHrefs(placement).invitationsHref(id)}
       listHref={organizationAccessHrefs(placement).listHref}
     />
   )

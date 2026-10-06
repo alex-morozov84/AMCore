@@ -53,8 +53,12 @@ const preview: Preview = {
       themes: { light: '', dark: 'dark' },
       defaultTheme: 'light',
     }),
-    (Story) => (
-      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={defaultMessages}>
+    (Story, context) => (
+      <NextIntlClientProvider
+        locale={DEFAULT_LOCALE}
+        messages={context.parameters.messages ?? defaultMessages}
+        timeZone="UTC"
+      >
         <QueryDecorator>
           <Story />
         </QueryDecorator>

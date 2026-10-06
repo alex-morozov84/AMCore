@@ -29,7 +29,7 @@ test('host Audit uses the isolated console session and closes after demotion', a
   const page = await consoleContext.newPage()
   await page.goto('/en/login')
   await page.getByLabel(/email/i).fill(email)
-  await page.getByLabel(/password/i).fill('Test1234Secure')
+  await page.getByLabel(/^password$/i).fill('Test1234Secure')
   const loginResponse = page.waitForResponse(
     (response) =>
       response.url().endsWith('/api/auth/login') && response.request().method() === 'POST'

@@ -1,0 +1,46 @@
+import React from 'react'
+import { afterEach, expect, it, vi } from 'vitest'
+import { cleanup, render } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
+import '@testing-library/jest-dom/vitest'
+
+// Execute the source play assertions in DOM without Storybook's browser instrumentation.
+vi.mock('storybook/test', async () => ({
+  expect,
+  fn: vi.fn,
+  userEvent: (await import('@testing-library/user-event')).default,
+  within: (await import('@testing-library/react')).within,
+}))
+
+import enMeta, { Ready as EnReady, UnknownOutcome as EnUnknown } from './en.stories'
+import ruMeta, { Ready as RuReady, UnknownOutcome as RuUnknown } from './ru.stories'
+
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+})
+
+const catalogues = [
+  ['en', enMeta, EnReady, EnUnknown],
+  ['ru', ruMeta, RuReady, RuUnknown],
+] as const
+
+for (const [locale, meta, ready, unknown] of catalogues) {
+  for (const [name, story] of [['Ready', ready], ['UnknownOutcome', unknown]] as const) {
+    it(`single ${locale} Storybook retained: actual projected ${name} play`, async () => {
+      const args = {
+        ...meta.args, ...story.args,
+        onAccept: vi.fn(), onRecover: vi.fn(), onLeave: vi.fn(),
+      }
+      const Component = meta.component
+      const { container } = render(
+        <NextIntlClientProvider locale={locale} messages={meta.parameters.messages} timeZone="UTC">
+          <Component {...args} />
+        </NextIntlClientProvider>
+      )
+      await story.play!({ canvasElement: container, args } as never)
+      expect(args.onAccept).toHaveBeenCalledTimes(name === 'Ready' ? 1 : 0)
+      expect(args.onRecover).toHaveBeenCalledTimes(name === 'UnknownOutcome' ? 1 : 0)
+    })
+  }
+}

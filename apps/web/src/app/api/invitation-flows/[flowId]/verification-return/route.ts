@@ -1,0 +1,5 @@
+import { invitationHandlers } from '@/_app/invitation-flow/index.server'
+
+export async function POST(request: Request, { params }: { params: Promise<{ flowId: string }> }) {
+  return invitationHandlers.verificationLink(request, (await params).flowId)
+}

@@ -51,6 +51,7 @@ describe('SessionService', () => {
 
   beforeEach(() => {
     mockCtx = createMockContext()
+    mockCtx.prisma.$queryRaw.mockResolvedValue([])
 
     tokenService = {
       generateRefreshToken: jest.fn(),
@@ -241,6 +242,21 @@ describe('SessionService', () => {
   })
 
   describe('rotateRefreshToken', () => {
+    it.each(['pending', 'aborted'])(
+      'does not rotate a %s authentication handoff',
+      async (status) => {
+        mockCtx.prisma.session.findUnique.mockResolvedValue(mockSession)
+        mockCtx.prisma.$queryRaw.mockResolvedValue([{ status }])
+        await expect(
+          sessionService.rotateRefreshToken('tagged-token', {
+            userId: mockSession.userId,
+          })
+        ).rejects.toMatchObject({ errorCode: 'AUTH_HANDOFF_INVALID' })
+        expect(mockCtx.prisma.session.create).not.toHaveBeenCalled()
+        expect(mockCtx.prisma.session.updateMany).not.toHaveBeenCalled()
+      }
+    )
+
     it('should revoke old session and create new one in the same family', async () => {
       const oldHashedToken = 'old-hashed-token'
       const newRawToken = 'new-raw-token'

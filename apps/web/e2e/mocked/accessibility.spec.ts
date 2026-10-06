@@ -1,5 +1,4 @@
-import { test } from '@playwright/test'
-
+import { test } from '../shared/auth-test'
 import { expectNoAxeViolations } from '../shared/axe'
 
 /**
@@ -25,7 +24,7 @@ test('login page has no axe violations in its API-error state', async ({ page })
 
   await page.goto('/en/login')
   await page.getByRole('textbox', { name: /email/i }).fill('spike-e2e@example.com')
-  await page.getByLabel(/password/i).fill('correct-horse-battery')
+  await page.getByLabel(/^password$/i).fill('correct-horse-battery')
   await page.getByRole('button', { name: /sign in/i }).click()
   await page.locator('[data-slot="alert"]').waitFor()
 

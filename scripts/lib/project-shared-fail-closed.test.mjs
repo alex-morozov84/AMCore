@@ -4,14 +4,14 @@ import path from 'node:path'
 import { test } from 'node:test'
 
 import { materializeProjectContentPath } from './project-content-materializer.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 function fact(pathname, operationKey) {
   return { kind: 'content', dimension: 'test', path: pathname, operationKey, params: {} }
 }
 
 function withCopy(run) {
-  const copy = createRealRepoCopy()
+  const copy = createWorkingTreeCopy()
   try {
     run(copy.root)
   } finally {

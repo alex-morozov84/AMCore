@@ -43,8 +43,10 @@ export function createOrganizationContextScheduler(
   let pending: Promise<void> | undefined
   let run: OrganizationContextRun | undefined
   let validatedIdentity = false
+  let initialPending = true
   const update = (next: OrganizationContextState) => {
     state = next
+    if (next.status !== 'pending') initialPending = false
     listeners.forEach((listener) => listener())
   }
   const suspend = () => update({ target: organizationContextTarget(input), status: 'pending' })
@@ -116,6 +118,7 @@ export function createOrganizationContextScheduler(
   }
   return {
     getSnapshot: () => state,
+    isInitialPending: () => initialPending,
     subscribe(listener: () => void) {
       listeners.add(listener)
       return () => {

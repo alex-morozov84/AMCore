@@ -56,14 +56,25 @@ describe('proxyToBackend — session/CSRF gating and auth-failure classification
 
   it.each([
     ['auth', 'me'],
-    ['auth/login'],
-    ['auth', '%6cogin'],
+    ['auth', 'logins'],
+    ['auth', 'login', 'extra'],
     ['organizations', 'id', 'switching'],
   ])('does not broaden denial to %j', async (...segments) => {
     mockCookieStore(undefined)
     const response = await proxyToBackend(makeRequest('probe'), segments)
     expect(response.status).toBe(401)
   })
+
+  it.each([['auth/login'], ['auth', '%6cogin']])(
+    'contains effective credential aliases %j before session lookup',
+    async (...segments) => {
+      mockCookieStore(undefined)
+      const response = await proxyToBackend(makeRequest('probe'), segments)
+      expect(response.status).toBe(404)
+      expect(cookies).not.toHaveBeenCalled()
+      expect(ensureFreshSession).not.toHaveBeenCalled()
+    }
+  )
 
   it('returns 401 when there is no session cookie, without touching ensureFreshSession', async () => {
     mockCookieStore(undefined)

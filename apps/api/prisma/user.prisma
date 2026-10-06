@@ -112,6 +112,8 @@ model User {
   telegramLinkTokens      TelegramLinkToken[]
   aiConversations         AiConversation[]
   aiApprovalsDecided      AiApproval[]
+  invitationOperations   InvitationOperation[]
+  invitationAuthHandoffs  InvitationAuthHandoff[]
 
   // Admin discovery (Operations Console search/sort). Composite indexes
   // serve `ORDER BY <field>, id` for each allowlisted sort field with a
@@ -190,6 +192,7 @@ model Session {
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitationAuthHandoff InvitationAuthHandoff?
 
   @@index([userId])
   @@index([familyId])
@@ -304,6 +307,7 @@ model Organization {
   permissions     Permission[]
   apiKeys         ApiKey[]
   invites         OrgInvite[]
+  invitationOperations InvitationOperation[]
   notifications   Notification[]
   aiConversations AiConversation[]
 
@@ -364,7 +368,7 @@ model Role {
   organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   permissions  RolePermission[]
   members      MemberRole[]
-  invites      OrgInvite[]
+  inviteIntents OrgInviteRoleIntent[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -402,48 +406,19 @@ model RolePermission {
 }
 
 // ===========================================
-// Organization Invites (OB-02)
+// Organization invitations
 // ===========================================
-//
-// Pending-invite model for org membership. Replaces the previous
-// "user must already exist" flow, which leaked platform-wide
-// registration state via 404 vs 201 status-code deltas.
-//
-// Identity is bound by canonical email at create time and
-// re-verified at accept time against the authenticated caller's
-// `emailCanonical`. The raw token lives only inside the email
-// body; only `tokenHash` (SHA-256) is at rest.
-//
-// Uniqueness is enforced via a Postgres partial unique index
-// (declared declaratively here via `@@unique(..., where: {...})`
-// using the `partialIndexes` preview feature). The predicate
-// covers any row that has not yet been terminally settled —
-// `acceptedAt IS NULL AND revokedAt IS NULL` — so an expired
-// pending row still counts as "active" for the constraint.
-//
-// Re-invite contract (Stage B implements, pinned here for
-// invariant-clarity at the schema level):
-//
-//   - For (orgId, emailCanonical) with no row in the active
-//     bucket, `createInvite` inserts a new row.
-//   - For (orgId, emailCanonical) with an existing active row
-//     (pending or expired-pending), `createInvite` rotates that
-//     row in place — new `tokenHash`, refreshed `expiresAt`,
-//     possibly updated `roleId`/`invitedById`. The audit
-//     timestamp of the first attempt collapses; this is an
-//     accepted trade-off for the simpler partial-unique scope
-//     vs introducing an `expiredAt` column purely for audit
-//     chronology.
-//   - Accepted or revoked rows are outside the partial unique
-//     scope and can coexist with a fresh active row for the
-//     same pair, so legitimate re-invite after a terminal
-//     settle is possible without overwriting history.
+// Immutable requested role IDs survive role deletion. Generation fences reissue;
+// a receipt fences retries independently of the lifetime of an invitation.
 model OrgInvite {
   id               String    @id @default(cuid())
   organizationId   String
   emailCanonical   String
   email            String
-  roleId           String?
+  generation       Int       @default(1)
+  issuedAt         DateTime  @default(now())
+  issuedAtEstimated Boolean  @default(false)
+  intentInvalid    Boolean   @default(false)
   invitedById      String?
   tokenHash        String    @unique
   expiresAt        DateTime
@@ -455,7 +430,8 @@ model OrgInvite {
   updatedAt        DateTime  @updatedAt
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  role           Role?        @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  roleIntents    OrgInviteRoleIntent[]
+  continuations  InvitationContinuation[]
   invitedBy      User?        @relation("InvitesSent", fields: [invitedById], references: [id], onDelete: SetNull)
   acceptedByUser User?        @relation("InvitesAccepted", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
   revokedByUser  User?        @relation("InvitesRevoked", fields: [revokedById], references: [id], onDelete: SetNull)
@@ -463,7 +439,7 @@ model OrgInvite {
   @@unique([organizationId, emailCanonical], where: { acceptedAt: null, revokedAt: null })
   @@index([emailCanonical])
   @@index([expiresAt])
-  @@index([organizationId, createdAt])
+  @@index([organizationId, issuedAt(sort: Desc), id])
   @@map("org_invites")
   @@schema("core")
 }
@@ -489,5 +465,78 @@ model AuditLog {
   @@index([targetId])
   @@index([organizationId])
   @@map("audit_log")
+  @@schema("core")
+}
+
+model OrgInviteRoleIntent {
+  id              String @id @default(cuid())
+  inviteId        String
+  ordinal         Int
+  requestedRoleId String
+  liveRoleId      String?
+  roleNameAtIssue String
+
+  invite OrgInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  role Role? @relation(fields: [liveRoleId], references: [id], onDelete: SetNull)
+
+  @@unique([inviteId, requestedRoleId])
+  @@unique([inviteId, ordinal])
+  @@index([liveRoleId])
+  @@map("org_invite_role_intents")
+  @@schema("core")
+}
+
+model InvitationContinuation {
+  id String @id @default(cuid())
+  credentialHash String @unique
+  inviteId String
+  generation Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  invite OrgInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("invitation_continuations")
+  @@schema("core")
+}
+
+model InvitationOperation {
+  id String @id @default(cuid())
+  actorId String
+  organizationId String?
+  scope String
+  operationId String @db.Uuid
+  kind String
+  fingerprint String
+  intent Json
+  result Json
+  completedAt DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([actorId, scope, operationId])
+  @@index([completedAt])
+  @@map("invitation_operations")
+  @@schema("core")
+}
+
+model InvitationAuthHandoff {
+  attemptId String @id
+  cleanupKeyHash String
+  sessionId String @unique
+  actorId String
+  deadline DateTime
+  status String @default("pending")
+  createdAt DateTime @default(now())
+  settledAt DateTime?
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([status, deadline])
+  @@index([createdAt])
+  @@map("invitation_auth_handoffs")
   @@schema("core")
 }

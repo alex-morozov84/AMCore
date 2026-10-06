@@ -35,7 +35,7 @@ test('host session helper preserves current UA on actual vault rotation; Session
   const page = await admin.newPage()
   await page.goto('/en/login')
   await page.getByLabel(/email/i).fill(email)
-  await page.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
   await expect(page).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
@@ -82,7 +82,7 @@ test('host session helper preserves current UA on actual vault rotation; Session
     .click()
   const stepUp = page.getByRole('dialog', { name: /confirm your password/i })
   await expect(stepUp).toBeVisible()
-  await stepUp.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await stepUp.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUp.getByRole('button', { name: /confirm/i }).click()
   await expect(page.getByText('No active sessions.', { exact: true })).toBeVisible()
   expect(responses).toEqual([204])

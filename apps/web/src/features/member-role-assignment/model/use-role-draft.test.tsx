@@ -30,6 +30,7 @@ function fixture() {
   const reads = {
     data: initial,
     ready: true,
+    available: true,
     pending: false,
     busy: false,
     identity: '',

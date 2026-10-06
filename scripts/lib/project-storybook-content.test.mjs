@@ -8,13 +8,13 @@ import { materializeProjectContentPath } from './project-content-materializer.mj
 import { prepareProjectInit } from './project-init-plan.mjs'
 import { STORYBOOK_PACKAGE_PATHS } from './project-shared-json-operations.mjs'
 import { STORYBOOK_RESIDUAL_PATTERNS } from './project-storybook-residual.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 let copy
 afterEach(() => copy?.cleanup())
 
 function fixture() {
-  copy = createRealRepoCopy()
+  copy = createWorkingTreeCopy()
   return copy.root
 }
 
@@ -133,7 +133,7 @@ describe('Storybook residual guard', () => {
     )
     assert.equal(reviewed.length, 6)
     for (const [pathname, [pattern]] of reviewed) {
-      const current = createRealRepoCopy()
+      const current = createWorkingTreeCopy()
       try {
         const plan = prepareProjectInit(current.root, { storybook: 'disabled' }, 'admin')
         applyFilesystemTransaction({

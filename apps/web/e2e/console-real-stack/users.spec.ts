@@ -27,7 +27,7 @@ test('host-mode Users inventory uses only the isolated console session', async (
   const consolePage = await console.newPage()
   await consolePage.goto('/en/login')
   await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/password/i).fill('Test1234Secure')
+  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')

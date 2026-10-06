@@ -24,8 +24,8 @@ export function rewriteOAuthTest(model, ctx) {
     model,
     (node) => ts.isCallExpression(node) && callName(node) === 'handleOAuthExchange'
   )
-  if (calls.length !== 6)
-    throw new Error(`expected six OAuth exchange calls, found ${calls.length}`)
+  if (calls.length !== 7)
+    throw new Error(`expected seven OAuth exchange call sites, found ${calls.length}`)
   for (const call of calls) {
     if (call.arguments.length !== 2) throw new Error('OAuth exchange test arguments drifted')
     model.removeNode(call.arguments[1], ctx)

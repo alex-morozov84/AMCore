@@ -15,6 +15,17 @@ export async function assertManagedStandProjection(root, scenario) {
   })
   assert.equal(help.includes('console-real-stack'), enabled)
   assert.match(help, /mocked\|real-stack/)
+  const matrix = JSON.parse(
+    execFileSync(process.execPath, ['scripts/e2e-ci.mjs', '--matrix'], {
+      cwd: root,
+      env,
+      encoding: 'utf8',
+    })
+  )
+  assert.equal(matrix.lane.includes('host'), enabled)
+  assert.ok(matrix.lane.includes('path-standard'))
+  assert.ok(matrix.lane.includes('safety'))
+  assert.ok(matrix.lane.includes('mocked'))
   for (const file of [
     'scripts/stand/proxy-smoke.mjs',
     'scripts/stand/wrapper-cancellation.test.mjs',

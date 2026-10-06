@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 
 import {
   AlertDialog,
@@ -28,6 +28,7 @@ export interface ConfirmDialogProps {
    * concern (a toast, a follow-up dialog, whatever fits the caller). */
   onConfirm: () => void
   disabled?: boolean
+  finalFocus?: ComponentProps<typeof AlertDialogContent>['finalFocus']
 }
 
 /**
@@ -53,10 +54,11 @@ export function ConfirmDialog({
   variant = 'default',
   onConfirm,
   disabled,
+  finalFocus,
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent finalFocus={finalFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

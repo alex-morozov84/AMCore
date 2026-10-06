@@ -9,10 +9,10 @@ import {
   filesystemSnapshot,
 } from './filesystem-transaction-test-helpers.mjs'
 import { prepareProjectInit } from './project-init-plan.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 function withCopy(run) {
-  const copy = createRealRepoCopy()
+  const copy = createWorkingTreeCopy()
   try {
     return run(copy.root)
   } finally {

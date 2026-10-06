@@ -1,6 +1,14 @@
 import { localeContent, localeDelete } from './project-locale-fact-helpers.mjs'
 
 const catalogueFixtures = [
+  ['apps/web/src/features/auth-login/ui/LoginForm.stories.tsx', 'invitation'],
+  ['apps/web/src/features/auth-register/ui/RegisterForm.stories.tsx', 'invitation'],
+  ['apps/web/src/features/auth-reset-password/ui/ResetPasswordForm.stories.tsx', 'invitation'],
+  ['apps/web/src/_pages/invitation-recipient/ui/recipient-auth.stories.tsx', 'invitation'],
+  ['apps/web/src/_pages/invitation-recipient/ui/recipient-status.stories.tsx', 'invitation'],
+  ['apps/web/src/features/invitation-acceptance/ui/invitation-consent.stories.tsx', 'invitation'],
+  ['apps/web/src/features/invitation-acceptance/ui/invitation-consent.test.tsx', 'invitation'],
+
   [
     'apps/web/src/features/console-storage-setting/ui/StorageProbeIntervalEditor.test.tsx',
     'storage-setting',

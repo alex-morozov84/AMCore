@@ -8,6 +8,11 @@ FROM node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a
 
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
+# pnpm store in a BuildKit cache mount shared with the api image and every other
+# build on the machine (see apps/api/Dockerfile for the rationale). Not baked
+# into an image layer.
+ENV pnpm_config_store_dir=/pnpm/store
+
 WORKDIR /app
 
 # ===========================================
@@ -19,13 +24,17 @@ WORKDIR /app
 # install layer still caches because manifests are copied before sources.
 FROM base AS build
 
+# pnpm 11 may reinstall before scripts after COPY; every install must keep the lockfile frozen.
+ENV pnpm_config_frozen_lockfile=true
+
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/web/package.json ./apps/web/
 
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
 
 COPY packages ./packages
 COPY apps/web ./apps/web

@@ -203,8 +203,9 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `@/shared/lib/utils`) — there is no `@/shared/ui` barrel, and no layer-level
   barrel anywhere. A slice may not import a sibling slice in another group.
   `_app/<slice>` enters lower slice public APIs and is not imported from below.
-  The explicitly named `entities/organization-context/index.server.ts` is its
-  server-only public DAL entry; other deep server imports remain forbidden.
+  The explicitly named `entities/organization-context/index.server.ts` and
+  `entities/invitation-flow/index.server.ts` are server-only public DAL entries;
+  other deep server imports remain forbidden.
   TanStack Query for server state, Zustand for local client state (kept as
   the convention; no live store exists today — see
   `docs/frontend/architecture-and-conventions.md` → State model). Theme
@@ -261,6 +262,12 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   never background/log redirection; in a sandbox, `pnpm --filter web build`
   always uses the user-approved elevated path. Details:
   `docs/frontend/testing.md#observable-long-running-checks`.
+- **Browser accessibility scans:** use `expectNoAxeViolations()` from
+  `apps/web/e2e/shared/axe.ts`; it waits for fonts and finite visual transitions.
+  Assert the intended loaded/open state first. Direct axe runtime imports outside
+  this helper fail web lint. Do not disable contrast checks or add fixed sleeps.
+  For full CI E2E reproduction use `node scripts/e2e-ci.mjs --all`; it runs the
+  same applicable isolated lanes with CI settings (locally sequential).
 - **Frontend server/client boundary — two separate decisions.** Server
   Components are the default; add `'use client'` only at the interactive leaf
   that owns events, effects, browser APIs, a Zustand store or a Query hook —
