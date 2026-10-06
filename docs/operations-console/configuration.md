@@ -100,6 +100,11 @@ The base Caddy profile is API-only. Only the host override mounts the console
 Caddyfile, and missing hostnames fail validation. For nginx, adapt and include
 `docker/nginx/operations-console.conf` with the real domains and certificates.
 
+For HTTPS on a non-default public port, set `ADMIN_CONSOLE_ORIGIN` to the exact
+origin, for example `https://console.example.com:8443`. Preserve the complete
+public `Host` authority at the edge; the Console guard matches the configured
+host and port. A different port or product host is rejected.
+
 Keep `web` private to the proxy network. Do not expose its port publicly. Both
 reference proxies reject unknown hosts and direct physical `/{slug}` paths,
 preserve assets/API/CSP paths, and map only public console pages and API paths.
