@@ -12,7 +12,8 @@ import { TEST_PASSWORD, uniqueEmail } from './helpers'
 export async function inviteRecipient(email: string, existingOwnerEmail?: string) {
   const target = activeTarget()
   const ownerEmail = existingOwnerEmail ?? uniqueEmail('invitation-owner')
-  if (!existingOwnerEmail) await directApi('auth/register', { email: ownerEmail, password: TEST_PASSWORD })
+  if (!existingOwnerEmail)
+    await directApi('auth/register', { email: ownerEmail, password: TEST_PASSWORD })
   const login = await directApi('auth/login', { email: ownerEmail, password: TEST_PASSWORD })
   const org = await directApi(
     'organizations',

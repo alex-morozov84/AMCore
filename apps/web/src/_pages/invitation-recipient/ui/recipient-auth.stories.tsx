@@ -6,14 +6,32 @@ import messages from '../../../../messages/en.json'
 import { RecipientAuth } from './recipient-auth'
 
 const meta = {
-  title: 'pages/invitation-recipient/Authentication', component: RecipientAuth,
-  parameters: { messages: { common: messages.common, auth: messages.auth, errors: messages.errors,
-    validation: messages.validation, invitationRecipient: messages.invitationRecipient } },
+  title: 'pages/invitation-recipient/Authentication',
+  component: RecipientAuth,
+  parameters: {
+    messages: {
+      common: messages.common,
+      auth: messages.auth,
+      errors: messages.errors,
+      validation: messages.validation,
+      invitationRecipient: messages.invitationRecipient,
+    },
+  },
   args: {
-    email: 'invited@example.test', busy: false,
-    login: { submit: fn(() => new Promise<never>(() => {})), isCurrent: () => true, onSuccess: fn() },
-    register: { submit: fn(() => new Promise<never>(() => {})), isCurrent: () => true, onSuccess: fn() },
-    oauth: { providers: ['google', 'github', 'apple'], onChoose: fn() }, onLeave: fn(),
+    email: 'invited@example.test',
+    busy: false,
+    login: {
+      submit: fn(() => new Promise<never>(() => {})),
+      isCurrent: () => true,
+      onSuccess: fn(),
+    },
+    register: {
+      submit: fn(() => new Promise<never>(() => {})),
+      isCurrent: () => true,
+      onSuccess: fn(),
+    },
+    oauth: { providers: ['google', 'github', 'apple'], onChoose: fn() },
+    onLeave: fn(),
   },
 } satisfies Meta<typeof RecipientAuth>
 export default meta
@@ -34,7 +52,9 @@ export const FixedEmailRegistration: Story = {
     const registration = within(canvas.getByRole('tabpanel', { name: messages.auth.register }))
     await expect(registration.getByLabelText(messages.auth.email)).toHaveValue(args.email)
     await expect(registration.getByLabelText(messages.auth.email)).toHaveAttribute('readonly')
-    await expect(canvas.getByRole('tabpanel', { name: messages.auth.register })).toHaveAccessibleName(messages.auth.register)
+    await expect(
+      canvas.getByRole('tabpanel', { name: messages.auth.register })
+    ).toHaveAccessibleName(messages.auth.register)
     await expect(args.register.submit).not.toHaveBeenCalled()
   },
 }
@@ -49,8 +69,13 @@ export const Busy: Story = {
   args: { busy: true },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await expect(canvas.getByRole('tab', { name: messages.auth.register })).toHaveAttribute('aria-disabled', 'true')
+    await expect(canvas.getByRole('tab', { name: messages.auth.register })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
     await expect(canvas.getByRole('button', { name: messages.auth.login })).toBeDisabled()
-    await expect(canvas.getByRole('button', { name: messages.invitationRecipient.leave })).toBeEnabled()
+    await expect(
+      canvas.getByRole('button', { name: messages.invitationRecipient.leave })
+    ).toBeEnabled()
   },
 }

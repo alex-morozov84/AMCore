@@ -9,7 +9,9 @@ import { readyInvitation } from './invitation-consent.fixture'
 const meta = {
   title: 'features/invitation-acceptance/InvitationConsent',
   component: InvitationConsent,
-  parameters: { messages: { invitationRecipient: messages.invitationRecipient, errors: messages.errors } },
+  parameters: {
+    messages: { invitationRecipient: messages.invitationRecipient, errors: messages.errors },
+  },
   args: {
     invitation: readyInvitation,
     accountEmail: 'person@example.test',
@@ -32,7 +34,9 @@ type Story = StoryObj<typeof meta>
 
 export const Ready: Story = {
   play: async ({ canvasElement, args }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: messages.invitationRecipient.accept }))
+    await userEvent.click(
+      within(canvasElement).getByRole('button', { name: messages.invitationRecipient.accept })
+    )
     await expect(args.onAccept).toHaveBeenCalledOnce()
     await expect(args.onRecover).not.toHaveBeenCalled()
   },
@@ -42,8 +46,12 @@ export const UnknownOutcome: Story = {
   args: { state: 'unknown' },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
-    await expect(canvas.getByRole('button', { name: messages.invitationRecipient.accept })).toBeDisabled()
-    await userEvent.click(canvas.getByRole('button', { name: messages.invitationRecipient.recover }))
+    await expect(
+      canvas.getByRole('button', { name: messages.invitationRecipient.accept })
+    ).toBeDisabled()
+    await userEvent.click(
+      canvas.getByRole('button', { name: messages.invitationRecipient.recover })
+    )
     await expect(args.onRecover).toHaveBeenCalledOnce()
     await expect(args.onAccept).not.toHaveBeenCalled()
   },

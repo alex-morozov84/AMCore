@@ -5,7 +5,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { callUpstreamOAuthExchange, fetchCurrentUser, UpstreamOAuthError } from './upstream-oauth'
 
 vi.mock('server-only', () => ({}))
-const exampleUser = { id: 'u1', email: 'example@example.test', name: null, phone: null, avatarUrl: null, locale: DEFAULT_LOCALE, timezone: 'UTC', emailVerified: true, createdAt: '2026-01-01T00:00:00.000Z', lastLoginAt: null }
+const exampleUser = {
+  id: 'u1',
+  email: 'example@example.test',
+  name: null,
+  phone: null,
+  avatarUrl: null,
+  locale: DEFAULT_LOCALE,
+  timezone: 'UTC',
+  emailVerified: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  lastLoginAt: null,
+}
 
 afterEach(() => {
   vi.unstubAllGlobals()

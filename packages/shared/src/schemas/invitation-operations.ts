@@ -1,6 +1,11 @@
 import { z } from 'zod'
 
-import { acceptIntentSchema, acceptInviteResponseSchema, inviteResponseSchema, revokeInviteResponseSchema } from './invite'
+import {
+  acceptIntentSchema,
+  acceptInviteResponseSchema,
+  inviteResponseSchema,
+  revokeInviteResponseSchema,
+} from './invite'
 
 export const invitationOperationIdSchema = z
   .string()

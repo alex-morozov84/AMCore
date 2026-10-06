@@ -8,7 +8,10 @@ import { ApiRequestError } from '@/shared/api/http-client'
 
 import { useRecipientAuthentication } from './use-recipient-authentication'
 
-const { context, createAdapters } = vi.hoisted(() => ({ context: vi.fn(), createAdapters: vi.fn((_input: unknown) => ({})) }))
+const { context, createAdapters } = vi.hoisted(() => ({
+  context: vi.fn(),
+  createAdapters: vi.fn((_input: unknown) => ({})),
+}))
 vi.mock('@/entities/invitation-flow', () => ({ invitationFlowClient: { context } }))
 vi.mock('./credential-adapters', () => ({ createInvitationCredentialAdapters: createAdapters }))
 afterEach(() => vi.clearAllMocks())
@@ -23,20 +26,28 @@ function setup() {
 
 describe('recipient pending authentication recovery', () => {
   it.each([AuthErrorCode.INVALID_CREDENTIALS, AuthErrorCode.RATE_LIMIT_EXCEEDED])(
-    'synchronizes known rejection %s without replaying credentials', async (code) => {
-    const { result } = setup()
-    const callbacks = createAdapters.mock.calls.at(-1)?.[0] as unknown as {
-      onStart(): void; onFailure(error: unknown): Promise<void>
+    'synchronizes known rejection %s without replaying credentials',
+    async (code) => {
+      const { result } = setup()
+      const callbacks = createAdapters.mock.calls.at(-1)?.[0] as unknown as {
+        onStart(): void
+        onFailure(error: unknown): Promise<void>
+      }
+      const failure = new ApiRequestError(code === AuthErrorCode.RATE_LIMIT_EXCEEDED ? 429 : 401, {
+        errorCode: code,
+      } as never)
+      context.mockResolvedValueOnce({
+        binding: { ...binding, flowRevision: 3 },
+        data: { email: 'invited@example.test' },
+      })
+      act(() => callbacks.onStart())
+      await act(() => callbacks.onFailure(failure))
+      expect(result.current.phase).toBe('active')
+      expect(result.current.binding.flowRevision).toBe(3)
+      expect(result.current.error).toBe(failure)
+      expect(context).toHaveBeenCalledOnce()
     }
-    const failure = new ApiRequestError(code === AuthErrorCode.RATE_LIMIT_EXCEEDED ? 429 : 401, { errorCode: code } as never)
-    context.mockResolvedValueOnce({ binding: { ...binding, flowRevision: 3 }, data: { email: 'invited@example.test' } })
-    act(() => callbacks.onStart())
-    await act(() => callbacks.onFailure(failure))
-    expect(result.current.phase).toBe('active')
-    expect(result.current.binding.flowRevision).toBe(3)
-    expect(result.current.error).toBe(failure)
-    expect(context).toHaveBeenCalledOnce()
-  })
+  )
 
   it.each(['INVITE_INVALID_OR_EXPIRED', 'INVITE_FLOW_CHANGED'])(
     'requires reopening after %s',

@@ -50,7 +50,12 @@ export function LoginForm({ adapter, initialEmail = '', disabled = false }: Logi
             <FormItem>
               <FormLabel>{t('email')}</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="email@example.com" {...field} disabled={disabled} />
+                <Input
+                  type="email"
+                  placeholder="email@example.com"
+                  {...field}
+                  disabled={disabled}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -74,7 +79,12 @@ export function LoginForm({ adapter, initialEmail = '', disabled = false }: Logi
                 </RouteProgressLink>
               </div>
               <FormControl>
-                <PasswordInput showLabel={passwordT('showPassword')} hideLabel={passwordT('hidePassword')} {...field} disabled={disabled} />
+                <PasswordInput
+                  showLabel={passwordT('showPassword')}
+                  hideLabel={passwordT('hidePassword')}
+                  {...field}
+                  disabled={disabled}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -1,1 +1,1 @@
-export { type InvitationPlacement,invitationPlacement } from './model/placement'
+export { type InvitationPlacement, invitationPlacement } from './model/placement'

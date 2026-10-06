@@ -22,7 +22,9 @@ export const membersClient = {
     signal: AbortSignal
   ) {
     const q = new URLSearchParams({ page: String(query.page), limit: '20', search: query.search })
-    return parseContextResponse(binding, organizationMembersResponseSchema,
+    return parseContextResponse(
+      binding,
+      organizationMembersResponseSchema,
       await apiClient.get(`${base(orgId)}?${q}`, { headers: headers(binding), signal })
     )
   },
@@ -39,7 +41,9 @@ export const membersClient = {
       page: String(query.page),
       limit: '20',
     })
-    return parseContextResponse(binding, memberRolesResponseSchema,
+    return parseContextResponse(
+      binding,
+      memberRolesResponseSchema,
       await apiClient.get(`${base(orgId)}/${encodeURIComponent(userId)}/roles?${q}`, {
         headers: headers(binding),
         signal,

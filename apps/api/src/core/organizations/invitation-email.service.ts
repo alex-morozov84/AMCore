@@ -8,8 +8,14 @@ import { EmailService } from '../../infrastructure/email'
 
 /** Ephemeral issuance-time display snapshot; never persisted or queued with its secret. */
 export type InvitationMailSnapshot = {
-  email: string; token: string; roleNames: string[]; locale: string | null;
-  hasAccount: boolean; orgName: string; inviterName: string; inviterEmail: string;
+  email: string
+  token: string
+  roleNames: string[]
+  locale: string | null
+  hasAccount: boolean
+  orgName: string
+  inviterName: string
+  inviterEmail: string
 }
 
 @Injectable()
@@ -37,7 +43,9 @@ export class InvitationEmailService {
   }
 
   reportOutcome(orgId: string, category: 'failed' | 'timeout'): void {
-    this.logger.warn({ event: 'org.invite.email_dispatch_failed', orgId, category },
-      'Invitation committed; email dispatch was not acknowledged within the optional wait')
+    this.logger.warn(
+      { event: 'org.invite.email_dispatch_failed', orgId, category },
+      'Invitation committed; email dispatch was not acknowledged within the optional wait'
+    )
   }
 }

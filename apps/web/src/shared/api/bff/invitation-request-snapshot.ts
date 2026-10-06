@@ -20,7 +20,10 @@ export async function invitationIncomingSession(deps: ContextExecutorDeps) {
 }
 
 export async function captureInvitationRequest(
-  request: Request, flowId: string, deps: ContextExecutorDeps, mutation = false
+  request: Request,
+  flowId: string,
+  deps: ContextExecutorDeps,
+  mutation = false
 ) {
   const id = invitationFlowIdSchema.parse(flowId)
   const authority = invitationRequestAuthority(request, mutation)
@@ -34,10 +37,20 @@ export async function captureInvitationRequest(
   return { ...authority, ownerHash: authority.ownerHash, owner, flow, session }
 }
 
-export async function assertInvitationReadCurrent(snapshot: Awaited<ReturnType<typeof captureInvitationRequest>>) {
+export async function assertInvitationReadCurrent(
+  snapshot: Awaited<ReturnType<typeof captureInvitationRequest>>
+) {
   const latest = await invitationOwnerStore.get(snapshot.ownerHash, snapshot.owner.origin)
   if (!latest || latest.epoch !== snapshot.owner.epoch) throw invitationFlowChanged()
-  const flow = currentInvitationFlow(latest, snapshot.flow.binding.flowId, snapshot.session?.binding ?? null, Date.now())
-  if (flow.binding.flowRevision !== snapshot.flow.binding.flowRevision || flow.state !== snapshot.flow.state)
+  const flow = currentInvitationFlow(
+    latest,
+    snapshot.flow.binding.flowId,
+    snapshot.session?.binding ?? null,
+    Date.now()
+  )
+  if (
+    flow.binding.flowRevision !== snapshot.flow.binding.flowRevision ||
+    flow.state !== snapshot.flow.state
+  )
     throw invitationFlowChanged()
 }

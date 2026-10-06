@@ -8,11 +8,21 @@ function token(claims: unknown) {
 }
 describe('issued invitation session correlation', () => {
   it('reads only the actor-matching backend sid for later authoritative confirmation', () => {
-    expect(invitationIssuedSessionId(token({ sub: 'example-user', sid: 'example-session' }), 'example-user')).toBe('example-session')
+    expect(
+      invitationIssuedSessionId(
+        token({ sub: 'example-user', sid: 'example-session' }),
+        'example-user'
+      )
+    ).toBe('example-session')
   })
   it('fails closed on malformed, oversized, missing or mismatched correlation without retaining the token', () => {
-    for (const input of ['invalid-token', 'x'.repeat(8193), token({ sub: 'other-user', sid: 'example-session' }),
-      token({ sub: 'example-user' }), token({ sub: 'example-user', sid: '../foreign-key' })]) {
+    for (const input of [
+      'invalid-token',
+      'x'.repeat(8193),
+      token({ sub: 'other-user', sid: 'example-session' }),
+      token({ sub: 'example-user' }),
+      token({ sub: 'example-user', sid: '../foreign-key' }),
+    ]) {
       try {
         invitationIssuedSessionId(input, 'example-user')
         expect.unreachable()

@@ -43,7 +43,10 @@ export async function assertContextEmptyBody(body: ReadableStream<Uint8Array> | 
   if (!body) return
   const reader = body.getReader()
   let timedOut = false
-  const timer = setTimeout(() => { timedOut = true; void reader.cancel().catch(() => undefined) }, 5000)
+  const timer = setTimeout(() => {
+    timedOut = true
+    void reader.cancel().catch(() => undefined)
+  }, 5000)
   try {
     for (;;) {
       const next = await reader.read()

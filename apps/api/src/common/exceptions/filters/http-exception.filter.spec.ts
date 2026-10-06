@@ -50,15 +50,34 @@ describe('HttpExceptionFilter', () => {
   })
 
   it('emits bounded Retry-After for an exhausted issuance allowance', () => {
-    filter.catch(new HttpException({ message: 'Rate limited', errorCode: 'RATE_LIMIT_EXCEEDED', details: { retryAfterSeconds: 3600 } }, 429), mockHost)
+    filter.catch(
+      new HttpException(
+        {
+          message: 'Rate limited',
+          errorCode: 'RATE_LIMIT_EXCEEDED',
+          details: { retryAfterSeconds: 3600 },
+        },
+        429
+      ),
+      mockHost
+    )
     expect(mockResponse.setHeader).toHaveBeenCalledWith('Retry-After', '3600')
   })
-  it.each([0, Infinity, '3600', 86401, -1])('does not serialize an invalid retry hint %s', retryAfterSeconds => {
-    filter.catch(new HttpException({ message: 'Rate limited', details: { retryAfterSeconds } }, 429), mockHost)
-    expect(mockResponse.setHeader).not.toHaveBeenCalled()
-  })
+  it.each([0, Infinity, '3600', 86401, -1])(
+    'does not serialize an invalid retry hint %s',
+    (retryAfterSeconds) => {
+      filter.catch(
+        new HttpException({ message: 'Rate limited', details: { retryAfterSeconds } }, 429),
+        mockHost
+      )
+      expect(mockResponse.setHeader).not.toHaveBeenCalled()
+    }
+  )
   it('does not attach a rate-limit hint to an unrelated response', () => {
-    filter.catch(new HttpException({ message: 'Conflict', details: { retryAfterSeconds: 3600 } }, 409), mockHost)
+    filter.catch(
+      new HttpException({ message: 'Conflict', details: { retryAfterSeconds: 3600 } }, 409),
+      mockHost
+    )
     expect(mockResponse.setHeader).not.toHaveBeenCalled()
   })
 

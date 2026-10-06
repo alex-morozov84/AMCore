@@ -69,14 +69,24 @@ export function useRecipientAuthentication(
       async onFailure(failure) {
         setError(failure)
         const code = getErrorCode(failure)
-        if (code !== AuthErrorCode.INVALID_CREDENTIALS && code !== AuthErrorCode.RATE_LIMIT_EXCEEDED)
+        if (
+          code !== AuthErrorCode.INVALID_CREDENTIALS &&
+          code !== AuthErrorCode.RATE_LIMIT_EXCEEDED
+        )
           return
         // Rejection advances the server revision. Read its authoritative binding before retrying.
         try {
-          const current = await invitationFlowClient.context(binding.flowId, AbortSignal.timeout(10000))
+          const current = await invitationFlowClient.context(
+            binding.flowId,
+            AbortSignal.timeout(10000)
+          )
           if (!lifecycle.current.active || lifecycle.current.epoch !== captured) return
-          if ('state' in current || current.binding.flowId !== binding.flowId ||
-            current.binding.sessionBinding !== binding.sessionBinding) return
+          if (
+            'state' in current ||
+            current.binding.flowId !== binding.flowId ||
+            current.binding.sessionBinding !== binding.sessionBinding
+          )
+            return
           setBinding(current.binding)
           setPhase('active')
           setHandoff(null)

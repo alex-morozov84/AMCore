@@ -28,7 +28,11 @@ interface VerifyEmailStatusProps {
  * second call would hit the token's real single-use guard
  * (`used: true` after the first) and show a false failure.
  */
-export function VerifyEmailStatus({ token, withoutTokenContent, successContent }: VerifyEmailStatusProps) {
+export function VerifyEmailStatus({
+  token,
+  withoutTokenContent,
+  successContent,
+}: VerifyEmailStatusProps) {
   const t = useTranslations('auth')
   const tErrors = useTranslations('errors')
   const { mutate, isSuccess, isError, error } = useVerifyEmail()

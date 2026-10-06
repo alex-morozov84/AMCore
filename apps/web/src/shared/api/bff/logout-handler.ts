@@ -49,11 +49,24 @@ export async function handleLogout(request: Request): Promise<NextResponse> {
   }
 
   const response = NextResponse.json({ message: 'Logged out' }, { status: 200 })
-  try { await retireFlowsForOrdinaryAuth(request, null) }
-  catch {
+  try {
+    await retireFlowsForOrdinaryAuth(request, null)
+  } catch {
     // Without the owner proof, a journal that could not be retired cannot authorize this browser.
-    response.cookies.set('__Host-amcore_invite_browser', '', { secure: true, httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 })
-    response.cookies.set('amcore_invite_browser_local', '', { secure: false, httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 })
+    response.cookies.set('__Host-amcore_invite_browser', '', {
+      secure: true,
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    })
+    response.cookies.set('amcore_invite_browser_local', '', {
+      secure: false,
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    })
     console.error('[bff] invitation retirement unavailable during logout')
   }
   response.cookies.delete(SESSION_COOKIE_NAME)

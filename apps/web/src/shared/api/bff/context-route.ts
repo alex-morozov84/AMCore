@@ -10,7 +10,10 @@ export async function contextRoute(
   successStatus: 200 | 201 | 202 = 200
 ): Promise<Response> {
   try {
-    return Response.json(await work(), { status: successStatus, headers: { 'cache-control': 'private, no-store' } })
+    return Response.json(await work(), {
+      status: successStatus,
+      headers: { 'cache-control': 'private, no-store' },
+    })
   } catch (error) {
     if (error instanceof ContextRequestError) {
       const response = apiErrorResponse(request, {

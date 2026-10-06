@@ -87,7 +87,10 @@ export function createOrganizationAccessController(binding: string, organization
     resume() {
       active = true
     },
-    async save(memberId: string, work: (signal: AbortSignal) => Promise<ReplaceMemberRolesResponse>): Promise<RoleWriteOutcome> {
+    async save(
+      memberId: string,
+      work: (signal: AbortSignal) => Promise<ReplaceMemberRolesResponse>
+    ): Promise<RoleWriteOutcome> {
       return controller.execute(memberId, work)
     },
     async execute<T>(
@@ -139,20 +142,22 @@ export function createOrganizationAccessController(binding: string, organization
         if (result) return { status: 'committed', result, followup }
         const status = getErrorStatus(error)
         const code = getErrorCode(error)
-        const rejectionCodes = options?.rejectionCodes ?? new Set([
-          'MEMBER_UNAVAILABLE',
-          'MEMBER_ROLES_CONFLICT',
-          'MEMBER_ROLE_ASSIGNMENT_DENIED',
-          'ORGANIZATION_LAST_ADMIN',
-          'BAD_REQUEST',
-          'VALIDATION_ERROR',
-          'FORBIDDEN',
-          'UNAUTHORIZED',
-          'AUTH_ORIGIN_REJECTED',
-          'CONTEXT_SESSION_CHANGED',
-          'RATE_LIMIT_EXCEEDED',
-          'PAYLOAD_TOO_LARGE',
-        ])
+        const rejectionCodes =
+          options?.rejectionCodes ??
+          new Set([
+            'MEMBER_UNAVAILABLE',
+            'MEMBER_ROLES_CONFLICT',
+            'MEMBER_ROLE_ASSIGNMENT_DENIED',
+            'ORGANIZATION_LAST_ADMIN',
+            'BAD_REQUEST',
+            'VALIDATION_ERROR',
+            'FORBIDDEN',
+            'UNAUTHORIZED',
+            'AUTH_ORIGIN_REJECTED',
+            'CONTEXT_SESSION_CHANGED',
+            'RATE_LIMIT_EXCEEDED',
+            'PAYLOAD_TOO_LARGE',
+          ])
         const rejected =
           error instanceof ApiRequestError &&
           status !== undefined &&

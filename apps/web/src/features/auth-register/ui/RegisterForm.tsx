@@ -21,10 +21,13 @@ import { PasswordInput } from '@/shared/ui/password-input'
 
 import { useRegister } from '../model/use-register'
 
-export type RegisterFormProps = ({
-  adapter: CredentialFormAdapter<RegisterInput>
-  fixedEmail: string
-} | { adapter?: never; fixedEmail?: never }) & { disabled?: boolean }
+export type RegisterFormProps = (
+  | {
+      adapter: CredentialFormAdapter<RegisterInput>
+      fixedEmail: string
+    }
+  | { adapter?: never; fixedEmail?: never }
+) & { disabled?: boolean }
 
 export function RegisterForm({ adapter, fixedEmail, disabled = false }: RegisterFormProps = {}) {
   const passwordT = useTranslations('common')
@@ -71,7 +74,13 @@ export function RegisterForm({ adapter, fixedEmail, disabled = false }: Register
             <FormItem>
               <FormLabel>{t('email')}</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="email@example.com" {...field} readOnly={fixedEmail !== undefined} disabled={disabled} />
+                <Input
+                  type="email"
+                  placeholder="email@example.com"
+                  {...field}
+                  readOnly={fixedEmail !== undefined}
+                  disabled={disabled}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -85,7 +94,12 @@ export function RegisterForm({ adapter, fixedEmail, disabled = false }: Register
             <FormItem>
               <FormLabel>{t('password')}</FormLabel>
               <FormControl>
-                <PasswordInput showLabel={passwordT('showPassword')} hideLabel={passwordT('hidePassword')} {...field} disabled={disabled} />
+                <PasswordInput
+                  showLabel={passwordT('showPassword')}
+                  hideLabel={passwordT('hidePassword')}
+                  {...field}
+                  disabled={disabled}
+                />
               </FormControl>
               <FormDescription>{t('passwordRequirements')}</FormDescription>
               <FormMessage />

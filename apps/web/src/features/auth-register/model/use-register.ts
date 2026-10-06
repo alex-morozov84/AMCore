@@ -10,15 +10,20 @@ import { useFormMutation } from '@/shared/hooks'
 import type { CredentialFormAdapter } from '@/shared/lib/credential-form-adapter'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
-export function useRegister(setError?: UseFormSetError<RegisterInput>, adapter?: CredentialFormAdapter<RegisterInput>) {
+export function useRegister(
+  setError?: UseFormSetError<RegisterInput>,
+  adapter?: CredentialFormAdapter<RegisterInput>
+) {
   const router = useRouteProgressRouter()
   const queryClient = useQueryClient()
   const guardedSetError: UseFormSetError<RegisterInput> | undefined = setError
-    ? (...args) => { if (!adapter || adapter.isCurrent()) setError(...args) }
+    ? (...args) => {
+        if (!adapter || adapter.isCurrent()) setError(...args)
+      }
     : undefined
 
   return useFormMutation({
-    mutationFn: (data: RegisterInput) => adapter ? adapter.submit(data) : authApi.register(data),
+    mutationFn: (data: RegisterInput) => (adapter ? adapter.submit(data) : authApi.register(data)),
     retry: false,
     setError: guardedSetError,
     onSuccess: (response) => {

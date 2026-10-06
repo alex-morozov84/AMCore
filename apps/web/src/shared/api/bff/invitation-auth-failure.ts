@@ -18,21 +18,41 @@ export async function recoverFailedInvitationAuth(input: {
 }) {
   const { snapshot, attempt } = input
   const knownRejection = input.error instanceof InvitationBackendError && input.error.knownRejection
-  const aborted = !knownRejection && await abortInvitationAuth(input.request.headers, {
-    attemptId: attempt.id, cleanupKey: attempt.cleanupKey,
-  }) === 'aborted'
+  const aborted =
+    !knownRejection &&
+    (await abortInvitationAuth(input.request.headers, {
+      attemptId: attempt.id,
+      cleanupKey: attempt.cleanupKey,
+    })) === 'aborted'
   if (!knownRejection && !aborted) return
   const owner = await invitationOwnerStore.get(snapshot.ownerHash, snapshot.owner.origin)
-  const flow = owner?.flows.find(candidate => candidate.binding.flowId === snapshot.flow.binding.flowId)
-  if (aborted && owner && flow?.state === 'completing_signin' &&
-    flow.handoff?.attemptId === attempt.id && !flow.handoff.confirmed) {
+  const flow = owner?.flows.find(
+    (candidate) => candidate.binding.flowId === snapshot.flow.binding.flowId
+  )
+  if (
+    aborted &&
+    owner &&
+    flow?.state === 'completing_signin' &&
+    flow.handoff?.attemptId === attempt.id &&
+    !flow.handoff.confirmed
+  ) {
     // A transport failure can follow a committed Redis publication. Retire its exact journal;
     // deleting the revoked SID cannot remove a successor allocated by another login.
-    if (await invitationOwnerStore.compareAndSet(snapshot.ownerHash, owner.version,
-      retireInvitationFlows(owner, snapshot.session?.binding ?? null)))
+    if (
+      await invitationOwnerStore.compareAndSet(
+        snapshot.ownerHash,
+        owner.version,
+        retireInvitationFlows(owner, snapshot.session?.binding ?? null)
+      )
+    )
       await input.store.delete(flow.handoff.newSessionId)
     return
   }
-  await releaseRejectedInvitationAuth({ ownerHash: snapshot.ownerHash, origin: snapshot.owner.origin,
-    flowId: snapshot.flow.binding.flowId, attemptId: attempt.id, fence: attempt.fence })
+  await releaseRejectedInvitationAuth({
+    ownerHash: snapshot.ownerHash,
+    origin: snapshot.owner.origin,
+    flowId: snapshot.flow.binding.flowId,
+    attemptId: attempt.id,
+    fence: attempt.fence,
+  })
 }

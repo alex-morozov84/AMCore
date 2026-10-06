@@ -1,6 +1,12 @@
-import { invitationManagerHandlers, invitationManagerMethodDenied } from '@/_app/organization-access/index.server'
+import {
+  invitationManagerHandlers,
+  invitationManagerMethodDenied,
+} from '@/_app/organization-access/index.server'
 
-export async function GET(request: Request, context: { params: Promise<{ id: string; operationId: string }> }) {
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ id: string; operationId: string }> }
+) {
   const { id, operationId } = await context.params
   return invitationManagerHandlers.receipt(request, id, operationId)
 }

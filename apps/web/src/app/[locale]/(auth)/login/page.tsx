@@ -21,7 +21,17 @@ export default async function Login({
   setRequestLocale(locale)
   await redirectIfAuthenticated(locale)
 
-  const [oauthProviders, { oauthError }, publicSignupEnabled] = await Promise.all([getOAuthProviders(), searchParams, getPublicSignupPolicy()])
+  const [oauthProviders, { oauthError }, publicSignupEnabled] = await Promise.all([
+    getOAuthProviders(),
+    searchParams,
+    getPublicSignupPolicy(),
+  ])
 
-  return <LoginPage oauthProviders={oauthProviders} oauthError={oauthError} publicSignupEnabled={publicSignupEnabled} />
+  return (
+    <LoginPage
+      oauthProviders={oauthProviders}
+      oauthError={oauthError}
+      publicSignupEnabled={publicSignupEnabled}
+    />
+  )
 }

@@ -129,20 +129,37 @@ for (const recovered of [true, false]) {
     try {
       mockRefreshCookie('rt-1')
       if (recovered) {
-        vi.mocked(recoverPublishedInvitedOAuth).mockResolvedValue({ locale: DEFAULT_LOCALE, flowId })
+        vi.mocked(recoverPublishedInvitedOAuth).mockResolvedValue({
+          locale: DEFAULT_LOCALE,
+          flowId,
+        })
       } else {
-        vi.mocked(callUpstreamOAuthExchange).mockResolvedValue({ accessToken: 'at-1', invitation: {} } as never)
+        vi.mocked(callUpstreamOAuthExchange).mockResolvedValue({
+          accessToken: 'at-1',
+          invitation: {},
+        } as never)
         vi.mocked(fetchCurrentUser).mockResolvedValue({ id: 'u1' } as never)
-        vi.mocked(publishInvitedOAuth).mockResolvedValue({ locale: DEFAULT_LOCALE, flowId, sessionId: 'sess-invited' } as never)
+        vi.mocked(publishInvitedOAuth).mockResolvedValue({
+          locale: DEFAULT_LOCALE,
+          flowId,
+          sessionId: 'sess-invited',
+        } as never)
       }
-      const response = await handleOAuthExchange(new Request(`${origin}/auth/callback?ticket=t1`), DEFAULT_LOCALE)
+      const response = await handleOAuthExchange(
+        new Request(`${origin}/auth/callback?ticket=t1`),
+        DEFAULT_LOCALE
+      )
       expect(response.status).toBe(303)
-      expect(response.headers.get('location')).toBe(localizedFrontendUrl(origin, DEFAULT_LOCALE, `invite/flow/${flowId}`))
+      expect(response.headers.get('location')).toBe(
+        localizedFrontendUrl(origin, DEFAULT_LOCALE, `invite/flow/${flowId}`)
+      )
       expect(response.headers.get('cache-control')).toBe('private, no-store')
       expect(response.headers.get('referrer-policy')).toBe('no-referrer')
       expect(response.cookies.get('refresh_token')?.value).toBe('')
       if (recovered) expect(callUpstreamOAuthExchange).not.toHaveBeenCalled()
       else expect(response.cookies.get('amcore_session')?.value).toBe('sess-invited')
-    } finally { vi.unstubAllEnvs() }
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 }

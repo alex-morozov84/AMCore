@@ -1,10 +1,13 @@
 import { invitationFlowIdSchema } from '@amcore/shared'
 
 import { invitationFlowChanged } from './invitation-flow-authority'
-import { type InvitationOAuthCarrier,invitationOAuthCarrierSchema } from './invitation-oauth-carrier'
+import {
+  type InvitationOAuthCarrier,
+  invitationOAuthCarrierSchema,
+} from './invitation-oauth-carrier'
 import { invitationOwnerKey } from './invitation-owner-store'
 import { withInvitationStorage } from './invitation-storage'
-import { type InvitationOwnerRecord,invitationOwnerRecordSchema } from './invitation-vault-record'
+import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
 import { getWebRedisClient } from './redis-client'
 
 import 'server-only'
@@ -39,17 +42,28 @@ redis.call('SET', KEYS[1], ARGV[2], 'PXAT', owner.expiresAt)
 return 1
 `
 
-export async function reserveInvitationOAuthCarrier(ownerHash: string, version: number,
-  next: InvitationOwnerRecord, carrier: InvitationOAuthCarrier): Promise<boolean> {
+export async function reserveInvitationOAuthCarrier(
+  ownerHash: string,
+  version: number,
+  next: InvitationOwnerRecord,
+  carrier: InvitationOAuthCarrier
+): Promise<boolean> {
   const record = invitationOwnerRecordSchema.parse({ ...next, version: version + 1 })
   const parsed = invitationOAuthCarrierSchema.parse(carrier)
   if (parsed.ownerHash !== ownerHash || parsed.status !== 'reserved') throw invitationFlowChanged()
-  return withInvitationStorage(async () => await (await getWebRedisClient()).eval(RESERVE, {
-    keys: [invitationOwnerKey(ownerHash), invitationOAuthCarrierKey(parsed.attemptId)],
-    arguments: [String(version), JSON.stringify(record), JSON.stringify(parsed)],
-  }) === 1)
+  return withInvitationStorage(
+    async () =>
+      (await (
+        await getWebRedisClient()
+      ).eval(RESERVE, {
+        keys: [invitationOwnerKey(ownerHash), invitationOAuthCarrierKey(parsed.attemptId)],
+        arguments: [String(version), JSON.stringify(record), JSON.stringify(parsed)],
+      })) === 1
+  )
 }
-export async function readInvitationOAuthCarrier(attemptId: string): Promise<InvitationOAuthCarrier | null> {
+export async function readInvitationOAuthCarrier(
+  attemptId: string
+): Promise<InvitationOAuthCarrier | null> {
   return withInvitationStorage(async () => {
     const raw = await (await getWebRedisClient()).get(invitationOAuthCarrierKey(attemptId))
     if (!raw) return null
@@ -59,10 +73,19 @@ export async function readInvitationOAuthCarrier(attemptId: string): Promise<Inv
 }
 
 /** Starting is single-use and changes carrier plus owner attempt in one transaction. */
-export async function startInvitationOAuthCarrier(ownerHash: string, version: number,
-  next: InvitationOwnerRecord, carrier: InvitationOAuthCarrier): Promise<boolean> {
+export async function startInvitationOAuthCarrier(
+  ownerHash: string,
+  version: number,
+  next: InvitationOwnerRecord,
+  carrier: InvitationOAuthCarrier
+): Promise<boolean> {
   const record = invitationOwnerRecordSchema.parse({ ...next, version: version + 1 })
-  return withInvitationStorage(async () => await (await getWebRedisClient()).eval(`
+  return withInvitationStorage(
+    async () =>
+      (await (
+        await getWebRedisClient()
+      ).eval(
+        `
     local ownerRaw = redis.call('GET', KEYS[1])
     local carrierRaw = redis.call('GET', KEYS[2])
     if not ownerRaw or not carrierRaw then return 0 end
@@ -79,6 +102,11 @@ export async function startInvitationOAuthCarrier(ownerHash: string, version: nu
     redis.call('SET', KEYS[2], cjson.encode(carrier), 'PXAT', carrier.expiresAt)
     redis.call('SET', KEYS[1], ARGV[2], 'PXAT', owner.expiresAt)
     return 1
-  `, { keys: [invitationOwnerKey(ownerHash), invitationOAuthCarrierKey(carrier.attemptId)],
-    arguments: [String(version), JSON.stringify(record), ownerHash, carrier.fence] }) === 1)
+  `,
+        {
+          keys: [invitationOwnerKey(ownerHash), invitationOAuthCarrierKey(carrier.attemptId)],
+          arguments: [String(version), JSON.stringify(record), ownerHash, carrier.fence],
+        }
+      )) === 1
+  )
 }

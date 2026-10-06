@@ -1,6 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { AuthErrorCode, coerceSupportedLocale, localizedFrontendUrl, type OAuthExchangeResponse } from '@amcore/shared'
+import {
+  AuthErrorCode,
+  coerceSupportedLocale,
+  localizedFrontendUrl,
+  type OAuthExchangeResponse,
+} from '@amcore/shared'
 
 import { assertOrdinaryOAuthAllowed, retireFlowsForOrdinaryAuth } from './invitation-auth-lifecycle'
 import { publishInvitedOAuth } from './invitation-oauth-exchange'
@@ -33,12 +38,20 @@ const OAUTH_ERROR_QUERY_PARAM = 'oauthError'
  */
 export async function handleOAuthExchange(request: Request, locale: string): Promise<NextResponse> {
   const query = new URL(request.url).searchParams
-  const ticket = query.getAll('ticket').length === 1 && query.size === 1 ? query.get('ticket') : null
+  const ticket =
+    query.getAll('ticket').length === 1 && query.size === 1 ? query.get('ticket') : null
   if (ticket && ticket.length > 4096) return failureRedirect(request, locale)
   if (ticket) {
     const recovered = await recoverPublishedInvitedOAuth(request, ticket).catch(() => null)
     if (recovered) {
-      const response = NextResponse.redirect(localizedFrontendUrl(invitationCanonicalOrigin(request.headers, request.url), coerceSupportedLocale(recovered.locale), `invite/flow/${recovered.flowId}`), 303)
+      const response = NextResponse.redirect(
+        localizedFrontendUrl(
+          invitationCanonicalOrigin(request.headers, request.url),
+          coerceSupportedLocale(recovered.locale),
+          `invite/flow/${recovered.flowId}`
+        ),
+        303
+      )
       response.cookies.delete(REFRESH_COOKIE_NAME)
       response.headers.set('cache-control', 'private, no-store')
       response.headers.set('referrer-policy', 'no-referrer')
@@ -72,22 +85,39 @@ export async function handleOAuthExchange(request: Request, locale: string): Pro
   if (exchange.invitation) {
     try {
       const published = await publishInvitedOAuth(request, ticket, exchange, refreshToken, user)
-      const response = NextResponse.redirect(localizedFrontendUrl(invitationCanonicalOrigin(request.headers, request.url), coerceSupportedLocale(published.locale), `invite/flow/${published.flowId}`), 303)
+      const response = NextResponse.redirect(
+        localizedFrontendUrl(
+          invitationCanonicalOrigin(request.headers, request.url),
+          coerceSupportedLocale(published.locale),
+          `invite/flow/${published.flowId}`
+        ),
+        303
+      )
       response.cookies.set(SESSION_COOKIE_NAME, published.sessionId, sessionCookieOptions())
       response.cookies.delete(REFRESH_COOKIE_NAME)
       response.headers.set('cache-control', 'private, no-store')
       response.headers.set('referrer-policy', 'no-referrer')
       response.headers.set('x-robots-tag', 'noindex, nofollow')
       return response
-    } catch (error) { return failureRedirect(request, locale, error) }
+    } catch (error) {
+      return failureRedirect(request, locale, error)
+    }
   }
 
   let sessionId: string
   try {
     await assertOrdinaryOAuthAllowed(request)
     ;({ sessionId } = await mintSession({ accessToken: exchange.accessToken, refreshToken, user }))
-    try { await retireFlowsForOrdinaryAuth(request, { sessionId, actorId: user.id }, { rejectPendingHandoff: true }) }
-    catch (error) { await redisVaultStore.delete(sessionId).catch(() => undefined); throw error }
+    try {
+      await retireFlowsForOrdinaryAuth(
+        request,
+        { sessionId, actorId: user.id },
+        { rejectPendingHandoff: true }
+      )
+    } catch (error) {
+      await redisVaultStore.delete(sessionId).catch(() => undefined)
+      throw error
+    }
   } catch (error) {
     return failureRedirect(request, locale, error)
   }

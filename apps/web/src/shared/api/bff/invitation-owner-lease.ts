@@ -12,7 +12,10 @@ const ownerLock = createRedisVaultLock('web:invitation:owner:v1')
 
 /** Serializes the bounded owner command; record revision/attempt fences remain the authority. */
 export async function withInvitationOwnerLease<T>(
-  ownerHash: string, signal: AbortSignal, work: () => Promise<T>, lock: VaultLock = ownerLock
+  ownerHash: string,
+  signal: AbortSignal,
+  work: () => Promise<T>,
+  lock: VaultLock = ownerLock
 ): Promise<T> {
   invitationOwnerKey(ownerHash)
   signal.throwIfAborted()

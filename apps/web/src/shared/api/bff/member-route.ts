@@ -4,7 +4,10 @@ import { contextRouteBody } from './context-route-input'
 
 import 'server-only'
 
-export { contextRouteInput as memberRouteInput, contextRouteQuery as memberRouteQuery } from './context-route-input'
+export {
+  contextRouteInput as memberRouteInput,
+  contextRouteQuery as memberRouteQuery,
+} from './context-route-input'
 export function memberRouteBody(request: Request) {
   return contextRouteBody(request, MEMBER_REQUEST_BYTES)
 }

@@ -25,7 +25,9 @@ export default async function VerifyEmail({
   const { token: rawToken, inviteReturn } = await searchParams
   const token = typeof rawToken === 'string' ? rawToken : undefined
 
-  return typeof inviteReturn === 'string'
-    ? <InvitationVerificationMount token={token} selectorId={inviteReturn} />
-    : <VerifyEmailPage token={token} />
+  return typeof inviteReturn === 'string' ? (
+    <InvitationVerificationMount token={token} selectorId={inviteReturn} />
+  ) : (
+    <VerifyEmailPage token={token} />
+  )
 }

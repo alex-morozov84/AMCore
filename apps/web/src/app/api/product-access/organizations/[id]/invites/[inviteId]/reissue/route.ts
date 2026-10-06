@@ -1,6 +1,12 @@
-import { invitationManagerHandlers, invitationManagerMethodDenied } from '@/_app/organization-access/index.server'
+import {
+  invitationManagerHandlers,
+  invitationManagerMethodDenied,
+} from '@/_app/organization-access/index.server'
 
-export async function POST(request: Request, context: { params: Promise<{ id: string; inviteId: string }> }) {
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string; inviteId: string }> }
+) {
   const { id, inviteId } = await context.params
   return invitationManagerHandlers.reissue(request, id, inviteId)
 }

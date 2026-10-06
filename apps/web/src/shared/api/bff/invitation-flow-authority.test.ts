@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { publishInvitationAuth,reserveInvitationAuth } from './invitation-auth-transition'
+import { publishInvitationAuth, reserveInvitationAuth } from './invitation-auth-transition'
 import {
   admitInvitationFlow,
   currentInvitationFlow,

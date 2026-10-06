@@ -5,12 +5,21 @@ import { PasswordInput } from './password-input'
 
 describe('PasswordInput', () => {
   it('preserves the field, ref and value while toggling without submitting', () => {
-    const submit = vi.fn(event => event.preventDefault())
+    const submit = vi.fn((event) => event.preventDefault())
     const ref = vi.fn()
-    render(<form onSubmit={submit}><label htmlFor="password">Password</label>
-      <PasswordInput id="password" ref={ref} defaultValue="example-password" autoComplete="current-password"
-        showLabel="Show password" hideLabel="Hide password" />
-    </form>)
+    render(
+      <form onSubmit={submit}>
+        <label htmlFor="password">Password</label>
+        <PasswordInput
+          id="password"
+          ref={ref}
+          defaultValue="example-password"
+          autoComplete="current-password"
+          showLabel="Show password"
+          hideLabel="Hide password"
+        />
+      </form>
+    )
     const input = screen.getByLabelText('Password')
     expect(input).toHaveAttribute('type', 'password')
     fireEvent.click(screen.getByRole('button', { name: 'Show password' }))
@@ -24,7 +33,14 @@ describe('PasswordInput', () => {
   })
 
   it('disables both the input and its disclosure action', () => {
-    render(<PasswordInput aria-label="Password" disabled showLabel="Show password" hideLabel="Hide password" />)
+    render(
+      <PasswordInput
+        aria-label="Password"
+        disabled
+        showLabel="Show password"
+        hideLabel="Hide password"
+      />
+    )
     expect(screen.getByLabelText('Password')).toBeDisabled()
     expect(screen.getByRole('button')).toBeDisabled()
   })

@@ -39,7 +39,11 @@ export function useOrganizationContext(binding: string, input: OrganizationConte
     scheduler.getSnapshot,
     scheduler.getSnapshot
   )
-  const initialPending = useSyncExternalStore(scheduler.subscribe, scheduler.isInitialPending, () => true)
+  const initialPending = useSyncExternalStore(
+    scheduler.subscribe,
+    scheduler.isInitialPending,
+    () => true
+  )
   const query = useQuery<OrganizationContextData>({
     queryKey: organizationContextKey(binding, input),
     queryFn: skipToken,

@@ -47,9 +47,14 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
   const navigation = useAccessNavigation({ ...props, state, data, refresh })
   const { heading, selected, list, context, inconsistent, autoOpen } = navigation
   const pending = state.status === 'pending' || autoOpen
-  const title = selected ? context?.organization.name ?? (initialPending ? props.initialOrganizationName : undefined) : t('title')
-  const sectionId = context?.canManageTeamAccess ? context.organization.id :
-    initialPending && props.initialCanManageTeamAccess && input.kind === 'selected' ? input.id : undefined
+  const title = selected
+    ? (context?.organization.name ?? (initialPending ? props.initialOrganizationName : undefined))
+    : t('title')
+  const sectionId = context?.canManageTeamAccess
+    ? context.organization.id
+    : initialPending && props.initialCanManageTeamAccess && input.kind === 'selected'
+      ? input.id
+      : undefined
   const refreshDisabled =
     pending || Boolean(state.retryAt) || state.status === 'changed' || state.status === 'missing'
 
@@ -89,7 +94,15 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
               href: props.membersHref(sectionId),
               active: false,
             },
-            ...(props.invitationsHref ? [{ label: invitesT('title'), href: props.invitationsHref(sectionId), active: false }] : []),
+            ...(props.invitationsHref
+              ? [
+                  {
+                    label: invitesT('title'),
+                    href: props.invitationsHref(sectionId),
+                    active: false,
+                  },
+                ]
+              : []),
           ]}
         />
       )}

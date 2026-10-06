@@ -2,11 +2,14 @@ import { randomBytes } from 'node:crypto'
 
 import { ContextRequestError } from './context-errors'
 import { SessionVaultUnavailableError } from './errors'
-import { type InvitationOAuthCarrier, invitationOAuthCarrierSchema } from './invitation-oauth-carrier'
+import {
+  type InvitationOAuthCarrier,
+  invitationOAuthCarrierSchema,
+} from './invitation-oauth-carrier'
 import { invitationOAuthCarrierKey } from './invitation-oauth-store'
 import { invitationOwnerKey } from './invitation-owner-store'
 import { withInvitationStorage } from './invitation-storage'
-import { type InvitationOwnerRecord,invitationOwnerRecordSchema } from './invitation-vault-record'
+import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
 import { getWebRedisClient } from './redis-client'
 import type { VaultRecord } from './session-vault.types'
 import { VAULT_TTL_SECONDS } from './vault-constants'
@@ -86,9 +89,13 @@ export async function stageInvitationSession(input: {
   const sessionId = randomBytes(32).toString('base64url')
   if (input.oauth) {
     invitationOAuthCarrierSchema.parse(input.oauth.carrier)
-    if (!/^[a-f0-9]{64}$/.test(input.oauth.ticketHash) ||
-      input.oauth.carrier.ownerHash !== input.ownerHash || input.oauth.carrier.flowId !== input.flowId ||
-      input.oauth.carrier.attemptId !== input.attemptId || input.oauth.carrier.status !== 'started')
+    if (
+      !/^[a-f0-9]{64}$/.test(input.oauth.ticketHash) ||
+      input.oauth.carrier.ownerHash !== input.ownerHash ||
+      input.oauth.carrier.flowId !== input.flowId ||
+      input.oauth.carrier.attemptId !== input.attemptId ||
+      input.oauth.carrier.status !== 'started'
+    )
       throw new ContextRequestError(409, 'INVITE_FLOW_CHANGED')
   }
   const record = {
@@ -100,8 +107,11 @@ export async function stageInvitationSession(input: {
     ...(input.oauth ? { oauth: input.oauth } : {}),
   }
   await withInvitationStorage(async () => {
-    const result = await (await getWebRedisClient()).set(stagingKey(sessionId), JSON.stringify(record), {
-      condition: 'NX', expiration: { type: 'PXAT', value: input.deadline },
+    const result = await (
+      await getWebRedisClient()
+    ).set(stagingKey(sessionId), JSON.stringify(record), {
+      condition: 'NX',
+      expiration: { type: 'PXAT', value: input.deadline },
     })
     if (result !== 'OK') throw new SessionVaultUnavailableError(undefined)
   })
@@ -113,28 +123,47 @@ export async function publishInvitationSession(
   ownerHash: string,
   expectedVersion: number,
   next: InvitationOwnerRecord,
-  sessionId: string
-  , oauthAttemptId?: string
+  sessionId: string,
+  oauthAttemptId?: string
 ): Promise<boolean> {
   const parsed = invitationOwnerRecordSchema.parse({ ...next, version: expectedVersion + 1 })
   return withInvitationStorage(async () => {
-    const result = await (await getWebRedisClient()).eval(PUBLISH, {
-      keys: [invitationOwnerKey(ownerHash), stagingKey(sessionId), `web:session:v1:${sessionId}`,
-        ...(oauthAttemptId ? [invitationOAuthCarrierKey(oauthAttemptId)] : [])],
-      arguments: [String(expectedVersion), JSON.stringify(parsed), sessionId, String(VAULT_TTL_SECONDS)],
+    const result = await (
+      await getWebRedisClient()
+    ).eval(PUBLISH, {
+      keys: [
+        invitationOwnerKey(ownerHash),
+        stagingKey(sessionId),
+        `web:session:v1:${sessionId}`,
+        ...(oauthAttemptId ? [invitationOAuthCarrierKey(oauthAttemptId)] : []),
+      ],
+      arguments: [
+        String(expectedVersion),
+        JSON.stringify(parsed),
+        sessionId,
+        String(VAULT_TTL_SECONDS),
+      ],
     })
     return result === 1
   })
 }
 
 /** Failure cleanup only removes this owner's unpublished staging, never a published session. */
-export async function discardInvitationSession(ownerHash: string, sessionId: string): Promise<void> {
+export async function discardInvitationSession(
+  ownerHash: string,
+  sessionId: string
+): Promise<void> {
   await withInvitationStorage(async () => {
-    await (await getWebRedisClient()).eval(`
+    await (
+      await getWebRedisClient()
+    ).eval(
+      `
       local raw = redis.call('GET', KEYS[1])
       if not raw then return 0 end
       if cjson.decode(raw).ownerKey ~= ARGV[1] then return 0 end
       return redis.call('DEL', KEYS[1])
-    `, { keys: [stagingKey(sessionId)], arguments: [invitationOwnerKey(ownerHash)] })
+    `,
+      { keys: [stagingKey(sessionId)], arguments: [invitationOwnerKey(ownerHash)] }
+    )
   })
 }

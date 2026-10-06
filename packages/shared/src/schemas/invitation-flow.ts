@@ -49,8 +49,11 @@ export const invitationFlowAcceptResponseSchema = z.strictObject({
 })
 export const invitationFlowPendingResponseSchema = z.discriminatedUnion('state', [
   z.strictObject({ state: z.literal('authenticating'), binding: invitationFlowBindingSchema }),
-  z.strictObject({ state: z.literal('completing_signin'), binding: invitationFlowBindingSchema,
-    handoff: z.strictObject({ attemptId: invitationFlowIdSchema }) }),
+  z.strictObject({
+    state: z.literal('completing_signin'),
+    binding: invitationFlowBindingSchema,
+    handoff: z.strictObject({ attemptId: invitationFlowIdSchema }),
+  }),
 ])
 export const invitationFlowSwitchResponseSchema = z.strictObject({
   binding: invitationFlowBindingSchema,
@@ -58,7 +61,9 @@ export const invitationFlowSwitchResponseSchema = z.strictObject({
 })
 export const invitationFlowOAuthResponseSchema = z.strictObject({
   binding: invitationFlowBindingSchema,
-  authorizeHref: z.string().regex(/^\/api\/auth\/oauth\/(google|github|apple)\?invitationAttempt=[A-Za-z0-9_-]{22}$/),
+  authorizeHref: z
+    .string()
+    .regex(/^\/api\/auth\/oauth\/(google|github|apple)\?invitationAttempt=[A-Za-z0-9_-]{22}$/),
 })
 export const invitationFlowVerificationResponseSchema = z.strictObject({
   binding: invitationFlowBindingSchema,
@@ -68,10 +73,14 @@ export const invitationVerificationReturnInputSchema = z.strictObject({
   expectedSessionBinding: invitationSessionBindingSchema,
 })
 export const invitationVerificationReturnLinkSchema = z.strictObject({
-  verifyHref: z.string().regex(/^\/(?:[a-z]{2}(?:-[A-Za-z0-9]+)?\/)?verify-email\?inviteReturn=[A-Za-z0-9_-]{22}$/),
+  verifyHref: z
+    .string()
+    .regex(/^\/(?:[a-z]{2}(?:-[A-Za-z0-9]+)?\/)?verify-email\?inviteReturn=[A-Za-z0-9_-]{22}$/),
 })
 export const invitationVerificationReturnResponseSchema = z.strictObject({
-  destination: z.string().regex(/^\/(?:[a-z]{2}(?:-[A-Za-z0-9]+)?\/)?invite\/flow\/[A-Za-z0-9_-]{22}$/),
+  destination: z
+    .string()
+    .regex(/^\/(?:[a-z]{2}(?:-[A-Za-z0-9]+)?\/)?invite\/flow\/[A-Za-z0-9_-]{22}$/),
   binding: invitationFlowBindingSchema,
 })
 export type InvitationFlowBinding = z.infer<typeof invitationFlowBindingSchema>

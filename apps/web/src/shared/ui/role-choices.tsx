@@ -47,7 +47,11 @@ export function RoleChoices({
         </div>
       ) : error || unavailable ? (
         <div className="space-y-3">
-          {error ? <ApiErrorAlert error={error} /> : <p role="status">{regionLabels.unavailable}</p>}
+          {error ? (
+            <ApiErrorAlert error={error} />
+          ) : (
+            <p role="status">{regionLabels.unavailable}</p>
+          )}
           <Button type="button" variant="outline" disabled={retryDisabled} onClick={onRetry}>
             {regionLabels.retry}
           </Button>

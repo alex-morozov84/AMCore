@@ -90,7 +90,12 @@ export function ConsoleStepUpDialog({
                   <FormItem>
                     <FormLabel>{t('loginPassword')}</FormLabel>
                     <FormControl>
-                      <PasswordInput showLabel={tCommon('showPassword')} hideLabel={tCommon('hidePassword')} autoComplete="current-password" {...field} />
+                      <PasswordInput
+                        showLabel={tCommon('showPassword')}
+                        hideLabel={tCommon('hidePassword')}
+                        autoComplete="current-password"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -11,7 +11,9 @@ describe('Invitation inventory representative query plans', () => {
     pool = new Pool({ connectionString: context.postgresContainer.getConnectionUri() })
     await context.prisma.organization.createMany({
       data: Array.from({ length: 100 }, (_, i) => ({
-        id: `volume-org-${i}`, name: `Volume ${i}`, slug: `volume-${i}`,
+        id: `volume-org-${i}`,
+        name: `Volume ${i}`,
+        slug: `volume-${i}`,
       })),
     })
     await pool.query(`
@@ -46,7 +48,10 @@ describe('Invitation inventory representative query plans', () => {
       expect(plan['Execution Time']).toBeGreaterThanOrEqual(0)
       expect(JSON.stringify(plan)).not.toContain('"Plan Rows":10000')
       plans[name] = plan
-      console.info('invitation_volume_plan', JSON.stringify({ name, rows: 10000, organizations: 100, plan }))
+      console.info(
+        'invitation_volume_plan',
+        JSON.stringify({ name, rows: 10000, organizations: 100, plan })
+      )
     }
     expect(JSON.stringify(plans.pending)).toContain('org_invites_organizationId_issuedAt_id_idx')
     expect(JSON.stringify(plans.token)).toContain('org_invites_tokenHash_key')

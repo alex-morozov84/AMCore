@@ -66,7 +66,8 @@ describe('proxyToBackend — session/CSRF gating and auth-failure classification
   })
 
   it.each([['auth/login'], ['auth', '%6cogin']])(
-    'contains effective credential aliases %j before session lookup', async (...segments) => {
+    'contains effective credential aliases %j before session lookup',
+    async (...segments) => {
       mockCookieStore(undefined)
       const response = await proxyToBackend(makeRequest('probe'), segments)
       expect(response.status).toBe(404)

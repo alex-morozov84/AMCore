@@ -119,9 +119,13 @@ export function useOrganizationRead<T>(
     )
     return () => clearTimeout(timer)
   }, [state.retryAt, state.identity])
-  useEffect(() => controller.registerRead(options?.secondary
-    ? signal => refresh(signal).catch(() => undefined)
-    : refresh), [controller, refresh, options?.secondary])
+  useEffect(
+    () =>
+      controller.registerRead(
+        options?.secondary ? (signal) => refresh(signal).catch(() => undefined) : refresh
+      ),
+    [controller, refresh, options?.secondary]
+  )
   return {
     ...(state.identity === identity ? state : { identity, pending: true }),
     data: state.identity === identity ? query.data : undefined,

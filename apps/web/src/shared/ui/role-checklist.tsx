@@ -32,7 +32,12 @@ export function RoleChecklist({
             <Checkbox
               id={`${prefix}-${role.id}`}
               checked={selected.includes(role.id)}
-              disabled={disabled || (!selected.includes(role.id) && maxSelected !== undefined && selected.length >= maxSelected)}
+              disabled={
+                disabled ||
+                (!selected.includes(role.id) &&
+                  maxSelected !== undefined &&
+                  selected.length >= maxSelected)
+              }
               onCheckedChange={(checked) =>
                 onChange(
                   checked

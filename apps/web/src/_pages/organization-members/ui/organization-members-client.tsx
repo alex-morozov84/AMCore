@@ -43,13 +43,21 @@ export function OrganizationMembersClient({
   return (
     <section className="space-y-6">
       <BackLink href={listHref ?? backHref}>{t('allOrganizations')}</BackLink>
-      <PageTitle>{access.data && 'organization' in access.data.data ? access.data.data.organization.name : access.initialPending ? initialOrganizationName : undefined}</PageTitle>
+      <PageTitle>
+        {access.data && 'organization' in access.data.data
+          ? access.data.data.organization.name
+          : access.initialPending
+            ? initialOrganizationName
+            : undefined}
+      </PageTitle>
       <SectionNavigation
         label={t('sections')}
         items={[
           { label: t('overview'), href: backHref, active: false },
           { label: t('title'), href: membersHref ?? `${backHref}/members`, active: true },
-          ...(invitationsHref ? [{ label: invitesT('title'), href: invitationsHref, active: false }] : []),
+          ...(invitationsHref
+            ? [{ label: invitesT('title'), href: invitationsHref, active: false }]
+            : []),
         ]}
       />
       <ApiErrorAlert error={access.state.error} />

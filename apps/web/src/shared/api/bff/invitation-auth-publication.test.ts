@@ -4,27 +4,50 @@ import { publishInvitedCredentials } from './invitation-auth-publication'
 import { publishInvitationAuth } from './invitation-auth-transition'
 import { invitationIssuedSessionId } from './invitation-issued-session'
 import { invitationOwnerStore } from './invitation-owner-store'
-import { discardInvitationSession, publishInvitationSession, stageInvitationSession } from './invitation-session-publication'
+import {
+  discardInvitationSession,
+  publishInvitationSession,
+  stageInvitationSession,
+} from './invitation-session-publication'
 
 vi.mock('server-only', () => ({}))
 vi.mock('./invitation-issued-session', () => ({ invitationIssuedSessionId: vi.fn() }))
 vi.mock('./invitation-owner-store', () => ({ invitationOwnerStore: { get: vi.fn() } }))
 vi.mock('./invitation-auth-transition', () => ({ publishInvitationAuth: vi.fn() }))
-vi.mock('./invitation-session-publication', () => ({ stageInvitationSession: vi.fn(), publishInvitationSession: vi.fn(), discardInvitationSession: vi.fn() }))
+vi.mock('./invitation-session-publication', () => ({
+  stageInvitationSession: vi.fn(),
+  publishInvitationSession: vi.fn(),
+  discardInvitationSession: vi.fn(),
+}))
 function input(): Parameters<typeof publishInvitedCredentials>[0] {
   // Only the capabilities read by this orchestration are supplied; pure transition/storage contracts have separate tests.
-  return { snapshot: { ownerHash: 'a'.repeat(64), owner: { origin: 'https://app.example.test' },
-    flow: { binding: { flowId: 'f'.repeat(22) }, expiresAt: Date.now() + 1800000 }, session: null },
+  return {
+    snapshot: {
+      ownerHash: 'a'.repeat(64),
+      owner: { origin: 'https://app.example.test' },
+      flow: { binding: { flowId: 'f'.repeat(22) }, expiresAt: Date.now() + 1800000 },
+      session: null,
+    },
     attempt: { id: 'i'.repeat(22), fence: 'z'.repeat(22), expiresAt: Date.now() + 60000 },
-    credentials: { data: { user: { id: 'user-example' }, accessToken: '<test-access>' }, refreshToken: '<test-refresh>' },
-    signal: new AbortController().signal } as Parameters<typeof publishInvitedCredentials>[0]
+    credentials: {
+      data: { user: { id: 'user-example' }, accessToken: '<test-access>' },
+      refreshToken: '<test-refresh>',
+    },
+    signal: new AbortController().signal,
+  } as Parameters<typeof publishInvitedCredentials>[0]
 }
 beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(invitationIssuedSessionId).mockReturnValue('backend-example')
   vi.mocked(stageInvitationSession).mockResolvedValue('s'.repeat(43))
-  vi.mocked(invitationOwnerStore.get).mockResolvedValue({ version: 4 } as NonNullable<Awaited<ReturnType<typeof invitationOwnerStore.get>>>)
-  vi.mocked(publishInvitationAuth).mockReturnValue({ flows: [{ binding: { flowId: 'f'.repeat(22), flowRevision: 3, sessionBinding: 'b'.repeat(64) } }] } as ReturnType<typeof publishInvitationAuth>)
+  vi.mocked(invitationOwnerStore.get).mockResolvedValue({ version: 4 } as NonNullable<
+    Awaited<ReturnType<typeof invitationOwnerStore.get>>
+  >)
+  vi.mocked(publishInvitationAuth).mockReturnValue({
+    flows: [
+      { binding: { flowId: 'f'.repeat(22), flowRevision: 3, sessionBinding: 'b'.repeat(64) } },
+    ],
+  } as ReturnType<typeof publishInvitationAuth>)
   vi.mocked(publishInvitationSession).mockResolvedValue(true)
 })
 describe('server-only credential publication orchestration', () => {
@@ -32,7 +55,13 @@ describe('server-only credential publication orchestration', () => {
     const result = await publishInvitedCredentials(input())
     expect(result.sessionId).toBe('s'.repeat(43))
     expect(result.binding.flowRevision).toBe(3)
-    expect(publishInvitationSession).toHaveBeenCalledWith('a'.repeat(64), 4, expect.anything(), 's'.repeat(43), undefined)
+    expect(publishInvitationSession).toHaveBeenCalledWith(
+      'a'.repeat(64),
+      4,
+      expect.anything(),
+      's'.repeat(43),
+      undefined
+    )
     expect(discardInvitationSession).not.toHaveBeenCalled()
     expect(result).not.toHaveProperty('accessToken')
     expect(result).not.toHaveProperty('refreshToken')
@@ -53,9 +82,11 @@ describe('server-only credential publication orchestration', () => {
     expect(discardInvitationSession).toHaveBeenCalledWith('a'.repeat(64), 's'.repeat(43))
   })
   it('does not stage credentials without the API refresh cookie or after cancellation', async () => {
-    const missing = input(); missing.credentials.refreshToken = null
+    const missing = input()
+    missing.credentials.refreshToken = null
     await expect(publishInvitedCredentials(missing)).rejects.toThrow()
-    const canceled = input(); canceled.signal = AbortSignal.abort()
+    const canceled = input()
+    canceled.signal = AbortSignal.abort()
     await expect(publishInvitedCredentials(canceled)).rejects.toThrow()
     expect(stageInvitationSession).not.toHaveBeenCalled()
   })

@@ -100,12 +100,12 @@ describe('TeamAccessGuard', () => {
         ],
         'orgId',
       ],
+      [MembersController.prototype, ['removeMember', 'assignRole', 'removeRole'], 'orgId'],
       [
-        MembersController.prototype,
-        ['removeMember', 'assignRole', 'removeRole'],
+        InvitesController.prototype,
+        ['listInvites', 'roleChoices', 'create', 'reissue', 'revokeInvite'],
         'orgId',
       ],
-      [InvitesController.prototype, ['listInvites', 'roleChoices', 'create', 'reissue', 'revokeInvite'], 'orgId'],
       [InviteOperationsController.prototype, ['operation'], 'orgId'],
       [OrganizationsController.prototype, ['remove'], 'id'],
     ]

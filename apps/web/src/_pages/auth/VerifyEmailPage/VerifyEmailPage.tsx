@@ -11,7 +11,11 @@ interface VerifyEmailPageProps {
   successContent?: ReactNode
 }
 
-export function VerifyEmailPage({ token, withoutTokenContent, successContent }: VerifyEmailPageProps) {
+export function VerifyEmailPage({
+  token,
+  withoutTokenContent,
+  successContent,
+}: VerifyEmailPageProps) {
   const t = useTranslations('auth')
 
   return (
@@ -22,7 +26,11 @@ export function VerifyEmailPage({ token, withoutTokenContent, successContent }: 
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <VerifyEmailStatus token={token} withoutTokenContent={withoutTokenContent} successContent={successContent} />
+        <VerifyEmailStatus
+          token={token}
+          withoutTokenContent={withoutTokenContent}
+          successContent={successContent}
+        />
       </CardContent>
     </Card>
   )

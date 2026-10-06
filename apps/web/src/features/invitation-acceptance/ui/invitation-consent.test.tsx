@@ -26,7 +26,11 @@ describe('invitation explicit consent', () => {
 
   it('shows the complete role set and joins only after a deliberate click', () => {
     const actions = setup('idle')
-    expect(screen.getByRole('heading', { name: messages.invitationRecipient.consentTitle.replace('{organization}', 'Acme Studio') })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: messages.invitationRecipient.consentTitle.replace('{organization}', 'Acme Studio'),
+      })
+    ).toBeInTheDocument()
     expect(screen.getByText('MEMBER')).toBeInTheDocument()
     expect(screen.getByText('Editor')).toBeInTheDocument()
     expect(actions.onAccept).not.toHaveBeenCalled()

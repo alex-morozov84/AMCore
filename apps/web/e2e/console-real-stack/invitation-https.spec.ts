@@ -82,11 +82,16 @@ test('HTTPS: competing first ingress, current-cookie bootstrap and late overwrit
       new URL(`/api/invitation-flows/${displacedFlow}/context`, target.origins.product).href
     )
     expect(stale.ok()).toBe(false)
-    const displacedRead = tab.waitForResponse(r => new URL(r.url()).pathname === `/api/invitation-flows/${displacedFlow}/context`, {timeout:10000})
+    const displacedRead = tab.waitForResponse(
+      (r) => new URL(r.url()).pathname === `/api/invitation-flows/${displacedFlow}/context`,
+      { timeout: 10000 }
+    )
     await tab.bringToFront()
-    await tab.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted:true})))
+    await tab.evaluate(() =>
+      window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+    )
     expect((await displacedRead).ok()).toBe(false)
-    await expect(tab.getByRole('heading', {name:t.signInTitle, exact:true})).toHaveCount(0)
+    await expect(tab.getByRole('heading', { name: t.signInTitle, exact: true })).toHaveCount(0)
     const cookies = (await context.cookies(target.origins.product)).filter(
       (c) => c.name === cookieName
     )
@@ -213,9 +218,16 @@ test('HTTPS: established-owner independent tabs and replacement session cannot u
   )
   expect(ack.status()).toBe(409)
   expect((await ack.json()).errorCode).toBe('INVITE_FLOW_CHANGED')
-  const staleRead = page.waitForResponse(r => new URL(r.url()).pathname.startsWith(`/api/invitation-flows/${firstFlow}/`) && r.request().method() === 'GET', {timeout:10000})
+  const staleRead = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname.startsWith(`/api/invitation-flows/${firstFlow}/`) &&
+      r.request().method() === 'GET',
+    { timeout: 10000 }
+  )
   await page.bringToFront()
-  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted:true})))
+  await page.evaluate(() =>
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+  )
   expect((await staleRead).ok()).toBe(false)
   await expect(
     page.getByRole('heading', {

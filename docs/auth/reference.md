@@ -203,15 +203,15 @@ not the top-level field). See [API Keys](./api-keys.md) for the scope grammar.
 
 ### Optional (with defaults)
 
-| Variable                          | Default              | Description                                     |
-| --------------------------------- | -------------------- | ----------------------------------------------- |
-| `AUTH_PUBLIC_SIGNUP_ENABLED` | `true` | Ordinary email/new-account OAuth signup; valid invited signup remains available |
-| `JWT_ACCESS_EXPIRATION`           | `15m`                | Access-token lifetime                           |
-| `JWT_REFRESH_DAYS`                | `7`                  | Refresh-token lifetime (days)                   |
-| `PASSWORD_RESET_EXPIRY_MINUTES`   | `15`                 | Reset-link lifetime                             |
-| `EMAIL_VERIFICATION_EXPIRY_HOURS` | `48`                 | Verification-link lifetime                      |
-| `STEP_UP_MAX_AGE_SECONDS`         | `600`                | Recent-auth window for step-up-guarded ops      |
-| `SUPPORT_EMAIL`                   | `support@amcore.com` | Support/contact address for transactional email |
+| Variable                          | Default              | Description                                                                     |
+| --------------------------------- | -------------------- | ------------------------------------------------------------------------------- |
+| `AUTH_PUBLIC_SIGNUP_ENABLED`      | `true`               | Ordinary email/new-account OAuth signup; valid invited signup remains available |
+| `JWT_ACCESS_EXPIRATION`           | `15m`                | Access-token lifetime                                                           |
+| `JWT_REFRESH_DAYS`                | `7`                  | Refresh-token lifetime (days)                                                   |
+| `PASSWORD_RESET_EXPIRY_MINUTES`   | `15`                 | Reset-link lifetime                                                             |
+| `EMAIL_VERIFICATION_EXPIRY_HOURS` | `48`                 | Verification-link lifetime                                                      |
+| `STEP_UP_MAX_AGE_SECONDS`         | `600`                | Recent-auth window for step-up-guarded ops                                      |
+| `SUPPORT_EMAIL`                   | `support@amcore.com` | Support/contact address for transactional email                                 |
 
 ### OAuth providers (all optional)
 

@@ -13,7 +13,7 @@ export function useInvitationAcceptDescriptor(flowId?: string) {
       const next = flowId ? createInvitationAcceptJournal().read(flowId) : null
       if (JSON.stringify(snapshot) !== JSON.stringify(next)) {
         snapshot = next
-        listeners.forEach(listener => listener())
+        listeners.forEach((listener) => listener())
       }
     }
     return {

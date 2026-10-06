@@ -26,7 +26,12 @@ const API_URL = process.env.API_URL ?? 'http://localhost:5002'
  * intermediate 302's `Location` and `Set-Cookie` before this code ever saw
  * them.
  */
-async function fetchUpstream(request: Request, upstreamPath: string, proof?: Headers, signal?: AbortSignal): Promise<Response> {
+async function fetchUpstream(
+  request: Request,
+  upstreamPath: string,
+  proof?: Headers,
+  signal?: AbortSignal
+): Promise<Response> {
   const upstream = new URL(`${API_URL}/api/v1${upstreamPath}`)
   upstream.search = new URL(request.url).search
   upstream.searchParams.delete('invitationAttempt')
@@ -34,9 +39,14 @@ async function fetchUpstream(request: Request, upstreamPath: string, proof?: Hea
   const hasBody = request.method === 'POST' && request.body !== null
   const headers = new Headers(sessionMetadataHeaders(request.headers))
   const nonceName = upstreamPath.endsWith('/callback')
-    ? (upstreamPath.includes('/apple/') ? 'oauth_state_apple' : 'oauth_state') : null
-  const cookies = (request.headers.get('cookie') ?? '').split(';').map(value => value.trim())
-    .filter(value => nonceName && value.startsWith(`${nonceName}=`))
+    ? upstreamPath.includes('/apple/')
+      ? 'oauth_state_apple'
+      : 'oauth_state'
+    : null
+  const cookies = (request.headers.get('cookie') ?? '')
+    .split(';')
+    .map((value) => value.trim())
+    .filter((value) => nonceName && value.startsWith(`${nonceName}=`))
   if (cookies.length === 1) headers.set('cookie', cookies[0]!)
   proof?.forEach((value, name) => headers.set(name, value))
   const acceptLanguage = request.headers.get('accept-language')
@@ -75,12 +85,23 @@ export async function proxyOAuthAuthorize(request: Request, provider: string): P
   if (query.has('invitationAttempt')) {
     if (query.size !== 1) return new Response(null, { status: 400 })
     try {
-      const upstream = await startInvitedOAuth(request, provider, query.get('invitationAttempt')!,
-        (proof, signal) => fetchUpstream(request, `/auth/oauth/${encodeURIComponent(provider)}`, proof, signal))
+      const upstream = await startInvitedOAuth(
+        request,
+        provider,
+        query.get('invitationAttempt')!,
+        (proof, signal) =>
+          fetchUpstream(request, `/auth/oauth/${encodeURIComponent(provider)}`, proof, signal)
+      )
       return relayResponse(upstream, provider)
     } catch (error) {
-      return new Response(null, { status: error instanceof ContextRequestError ? error.status : 503,
-        headers: { 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex, nofollow' } })
+      return new Response(null, {
+        status: error instanceof ContextRequestError ? error.status : 503,
+        headers: {
+          'cache-control': 'private, no-store',
+          'referrer-policy': 'no-referrer',
+          'x-robots-tag': 'noindex, nofollow',
+        },
+      })
     }
   }
   await cancelInvitedOAuthForOrdinaryStart(request)

@@ -102,9 +102,20 @@ export class InvitationCommandService {
       })
       if (!result) return null
       // These parents are already locked; no postcommit metadata lookup or fictional fallback.
-      const organization = await tx.organization.findUniqueOrThrow({ where: { id: orgId }, select: { name: true } })
-      const inviter = await tx.user.findUniqueOrThrow({ where: { id: user.id }, select: { name: true, email: true } })
-      return { ...result, orgName: organization.name, inviterName: inviter.name ?? inviter.email, inviterEmail: inviter.email }
+      const organization = await tx.organization.findUniqueOrThrow({
+        where: { id: orgId },
+        select: { name: true },
+      })
+      const inviter = await tx.user.findUniqueOrThrow({
+        where: { id: user.id },
+        select: { name: true, email: true },
+      })
+      return {
+        ...result,
+        orgName: organization.name,
+        inviterName: inviter.name ?? inviter.email,
+        inviterEmail: inviter.email,
+      }
     })
     if (mail) {
       const outcome = await invitationPostCommit(() => this.email.dispatch(mail))

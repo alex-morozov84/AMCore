@@ -81,18 +81,16 @@ describe('invitation direct transport', () => {
   it('keeps structured rejection and retry timing without retaining upstream body secrets', async () => {
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json(
-            {
-              errorCode: 'RATE_LIMIT_EXCEEDED',
-              token: 'fake-private-data',
-              message: 'fake-private-data',
-            },
-            { status: 429, headers: { 'retry-after': '8' } }
-          )
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            errorCode: 'RATE_LIMIT_EXCEEDED',
+            token: 'fake-private-data',
+            message: 'fake-private-data',
+          },
+          { status: 429, headers: { 'retry-after': '8' } }
         )
+      )
     )
     let caught: unknown
     try {

@@ -46,7 +46,8 @@ function SearchFieldLabel({ id, label }: Pick<SearchFieldProps, 'id' | 'label'>)
 }
 
 function SearchTextInput(props: SearchTextInputProps) {
-  const { inputRef, id, name, value, onValueChange, placeholder, maxLength, onKeyDown, disabled } = props
+  const { inputRef, id, name, value, onValueChange, placeholder, maxLength, onKeyDown, disabled } =
+    props
   return (
     <Input
       ref={inputRef}
@@ -65,7 +66,15 @@ function SearchTextInput(props: SearchTextInputProps) {
   )
 }
 
-function SearchClearButton({ label, onClear, disabled }: { label: string; onClear: () => void; disabled?: boolean }) {
+function SearchClearButton({
+  label,
+  onClear,
+  disabled,
+}: {
+  label: string
+  onClear: () => void
+  disabled?: boolean
+}) {
   return (
     <Button
       type="button"
@@ -103,7 +112,13 @@ export function SearchField(props: SearchFieldProps) {
         onKeyDown={props.onKeyDown}
         disabled={props.disabled}
       />
-      {props.value && <SearchClearButton label={props.clearLabel} onClear={handleClear} disabled={props.disabled} />}
+      {props.value && (
+        <SearchClearButton
+          label={props.clearLabel}
+          onClear={handleClear}
+          disabled={props.disabled}
+        />
+      )}
     </div>
   )
 }

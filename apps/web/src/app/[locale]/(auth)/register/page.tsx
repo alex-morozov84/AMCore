@@ -15,7 +15,10 @@ export default async function Register({ params }: { params: Promise<{ locale: s
   setRequestLocale(locale)
   await redirectIfAuthenticated(locale)
 
-  const [oauthProviders, publicSignupEnabled] = await Promise.all([getOAuthProviders(), getPublicSignupPolicy()])
+  const [oauthProviders, publicSignupEnabled] = await Promise.all([
+    getOAuthProviders(),
+    getPublicSignupPolicy(),
+  ])
 
   return <RegisterPage oauthProviders={oauthProviders} publicSignupEnabled={publicSignupEnabled} />
 }

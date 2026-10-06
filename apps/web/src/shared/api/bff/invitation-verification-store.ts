@@ -10,36 +10,69 @@ import { getWebRedisClient } from './redis-client'
 
 import 'server-only'
 
-const selectorSchema = z.strictObject({ ownerHash: z.string().regex(/^[a-f0-9]{64}$/), origin: z.url(),
-  binding: invitationFlowBindingSchema, ownerEpoch: z.number().int().nonnegative(), expiresAt: z.number().int() })
+const selectorSchema = z.strictObject({
+  ownerHash: z.string().regex(/^[a-f0-9]{64}$/),
+  origin: z.url(),
+  binding: invitationFlowBindingSchema,
+  ownerEpoch: z.number().int().nonnegative(),
+  expiresAt: z.number().int(),
+})
 type Selector = z.infer<typeof selectorSchema>
-function key(id: string) { return `web:invitation:verification-return:v1:${invitationFlowIdSchema.parse(id)}` }
+function key(id: string) {
+  return `web:invitation:verification-return:v1:${invitationFlowIdSchema.parse(id)}`
+}
 
 export async function createInvitationVerificationSelector(input: Selector) {
   const record = selectorSchema.parse(input)
-  if (!record.binding.sessionBinding || record.expiresAt <= Date.now() || record.expiresAt > Date.now() + 1800000)
+  if (
+    !record.binding.sessionBinding ||
+    record.expiresAt <= Date.now() ||
+    record.expiresAt > Date.now() + 1800000
+  )
     throw invitationFlowChanged()
   const id = randomBytes(16).toString('base64url')
   await withInvitationStorage(async () => {
-    const saved = await (await getWebRedisClient()).set(key(id), JSON.stringify(record),
-      { condition: 'NX', expiration: { type: 'PXAT', value: record.expiresAt } })
+    const saved = await (
+      await getWebRedisClient()
+    ).set(key(id), JSON.stringify(record), {
+      condition: 'NX',
+      expiration: { type: 'PXAT', value: record.expiresAt },
+    })
     if (saved !== 'OK') throw invitationFlowChanged()
   })
   return id
 }
 
-export async function readInvitationVerificationSelector(id: string, ownerHash: string, origin: string) {
+export async function readInvitationVerificationSelector(
+  id: string,
+  ownerHash: string,
+  origin: string
+) {
   return withInvitationStorage(async () => {
     const raw = await (await getWebRedisClient()).get(key(id))
     if (!raw) return null
     const record = selectorSchema.parse(JSON.parse(raw))
-    return record.ownerHash === ownerHash && record.origin === origin && record.expiresAt > Date.now() ? record : null
+    return record.ownerHash === ownerHash &&
+      record.origin === origin &&
+      record.expiresAt > Date.now()
+      ? record
+      : null
   })
 }
 
 /** A mismatched browser, session or flow revision never consumes another selector. */
-export async function consumeInvitationVerificationSelector(id: string, ownerHash: string, version: number, record: Selector) {
-  return withInvitationStorage(async () => await (await getWebRedisClient()).eval(`
+export async function consumeInvitationVerificationSelector(
+  id: string,
+  ownerHash: string,
+  version: number,
+  record: Selector
+) {
+  return withInvitationStorage(
+    async () =>
+      (await (
+        await getWebRedisClient()
+      ).eval(
+        `
     local raw = redis.call('GET', KEYS[1])
     local ownerRaw = redis.call('GET', KEYS[2])
     if not raw or not ownerRaw or raw ~= ARGV[1] then return 0 end
@@ -58,5 +91,11 @@ export async function consumeInvitationVerificationSelector(id: string, ownerHas
       end
     end
     return 0
-  `, { keys: [key(id), invitationOwnerKey(ownerHash)], arguments: [JSON.stringify(selectorSchema.parse(record)), String(version), ownerHash] }) === 1)
+  `,
+        {
+          keys: [key(id), invitationOwnerKey(ownerHash)],
+          arguments: [JSON.stringify(selectorSchema.parse(record)), String(version), ownerHash],
+        }
+      )) === 1
+  )
 }

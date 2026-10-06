@@ -31,7 +31,8 @@ export async function OrganizationAccessMount({
     admission = await safeOrganizationAdmission()
     if (id) {
       const context = await readOrganizationContext(id, {
-        headers: await headers(), expectedSession: admission.binding,
+        headers: await headers(),
+        expectedSession: admission.binding,
       })
       initialOrganizationName = context.data.organization.name
       initialCanManageTeamAccess = context.data.canManageTeamAccess

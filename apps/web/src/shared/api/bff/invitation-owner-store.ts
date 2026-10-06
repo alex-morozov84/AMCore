@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 
 import { ContextRequestError } from './context-errors'
 import { withInvitationStorage } from './invitation-storage'
-import { type InvitationOwnerRecord,invitationOwnerRecordSchema } from './invitation-vault-record'
+import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
 import { getWebRedisClient } from './redis-client'
 
 import 'server-only'

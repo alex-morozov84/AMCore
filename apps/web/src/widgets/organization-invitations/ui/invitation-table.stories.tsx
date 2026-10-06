@@ -6,13 +6,27 @@ import { InvitationListSkeleton } from './invitation-list-skeleton'
 import { InvitationTable } from './invitation-table'
 
 const row: InviteListItem = {
-  id: 'invitation-example', email: 'invited@example.test', generation: 1,
-  issuedAt: '2026-01-01T12:00:00.000Z', issuedAtEstimated: false,
-  expiresAt: '2026-01-08T12:00:00.000Z', status: 'pending', intentValid: true,
-  roles: [{ requestedRoleId: 'role-example', id: 'role-example', nameAtIssue: 'MEMBER',
-    name: 'MEMBER', description: 'Example role description' }],
+  id: 'invitation-example',
+  email: 'invited@example.test',
+  generation: 1,
+  issuedAt: '2026-01-01T12:00:00.000Z',
+  issuedAtEstimated: false,
+  expiresAt: '2026-01-08T12:00:00.000Z',
+  status: 'pending',
+  intentValid: true,
+  roles: [
+    {
+      requestedRoleId: 'role-example',
+      id: 'role-example',
+      nameAtIssue: 'MEMBER',
+      name: 'MEMBER',
+      description: 'Example role description',
+    },
+  ],
 }
-const meta = { title: 'Widgets/Organization invitations/Table', component: InvitationTable,
+const meta = {
+  title: 'Widgets/Organization invitations/Table',
+  component: InvitationTable,
   args: { rows: [row], disabled: false, onAction: fn() },
 } satisfies Meta<typeof InvitationTable>
 export default meta
@@ -34,10 +48,20 @@ export const Ready: Story = {
   },
 }
 export const ExpiredDeletedRole: Story = {
-  args: { rows: [{ ...row, status: 'expired', intentValid: false,
-    roles: [{ ...row.roles[0], id: null, name: null, description: null }] }] },
+  args: {
+    rows: [
+      {
+        ...row,
+        status: 'expired',
+        intentValid: false,
+        roles: [{ ...row.roles[0], id: null, name: null, description: null }],
+      },
+    ],
+  },
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByRole('row', { name: /invited@example.test/ })).toBeVisible()
+    await expect(
+      within(canvasElement).getByRole('row', { name: /invited@example.test/ })
+    ).toBeVisible()
   },
 }
 export const Disabled: Story = {

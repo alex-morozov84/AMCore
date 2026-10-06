@@ -35,12 +35,18 @@ export class InviteRateLimiterService {
   async consume(orgId: string, emailCanonical: string, inviterId: string): Promise<void> {
     const hash = createHash('sha256').update(emailCanonical).digest('hex')
     const admitted = await this.redis.eval(ADMIT, {
-      keys: [`rate:org_invite_pair:${orgId}:${hash}`, `rate:org_invite_actor:${inviterId}:${orgId}`],
+      keys: [
+        `rate:org_invite_pair:${orgId}:${hash}`,
+        `rate:org_invite_actor:${inviterId}:${orgId}`,
+      ],
       arguments: [String(WINDOW_MS)],
     })
-    if (admitted !== 1) throw new AppException(
-      'Too many invite attempts. Please try again later.', HttpStatus.TOO_MANY_REQUESTS,
-      AuthErrorCode.RATE_LIMIT_EXCEEDED, { retryAfterSeconds: 3600 }
-    )
+    if (admitted !== 1)
+      throw new AppException(
+        'Too many invite attempts. Please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+        AuthErrorCode.RATE_LIMIT_EXCEEDED,
+        { retryAfterSeconds: 3600 }
+      )
   }
 }

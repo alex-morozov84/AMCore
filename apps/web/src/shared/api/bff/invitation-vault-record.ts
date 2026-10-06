@@ -29,7 +29,11 @@ const handoffJournalSchema = z.strictObject({
   backendSessionId: z.string().min(1).max(128),
   deadline: z.number().int(),
   confirmed: z.boolean(),
-  ticketHash: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(),
+  ticketHash: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable()
+    .optional(),
 })
 export const invitationVaultFlowSchema = z.strictObject({
   binding: invitationFlowBindingSchema,

@@ -1,4 +1,8 @@
-import { acceptIntentSchema, invitationFlowIdSchema, invitationOperationIdSchema } from '@amcore/shared'
+import {
+  acceptIntentSchema,
+  invitationFlowIdSchema,
+  invitationOperationIdSchema,
+} from '@amcore/shared'
 import { z } from 'zod'
 
 import 'client-only'
@@ -14,7 +18,9 @@ function key(flowId: string): string {
 }
 
 /** Stores an intent to recover, never permission to join or authentication credentials. */
-export function createInvitationAcceptJournal(storage: () => JournalStorage = () => sessionStorage) {
+export function createInvitationAcceptJournal(
+  storage: () => JournalStorage = () => sessionStorage
+) {
   return {
     read(flowId: string): InvitationAcceptDescriptor | null {
       try {
@@ -51,7 +57,8 @@ export function createInvitationAcceptJournal(storage: () => JournalStorage = ()
         const raw = storage().getItem(key(flowId))
         if (raw === null) return
         const parsed = descriptorSchema.safeParse(JSON.parse(raw))
-        if (parsed.success && parsed.data.operationId === operationId) storage().removeItem(key(flowId))
+        if (parsed.success && parsed.data.operationId === operationId)
+          storage().removeItem(key(flowId))
       } catch {
         // A stale callback never removes a newer operation; storage failures do not undo a commit.
       }

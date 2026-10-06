@@ -46,7 +46,10 @@ function setup() {
     return [{ value: now }]
   }) as never)
   prisma.organization.findUniqueOrThrow.mockResolvedValue({ name: 'Issued organization' } as never)
-  prisma.user.findUniqueOrThrow.mockResolvedValue({ name: 'Issued inviter', email: 'manager@example.test' } as never)
+  prisma.user.findUniqueOrThrow.mockResolvedValue({
+    name: 'Issued inviter',
+    email: 'manager@example.test',
+  } as never)
   prisma.role.findMany.mockResolvedValue([role] as never)
   prisma.user.findUnique.mockResolvedValue(null)
   prisma.orgMember.findUnique.mockResolvedValue(null)
@@ -58,7 +61,10 @@ function setup() {
     authorize: jest.fn(async () => undefined),
   }
   const audit = { record: jest.fn(async () => undefined) }
-  const mail = { dispatch: jest.fn(async (_mail: unknown): Promise<void> => undefined), reportOutcome: jest.fn() }
+  const mail = {
+    dispatch: jest.fn(async (_mail: unknown): Promise<void> => undefined),
+    reportOutcome: jest.fn(),
+  }
   const limiter = { consume: jest.fn(async () => undefined) }
   const service = new InvitationCommandService(
     prisma as never,
@@ -204,48 +210,91 @@ describe('invitation issuance decisions', () => {
   })
 })
 
-
 describe('actual issuance acknowledgment and snapshot', () => {
   afterEach(() => jest.useRealTimers())
-  it.each(['create', 'reissue'] as const)('bounds stalled %s mail and never resends a committed key', async kind => {
-    jest.useFakeTimers({ now })
-    const { service, prisma, mail, audit, limiter } = setup()
-    const id = operation()
-    let finish!: () => void
-    mail.dispatch.mockImplementation(() => new Promise<void>(resolve => { finish = resolve }))
-    const cmd = kind === 'create' ? command : { kind, id: 'invitation', dto: { mode: 'replace' as const, roleIds: [role.id], expectedGeneration: 1 } }
-    if (kind === 'reissue') {
-      prisma.orgInvite.findFirst.mockResolvedValue({ generation: 1, acceptedAt: null, revokedAt: null } as never)
-      prisma.$queryRaw.mockImplementation((async (query: TemplateStringsArray | { strings: string[] }) => {
-        const sql = ('strings' in query ? query.strings : query).join('')
-        if (sql.includes('core.roles')) return [role]
-        if (sql.includes('core.org_invites')) return [{ id: 'invitation', generation: 1, email: command.dto.email, emailCanonical: command.dto.email, expiresAt: new Date(now.getTime()+60000) }]
-        return [{ value: now }]
-      }) as never)
+  it.each(['create', 'reissue'] as const)(
+    'bounds stalled %s mail and never resends a committed key',
+    async (kind) => {
+      jest.useFakeTimers({ now })
+      const { service, prisma, mail, audit, limiter } = setup()
+      const id = operation()
+      let finish!: () => void
+      mail.dispatch.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve
+          })
+      )
+      const cmd =
+        kind === 'create'
+          ? command
+          : {
+              kind,
+              id: 'invitation',
+              dto: { mode: 'replace' as const, roleIds: [role.id], expectedGeneration: 1 },
+            }
+      if (kind === 'reissue') {
+        prisma.orgInvite.findFirst.mockResolvedValue({
+          generation: 1,
+          acceptedAt: null,
+          revokedAt: null,
+        } as never)
+        prisma.$queryRaw.mockImplementation((async (
+          query: TemplateStringsArray | { strings: string[] }
+        ) => {
+          const sql = ('strings' in query ? query.strings : query).join('')
+          if (sql.includes('core.roles')) return [role]
+          if (sql.includes('core.org_invites'))
+            return [
+              {
+                id: 'invitation',
+                generation: 1,
+                email: command.dto.email,
+                emailCanonical: command.dto.email,
+                expiresAt: new Date(now.getTime() + 60000),
+              },
+            ]
+          return [{ value: now }]
+        }) as never)
+      }
+      const pending = service.execute('organization', cmd, actor, id)
+      await jest.advanceTimersByTimeAsync(249)
+      expect(mail.dispatch).toHaveBeenCalledTimes(1)
+      expect(prisma.invitationOperation.create).toHaveBeenCalledTimes(1)
+      await jest.advanceTimersByTimeAsync(1)
+      await expect(pending).resolves.toEqual({ status: 'invited' })
+      expect(mail.reportOutcome).toHaveBeenCalledWith('organization', 'timeout')
+      const receipt = prisma.invitationOperation.create.mock.calls[0]![0].data
+      prisma.invitationOperation.findUnique.mockResolvedValue({
+        ...receipt,
+        completedAt: now,
+      } as never)
+      limiter.consume.mockRejectedValue(new Error('exhausted should not be checked on replay'))
+      prisma.organization.findUniqueOrThrow.mockRejectedValue(new Error('deleted after commit'))
+      prisma.user.findUniqueOrThrow.mockRejectedValue(new Error('deleted after commit'))
+      finish()
+      await expect(service.execute('organization', cmd, actor, id)).resolves.toEqual({
+        status: 'invited',
+      })
+      expect(mail.dispatch).toHaveBeenCalledTimes(1)
+      expect(audit.record).toHaveBeenCalledTimes(1)
+      expect(limiter.consume).toHaveBeenCalledTimes(1)
+      expect(mail.dispatch.mock.calls[0]).toEqual([
+        expect.objectContaining({
+          orgName: 'Issued organization',
+          inviterName: 'Issued inviter',
+          inviterEmail: 'manager@example.test',
+          roleNames: ['MEMBER'],
+        }),
+      ])
     }
-    const pending = service.execute('organization', cmd, actor, id)
-    await jest.advanceTimersByTimeAsync(249)
-    expect(mail.dispatch).toHaveBeenCalledTimes(1)
-    expect(prisma.invitationOperation.create).toHaveBeenCalledTimes(1)
-    await jest.advanceTimersByTimeAsync(1)
-    await expect(pending).resolves.toEqual({ status: 'invited' })
-    expect(mail.reportOutcome).toHaveBeenCalledWith('organization', 'timeout')
-    const receipt = prisma.invitationOperation.create.mock.calls[0]![0].data
-    prisma.invitationOperation.findUnique.mockResolvedValue({ ...receipt, completedAt: now } as never)
-    limiter.consume.mockRejectedValue(new Error('exhausted should not be checked on replay'))
-    prisma.organization.findUniqueOrThrow.mockRejectedValue(new Error('deleted after commit'))
-    prisma.user.findUniqueOrThrow.mockRejectedValue(new Error('deleted after commit'))
-    finish()
-    await expect(service.execute('organization', cmd, actor, id)).resolves.toEqual({ status: 'invited' })
-    expect(mail.dispatch).toHaveBeenCalledTimes(1)
-    expect(audit.record).toHaveBeenCalledTimes(1)
-    expect(limiter.consume).toHaveBeenCalledTimes(1)
-    expect(mail.dispatch.mock.calls[0]).toEqual([expect.objectContaining({ orgName: 'Issued organization', inviterName: 'Issued inviter', inviterEmail: 'manager@example.test', roleNames: ['MEMBER'] })])
-  })
+  )
   it('acknowledges a rejected provider without rolling back or leaking its exception', async () => {
     const { service, mail, prisma } = setup()
     mail.dispatch.mockRejectedValue(new Error('fake-private-provider-body'))
-    await expect(service.execute('organization', command, actor, operation())).resolves.toEqual({ status: 'invited' })
+    await expect(service.execute('organization', command, actor, operation())).resolves.toEqual({
+      status: 'invited',
+    })
     expect(prisma.invitationOperation.create).toHaveBeenCalledTimes(1)
     expect(mail.reportOutcome).toHaveBeenCalledWith('organization', 'failed')
     expect(JSON.stringify(mail.reportOutcome.mock.calls)).not.toContain('fake-private')

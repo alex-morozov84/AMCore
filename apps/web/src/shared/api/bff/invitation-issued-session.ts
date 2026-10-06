@@ -10,7 +10,7 @@ import 'server-only'
 export function invitationIssuedSessionId(accessToken: string, expectedActorId: string): string {
   if (accessToken.length > 8192) throw new InvitationBackendError(503, false)
   const parts = accessToken.split('.')
-  if (parts.length !== 3 || parts.some(part => !/^[A-Za-z0-9_-]+$/.test(part)))
+  if (parts.length !== 3 || parts.some((part) => !/^[A-Za-z0-9_-]+$/.test(part)))
     throw new InvitationBackendError(503, false)
   let claims: unknown
   try {
@@ -18,8 +18,15 @@ export function invitationIssuedSessionId(accessToken: string, expectedActorId: 
   } catch {
     throw new InvitationBackendError(503, false)
   }
-  if (!claims || typeof claims !== 'object' || !('sub' in claims) || claims.sub !== expectedActorId ||
-    !('sid' in claims) || typeof claims.sid !== 'string' || !isOrganizationContextId(claims.sid))
+  if (
+    !claims ||
+    typeof claims !== 'object' ||
+    !('sub' in claims) ||
+    claims.sub !== expectedActorId ||
+    !('sid' in claims) ||
+    typeof claims.sid !== 'string' ||
+    !isOrganizationContextId(claims.sid)
+  )
     throw new InvitationBackendError(503, false)
   return claims.sid
 }

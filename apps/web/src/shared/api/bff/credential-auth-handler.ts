@@ -57,8 +57,12 @@ export async function handleCredentialAuth<TInput>(
   }
 
   const { sessionId, user } = await mintSession(upstream)
-  try { await retireFlowsForOrdinaryAuth(request, { sessionId, actorId: user.id }) }
-  catch (error) { await redisVaultStore.delete(sessionId).catch(() => undefined); throw error }
+  try {
+    await retireFlowsForOrdinaryAuth(request, { sessionId, actorId: user.id })
+  } catch (error) {
+    await redisVaultStore.delete(sessionId).catch(() => undefined)
+    throw error
+  }
 
   const response = NextResponse.json({ user }, { status: options.successStatus })
   response.cookies.set(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions())

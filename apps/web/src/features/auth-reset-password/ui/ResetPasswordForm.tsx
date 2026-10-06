@@ -90,7 +90,11 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             <FormItem>
               <FormLabel>{t('newPassword')}</FormLabel>
               <FormControl>
-                <PasswordInput showLabel={passwordT('showPassword')} hideLabel={passwordT('hidePassword')} {...field} />
+                <PasswordInput
+                  showLabel={passwordT('showPassword')}
+                  hideLabel={passwordT('hidePassword')}
+                  {...field}
+                />
               </FormControl>
               <FormDescription>{t('passwordRequirements')}</FormDescription>
               <FormMessage />

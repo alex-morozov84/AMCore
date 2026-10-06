@@ -1,4 +1,4 @@
-import type { UserResponse } from '@amcore/shared';
+import type { UserResponse } from '@amcore/shared'
 import { DEFAULT_LOCALE, type LoginInput } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
@@ -21,7 +21,10 @@ const response = { user: { id: 'example-user', locale: DEFAULT_LOCALE } as UserR
 const input = { email: 'invited@example.test', password: '<test-password>' }
 beforeEach(() => vi.clearAllMocks())
 
-for (const [name, useCredential] of [['login', useLogin], ['register', useRegister]] as const) {
+for (const [name, useCredential] of [
+  ['login', useLogin],
+  ['register', useRegister],
+] as const) {
   describe(`invited ${name} adapter`, () => {
     function setup(adapter: CredentialFormAdapter<LoginInput>) {
       const queryClient = new QueryClient()
@@ -33,8 +36,16 @@ for (const [name, useCredential] of [['login', useLogin], ['register', useRegist
 
     it('waits for the confirmed handoff and uses the application continuation', async () => {
       let complete!: (value: typeof response) => void
-      const adapter = { submit: vi.fn(() => new Promise<typeof response>(resolve => { complete = resolve })),
-        isCurrent: () => true, onSuccess: vi.fn() }
+      const adapter = {
+        submit: vi.fn(
+          () =>
+            new Promise<typeof response>((resolve) => {
+              complete = resolve
+            })
+        ),
+        isCurrent: () => true,
+        onSuccess: vi.fn(),
+      }
       const { result, queryClient } = setup(adapter)
       act(() => result.current.mutate(input))
       await waitFor(() => expect(adapter.submit).toHaveBeenCalledOnce())
@@ -49,8 +60,16 @@ for (const [name, useCredential] of [['login', useLogin], ['register', useRegist
     it('does not publish a late handoff from a retired flow', async () => {
       let current = true
       let complete!: (value: typeof response) => void
-      const adapter = { submit: vi.fn(() => new Promise<typeof response>(resolve => { complete = resolve })),
-        isCurrent: () => current, onSuccess: vi.fn() }
+      const adapter = {
+        submit: vi.fn(
+          () =>
+            new Promise<typeof response>((resolve) => {
+              complete = resolve
+            })
+        ),
+        isCurrent: () => current,
+        onSuccess: vi.fn(),
+      }
       const { result, queryClient } = setup(adapter)
       act(() => result.current.mutate(input))
       await waitFor(() => expect(adapter.submit).toHaveBeenCalledOnce())

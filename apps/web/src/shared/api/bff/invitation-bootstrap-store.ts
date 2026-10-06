@@ -5,13 +5,16 @@ import { z } from 'zod'
 
 import { invitationOwnerKey } from './invitation-owner-store'
 import { withInvitationStorage } from './invitation-storage'
-import { type InvitationOwnerRecord,invitationOwnerRecordSchema } from './invitation-vault-record'
+import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
 import { getWebRedisClient } from './redis-client'
 
 import 'server-only'
 
 const pendingSchema = z.strictObject({
-  ownerKey: z.string(), origin: z.url(), deadline: z.number().int(), locale: z.string().max(16),
+  ownerKey: z.string(),
+  origin: z.url(),
+  deadline: z.number().int(),
+  locale: z.string().max(16),
   admission: invitationAdmissionResponseSchema,
 })
 type PendingBootstrap = z.infer<typeof pendingSchema>
@@ -46,16 +49,26 @@ function pendingKey(id: string): string {
 
 /** Only the admitted continuation is retained: the raw email token never enters storage. */
 export async function saveInvitationBootstrap(
-  ownerHash: string, origin: string, locale: string,
-  admission: z.infer<typeof invitationAdmissionResponseSchema>, now: number
+  ownerHash: string,
+  origin: string,
+  locale: string,
+  admission: z.infer<typeof invitationAdmissionResponseSchema>,
+  now: number
 ): Promise<string> {
   const id = randomBytes(16).toString('base64url')
   const pending = pendingSchema.parse({
-    ownerKey: invitationOwnerKey(ownerHash), origin, locale, admission, deadline: now + 60000,
+    ownerKey: invitationOwnerKey(ownerHash),
+    origin,
+    locale,
+    admission,
+    deadline: now + 60000,
   })
   await withInvitationStorage(async () => {
-    const result = await (await getWebRedisClient()).set(pendingKey(id), JSON.stringify(pending), {
-      condition: 'NX', expiration: { type: 'PXAT', value: pending.deadline },
+    const result = await (
+      await getWebRedisClient()
+    ).set(pendingKey(id), JSON.stringify(pending), {
+      condition: 'NX',
+      expiration: { type: 'PXAT', value: pending.deadline },
     })
     if (result !== 'OK') throw new Error('Bootstrap staging unavailable')
   })
@@ -64,27 +77,41 @@ export async function saveInvitationBootstrap(
 
 /** The caller hashes the CURRENT cookie. A stale Set-Cookie candidate is never authority. */
 export async function readInvitationBootstrap(
-  id: string, currentOwnerHash: string, origin: string
+  id: string,
+  currentOwnerHash: string,
+  origin: string
 ): Promise<PendingBootstrap | null> {
   return withInvitationStorage(async () => {
     const raw = await (await getWebRedisClient()).get(pendingKey(id))
     if (!raw) return null
     const pending = pendingSchema.parse(JSON.parse(raw))
-    return pending.ownerKey === invitationOwnerKey(currentOwnerHash) && pending.origin === origin &&
-      pending.deadline > Date.now() ? pending : null
+    return pending.ownerKey === invitationOwnerKey(currentOwnerHash) &&
+      pending.origin === origin &&
+      pending.deadline > Date.now()
+      ? pending
+      : null
   })
 }
 
 /** Admission quotas and flow/session binding are calculated before this single-use owner CAS. */
 export async function attachInvitationBootstrap(
-  id: string, currentOwnerHash: string, expectedVersion: number,
-  next: InvitationOwnerRecord, flowId: string
+  id: string,
+  currentOwnerHash: string,
+  expectedVersion: number,
+  next: InvitationOwnerRecord,
+  flowId: string
 ): Promise<boolean> {
   const parsed = invitationOwnerRecordSchema.parse({ ...next, version: expectedVersion + 1 })
   return withInvitationStorage(async () => {
-    const result = await (await getWebRedisClient()).eval(ATTACH, {
+    const result = await (
+      await getWebRedisClient()
+    ).eval(ATTACH, {
       keys: [pendingKey(id), invitationOwnerKey(currentOwnerHash)],
-      arguments: [String(expectedVersion), JSON.stringify(parsed), invitationFlowIdSchema.parse(flowId)],
+      arguments: [
+        String(expectedVersion),
+        JSON.stringify(parsed),
+        invitationFlowIdSchema.parse(flowId),
+      ],
     })
     return result === 1
   })

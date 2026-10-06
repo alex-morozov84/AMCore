@@ -152,8 +152,11 @@ const nextConfig: NextConfig = {
         source: SUPPORTED_LOCALES.length > 1 ? '/:locale/verify-email' : '/verify-email',
         headers: invitationPrivacyHeaders,
       },
-      ...['/api/invitation-flows/:path*', '/api/invitation-operations/:path*', '/api/invitation-verification-return/:path*']
-        .map(source => ({ source, headers: invitationPrivacyHeaders })),
+      ...[
+        '/api/invitation-flows/:path*',
+        '/api/invitation-operations/:path*',
+        '/api/invitation-verification-return/:path*',
+      ].map((source) => ({ source, headers: invitationPrivacyHeaders })),
       {
         source: '/sw.js',
         headers: [

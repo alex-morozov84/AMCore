@@ -44,7 +44,12 @@ export function ConsoleLoginForm() {
             <FormItem>
               <FormLabel>{t('loginPassword')}</FormLabel>
               <FormControl>
-                <PasswordInput showLabel={passwordT('showPassword')} hideLabel={passwordT('hidePassword')} autoComplete="current-password" {...field} />
+                <PasswordInput
+                  showLabel={passwordT('showPassword')}
+                  hideLabel={passwordT('hidePassword')}
+                  autoComplete="current-password"
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
