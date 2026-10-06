@@ -262,6 +262,12 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   never background/log redirection; in a sandbox, `pnpm --filter web build`
   always uses the user-approved elevated path. Details:
   `docs/frontend/testing.md#observable-long-running-checks`.
+- **Browser accessibility scans:** use `expectNoAxeViolations()` from
+  `apps/web/e2e/shared/axe.ts`; it waits for fonts and finite visual transitions.
+  Assert the intended loaded/open state first. Direct axe runtime imports outside
+  this helper fail web lint. Do not disable contrast checks or add fixed sleeps.
+  For full CI E2E reproduction use `node scripts/e2e-ci.mjs --all`; it runs the
+  same applicable isolated lanes with CI settings (locally sequential).
 - **Frontend server/client boundary — two separate decisions.** Server
   Components are the default; add `'use client'` only at the interactive leaf
   that owns events, effects, browser APIs, a Zustand store or a Query hook —

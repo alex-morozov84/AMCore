@@ -1,29 +1,12 @@
 import { randomUUID } from 'node:crypto'
 
-import AxeBuilder from '@axe-core/playwright'
-import { expect, type Page, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
+import { scanAccessibility } from '../shared/axe'
 import { guardedSql } from '../support/managed-target.mjs'
 
 import { ageSessionLastAuthAt, getUserId, setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
-
-async function settleFiniteAnimations(page: Page) {
-  await page.evaluate(async () => {
-    let idleFrames = 0
-    for (let frame = 0; frame < 30; frame++) {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      const active = document.getAnimations().filter((animation) => {
-        const end = animation.effect?.getComputedTiming().endTime
-        return animation.playState !== 'finished' && typeof end === 'number' && Number.isFinite(end)
-      })
-      idleFrames = active.length ? 0 : idleFrames + 1
-      if (idleFrames === 2) return
-      for (const animation of active) animation.finish()
-    }
-    throw new Error('Finite animations did not settle before the accessibility scan')
-  })
-}
 
 function seedKeys(userId: string) {
   const organizationId = randomUUID()
@@ -108,14 +91,13 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
       { id: keys[0]!.id }
     ).trim()
   ).toBe('1')
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  expect((await scanAccessibility(page)).violations).toEqual([])
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect(page.locator('html')).toHaveClass(/dark/)
-  await settleFiniteAnimations(page)
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  expect((await scanAccessibility(page)).violations).toEqual([])
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByText('Lifecycle 00', { exact: true }).last()).toBeVisible()
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  expect((await scanAccessibility(page)).violations).toEqual([])
   await page.goto(`/ru/admin/api-keys?id=${keys[0]!.id}`)
   await expect(page.getByRole('heading', { name: 'API-ключи', exact: true })).toBeVisible()
   await expect(page.getByText('Отозван', { exact: true }).last()).toBeVisible()

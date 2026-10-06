@@ -128,7 +128,13 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
     .click()
   const mobile = page.locator('[data-slot="sidebar"][data-mobile="true"]')
   await expect(mobile).toBeVisible()
+  const navigationContext = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === `/api/product-access/organizations/${second.id}/context`
+  )
   await mobile.getByRole('link', { name: lastUi.text('title'), exact: true }).click()
+  await (await navigationContext).finished()
+  await expect(page.locator('[aria-busy="false"]')).toBeVisible()
   await expect(mobile).toHaveCount(0)
   await expect(page.getByRole('heading', { name: second.name, exact: true })).toBeVisible()
 

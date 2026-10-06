@@ -68,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Browser accessibility checks wait for finite visual transitions and loaded fonts
+  through one guarded helper, preserving real contrast failures.
+
 - Keep empty optional backend environment values absent after validation, so
   Compose's unset heap override preserves the default readiness and liveness limits.
 
@@ -112,6 +115,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `stop_grace_period: 30s`.
 
 ### Changed
+
+- Web E2E runs independent isolated CI lanes with an unchanged fail-closed
+  aggregate check and a shared local CI reproduction command.
 
 - Docker image builds keep the pnpm store and metadata cache in shared BuildKit
   cache mounts, so rebuilding after a lockfile, prisma or source change no longer

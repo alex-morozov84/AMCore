@@ -189,7 +189,12 @@
       "graph": "planning",
       "matcher": {
         "kind": "path",
-        "patterns": ["scripts/stand.mjs", "docs/operations/local-stands.md"]
+        "patterns": [
+          "scripts/stand.mjs",
+          "scripts/e2e-ci.mjs",
+          "scripts/e2e-ci-plan.mjs",
+          "docs/operations/local-stands.md"
+        ]
       },
       "statuses": ["A", "M", "D", "R"],
       "lane": "generated-full",

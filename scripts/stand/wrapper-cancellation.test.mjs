@@ -13,7 +13,11 @@ import { assertNoSurvivors } from './survivors.mjs'
 import { processTable } from './process-groups.mjs'
 import { commit } from '../lib/init-project-test-helpers.mjs'
 
-for (const script of ['run-console-session-e2e.mjs', 'run-console-single-locale-proxy-smoke.mjs'])
+for (const script of [
+  'run-console-session-e2e.mjs',
+  'run-console-single-locale-proxy-smoke.mjs',
+  'e2e-ci.mjs',
+])
   for (const signal of ['SIGINT', 'SIGTERM'])
     test(`public ${script} forwards ${signal}, waits for runner cleanup and preserves foreign process`, async () => {
       const home = await mkdtemp(join(tmpdir(), 'amcore-wrapper-proof-'))
@@ -38,10 +42,14 @@ for (const script of ['run-console-session-e2e.mjs', 'run-console-single-locale-
         { mode: 0o600 }
       )
       let completed = false
-      const running = run(process.execPath, [`scripts/${script}`], {
-        cwd: source,
-        env: cleanEnvironment({ TMPDIR: tmp }),
-      })
+      const running = run(
+        process.execPath,
+        [`scripts/${script}`, ...(script === 'e2e-ci.mjs' ? ['host'] : [])],
+        {
+          cwd: source,
+          env: cleanEnvironment({ TMPDIR: tmp }),
+        }
+      )
         .then(
           () => undefined,
           (error) => error
@@ -103,7 +111,7 @@ for (const script of ['run-console-session-e2e.mjs', 'run-console-single-locale-
             { code: 'ENOENT' }
           )
         }
-        if (script === 'run-console-session-e2e.mjs') {
+        if (script !== 'run-console-single-locale-proxy-smoke.mjs') {
           const final = JSON.parse(
             await readFile(`${m.worktree}/.amcore/stands/${m.id}/manifest.json`, 'utf8')
           )

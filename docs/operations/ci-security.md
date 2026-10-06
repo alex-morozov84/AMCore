@@ -45,6 +45,17 @@ of workflow self-hardening to keep the example forkable.
   not add a sample product domain to the shipped starter.
 - **workflow-lint** checks workflow syntax and hardening rules, and verifies
   that every `uses:` pin matches the real tag commit (including annotated tags).
+- **Web E2E** remains the mandatory aggregate check. Its plan selects all
+  applicable lanes; independent matrix runners execute safety/transport, mocked,
+  two isolated path groups and the retained HTTPS host lane with `fail-fast: false`.
+  Every lane invokes `node scripts/e2e-ci.mjs <lane>` with CI settings. Matrix
+  failure, cancellation or skipping fails the aggregate; the plan must also succeed.
+  Grouped runs verify actual Playwright inventory before browser execution.
+  All lanes retain browser reports/test results/inventories for seven days.
+  Parallelism changes wall time, not coverage or within-stand concurrency.
+  The 20-minute lane timeout is emergency headroom, not a runtime target or
+  performance proof. Measure cold setup and runner-minutes as well as test time.
+  [Local reproduction and isolation](../frontend/testing.md#complete-ci-e2e-locally).
 - **Observability contract (static)** — job id `promtool`, display name
   "Observability contract (static)" — cross-checks every alert/recording-rule
   and dashboard-panel PromQL expression, runbook links/anchors/panel

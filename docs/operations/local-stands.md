@@ -50,6 +50,14 @@ these managed lanes.
 `pnpm test:console-session-e2e` remains its entry point.
 <!-- AMCORE_CONSOLE_STAND_COMMANDS_END -->
 
+### CI lane reproduction
+
+`node scripts/e2e-ci.mjs --all` runs the complete Web E2E contract locally with
+CI settings through the same entrypoint as each GitHub lane. Local execution is
+sequential; GitHub lanes have independent runners and fresh stands. See
+[frontend testing](../frontend/testing.md#complete-ci-e2e-locally) for group
+selection and inventory proof. These commands never reuse owner preview data.
+
 ### API Testcontainers
 
 Backend Jest E2E uses `pnpm --filter api test:e2e`; scope it with

@@ -525,6 +525,24 @@ export default [
     },
   },
 
+  {
+    name: 'project/e2e-accessibility-entrypoint',
+    files: ['e2e/**/*.{ts,tsx,js,mjs}'],
+    ignores: ['e2e/shared/axe.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@axe-core/playwright',
+          message: 'Use e2e/shared/axe.ts expectNoAxeViolations: it waits for fonts and finite visual transitions before scanning.',
+        }, {
+          name: 'axe-core',
+          allowTypeImports: true,
+          message: 'Run accessibility checks through e2e/shared/axe.ts; direct scans bypass visual stabilization.',
+        }],
+      }],
+    },
+  },
+
   // Next.js rules
   {
     name: 'project/nextjs',

@@ -47,8 +47,15 @@ test('a named-only import of the storybook plugin is a missing default import, n
 })
 
 test('a renamed option property is a missing node, reported by its semantic description', () => {
-  const isPathsOption = (n) =>
-    ts.isPropertyAssignment(n) && ts.isIdentifier(n.name) && n.name.text === 'paths'
+  const isPathsOption = (n) => {
+    if (!ts.isPropertyAssignment(n) || !ts.isIdentifier(n.name) || n.name.text !== 'paths') {
+      return false
+    }
+    for (let parent = n.parent; parent; parent = parent.parent) {
+      if (isConfigBlock('project/import-guards')(parent)) return true
+    }
+    return false
+  }
   const source = mutate(ESLINT_CONFIG_TEXT, isPathsOption, (t) => t.replace('paths', 'renamed'))
   assert.throws(
     () => composeEslint([NAVIGATION], source),
