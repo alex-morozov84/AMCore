@@ -1,8 +1,9 @@
 import { initializeMarker } from './bootstrap-marker.mjs'
 import { writeFile } from 'node:fs/promises'
 import { compose, docker, inspect } from './docker.mjs'
-import { configuration } from './config.mjs'
+import { configuration, builtServices } from './config.mjs'
 import { dataAdmission, cleanup } from './ownership.mjs'
+import { runBuild } from './build-intent.mjs'
 import { save } from './state.mjs'
 
 export async function start(m) {
@@ -18,9 +19,11 @@ export async function start(m) {
   m.state = 'infrastructure-ready'
   await save(m)
   if (!m.images) {
-    await compose(m, ['build', 'migrate', 'api', 'worker', 'web'])
+    // Intent is persisted before the build; only a successful return of `compose build`
+    // settles it, and an unresolved earlier attempt blocks starting another.
+    await runBuild(m, () => compose(m, ['build', ...builtServices]))
     m.images = {}
-    for (const service of ['migrate', 'api', 'worker', 'web']) {
+    for (const service of builtServices) {
       m.images[service] = JSON.parse(
         await docker(m, ['image', 'inspect', `${m.project}-${service}`], { capture: true })
       )[0].Id

@@ -6,6 +6,8 @@ import { docker, inspect, composeArguments, withDockerEngine } from './docker.mj
 import { label, validateModel } from './config.mjs'
 import { save } from './state.mjs'
 import { assertNoSurvivors } from './survivors.mjs'
+import { disposeImages } from './image-census.mjs'
+import { acceptBuildRisk, assertBuildsResolved, unresolvedBuilds } from './build-intent.mjs'
 
 export function owned(m, resource, kind) {
   const tags = resource.Config?.Labels ?? resource.Labels
@@ -129,7 +131,7 @@ export async function dataAdmission(m, bootstrap = false) {
     await save(m)
   })
 }
-export async function cleanup(m, purge) {
+export async function cleanup(m, purge, { acceptReason } = {}) {
   await assertNoSurvivors(m)
   await discover(m)
   for (const id of m.resources.network) {
@@ -150,11 +152,24 @@ export async function cleanup(m, purge) {
       await docker(m, [kind, 'rm', ...(kind === 'container' ? ['-f'] : []), id])
     }
   }
+  // Images go last, once no container can reference them. Ordinary `down` and source
+  // refresh keep them so a restart stays fast; purge and closeout dispose of them.
+  if (purge) await withDockerEngine(m, (execute) => disposeImages(m, execute, save))
+  await concludeCleanup(m, purge, acceptReason)
+}
+
+async function concludeCleanup(m, purge, acceptReason) {
   const remaining = await discover(m, false)
   if (remaining.container.length || remaining.network.length || (purge && remaining.volume.length))
     throw new Error('Owned resource removal could not be verified')
   await assertNoSurvivors(m)
   m.resources = remaining
-  m.state = purge ? 'purged' : 'stopped'
+  // Acceptance only when the owner passed a reason; without it an unresolved build is
+  // reported as unresolved, never as a missing-reason error.
+  if (purge && acceptReason !== undefined) await acceptBuildRisk(m, acceptReason)
+  const unresolved = purge && unresolvedBuilds(m).length > 0
+  m.state = unresolved ? 'cleanup-incomplete' : purge ? 'purged' : 'stopped'
   await save(m)
+  // Proved-owned resources are already gone; the record and source stay for recovery.
+  if (unresolved) assertBuildsResolved(m)
 }

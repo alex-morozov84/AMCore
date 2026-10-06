@@ -6,9 +6,18 @@ import { compose } from './docker.mjs'
 import { directory } from './state.mjs'
 
 export const label = 'org.amcore.stand'
+// Services whose images the stand builds itself. Only these carry ownership labels on
+// the built image (`build.labels`); pulled images (postgres, redis, caddy) never do.
+export const builtServices = ['migrate', 'api', 'worker', 'web']
 export function labels(m) {
   return { [label]: m.uuid, 'org.amcore.attempt': m.attempt, 'org.amcore.worktree': m.worktree }
 }
+const labelLines = (m, pad) =>
+  stringify(labels(m))
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => `${pad}${l}\n`)
+    .join('')
 const overridden = (value) =>
   `!override\n      ${stringify(value).trimEnd().replaceAll('\n', '\n      ')}`
 
@@ -62,13 +71,9 @@ export async function configuration(m) {
   }
   let yaml = 'services:\n'
   for (const [service, environment] of Object.entries(environments)) {
-    yaml += `  ${service}:\n    environment: ${overridden(environment)}\n    labels:\n${stringify(
-      labels(m)
-    )
-      .split('\n')
-      .filter(Boolean)
-      .map((l) => `      ${l}\n`)
-      .join('')}`
+    yaml += `  ${service}:\n    environment: ${overridden(environment)}\n    labels:\n${labelLines(m, '      ')}`
+    if (builtServices.includes(service))
+      yaml += `    build:\n      labels:\n${labelLines(m, '        ')}`
     if (m.images?.[service]) yaml += `    image: ${m.images[service]}\n`
     if (ports[service]) yaml += `    ports: ${overridden(ports[service])}\n`
   }
@@ -154,6 +159,13 @@ export function validateModel(m) {
       if (mount.type === 'bind' && !mount.source.startsWith(`${m.snapshot}/docker/`))
         throw new Error('Foreign bind mount')
     if (s.build?.context && s.build.context !== m.snapshot) throw new Error('Foreign build root')
+    // Built images must carry the full ownership tuple so disposal can prove them;
+    // no other service may claim build labels.
+    const built = Object.entries(labels(m)).every(
+      ([key, value]) => s.build?.labels?.[key] === value
+    )
+    if (builtServices.includes(name) ? !built : s.build?.labels)
+      throw new Error(`Unowned ${name} image labels`)
   }
   for (const resource of [...Object.values(m.model.volumes), ...Object.values(m.model.networks)]) {
     if (

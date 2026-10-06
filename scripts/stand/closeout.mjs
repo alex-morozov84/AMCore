@@ -32,7 +32,14 @@ export async function closeout() {
     }
   }
   const current = await engine()
-  for (const kind of ['container', 'network', 'volume']) {
+  // Images need `-a --no-trunc` so dangling and unrecorded generations are inventoried too.
+  const listing = {
+    container: ['-aq'],
+    network: ['-q'],
+    volume: ['-q'],
+    image: ['-a', '--no-trunc', '-q'],
+  }
+  for (const [kind, flags] of Object.entries(listing)) {
     const ids = await run(
       'docker',
       [
@@ -40,7 +47,7 @@ export async function closeout() {
         current.context,
         kind,
         'ls',
-        kind === 'container' ? '-aq' : '-q',
+        ...flags,
         '--filter',
         `label=org.amcore.worktree=${root}`,
       ],

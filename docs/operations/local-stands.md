@@ -28,7 +28,7 @@ ports. Keep long runs in a foreground terminal with visible output.
 | Inspect selected preview             | `pnpm stand status`                          | Read-only                                               |
 | List records and labelled resources  | `pnpm stand list`                            | Read-only, includes missing-source orphans              |
 | Stop preview                         | `pnpm stand down`                            | Retains named volumes                                   |
-| Delete preview data explicitly       | `pnpm stand down --purge`                    | Deletes only proved-owned resources                     |
+| Delete preview data explicitly       | `pnpm stand down --purge`                    | Deletes only proved-owned resources, built images too   |
 | Recover interrupted run              | `pnpm stand recover --id <stand-id> --purge` | Requires stopped children and resource ownership        |
 
 `--id <stand-id>` selects a recorded identity, never an arbitrary URL or Compose
@@ -135,6 +135,53 @@ IDs/labels/membership and approved mounts. It does not query Postgres or require
 a marker, so failed startup and a broken database remain removable. Unproved
 resources are preserved with recovery metadata. No prune, default-project cleanup
 or automatic adoption of legacy resources is supported.
+
+### Built images and unresolved builds
+
+The images a stand builds (`migrate`, `api`, `worker`, `web`) carry the same ownership
+labels as its containers, through `build.labels` in the generated override. Purge
+(`down --purge`, `recover --purge`, `down --orphan --purge`, the end of every Docker
+e2e run, and `closeout`) removes only images that pass a physical proof: the stand's
+UUID, attempt, worktree and Compose project/service labels, a service from that fixed
+built set, and references limited to the stand's own generated
+`<project>-<service>:latest` name (a dangling generation has none). Discovery is a
+label census (`image ls -a --no-trunc`), so older generations and partial or
+interrupted builds are found even when the stand's current image map does not list
+them. Images are removed last, after the stand's containers, by full image ID: never
+forced, never by tag, never pruning parent images. A foreign tag or alias, or any
+container in any state that still uses the image, refuses removal, and success
+requires a fresh census proving absence; a zero exit status alone is not proof.
+Base images that Compose or Testcontainers pull (`postgres`, `redis`, `node`,
+`testcontainers/ryuk`) are never labelled and never touched. Ordinary `down` and a
+source refresh keep the images so a restart stays fast. Images built before this
+behavior carry no labels and are left alone; removing them is a deliberate manual
+step outside the managed commands. Image removal frees the engine's image records;
+the disk actually recovered depends on shared layers, and the BuildKit build cache
+(including the pnpm cache mounts below) is a separate store these commands do not touch.
+
+Before `compose build` runs, the stand records the attempt in its manifest. Only a
+successful, unsignalled return of the command (exit 0) settles it. A non-zero exit, a
+signal such as Ctrl-C, a spawn or transport error, or a crash leaves the attempt
+**unresolved**, because a host-side result does not show whether the Docker daemon is
+still exporting an image for this stand. Purge still removes everything it can
+prove, but reports cleanup incomplete, keeps the stand record and its source, and
+`closeout` refuses until the attempt is resolved. A new build for the same stand
+is refused while an attempt is unresolved, and a later successful build never hides
+an older one. Resolve it by explicit risk acceptance:
+
+```sh
+pnpm stand down --id <stand-id> --purge --accept-unresolved-build "<reason>"
+pnpm stand recover --id <stand-id> --purge --accept-unresolved-build "<reason>"
+```
+
+Use `down` after a cleanup failure with a released lease and `recover` after an
+interrupted run that retained its lease. Neither runs migrations, needs the database
+marker or an intact original source. The reason is stored in the manifest as an
+acceptance record, not as proof of completion, and closeout reports it as such. It is
+a maintainer decision: agents must not pass the flag on their own authority. Engine-
+side build status (a Docker build-history record per service) could prove that a
+build finished, but it needs a newer buildx plugin and has short retention, so it
+is not used yet.
 
 A lease covers startup, admission, tests and cleanup. Competing mutation commands
 refuse. SIGINT/SIGTERM stops and awaits proved-owned process groups, including
@@ -256,8 +303,9 @@ the stands expect to find locally.
 ## Closeout before removing a checkout
 
 Run `pnpm stand closeout` in the task checkout before deleting its worktree. It
-purges every proved-owned local stand, verifies that labelled containers, networks
-and volumes are gone, and checks recorded process groups as well as source paths
+purges every proved-owned local stand, verifies that labelled containers, networks,
+volumes and images (dangling and unrecorded ones included) are gone, refuses while a
+stand still has an unresolved build attempt, and checks recorded process groups as well as source paths
 for survivors; a short or changed process title does not waive group checks.
 Kernel cwd inspection also blocks removal for an unobserved, reparented child
 under the stand source: `/proc` on Linux and `lsof` on macOS. Inventory failure is
