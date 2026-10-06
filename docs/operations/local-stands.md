@@ -229,6 +229,30 @@ docker compose --project-directory . -f docker/compose/dev.yml up -d
 Production/BYO/backup/observability instructions remain in their existing guides;
 managed local commands do not replace those deployment contracts.
 
+## Image build cache and network use
+
+The `apps/api` and `apps/web` Dockerfiles keep the pnpm store (and, for the api
+`deploy` step, pnpm's registry-metadata cache) in BuildKit cache mounts
+(`id=pnpm-store`, `id=pnpm-metadata`), not in image layers. The mounts are shared by
+every build on the machine, so all worktrees and stands reuse one set of downloaded
+packages. A lockfile, manifest or `apps/api/prisma` change that invalidates the
+install layer re-links packages from disk instead of downloading them again; a
+source-only change costs no package traffic. This matters on metered connections:
+a cold api+web build downloads a few hundred MB once, later builds download close
+to nothing. Integrity checking is unchanged — `--frozen-lockfile` still verifies
+every package against the lockfile hashes.
+
+pnpm 11 reads these settings from `pnpm_config_*` variables; `npm_config_*` and
+`PNPM_STORE_DIR` are ignored, which silently disables the cache mount. Check
+`Content-addressable store is at: /pnpm/store/v11` in the build log if a build
+downloads everything again.
+
+`docker builder prune` (and `docker system prune -a`) removes these cache mounts and
+the next build downloads packages again. Prefer a size cap such as
+`docker builder prune --keep-storage <size>` over a full prune, and never prune base
+images (`postgres`, `redis`, `node`, `testcontainers/ryuk`) that Testcontainers and
+the stands expect to find locally.
+
 ## Closeout before removing a checkout
 
 Run `pnpm stand closeout` in the task checkout before deleting its worktree. It
