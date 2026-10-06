@@ -93,13 +93,26 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
   /** Reclaim expired leases, expire overdue never-run queued runs and fail runs whose history is full. */
   async reap(): Promise<void> {
     if (this.latch.closed) return
-    const reaped = await this.latch.run(async () => ({
-      ...(await this.repository.reapExpiredLeases()),
-      expired: await this.repository.expireDeadlinedRuns(),
-      capped: await this.repository.failEpochCappedRuns(),
-    }))
-    if (reaped === CUTOFF) return
-    const { rescheduled, failed, expired, capped } = reaped
+    // Each sweep is its own latch-bounded operation: once the dispatcher is closed or sealed no LATER sweep
+    // starts (an outer wrapper would release the waiter on seal but let the callback keep issuing queries).
+    let rescheduled = 0
+    let failed = 0
+    let expired = 0
+    let capped = 0
+    const reaped = await this.latch.run(() => this.repository.reapExpiredLeases())
+    if (reaped !== CUTOFF) {
+      ;({ rescheduled, failed } = reaped)
+      if (!this.latch.closed) {
+        const overdue = await this.latch.run(() => this.repository.expireDeadlinedRuns())
+        if (overdue !== CUTOFF) {
+          expired = overdue
+          if (!this.latch.closed) {
+            const full = await this.latch.run(() => this.repository.failEpochCappedRuns())
+            if (full !== CUTOFF) capped = full
+          }
+        }
+      }
+    }
     if (rescheduled > 0 || failed > 0 || expired > 0 || capped > 0) {
       this.logger.warn(
         { event: 'ai.run.reaped', rescheduled, failed, expired, capped },

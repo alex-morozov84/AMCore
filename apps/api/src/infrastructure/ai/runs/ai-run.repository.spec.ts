@@ -9,6 +9,7 @@ import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun, GuardrailRefusalInput } from './ai-run-dispatch.types'
 
 import { AiRunStepType } from '@/generated/prisma/client'
+import { ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
 function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
@@ -29,10 +30,12 @@ function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
 describe('AiRunRepository', () => {
   let prisma: DeepMockProxy<PrismaService>
   let repo: AiRunRepository
+  let latch: ShutdownLatch
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>()
-    repo = new AiRunRepository(prisma)
+    latch = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
+    repo = new AiRunRepository(prisma, latch)
     prisma.$transaction.mockImplementation(((cb: (tx: PrismaService) => Promise<unknown>) =>
       cb(prisma)) as never)
   })
@@ -479,6 +482,55 @@ describe('AiRunRepository', () => {
       expect(sql).not.toContain('ai_conversations')
       expect(sql).toContain('clock_timestamp()')
     })
+  })
+
+  describe('shutdown seal (sweeps run through the latch guarded transaction)', () => {
+    it('a reaper transaction resumed AFTER the seal rolls its tail back: no later query, no update', async () => {
+      const release = deferred()
+      prisma.$queryRaw.mockImplementation((async () => {
+        await release.promise // the first (lock) query of the sweep is still pending when the seal happens
+        return [reapRow()]
+      }) as never)
+      const reaping = repo.reapExpiredLeases()
+      await new Promise((resolve) => setImmediate(resolve))
+
+      latch.seal()
+      release.resolve()
+      const result = await reaping
+
+      expect(result).toEqual({ rescheduled: 0, failed: 0 }) // sealed: reported as nothing done
+      expect(prisma.aiRun.update).not.toHaveBeenCalled() // the forbidden tail never reached the database
+      expect(prisma.$executeRaw).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['expireDeadlinedRuns', 0],
+      ['failEpochCappedRuns', 0],
+    ] as const)('%s starts no transaction once sealed', async (method, empty) => {
+      latch.seal()
+
+      expect(await repo[method]()).toBe(empty)
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    function reapRow(): Record<string, unknown> {
+      return {
+        id: 'run-1',
+        attemptCount: 0,
+        maxAttempts: 3,
+        deadlineAt: null,
+        cancellationRequestedAt: null,
+        leaseEpoch: 1,
+        ioStarted: true,
+      }
+    }
+    function deferred(): { promise: Promise<void>; resolve: () => void } {
+      let resolve!: () => void
+      const promise = new Promise<void>((done) => {
+        resolve = done
+      })
+      return { promise, resolve }
+    }
   })
 
   describe('expireDeadlinedRuns', () => {

@@ -13,6 +13,7 @@ import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { Client } from 'pg'
 
 import { seedOrgRoles } from '../prisma/seed-org-roles'
 import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
@@ -53,6 +54,35 @@ export interface E2ETestContext {
   throttlerStorage: GcraRedisLimiter
   postgresContainer: StartedPostgreSqlContainer
   redisContainer: StartedRedisContainer
+}
+
+/**
+ * Create the extra schemas and deploy every migration to a fresh test database BEFORE the application
+ * bootstraps. The AI run migrations refuse to run while an `amcore-web|worker|all` connection exists
+ * (their maintenance-stop guard), and an application started first would be exactly that connection — so a
+ * harness must migrate first, on its own short-lived client, and only then start the app. Testcontainers
+ * databases are disposable, so there is no data-conversion race to protect here.
+ */
+export async function migrateTestDatabase(databaseUrl: string): Promise<void> {
+  const client = new Client({
+    connectionString: databaseUrl,
+    application_name: 'amcore-e2e-migrator',
+  })
+  await client.connect()
+  try {
+    for (const schema of ['core', 'fitness', 'finance', 'subscriptions']) {
+      await client.query(`CREATE SCHEMA IF NOT EXISTS ${schema}`)
+    }
+  } finally {
+    await client.end()
+  }
+  // We pass `env` explicitly because Jest's jest-environment-node sandboxes `process.env` and child
+  // processes spawned via execSync's default inheritance do NOT see mutations made by the test.
+  // `E2E_DATABASE_URL` lets `prisma.config.ts` pick the testcontainer URL instead of the `.env` one.
+  execSync('pnpm prisma migrate deploy', {
+    stdio: 'inherit',
+    env: { ...process.env, E2E_DATABASE_URL: databaseUrl },
+  })
 }
 
 export async function setupE2ETestInfrastructure(): Promise<
@@ -172,6 +202,8 @@ export async function setupE2ETest(
     }
     app.useGlobalPipes(new ZodValidationPipe())
 
+    // Migrate BEFORE the app (and its database connections) exists: see `migrateTestDatabase`.
+    await migrateTestDatabase(databaseUrl)
     await app.init()
 
     // Get Prisma service and cache
@@ -181,24 +213,6 @@ export async function setupE2ETest(
     // the old @nestjs/throttler storage needed) — the guard resolves the exact
     // same instance via its own constructor injection.
     const throttlerStorage = app.get(GcraRedisLimiter)
-
-    // Run migrations
-    await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS core')
-    await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS fitness')
-    await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS finance')
-    await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS subscriptions')
-
-    // Deploy migrations against the testcontainer DB. We pass `env` explicitly
-    // because Jest's jest-environment-node sandboxes `process.env` and child
-    // processes spawned via execSync's default inheritance do NOT see mutations
-    // made by the test (verified empirically — DATABASE_URL was undefined in the
-    // subprocess despite being set on `process.env` above). Forwarding
-    // `E2E_DATABASE_URL` lets `prisma.config.ts` pick the testcontainer URL
-    // instead of the `.env`-derived production one.
-    execSync('pnpm prisma migrate deploy', {
-      stdio: 'inherit',
-      env: { ...process.env, E2E_DATABASE_URL: databaseUrl },
-    })
 
     // Match supertest's IPv4 destination and keep one listener for the fixture.
     // Its implicit listen/close cycle can deliver responses outside this server.

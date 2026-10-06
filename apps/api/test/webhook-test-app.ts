@@ -4,7 +4,6 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import type { Cache } from 'cache-manager'
-import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
 import { PinoLogger } from 'nestjs-pino'
 import { ZodValidationPipe } from 'nestjs-zod'
@@ -13,7 +12,7 @@ import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
 import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
-import { type E2ETestContext, noopPinoLogger } from './helpers'
+import { type E2ETestContext, migrateTestDatabase, noopPinoLogger } from './helpers'
 
 export async function setupWebhookTestApp(
   controllers: Type<unknown> | Type<unknown>[]
@@ -43,23 +42,12 @@ export async function setupWebhookTestApp(
   configureBodyParser(app, '')
   app.use(cookieParser())
   app.useGlobalPipes(new ZodValidationPipe())
+  // Migrate BEFORE the app's database connections exist (AI migration maintenance-stop guard).
+  await migrateTestDatabase(databaseUrl)
   await app.init()
 
   const prisma = app.get(PrismaService)
   const cache = app.get<Cache>(CACHE_MANAGER)
   const throttlerStorage = app.get(GcraRedisLimiter)
-  await ensureSchemas(prisma, databaseUrl)
   return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
-}
-
-async function ensureSchemas(prisma: PrismaService, databaseUrl: string): Promise<void> {
-  await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS core')
-  await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS fitness')
-  await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS finance')
-  await prisma.$executeRawUnsafe('CREATE SCHEMA IF NOT EXISTS subscriptions')
-
-  execSync('pnpm prisma migrate deploy', {
-    stdio: 'inherit',
-    env: { ...process.env, E2E_DATABASE_URL: databaseUrl },
-  })
 }

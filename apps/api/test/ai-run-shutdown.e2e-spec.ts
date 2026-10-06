@@ -13,6 +13,7 @@ import { ControllableAdapter, controls, deferred, until } from './fixtures/ai-ru
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 import { AiRunStatus } from '@/generated/prisma/client'
+import { ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 
 /**
  * Worker shutdown against real Postgres (Track C — ADR-054): after the dispatcher is closed nothing new
@@ -105,7 +106,14 @@ describe('AI run dispatcher shutdown (e2e)', () => {
       where: { id: runId },
       data: { leaseExpiresAt: new Date(Date.now() - 1000) },
     })
-    expect(await repository.reapExpiredLeases()).toEqual({ rescheduled: 1, failed: 0 })
+    // The sealed process itself no longer sweeps (nothing may start after the seal)…
+    expect(await repository.reapExpiredLeases()).toEqual({ rescheduled: 0, failed: 0 })
+    // …a LATER worker (a new process, so a fresh latch) reclaims the run.
+    const nextWorker = new AiRunRepository(
+      prisma,
+      new ShutdownLatch({ warn: () => undefined }, 'ai.run')
+    )
+    expect(await nextWorker.reapExpiredLeases()).toEqual({ rescheduled: 1, failed: 0 })
     expect((await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })).status).toBe(
       AiRunStatus.QUEUED
     )

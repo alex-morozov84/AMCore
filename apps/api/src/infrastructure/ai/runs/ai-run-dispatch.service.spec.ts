@@ -197,6 +197,36 @@ describe('AiRunDispatchService', () => {
       expect(repository.claimDueBatch).toHaveBeenCalled()
     })
 
+    it('a reaper resumed after the seal starts NO later sweep (each sweep is its own bounded operation)', async () => {
+      const first = deferred()
+      repository.reapExpiredLeases.mockImplementation(async () => {
+        await first.promise
+        return { rescheduled: 1, failed: 0 }
+      })
+
+      const reap = service.reap()
+      await new Promise((resolve) => setImmediate(resolve))
+      await service.shutdown() // closes, then seals: the first sweep is still pending
+      first.resolve()
+      await reap
+
+      expect(repository.reapExpiredLeases).toHaveBeenCalledTimes(1)
+      expect(repository.expireDeadlinedRuns).not.toHaveBeenCalled()
+      expect(repository.failEpochCappedRuns).not.toHaveBeenCalled()
+    })
+
+    it('a close between two sweeps stops the remaining sweeps', async () => {
+      repository.reapExpiredLeases.mockImplementation(async () => {
+        latch.close() // shutdown starts while the first sweep is running
+        return { rescheduled: 0, failed: 0 }
+      })
+
+      await service.reap()
+
+      expect(repository.expireDeadlinedRuns).not.toHaveBeenCalled()
+      expect(repository.failEpochCappedRuns).not.toHaveBeenCalled()
+    })
+
     it('does nothing once closed (no reap, no drain)', async () => {
       latch.close()
       await service.runDispatchCycle()

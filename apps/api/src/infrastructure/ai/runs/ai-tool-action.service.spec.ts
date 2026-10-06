@@ -18,7 +18,7 @@ import type { AuditLogService } from '@/core/audit'
 import type { EnvService } from '@/env/env.service'
 import { AiToolInvocationStatus, AiToolRiskClass } from '@/generated/prisma/client'
 import type { MetricsService } from '@/infrastructure/observability'
-import type { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
+import { type AttemptRuntime, ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
 /**
@@ -145,6 +145,7 @@ describe('AiToolActionService', () => {
       env,
       metrics as unknown as MetricsService,
       audit as unknown as AuditLogService,
+      new ShutdownLatch({ warn: jest.fn() }, 'ai.run'),
       logger as never
     )
     ctx = {
@@ -503,6 +504,31 @@ describe('AiToolActionService', () => {
           'tool_effect_unknown'
         )
       })
+    })
+  })
+
+  describe('shutdown seal', () => {
+    it('the tool-outcome audit write does not start after the seal (the outcome itself is already committed)', async () => {
+      const sealed = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
+      const sealedService = new AiToolActionService(
+        guard as unknown as AiRunGuard,
+        repository,
+        transitions as unknown as AiRunTransitions,
+        { get: jest.fn(() => 200) } as unknown as EnvService,
+        metrics as unknown as MetricsService,
+        audit as unknown as AuditLogService,
+        sealed,
+        logger as never
+      )
+      // The seal lands while the tool runs; the guarded result commit has already been recorded.
+      const tool = makeTool({}, async () => {
+        sealed.seal()
+        return { output: 'archived' }
+      })
+
+      await sealedService.execute(ctx, row(), tool, 'call-1', { documentId: 'd1' })
+
+      expect(audit.record).not.toHaveBeenCalled()
     })
   })
 

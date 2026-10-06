@@ -12,7 +12,7 @@ import type { AiRunTransitions } from './ai-run-transitions.service'
 import type { EnvService } from '@/env/env.service'
 import type { MetricsService } from '@/infrastructure/observability'
 import { StorageObjectNotFoundError } from '@/infrastructure/storage'
-import type { AttemptRuntime, ShutdownLatch } from '@/infrastructure/worker-lifecycle'
+import { type AttemptRuntime, ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
 /**
@@ -486,6 +486,75 @@ describe('AiRunExecutorService', () => {
         'assistant_disabled',
         'assistant_disabled'
       )
+    })
+  })
+
+  describe('shutdown seal (every pre-flight read is its own latch-bounded operation)', () => {
+    function sealable(): ShutdownLatch {
+      const real = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
+      latch.run = jest.fn((operation: () => Promise<unknown>) => real.run(operation))
+      Object.defineProperty(latch, 'closed', { get: () => real.closed })
+      return real
+    }
+
+    it('a conversation read pending at the seal stops the attempt: no input read, no storage fetch, no loop', async () => {
+      const real = sealable()
+      let release!: (value: unknown) => void
+      prisma.aiConversation.findUnique.mockImplementation(
+        (() => new Promise((resolve) => (release = resolve))) as never
+      )
+
+      const attempt = executor.execute(claim(), runtime)
+      await new Promise((resolve) => setImmediate(resolve))
+      real.seal()
+      release({ ownerUserId: 'u1', organizationId: null, assistant: null })
+      await attempt
+
+      expect(prisma.aiMessage.findFirst).not.toHaveBeenCalled()
+      expect(storage.download).not.toHaveBeenCalled()
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(transitions.failed).not.toHaveBeenCalled()
+    })
+
+    it('an input read pending at the seal stops the attempt before artifacts or the loop', async () => {
+      const real = sealable()
+      let release!: (value: unknown) => void
+      prisma.aiMessage.findFirst.mockImplementation(
+        (() => new Promise((resolve) => (release = resolve))) as never
+      )
+
+      const attempt = executor.execute(claim(), runtime)
+      await new Promise((resolve) => setImmediate(resolve))
+      real.seal()
+      release({ content: [{ type: 'artifact_ref', artifactId: 'art-1' }] })
+      await attempt
+
+      expect(prisma.aiArtifact.findMany).not.toHaveBeenCalled()
+      expect(loop.run).not.toHaveBeenCalled()
+    })
+
+    it('an artifact download pending at the seal never reaches the provider loop', async () => {
+      const real = sealable()
+      prisma.aiMessage.findFirst.mockResolvedValue({
+        content: [{ type: 'artifact_ref', artifactId: 'art-1' }],
+      } as never)
+      prisma.aiArtifact.findMany.mockResolvedValue([
+        { id: 'art-1', kind: 'IMAGE', contentType: 'image/png', storageKey: 'k' },
+      ] as never)
+      let release!: (value: Buffer) => void
+      storage.download.mockImplementation(() => new Promise((resolve) => (release = resolve)))
+
+      const attempt = executor.execute(
+        claim({ modelSnapshot: { modelSlug: 'claude-default', capabilities: { vision: true } } }),
+        runtime
+      )
+      await new Promise((resolve) => setImmediate(resolve))
+      real.seal()
+      release(Buffer.from('png'))
+      await attempt
+
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(transitions.failed).not.toHaveBeenCalled()
     })
   })
 

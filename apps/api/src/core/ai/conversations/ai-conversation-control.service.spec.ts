@@ -184,21 +184,61 @@ describe('AiConversationControlService', () => {
       await expect(service.takeControl(owner, 'conv-1')).rejects.toThrow(ConflictException)
     })
 
-    it('sweeps QUEUED runs (superseded_by_human) after voiding WAITING_APPROVAL', async () => {
-      setConversation(locked({ controlledBy: 'BOT' }))
-      prisma.aiRun.updateMany.mockResolvedValue({ count: 3 } as never)
+    describe('queued runs (lock order run → invocation)', () => {
+      /** The four raw queries of a takeover, in order: conversation, waiting runs, approval join, QUEUED runs. */
+      function withQueued(ids: string[]): void {
+        ;(prisma.$queryRaw as unknown as jest.Mock)
+          .mockReset()
+          .mockResolvedValueOnce([locked({ controlledBy: 'BOT' })])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(ids.map((id) => ({ id })))
+      }
 
-      await service.takeControl(owner, 'conv-1')
+      it('locks the queued runs FIRST (ordered), then skips their unstarted tools, then cancels them', async () => {
+        withQueued(['run-a', 'run-b'])
+        prisma.aiRun.updateMany.mockResolvedValue({ count: 2 } as never)
 
-      expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { conversationId: 'conv-1', status: 'QUEUED' },
-          data: expect.objectContaining({
-            status: 'CANCELLED',
-            terminalReasonCode: 'superseded_by_human',
-          }),
+        await service.takeControl(owner, 'conv-1')
+
+        const lockSql = (
+          (prisma.$queryRaw as unknown as jest.Mock).mock.calls[3]![0].strings as string[]
+        ).join('')
+        expect(lockSql).toContain('"ai"."ai_runs"')
+        expect(lockSql).toContain("status = 'QUEUED'")
+        expect(lockSql).toContain('ORDER BY id')
+        expect(lockSql).toContain('FOR UPDATE')
+        expect(prisma.aiToolInvocation.updateMany).toHaveBeenCalledWith({
+          where: { runId: { in: ['run-a', 'run-b'] }, status: { in: ['REQUESTED', 'APPROVED'] } },
+          data: { status: 'SKIPPED' },
         })
-      )
+        // The run lock precedes the invocation update, which precedes the run update.
+        const lockOrder = (prisma.$queryRaw as unknown as jest.Mock).mock.invocationCallOrder[3]!
+        expect(lockOrder).toBeLessThan(
+          prisma.aiToolInvocation.updateMany.mock.invocationCallOrder[0]!
+        )
+        expect(prisma.aiToolInvocation.updateMany.mock.invocationCallOrder[0]!).toBeLessThan(
+          prisma.aiRun.updateMany.mock.invocationCallOrder[0]!
+        )
+        expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: { in: ['run-a', 'run-b'] }, status: 'QUEUED' },
+            data: expect.objectContaining({
+              status: 'CANCELLED',
+              terminalReasonCode: 'superseded_by_human',
+            }),
+          })
+        )
+      })
+
+      it('touches neither tools nor runs when no queued run is lockable (claimed or cancelled meanwhile)', async () => {
+        withQueued([])
+
+        await service.takeControl(owner, 'conv-1')
+
+        expect(prisma.aiToolInvocation.updateMany).not.toHaveBeenCalled()
+        expect(prisma.aiRun.updateMany).not.toHaveBeenCalled()
+      })
     })
 
     it('is an idempotent no-op when the same holder re-takes (no generation bump, no audit/metric)', async () => {

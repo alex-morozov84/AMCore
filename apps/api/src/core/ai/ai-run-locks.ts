@@ -50,3 +50,24 @@ export async function lockWaitingRunsOfConversation(
     FOR UPDATE
   `)
 }
+
+/**
+ * Lock every `QUEUED` run of a conversation `FOR UPDATE`, ordered by id, and return their ids. The caller
+ * must do this BEFORE touching those runs' tool invocations: a concurrent cancel holds a queued run's row
+ * lock and then updates its invocation, so taking the invocation first would reverse run → invocation.
+ * Under READ COMMITTED the status predicate is re-evaluated after any lock wait, so a run that stopped
+ * being queued meanwhile (claimed, cancelled) is not returned.
+ */
+export async function lockQueuedRunsOfConversation(
+  tx: Prisma.TransactionClient,
+  conversationId: string
+): Promise<string[]> {
+  const rows = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+    SELECT id FROM "ai"."ai_runs"
+    WHERE "conversationId" = ${conversationId}
+      AND status = 'QUEUED'::"ai"."AiRunStatus"
+    ORDER BY id
+    FOR UPDATE
+  `)
+  return rows.map((row) => row.id)
+}

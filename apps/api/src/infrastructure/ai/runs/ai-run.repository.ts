@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
 import {
   AI_RUN_CLAIM_BATCH_LIMIT,
@@ -20,6 +20,7 @@ import type {
   RunReapResult,
   RunRetryOutcome,
 } from './ai-run-dispatch.types'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
 import { sanitizeGuardrailCategories } from './guardrail-step-detail'
 
 import {
@@ -30,6 +31,7 @@ import {
   AiRunStepType,
   Prisma,
 } from '@/generated/prisma/client'
+import { CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import { PrismaService } from '@/prisma'
 
 /** Shape returned by the raw claim `UPDATE ... RETURNING`. */
@@ -80,7 +82,10 @@ interface Leaving {
  */
 @Injectable()
 export class AiRunRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(AI_RUN_SHUTDOWN_LATCH) private readonly latch: ShutdownLatch
+  ) {}
 
   /**
    * Atomically claim up to `limit` due runs (one per dispatch lane): lease them (`RUNNING`), bump the
@@ -323,7 +328,9 @@ export class AiRunRepository {
    * is closed and the run's in-flight tool invocations are resolved in the same transaction.
    */
   async reapExpiredLeases(limit: number = AI_RUN_REAP_BATCH_LIMIT): Promise<RunReapResult> {
-    return this.prisma.$transaction(async (tx) => {
+    // The sweep's transaction runs through the shutdown latch: a sealed latch starts none, and the guarded
+    // client rejects the next query of one already open, so its tail rolls back whole.
+    const outcome = await this.latch.transaction(this.prisma, async (tx) => {
       const now = new Date()
       const expired = await tx.$queryRaw<ReapRow[]>(Prisma.sql`
         SELECT r.id, r."attemptCount", r."maxAttempts", r."deadlineAt", r."cancellationRequestedAt",
@@ -353,6 +360,7 @@ export class AiRunRepository {
       }
       return { rescheduled, failed }
     })
+    return outcome === CUTOFF ? { rescheduled: 0, failed: 0 } : outcome
   }
 
   /** Reap a run that must not be retried: a recorded cancel or a passed deadline. */
@@ -423,7 +431,7 @@ export class AiRunRepository {
 
   /** Sweep `QUEUED` runs past their `deadlineAt` to terminal `EXPIRED` (never claimed/executed). */
   async expireDeadlinedRuns(limit: number = AI_RUN_REAP_BATCH_LIMIT): Promise<number> {
-    return this.prisma.$transaction(async (tx) => {
+    const outcome = await this.latch.transaction(this.prisma, async (tx) => {
       const now = new Date()
       const overdue = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
         SELECT id FROM "ai"."ai_runs"
@@ -445,6 +453,7 @@ export class AiRunRepository {
       }
       return overdue.length
     })
+    return outcome === CUTOFF ? 0 : outcome
   }
 
   /**
@@ -452,7 +461,7 @@ export class AiRunRepository {
    * so without this sweep they would sit queued forever. History rows are never evicted or truncated.
    */
   async failEpochCappedRuns(limit: number = AI_RUN_REAP_BATCH_LIMIT): Promise<number> {
-    return this.prisma.$transaction(async (tx) => {
+    const outcome = await this.latch.transaction(this.prisma, async (tx) => {
       const now = new Date()
       const capped = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
         SELECT id FROM "ai"."ai_runs"
@@ -477,6 +486,7 @@ export class AiRunRepository {
       }
       return capped.length
     })
+    return outcome === CUTOFF ? 0 : outcome
   }
 
   /** The column set of a terminal transition (lease released, `finishedAt` stamped now). */

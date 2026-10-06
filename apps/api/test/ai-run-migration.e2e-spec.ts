@@ -155,7 +155,7 @@ describe('AI run ownership migrations (e2e)', () => {
       await db.query("SET session_replication_role = 'origin'")
     }
 
-    it('REFUSES the migration while an old amcore web/worker/all process is connected and AI data exists — before any change', async () => {
+    it('REFUSES the migration while an old amcore web/worker/all process is connected — before any change', async () => {
       for (const applicationName of ['amcore-web', 'amcore-worker', 'amcore-all']) {
         const writer = new Client({ connectionString: url, application_name: applicationName })
         await writer.connect()
@@ -264,7 +264,7 @@ describe('AI run ownership migrations (e2e)', () => {
     })
   })
 
-  describe('fresh install', () => {
+  describe('fresh install (empty AI tables)', () => {
     let container: StartedPostgreSqlContainer
     let url: string
     let client: Client
@@ -281,14 +281,43 @@ describe('AI run ownership migrations (e2e)', () => {
       await container?.stop({ timeout: 10_000 })
     })
 
-    it('skips the maintenance-stop guard when there is no AI data to convert (a running app does not block a fresh DB)', async () => {
+    it('STILL refuses while a named old writer is connected: an empty table proves nothing about its later writes', async () => {
       const writer = new Client({ connectionString: url, application_name: 'amcore-all' })
       await writer.connect()
       try {
-        await client.query(sql(OWNERSHIP))
-        await client.query(sql(CONVERSION))
+        // No AI rows exist, yet the guard is unconditional: the writer could insert during, or keep
+        // writing unfenced after, the conversion.
+        expect(
+          (await client.query(`SELECT count(*)::int AS n FROM "ai"."ai_runs"`)).rows[0].n
+        ).toBe(0)
+        await expect(client.query(sql(OWNERSHIP))).rejects.toThrow(
+          /ai_run_migration_old_writers_connected/
+        )
       } finally {
         await writer.end()
+      }
+    })
+
+    it('guards the conversion migration too: a writer that connects after the schema migration still blocks it', async () => {
+      await client.query(sql(OWNERSHIP))
+      const writer = new Client({ connectionString: url, application_name: 'amcore-worker' })
+      await writer.connect()
+      try {
+        await expect(client.query(sql(CONVERSION))).rejects.toThrow(
+          /ai_run_migration_old_writers_connected/
+        )
+      } finally {
+        await writer.end()
+      }
+    })
+
+    it('applies cleanly once no named writer is connected (other clients do not matter)', async () => {
+      const other = new Client({ connectionString: url, application_name: 'amcore-e2e-migrator' })
+      await other.connect()
+      try {
+        await client.query(sql(CONVERSION))
+      } finally {
+        await other.end()
       }
       const epoch = await client.query(
         `SELECT column_default FROM information_schema.columns WHERE table_schema = 'ai' AND table_name = 'ai_runs' AND column_name = 'leaseEpoch'`

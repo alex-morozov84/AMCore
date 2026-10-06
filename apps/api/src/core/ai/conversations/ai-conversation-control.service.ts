@@ -5,7 +5,7 @@ import type { AiConversationResponse } from '@amcore/shared'
 
 import { ConflictException, NotFoundException } from '../../../common/exceptions'
 import { AI_RUN_SUPERSEDED_BY_HUMAN } from '../ai-run.constants'
-import { lockWaitingRunsOfConversation } from '../ai-run-locks'
+import { lockQueuedRunsOfConversation, lockWaitingRunsOfConversation } from '../ai-run-locks'
 import { ApprovalRaceError } from '../approvals/ai-approval-expiry'
 import { toAiConversationResponse } from '../runs/ai-run.mapper'
 
@@ -319,18 +319,20 @@ export class AiConversationControlService {
     conversationId: string,
     now: Date
   ): Promise<number> {
+    // Lock order run → invocation (see `ai-run-locks`): take the queued run locks FIRST, ordered by id, so a
+    // concurrent cancel (which holds a queued run, then updates its invocation) cannot lock-cycle with this.
+    const runIds = await lockQueuedRunsOfConversation(tx, conversationId)
+    if (runIds.length === 0) return 0
     // An approved-but-not-started tool of a run being cancelled never runs: skip it (a started effect is kept).
-    await tx.$executeRaw(Prisma.sql`
-      UPDATE "ai"."ai_tool_invocations"
-      SET status = 'SKIPPED'::"ai"."AiToolInvocationStatus", "updatedAt" = now()
-      WHERE status IN ('REQUESTED'::"ai"."AiToolInvocationStatus", 'APPROVED'::"ai"."AiToolInvocationStatus")
-        AND "runId" IN (
-          SELECT id FROM "ai"."ai_runs"
-          WHERE "conversationId" = ${conversationId} AND status = 'QUEUED'::"ai"."AiRunStatus"
-        )
-    `)
+    await tx.aiToolInvocation.updateMany({
+      where: {
+        runId: { in: runIds },
+        status: { in: [AiToolInvocationStatus.REQUESTED, AiToolInvocationStatus.APPROVED] },
+      },
+      data: { status: AiToolInvocationStatus.SKIPPED },
+    })
     const { count } = await tx.aiRun.updateMany({
-      where: { conversationId, status: AiRunStatus.QUEUED },
+      where: { id: { in: runIds }, status: AiRunStatus.QUEUED },
       data: {
         status: AiRunStatus.CANCELLED,
         finishedAt: now,

@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AiGatewayException } from '../gateway/ai-gateway.error'
@@ -23,6 +23,7 @@ import { AiRunLoopFinalizer } from './ai-run-loop-finalizer.service'
 import { countProviderCalls, reconstructRounds } from './ai-run-loop-reconstruct'
 import type { RunPlan } from './ai-run-plan'
 import { abortCause, callProvider, ProviderCallBoundError } from './ai-run-provider-call'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
 import { reconstructLoopMessages } from './ai-run-transcript'
 import { AiRunTransitions } from './ai-run-transitions.service'
 import { AiToolActionService, type ToolRunContext } from './ai-tool-action.service'
@@ -30,7 +31,7 @@ import { AiToolRecoveryService } from './ai-tool-recovery.service'
 
 import { EnvService } from '@/env/env.service'
 import { MetricsService } from '@/infrastructure/observability'
-import type { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
+import { type AttemptRuntime, CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import { PrismaService } from '@/prisma'
 
 /** What one provider step resolved to after the output guard passed. */
@@ -58,6 +59,7 @@ export class AiRunLoopExecutor {
     private readonly prisma: PrismaService,
     private readonly gateway: ModelGateway,
     private readonly guard: AiRunGuard,
+    @Inject(AI_RUN_SHUTDOWN_LATCH) private readonly latch: ShutdownLatch,
     private readonly transitions: AiRunTransitions,
     private readonly registry: AiToolRegistry,
     private readonly actions: AiToolActionService,
@@ -85,8 +87,13 @@ export class AiRunLoopExecutor {
 
     // Reconstruct BEFORE building the step: even when the current allowlist offers no tools, prior
     // applied tool rounds must still carry the tool-result boundary marker + policy.
-    const rounds = await reconstructRounds(this.prisma, claim.id)
-    let providerCalls = await countProviderCalls(this.prisma, claim.id)
+    // Each read is its own latch-bounded operation: after the shutdown seal none starts.
+    const reconstructed = await this.latch.run(() => reconstructRounds(this.prisma, claim.id))
+    if (reconstructed === CUTOFF) return
+    const rounds = reconstructed
+    const counted = await this.latch.run(() => countProviderCalls(this.prisma, claim.id))
+    if (counted === CUTOFF) return
+    let providerCalls = counted
     const setup = this.buildStep(plan, rounds.length > 0)
     const maxSteps = this.env.get('AI_TOOL_LOOP_MAX_STEPS')
 

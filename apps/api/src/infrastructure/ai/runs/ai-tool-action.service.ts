@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiTextResult } from '../gateway/ai-gateway.types'
@@ -20,6 +20,7 @@ import type { ClaimedRun } from './ai-run-dispatch.types'
 import { AiRunGuard, RunLeaseLostError } from './ai-run-guard.service'
 import { providerCallStep, writeRunSteps, writeUsageLedger } from './ai-run-loop-persistence'
 import type { RunPlan } from './ai-run-plan'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
 import { AiRunTransitions, applyStop } from './ai-run-transitions.service'
 import {
   applyRejection,
@@ -39,7 +40,7 @@ import { AuditLogService } from '@/core/audit'
 import { EnvService } from '@/env/env.service'
 import { AiToolInvocationStatus, AuditActorType, AuditTargetType } from '@/generated/prisma/client'
 import { type AiMetricsToolRiskClass, MetricsService } from '@/infrastructure/observability'
-import type { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
+import type { AttemptRuntime, ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 
 /**
  * Defensive cap on the tool output stored in `resultSummary` + fed back to the model. This row is
@@ -104,6 +105,7 @@ export class AiToolActionService {
     private readonly env: EnvService,
     private readonly metrics: MetricsService,
     private readonly audit: AuditLogService,
+    @Inject(AI_RUN_SHUTDOWN_LATCH) private readonly latch: ShutdownLatch,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(AiToolActionService.name)
@@ -346,20 +348,23 @@ export class AiToolActionService {
           : 'failed'
     this.metrics.incAiToolInvocation(tool.toolId, riskOf(action), metric)
     try {
-      await this.audit.record({
-        action: failure === null ? 'ai.tool.invoked' : 'ai.tool.execution_failed',
-        actorType: AuditActorType.SYSTEM,
-        targetType: AuditTargetType.AI_TOOL_INVOCATION,
-        targetId: action.id,
-        organizationId: ctx.organizationId,
-        metadata: {
-          toolId: tool.toolId,
-          riskClass: riskOf(action),
-          invocationId: action.id,
-          runId: ctx.claim.id,
-          ...(failure === null ? { outcome: 'succeeded' } : { reasonCode: failure.errorCode }),
-        },
-      })
+      // Through the latch: after the shutdown seal no late audit write starts.
+      await this.latch.run(() =>
+        this.audit.record({
+          action: failure === null ? 'ai.tool.invoked' : 'ai.tool.execution_failed',
+          actorType: AuditActorType.SYSTEM,
+          targetType: AuditTargetType.AI_TOOL_INVOCATION,
+          targetId: action.id,
+          organizationId: ctx.organizationId,
+          metadata: {
+            toolId: tool.toolId,
+            riskClass: riskOf(action),
+            invocationId: action.id,
+            runId: ctx.claim.id,
+            ...(failure === null ? { outcome: 'succeeded' } : { reasonCode: failure.errorCode }),
+          },
+        })
+      )
     } catch (error) {
       this.logger.warn(
         {

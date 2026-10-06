@@ -127,21 +127,29 @@ export class AiRunExecutorService {
       return null
     }
 
-    const conversation = await this.prisma.aiConversation.findUnique({
-      where: { id: claim.conversationId },
-      select: {
-        ownerUserId: true,
-        organizationId: true,
-        assistant: { select: { toolAllowlist: true, systemPrompt: true, enabled: true } },
-      },
-    })
+    // Every pre-flight read and download is its own latch-bounded operation: after the shutdown seal no
+    // later query or storage fetch of this attempt starts (an outer wrapper would not stop the tail).
+    const conversation = await this.latch.run(() =>
+      this.prisma.aiConversation.findUnique({
+        where: { id: claim.conversationId },
+        select: {
+          ownerUserId: true,
+          organizationId: true,
+          assistant: { select: { toolAllowlist: true, systemPrompt: true, enabled: true } },
+        },
+      })
+    )
+    if (conversation === CUTOFF) return null
     // The run's OWN input turn is bound by `runId` (not the max-sequence message) so several runs
     // queued on one conversation before execution each read their own input.
-    const input = await this.prisma.aiMessage.findFirst({
-      where: { runId: claim.id, role: AiMessageRole.USER },
-      orderBy: { sequence: 'asc' },
-      select: { content: true },
-    })
+    const input = await this.latch.run(() =>
+      this.prisma.aiMessage.findFirst({
+        where: { runId: claim.id, role: AiMessageRole.USER },
+        orderBy: { sequence: 'asc' },
+        select: { content: true },
+      })
+    )
+    if (input === CUTOFF) return null
     if (conversation === null || input === null) {
       await this.transitions.failed(claim, AiRunErrorCode.INPUT_MISSING)
       return null
@@ -242,10 +250,14 @@ export class AiRunExecutorService {
     artifactIds: string[]
   ): Promise<AiUserContentPart[] | null> {
     const capabilities = modelCapabilitiesFromSnapshot(claim.modelSnapshot)
-    const rows = await this.prisma.aiArtifact.findMany({
-      where: { id: { in: artifactIds }, runId: claim.id },
-      select: { id: true, kind: true, contentType: true, storageKey: true },
-    })
+    const found = await this.latch.run(() =>
+      this.prisma.aiArtifact.findMany({
+        where: { id: { in: artifactIds }, runId: claim.id },
+        select: { id: true, kind: true, contentType: true, storageKey: true },
+      })
+    )
+    if (found === CUTOFF) return null
+    const rows = found
     const byId = new Map(rows.map((row) => [row.id, row]))
 
     const parts: AiUserContentPart[] = []
@@ -264,7 +276,9 @@ export class AiRunExecutorService {
       }
       let data: Buffer
       try {
-        data = await this.storage.download(row.storageKey)
+        const downloaded = await this.latch.run(() => this.storage.download(row.storageKey))
+        if (downloaded === CUTOFF) return null
+        data = downloaded
       } catch (error) {
         this.metrics.incAiArtifactResolution('storage_error')
         // A genuinely missing/deleted object is permanent — no retry can fix it. Any other storage

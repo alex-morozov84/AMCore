@@ -162,18 +162,33 @@ describe('AiRunProducerService', () => {
     expect(prisma.aiRun.create).not.toHaveBeenCalled()
   })
 
-  it('stamps an immutable absolute deadline and the versioned input fingerprint on a new run', async () => {
-    const before = Date.now()
-
+  it('stamps the versioned input fingerprint and an immutable lifetime derived from the row own createdAt', async () => {
     await service.create('user-1', INPUT)
 
-    const data = prisma.aiRun.create.mock.calls[0]![0]!.data as {
-      inputFingerprint: string
-      deadlineAt: Date
-    }
+    const data = prisma.aiRun.create.mock.calls[0]![0]!.data as Record<string, unknown>
     expect(data.inputFingerprint).toBe(aiRunInputFingerprint(INPUT.inputParts))
-    expect(data.deadlineAt.getTime()).toBeGreaterThanOrEqual(before + RUN_DEADLINE_MS)
-    expect(data.deadlineAt.getTime()).toBeLessThanOrEqual(Date.now() + RUN_DEADLINE_MS)
+    expect(data).not.toHaveProperty('deadlineAt') // never from the application clock
+
+    // One statement, in the creating transaction, computes deadlineAt = createdAt + the configured lifetime.
+    const [query] = prisma.$executeRaw.mock.calls[0] as unknown as [
+      { strings: string[]; values: unknown[] },
+    ]
+    const sql = query.strings.join('?')
+    expect(sql).toContain('"deadlineAt" = "createdAt" +')
+    expect(query.values).toEqual([RUN_DEADLINE_MS / 1000, 'run-1'])
+    expect(prisma.aiRun.create.mock.invocationCallOrder[0]!).toBeLessThan(
+      prisma.$executeRaw.mock.invocationCallOrder[0]!
+    )
+  })
+
+  it('a replay never re-arms the lifetime', async () => {
+    prisma.aiRun.findFirst.mockResolvedValue(
+      fakeRun({ inputFingerprint: aiRunInputFingerprint(INPUT.inputParts) }) as never
+    )
+
+    await service.create('user-1', { ...INPUT, idempotencyKey: 'evt-1' })
+
+    expect(prisma.$executeRaw).not.toHaveBeenCalled()
   })
 
   describe('idempotent replay', () => {

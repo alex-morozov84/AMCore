@@ -387,12 +387,11 @@ describe('AI run ownership, cancel/deadline and tool effects (e2e)', () => {
   })
 
   describe('E5 — cancel, default deadline and stop precedence', () => {
-    it('stamps a server-side default deadline on creation (immutable absolute lifetime)', async () => {
+    it('stamps the default lifetime on creation as EXACTLY createdAt + AI_RUN_DEADLINE_MS (database time)', async () => {
       const { runId } = await queue('hello')
       const run = await getRun(runId)
       expect(run.deadlineAt).toBeInstanceOf(Date)
-      const lifetime = run.deadlineAt!.getTime() - run.createdAt.getTime()
-      expect(Math.abs(lifetime - 172_800_000)).toBeLessThan(5_000)
+      expect(run.deadlineAt!.getTime() - run.createdAt.getTime()).toBe(172_800_000)
     })
 
     it('cancel during the provider call: usage is recorded, the next tool and provider never start, the run ends CANCELLED', async () => {

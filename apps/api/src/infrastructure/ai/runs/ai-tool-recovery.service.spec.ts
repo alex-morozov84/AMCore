@@ -11,7 +11,7 @@ import type { InvocationRow } from './ai-tool-invocation.store'
 import { AiToolRecoveryService } from './ai-tool-recovery.service'
 
 import { AiToolInvocationStatus, AiToolRiskClass } from '@/generated/prisma/client'
-import type { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
+import { type AttemptRuntime, ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
 /**
@@ -60,8 +60,14 @@ describe('AiToolRecoveryService', () => {
   let transitions: { failed: jest.Mock }
   let recovery: AiToolRecoveryService
 
-  function pending(row: InvocationRow | null): void {
-    prisma.aiToolInvocation.findFirst.mockResolvedValue(row as never)
+  /**
+   * Script the two recovery reads: the unconditional "any OUTCOME_UNKNOWN" check (findFirst) and then the
+   * bounded pending list (findMany). `rows` are the unresolved invocations of the run, oldest first.
+   */
+  function pending(...rows: InvocationRow[]): void {
+    const unknown = rows.find((r) => r.status === AiToolInvocationStatus.OUTCOME_UNKNOWN) ?? null
+    prisma.aiToolInvocation.findFirst.mockResolvedValue(unknown as never)
+    prisma.aiToolInvocation.findMany.mockResolvedValue(rows.slice(0, 2) as never)
   }
 
   beforeEach(() => {
@@ -76,12 +82,28 @@ describe('AiToolRecoveryService', () => {
       prisma,
       registry as unknown as AiToolRegistry,
       actions as unknown as AiToolActionService,
-      transitions as unknown as AiRunTransitions
+      transitions as unknown as AiRunTransitions,
+      new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
     )
   })
 
+  it('after the shutdown seal the pending-action read never starts and recovery reports done', async () => {
+    const sealed = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
+    sealed.seal()
+    const sealedRecovery = new AiToolRecoveryService(
+      prisma,
+      registry as unknown as AiToolRegistry,
+      actions as unknown as AiToolActionService,
+      transitions as unknown as AiRunTransitions,
+      sealed
+    )
+
+    expect(await sealedRecovery.recover(CTX)).toBe('done')
+    expect(prisma.aiToolInvocation.findFirst).not.toHaveBeenCalled()
+  })
+
   it('proceeds (asks the model) only when nothing is pending', async () => {
-    pending(null)
+    pending()
 
     expect(await recovery.recover(CTX)).toBe('proceed')
     expect(actions.execute).not.toHaveBeenCalled()
@@ -115,6 +137,57 @@ describe('AiToolRecoveryService', () => {
     actions.execute.mockResolvedValue({ status })
 
     expect(await recovery.recover(CTX)).toBe('done')
+  })
+
+  describe('an unknown effect has absolute precedence (mixed legacy data)', () => {
+    it('an OLDER OUTCOME_UNKNOWN blocks a NEWER approved/requested action: nothing executes, the run fails uncertain', async () => {
+      pending(
+        action({ id: 'inv-old', status: AiToolInvocationStatus.OUTCOME_UNKNOWN }),
+        action({ id: 'inv-new', status: AiToolInvocationStatus.APPROVED, riskClass: 'SENSITIVE' })
+      )
+
+      expect(await recovery.recover(CTX)).toBe('done')
+      expect(transitions.failed).toHaveBeenCalledWith(
+        CLAIM,
+        'tool_loop_failed',
+        'tool_effect_unknown'
+      )
+      expect(actions.execute).not.toHaveBeenCalled()
+    })
+
+    it('checks for ANY unknown effect first (a distinct, unconditional read — before the pending list)', async () => {
+      pending()
+
+      await recovery.recover(CTX)
+
+      const first = prisma.aiToolInvocation.findFirst.mock.calls[0]![0]!
+      expect(first.where).toEqual({ runId: 'run-1', status: 'OUTCOME_UNKNOWN' })
+      expect(prisma.aiToolInvocation.findFirst.mock.invocationCallOrder[0]!).toBeLessThan(
+        prisma.aiToolInvocation.findMany.mock.invocationCallOrder[0]!
+      )
+    })
+
+    it('MORE than one pending legacy action is ambiguous: fail closed, nothing is executed', async () => {
+      pending(
+        action({ id: 'a', status: AiToolInvocationStatus.REQUESTED }),
+        action({ id: 'b', status: AiToolInvocationStatus.APPROVED })
+      )
+
+      expect(await recovery.recover(CTX)).toBe('done')
+      expect(transitions.failed).toHaveBeenCalledWith(
+        CLAIM,
+        'tool_loop_failed',
+        'tool_state_inconsistent'
+      )
+      expect(actions.execute).not.toHaveBeenCalled()
+    })
+
+    it('a single pending action still resumes normally', async () => {
+      pending(action({ status: AiToolInvocationStatus.APPROVED }))
+
+      expect(await recovery.recover(CTX)).toBe('proceed')
+      expect(actions.execute).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('OUTCOME_UNKNOWN → the run fails uncertain with NO model request and NO new action', async () => {
@@ -189,11 +262,11 @@ describe('AiToolRecoveryService', () => {
   })
 
   it('selects only unfinished actions (applied/skipped/awaiting-approval rows are never picked up)', async () => {
-    pending(null)
+    pending()
 
     await recovery.recover(CTX)
 
-    const where = prisma.aiToolInvocation.findFirst.mock.calls[0]![0]!.where as {
+    const where = prisma.aiToolInvocation.findMany.mock.calls[0]![0]!.where as {
       OR: { status: { in: string[] }; appliedAt?: null }[]
     }
     const statuses = where.OR.flatMap((clause) => clause.status.in)
@@ -202,7 +275,6 @@ describe('AiToolRecoveryService', () => {
         'REQUESTED',
         'APPROVED',
         'EXECUTING',
-        'OUTCOME_UNKNOWN',
         'FAILED',
         'SUCCEEDED',
         'REJECTED',

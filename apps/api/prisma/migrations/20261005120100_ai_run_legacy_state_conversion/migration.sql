@@ -3,9 +3,7 @@
 -- Same maintenance-stop guard as the previous migration (old writers must be stopped).
 DO $$
 BEGIN
-  IF (
-    EXISTS (SELECT 1 FROM "ai"."ai_runs") OR EXISTS (SELECT 1 FROM "ai"."ai_tool_invocations")
-  ) AND EXISTS (
+  IF EXISTS (
     SELECT 1 FROM pg_stat_activity
     WHERE datname = current_database()
       AND application_name IN ('amcore-web', 'amcore-worker', 'amcore-all')

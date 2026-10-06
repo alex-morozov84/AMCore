@@ -6,19 +6,35 @@ import { INVOCATION_SELECT, type InvocationRow } from './ai-tool-invocation.stor
 import { AiRunStepType, AiToolInvocationStatus, type Prisma } from '@/generated/prisma/client'
 import type { PrismaService } from '@/prisma'
 
+/** What recovery found: nothing, exactly one action to resolve, or an inconsistent set (fail closed). */
+export type UnresolvedAction = InvocationRow | 'ambiguous' | null
+
 /**
- * The run's single unresolved tool action, if any (E12 recovery). At the start of every epoch — BEFORE
- * the model is asked again — recovery evaluates the latest invocation that still needs an action:
- * `REQUESTED`/`APPROVED` (start it), `EXECUTING` (same epoch: exit; older epoch: adopt a read-only one,
- * fail a side-effecting one uncertain), `REJECTED`/`SUCCEEDED` whose application marker is unset,
- * `OUTCOME_UNKNOWN` and a `FAILED` row on a still-running run (apply its terminal policy). `null` means
- * nothing is pending (the normal loop). `AWAITING_APPROVAL`/`SKIPPED`/applied rows are never selected.
+ * The run's unresolved tool action, if any (E12 recovery). At the start of every epoch — BEFORE the model
+ * is asked again — recovery evaluates what is still pending:
+ *
+ * 1. **Any** recorded `OUTCOME_UNKNOWN` has absolute precedence, whatever its age or what else is pending:
+ *    an uncertain side effect must stop the run before anything executable continues (legacy data can hold
+ *    several invocations, so "the newest one" is not enough).
+ * 2. Otherwise the pending actions are `REQUESTED`/`APPROVED` (start it), `EXECUTING` (same epoch: exit;
+ *    older epoch: adopt a read-only one), `REJECTED`/`SUCCEEDED` whose application marker is unset, and a
+ *    `FAILED` row on a still-running run (apply its terminal policy). New code leaves at most ONE; more than
+ *    one is an inconsistent legacy set and returns `'ambiguous'` (fail closed — nothing is executed).
+ *
+ * `null` means nothing is pending (the normal loop). `AWAITING_APPROVAL`/`SKIPPED`/applied rows are never
+ * selected.
  */
 export async function findUnresolvedAction(
   prisma: PrismaService,
   runId: string
-): Promise<InvocationRow | null> {
-  return prisma.aiToolInvocation.findFirst({
+): Promise<UnresolvedAction> {
+  const unknown = await prisma.aiToolInvocation.findFirst({
+    where: { runId, status: AiToolInvocationStatus.OUTCOME_UNKNOWN },
+    orderBy: { createdAt: 'asc' },
+    select: INVOCATION_SELECT,
+  })
+  if (unknown !== null) return unknown
+  const pending = await prisma.aiToolInvocation.findMany({
     where: {
       runId,
       OR: [
@@ -28,7 +44,6 @@ export async function findUnresolvedAction(
               AiToolInvocationStatus.REQUESTED,
               AiToolInvocationStatus.APPROVED,
               AiToolInvocationStatus.EXECUTING,
-              AiToolInvocationStatus.OUTCOME_UNKNOWN,
               AiToolInvocationStatus.FAILED,
             ],
           },
@@ -39,9 +54,12 @@ export async function findUnresolvedAction(
         },
       ],
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: 'asc' },
     select: INVOCATION_SELECT,
+    take: 2,
   })
+  if (pending.length > 1) return 'ambiguous'
+  return pending[0] ?? null
 }
 
 /**

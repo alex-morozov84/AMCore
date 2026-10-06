@@ -156,10 +156,16 @@ export class AiRunProducerService {
         idempotencyKey: input.idempotencyKey ?? null,
         maxAttempts: AI_RUN_DEFAULT_MAX_ATTEMPTS,
         inputFingerprint: aiRunInputFingerprint(input.inputParts),
-        // Immutable absolute lifetime: queue time, backoff and approval waits all count against it.
-        deadlineAt: new Date(Date.now() + this.env.get('AI_RUN_DEADLINE_MS')),
       },
     })
+    // Immutable absolute lifetime: queue time, backoff and approval waits all count against it. Stamped from
+    // the row's own database-generated `createdAt`, so `deadlineAt = createdAt + AI_RUN_DEADLINE_MS` holds
+    // exactly regardless of application clock skew.
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE "ai"."ai_runs"
+      SET "deadlineAt" = "createdAt" + make_interval(secs => ${this.env.get('AI_RUN_DEADLINE_MS') / 1000}::double precision)
+      WHERE id = ${run.id}
+    `)
     const sequence = await this.nextSequence(tx, input.conversationId)
     const message = await tx.aiMessage.create({
       data: {

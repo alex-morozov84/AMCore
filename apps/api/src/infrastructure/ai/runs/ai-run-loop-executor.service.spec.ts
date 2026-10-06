@@ -22,7 +22,7 @@ import type { AiToolRecoveryService } from './ai-tool-recovery.service'
 import type { EnvService } from '@/env/env.service'
 import { AiToolInvocationStatus, AiToolRiskClass } from '@/generated/prisma/client'
 import type { MetricsService } from '@/infrastructure/observability'
-import type { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
+import { type AttemptRuntime, ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
 // The output guard runs each step; mock it so tests drive allow/block deterministically and can assert
@@ -202,6 +202,7 @@ describe('AiRunLoopExecutor', () => {
       prisma,
       gateway as unknown as ModelGateway,
       guard as unknown as AiRunGuard,
+      new ShutdownLatch({ warn: jest.fn() }, 'ai.run'),
       transitions as unknown as AiRunTransitions,
       registry as unknown as AiToolRegistry,
       actions as unknown as AiToolActionService,
@@ -215,6 +216,34 @@ describe('AiRunLoopExecutor', () => {
   })
 
   const run = (p: RunPlan = plan(), c: ClaimedRun = claim()) => loop.run(c, p, runtime)
+
+  describe('shutdown seal', () => {
+    it('a sealed dispatcher starts no transcript read and no provider call', async () => {
+      const sealed = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
+      sealed.seal()
+      const sealedLoop = new AiRunLoopExecutor(
+        prisma,
+        gateway as unknown as ModelGateway,
+        guard as unknown as AiRunGuard,
+        sealed,
+        transitions as unknown as AiRunTransitions,
+        registry as unknown as AiToolRegistry,
+        actions as unknown as AiToolActionService,
+        recovery as unknown as AiToolRecoveryService,
+        finalizer as unknown as AiRunLoopFinalizer,
+        parker as unknown as AiRunApprovalParker,
+        env as unknown as EnvService,
+        metrics as unknown as MetricsService,
+        logger as never
+      )
+
+      await sealedLoop.run(claim(), plan(), runtime)
+
+      expect(prisma.aiRunStep.findMany).not.toHaveBeenCalled()
+      expect(prisma.aiRunStep.count).not.toHaveBeenCalled()
+      expect(gateway.generateText).not.toHaveBeenCalled()
+    })
+  })
 
   describe('final-text path (Arc C single-shot behavior when no tools apply)', () => {
     it('admits (marking possible I/O start), calls the provider once with no tools, then finalizes', async () => {
