@@ -121,7 +121,11 @@ export class ModelGateway {
   private async prepare(
     request: AiGenerateRequest
   ): Promise<{ model: ResolvedAiModel; adapter: AiProviderAdapter; call: AiAdapterCall }> {
-    const model = await this.resolveModel(request.modelSlug)
+    const model = await this.resolveModel(request.modelSlug, request.abortSignal)
+    // The catalog read may have resumed after the caller's cutoff: start no transport then.
+    if (request.abortSignal?.aborted === true) {
+      throw AiGatewayException.aborted(model.provider.type)
+    }
     // Central gate (B.2 follow-up): a key-less model or a type with no adapter is not configured.
     const adapter = this.adapters.get(model.provider.type)
     if (!this.registry.hasCredential(model) || adapter === undefined) {
@@ -149,13 +153,31 @@ export class ModelGateway {
     return { model, adapter, call }
   }
 
-  private async resolveModel(slug: string | undefined): Promise<ResolvedAiModel> {
+  private async resolveModel(
+    slug: string | undefined,
+    signal: AbortSignal | undefined
+  ): Promise<ResolvedAiModel> {
+    try {
+      return await this.lookupModel(slug, signal)
+    } catch (error) {
+      // The caller's attempt boundary fired during the catalog read: not a provider fault.
+      if (signal?.aborted === true && !(error instanceof AiGatewayException)) {
+        throw AiGatewayException.aborted()
+      }
+      throw error
+    }
+  }
+
+  private async lookupModel(
+    slug: string | undefined,
+    signal: AbortSignal | undefined
+  ): Promise<ResolvedAiModel> {
     if (slug !== undefined) {
-      const model = await this.registry.resolveModel(slug)
+      const model = await this.registry.resolveModel(slug, signal)
       if (model === null) throw AiGatewayException.modelNotFound(slug)
       return model
     }
-    const model = await this.registry.resolveDefaultModel()
+    const model = await this.registry.resolveDefaultModel(signal)
     if (model === null) throw AiGatewayException.noDefaultModel()
     return model
   }

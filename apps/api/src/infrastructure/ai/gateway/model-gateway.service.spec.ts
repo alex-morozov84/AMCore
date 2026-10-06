@@ -116,7 +116,29 @@ describe('ModelGateway.generateText', () => {
       modelSlug: 'mock-default',
       messages: [{ role: 'user', content: 'x' }],
     })
-    expect(resolveModel).toHaveBeenCalledWith('mock-default')
+    expect(resolveModel).toHaveBeenCalledWith('mock-default', undefined)
+  })
+
+  it('starts no transport and reports an abort when the caller boundary fired during the catalog read', async () => {
+    const controller = new AbortController()
+    const resolveModel = jest.fn(async () => {
+      controller.abort()
+      return model({ slug: 'mock-default' })
+    })
+    const generate = jest.fn()
+    const adapter: AiProviderAdapter = {
+      supportedTypes: [AiProviderType.MOCK],
+      generateText: generate,
+    }
+    const gateway = makeGateway({ resolveModel, hasCredential: () => true }, [adapter])
+    await expect(
+      gateway.generateText({
+        modelSlug: 'mock-default',
+        messages: [{ role: 'user', content: 'x' }],
+        abortSignal: controller.signal,
+      })
+    ).rejects.toMatchObject({ code: 'aborted' })
+    expect(generate).not.toHaveBeenCalled()
   })
 
   it('throws model_not_found for an unknown explicit slug', async () => {

@@ -175,7 +175,12 @@ starts, and a slot is held until the physical provider or tool call has settled
 
 On shutdown the worker stops starting work, waits up to 15 seconds for in-flight
 runs, then seals: late results are discarded without writing and the run is
-recovered after its lease expires. See [Deployment](../operations/deployment.md).
+recovered after its lease expires. After the seal no further database or cache
+operation of that run's attempt starts — including the reads inside recovery,
+transcript reconstruction and the model-catalog lookup (its Redis read and database
+fallback) — and the provider request is not started. Operations already in flight
+are allowed to settle; their late results are discarded. See
+[Deployment](../operations/deployment.md).
 
 ## Status-only SSE
 

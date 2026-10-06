@@ -43,8 +43,8 @@ export class AiModelRegistry {
   }
 
   /** An enabled model by logical slug, or `null`. No credential gating — an explicit choice. */
-  async resolveModel(slug: string): Promise<ResolvedAiModel | null> {
-    const snapshot = await this.getSnapshot()
+  async resolveModel(slug: string, signal?: AbortSignal): Promise<ResolvedAiModel | null> {
+    const snapshot = await this.getSnapshot(signal)
     return snapshot.find((model) => model.slug === slug) ?? null
   }
 
@@ -52,8 +52,8 @@ export class AiModelRegistry {
    * The selectable default model: the `isDefault` row when its provider has a usable credential,
    * else the key-less `mock` provider's model, else `null` (empty/unconfigured catalog).
    */
-  async resolveDefaultModel(): Promise<ResolvedAiModel | null> {
-    const snapshot = await this.getSnapshot()
+  async resolveDefaultModel(signal?: AbortSignal): Promise<ResolvedAiModel | null> {
+    const snapshot = await this.getSnapshot(signal)
     const preferred = snapshot.find((model) => model.isDefault && this.hasCredential(model))
     if (preferred) return preferred
     return snapshot.find((model) => model.provider.type === AiProviderType.MOCK) ?? null
@@ -69,8 +69,16 @@ export class AiModelRegistry {
     await this.redis.del(CATALOG_CACHE_KEY)
   }
 
-  private async getSnapshot(): Promise<AiCatalogSnapshot> {
+  /**
+   * `signal` is the CALLER's attempt boundary (an AI worker run): it is checked before every actual
+   * operation — each Redis call and the database fallback — so a continuation resuming after the
+   * caller's cutoff starts nothing more (it throws the signal's abort reason instead). The registry
+   * itself stays shared and open: other callers (web role, producer) pass no signal.
+   */
+  private async getSnapshot(signal?: AbortSignal): Promise<AiCatalogSnapshot> {
+    signal?.throwIfAborted()
     const raw = await this.redis.get(CATALOG_CACHE_KEY)
+    signal?.throwIfAborted()
     if (raw !== null) {
       const cached = this.parseSnapshot(raw)
       if (cached !== null) {
@@ -79,11 +87,13 @@ export class AiModelRegistry {
       }
       // Syntactically or structurally invalid cache → never trust it; drop and reload.
       await this.redis.del(CATALOG_CACHE_KEY)
+      signal?.throwIfAborted()
       this.metrics.incCacheOperation('ai_catalog', 'corrupt')
     }
 
     this.metrics.incCacheOperation('ai_catalog', 'miss')
     const snapshot = await this.loadFromDb()
+    signal?.throwIfAborted()
     this.metrics.incCacheOperation('ai_catalog', 'db_fallback')
     await this.redis.set(CATALOG_CACHE_KEY, JSON.stringify(snapshot), {
       expiration: { type: 'EX', value: this.env.get('AI_CATALOG_CACHE_TTL_SECONDS') },

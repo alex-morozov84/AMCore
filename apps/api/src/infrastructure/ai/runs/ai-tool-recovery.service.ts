@@ -45,7 +45,7 @@ export class AiToolRecoveryService {
   /** `proceed` = nothing pending (or it was applied cleanly); `done` = the run was terminalized / must exit. */
   async recover(ctx: ToolRunContext): Promise<'proceed' | 'done'> {
     const { claim } = ctx
-    const found = await this.latch.run(() => findUnresolvedAction(this.prisma, claim.id))
+    const found = await findUnresolvedAction(this.prisma, claim.id, (op) => this.latch.run(op))
     if (found === CUTOFF) return 'done' // sealed: nothing may start
     const action = found
     if (action === null) return 'proceed'

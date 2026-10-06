@@ -65,13 +65,13 @@ export class AiGatewayException extends AppException {
   }
 
   /** The caller's abort signal fired (run deadline or worker shutdown): not retryable as a provider fault. */
-  static aborted(providerType: AiProviderType): AiGatewayException {
+  static aborted(providerType?: AiProviderType): AiGatewayException {
     return new AiGatewayException(
       'aborted',
       HttpStatus.SERVICE_UNAVAILABLE,
       false,
       'AI provider call was aborted by the caller',
-      { providerType }
+      providerType === undefined ? undefined : { providerType }
     )
   }
 

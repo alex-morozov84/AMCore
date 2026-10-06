@@ -88,7 +88,7 @@ export class AiRunLoopExecutor {
     // Reconstruct BEFORE building the step: even when the current allowlist offers no tools, prior
     // applied tool rounds must still carry the tool-result boundary marker + policy.
     // Each read is its own latch-bounded operation: after the shutdown seal none starts.
-    const reconstructed = await this.latch.run(() => reconstructRounds(this.prisma, claim.id))
+    const reconstructed = await reconstructRounds(this.prisma, claim.id, (op) => this.latch.run(op))
     if (reconstructed === CUTOFF) return
     const rounds = reconstructed
     const counted = await this.latch.run(() => countProviderCalls(this.prisma, claim.id))

@@ -4,7 +4,15 @@ import type { CompletedToolRound } from './ai-run-transcript'
 import { INVOCATION_SELECT, type InvocationRow } from './ai-tool-invocation.store'
 
 import { AiRunStepType, AiToolInvocationStatus, type Prisma } from '@/generated/prisma/client'
+import { CUTOFF, type Cutoff } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
+
+/**
+ * Runs ONE database operation under the shutdown latch: sealed → not invoked, `CUTOFF`. Every query of a
+ * multi-query helper goes through it individually, because a single wrapper around the whole helper would
+ * let a continuation that resumes after the seal start its next query.
+ */
+export type FencedRun = <T>(operation: () => Promise<T>) => Promise<T | Cutoff>
 
 /** What recovery found: nothing, exactly one action to resolve, or an inconsistent set (fail closed). */
 export type UnresolvedAction = InvocationRow | 'ambiguous' | null
@@ -26,38 +34,44 @@ export type UnresolvedAction = InvocationRow | 'ambiguous' | null
  */
 export async function findUnresolvedAction(
   prisma: PrismaService,
-  runId: string
-): Promise<UnresolvedAction> {
-  const unknown = await prisma.aiToolInvocation.findFirst({
-    where: { runId, status: AiToolInvocationStatus.OUTCOME_UNKNOWN },
-    orderBy: { createdAt: 'asc' },
-    select: INVOCATION_SELECT,
-  })
-  if (unknown !== null) return unknown
-  const pending = await prisma.aiToolInvocation.findMany({
-    where: {
-      runId,
-      OR: [
-        {
-          status: {
-            in: [
-              AiToolInvocationStatus.REQUESTED,
-              AiToolInvocationStatus.APPROVED,
-              AiToolInvocationStatus.EXECUTING,
-              AiToolInvocationStatus.FAILED,
-            ],
+  runId: string,
+  run: FencedRun
+): Promise<UnresolvedAction | Cutoff> {
+  const unknown = await run(() =>
+    prisma.aiToolInvocation.findFirst({
+      where: { runId, status: AiToolInvocationStatus.OUTCOME_UNKNOWN },
+      orderBy: { createdAt: 'asc' },
+      select: INVOCATION_SELECT,
+    })
+  )
+  if (unknown === CUTOFF || unknown !== null) return unknown
+  const pending = await run(() =>
+    prisma.aiToolInvocation.findMany({
+      where: {
+        runId,
+        OR: [
+          {
+            status: {
+              in: [
+                AiToolInvocationStatus.REQUESTED,
+                AiToolInvocationStatus.APPROVED,
+                AiToolInvocationStatus.EXECUTING,
+                AiToolInvocationStatus.FAILED,
+              ],
+            },
           },
-        },
-        {
-          status: { in: [AiToolInvocationStatus.SUCCEEDED, AiToolInvocationStatus.REJECTED] },
-          appliedAt: null,
-        },
-      ],
-    },
-    orderBy: { createdAt: 'asc' },
-    select: INVOCATION_SELECT,
-    take: 2,
-  })
+          {
+            status: { in: [AiToolInvocationStatus.SUCCEEDED, AiToolInvocationStatus.REJECTED] },
+            appliedAt: null,
+          },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+      select: INVOCATION_SELECT,
+      take: 2,
+    })
+  )
+  if (pending === CUTOFF) return CUTOFF
   if (pending.length > 1) return 'ambiguous'
   return pending[0] ?? null
 }
@@ -75,23 +89,30 @@ export async function findUnresolvedAction(
 /** Applied tool rounds in `TOOL_INVOCATION` step order, joined to their SUCCEEDED/REJECTED invocations. */
 export async function reconstructRounds(
   prisma: PrismaService,
-  runId: string
-): Promise<CompletedToolRound[]> {
-  const steps = await prisma.aiRunStep.findMany({
-    where: { runId, type: AiRunStepType.TOOL_INVOCATION },
-    orderBy: { stepNumber: 'asc' },
-    select: { detail: true },
-  })
+  runId: string,
+  run: FencedRun
+): Promise<CompletedToolRound[] | Cutoff> {
+  const steps = await run(() =>
+    prisma.aiRunStep.findMany({
+      where: { runId, type: AiRunStepType.TOOL_INVOCATION },
+      orderBy: { stepNumber: 'asc' },
+      select: { detail: true },
+    })
+  )
+  if (steps === CUTOFF) return CUTOFF
   const refs = steps.map((step) => parseToolStepDetail(step.detail)).filter(isPresent)
   if (refs.length === 0) return []
 
-  const invocations = await prisma.aiToolInvocation.findMany({
-    where: {
-      id: { in: refs.map((ref) => ref.invocationId) },
-      status: { in: [AiToolInvocationStatus.SUCCEEDED, AiToolInvocationStatus.REJECTED] },
-    },
-    select: { id: true, toolId: true, status: true, argsSnapshot: true, resultSummary: true },
-  })
+  const invocations = await run(() =>
+    prisma.aiToolInvocation.findMany({
+      where: {
+        id: { in: refs.map((ref) => ref.invocationId) },
+        status: { in: [AiToolInvocationStatus.SUCCEEDED, AiToolInvocationStatus.REJECTED] },
+      },
+      select: { id: true, toolId: true, status: true, argsSnapshot: true, resultSummary: true },
+    })
+  )
+  if (invocations === CUTOFF) return CUTOFF
   const byId = new Map(invocations.map((inv) => [inv.id, inv]))
 
   const rounds: CompletedToolRound[] = []
