@@ -22,7 +22,8 @@ personal, discovery, exchange or organization policy.
 | `GET /organizations/:orgId/members`, `GET /organizations/:orgId/members/:userId/roles` | Selected organization, bearer-only; current membership and full TeamAccess, including for SUPER_ADMIN |
 | `PATCH /organizations/:orgId/members/:userId/roles`                                    | Same admission; atomic complete-set replacement with membership identity and ACL revision checks      |
 | `PATCH /organizations/:id`, `DELETE /organizations/:id`                                | Selected organization; existing credential/field/TeamAccess requirements retained                     |
-| Legacy per-role/member-removal, role and invite handlers                               | Path-selected organization; existing per-handler credential allowlist retained                        |
+| Legacy per-role/member-removal and role handlers                               | Path-selected organization; existing per-handler credential allowlist retained                        |
+| `GET/POST /organizations/:orgId/invites`, reissue/revoke and own operation receipts | Personal bearer; actual membership and full TeamAccess; no platform bypass or API-key admission |
 | `POST /auth/invites/accept`                                                            | Personal, bearer-only                                                                                 |
 | `POST /organizations/:id/switch`                                                       | Existing bearer-only exchange; membership-checked A→B and parent-bounded expiry retained              |
 

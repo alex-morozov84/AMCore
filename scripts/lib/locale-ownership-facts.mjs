@@ -85,6 +85,7 @@ const topology = [
   '(auth)/invite/flow/[flowId]/page.tsx',
   '(auth)/invite/flow/[flowId]/loading.tsx',
   '(auth)/invite/unusable/page.tsx',
+  '(organization-access)/organizations/[id]/invites/page.tsx',
   'auth/callback/route.ts',
   'layout.tsx',
   'providers.tsx',

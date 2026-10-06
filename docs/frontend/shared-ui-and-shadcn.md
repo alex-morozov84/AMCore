@@ -51,13 +51,24 @@ for why.
 | `sheet.tsx`                      | shadcn (Base UI), customized                | Pulled in as `sidebar.tsx`'s mobile-breakpoint dependency. `SheetContent` requires a caller-provided `closeLabel`, mirroring `dialog.tsx`.                                                                                                                                                                                                                                                                                                |
 | `tooltip.tsx`, `separator.tsx`   | shadcn (Base UI), stock                     | Pulled in as `sidebar.tsx` dependencies (`SidebarMenuButton`'s collapsed-state tooltip, `SidebarSeparator`). No customization needed.                                                                                                                                                                                                                                                                                                     |
 
-### Password fields
+### Password fields and page titles
 
 Use `PasswordInput` from `@/shared/ui/password-input` in password forms.
 It starts masked; its keyboard-accessible show/hide button never submits the form.
 Supply localized `showLabel` and `hideLabel`, and ordinary input props (including
 form ref, id, autocomplete and disabled state). The component owns only visibility;
 downstreams can reuse it independently of the ready authentication forms.
+
+`PageTitle` from `@/shared/ui/page-title` reserves the heading height and renders
+a skeleton when children are unavailable. Protected names may be provided from a
+fresh server-authorized response during initial loading; subsequent authority
+failures must mask them rather than reuse cached names.
+
+### Loading and reduced motion
+
+Loading placeholders use `Skeleton`, which disables its pulse animation when the
+user requests reduced motion. The owning view supplies a localized loading label,
+`aria-busy`, and placeholder dimensions that match the eventual content.
 
 ### Shared list surfaces
 
@@ -70,6 +81,20 @@ the owning page/widget. `list-pagination.tsx` supplies the common inventory
 pagination frame; callers supply links or buttons and localized status.
 `ConsoleFilterPanel` delegates to the neutral FilterPanel
 and preserves its existing slot for Console consumers.
+
+### Row actions and confirmation focus
+
+Use `RowActionsMenu` from `@/shared/ui/row-actions-menu` for compact table or
+card actions. Supply a localized `label` that identifies the row, then compose
+`DropdownMenuItem` children with the domain actions. `disabled` blocks opening
+while current primary data is unavailable. Optional `triggerRef` and `triggerId`
+let the owning flow restore focus after a separately mounted dialog closes.
+Use different IDs for simultaneous desktop and mobile representations.
+
+`ConfirmDialog` accepts the underlying alert dialog's `finalFocus` target or
+resolver. Return the current enabled trigger when it still exists; otherwise
+choose a stable accessible control, such as the list search field. The owner
+supplies domain permission checks and localized confirm/cancel labels.
 
 ### Search field contract
 

@@ -76,6 +76,11 @@ props: `admission`, `input`, `explicitList`, `contextHref`, `pageHref`, `listHre
 supply independent destinations and callbacks. Obtain safe admission through the
 public entity server DAL and keep the page-level server gate. Use
 `useRouteProgressRouter()` and `RouteProgressLink` for internal navigation.
+Optional `initialOrganizationName`/`initialCanManageTeamAccess` props may seed
+selected-page presentation only from a fresh server context read with the same
+expected admission binding. They do not authorize client commands. The reference
+mount supplies these values so tab navigation does not flash a generic heading;
+subsequent authority failures hide protected data.
 If customizing login links here, align your own server gate too; the ordinary
 mount's server login destination remains `/login`.
 
@@ -190,34 +195,6 @@ example, not a delivered CRM screen. See the
 [capability guide](../auth/capability-catalogue.md) for `recordRequired` and
 field decisions.
 
-## Validate your composition
-
-Check menu links from dashboard and organization frame, direct list/id entry,
-single-organization auto-open, explicit-list return and page two. Check a no-cookie
-visit, mounted session loss, a nonmember/removed organization and a replaced login.
-A changed login must hide old content and offer explicit recovery before new
-identity authority is shown. Check locales, keyboard/focus, mobile navigation,
-themes and error boundaries. Use the [managed stands](../operations/local-stands.md)
-for real sessions and membership proof. Type/lint alone do not prove these flows.
-
-## Custom member editor
-
-Use the public `useOrganizationMembers(context.controller, {page, search})` and
-`useMemberRoleAssignments(context.controller, {userId, page, search, section})`
-hooks with that same parent owner. Keep a complete assigned-set snapshot and
-its membership/ACL revision separate from paginated choices and your dirty draft.
-Call `save({expectedMemberId, expectedAclVersion, roleIds})`; inspect `committed`,
-`rejected`, `unknown`, `busy` and `retired` outcomes. A committed result includes
-follow-up status. Never turn a failed follow-up into a claimed write rollback.
-
-The executable `scripts/fixtures/organization-members-headless.mjs` creates a
-separate disposable consumer with a list and inline editor instead of the ready
-table/dialog. `--projected` also selects single-Russian routing, Console disabled
-and Storybook disabled in that fixture. It prints the managed real-stack browser
-command; no standalone sample product route is added to the starter. See the
-[members contract](organization-members.md) for permissions, complete-set/byte
-limits, truthful self-edit warnings and safe recovery.
-
 ## Custom invitation forms
 
 Keep invitation state and presentation separate. The public browser transport in
@@ -251,3 +228,56 @@ do not resend an authentication request whose outcome is unknown. Recover the
 same handoff acknowledgment instead. Authentication, verification and screen
 mounting never accept organization membership. Joining requires a separate
 explicit action with the inspected intent and a stable operation ID.
+
+## Validate your composition
+
+Check menu links from dashboard and organization frame, direct list/id entry,
+single-organization auto-open, explicit-list return and page two. Check a no-cookie
+visit, mounted session loss, a nonmember/removed organization and a replaced login.
+A changed login must hide old content and offer explicit recovery before new
+identity authority is shown. Check locales, keyboard/focus, mobile navigation,
+themes and error boundaries. Use the [managed stands](../operations/local-stands.md)
+for real sessions and membership proof. Type/lint alone do not prove these flows.
+
+## Custom member editor
+
+Use the public `useOrganizationMembers(context.controller, {page, search})` and
+`useMemberRoleAssignments(context.controller, {userId, page, search, section})`
+hooks with that same parent owner. Keep a complete assigned-set snapshot and
+its membership/ACL revision separate from paginated choices and your dirty draft.
+Call `save({expectedMemberId, expectedAclVersion, roleIds})`; inspect `committed`,
+`rejected`, `unknown`, `busy` and `retired` outcomes. A committed result includes
+follow-up status. Never turn a failed follow-up into a claimed write rollback.
+
+The executable `scripts/fixtures/organization-members-headless.mjs` creates a
+separate disposable consumer with a list and inline editor instead of the ready
+table/dialog. `--projected` also selects single-Russian routing, Console disabled
+and Storybook disabled in that fixture. It prints the managed real-stack browser
+command; no standalone sample product route is added to the starter. See the
+[members contract](organization-members.md) for permissions, complete-set/byte
+limits, truthful self-edit warnings and safe recovery.
+
+## Custom invitation manager
+
+Run `node scripts/fixtures/organization-invitations-headless.mjs` to prepare a
+disposable consumer with a persistent inline form beside an invitation list.
+It imports the public organization-context hooks, without the ready invitation
+page, widget or form. The printed managed command exercises create, repeat and
+revoke through the real BFF, the concrete default role, primary/secondary read
+faults, committed-write/failed-refresh recovery, session retirement and accessibility.
+The fixture distinguishes `list.ready` (authority) from `list.available` (the
+current primary read succeeded). Gate writes and cached row presentation with
+`available`; pending/error is not authorization to act on old data. Keep secondary
+role choices independent of revoke. The role-choices hook registers a secondary
+refresh: its failure remains in the local role error and does not fail an
+otherwise successful primary write followup. Display committed success separately from
+followup failure and offer `operation.controller.review()` to refresh current state
+without sending the original command again. Unknown results use `recover()`.
+`--projected` prepares single-Russian routing with Console and Storybook removed
+and route progress disabled. Install dependencies and run the printed browser
+command in that separate copy; preparing it alone does not verify the projection.
+
+This small fixture demonstrates composition, not a complete replacement manager.
+For your product, add your own search/paging, complete-set draft review and
+confirmation UI while retaining the headless operation's identity, generation
+and recovery semantics. See [invitation reuse](invitations.md#reuse-with-your-own-design).

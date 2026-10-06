@@ -1,61 +1,17 @@
 'use client'
+
 import { useTranslations } from 'next-intl'
 
-import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
-import { Button } from '@/shared/ui/button'
-import { Skeleton } from '@/shared/ui/skeleton'
+import { RoleChoices as SharedRoleChoices } from '@/shared/ui/role-choices'
 
-import { RoleChecklist } from './role-checklist'
+import type { RoleChecklist } from './role-checklist'
 
 type Props = React.ComponentProps<typeof RoleChecklist> & {
-  pending: boolean
-  error?: unknown
-  unavailable?: boolean
-  onRetry: () => void
-  retryDisabled?: boolean
+  pending: boolean; error?: unknown; unavailable?: boolean; onRetry(): void; retryDisabled?: boolean
 }
-export function RoleChoices({
-  pending,
-  error,
-  unavailable,
-  onRetry,
-  retryDisabled,
-  ...props
-}: Props) {
+export function RoleChoices(props: Props) {
   const t = useTranslations('organizationMembers')
-  return (
-    <div
-      className="h-64 overflow-y-auto sm:h-[min(25rem,45dvh)]"
-      role="region"
-      aria-label={t('roleList')}
-      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- A scrolling region needs keyboard access even while its children are loading or read-only.
-      tabIndex={0}
-      aria-busy={pending}
-    >
-      {pending ? (
-        <div role="status" className="space-y-3">
-          <span className="sr-only">{t('loading')}</span>
-          {[0, 1, 2].map((key) => (
-            <div key={key} aria-hidden="true" className="flex gap-3 rounded-lg border p-3">
-              <Skeleton className="size-4 shrink-0 motion-reduce:animate-none" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-2/3 motion-reduce:animate-none" />
-                <Skeleton className="h-3 w-1/2 motion-reduce:animate-none" />
-                <Skeleton className="h-3 w-full motion-reduce:animate-none" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : error || unavailable ? (
-        <div className="space-y-3">
-          {error ? <ApiErrorAlert error={error} /> : <p role="status">{t('readUnavailable')}</p>}
-          <Button type="button" variant="outline" disabled={retryDisabled} onClick={onRetry}>
-            {t('retry')}
-          </Button>
-        </div>
-      ) : (
-        <RoleChecklist {...props} />
-      )}
-    </div>
-  )
+  return <SharedRoleChoices {...props} labels={{ system: t('system'), custom: t('custom'),
+    noDescription: t('noDescription'), empty: t('emptyRoles') }} regionLabels={{ roleList: t('roleList'),
+    loading: t('loading'), retry: t('retry'), unavailable: t('readUnavailable') }} />
 }

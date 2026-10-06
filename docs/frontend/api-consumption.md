@@ -83,14 +83,15 @@ or add a response scanner that buffers uploads or SSE.
 
 ## Invitation adapters
 
-Personal recipient journeys use the dedicated `/api/invitation-flows/{flowId}`
-and `/api/invitation-operations/{operationId}` adapters. Success carries the
-current `binding` and safe `data`; confirming a published login is separate from
-explicit invitation acceptance. These adapters never expose backend credentials.
+Organization invitation management uses the dedicated personal, session-fenced
+`/api/product-access/organizations/{id}/invites` family. Its safe responses include
+`binding` and `data`; create/reissue return202. Direct API revoke returns an empty204,
+but its browser adapter returns200 with `{binding,data:{status:"revoked"}}` after
+checking that precise204 acknowledgment. A generic proxy cannot enter the closed
+organization family. Personal recipient journeys instead use
+`/api/invitation-flows/{flowId}` and `/api/invitation-operations/{operationId}`.
 See the [browser contract](../auth/invites.md#browser-bff-contract) and
 [custom composition](../product-admin/integration.md#custom-invitation-forms).
-Invitation management remains available through the direct API; its browser
-adapters and ready management screen are not supplied yet.
 
 ## Server Components: direct backend transport (ADR-079)
 

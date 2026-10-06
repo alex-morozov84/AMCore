@@ -11,6 +11,7 @@ export const LOCALE_PURE_MOVES = Object.freeze([
   '(organization-access)/organizations/page.tsx',
   '(organization-access)/organizations/[id]/page.tsx',
   '(organization-access)/organizations/[id]/members/page.tsx',
+  '(organization-access)/organizations/[id]/invites/page.tsx',
   '(auth)/invite/flow/[flowId]/loading.tsx',
   'providers.tsx',
 ])

@@ -1,0 +1,79 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { localizedFrontendUrl, DEFAULT_LOCALE } from '@amcore/shared'
+import { expect, test } from '@playwright/test'
+import { expectNoAxeViolations } from '../shared/axe'
+import { activeTarget } from '../support/managed-target.mjs'
+import { directApi } from './credential-containment.helpers'
+import { TEST_PASSWORD, uniqueEmail } from './helpers'
+
+test('alternate inline invitation composer uses public headless API through the real BFF', async ({ page, context }) => {
+  const target = activeTarget()
+  const email = uniqueEmail('headless-owner')
+  const invited = uniqueEmail('headless-recipient')
+  const register = await context.request.post('/api/auth/register', { headers: { origin: target.origins.product }, data: { email, password: TEST_PASSWORD } })
+  expect(register.status()).toBe(201)
+  const login = await directApi('auth/login', { email, password: TEST_PASSWORD })
+  const org = await directApi('organizations', { name: 'Custom invitation composition' }, login.accessToken)
+  const t = JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')).organizationInvitations
+  await page.goto(new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, `organizations/${org.id}/invites`)).pathname)
+  await expect(page.getByTestId('custom-headless-invitations')).toBeVisible()
+  const input = page.getByLabel(t.email, { exact: true })
+  await expect(input).toBeEnabled()
+  await input.fill(invited)
+  await expect(page.getByRole('checkbox', { name: 'MEMBER', exact: true })).toBeChecked()
+  const create = page.waitForResponse(r => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/invites'))
+  await page.getByRole('button', { name: t.invite, exact: true }).click()
+  expect((await create).status()).toBe(202)
+  const row = page.getByRole('listitem').filter({ hasText: invited })
+  await expect(row).toBeVisible()
+  await expect(input).toBeEnabled()
+  // Acknowledgment and refreshed primary state are separate: recover without another send.
+  const primary = (url: URL) => url.pathname.endsWith(`/organizations/${org.id}/invites`)
+  let unavailable = true
+  let reissues = 0
+  await page.route(primary, async route => {
+    if (route.request().method() === 'GET' && unavailable) return route.fulfill({ status: 503,
+      contentType: 'application/json', body: JSON.stringify({ errorCode: 'SERVICE_UNAVAILABLE' }) })
+    await route.continue()
+  })
+  await page.route('**/invites/*/reissue', async route => { reissues++; await route.continue() })
+  const repeat = page.waitForResponse(r => r.request().method() === 'POST' && r.url().includes('/reissue'))
+  await row.getByRole('button', { name: t.repeat, exact: true }).click()
+  expect((await repeat).status()).toBe(202)
+  await expect(page.getByText(t.processed, { exact: true })).toBeVisible()
+  await expect(page.getByText(t.refreshFailed, { exact: true })).toBeVisible()
+  await expect(page.locator('[data-slot="alert"]')).toBeVisible()
+  await expect(input).toBeDisabled()
+  await expect(row).toHaveCount(0)
+  unavailable = false
+  await page.getByRole('button', { name: t.reviewCurrent, exact: true }).click()
+  await expect(input).toBeEnabled()
+  await expect(row).toBeVisible()
+  expect(reissues).toBe(1)
+  // Secondary role failure does not block the independent list/revoke path.
+  await page.route('**/invites/role-choices?*', route => route.fulfill({ status: 503,
+    contentType: 'application/json', body: JSON.stringify({ errorCode: 'SERVICE_UNAVAILABLE' }) }))
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(page.locator('[data-slot="alert"]')).toBeVisible()
+  await expect(input).toBeDisabled()
+  await expect(row.getByRole('button', { name: t.revoke, exact: true })).toBeEnabled()
+  const revoke = page.waitForResponse(r => r.request().method() === 'DELETE' && r.url().includes('/invites/'))
+  await row.getByRole('button', { name: t.revoke, exact: true }).click()
+  expect((await revoke).status()).toBe(200)
+  await expect(row).toHaveCount(0)
+  await expect(page.getByText(t.revokedProcessed, { exact: true })).toBeVisible()
+  await expect(page.getByText(t.refreshFailed, { exact: true })).toHaveCount(0)
+  await page.unroute('**/invites/role-choices?*')
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(input).toBeEnabled()
+  // A replacement personal session retires authority, rather than displaying a permanent skeleton.
+  expect((await context.request.post('/api/auth/register', { headers: { origin: target.origins.product },
+    data: { email: uniqueEmail('headless-replacement'), password: TEST_PASSWORD } })).status()).toBe(201)
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(page.getByText(t.denied, { exact: true })).toBeVisible()
+  await expect(input).toBeDisabled()
+  await expect(page.getByTestId('custom-headless-invitations').getByRole('listitem')).toHaveCount(0)
+  expect(await page.getByRole('dialog').count()).toBe(0)
+  await expectNoAxeViolations(page)
+})

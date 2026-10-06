@@ -105,6 +105,7 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/src/app/(auth)/invite/flow/[flowId]/page.tsx',
   'apps/web/src/app/(auth)/invite/flow/[flowId]/loading.tsx',
   'apps/web/src/app/(auth)/invite/unusable/page.tsx',
+  'apps/web/src/app/(organization-access)/organizations/[id]/invites/page.tsx',
   'apps/web/src/app/auth/callback/route.ts',
   'apps/web/src/app/(auth)/forgot-password/page.tsx',
   'apps/web/src/app/(auth)/resend-verification/page.tsx',

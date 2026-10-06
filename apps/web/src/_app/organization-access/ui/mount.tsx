@@ -1,6 +1,8 @@
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { isOrganizationContextId } from '@amcore/shared'
 
+import { readOrganizationContext } from '@/entities/organization-context/index.server'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { redirectToLogin } from '@/shared/api/bff/dal'
 import { SessionNotFoundError } from '@/shared/api/bff/errors'
@@ -23,8 +25,17 @@ export async function OrganizationAccessMount({
 }) {
   if (id !== undefined && !isOrganizationContextId(id)) notFound()
   let admission
+  let initialOrganizationName: string | undefined
+  let initialCanManageTeamAccess = false
   try {
     admission = await safeOrganizationAdmission()
+    if (id) {
+      const context = await readOrganizationContext(id, {
+        headers: await headers(), expectedSession: admission.binding,
+      })
+      initialOrganizationName = context.data.organization.name
+      initialCanManageTeamAccess = context.data.canManageTeamAccess
+    }
   } catch (error) {
     if (
       error instanceof SessionNotFoundError ||
@@ -32,6 +43,7 @@ export async function OrganizationAccessMount({
     ) {
       return redirectToLogin()
     }
+    if (error instanceof ContextRequestError && [403, 404].includes(error.status)) notFound()
     throw error
   }
   const search = await searchParams
@@ -45,6 +57,8 @@ export async function OrganizationAccessMount({
       placement={placement}
       admission={admission}
       id={id}
+      initialOrganizationName={initialOrganizationName}
+      initialCanManageTeamAccess={initialCanManageTeamAccess}
       page={page}
       explicitList={search.view === 'list'}
     />

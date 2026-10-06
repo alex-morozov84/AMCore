@@ -12,6 +12,7 @@ import { OrganizationSelect } from '@/features/organization-select'
 import { Alert, AlertDescription } from '@/shared/ui/alert'
 import { BackLink } from '@/shared/ui/back-link'
 import { Button } from '@/shared/ui/button'
+import { PageTitle } from '@/shared/ui/page-title'
 import { SectionNavigation } from '@/shared/ui/section-navigation'
 import { OrganizationContextSummary } from '@/widgets/organization-context-summary'
 
@@ -21,10 +22,13 @@ import { OrganizationAccessFailure } from './context-failure'
 import { OrganizationAccessSkeleton } from './context-skeleton'
 
 export interface OrganizationAccessClientProps {
+  initialOrganizationName?: string
+  initialCanManageTeamAccess?: boolean
   admission: ProductAccessBootstrap
   input: OrganizationContextInput
   explicitList: boolean
   membersHref?: (id: string) => string
+  invitationsHref?: (id: string) => string
   contextHref: (id: string) => string
   pageHref: (page: number) => string
   listHref: string
@@ -37,12 +41,15 @@ export interface OrganizationAccessClientProps {
 export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
   const t = useTranslations('organizationAccess')
   const membersT = useTranslations('organizationMembers')
+  const invitesT = useTranslations('organizationInvitations')
   const { admission, input } = props
-  const { state, data, refresh } = useOrganizationContext(admission.binding, input)
+  const { state, data, refresh, initialPending } = useOrganizationContext(admission.binding, input)
   const navigation = useAccessNavigation({ ...props, state, data, refresh })
   const { heading, selected, list, context, inconsistent, autoOpen } = navigation
   const pending = state.status === 'pending' || autoOpen
-  const title = context?.organization.name ?? (selected ? t('organization') : t('title'))
+  const title = selected ? context?.organization.name ?? (initialPending ? props.initialOrganizationName : undefined) : t('title')
+  const sectionId = context?.canManageTeamAccess ? context.organization.id :
+    initialPending && props.initialCanManageTeamAccess && input.kind === 'selected' ? input.id : undefined
   const refreshDisabled =
     pending || Boolean(state.retryAt) || state.status === 'changed' || state.status === 'missing'
 
@@ -51,14 +58,14 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
       {selected && <BackLink href={props.listHref}>{t('all')}</BackLink>}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
-          <h1
+          <PageTitle
             ref={heading}
             tabIndex={-1}
             className="break-words text-2xl font-semibold tracking-tight outline-none"
           >
             {title}
-          </h1>
-          <p className="text-muted-foreground">{selected ? t('current') : t('choose')}</p>
+          </PageTitle>
+          {!selected && <p className="text-muted-foreground">{t('choose')}</p>}
         </div>
         <Button variant="outline" disabled={refreshDisabled} onClick={navigation.refresh}>
           <RefreshCw
@@ -68,20 +75,21 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
           {pending ? t('checking') : t('refresh')}
         </Button>
       </div>
-      {context?.canManageTeamAccess && props.membersHref && (
+      {sectionId && props.membersHref && (
         <SectionNavigation
           label={membersT('sections')}
           items={[
             {
               label: membersT('overview'),
-              href: props.contextHref(context.organization.id),
+              href: props.contextHref(sectionId),
               active: true,
             },
             {
               label: membersT('title'),
-              href: props.membersHref(context.organization.id),
+              href: props.membersHref(sectionId),
               active: false,
             },
+            ...(props.invitationsHref ? [{ label: invitesT('title'), href: props.invitationsHref(sectionId), active: false }] : []),
           ]}
         />
       )}

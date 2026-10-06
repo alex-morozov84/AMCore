@@ -46,8 +46,6 @@ find for something, that page is under-documented; please open an issue.
 | Add an environment variable                                                                    | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)                     |
 | Add an external service / infra dependency                                                     | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency)       |
 | Add UI copy, a locale, or an error message                                                     | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                            |
-| Accept an organization invitation or build a custom recipient screen | [`product-admin/invitations.md`](product-admin/invitations.md) — account, verification and consent scenarios |
-| Invite people to an organization | [`auth/invites.md`](auth/invites.md) — API contracts, role intent, command recovery and controlled upgrade |
 | Configure auth, OAuth, sessions                                                                | [`auth/`](auth/README.md)                                                                                                               |
 | Set up RBAC / authorization                                                                    | [`auth/rbac.md`](auth/rbac.md)                                                                                                          |
 | Discover implemented actions, author permission presets, or add a resource                     | [`auth/capability-catalogue.md`](auth/capability-catalogue.md)                                                                          |
@@ -138,7 +136,8 @@ provide an operator interface for admin session management.
   and the `ROUTE_PROGRESS_ENABLED` dev/agent flag.
 - **[Product administration foundation](product-admin/README.md)** — the
   organization selector and read-only overview, one-placement integration and
-  headless extension path; product-domain management UI remains downstream-owned.
+  headless extension path, members/roles and [invitations](product-admin/invitations.md);
+  product-domain management UI remains downstream-owned.
 - **[Operations Console](operations-console/README.md)** — the optional
   `SUPER_ADMIN` control plane: Overview readiness, API/web identity and local
   resources, read-only Background work queue state, user and organization details,

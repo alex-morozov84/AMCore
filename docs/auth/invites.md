@@ -203,8 +203,13 @@ clients rather than manually duplicating schemas. A flow binding is
 credentials. Requests also require the current HttpOnly browser proof, exact
 origin and appropriate personal session. Changed authority retires the flow.
 
-Invitation managers use the direct API described above. Browser management
-adapters and its ready screen are not supplied yet.
+Management paths under `/api/product-access/organizations/{orgId}` mirror
+`invites`, `invites/role-choices`, `invites/{id}/reissue`,
+`invites/{id}?expectedGeneration=...` and `invite-operations/{operationId}`.
+Send `X-AMCore-Context-Session` from current bootstrap and an operation header
+for commands. Success uses `{binding,data}`. Create/reissue return 202; browser
+revoke returns 200 with `data:{status:"revoked"}` only after direct API empty 204.
+Unknown outcomes retain the same operation ID and complete command.
 
 | Method and path suffix under `/api/invitation-flows/{flowId}` | Body | Successful result |
 | --- | --- | --- |

@@ -1,0 +1,80 @@
+'use client'
+
+import { useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
+import type { ProductAccessBootstrap } from '@amcore/shared'
+
+import { useInvitationManagerOperations, useInvitationRoleChoices, useOrganizationContext, useOrganizationInvitations } from '@/entities/organization-context'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+import { Input } from '@/shared/ui/input'
+import { Skeleton } from '@/shared/ui/skeleton'
+
+// Alternate persistent inline composer: no ready invitation feature/widget imports.
+export function CustomInvitations({ admission, organizationId }: {
+  admission: ProductAccessBootstrap; organizationId: string; initialOrganizationName?: string;
+  query?: unknown; invalidQuery?: boolean; listHref?: string; backHref?: string;
+  membersHref?: string; invitationsHref?: string;
+}) {
+  const locale = useLocale()
+  const t = useTranslations('organizationInvitations')
+  const access = useOrganizationContext(admission.binding, { kind: 'selected', id: organizationId, locale })
+  const list = useOrganizationInvitations(access.controller, { page: 1, limit: 20, search: '', status: 'pending' })
+  const roles = useInvitationRoleChoices(access.controller, { page: 1, limit: 20, search: '' })
+  const operation = useInvitationManagerOperations(access.controller)
+  const [email, setEmail] = useState('')
+  const [reviewing, setReviewing] = useState(false)
+  const [reviewError, setReviewError] = useState<unknown>()
+  const [selected, setSelected] = useState<string[]>()
+  const roleIds = selected ?? (roles.data ? [roles.data.defaultRole.id] : [])
+  const primaryAvailable = list.available
+  const denied = !['ready', 'pending'].includes(access.state.status)
+  const editable = primaryAvailable && roles.available &&
+    (operation.status === 'idle' || (operation.status === 'committed' && operation.followup === 'ready'))
+  return <section className="space-y-6" data-testid="custom-headless-invitations">
+    <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <ApiErrorAlert error={access.state.error ?? list.error ?? roles.error ?? operation.error ?? reviewError} />
+    {denied && <p role="status">{t('denied')}</p>}
+    {Boolean(list.error) && !denied && <Button disabled={list.retryAt !== undefined} onClick={() => void list.refresh().catch(() => undefined)}>{t('retry')}</Button>}
+    {operation.status === 'committed' && <div role="status"><p>{t(operation.result?.status === 'revoked' ? 'revokedProcessed' : 'processed')}</p>
+      {operation.followup !== 'ready' && <p>{t('refreshFailed')}</p>}</div>}
+    {operation.status === 'unknown' && <p role="status">{t('unknownOutcome')}</p>}
+    {operation.status === 'pending' && <p role="status">{t('processing')}</p>}
+    <div className="grid gap-6 md:grid-cols-2">
+      <form className="space-y-3 rounded-lg border p-4" onSubmit={event => {
+        event.preventDefault()
+        if (editable && roleIds.length) void operation.controller.submit({ kind: 'create', input: { email, roleIds } })
+      }}>
+        <label htmlFor="custom-invite-email">{t('email')}</label>
+        <Input id="custom-invite-email" type="email" required value={email} disabled={!editable} onChange={event => setEmail(event.target.value)} />
+        {denied ? null : roles.error ? <Button type="button" disabled={roles.retryAt !== undefined} onClick={() => void roles.refresh().catch(() => undefined)}>{t('retry')}</Button> : !roles.available ? <Skeleton className="h-12 w-full" /> : <fieldset disabled={!editable}>
+          <legend>{t('roles')}</legend>
+          {roles.data?.data.map(role => <label key={role.id} className="flex gap-2">
+            <input type="checkbox" checked={roleIds.includes(role.id)} onChange={event => setSelected(event.target.checked
+              ? [...roleIds, role.id] : roleIds.filter(id => id !== role.id))} />{role.name}
+          </label>)}
+        </fieldset>}
+        <Button type="submit" disabled={!editable || !roleIds.length}>{t('invite')}</Button>
+      </form>
+      {denied || list.error ? null : !primaryAvailable ? <Skeleton className="h-24 w-full" /> : <ul className="space-y-3">
+        {list.data?.data.map(row => <li key={row.id} className="space-y-2 rounded-lg border p-4">
+          <p>{row.email}</p>
+          <Button disabled={!primaryAvailable || !(operation.status === 'idle' || (operation.status === 'committed' && operation.followup === 'ready'))} variant="outline" onClick={() => void operation.controller.submit({
+            kind: 'reissue', inviteId: row.id, input: { mode: 'repeat', expectedGeneration: row.generation },
+          })}>{t('repeat')}</Button>
+          <Button disabled={!primaryAvailable || !(operation.status === 'idle' || (operation.status === 'committed' && operation.followup === 'ready'))} variant="outline" onClick={() => void operation.controller.submit({
+            kind: 'revoke', inviteId: row.id, input: { expectedGeneration: row.generation },
+          })}>{t('revoke')}</Button>
+        </li>)}
+      </ul>}
+    </div>
+    {operation.status === 'unknown' && <Button onClick={() => void operation.controller.recover()}>{t('recover')}</Button>}
+    {(['rejected', 'expired'].includes(operation.status) || (operation.status === 'committed' && operation.followup !== 'ready')) && !denied && <Button disabled={reviewing} onClick={async () => {
+      setReviewing(true); setReviewError(undefined)
+      try { if (!await operation.controller.review()) setReviewError(new Error('AUTHORITY_UNAVAILABLE')) }
+      catch (error) { setReviewError(error) }
+      finally { setReviewing(false) }
+    }}>{t('reviewCurrent')}</Button>}
+    <noscript><p>{t('javascriptRequired')}</p></noscript>
+  </section>
+}

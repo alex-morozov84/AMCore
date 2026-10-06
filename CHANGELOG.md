@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
-- Shared password visibility toggle across product and Console authentication forms.
+- Organization invitation management and explicit recipient consent, complete role
+  intent, generation checks and durable operation recovery; replaceable ready UI.
+  Existing installations require the controlled upgrade described in the invitation guide.
 
-- Invitation recipient journey with explicit consent and replaceable headless presentation.
-  Existing installations require the controlled upgrade in `docs/auth/invites.md`.
+- Shared password visibility toggle across product and Console authentication forms.
 
 - Organization members and atomic multi-role assignment with reusable headless
   hooks, a responsive ready page, debounced search, optimistic revision checks
