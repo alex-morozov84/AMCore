@@ -82,6 +82,11 @@ replacement action, and keeps the uncertain action visible. A `read_only` tool
 has no effect to be unsure about: a failure is a plain failure, and a read-only
 call interrupted by a crash is safely repeated by the next attempt.
 
+An unknown outcome recorded **anywhere** on a run stops it before anything else
+continues, even if a newer approved or requested action exists. A run that holds
+more than one unresolved action cannot say which one took effect, so it also stops
+(`tool_state_inconsistent`) without executing any of them.
+
 A cancel, takeover or deadline that arrives while the tool runs never erases its
 outcome: the result (or the uncertainty) is recorded, nothing further starts, and
 the run ends as the stop cause without applying the tool's result to a transcript

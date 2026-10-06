@@ -141,13 +141,20 @@ backup, see [Backup & restore](./backup-restore.md)).
 2. Verify nothing old is connected:
    `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND application_name IN ('amcore-web', 'amcore-worker', 'amcore-all');`
    must return `0`.
-3. Run `docker compose run --rm migrate`. The first migration repeats that check
-   itself and **fails before changing anything** if an old process is still
-   connected to a database that holds AI data (a fresh install skips it). If it
+3. Run `docker compose run --rm migrate`. Both migrations repeat that check
+   themselves and **fail before changing anything** if a process named
+   `amcore-web`, `amcore-worker` or `amcore-all` is still connected — on **every**
+   database, including a fresh install with empty AI tables (an empty table does
+   not prove an old process cannot write to it later). The check is a tripwire on
+   the connection name, not a permanent fence: it cannot see a client with another
+   name, so keep every old process and auto-restart stopped until the new version
+   starts. In local development, stop `pnpm dev` / the local API before
+   `pnpm --filter api db:migrate` for the same reason. If it
    fails: stop the writer, mark the failed migration rolled back with
    `docker compose run --rm migrate ./node_modules/.bin/prisma migrate resolve --rolled-back 20261005120000_ai_run_ownership_and_effect_identity`,
    then run `docker compose run --rm migrate` again (until it is resolved, Prisma
-   refuses further deploys with `P3009`).
+   refuses further deploys with `P3009`). Test harnesses migrate a fresh database
+   **before** starting the application for exactly this reason.
 4. Start **only** the new version, `web` and `worker`/`all` together.
 
 What the conversion does to existing data: a run's retry counter is converted to

@@ -117,7 +117,8 @@ If several stop causes are visible at once, the first of these wins:
 ## Run Lifetime (Deadline)
 
 Every run gets a server-side, immutable lifetime: `deadlineAt = createdAt +
-AI_RUN_DEADLINE_MS` (default **48 hours**, range 1 minute – 30 days). The clock
+AI_RUN_DEADLINE_MS`, computed in the database from the run's own `createdAt`
+(application clock skew cannot shift it) (default **48 hours**, range 1 minute – 30 days). The clock
 includes queue time, retry backoff and human approval waits; per-call provider
 and tool timeouts are separate and shorter. A run past its lifetime ends
 `expired` / `deadline_exceeded`; an in-flight provider call is aborted when the
@@ -160,8 +161,9 @@ takeover or deadline seen **while** a provider call or tool was running never
 erases what already happened: the call's usage and the tool's outcome are
 recorded, no assistant message is written, and the run ends as the stop cause.
 
-Lock order is the same everywhere — conversation, then run, then approval — so
-approve, cancel, approval expiry, takeover and the lease reaper cannot deadlock.
+Lock order is the same everywhere — conversation, then run, then approval, then
+tool records — so approve, cancel, approval expiry, takeover (waiting and queued
+runs alike) and the lease reaper cannot deadlock.
 
 ## Worker Capacity and Shutdown
 
