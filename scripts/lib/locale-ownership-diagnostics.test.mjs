@@ -5,10 +5,10 @@ import { test } from 'node:test'
 
 import { OWNERSHIP_CODES } from './ownership-errors.mjs'
 import { buildProjectLocalePlan, validateProjectLocaleOwnership } from './project-locale-plan.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 test('catalogue-import diagnostics name the source, target, manifest, and bounded fixes', () => {
-  const copy = createRealRepoCopy()
+  const copy = createWorkingTreeCopy()
   const file = 'apps/web/src/widgets/forgotten-locale-fixture.test.tsx'
   try {
     writeFileSync(
@@ -38,7 +38,7 @@ test('catalogue-import diagnostics name the source, target, manifest, and bounde
 })
 
 test('many missing contributions keep diagnostics bounded', () => {
-  const copy = createRealRepoCopy()
+  const copy = createWorkingTreeCopy()
   try {
     for (let index = 0; index < 12; index += 1) {
       const file = `apps/web/src/widgets/forgotten-${index}.test.tsx`

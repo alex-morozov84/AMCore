@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Organization invitation management and explicit recipient consent, complete role
+  intent, generation checks and durable operation recovery; replaceable ready UI.
+  Existing installations require the controlled upgrade described in the invitation guide.
+
+- Shared password visibility toggle across product and Console authentication forms.
+
 - Organization members and atomic multi-role assignment with reusable headless
   hooks, a responsive ready page, debounced search, optimistic revision checks
   and transactional audit. Shared presentation remains independent of Console.
@@ -62,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Browser accessibility checks wait for finite visual transitions and loaded fonts
+  through one guarded helper, preserving real contrast failures.
+
 - Keep empty optional backend environment values absent after validation, so
   Compose's unset heap override preserves the default readiness and liveness limits.
 
@@ -106,6 +115,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `stop_grace_period: 30s`.
 
 ### Changed
+
+- Web E2E runs independent isolated CI lanes with an unchanged fail-closed
+  aggregate check and a shared local CI reproduction command.
 
 - Docker image builds keep the pnpm store and metadata cache in shared BuildKit
   cache mounts, so rebuilding after a lockfile, prisma or source change no longer

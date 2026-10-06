@@ -6,6 +6,8 @@ export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { validateAdminConsoleStartupOrExit } = await import('@/shared/lib/admin-console-startup')
     validateAdminConsoleStartupOrExit()
+    const { invitationLocalOrigin } = await import('@/shared/api/bff/invitation-cookie')
+    invitationLocalOrigin()
   }
 }
 

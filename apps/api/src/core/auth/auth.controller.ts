@@ -48,6 +48,7 @@ import {
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
 import { resolveSessionIpAddress } from '../../common/utils/verified-visitor-ip'
 import { EnvService } from '../../env/env.service'
+import { invitationHandoffProof } from '../invitations/invitation-auth-handoff'
 
 import { AuthService } from './auth.service'
 import { AvatarService, type AvatarUploadFile } from './avatar.service'
@@ -64,6 +65,7 @@ import {
   RegisterDto,
   ResendVerificationDto,
   ResetPasswordDto,
+  SignupPolicyResponseDto,
   StepUpDto,
   UpdateProfileDto,
   VerifyEmailDto,
@@ -113,9 +115,26 @@ export class AuthController {
     }
   }
 
+  @Get('signup-policy')
+  @Auth(AuthType.None)
+  @ApiOperation({
+    summary:
+      'Read the public signup policy; invitation/account authorization remains server-enforced',
+  })
+  @ZodResponse({ type: SignupPolicyResponseDto, status: 200 })
+  signupPolicy(): { publicSignupEnabled: boolean } {
+    return { publicSignupEnabled: this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED') }
+  }
+
   @Post('register')
   @Auth(AuthType.None)
-  @ApiOperation({ summary: 'Register new user' })
+  @ApiHeader({ name: 'X-Invitation-Auth-Attempt-Id', required: false })
+  @ApiHeader({ name: 'X-Invitation-Handoff-Key', required: false })
+  @ApiHeader({ name: 'X-Invitation-Continuation', required: false })
+  @ApiOperation({
+    summary:
+      'Register under public signup policy; scoped handoff uses the fixed matching invitation email',
+  })
   @ZodResponse({ type: AuthResponseDto, status: 201, description: 'User registered' })
   async register(
     @Body() dto: RegisterDto,
@@ -126,6 +145,14 @@ export class AuthController {
       userAgent: req.headers['user-agent'],
       ipAddress: resolveSessionIpAddress(req, this.env),
       acceptedLocale: negotiateLocale(req),
+      handoff: invitationHandoffProof(
+        req.headers['x-invitation-auth-attempt-id'],
+        req.headers['x-invitation-handoff-key']
+      ),
+      invitationCredential:
+        typeof req.headers['x-invitation-continuation'] === 'string'
+          ? req.headers['x-invitation-continuation']
+          : undefined,
     })
 
     res.cookie('refresh_token', result.refreshToken, this.cookieOptions)
@@ -138,7 +165,16 @@ export class AuthController {
 
   @Post('login')
   @Auth(AuthType.None)
-  @ApiOperation({ summary: 'Login user' })
+  @ApiHeader({
+    name: 'X-Invitation-Auth-Attempt-Id',
+    required: false,
+    description: 'Paired with handoff key and continuation for scoped server auth',
+  })
+  @ApiHeader({ name: 'X-Invitation-Handoff-Key', required: false })
+  @ApiHeader({ name: 'X-Invitation-Continuation', required: false })
+  @ApiOperation({
+    summary: 'Login user; optional scoped invitation handoff requires explicit confirmation',
+  })
   @ZodResponse({ type: AuthResponseDto, status: 200, description: 'Login successful' })
   async login(
     @Body() dto: LoginDto,
@@ -149,6 +185,14 @@ export class AuthController {
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
       sessionIpAddress: resolveSessionIpAddress(req, this.env),
+      handoff: invitationHandoffProof(
+        req.headers['x-invitation-auth-attempt-id'],
+        req.headers['x-invitation-handoff-key']
+      ),
+      invitationCredential:
+        typeof req.headers['x-invitation-continuation'] === 'string'
+          ? req.headers['x-invitation-continuation']
+          : undefined,
     })
 
     res.cookie('refresh_token', result.refreshToken, this.cookieOptions)

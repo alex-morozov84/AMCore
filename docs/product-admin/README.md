@@ -2,7 +2,7 @@
 
 AMCore supplies an Organizations selector and read-only organization overview for
 signed-in members, plus a [members and role-assignment page](organization-members.md)
-for members with full TeamAccess.
+and [invitation management](invitations.md) for members with full TeamAccess.
 
 This product surface is independent of the [Operations Console](../operations-console/README.md), which is restricted to
 platform super-administrators. An organization role does not grant Console access.
@@ -12,10 +12,10 @@ The default pages are `/organizations` and `/organizations/[id]`, with `/en` or
 single membership automatically, and paginates multiple memberships in groups of 20. **All organizations** returns to `?view=list`, preserving list access even
 with one membership. The overview confirms organization, account and team-access
 capability. The “Your access” card reports only the verified team-access decision;
-it does not infer permissions for individual records. It does not provide
-organization editing, role-definition editing or invitation management. The
-[backend invitation lifecycle](../auth/invites.md) provides issuance, acceptance
-and revocation contracts for downstream invitation screens. See the
+it does not infer permissions for individual records. It does not provide organization editing or role-definition editing. The
+Invitations section provides creation, search, repeat/replace and revocation;
+recipients use a separate sign-in, verification and explicit-consent journey.
+See the [invitation API](../auth/invites.md) for contracts and upgrade requirements. See the
 [capability catalogue and access hints](../auth/capability-catalogue.md) for the
 separate discovery, actor and record contracts.
 

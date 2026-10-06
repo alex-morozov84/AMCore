@@ -39,13 +39,13 @@ const CADDY_PAGE = `\t@consolePage path_regexp consolePage ^/(en|ru)(/.*)?$
 \thandle @consolePage {
 \t\trewrite * /{re.consolePage.1}/admin{re.consolePage.2}
 \t\treverse_proxy web:3000 {
-\t\t\theader_up Host {host}
+\t\t\theader_up Host {hostport}
 \t\t}
 \t}
 
 \thandle {
 \t\treverse_proxy web:3000 {
-\t\t\theader_up Host {host}
+\t\t\theader_up Host {hostport}
 \t\t}
 \t}
 `
@@ -81,21 +81,21 @@ const NGINX_SINGLE_PAGE = `    location ^~ /_next/ {
 const CADDY_SINGLE_PAGE = `\t@nextAssets path /_next/*
 \thandle @nextAssets {
 \t\treverse_proxy web:3000 {
-\t\t\theader_up Host {host}
+\t\t\theader_up Host {hostport}
 \t\t}
 \t}
 
 \t@metadata path /favicon.ico /manifest.webmanifest
 \thandle @metadata {
 \t\treverse_proxy web:3000 {
-\t\t\theader_up Host {host}
+\t\t\theader_up Host {hostport}
 \t\t}
 \t}
 
 \t@staticAsset path_regexp staticAsset ^/.*\\.[a-zA-Z0-9]{1,16}$
 \thandle @staticAsset {
 \t\treverse_proxy web:3000 {
-\t\t\theader_up Host {host}
+\t\t\theader_up Host {hostport}
 \t\t}
 \t}
 
@@ -103,14 +103,14 @@ const CADDY_SINGLE_PAGE = `\t@nextAssets path /_next/*
 \thandle @consoleRoot {
 \t\trewrite * /__SLUG__
 \t\treverse_proxy web:3000 {
-\t\t\theader_up Host {host}
+\t\t\theader_up Host {hostport}
 \t\t}
 \t}
 
 \thandle {
 \t\trewrite * /__SLUG__{path}
 \t\treverse_proxy web:3000 {
-\t\t\theader_up Host {host}
+\t\t\theader_up Host {hostport}
 \t\t}
 \t}
 `

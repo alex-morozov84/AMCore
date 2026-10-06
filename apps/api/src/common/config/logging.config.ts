@@ -21,6 +21,9 @@ export type TruncatedBody = {
  */
 const SENSITIVE_QUERY_PARAMS = [
   'token',
+  'ticket',
+  'code',
+  'state',
   'apiKey',
   'search',
   'actorId',
@@ -141,6 +144,9 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
 
           // Tokens & Secrets
           'req.body.token',
+          'req.body.ticket',
+          'req.body.credential',
+          'req.body.cleanupKey',
           'req.body.accessToken',
           'req.body.refreshToken',
           'req.body.apiKey',
@@ -168,6 +174,13 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
           '*.secret',
           '*.passwordHash',
           '*.tokenHash',
+          '*.credential',
+          '*.credentialHash',
+          '*.cleanupKeyHash',
+          'req.headers["x-invitation-continuation"]',
+          'req.headers["x-invitation-handoff-key"]',
+          '*.invitation.credential',
+          '*.invitation.cleanupKey',
           '*.keyHash',
           '*.salt',
 
@@ -210,6 +223,8 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
           // Headers
           'req.headers.authorization',
           'req.headers.cookie',
+          'res.headers["set-cookie"]',
+          'res.headers.location',
           'req.headers["x-api-key"]',
           'req.headers["x-auth-token"]',
           'req.headers["stripe-signature"]',

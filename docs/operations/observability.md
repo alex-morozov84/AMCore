@@ -28,6 +28,9 @@ token-bearing action URLs, AI operator reasons, provider bodies, and other known
 secret-bearing fields. **New code must not log** raw request bodies, rendered
 email bodies, object keys, prompt/provider payloads, or free-form user content
 unless a feature-specific public doc explicitly allows that field.
+Invitation continuation and handoff headers, OAuth authorization code/state and
+login tickets are also redacted. Response `Set-Cookie` and `Location` values are
+redacted because authentication cookies and redirects may carry credentials.
 
 Email addresses in log lines (queued/processed/sent/dead-lettered email jobs)
 are redacted via `redactEmail()` (`a***@example.com` — domain kept, since

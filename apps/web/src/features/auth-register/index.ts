@@ -1,2 +1,2 @@
 export { useRegister } from './model/use-register'
-export { RegisterForm } from './ui/RegisterForm'
+export { RegisterForm, type RegisterFormProps } from './ui/RegisterForm'

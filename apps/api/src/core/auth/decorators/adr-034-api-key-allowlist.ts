@@ -90,12 +90,6 @@ export const ADR_034_APIKEY_ALLOWLIST: readonly HandlerAllowlistEntry[] = [
   // role-ownership narrowings on assign/remove role handlers, but
   // the auth-types matrix is not expected to change.
   {
-    method: RequestMethod.POST,
-    classPath: 'organizations/:orgId/members',
-    handlerPath: 'invite',
-    reason: 'invite — manage:Organization scope per ADR-033.',
-  },
-  {
     method: RequestMethod.DELETE,
     classPath: 'organizations/:orgId/members',
     handlerPath: ':userId',

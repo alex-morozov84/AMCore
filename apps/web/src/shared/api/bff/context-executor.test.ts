@@ -37,6 +37,60 @@ const operation = {
 }
 
 describe('typed context executor', () => {
+  it('preserves exact202 invitation acknowledgment with code-owned operation proof', async () => {
+    const { deps, expected } = fixture()
+    const operationId = '01900000-0000-7000-8000-000000000000'
+    deps.fetch = vi.fn().mockResolvedValue(Response.json({ status: 'invited' }, { status: 202 }))
+    const result = await executeContextOperation(
+      {
+        method: 'POST',
+        path: '/api/v1/organizations/org-a/invites',
+        organizationId: 'org-a',
+        body: { email: 'recipient@example.test' },
+        invitationOperationId: operationId,
+        successStatus: 202,
+        schema: z.strictObject({ status: z.literal('invited') }),
+      },
+      {
+        expectedSession: expected,
+        headers: new Headers({ 'x-invitation-operation-id': 'browser-unvalidated-id' }),
+      },
+      deps
+    )
+    expect(result.data).toEqual({ status: 'invited' })
+    const headers = vi.mocked(deps.fetch!).mock.calls[0]![1]!.headers as Headers
+    expect(headers.get('x-invitation-operation-id')).toBe(operationId)
+  })
+
+  it('maps genuinely empty204 to a typed envelope and rejects another2xx or a body', async () => {
+    const { deps, expected } = fixture()
+    const revoke = {
+      method: 'DELETE' as const,
+      path: '/api/v1/organizations/org-a/invites/invite-a',
+      organizationId: 'org-a',
+      bodyMode: 'empty' as const,
+      successStatus: 204 as const,
+      acknowledgment: { status: 'revoked' as const },
+      schema: z.strictObject({ status: z.literal('revoked') }),
+    }
+    deps.fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    expect(
+      await executeContextOperation(
+        revoke,
+        { expectedSession: expected, headers: new Headers() },
+        deps
+      )
+    ).toEqual({ binding: expected, data: { status: 'revoked' } })
+    deps.fetch = vi.fn().mockResolvedValue(Response.json({ status: 'revoked' }, { status: 200 }))
+    await expect(
+      executeContextOperation(revoke, { expectedSession: expected, headers: new Headers() }, deps)
+    ).rejects.toMatchObject({ status: 502, errorCode: 'INVALID_UPSTREAM_RESPONSE' })
+    deps.fetch = vi.fn().mockResolvedValue({ ok: true, status: 204, body: new ReadableStream() })
+    await expect(
+      executeContextOperation(revoke, { expectedSession: expected, headers: new Headers() }, deps)
+    ).rejects.toMatchObject({ status: 502 })
+  })
+
   it('rejects another actor and same-actor re-login before refresh/domain work', async () => {
     for (const actorId of ['actor-x', 'actor-y']) {
       const { deps, entry, expected } = fixture(true)

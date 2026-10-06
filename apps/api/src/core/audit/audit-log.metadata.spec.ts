@@ -1,5 +1,26 @@
 import { sanitizeAuditMetadata } from './audit-log.metadata'
 
+describe('invitation role intent audit', () => {
+  it('keeps the complete role set and generation while dropping raw capabilities', () => {
+    expect(
+      sanitizeAuditMetadata('org.invite_accepted', {
+        actorCredentialType: 'jwt',
+        branch: 'accepted',
+        generation: 2,
+        roleIds: ['role-a', 'role-b'],
+        email: 'person@example.test',
+        token: 'fake-token',
+        continuation: 'fake-continuation',
+      })
+    ).toEqual({
+      actorCredentialType: 'jwt',
+      branch: 'accepted',
+      generation: 2,
+      roleIds: ['role-a', 'role-b'],
+    })
+  })
+})
+
 describe('admin.audit_logs.viewed metadata', () => {
   it('retains filter classes and bounded result count without query values', () => {
     expect(

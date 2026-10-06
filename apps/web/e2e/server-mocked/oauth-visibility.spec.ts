@@ -1,6 +1,7 @@
-import { test } from 'next/experimental/testmode/playwright/msw'
 import { expect } from '@playwright/test'
 import { http, HttpResponse } from 'msw'
+
+import { test } from '../shared/auth-test'
 
 /**
  * `getOAuthProviders()` (`shared/api/bff/oauth-providers.ts`) is a

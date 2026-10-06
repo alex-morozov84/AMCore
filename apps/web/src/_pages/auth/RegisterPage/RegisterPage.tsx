@@ -7,9 +7,10 @@ import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 interface RegisterPageProps {
   oauthProviders: string[]
+  publicSignupEnabled?: boolean | null
 }
 
-export function RegisterPage({ oauthProviders }: RegisterPageProps) {
+export function RegisterPage({ oauthProviders, publicSignupEnabled = true }: RegisterPageProps) {
   const t = useTranslations('auth')
 
   return (
@@ -21,8 +22,16 @@ export function RegisterPage({ oauthProviders }: RegisterPageProps) {
         <CardDescription>{t('registerSubtitle')}</CardDescription>
       </CardHeader>
       <CardContent>
-        <OAuthSection providers={oauthProviders} />
-        <RegisterForm />
+        {publicSignupEnabled === true ? (
+          <>
+            <OAuthSection providers={oauthProviders} />
+            <RegisterForm />
+          </>
+        ) : (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t(publicSignupEnabled === false ? 'publicSignupClosed' : 'signupPolicyUnavailable')}
+          </p>
+        )}
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {t('hasAccount')}{' '}
           {/* `underline`, not `hover:underline`: a link inside body text needs

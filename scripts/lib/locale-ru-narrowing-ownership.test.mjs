@@ -55,7 +55,7 @@ test('rejects a mutation that restores a typed EN notification fixture', () => {
 
 test('rejects mutations that restore EN-only default expectations', () => {
   assertResidualMutation('invite.service.spec.ts', (content) =>
-    content.replace("expect(data.locale).toBe('ru')", "expect(data.locale).toBe('en')")
+    content.replace("locale: known ? 'ru' : null", "locale: known ? 'en' : null")
   )
   assertResidualMutation('notification-feed.service.spec.ts', (content) =>
     content.replace("title: 'Профиль обновлён'", "title: 'Profile updated'")

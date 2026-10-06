@@ -1,4 +1,4 @@
-/** Acknowledged writes never wait indefinitely for optional Redis operations. */
+/** Acknowledged writes never wait indefinitely for optional postcommit side effects. */
 export const INVITATION_POST_COMMIT_TIMEOUT_MS = 250
 
 export async function invitationPostCommit(

@@ -10,7 +10,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
 import { ZodResponse } from 'nestjs-zod'
 
@@ -18,6 +18,7 @@ import {
   AuthErrorCode,
   AuthType,
   coerceSupportedLocale,
+  invitationOAuthCorrelationSchema,
   localizedFrontendUrl,
   type OAuthExchangeResponse,
   type OAuthProvidersResponse,
@@ -26,6 +27,8 @@ import {
 import { AppException, NotFoundException } from '../../../common/exceptions'
 import { resolveSessionIpAddress } from '../../../common/utils/verified-visitor-ip'
 import { EnvService } from '../../../env/env.service'
+import { invitationHandoffProof } from '../../invitations/invitation-auth-handoff'
+import { invalidInvitation } from '../../invitations/invitation-locks'
 import { Auth } from '../decorators/auth.decorator'
 import { CurrentUser } from '../decorators/current-user.decorator'
 import { OAuthExchangeDto, OAuthExchangeResponseDto, OAuthProvidersResponseDto } from '../dto'
@@ -75,7 +78,11 @@ export class OAuthController {
 
   @Get(':provider')
   @Auth(AuthType.None)
-  @ApiOperation({ summary: 'Redirect to OAuth provider for login' })
+  @ApiHeader({ name: 'X-Invitation-Continuation', required: false })
+  @ApiHeader({ name: 'X-Invitation-Attempt-Id', required: false })
+  @ApiHeader({ name: 'X-Invitation-Auth-Attempt-Id', required: false })
+  @ApiHeader({ name: 'X-Invitation-Handoff-Key', required: false })
+  @ApiOperation({ summary: 'Start OAuth login with optional server-bound invitation correlation' })
   @ApiResponse({ status: 302, description: 'Redirect to the provider authorization URL' })
   async authorize(
     @Param('provider') provider: string,
@@ -86,7 +93,8 @@ export class OAuthController {
     // carried in the one-time state and applied only on account creation.
     const { url, browserNonce } = await this.oauthService.getAuthorizationURL(
       provider,
-      negotiateLocale(req)
+      negotiateLocale(req),
+      this.invitedStart(req)
     )
     setOAuthBindingCookie(res, provider, browserNonce, this.isProduction)
     res.redirect(url)
@@ -210,6 +218,7 @@ export class OAuthController {
         email: result.accessClaims.email,
         systemRole: result.accessClaims.systemRole,
         sessionId: result.sessionId,
+        ...(result.invitation ? { invitation: result.invitation } : {}),
       })
 
       res.redirect(
@@ -258,6 +267,16 @@ export class OAuthController {
       throw this.invalidExchange()
     }
 
+    if (claims.invitation) {
+      const correlation = invitationOAuthCorrelationSchema.safeParse(claims.invitation)
+      if (!correlation.success || correlation.data.backendSessionId !== session.id)
+        throw this.invalidExchange()
+      await this.sessionService.assertInvitationExchange(
+        correlation.data.attemptId,
+        session.id,
+        claims.userId
+      )
+    }
     const accessToken = this.tokenService.generateAccessToken({
       sub: claims.userId,
       email: claims.email,
@@ -267,7 +286,31 @@ export class OAuthController {
       sid: claims.sessionId,
     })
 
-    return { accessToken }
+    return { accessToken, ...(claims.invitation ? { invitation: claims.invitation } : {}) }
+  }
+
+  private invitedStart(req: Request):
+    | {
+        handoff: NonNullable<ReturnType<typeof invitationHandoffProof>>
+        credential: string
+        attemptId: string
+      }
+    | undefined {
+    const handoff = invitationHandoffProof(
+      req.headers['x-invitation-auth-attempt-id'],
+      req.headers['x-invitation-handoff-key']
+    )
+    const credential = req.headers['x-invitation-continuation']
+    const attemptId = req.headers['x-invitation-attempt-id']
+    if (!handoff && credential === undefined && attemptId === undefined) return undefined
+    if (
+      !handoff ||
+      typeof credential !== 'string' ||
+      typeof attemptId !== 'string' ||
+      attemptId !== handoff.attemptId
+    )
+      throw invalidInvitation()
+    return { handoff, credential, attemptId }
   }
 
   private invalidExchange(): AppException {

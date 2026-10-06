@@ -53,6 +53,65 @@ The bundled worker caches only install icons; it must not serve old HTML, RSC,
 API/version responses or chunks as an offline application. See the
 [deployment contract](../operations/deployment.md#open-tabs-after-a-web-deployment).
 
+## Complete CI E2E locally
+
+Install frozen dependencies and Playwright Chromium, then run from the repository root:
+
+```bash
+node scripts/e2e-ci.mjs --all
+```
+
+This invokes the same lane commands as GitHub with `CI=true`: forbidden `.only`,
+one browser worker per stand and one retry. Locally the lanes run sequentially
+on one machine; GitHub runs each lane on a separate Ubuntu runner. This proves
+matching commands, inventory and settings, not identical OS, hardware or cache timings.
+A nonzero, cancelled or missing lane cannot produce a successful aggregate result.
+Mocked completion waits up to ten seconds for short-lived source processes to
+exit naturally before verified closeout. A remaining process or unavailable
+ownership inventory fails the lane and retains recovery; unproved children are
+never killed to make the check pass.
+
+The lanes are safety/transport, both mocked projects, ordinary path-mode tests,
+disruptive path-mode tests (entire runtime-settings/background-work files), and
+HTTPS host tests when the Console is retained. Every Docker lane owns fresh
+Postgres, Redis, origins, volumes, lease, marker and cleanup. Keep `workers: 1`:
+Redis pauses, runtime-setting revisions and registration IP budgets are shared
+within a stand. Unique emails do not isolate those mechanisms.
+
+Run one lane with `node scripts/e2e-ci.mjs path-standard` (also `safety`, `mocked`,
+`path-disruptive` and `host` when applicable). New ordinary specs automatically join
+`path-standard`; runtime-settings/background-work specs join `path-disruptive`.
+Before grouped execution, the runner collects Playwright's full and selected
+inventories, rejects missing/duplicate tests and writes `inventory.json` under
+that stand. Full original `pnpm stand e2e --lane real-stack` remains available.
+Successful and failed GitHub lanes retain reports/test results/inventories for
+seven days; inspect retries separately from clean passes. The unchanged mandatory
+`Web E2E` result requires every applicable lane to succeed.
+
+## Stable accessibility scans
+
+Use `expectNoAxeViolations(page)` from `e2e/shared/axe.ts`. It waits for loaded
+fonts, resolves layout and observes finite animations/transitions throughout the
+page before running axe once. Nested fades and theme colour transitions are
+included; infinite spinners continue and cannot block this wait. A finite paused
+or stuck transition fails within ten seconds rather than being silently cancelled.
+The helper changes no styles, theme, reduced-motion setting or axe rules.
+For a deliberately scoped scan use `scanAccessibility(page, { include, rules })`
+from the same module and retain assertions on both violations and scanned nodes.
+
+Assert the intended UI state first (for example a loaded view or an open dialog).
+Visual stability does not prove hydration, completed data loading or authority.
+Do not scan a skeleton when the scenario is meant to prove the loaded form.
+Keep normal-motion and reduced-motion behavior checks in their own scenarios.
+ESLint rejects direct runtime imports of axe in E2E outside the shared helper,
+with guidance to use it. Genuine final-state contrast violations remain failures;
+never fix transient results by excluding nodes, disabling contrast or retrying
+scans until one passes. Screenshot `animations: 'disabled'` does not configure axe.
+
+The browser regression covers nested/ancestor finite fades, continuing infinite
+motion and a deliberately bad final contrast that must still fail. This follows
+[Playwright's instruction to reach the intended state before scanning](https://playwright.dev/docs/accessibility-testing).
+
 ## Application alert selectors
 
 Next.js also renders a `role="alert"` route-announcer live region. Browser tests
@@ -161,6 +220,11 @@ fixture (`next/experimental/testmode/playwright/msw`, gated behind
 `PLAYWRIGHT_TEST_PROXY`, which only `playwright.config.ts`'s
 `webServer.env` sets, never a real dev/prod boot) for server-side fetches
 `page.route()` can't reach.
+
+Public-auth scenarios import `test` from `e2e/shared/auth-test.ts`. Its auto fixture
+returns an explicit enabled public signup policy through the server-side proxy;
+a browser `page.route()` cannot supply that SSR policy. Scenarios testing closed
+or unavailable signup must override that endpoint with their intended response.
 
 Current flows: locale redirect, login/register client-side validation
 (no network call reaches the BFF), a mocked API failure rendering the
@@ -524,3 +588,11 @@ there are no independent endpoint overrides. See
 - [Bundle baseline and budget](./bundle-budget.md) — the per-route client
   bundle methodology this verification loop sits alongside, and why it
   rides on a documented baseline rather than a CI-enforced gate today.
+
+Invited-registration browser scenarios share one IP in the serial managed real-stack
+lane. Their fixture resets only `ratelimit:v1:invite-register-ip:*` and the matching
+`InvitationPublicController.register` global IP bucket through lease-checked Redis
+commands before each scenario. The global bucket uses the guard’s existing SHA-256
+controller/handler/IP identity. Per-email and other budgets
+remain intact; production limits are unchanged. Rate-limit enforcement is checked
+separately in API tests. This fixture cannot run against an owner preview.

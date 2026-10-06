@@ -4,29 +4,38 @@ import { useTranslations } from 'next-intl'
 import { type LoginInput, loginSchema } from '@amcore/shared'
 
 import { useLocalizedForm } from '@/shared/hooks'
+import type { CredentialFormAdapter } from '@/shared/lib/credential-form-adapter'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
 import { Input } from '@/shared/ui/input'
+import { PasswordInput } from '@/shared/ui/password-input'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import { useLogin } from '../model/use-login'
 
-export function LoginForm() {
+export interface LoginFormProps {
+  adapter?: CredentialFormAdapter<LoginInput>
+  initialEmail?: string
+  disabled?: boolean
+}
+
+export function LoginForm({ adapter, initialEmail = '', disabled = false }: LoginFormProps = {}) {
+  const passwordT = useTranslations('common')
   const t = useTranslations('auth')
 
   const form = useLocalizedForm<LoginInput>(loginSchema, {
     defaultValues: {
-      email: '',
+      email: initialEmail,
       password: '',
     },
   })
 
   // Pass setError to hook for automatic field-level error handling
-  const { mutate, isPending, error } = useLogin(form.setError)
+  const { mutate, isPending, error } = useLogin(form.setError, adapter)
 
   const onSubmit = (data: LoginInput) => {
-    mutate(data)
+    if (!disabled && !isPending) mutate(data)
   }
 
   return (
@@ -41,7 +50,12 @@ export function LoginForm() {
             <FormItem>
               <FormLabel>{t('email')}</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="email@example.com" {...field} />
+                <Input
+                  type="email"
+                  placeholder="email@example.com"
+                  {...field}
+                  disabled={disabled}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -65,14 +79,19 @@ export function LoginForm() {
                 </RouteProgressLink>
               </div>
               <FormControl>
-                <Input type="password" {...field} />
+                <PasswordInput
+                  showLabel={passwordT('showPassword')}
+                  hideLabel={passwordT('hidePassword')}
+                  {...field}
+                  disabled={disabled}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <Button type="submit" className="w-full" disabled={isPending}>
+        <Button type="submit" className="w-full" disabled={isPending || disabled}>
           {isPending ? t('loggingIn') : t('login')}
         </Button>
       </form>

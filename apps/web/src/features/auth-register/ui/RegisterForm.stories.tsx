@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import messages from '../../../../messages/en.json'
+
 import { RegisterForm } from './RegisterForm'
 
 const meta = {
@@ -26,12 +28,19 @@ export const Submitting: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.type(canvas.getByLabelText(/name/i), 'Jane Doe')
-    await userEvent.type(canvas.getByLabelText(/email/i), 'jane@amcore.dev')
-    await userEvent.type(canvas.getByLabelText(/password/i), 'Correct1Horse')
-    await userEvent.click(canvas.getByRole('button'))
+    await userEvent.type(canvas.getByLabelText(messages.auth.name, { exact: true }), 'Jane Doe')
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.email, { exact: true }),
+      'jane@amcore.dev'
+    )
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.password, { exact: true }),
+      'Correct1Horse'
+    )
+    const submit = canvas.getByRole('button', { name: messages.auth.register })
+    await userEvent.click(submit)
 
-    await waitFor(() => expect(canvas.getByRole('button')).toBeDisabled())
+    await waitFor(() => expect(submit).toBeDisabled())
   },
 }
 
@@ -49,13 +58,20 @@ export const EmailAlreadyExists: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.type(canvas.getByLabelText(/name/i), 'Jane Doe')
-    await userEvent.type(canvas.getByLabelText(/email/i), 'jane@amcore.dev')
-    await userEvent.type(canvas.getByLabelText(/password/i), 'Correct1Horse')
-    await userEvent.click(canvas.getByRole('button'))
+    await userEvent.type(canvas.getByLabelText(messages.auth.name, { exact: true }), 'Jane Doe')
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.email, { exact: true }),
+      'jane@amcore.dev'
+    )
+    await userEvent.type(
+      canvas.getByLabelText(messages.auth.password, { exact: true }),
+      'Correct1Horse'
+    )
+    const submit = canvas.getByRole('button', { name: messages.auth.register })
+    await userEvent.click(submit)
 
     await waitFor(() =>
-      expect(canvas.getByText('An account with this email already exists.')).toBeInTheDocument()
+      expect(canvas.getByText(messages.errors.EMAIL_ALREADY_EXISTS)).toBeInTheDocument()
     )
   },
 }

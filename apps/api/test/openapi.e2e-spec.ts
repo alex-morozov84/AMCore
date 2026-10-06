@@ -66,6 +66,19 @@ const EXPECTED: Record<string, Expected> = {
   'get /auth/oauth/{provider}/callback': { status: '302', kind: 'redirect' },
   'post /auth/oauth/{provider}/callback': { status: '302', kind: 'redirect' },
   'post /auth/oauth/exchange': { status: '200', kind: 'json' },
+  'get /auth/signup-policy': { status: '200', kind: 'json' },
+  'post /auth/invites/continuations': { status: '201', kind: 'json' },
+  'post /auth/invites/continuations/context': { status: '200', kind: 'json' },
+  'post /auth/invites/continuations/inspect': { status: '200', kind: 'json' },
+  'post /auth/invites/inspect': { status: '200', kind: 'json' },
+  'post /auth/invites/register': { status: '201', kind: 'json' },
+  'get /auth/invites/operations/{operationId}': { status: '200', kind: 'json' },
+  'post /auth/invites/auth-handoffs/{attemptId}/confirm': { status: '200', kind: 'json' },
+  'post /auth/invites/auth-handoffs/{attemptId}/abort': { status: '200', kind: 'json' },
+  'post /organizations/{orgId}/invites': { status: '202', kind: 'json' },
+  'post /organizations/{orgId}/invites/{inviteId}/reissue': { status: '202', kind: 'json' },
+  'get /organizations/{orgId}/invites/role-choices': { status: '200', kind: 'json' },
+  'get /organizations/{orgId}/invite-operations/{operationId}': { status: '200', kind: 'json' },
   // auth-invites
   'post /auth/invites/accept': { status: '200', kind: 'json' },
   // admin
@@ -107,7 +120,6 @@ const EXPECTED: Record<string, Expected> = {
   'get /organizations/{orgId}/members': { status: '200', kind: 'json' },
   'get /organizations/{orgId}/members/{userId}/roles': { status: '200', kind: 'json' },
   'patch /organizations/{orgId}/members/{userId}/roles': { status: '200', kind: 'json' },
-  'post /organizations/{orgId}/members/invite': { status: '202', kind: 'json' },
   'delete /organizations/{orgId}/members/{userId}': { status: '204', kind: 'none' },
   'post /organizations/{orgId}/members/{userId}/roles/{roleId}': { status: '204', kind: 'none' },
   'delete /organizations/{orgId}/members/{userId}/roles/{roleId}': { status: '204', kind: 'none' },
@@ -355,7 +367,7 @@ describe('OpenAPI success surface (e2e)', () => {
     for (const status of ['200', '400', '401', '403', '409', '429', '503'])
       expect(accept.responses[status]).toBeDefined()
     expect(accept.security).toEqual([{ bearer: [] }])
-    const create = document.paths['/organizations/{orgId}/members/invite']!.post!
+    const create = document.paths['/organizations/{orgId}/invites']!.post!
     for (const status of ['202', '400', '401', '403', '404', '409', '429', '503'])
       expect(create.responses[status]).toBeDefined()
     expect(create.responses['202']).toEqual(

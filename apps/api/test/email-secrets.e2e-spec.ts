@@ -2,6 +2,8 @@ import type { INestApplication } from '@nestjs/common'
 import type { Job, Queue } from 'bullmq'
 import request from 'supertest'
 
+import { createInvitationOperationId } from '@amcore/shared'
+
 import { QueueName } from '../src/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '../src/infrastructure/queue/queue.service'
 import type { PrismaService } from '../src/prisma'
@@ -138,7 +140,8 @@ describe('Email secret payloads (e2e — EQS-02)', () => {
     await emailQueue.drain(true) // drop the welcome job from registration
 
     await request(app.getHttpServer())
-      .post(`/organizations/${orgId}/members/invite`)
+      .post(`/organizations/${orgId}/invites`)
+      .set('X-Invitation-Operation-Id', createInvitationOperationId())
       .set('Authorization', `Bearer ${orgToken}`)
       .send({ email: 'invitee@example.com' })
       .expect(202)

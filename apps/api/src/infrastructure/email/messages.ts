@@ -56,7 +56,7 @@ export const emailMessages = {
     'orgInvite.title': 'Вас пригласили в {orgName}',
     'orgInvite.intro':
       '{inviterName} ({inviterEmail}) приглашает вас присоединиться к организации «{orgName}» в AMCore.',
-    'orgInvite.roleInfo': 'Вам будет назначена роль: {roleName}.',
+    'orgInvite.roleInfo': 'Вам будут назначены роли: {roleName}.',
     'orgInvite.ctaSignIn': 'Войти и принять приглашение',
     'orgInvite.ctaSignUp': 'Создать аккаунт и присоединиться',
     'orgInvite.expiresInfo':
@@ -112,7 +112,7 @@ export const emailMessages = {
     'orgInvite.title': 'You have been invited to {orgName}',
     'orgInvite.intro':
       '{inviterName} ({inviterEmail}) has invited you to join the "{orgName}" organization on AMCore.',
-    'orgInvite.roleInfo': 'You will be assigned the role: {roleName}.',
+    'orgInvite.roleInfo': 'You will be assigned these roles: {roleName}.',
     'orgInvite.ctaSignIn': 'Sign in to accept the invitation',
     'orgInvite.ctaSignUp': 'Create an account to join',
     'orgInvite.expiresInfo':

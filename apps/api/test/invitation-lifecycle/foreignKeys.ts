@@ -1,6 +1,6 @@
+import { createInvitationOperationId } from '@amcore/shared'
 import { type RequestPrincipal } from '@amcore/shared'
 
-import { registerApiKeyAdmission } from '../../src/core/api-keys/api-key-admission'
 import { ApiKeysService } from '../../src/core/api-keys/api-keys.service'
 import { AbilityFactory } from '../../src/core/auth/casl/ability.factory'
 import { invitationActor } from '../../src/core/organizations/invitation-actor'
@@ -116,7 +116,7 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
   })
 
   it.each([true, false])(
-    'R07 key-backed issuance/org cascade, issuance first=%s',
+    'R07 personal issuance/org cascade, issuance first=%s',
     async (createFirst) => {
       const { context, prisma, pool, invites, orgId, owner, recipient, outcome } = getFixture()
       const key = await context.app.get(ApiKeysService).create(owner.sub, {
@@ -124,16 +124,11 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
         organizationId: orgId,
         scopes: ['manage:TeamAccess'],
       })
-      const principal: RequestPrincipal = {
-        ...owner,
-        type: 'api_key',
-        scopes: ['manage:TeamAccess'],
-      }
+      const principal: RequestPrincipal = owner
       const request = {
         user: principal,
         privilegedAdmission: { authenticated: principal, principal },
       }
-      registerApiKeyAdmission(request, key.id, principal)
       const admitted = invitationActor(request)
       const mail = jest
         .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
@@ -149,7 +144,12 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
         if (createFirst) {
           creating = outcome(
             trackInvitationOperation(() =>
-              invites.createInvite(orgId, { email: recipient.email! }, admitted)
+              invites.createInvite(
+                orgId,
+                { email: recipient.email! },
+                admitted,
+                createInvitationOperationId()
+              )
             )
           )
           await fence!.waitFor(creating)
@@ -171,7 +171,12 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
           await client.query('DELETE FROM core.organizations WHERE id=$1', [orgId])
           creating = outcome(
             trackInvitationOperation(() =>
-              invites.createInvite(orgId, { email: recipient.email! }, admitted)
+              invites.createInvite(
+                orgId,
+                { email: recipient.email! },
+                admitted,
+                createInvitationOperationId()
+              )
             )
           )
           await observeInvitationWait(pool, creating, pid, 'core.organizations')
@@ -198,7 +203,7 @@ export function registerForeignKeysProofs(getFixture: () => InvitationProofFixtu
     await prisma.role.delete({ where: { id: role.id } })
     expect(await outcome(accept(token))).toBe(400)
     const after = await truth(invite.id)
-    expect(after.invite!.roleId).toBeNull()
+    expect(after.invite!.roleIntents[0]?.liveRoleId).toBeNull()
     expect(after.invite!.acceptedAt).toBeNull()
     expect(after.members).toEqual([])
   })

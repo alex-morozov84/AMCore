@@ -122,7 +122,8 @@ describe('AuthService', () => {
 
     mockEnvService = {
       get: jest.fn((key: string) => {
-        const values: Record<string, string | number> = {
+        const values: Record<string, string | number | boolean> = {
+          AUTH_PUBLIC_SIGNUP_ENABLED: true,
           FRONTEND_URL: 'https://app.example.com',
           PASSWORD_RESET_EXPIRY_MINUTES: 15,
           EMAIL_VERIFICATION_EXPIRY_HOURS: 48,
@@ -166,7 +167,8 @@ describe('AuthService', () => {
       mockCache as never,
       mockLoginRateLimiter,
       mockNotifications as never,
-      mockLogger
+      mockLogger,
+      {} as never
     )
 
     jest.clearAllMocks()

@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt'
 import { Pool } from 'pg'
 import request from 'supertest'
 
+import { createInvitationOperationId } from '@amcore/shared'
 import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
 
 import { AuditLogService } from '../src/core/audit'
@@ -25,6 +26,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { acceptInvitationForTest, invitationSeedRole } from './helpers/invitation-contract'
 import { holdMemberTransaction, waitForDbBlock } from './helpers/organization-members-race'
 const jest = import.meta.jest
 
@@ -628,7 +630,7 @@ describe('Organization member reads and atomic role set (real DB)', () => {
           organizationId: orgId,
           email: invitee.email,
           emailCanonical: invitee.email,
-          roleId,
+          ...(await invitationSeedRole(prisma, roleId)),
           invitedById: principal().sub,
           tokenHash: createHash('sha256').update(rawToken).digest('hex'),
           expiresAt: new Date(Date.now() + 60000),
@@ -637,13 +639,13 @@ describe('Organization member reads and atomic role set (real DB)', () => {
       const input = await dto([])
       const hold = holdMemberTransaction(prisma, order === 'replace-first')
       const accept = () =>
-        context.app
-          .get(InviteService)
-          .acceptInvite(
-            rawToken,
-            { type: 'jwt', sub: invitee.sub, email: invitee.email, systemRole: SystemRole.User },
-            '127.0.0.1'
-          )
+        acceptInvitationForTest(
+          context.app.get(InviteService),
+          prisma,
+          rawToken,
+          { type: 'jwt', sub: invitee.sub, email: invitee.email, systemRole: SystemRole.User },
+          '127.0.0.1'
+        )
       let second: Promise<unknown> | undefined
       const first = order === 'accept-first' ? accept() : save(input).then((r) => r)
       try {
@@ -701,11 +703,35 @@ describe('Organization member reads and atomic role set (real DB)', () => {
         const email = `fence-${kind}-${inviteFirst}@example.test`
         const invites = context.app.get(InviteService)
         if (kind === 'reissue')
-          await invites.createInvite(orgId, { email, roleId: role.id }, inviteActor())
+          await invites.createInvite(
+            orgId,
+            { email, roleIds: [role.id] },
+            inviteActor(),
+            createInvitationOperationId()
+          )
+        const existing =
+          kind === 'reissue'
+            ? await prisma.orgInvite.findFirstOrThrow({
+                where: { organizationId: orgId, emailCanonical: email },
+              })
+            : null
         const trace: string[] = []
         const hold = holdMemberTransaction(prisma, false, trace)
         const inviting = () =>
-          invites.createInvite(orgId, { email, roleId: role.id }, inviteActor())
+          existing
+            ? invites.reissueInvite(
+                orgId,
+                existing.id,
+                { mode: 'replace', expectedGeneration: existing.generation, roleIds: [role.id] },
+                inviteActor(),
+                createInvitationOperationId()
+              )
+            : invites.createInvite(
+                orgId,
+                { email, roleIds: [role.id] },
+                inviteActor(),
+                createInvitationOperationId()
+              )
         const deleting = () => context.app.get(RoleService).deleteRole(orgId, role.id, principal())
         const first = (inviteFirst ? inviting() : deleting()).then(
           () => 'ok',
@@ -725,6 +751,7 @@ describe('Organization member reads and atomic role set (real DB)', () => {
             inviteFirst
               ? [
                   'advisory',
+                  ...(kind === 'create' ? ['advisory'] : []),
                   'parent',
                   'invite:findFirst',
                   kind === 'create' ? 'invite:create' : 'invite:update',
@@ -734,10 +761,10 @@ describe('Organization member reads and atomic role set (real DB)', () => {
           expect(await second).toBe(inviteFirst ? 'ok' : 'rejected')
           expect(await prisma.role.count({ where: { id: role.id } })).toBe(0)
           const rows = await pool.query(
-            'SELECT "roleId" FROM core.org_invites WHERE "organizationId"=$1 AND "emailCanonical"=$2',
+            'SELECT ri."liveRoleId" FROM core.org_invite_role_intents ri JOIN core.org_invites i ON i.id=ri."inviteId" WHERE i."organizationId"=$1 AND i."emailCanonical"=$2',
             [orgId, email]
           )
-          expect(rows.rows.every((r) => r.roleId === null)).toBe(true)
+          expect(rows.rows.every((r) => r.liveRoleId === null)).toBe(true)
         } finally {
           hold.restore()
           await Promise.allSettled([first, ...(second ? [second] : [])])

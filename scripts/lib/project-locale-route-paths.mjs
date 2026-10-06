@@ -11,6 +11,8 @@ export const LOCALE_PURE_MOVES = Object.freeze([
   '(organization-access)/organizations/page.tsx',
   '(organization-access)/organizations/[id]/page.tsx',
   '(organization-access)/organizations/[id]/members/page.tsx',
+  '(organization-access)/organizations/[id]/invites/page.tsx',
+  '(auth)/invite/flow/[flowId]/loading.tsx',
   'providers.tsx',
 ])
 
@@ -22,6 +24,10 @@ export const LOCALE_REWRITTEN_MOVES = Object.freeze([
   '(auth)/resend-verification/page.tsx',
   '(auth)/reset-password/page.tsx',
   '(auth)/verify-email/page.tsx',
+  '(auth)/invite/accept/route.ts',
+  '(auth)/invite/bootstrap/[pendingId]/route.ts',
+  '(auth)/invite/flow/[flowId]/page.tsx',
+  '(auth)/invite/unusable/page.tsx',
   'auth/callback/route.ts',
   'layout.tsx',
 ])

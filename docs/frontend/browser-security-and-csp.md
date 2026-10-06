@@ -124,6 +124,22 @@ the request nonce where supported, and never silence console noise by adding
 during normal navigation (the queue board's Google Fonts message above is the one documented
 exception, on that separate page); see [Testing](./testing.md#csp-and-security-headers).
 
+## Invitation browser proof
+
+Invitation continuation uses a separate HttpOnly browser proof. HTTPS uses
+`__Host-amcore_invite_browser` with Secure, SameSite=Lax, Path=/ and no Domain.
+The owner lifetime is an absolute24 hours; another invitation does not extend it.
+Duplicate proof cookies are rejected. The proof alone grants no organization access.
+
+For local HTTP only, set `WEB_INVITATION_LOCAL_HTTP_ORIGIN` to the exact canonical
+loopback origin also listed in `WEB_TRUSTED_ORIGINS`, for example
+`http://localhost:3002`. It uses the distinct `amcore_invite_browser_local` cookie
+with Secure=false and the same remaining options. An empty setting requires HTTPS.
+The exception is checked at server startup; public HTTP hosts, URL credentials,
+paths, queries and noncanonical origins are rejected. `NODE_ENV` and forwarded
+host headers do not authorize an HTTP exception. This configuration does not
+relax CSRF checks or other session-cookie policies.
+
 ## HSTS
 
 `Strict-Transport-Security` is emitted unconditionally (not gated on

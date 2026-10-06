@@ -5,14 +5,14 @@ import assert from 'node:assert/strict'
 import { symlinkSync, writeFileSync } from 'node:fs'
 import { prepareProjectInit } from './project-init-plan.mjs'
 import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 import { SCAFFOLD_COVERING_SCENARIOS } from './scaffold-covering-recipes.mjs'
 import { parseProjectFlags } from './project-flags.mjs'
 import { assertManagedStandProjection } from './scaffold-managed-stand-assertions.mjs'
 
 for (const scenario of SCAFFOLD_COVERING_SCENARIOS)
   test(`managed runtime projects with ${scenario.name}`, async () => {
-    const copy = createRealRepoCopy()
+    const copy = createWorkingTreeCopy()
     try {
       const flags = parseProjectFlags(scenario.flags)
       const plan = prepareProjectInit(copy.root, flags, 'panel')
@@ -29,7 +29,7 @@ for (const scenario of SCAFFOLD_COVERING_SCENARIOS)
   })
 
 test('a new managed helper importing Console verification requires ownership', () => {
-  const copy = createRealRepoCopy()
+  const copy = createWorkingTreeCopy()
   try {
     writeFileSync(
       `${copy.root}/scripts/stand/forgotten.test.mjs`,

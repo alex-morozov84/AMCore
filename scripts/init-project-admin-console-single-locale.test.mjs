@@ -13,6 +13,9 @@ afterEach(() => copies.splice(0).forEach((fixture) => fixture.cleanup()))
 
 function copy() {
   const fixture = createRealRepoCopy()
+  // Exercise the matching current proxy input alongside the current transform.
+  writeFileSync(path.join(fixture.root, "docker/caddy/Caddyfile.console-host"),
+    readFileSync(new URL("../docker/caddy/Caddyfile.console-host", import.meta.url)))
   commit(fixture.root)
   copies.push(fixture)
   return fixture.root

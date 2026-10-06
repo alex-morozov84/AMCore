@@ -80,6 +80,13 @@ compiler works.
 
 ## Story scope and placement
 
+Stories use UTC as the deterministic provider time zone. A story can provide
+`parameters.messages` with the complete namespaces its component consumes;
+otherwise it uses the default catalogue. Keep raw code-keyed lookup dictionaries
+outside a next-intl message fixture: dots in those keys represent nesting to
+next-intl. Components displaying account-local dates receive that account's time
+zone explicitly, independently of the workshop default.
+
 Story files are **co-located** next to source (`button.stories.tsx` beside
 `button.tsx`), matching the existing `*.test.tsx` convention — no separate
 `stories/` tree. Current coverage:
@@ -266,6 +273,15 @@ instead of running it for you.
 CI runs `build-storybook` then `test:storybook` in a dedicated `storybook`
 job (`.github/workflows/ci.yml`), separate from `web-e2e` — no
 Docker/Postgres/Redis needed since every story's API surface is mocked.
+
+For a focused consent-story locale regression, run
+`node apps/web/.storybook/projection-tests/consent.mjs` from the repository root.
+It materializes the single-EN and single-RU consent stories with Storybook retained,
+renders the real consent component with the selected catalogue, and executes the
+Ready and UnknownOutcome `play` assertions in jsdom. It uses installed web
+dependencies and an automatically removed temporary directory. This focused DOM
+check does not replace the browser Storybook/a11y gate or the generated matrix.
+The harness belongs to `.storybook/` and is removed by Storybookoff.
 
 ## See also
 

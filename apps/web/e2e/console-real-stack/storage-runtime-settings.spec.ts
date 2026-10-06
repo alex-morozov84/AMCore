@@ -27,7 +27,7 @@ test('Overview Edit/Cancel/Save and operator reset in HTTPS host topology', asyn
     expect((await operator.goto('/en'))?.status()).toBe(404)
     await operator.goto('/en/login')
     await operator.getByLabel(/email/i).fill(email)
-    await operator.getByLabel(/password/i).fill('Test1234Secure')
+    await operator.getByLabel(/^password$/i).fill('Test1234Secure')
     await operator.getByRole('button', { name: /sign in/i }).click()
     await expect(operator).toHaveURL(/\/en\/?$/)
     await storageSettingJourney(operator, '/api/runtime-settings/storage-probe')

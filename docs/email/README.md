@@ -41,6 +41,13 @@ attempt history. Use `EmailService` for transactional email infrastructure.
 | `org-invite`         | Secret-bearing direct (`acceptUrl`)                |
 | `notification`       | Notification-channel template, not the email queue |
 
+Organization invitation emails display the complete role names captured at
+issuance (for example `MEMBER, Analyst`). The localized CTA points to the original
+invitation ingress; sending is best-effort after the database decision commits.
+A 202 acknowledgment is not delivery proof. Disable provider link tracking and
+redact initial query tokens in ingress logs; see
+[invitation security and operations](../auth/invites.md#security-limits-and-operations).
+
 ## Quick Decision Table
 
 | Need                                                        | Use                                            |

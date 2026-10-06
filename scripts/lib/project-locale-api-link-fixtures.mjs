@@ -2,7 +2,7 @@ import ts from 'typescript'
 
 import { findAllNodes, findUniqueNode } from './path-algebra-ast-query.mjs'
 import { normalizeRussianFixtureLiterals } from './project-locale-api-simple-fixtures.mjs'
-import { callName, testCall } from './project-locale-ast-helpers.mjs'
+import { testCall } from './project-locale-ast-helpers.mjs'
 
 function replaceRussianAccesses(model, locale, ctx) {
   const names = findAllNodes(
@@ -49,36 +49,12 @@ export function rewriteEmailDeliverer(model, locale, ctx) {
 }
 
 export function rewriteInviteService(model, locale, ctx) {
+  // Command tests capture recipient locale; link construction now belongs to dispatch.
+  findUniqueNode(model, (node) => ts.isCallExpression(node) &&
+    node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text ===
+    'acknowledges known=%s nonmembers uniformly and captures truthful email intent',
+    { ...ctx, describe: 'issuance snapshot parameterized test' })
   normalizeRussianFixtureLiterals(model, locale, ctx)
-  const test = testCall(
-    model,
-    'sends an org invite email with hasAccount=true for a known non-member',
-    ctx
-  )
-  const regex = findUniqueNode(
-    model,
-    (node) => ts.isRegularExpressionLiteral(node) && node.text.includes('/ru\\/invite'),
-    { ...ctx, describe: 'locale-prefixed invite URL regex' },
-    test
-  )
-  model.replaceNode(regex, '/^https:\\/\\/app\\.example\\.com\\/invite\\/accept\\?token=.+/', ctx)
-  const fallback = testCall(
-    model,
-    'sends an org invite email with hasAccount=false for an unknown email',
-    ctx
-  )
-  const expectation = findUniqueNode(
-    model,
-    (node) =>
-      ts.isCallExpression(node) &&
-      callName(node) === 'toBe' &&
-      node.expression.getText() === 'expect(data.locale).toBe' &&
-      ts.isStringLiteral(node.arguments[0]) &&
-      ['en', 'ru'].includes(node.arguments[0].text),
-    { ...ctx, describe: 'unknown-recipient base locale expectation' },
-    fallback
-  )
-  if (locale === 'ru') model.replaceNode(expectation.arguments[0], "'ru'", ctx)
 }
 
 export function rewriteTelegramDeliverer(model, locale, ctx) {

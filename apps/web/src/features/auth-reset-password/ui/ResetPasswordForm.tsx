@@ -16,7 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/shared/ui/form'
-import { Input } from '@/shared/ui/input'
+import { PasswordInput } from '@/shared/ui/password-input'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import {
@@ -41,6 +41,7 @@ interface ResetPasswordFormProps {
  * deletes every session on reset, so there is nothing to resume mid-flow.
  */
 export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
+  const passwordT = useTranslations('common')
   const t = useTranslations('auth')
   const tErrors = useTranslations('errors')
   const [submitted, setSubmitted] = useState(false)
@@ -89,7 +90,11 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             <FormItem>
               <FormLabel>{t('newPassword')}</FormLabel>
               <FormControl>
-                <Input type="password" {...field} />
+                <PasswordInput
+                  showLabel={passwordT('showPassword')}
+                  hideLabel={passwordT('hidePassword')}
+                  {...field}
+                />
               </FormControl>
               <FormDescription>{t('passwordRequirements')}</FormDescription>
               <FormMessage />

@@ -64,6 +64,18 @@ auto-attaching the cookie, and browsers always send `Origin` on cross-origin POS
 The enforced guarantee is therefore: **any browser cross-origin POST must come from an
 allowlisted origin** — which is exactly the situation where cookie-CSRF is possible.
 
+## Invitation browser mutations
+
+Recipient invitation mutations require an explicit `Origin` equal to their
+canonical trusted product origin. Missing Origin, Referer alone, another trusted
+origin and sibling hosts do not satisfy this check. The HttpOnly invitation owner
+proof additionally binds the flow to that browser/origin and current session;
+selectors are not credentials. GET ingress/reads never join or confirm login.
+Manager invitation commands use the strict mutation Origin check in their typed
+product context adapters. This is narrower than the direct API cookie POST
+policy above. See [invitation BFF contracts](invites.md#browser-bff-contract) and
+[proof cookie options](../frontend/browser-security-and-csp.md#invitation-browser-proof).
+
 ## Operations Console host mode
 
 Console login and logout are a narrower, host-only cookie surface. They require

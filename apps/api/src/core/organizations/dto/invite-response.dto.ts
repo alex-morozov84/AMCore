@@ -18,4 +18,4 @@ export class InviteResponseDto extends createZodDto(inviteResponseSchema) {}
 
 export class InviteListResponseDto extends createZodDto(inviteListResponseSchema) {}
 
-export class AcceptInviteResponseDto extends createZodDto(acceptInviteResponseSchema) {}
+export const AcceptInviteResponseDto = createZodDto(acceptInviteResponseSchema)
