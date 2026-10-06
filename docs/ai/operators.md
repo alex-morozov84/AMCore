@@ -55,7 +55,13 @@ missing or not-visible conversations return no-leak `404`.
 - Taking control supersedes unleased queued/waiting bot runs and voids pending
   approvals in the same transaction.
 - Leased running runs are left to the worker fence; they cannot commit stale
-  transcript/progress rows after ownership changes.
+  transcript turns after ownership changes. A tool that was already
+  running keeps its recorded outcome (or its uncertainty) — takeover stops the
+  conversation from progressing, it does not pretend the effect did not happen;
+  nothing is applied to the human-owned transcript and the run ends
+  `cancelled` / `superseded_by_human`.
+- A cancel the owner already recorded on a running run takes precedence over a
+  takeover when both are visible.
 - Operator messages require the actor to currently hold control.
 - Human turns are stored as `role=assistant` with `authorType=user` or
   `authorType=operator`, preserving who wrote the assistant-seat turn.

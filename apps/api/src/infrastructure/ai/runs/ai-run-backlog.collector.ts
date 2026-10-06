@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
+import { AI_RUN_MAX_EPOCHS } from './ai-run.constants'
+
 import { AiRunStatus } from '@/generated/prisma/client'
 import { METRIC_NAMES, MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
@@ -85,7 +87,8 @@ export class AiRunBacklogCollector {
   /**
    * Mirrors `AiRunRepository.claimDueBatch()`'s claim predicate exactly:
    * `status='QUEUED' AND availableAt<=now() AND (nextAttemptAt IS NULL OR
-   * nextAttemptAt<=now()) AND (deadlineAt IS NULL OR deadlineAt>now())`. The
+   * nextAttemptAt<=now()) AND (deadlineAt IS NULL OR deadlineAt>now()) AND
+   * leaseEpoch<AI_RUN_MAX_EPOCHS`. The
    * `deadlineAt` clause matters: a `QUEUED` run past its deadline is
    * unclaimable — `AiRunRecoveryService`'s `@Cron` sweeps it to `EXPIRED`,
    * but only while the worker is up. Omitting this clause here would count
@@ -101,6 +104,7 @@ export class AiRunBacklogCollector {
         AND: [
           { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] },
           { OR: [{ deadlineAt: null }, { deadlineAt: { gt: now } }] },
+          { leaseEpoch: { lt: AI_RUN_MAX_EPOCHS } },
         ],
       },
     })

@@ -55,6 +55,7 @@
     "MEMBER_ROLES_SAVE_UNAVAILABLE": "The role save could not be confirmed.",
     "MEMBER_READ_UNAVAILABLE": "Member data could not be loaded within the size limit. Try a smaller page.",
     "SETTING_REVISION_CONFLICT": "The saved setting changed. Your draft is preserved; review the current revision before saving again.",
+    "AI_RUN_IDEMPOTENCY_CONFLICT": "This idempotency key was already used for a different request. Use a new key, or repeat the original request unchanged.",
     "AUTH_HANDOFF_ALREADY_STARTED": "This sign-in attempt has already started. Sign in again from the invitation.",
     "AUTH_HANDOFF_CONFIRMED": "This sign-in has already been confirmed."
   },

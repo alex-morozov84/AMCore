@@ -71,7 +71,11 @@ export type AiMetricsGuardrailVerdict = 'allow' | 'flag' | 'block'
 /** Tool risk class (lowercase wire form) — a bounded label for tool-invocation metrics (Arc E). */
 export type AiMetricsToolRiskClass = 'safe' | 'sensitive' | 'destructive'
 /** Terminal outcome of one tool invocation (Arc E). */
-export type AiMetricsToolOutcome = 'succeeded' | 'failed' | 'rejected' | 'skipped'
+export type AiMetricsToolOutcome =
+  'succeeded' | 'failed' | 'rejected' | 'skipped' | 'effect_unknown'
+/** Outcome of one run-guard admission: the action was admitted, or refused for a bounded reason. */
+export type AiMetricsRunAdmission =
+  'admitted' | 'cancelled' | 'superseded' | 'expired' | 'lease_lost' | 'shutdown'
 /** Approval kind (lowercase projection of `AiApprovalKind`) (Arc E). */
 export type AiMetricsApprovalKind = 'tool_invocation' | 'handoff' | 'sensitive_action'
 /** Approval lifecycle state (lowercase projection of `AiApprovalState`) (Arc E). */
@@ -170,6 +174,7 @@ export class MetricsService implements OnModuleDestroy {
   private readonly aiRunRealtimeEventsTotal: Counter<'event' | 'role'>
   private readonly aiToolInvocationsTotal: Counter<'tool_id' | 'risk_class' | 'outcome' | 'role'>
   private readonly aiApprovalsTotal: Counter<'kind' | 'state' | 'role'>
+  private readonly aiRunAdmissionTotal: Counter<'outcome' | 'role'>
   private readonly aiToolLoopSteps: Histogram<'outcome' | 'role'>
   private readonly aiAssistantAdminTotal: Counter<'action' | 'role'>
   private readonly aiConversationControlTotal: Counter<'action' | 'actor_role' | 'role'>
@@ -324,6 +329,10 @@ export class MetricsService implements OnModuleDestroy {
     this.aiApprovalsTotal = this.getOrCreateCounter(METRIC_NAMES.aiApprovalsTotal, {
       help: 'Total AI human-in-the-loop approvals by kind and state (+ process role). No approval/run/user id or reason text is ever a label.',
       labelNames: ['kind', 'state', 'role'],
+    })
+    this.aiRunAdmissionTotal = this.getOrCreateCounter(METRIC_NAMES.aiRunAdmissionTotal, {
+      help: 'Total AI run guard admissions by bounded outcome (admitted, or refused: cancelled, superseded, expired, lease_lost, shutdown) (+ process role). No run/user id is ever a label.',
+      labelNames: ['outcome', 'role'],
     })
     this.aiToolLoopSteps = this.getOrCreateHistogram(METRIC_NAMES.aiToolLoopSteps, {
       help: 'Distribution of bounded agent-loop steps per finished AI run by terminal outcome (+ process role).',
@@ -532,6 +541,15 @@ export class MetricsService implements OnModuleDestroy {
   incAiApproval(kind: AiMetricsApprovalKind, state: AiMetricsApprovalState): void {
     if (!this.enabled) return
     this.aiApprovalsTotal.inc({ kind, state, role: this.role })
+  }
+
+  /**
+   * Count one AI run guard admission (the ownership guard that fences every durable run write). Only the
+   * bounded `outcome` (+ process role) is a label — never a run/conversation/user id.
+   */
+  incAiRunAdmission(outcome: AiMetricsRunAdmission): void {
+    if (!this.enabled) return
+    this.aiRunAdmissionTotal.inc({ outcome, role: this.role })
   }
 
   /**

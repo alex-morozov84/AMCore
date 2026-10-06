@@ -15,6 +15,9 @@ enum AiToolInvocationStatus {
   SUCCEEDED
   FAILED
   SKIPPED
+  /// The tool may or may not have produced its external effect (timeout, crash, unclassified error of
+  /// a side-effecting tool). A stop state: it never authorizes another execution or a new action.
+  OUTCOME_UNKNOWN
 
   @@schema("ai")
 }
@@ -50,24 +53,35 @@ enum AiApprovalState {
 /// One self-hosted tool invocation (Arc E). `argsSnapshot`/`resultSummary` are validated and
 /// redacted — no secrets. Sensitive/destructive tools require an `AiApproval` before execution.
 model AiToolInvocation {
-  id            String                 @id @default(cuid())
-  runId         String
-  toolId        String // stable code-owned tool id
-  status        AiToolInvocationStatus @default(REQUESTED)
-  riskClass     AiToolRiskClass        @default(SAFE)
-  approvalId    String?
-  argsSnapshot  Json? // validated + redacted
-  resultSummary Json? // bounded; no secrets
-  errorCode     String?
-  durationMs    Int?
-  startedAt     DateTime?
-  finishedAt    DateTime?
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
+  id             String                 @id @default(cuid())
+  runId          String
+  toolId         String // stable code-owned tool id
+  status         AiToolInvocationStatus @default(REQUESTED)
+  riskClass      AiToolRiskClass        @default(SAFE)
+  approvalId     String?
+  argsSnapshot   Json? // validated + redacted; the frozen normalized action input
+  resultSummary  Json? // bounded; no secrets
+  errorCode      String?
+  durationMs     Int?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  // Ordinal of the PROVIDER_CALL step that requested this action: with `runId` it identifies ONE
+  // requested action (a provider response carries at most one tool call). NULL on legacy rows.
+  originCall     Int?
+  // `read_only` | `idempotent`, frozen at creation. NULL (legacy) is always treated as side-effecting.
+  idempotency    String?
+  // The run lease epoch that started the execution; result/failure writes must match it.
+  executionEpoch Int?
+  // Set once, in the same transaction as the ordering TOOL_INVOCATION step: the result/rejection has
+  // been applied to the run transcript.
+  appliedAt      DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   run      AiRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
   approval AiApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
 
+  @@unique([runId, originCall])
   @@index([runId])
   @@index([approvalId])
   @@map("ai_tool_invocations")

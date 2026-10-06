@@ -59,6 +59,26 @@ export async function readBotOwnership(
 }
 
 /**
+ * Lock the conversation row `FOR UPDATE` and return its fence columns WITHOUT judging them — the run
+ * guard evaluates every stop cause (cancel, takeover, deadline) together before applying its
+ * precedence, so an early takeover assertion can never hide an already-recorded user cancel.
+ */
+export async function lockBotOwnership(
+  tx: Prisma.TransactionClient,
+  conversationId: string
+): Promise<OwnershipFenceRow | null> {
+  const rows = await tx.$queryRaw<OwnershipFenceRow[]>(Prisma.sql`
+    SELECT "ownershipGeneration",
+           "controlledBy"::text AS "controlledBy",
+           state::text AS state
+    FROM "ai"."ai_conversations"
+    WHERE id = ${conversationId}
+    FOR UPDATE
+  `)
+  return rows[0] ?? null
+}
+
+/**
  * Lock the conversation row `FOR UPDATE` inside a durable-write tx and assert the run may still write.
  * Throws `ConversationSupersededError` (rolling the tx back) if the generation/control/state moved.
  * The lock also serializes the transcript append against concurrent writers (it replaces the plain

@@ -379,6 +379,22 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(revoke.security).toEqual([{ bearer: [] }])
   })
 
+  it('documents AI run creation errors (idempotency conflict, ownership, no model) and the cancel contract', () => {
+    const create = document.paths['/ai/runs']!.post!
+    for (const status of ['201', '404', '409', '503'])
+      expect(create.responses[status]).toBeDefined()
+    expect(create.responses['409']).toEqual(
+      expect.objectContaining({
+        description: expect.stringContaining('AI_RUN_IDEMPOTENCY_CONFLICT'),
+      })
+    )
+    expect(create.description).toContain('AI_RUN_DEADLINE_MS')
+    expect(create.security).toEqual([{ bearer: [] }])
+    const cancel = document.paths['/ai/runs/{id}/cancel']!.post!
+    for (const status of ['200', '404']) expect(cancel.responses[status]).toBeDefined()
+    expect(cancel.description).toContain('never lost')
+  })
+
   it('documents the apiKeyBearer security scheme on exactly the ADR-034 allowlisted operations', () => {
     // Guards against a dangling security reference: every @ApiSecurity('apiKeyBearer')
     // reference below is meaningless if the scheme itself isn't registered in

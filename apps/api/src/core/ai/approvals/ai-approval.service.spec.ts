@@ -90,7 +90,7 @@ describe('AiApprovalService', () => {
   }
 
   describe('decide — happy path', () => {
-    it('approves: flips approval + invocation, re-queues the run (attemptCount −1), audits in-tx, wakes', async () => {
+    it('approves: flips approval + invocation, re-queues the run (no retry budget spent), audits in-tx, wakes', async () => {
       withLock(lockRow())
       prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
 
@@ -106,9 +106,11 @@ describe('AiApprovalService', () => {
       expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'run-1', status: 'WAITING_APPROVAL' },
-          data: expect.objectContaining({ status: 'QUEUED', attemptCount: { decrement: 1 } }),
+          data: expect.objectContaining({ status: 'QUEUED' }),
         })
       )
+      // A resume neither spends nor refunds retry budget: the counter is never touched.
+      expect(prisma.aiRun.updateMany.mock.calls[0]![0]!.data).not.toHaveProperty('attemptCount')
       expect(prisma.aiToolInvocation.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { approvalId: 'appr-1', status: 'AWAITING_APPROVAL' },

@@ -8,10 +8,19 @@ import { AiRunBacklogCollector } from './runs/ai-run-backlog.collector'
 import { AiRunDispatchProcessor } from './runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from './runs/ai-run-dispatch.service'
 import { AiRunExecutorService } from './runs/ai-run-executor.service'
+import { AiRunGuard } from './runs/ai-run-guard.service'
 import { AiRunLoopExecutor } from './runs/ai-run-loop-executor.service'
 import { AiRunLoopFinalizer } from './runs/ai-run-loop-finalizer.service'
 import { AiRunRecoveryService } from './runs/ai-run-recovery.service'
-import { AiToolDispatcher } from './runs/ai-tool-dispatcher.service'
+import {
+  AI_RUN_CAPACITY_GATE,
+  AI_RUN_SHUTDOWN_LATCH,
+  AiRunCapacityGate,
+  AiRunShutdownLatch,
+} from './runs/ai-run-shutdown'
+import { AiRunTransitions } from './runs/ai-run-transitions.service'
+import { AiToolActionService } from './runs/ai-tool-action.service'
+import { AiToolRecoveryService } from './runs/ai-tool-recovery.service'
 import { AiToolsModule } from './tools/ai-tools.module'
 
 import { AiRealtimeModule } from '@/core/ai/realtime/ai-realtime.module'
@@ -43,7 +52,17 @@ import { PrismaModule } from '@/prisma'
     AiRunLoopFinalizer,
     AiRunApprovalParker,
     AiApprovalExpiryService,
-    AiToolDispatcher,
+    AiToolActionService,
+    AiToolRecoveryService,
+    AiRunGuard,
+    AiRunTransitions,
+    AiRunShutdownLatch,
+    { provide: AI_RUN_SHUTDOWN_LATCH, useExisting: AiRunShutdownLatch },
+    {
+      provide: AI_RUN_CAPACITY_GATE,
+      useFactory: (latch: AiRunShutdownLatch): AiRunCapacityGate => new AiRunCapacityGate(latch),
+      inject: [AiRunShutdownLatch],
+    },
     AiRunDispatchService,
     AiRunDispatchProcessor,
     AiRunRecoveryService,

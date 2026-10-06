@@ -1,12 +1,8 @@
 import { mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 
-import { ShutdownCutoffError } from './notification-guarded-tx'
-import {
-  CUTOFF,
-  NotificationShutdownLatch,
-  type TransactionRunner,
-} from './notification-shutdown.latch'
+import { ShutdownCutoffError } from './guarded-transaction-client'
+import { CUTOFF, ShutdownLatch, type TransactionRunner } from './shutdown-latch'
 
 import type { Prisma } from '@/generated/prisma/client'
 
@@ -64,11 +60,11 @@ function fakeRunner() {
   return { runner, tx, committed, rolledBack }
 }
 
-describe('NotificationShutdownLatch', () => {
-  let latch: NotificationShutdownLatch
+describe('ShutdownLatch', () => {
+  let latch: ShutdownLatch
 
   beforeEach(() => {
-    latch = new NotificationShutdownLatch(mockDeep<PinoLogger>())
+    latch = new ShutdownLatch(mockDeep<PinoLogger>())
   })
 
   describe('phases', () => {
@@ -299,7 +295,7 @@ describe('NotificationShutdownLatch', () => {
     it('refuses every raw-query entry point after the seal', async () => {
       const { runner } = fakeRunner()
       for (const method of ['$queryRaw', '$queryRawUnsafe', '$executeRaw', '$executeRawUnsafe']) {
-        const sealedLatch = new NotificationShutdownLatch(mockDeep<PinoLogger>())
+        const sealedLatch = new ShutdownLatch(mockDeep<PinoLogger>())
         const fake = fakeRunner()
         ;(fake.tx as unknown as Record<string, unknown>)[method] = () =>
           lazyQuery(() => undefined, [])

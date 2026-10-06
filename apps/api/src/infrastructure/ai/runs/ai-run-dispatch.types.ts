@@ -1,10 +1,16 @@
 import type { AiRunStepType, Prisma } from '@/generated/prisma/client'
 
 /**
- * A run atomically claimed for one execution attempt: leased (`RUNNING`), its `attemptCount` already
- * incremented to `attemptNumber`, `startedAt` stamped. The executor (Arc C.4) loads the transcript
- * and performs the provider call for this run, then finalizes it via a CAS keyed by
- * `(id, status=RUNNING, leaseToken)`. `modelSnapshot` is the frozen secret-free model chosen at
+ * Why a run must stop before its next action (deterministic precedence when several apply at once:
+ * `cancelled` > `superseded` > `expired`). Evaluated by the run guard from fresh database state.
+ */
+export type StopCause = 'cancelled' | 'superseded' | 'expired'
+
+/**
+ * A run atomically claimed for one execution attempt: leased (`RUNNING`), its lease epoch incremented
+ * and an attempt-history row opened, `startedAt` stamped. The executor loads the transcript and runs
+ * the loop; every durable write goes through the run guard, which re-checks the lease (token + epoch +
+ * fresh-clock expiry) under row locks. `modelSnapshot` is the frozen secret-free model chosen at
  * creation — the executor resolves the credential from `modelSnapshot.modelSlug`, never the current
  * default.
  */
@@ -12,7 +18,12 @@ export interface ClaimedRun {
   id: string
   conversationId: string
   modelSnapshot: Prisma.JsonValue
-  /** The attempt number this claim represents (== post-increment `attemptCount`). */
+  /** The monotonic lease epoch of this claim — the identity of this execution attempt. */
+  epoch: number
+  /**
+   * The retry ordinal of this execution (`attemptCount + 1`: consumed retries plus this one). Used only
+   * for the retry budget and backoff — NOT for history identity (that is `epoch`).
+   */
   attemptNumber: number
   maxAttempts: number
   deadlineAt: Date | null

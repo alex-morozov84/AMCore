@@ -259,11 +259,12 @@ describe('AI human takeover lifecycle (e2e)', () => {
     expect(assistantTurns).toBe(0)
   })
 
-  it('takeover DURING tool execution leaves the invocation EXECUTING (orphan) with no tool step', async () => {
+  it('takeover DURING tool execution records the tool outcome (never an EXECUTING orphan) but applies nothing', async () => {
     const userId = await createUser()
     const conversationId = await createBoundConversation(userId, ['demo_fence'])
-    // The SAFE tool lands a takeover mid-execution: the dispatcher's in-tx result fence then rolls back
-    // the SUCCEEDED commit + TOOL_INVOCATION step, and the run is superseded — an EXECUTING orphan remains.
+    // The SAFE tool lands a takeover mid-execution: the run guard sees it at the result commit. The tool's
+    // known outcome is recorded under the current lease, but nothing is applied to the human-owned
+    // conversation and the run is superseded.
     setDemoFenceHook(async () => {
       await prisma.aiConversation.update({
         where: { id: conversationId },
@@ -284,11 +285,11 @@ describe('AI human takeover lifecycle (e2e)', () => {
     const after = await prisma.aiRun.findUniqueOrThrow({ where: { id: run.id } })
     expect(after.status).toBe(AiRunStatus.CANCELLED)
     expect(after.terminalReasonCode).toBe('superseded_by_human')
-    // Intended contract: "no stale transcript/step/terminal", NOT invocation reconciliation — the tool
-    // ran (at-least-once) so its invocation stays EXECUTING, but no SUCCEEDED result / TOOL_INVOCATION
-    // step is committed and no assistant turn is written.
+    // Contract: the tool ran, so its outcome is KNOWN and stays observable (SUCCEEDED, with its result), but
+    // it is NOT applied: no TOOL_INVOCATION step, no `appliedAt`, no assistant turn in a human conversation.
     const invocation = await prisma.aiToolInvocation.findFirstOrThrow({ where: { runId: run.id } })
-    expect(invocation.status).toBe(AiToolInvocationStatus.EXECUTING)
+    expect(invocation.status).toBe(AiToolInvocationStatus.SUCCEEDED)
+    expect(invocation.appliedAt).toBeNull()
     const toolSteps = await prisma.aiRunStep.count({
       where: { runId: run.id, type: AiRunStepType.TOOL_INVOCATION },
     })

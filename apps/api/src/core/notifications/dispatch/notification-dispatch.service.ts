@@ -19,7 +19,6 @@ import {
 } from '../notification-dispatch.constants'
 
 import { NotificationAttemptAdmission } from './notification-attempt-admission'
-import { AttemptRuntime } from './notification-attempt-runtime'
 import { NotificationDeliveryRepository } from './notification-delivery.repository'
 import { NotificationDispatchGate } from './notification-dispatch.gate'
 import type { ClaimedDelivery, FinalizeResult } from './notification-dispatch.types'
@@ -27,6 +26,7 @@ import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch
 
 import { MetricsService } from '@/infrastructure/observability'
 import { QueueName } from '@/infrastructure/queue/constants/queues.constant'
+import { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
 
 /**
  * Drains due notification deliveries (ADR-052). Invoked by both the BullMQ wake job and the

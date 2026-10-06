@@ -39,6 +39,12 @@ export const aiEnv = z.object({
   // pending approval instantly nor park a run indefinitely. A run's own deadline still wins if it
   // is tighter (the park stores min(now+TTL, deadlineAt)).
   AI_APPROVAL_TTL_MS: z.coerce.number().int().min(60_000).max(2_592_000_000).default(86_400_000),
+  // Immutable absolute lifetime of a run (ms), stamped on creation as deadlineAt = createdAt + this.
+  // Queue time, retry backoff and human approval waits all count against it; per-call provider/tool
+  // timeouts stay separate. Default 48h (longer than the default approval TTL so approvals are not
+  // shortened); bounded [1min, 30d] (the approval TTL maximum). A run created before this setting
+  // existed keeps no deadline.
+  AI_RUN_DEADLINE_MS: z.coerce.number().int().min(60_000).max(2_592_000_000).default(172_800_000),
   // Arc G artifact upload size ceilings (raw bytes, before base64 encoding). Defaults match the
   // existing IMAGE_VALIDATION/DOCUMENT_VALIDATION presets; bounded so a typo can neither starve
   // real uploads nor exceed verified provider per-request payload limits (Anthropic: 10 MB

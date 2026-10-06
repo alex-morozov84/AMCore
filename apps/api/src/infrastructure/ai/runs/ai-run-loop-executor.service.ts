@@ -1,8 +1,9 @@
 import { performance } from 'node:perf_hooks'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
+import { AiGatewayException } from '../gateway/ai-gateway.error'
 import type { AiGatewayTool, AiTextResult, AiToolCall } from '../gateway/ai-gateway.types'
 import { ModelGateway } from '../gateway/model-gateway.service'
 import { GUARDRAIL_BOUNDARY_TAG_PREFIX } from '../guardrails/guardrail.constants'
@@ -11,29 +12,26 @@ import {
   generateBoundaryNonce,
   toolResultBoundaryPolicy,
 } from '../guardrails/trust-boundary.builder'
-import { AI_TOOL_REJECTION_NOTICE, approvedToolCallId } from '../tools/ai-tool.constants'
 import type { AiTool, AiToolDescriptor } from '../tools/ai-tool.types'
 import { AiToolRegistry } from '../tools/ai-tool-registry.service'
 
 import { AiRunTerminalReason } from './ai-run.constants'
-import { AiRunRepository } from './ai-run.repository'
 import { AiRunApprovalParker } from './ai-run-approval-parker.service'
 import type { ClaimedRun } from './ai-run-dispatch.types'
+import { AiRunGuard } from './ai-run-guard.service'
 import { AiRunLoopFinalizer } from './ai-run-loop-finalizer.service'
-import {
-  countProviderCalls,
-  findPendingApproval,
-  type PendingApprovalInvocation,
-  reconstructRounds,
-} from './ai-run-loop-reconstruct'
-import { isBotOwnershipStale, readBotOwnership } from './ai-run-ownership-fence'
+import { countProviderCalls, reconstructRounds } from './ai-run-loop-reconstruct'
 import type { RunPlan } from './ai-run-plan'
-import { type CompletedToolRound, reconstructLoopMessages } from './ai-run-transcript'
-import { AiToolDispatcher, type ToolDispatchContext } from './ai-tool-dispatcher.service'
+import { abortCause, callProvider, ProviderCallBoundError } from './ai-run-provider-call'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
+import { reconstructLoopMessages } from './ai-run-transcript'
+import { AiRunTransitions } from './ai-run-transitions.service'
+import { AiToolActionService, type ToolRunContext } from './ai-tool-action.service'
+import { AiToolRecoveryService } from './ai-tool-recovery.service'
 
 import { EnvService } from '@/env/env.service'
-import { AiToolInvocationStatus } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
+import { type AttemptRuntime, CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import { PrismaService } from '@/prisma'
 
 /** What one provider step resolved to after the output guard passed. */
@@ -44,24 +42,28 @@ type StepDecision =
   | { kind: 'approval'; tool: AiTool; call: AiToolCall }
 
 /**
- * Bounded, durable, host-controlled tool loop (Track C — ADR-054, Arc E.4b/E.5, worker role only). It
- * reconstructs the run's transcript from Postgres (applying any landed approval decision first), then
- * per step offers the bound assistant's allowlisted tools, calls the provider **once**, runs the Arc D
- * output guard over every active marker, and either finalizes the final text (`COMPLETED`), executes
- * at most **one SAFE** tool call host-side (via `AiToolDispatcher`) and loops, or **parks** an allowed
- * **non-SAFE** call behind a durable human approval (`AiRunApprovalParker`, Arc E.5). Every durable
- * write is delegated (finalizer / parker): per-call ledger + step trail + terminal-or-park CAS; the
- * lease is renewed each step (invariant 9) and the loop is bounded by `AI_TOOL_LOOP_MAX_STEPS` + the
- * run deadline.
+ * Bounded, durable, host-controlled tool loop (Track C — ADR-054, Arc E.4b/E.5, worker role only). At the
+ * start of every epoch it first resolves any unfinished tool action (`AiToolRecoveryService`) — the model
+ * is never re-asked while an action is pending — then reconstructs the transcript from Postgres. Per step
+ * it ADMITS the next provider call through the run guard (a recorded cancel, a takeover, a passed
+ * deadline, a lost lease or a closed dispatcher refuses it), calls the provider **once** with the run's
+ * remaining lifetime folded into the abort signal, runs the Arc D output guard over every active marker,
+ * and either finalizes the final text (`COMPLETED`), executes at most **one** tool call durably
+ * (`AiToolActionService`), or **parks** an allowed non-SAFE call behind a human approval
+ * (`AiRunApprovalParker`). Every durable write is delegated and runs inside the guard; the loop is
+ * bounded by `AI_TOOL_LOOP_MAX_STEPS` and the run lifetime.
  */
 @Injectable()
 export class AiRunLoopExecutor {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gateway: ModelGateway,
-    private readonly repository: AiRunRepository,
+    private readonly guard: AiRunGuard,
+    @Inject(AI_RUN_SHUTDOWN_LATCH) private readonly latch: ShutdownLatch,
+    private readonly transitions: AiRunTransitions,
     private readonly registry: AiToolRegistry,
-    private readonly dispatcher: AiToolDispatcher,
+    private readonly actions: AiToolActionService,
+    private readonly recovery: AiToolRecoveryService,
     private readonly finalizer: AiRunLoopFinalizer,
     private readonly parker: AiRunApprovalParker,
     private readonly env: EnvService,
@@ -72,40 +74,37 @@ export class AiRunLoopExecutor {
   }
 
   /** Run the bounded loop for one claimed attempt to a terminal transition (or stop on lease loss). */
-  async run(claim: ClaimedRun, plan: RunPlan): Promise<void> {
-    const ctx: ToolDispatchContext = {
+  async run(claim: ClaimedRun, plan: RunPlan, runtime: AttemptRuntime): Promise<void> {
+    const ctx: ToolRunContext = {
       claim,
       ownerUserId: plan.attribution.userId ?? '',
       organizationId: plan.attribution.organizationId,
+      runtime,
     }
 
+    // Resolve a pending/stranded tool action BEFORE anything else (and before the model is asked again).
+    if ((await this.recovery.recover(ctx)) === 'done') return
+
     // Reconstruct BEFORE building the step: even when the current allowlist offers no tools, prior
-    // SUCCEEDED tool rounds must still carry the tool-result boundary marker + policy (finding A2-2).
-    const rounds = await reconstructRounds(this.prisma, claim.id)
-    let providerCalls = await countProviderCalls(this.prisma, claim.id)
-    // Apply a landed approval decision (execute the approved tool / feed a rejection) before the loop.
-    if (await this.applyPendingDecision(claim, plan, rounds, ctx, providerCalls)) return
+    // applied tool rounds must still carry the tool-result boundary marker + policy.
+    // Each read is its own latch-bounded operation: after the shutdown seal none starts.
+    const reconstructed = await reconstructRounds(this.prisma, claim.id, (op) => this.latch.run(op))
+    if (reconstructed === CUTOFF) return
+    const rounds = reconstructed
+    const counted = await this.latch.run(() => countProviderCalls(this.prisma, claim.id))
+    if (counted === CUTOFF) return
+    let providerCalls = counted
     const setup = this.buildStep(plan, rounds.length > 0)
     const maxSteps = this.env.get('AI_TOOL_LOOP_MAX_STEPS')
 
     for (;;) {
-      if (!(await this.repository.renewLease(claim))) return // lease reclaimed elsewhere — stop safely
-      // Ownership fence (ADR-049, Arc F): if a human took over mid-loop, stop before the next provider
-      // call or tool dispatch — no wasted spend on a taken-over conversation (the durable write is
-      // fenced under lock too, so this cheap read is an early exit, not the correctness guarantee).
-      if (
-        isBotOwnershipStale(
-          await readBotOwnership(this.prisma, claim.conversationId),
-          claim.ownershipGeneration
-        )
-      ) {
-        await this.repository.finalizeSuperseded(this.prisma, claim)
+      // Admission before EVERY provider call: lease (fresh clock), cancel, takeover, deadline, shutdown.
+      const admitted = await this.guard.admit(claim, async () => undefined, { markIoStarted: true })
+      if (admitted.kind === 'stopped') {
+        await this.transitions.stop(claim, admitted.cause)
         return
       }
-      if (claim.deadlineAt !== null && claim.deadlineAt <= new Date()) {
-        await this.repository.finalizeExpired(this.prisma, claim)
-        return
-      }
+      if (admitted.kind !== 'ok') return // lease lost / dispatcher closed — nothing to write
       if (providerCalls >= maxSteps) {
         await this.finalizer.exhausted(claim, providerCalls)
         return
@@ -115,18 +114,23 @@ export class AiRunLoopExecutor {
       const startedAt = performance.now()
       let result: AiTextResult
       try {
-        result = await this.gateway.generateText({
-          modelSlug: plan.modelSlug,
-          system: setup.system,
-          messages,
-          tools: setup.tools,
-          recordUsage: false,
-        })
+        result = await callProvider(
+          this.gateway,
+          {
+            modelSlug: plan.modelSlug,
+            system: setup.system,
+            messages,
+            tools: setup.tools,
+            recordUsage: false,
+          },
+          { claim, runtime, timeoutMs: this.env.get('AI_REQUEST_TIMEOUT_MS') }
+        )
       } catch (error) {
-        await this.finalizer.gatewayError(claim, error)
+        await this.handleProviderError(claim, runtime, error)
         return
       }
       providerCalls += 1
+      const ordinal = providerCalls
       const durationMs = Math.round(performance.now() - startedAt)
 
       if (await this.blockedOutput(claim, plan, setup.toolMarker, result, providerCalls)) return
@@ -147,45 +151,75 @@ export class AiRunLoopExecutor {
         )
         return
       }
+
+      // An allowed tool call: validate its args once; the validated (normalized) data is the frozen action.
+      const parsed = decision.tool.parameters.safeParse(decision.call.input)
+      if (!parsed.success) {
+        await this.finalizer.afterProviderFailure(
+          claim,
+          plan,
+          result,
+          durationMs,
+          AiRunTerminalReason.TOOL_ARGS_INVALID,
+          providerCalls
+        )
+        return
+      }
       if (decision.kind === 'approval') {
-        // An allowed non-SAFE call: validate its args, then PARK behind a durable approval (the parker
-        // records this provider call + ledger in its own tx). The tool is NOT executed until approved.
-        const parsed = decision.tool.parameters.safeParse(decision.call.input)
-        if (!parsed.success) {
-          await this.finalizer.afterProviderFailure(
-            claim,
-            plan,
-            result,
-            durationMs,
-            AiRunTerminalReason.TOOL_ARGS_INVALID,
-            providerCalls
-          )
-          return
-        }
-        await this.parker.park(claim, plan, result, durationMs, decision.tool, parsed.data)
+        // A non-SAFE call PARKS behind a durable approval; it is NOT executed until approved.
+        await this.parker.park(claim, plan, result, durationMs, ordinal, decision.tool, parsed.data)
         return
       }
 
-      // Record the provider call (fenced); stop if a human took over (the run is already superseded).
-      if (!(await this.finalizer.recordProviderCall(claim, plan, result, durationMs))) return
-      const dispatched = await this.dispatcher.dispatch(decision.tool, decision.call, ctx)
-      if (dispatched.status === 'superseded') {
-        await this.repository.finalizeSuperseded(this.prisma, claim)
-        return
-      }
-      if (dispatched.status === 'failed') {
-        await this.finalizer.dispatchFailed(claim, dispatched.errorCode, providerCalls)
-        return
-      }
+      const intent = await this.actions.requestAction(
+        claim,
+        plan,
+        result,
+        durationMs,
+        ordinal,
+        decision.tool,
+        parsed.data
+      )
+      if (intent.kind !== 'ready') return
+      const step = await this.actions.execute(
+        ctx,
+        intent.action,
+        decision.tool,
+        decision.call.toolCallId,
+        parsed.data
+      )
+      if (step.status !== 'succeeded') return
       rounds.push({
-        toolCallId: dispatched.toolCallId,
+        toolCallId: step.toolCallId,
         toolId: decision.tool.toolId,
-        // The dispatcher's VALIDATED args (== persisted argsSnapshot) so this uninterrupted round is
-        // byte-identical to the same round reconstructed on a crash-resumed attempt (finding A2-1).
-        input: dispatched.input,
-        output: dispatched.output,
+        // The VALIDATED args (== the persisted `argsSnapshot`) so this uninterrupted round is
+        // byte-identical to the same round reconstructed on a crash-resumed attempt.
+        input: step.input,
+        output: step.output,
       })
     }
+  }
+
+  /**
+   * Map a provider-call failure. A caller abort (run deadline, or the shutdown seal) is NOT an ordinary
+   * provider retry: the deadline terminalizes the run as expired (or as a higher-precedence stop), and a
+   * shutdown writes nothing — the lease expires and recovery re-runs the step. A local bound breach is a
+   * retryable timeout; everything else follows the gateway taxonomy.
+   */
+  private async handleProviderError(
+    claim: ClaimedRun,
+    runtime: AttemptRuntime,
+    error: unknown
+  ): Promise<void> {
+    if (error instanceof AiGatewayException && error.code === 'aborted') {
+      await this.finalizer.callerAborted(claim, abortCause(runtime))
+      return
+    }
+    if (error instanceof ProviderCallBoundError) {
+      await this.transitions.retry(claim, 'provider_timeout')
+      return
+    }
+    await this.finalizer.gatewayError(claim, error)
   }
 
   /**
@@ -193,7 +227,7 @@ export class AiRunLoopExecutor {
    * tools apply OR prior tool rounds must be replayed — a distinct tool-result boundary marker (Arc D
    * reuse) + the augmented trusted instruction. Offering no current tools (empty allowlist) still keeps
    * the boundary if `hasPriorRounds`, so a resumed transcript never wraps a tool result under an empty
-   * marker (finding A2-2). No tools and no prior rounds ⇒ the Arc C single-call text path.
+   * marker. No tools and no prior rounds ⇒ the Arc C single-call text path.
    */
   private buildStep(
     plan: RunPlan,
@@ -230,7 +264,7 @@ export class AiRunLoopExecutor {
     return true
   }
 
-  /** Classify a provider step's tool calls (≤1 SAFE allowed call — invariant 5). */
+  /** Classify a provider step's tool calls (≤1 allowed call — invariant 5). */
   private classify(toolCalls: AiToolCall[], allowlist: string[]): StepDecision {
     if (toolCalls.length === 0) return { kind: 'final' }
     if (toolCalls.length > 1)
@@ -244,70 +278,6 @@ export class AiRunLoopExecutor {
     // executed inline. A SAFE call runs host-side immediately.
     if (this.registry.requiresApproval(tool)) return { kind: 'approval', tool, call }
     return { kind: 'execute', tool, call }
-  }
-
-  /**
-   * On resume, apply a landed approval decision before the normal loop (Arc E.5): execute the APPROVED
-   * tool (its `APPROVED→EXECUTING` CAS is the sole non-SAFE execution gate) or feed the fixed rejection
-   * notice, appending the round to `rounds`. Returns `true` when it drove the run terminal (approved
-   * tool failed / unregistered) — the caller then stops. `false` = nothing pending, or applied cleanly.
-   */
-  private async applyPendingDecision(
-    claim: ClaimedRun,
-    plan: RunPlan,
-    rounds: CompletedToolRound[],
-    ctx: ToolDispatchContext,
-    providerCalls: number
-  ): Promise<boolean> {
-    const pending = await findPendingApproval(this.prisma, claim.id)
-    if (pending === null) return false
-
-    // REJECTED: no execution — persist the ordering step (fenced) + replay the fixed rejection notice.
-    if (pending.status === AiToolInvocationStatus.REJECTED) {
-      if ((await this.dispatcher.applyRejected(pending, ctx)) === 'superseded') {
-        await this.repository.finalizeSuperseded(this.prisma, claim)
-        return true
-      }
-      rounds.push(rejectionRound(pending))
-      return false
-    }
-
-    // APPROVED (or a stranded EXECUTING from a crash before the SUCCEEDED commit) → execute the tool.
-    const tool = this.registry.get(pending.toolId)
-    if (tool === undefined) {
-      await this.finalizer.dispatchFailed(
-        claim,
-        AiRunTerminalReason.TOOL_NOT_ALLOWED,
-        providerCalls
-      )
-      return true
-    }
-    const res = await this.dispatcher.executeApproved(pending, tool, ctx)
-    if (res.status === 'superseded') {
-      await this.repository.finalizeSuperseded(this.prisma, claim)
-      return true
-    }
-    if (res.status === 'failed') {
-      await this.finalizer.dispatchFailed(claim, res.errorCode, providerCalls)
-      return true
-    }
-    rounds.push({
-      toolCallId: res.toolCallId,
-      toolId: tool.toolId,
-      input: res.input,
-      output: res.output,
-    })
-    return false
-  }
-}
-
-/** The tool-result round fed back to the model for an owner-REJECTED approval-gated call (Arc E.5). */
-function rejectionRound(pending: PendingApprovalInvocation): CompletedToolRound {
-  return {
-    toolCallId: approvedToolCallId(pending.id),
-    toolId: pending.toolId,
-    input: pending.argsSnapshot,
-    output: AI_TOOL_REJECTION_NOTICE,
   }
 }
 

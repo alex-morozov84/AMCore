@@ -19,6 +19,7 @@ export const AI_GATEWAY_ERROR_CODES = [
   'content_filtered', // the provider refused on safety grounds
   'capability_unsupported', // the model lacks the requested capability (e.g. structured output)
   'output_validation_failed', // structured output did not match the requested schema
+  'aborted', // the caller aborted the call (run deadline / shutdown) — never an ordinary provider retry
 ] as const
 
 export type AiGatewayErrorCode = (typeof AI_GATEWAY_ERROR_CODES)[number]
@@ -60,6 +61,17 @@ export class AiGatewayException extends AppException {
       false,
       'AI model is not usable (missing credential or adapter)',
       { modelSlug }
+    )
+  }
+
+  /** The caller's abort signal fired (run deadline or worker shutdown): not retryable as a provider fault. */
+  static aborted(providerType?: AiProviderType): AiGatewayException {
+    return new AiGatewayException(
+      'aborted',
+      HttpStatus.SERVICE_UNAVAILABLE,
+      false,
+      'AI provider call was aborted by the caller',
+      providerType === undefined ? undefined : { providerType }
     )
   }
 

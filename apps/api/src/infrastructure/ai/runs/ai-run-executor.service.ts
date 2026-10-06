@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiRunSseReason, AiRunStatusValue } from '@amcore/shared'
@@ -13,16 +13,18 @@ import {
 } from '../guardrails/trust-boundary.builder'
 
 import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
-import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
+import { AiRunGuard } from './ai-run-guard.service'
 import { AiRunLoopExecutor } from './ai-run-loop-executor.service'
-import { isBotOwnershipStale } from './ai-run-ownership-fence'
 import type { RunPlan } from './ai-run-plan'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
+import { AiRunTransitions } from './ai-run-transitions.service'
 
 import { EnvService } from '@/env/env.service'
 import { AiArtifactKind, AiMessageRole, AiRunStepType, Prisma } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
 import { StorageObjectNotFoundError, StorageService } from '@/infrastructure/storage'
+import { type AttemptRuntime, CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import { PrismaService } from '@/prisma'
 
 /** The single bounded realtime reason (Track C — ADR-054, Arc C.5); no content ever rides it. */
@@ -41,7 +43,9 @@ const RUN_STATUS_CHANGED: AiRunSseReason = 'status_changed'
 export class AiRunExecutorService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly repository: AiRunRepository,
+    private readonly guard: AiRunGuard,
+    private readonly transitions: AiRunTransitions,
+    @Inject(AI_RUN_SHUTDOWN_LATCH) private readonly latch: ShutdownLatch,
     private readonly loop: AiRunLoopExecutor,
     private readonly publisher: AiRunRealtimePublisher,
     private readonly storage: StorageService,
@@ -58,9 +62,9 @@ export class AiRunExecutorService {
    * (Arc C.5). The hint is fired in a `finally` so every path signals the client to refetch; a publish
    * never affects the durable outcome (status-only SSE is at-most-once, Postgres is recovery).
    */
-  async execute(claim: ClaimedRun): Promise<void> {
+  async execute(claim: ClaimedRun, runtime: AttemptRuntime): Promise<void> {
     try {
-      await this.runAttempt(claim)
+      await this.runAttempt(claim, runtime)
     } finally {
       // Fire-and-forget: the durable transition is already committed, so the worker must NOT block on
       // Redis for a best-effort hint. `publishStatusHint` is internally catch-all — it never rejects.
@@ -68,30 +72,36 @@ export class AiRunExecutorService {
     }
   }
 
-  private async runAttempt(claim: ClaimedRun): Promise<void> {
+  private async runAttempt(claim: ClaimedRun, runtime: AttemptRuntime): Promise<void> {
     const plan = await this.preflight(claim)
     // A null plan means pre-flight already reached a terminal/handled state (cancel, deadline, bad
     // snapshot, missing input, guardrail refusal) — nothing more to do this attempt.
     if (plan === null) return
-    await this.loop.run(claim, plan)
+    await this.loop.run(claim, plan, runtime)
   }
 
   /**
    * Publish the run's current committed status as a content-free hint (best-effort). Reads the status
-   * + owner in one query; never throws and never carries a prompt/response/model slug.
+   * + owner in one query through the shutdown latch (a closed/sealed dispatcher issues no late DB
+   * read); never throws and never carries a prompt/response/model slug.
    */
   private async publishStatusHint(runId: string): Promise<void> {
     try {
-      const run = await this.prisma.aiRun.findUnique({
-        where: { id: runId },
-        select: { status: true, conversation: { select: { ownerUserId: true } } },
-      })
-      if (!run) return
-      await this.publisher.publish(
-        run.conversation.ownerUserId,
-        runId,
-        run.status.toLowerCase() as AiRunStatusValue,
-        RUN_STATUS_CHANGED
+      if (this.latch.closed) return
+      const run = await this.latch.run(() =>
+        this.prisma.aiRun.findUnique({
+          where: { id: runId },
+          select: { status: true, conversation: { select: { ownerUserId: true } } },
+        })
+      )
+      if (run === CUTOFF || !run) return
+      await this.latch.run(() =>
+        this.publisher.publish(
+          run.conversation.ownerUserId,
+          runId,
+          run.status.toLowerCase() as AiRunStatusValue,
+          RUN_STATUS_CHANGED
+        )
       )
     } catch {
       // Best-effort: the client repairs a missed hint on its next reconnect/refetch.
@@ -104,71 +114,57 @@ export class AiRunExecutorService {
    * permanent-failed/refused).
    */
   private async preflight(claim: ClaimedRun): Promise<RunPlan | null> {
-    // Re-read the cooperative-cancel flag + deadline fresh (the cancel may have landed after claim).
-    const run = await this.prisma.aiRun.findUnique({
-      where: { id: claim.id },
-      select: { cancellationRequestedAt: true, deadlineAt: true },
-    })
-    const now = new Date()
-    if (run?.cancellationRequestedAt != null) {
-      await this.repository.finalizeCancelled(
-        this.prisma,
-        claim,
-        AiRunTerminalReason.CANCELLED_BY_USER
-      )
+    // Admission: lease (fresh clock), a cancel that landed after claim, a human takeover, the deadline and
+    // shutdown are all evaluated together under the run guard before any pre-flight work.
+    const admitted = await this.guard.admit(claim, async () => undefined)
+    if (admitted.kind === 'stopped') {
+      await this.transitions.stop(claim, admitted.cause)
       return null
     }
-    const deadlineAt = run?.deadlineAt ?? claim.deadlineAt
-    if (deadlineAt != null && deadlineAt <= now) {
-      await this.repository.finalizeExpired(this.prisma, claim)
-      return null
-    }
+    if (admitted.kind !== 'ok') return null
 
     const modelSlug = modelSlugFromSnapshot(claim.modelSnapshot)
     if (modelSlug === null) {
-      await this.repository.finalizeFailed(
-        this.prisma,
-        claim,
-        AiRunErrorCode.MODEL_SNAPSHOT_INVALID
-      )
+      await this.transitions.failed(claim, AiRunErrorCode.MODEL_SNAPSHOT_INVALID)
       return null
     }
 
-    const conversation = await this.prisma.aiConversation.findUnique({
-      where: { id: claim.conversationId },
-      select: {
-        ownerUserId: true,
-        organizationId: true,
-        ownershipGeneration: true,
-        controlledBy: true,
-        state: true,
-        assistant: { select: { toolAllowlist: true, systemPrompt: true, enabled: true } },
-      },
-    })
+    // Every pre-flight read and download is its own latch-bounded operation: after the shutdown seal no
+    // later query or storage fetch of this attempt starts (an outer wrapper would not stop the tail).
+    const conversation = await this.latch.run(() =>
+      this.prisma.aiConversation.findUnique({
+        where: { id: claim.conversationId },
+        select: {
+          ownerUserId: true,
+          organizationId: true,
+          assistant: { select: { toolAllowlist: true, systemPrompt: true, enabled: true } },
+        },
+      })
+    )
+    if (conversation === CUTOFF) return null
     // The run's OWN input turn is bound by `runId` (not the max-sequence message) so several runs
     // queued on one conversation before execution each read their own input.
-    const input = await this.prisma.aiMessage.findFirst({
-      where: { runId: claim.id, role: AiMessageRole.USER },
-      orderBy: { sequence: 'asc' },
-      select: { content: true },
-    })
+    const input = await this.latch.run(() =>
+      this.prisma.aiMessage.findFirst({
+        where: { runId: claim.id, role: AiMessageRole.USER },
+        orderBy: { sequence: 'asc' },
+        select: { content: true },
+      })
+    )
+    if (input === CUTOFF) return null
     if (conversation === null || input === null) {
-      await this.repository.finalizeFailed(this.prisma, claim, AiRunErrorCode.INPUT_MISSING)
+      await this.transitions.failed(claim, AiRunErrorCode.INPUT_MISSING)
       return null
     }
 
-    // Ownership fence (ADR-049, Arc F): if a human took control since this run was queued, abandon it
-    // terminally BEFORE any provider I/O — no spend, no stale bot turn written into a human conversation.
-    if (isBotOwnershipStale(conversation, claim.ownershipGeneration)) {
-      await this.repository.finalizeSuperseded(this.prisma, claim)
-      return null
-    }
+    // The ownership fence (ADR-049, Arc F) was evaluated by the admission above and is re-checked by every
+    // later admission, before each provider call and tool start — a takeover abandons the run terminally
+    // with no spend and no stale bot turn written into a human conversation.
 
     // Enabled kill-switch (Arc F.4): a bound assistant disabled after this run was queued must not drive
     // it. Terminal `FAILED` before any provider I/O (the producer gates new runs; this catches the race).
     if (conversation.assistant && !conversation.assistant.enabled) {
-      await this.repository.finalizeFailed(
-        this.prisma,
+      await this.transitions.failed(
         claim,
         AiRunErrorCode.ASSISTANT_DISABLED,
         AiRunTerminalReason.ASSISTANT_DISABLED
@@ -181,7 +177,7 @@ export class AiRunExecutorService {
     const inputText = extractText(input.content)
     const artifactIds = extractArtifactIds(input.content)
     if (inputText.length === 0 && artifactIds.length === 0) {
-      await this.repository.finalizeFailed(this.prisma, claim, AiRunErrorCode.NO_INPUT)
+      await this.transitions.failed(claim, AiRunErrorCode.NO_INPUT)
       return null
     }
 
@@ -256,10 +252,14 @@ export class AiRunExecutorService {
     artifactIds: string[]
   ): Promise<AiUserContentPart[] | null> {
     const capabilities = modelCapabilitiesFromSnapshot(claim.modelSnapshot)
-    const rows = await this.prisma.aiArtifact.findMany({
-      where: { id: { in: artifactIds }, runId: claim.id },
-      select: { id: true, kind: true, contentType: true, storageKey: true },
-    })
+    const found = await this.latch.run(() =>
+      this.prisma.aiArtifact.findMany({
+        where: { id: { in: artifactIds }, runId: claim.id },
+        select: { id: true, kind: true, contentType: true, storageKey: true },
+      })
+    )
+    if (found === CUTOFF) return null
+    const rows = found
     const byId = new Map(rows.map((row) => [row.id, row]))
 
     const parts: AiUserContentPart[] = []
@@ -267,26 +267,20 @@ export class AiRunExecutorService {
       const row = byId.get(artifactId)
       if (row === undefined) {
         this.metrics.incAiArtifactResolution('not_found')
-        await this.repository.finalizeFailed(
-          this.prisma,
-          claim,
-          AiRunErrorCode.ARTIFACT_UNAVAILABLE
-        )
+        await this.transitions.failed(claim, AiRunErrorCode.ARTIFACT_UNAVAILABLE)
         return null
       }
       const capability = capabilityForArtifactKind(row.kind)
       if (capability === null || capabilities[capability] !== true) {
         this.metrics.incAiArtifactResolution('capability_unsupported')
-        await this.repository.finalizeFailed(
-          this.prisma,
-          claim,
-          AiRunErrorCode.ARTIFACT_UNAVAILABLE
-        )
+        await this.transitions.failed(claim, AiRunErrorCode.ARTIFACT_UNAVAILABLE)
         return null
       }
       let data: Buffer
       try {
-        data = await this.storage.download(row.storageKey)
+        const downloaded = await this.latch.run(() => this.storage.download(row.storageKey))
+        if (downloaded === CUTOFF) return null
+        data = downloaded
       } catch (error) {
         this.metrics.incAiArtifactResolution('storage_error')
         // A genuinely missing/deleted object is permanent — no retry can fix it. Any other storage
@@ -294,21 +288,13 @@ export class AiRunExecutorService {
         // through the existing PG-owned retry schedule instead of permanently failing the run,
         // mirroring how `AiRunLoopFinalizer.gatewayError` treats an unexpected non-gateway error.
         if (error instanceof StorageObjectNotFoundError) {
-          await this.repository.finalizeFailed(
-            this.prisma,
-            claim,
-            AiRunErrorCode.ARTIFACT_UNAVAILABLE
-          )
+          await this.transitions.failed(claim, AiRunErrorCode.ARTIFACT_UNAVAILABLE)
         } else {
           this.logger.error(
             { event: 'ai.run.artifact_storage_retry', runId: claim.id },
             'Transient artifact storage fetch failure; scheduling retry'
           )
-          await this.repository.finalizeRetry(
-            this.prisma,
-            claim,
-            AiRunErrorCode.ARTIFACT_UNAVAILABLE
-          )
+          await this.transitions.retry(claim, AiRunErrorCode.ARTIFACT_UNAVAILABLE)
         }
         return null
       }
@@ -333,7 +319,7 @@ export class AiRunExecutorService {
   ): Promise<GuardrailStepCategory[] | null> {
     const maxInputChars = this.env.get('AI_GUARDRAIL_MAX_INPUT_CHARS')
     if (inputText.length > maxInputChars) {
-      await this.repository.finalizeRefusal(claim, {
+      await this.transitions.refusal(claim, {
         reasonCode: AiRunTerminalReason.GUARDRAIL_INPUT_TOO_LARGE,
         checkStepType: AiRunStepType.GUARDRAIL_CHECK,
       })
@@ -345,7 +331,7 @@ export class AiRunExecutorService {
     const verdict = scanInput(inputText)
     this.metrics.incAiGuardrailCheck('input', verdict.verdict)
     if (mode === 'block' && verdict.verdict === 'block') {
-      await this.repository.finalizeRefusal(claim, {
+      await this.transitions.refusal(claim, {
         reasonCode: AiRunTerminalReason.GUARDRAIL_INPUT_BLOCKED,
         checkStepType: AiRunStepType.GUARDRAIL_CHECK,
         categories: verdict.categories,

@@ -96,6 +96,12 @@ export interface AiGenerateRequest {
    * back (recovery retries) does not leave an orphan ledger row. Metrics still count every call.
    */
   recordUsage?: boolean
+  /**
+   * Caller-owned abort (the durable run's remaining lifetime / worker shutdown). Combined with the
+   * gateway's per-call timeout; an abort it causes surfaces as the non-retryable `aborted` error.
+   * Cancellation is cooperative: forwarding it does not prove the remote provider stopped.
+   */
+  abortSignal?: AbortSignal
 }
 
 /** Provider-reported (or estimated) token usage, normalized across adapters. */
@@ -136,6 +142,8 @@ export interface AiAdapterCall {
   /** Tools offered to the model for this step (Arc E); the adapter maps them to a provider schema. */
   tools?: AiGatewayTool[]
   timeoutMs: number
+  /** Caller-owned abort, merged with `timeoutMs` by the adapter (see `AiGenerateRequest.abortSignal`). */
+  abortSignal?: AbortSignal
 }
 
 /**

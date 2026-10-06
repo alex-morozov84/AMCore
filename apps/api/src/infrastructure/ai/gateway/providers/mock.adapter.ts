@@ -73,6 +73,10 @@ export class MockAiAdapter implements AiProviderAdapter {
   readonly supportedTypes = [AiProviderType.MOCK] as const
 
   async generateText(call: AiAdapterCall): Promise<AiTextResult> {
+    // Same contract as the SDK adapters: an already-aborted caller signal makes no call.
+    if (call.abortSignal?.aborted === true) {
+      throw AiGatewayException.aborted(call.model.provider.type)
+    }
     const last = call.messages[call.messages.length - 1]
     // A tool result just came back → the loop is resuming; answer with the tool outputs. Read the
     // INNER content of each result (a real model reads the data, it does NOT echo the Arc D untrusted

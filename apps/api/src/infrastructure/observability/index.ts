@@ -12,6 +12,7 @@ export type {
   AiMetricsGuardrailVerdict,
   AiMetricsOperation,
   AiMetricsProvider,
+  AiMetricsRunAdmission,
   AiMetricsTokenDirection,
   AiMetricsToolLoopOutcome,
   AiMetricsToolOutcome,

@@ -270,8 +270,16 @@ ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
   `verdict=allow|flag|block`).
 - `ai_tool_invocations_total{tool_id,risk_class,outcome,role}` (`tool_id` bounded
   to the code-owned registry, `risk_class=safe|sensitive|destructive`,
-  `outcome=succeeded|failed|rejected|skipped`), `ai_tool_loop_steps{outcome,role}`
-  (`outcome=completed|exhausted|failed`).
+  `outcome=succeeded|failed|rejected|skipped|effect_unknown`),
+  `ai_tool_loop_steps{outcome,role}` (`outcome=completed|exhausted|failed`).
+  `effect_unknown` counts a side-effecting tool whose external effect may or may
+  not have happened (the run stopped without repeating it).
+- `ai_run_admission_total{outcome,role}` — the run guard that fences every durable
+  AI run write (`outcome=admitted|cancelled|superseded|expired|lease_lost|shutdown`).
+  `lease_lost` is a stale or timed-out holder that wrote nothing; a sustained rate
+  means workers are stalling past their lease (see the
+  [queue runbook](./runbooks/queues.md#ai-run-recovery)). No run, conversation or
+  user id is ever a label.
 - `ai_approvals_total{kind,state,role}`
   (`kind=tool_invocation|handoff|sensitive_action`,
   `state=pending|approved|rejected|expired`).
