@@ -277,6 +277,8 @@ Kernel cwd inspection also blocks removal for an unobserved, reparented child
 under the stand source: `/proc` on Linux and `lsof` on macOS. Inventory failure is
 an incomplete check, never proof of absence. Such a child is recorded for manual
 inspection, not automatically signalled from its cwd alone.
+The common mocked CI runner allows up to ten seconds for natural child exit
+before closeout; a survivor still fails the lane and preserves recovery records.
 Also verify any external
 fixture checkout recorded by the task's specialized proofs. Never delete the
 worktree or its recovery records after a failure: closeout is incomplete until

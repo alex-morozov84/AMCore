@@ -8,10 +8,10 @@ const requested = process.argv[2]
 
 async function closeMockedRunner(standId) {
   const { load, lease } = await import('./stand/state.mjs')
-  const { closeoutStand } = await import('./stand/closeout.mjs')
+  const { waitForRunnerCloseout } = await import('./stand/wait-closeout.mjs')
   const held = await lease(standId, 'ci-closeout')
   try {
-    await closeoutStand(await load(standId))
+    await waitForRunnerCloseout(await load(standId))
   } finally {
     await held.release()
   }
@@ -19,7 +19,7 @@ async function closeMockedRunner(standId) {
 
 async function browserLane(lane) {
   const { cancellation } = await import('./stand/cancellation.mjs')
-  const { run, cleanEnvironment } = await import('./stand/process.mjs')
+  const { run, cleanEnvironment, stopChildren } = await import('./stand/process.mjs')
   const operation = await cancellation()
   const args = ['scripts/stand.mjs', 'e2e', '--id', operation.standId, '--lane', 'mocked']
   if (lane.startsWith('path-')) args.splice(5, 1, 'real-stack', '--ci-group', lane.slice(5))
@@ -39,6 +39,7 @@ async function browserLane(lane) {
     status = operation.interrupted ? process.exitCode : 1
   } finally {
     try {
+      await stopChildren()
       if (lane === 'mocked') await closeMockedRunner(operation.standId)
     } finally {
       await operation.finish()

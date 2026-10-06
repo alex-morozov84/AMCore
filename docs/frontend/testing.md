@@ -66,6 +66,10 @@ one browser worker per stand and one retry. Locally the lanes run sequentially
 on one machine; GitHub runs each lane on a separate Ubuntu runner. This proves
 matching commands, inventory and settings, not identical OS, hardware or cache timings.
 A nonzero, cancelled or missing lane cannot produce a successful aggregate result.
+Mocked completion waits up to ten seconds for short-lived source processes to
+exit naturally before verified closeout. A remaining process or unavailable
+ownership inventory fails the lane and retains recovery; unproved children are
+never killed to make the check pass.
 
 The lanes are safety/transport, both mocked projects, ordinary path-mode tests,
 disruptive path-mode tests (entire runtime-settings/background-work files), and
