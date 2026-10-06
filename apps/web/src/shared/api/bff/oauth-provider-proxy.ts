@@ -1,3 +1,6 @@
+import { ContextRequestError } from './context-errors'
+import { cancelInvitedOAuthForOrdinaryStart } from './invitation-auth-lifecycle'
+import { startInvitedOAuth } from './invitation-oauth-start'
 import { isFormPostProvider, relayOAuthCookies } from './oauth-cookie-relay'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 
@@ -23,14 +26,19 @@ const API_URL = process.env.API_URL ?? 'http://localhost:5002'
  * intermediate 302's `Location` and `Set-Cookie` before this code ever saw
  * them.
  */
-async function fetchUpstream(request: Request, upstreamPath: string): Promise<Response> {
+async function fetchUpstream(request: Request, upstreamPath: string, proof?: Headers, signal?: AbortSignal): Promise<Response> {
   const upstream = new URL(`${API_URL}/api/v1${upstreamPath}`)
   upstream.search = new URL(request.url).search
+  upstream.searchParams.delete('invitationAttempt')
 
   const hasBody = request.method === 'POST' && request.body !== null
   const headers = new Headers(sessionMetadataHeaders(request.headers))
-  const cookie = request.headers.get('cookie')
-  if (cookie) headers.set('cookie', cookie)
+  const nonceName = upstreamPath.endsWith('/callback')
+    ? (upstreamPath.includes('/apple/') ? 'oauth_state_apple' : 'oauth_state') : null
+  const cookies = (request.headers.get('cookie') ?? '').split(';').map(value => value.trim())
+    .filter(value => nonceName && value.startsWith(`${nonceName}=`))
+  if (cookies.length === 1) headers.set('cookie', cookies[0]!)
+  proof?.forEach((value, name) => headers.set(name, value))
   const acceptLanguage = request.headers.get('accept-language')
   if (acceptLanguage) headers.set('accept-language', acceptLanguage)
   const contentType = request.headers.get('content-type')
@@ -41,12 +49,17 @@ async function fetchUpstream(request: Request, upstreamPath: string): Promise<Re
     headers,
     body: hasBody ? request.body : undefined,
     redirect: 'manual',
+    cache: 'no-store',
+    signal: signal ?? AbortSignal.any([request.signal, AbortSignal.timeout(15000)]),
     ...(hasBody ? { duplex: 'half' } : {}),
   })
 }
 
 function relayResponse(upstream: Response, provider: string): Response {
   const headers = new Headers()
+  headers.set('cache-control', 'private, no-store')
+  headers.set('referrer-policy', 'no-referrer')
+  headers.set('x-robots-tag', 'noindex, nofollow')
   const location = upstream.headers.get('location')
   if (location) headers.set('location', location)
   const contentType = upstream.headers.get('content-type')
@@ -58,6 +71,19 @@ function relayResponse(upstream: Response, provider: string): Response {
 
 /** `GET /api/auth/oauth/:provider` -> backend `GET /auth/oauth/:provider`. */
 export async function proxyOAuthAuthorize(request: Request, provider: string): Promise<Response> {
+  const query = new URL(request.url).searchParams
+  if (query.has('invitationAttempt')) {
+    if (query.size !== 1) return new Response(null, { status: 400 })
+    try {
+      const upstream = await startInvitedOAuth(request, provider, query.get('invitationAttempt')!,
+        (proof, signal) => fetchUpstream(request, `/auth/oauth/${encodeURIComponent(provider)}`, proof, signal))
+      return relayResponse(upstream, provider)
+    } catch (error) {
+      return new Response(null, { status: error instanceof ContextRequestError ? error.status : 503,
+        headers: { 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex, nofollow' } })
+    }
+  }
+  await cancelInvitedOAuthForOrdinaryStart(request)
   const upstream = await fetchUpstream(request, `/auth/oauth/${encodeURIComponent(provider)}`)
   return relayResponse(upstream, provider)
 }

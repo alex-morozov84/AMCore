@@ -1,6 +1,7 @@
 export const E2E_UI_PROFILES = Object.freeze({
   auth: [
     ['/password/i', '/пароль/i'],
+    ['/^password$/i', '/^пароль$/i'],
     ['/name/i', '/имя/i'],
     ['/sign in/i', '/войти/i'],
     ['/sign up/i', '/регистрация/i'],

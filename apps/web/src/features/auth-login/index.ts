@@ -1,2 +1,2 @@
 export { useLogin } from './model/use-login'
-export { LoginForm } from './ui/LoginForm'
+export { LoginForm, type LoginFormProps } from './ui/LoginForm'

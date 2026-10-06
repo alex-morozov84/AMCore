@@ -52,6 +52,9 @@ The exact additional public entries are:
 
 - `entities/organization-context/index.server.ts`: the server-only DAL and
   family descriptor, available to layers that may import this entity.
+- `entities/invitation-flow/index.server.ts`: recipient admission returning only
+  the current flow binding and user snapshot, available to layers that may import
+  this entity. It never exposes continuation credentials or session-vault IDs.
 - `_app/organization-access/index.server.ts`, `index.client.ts` and
   `index.config.ts`: server mount, client menu and universal placement,
   respectively, available only to Next route wiring in `src/app/`.
@@ -300,3 +303,9 @@ content mount without AppShell), `index.client.ts` (menu), and `index.config.ts`
 slice; lower layers and arbitrary deep imports remain forbidden. The existing
 slice index preserves compatibility but has a mixed module graph. See
 [product integration](../product-admin/integration.md).
+
+Invitation routes enter `_app/invitation-flow/index.server.ts` for server handlers
+and mounts, `index.client.ts` for interactive composition, and `index.config.ts`
+for serializable placement. These named entries have the same narrow ESLint
+exception; they do not permit arbitrary composition slices or deep imports.
+The headless browser contract is the public `entities/invitation-flow` API.

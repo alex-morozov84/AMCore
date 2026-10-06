@@ -217,3 +217,37 @@ and Storybook disabled in that fixture. It prints the managed real-stack browser
 command; no standalone sample product route is added to the starter. See the
 [members contract](organization-members.md) for permissions, complete-set/byte
 limits, truthful self-edit warnings and safe recovery.
+
+## Custom invitation forms
+
+Keep invitation state and presentation separate. The public browser transport in
+`@/entities/invitation-flow` sends strict flow bindings, validates safe responses,
+and exposes receipt recovery independently of an expired invitation flow.
+`createInvitationAcceptJournal` stores only the operation ID and inspected
+invitation ID/generation in tab storage. It stores no password, token, cookie,
+continuation credential or permission to join. If storage is disabled, retain
+the descriptor in memory and explain that reload recovery is limited.
+
+The ready `RecipientAuth`, `RecipientStatus`, `RecipientFrame` and
+`RecipientSkeleton` components from `@/_pages/invitation-recipient` are optional
+presentation. `InvitationConsent` from `@/features/invitation-acceptance` renders
+the complete inspected role set, expiry and explicit actions. A downstream may
+replace these components with its own fields, cards or layout while retaining
+the transport and continuation protocol.
+
+Existing `LoginForm` and `RegisterForm` accept a cohesive
+`CredentialFormAdapter` from `@/shared/lib/credential-form-adapter`. Application
+composition supplies `submit`, `isCurrent` and `onSuccess`; invited registration
+also supplies `fixedEmail`. Use `createInvitationCredentialAdapters` from
+`@/_app/invitation-flow/index.client` to compose the ready forms. It authenticates
+once, reports the safe pending handoff, sends a separate acknowledgment, and
+resolves only after confirmation. The registration request derives its email
+from the server-held invitation, regardless of client form contents.
+
+Keep one continuation owner for the screen. Its callbacks show progress,
+refresh safe state after failure, and retire stale results on account or flow
+changes. Recreate forms/adapters when the authoritative flow revision changes;
+do not resend an authentication request whose outcome is unknown. Recover the
+same handoff acknowledgment instead. Authentication, verification and screen
+mounting never accept organization membership. Joining requires a separate
+explicit action with the inspected intent and a stable operation ID.

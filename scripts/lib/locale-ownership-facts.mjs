@@ -80,6 +80,11 @@ const topology = [
   '(organization-access)/organizations/page.tsx',
   '(organization-access)/organizations/[id]/page.tsx',
   '(organization-access)/organizations/[id]/members/page.tsx',
+  '(auth)/invite/accept/route.ts',
+  '(auth)/invite/bootstrap/[pendingId]/route.ts',
+  '(auth)/invite/flow/[flowId]/page.tsx',
+  '(auth)/invite/flow/[flowId]/loading.tsx',
+  '(auth)/invite/unusable/page.tsx',
   'auth/callback/route.ts',
   'layout.tsx',
   'providers.tsx',
@@ -91,7 +96,22 @@ export const localeOwnershipFacts = {
   sharedModules,
   sharedModuleTests: linkedTests,
   topology,
-  verification: [...e2eVerification, ...localeOnlyVerification],
+  verification: [
+    ...e2eVerification,
+    ...localeOnlyVerification,
+    one('apps/web/src/_pages/invitation-recipient/ui/recipient-auth.stories.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/_pages/invitation-recipient/ui/recipient-status.stories.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/invitation-acceptance/ui/invitation-consent.stories.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/invitation-acceptance/ui/invitation-consent.test.tsx', {
+      disposition: 'rewrite',
+    }),
+  ],
   documentation: [],
   featureEntrypoints: [],
   repositoryEntrypoints: [

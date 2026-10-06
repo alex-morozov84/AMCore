@@ -24,6 +24,9 @@ WORKDIR /app
 # install layer still caches because manifests are copied before sources.
 FROM base AS build
 
+# pnpm 11 may reinstall before scripts after COPY; every install must keep the lockfile frozen.
+ENV pnpm_config_frozen_lockfile=true
+
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/

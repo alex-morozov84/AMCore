@@ -48,10 +48,10 @@ minimal [organization selector and read-only context
 overview](docs/frontend/organization-context.md), separate from Operations Console.
 Its headless lifecycle and ready blocks can be mounted in a downstream shell;
 member lists, atomic multi-role assignment and the
-[invitation API](docs/auth/invites.md) are reusable, including complete role intent,
-generation checks and durable command recovery. Existing installations use the
-controlled upgrade in the API guide. Role-definition and invitation screens
-remain downstream work.
+[invitation recipient journey](docs/product-admin/invitations.md) are reusable.
+Recipient presentation is replaceable through headless adapters and ready composition.
+Managers administer invitations through the [API](docs/auth/invites.md);
+role-definition editing and the invitation management screen remain downstream work.
 The API also publishes a bounded [implemented-action catalogue and access
 hints](docs/auth/capability-catalogue.md) for future product role editors and
 record controls. Catalogue metadata never grants a permission.

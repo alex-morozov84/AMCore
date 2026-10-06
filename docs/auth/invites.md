@@ -1,8 +1,8 @@
 # Organization invitations
 
 An organization manager can invite a person by email and choose a complete set
-of roles. A direct API client signs in or creates an account, verifies their email,
-inspects the organization and roles, and explicitly accepts. Signing in, signing
+of roles. The recipient signs in or creates an account, verifies their email,
+reviews the organization and roles, and explicitly accepts. Signing in, signing
 up, opening a link or verifying an email never creates membership.
 
 For example, invite Dana with `MEMBER` and your organization’s `Analyst` role.
@@ -18,9 +18,8 @@ requires actual membership in the selected organization and unrestricted
 
 ## Issue, find and manage invitations
 
-This delivery provides the API and direct-client contracts. The starter invitation
-email points to `/invite/accept`; its ready recipient screen and management UI are
-not supplied yet. Use the direct API protocol below until that frontend is supplied.
+For ready UI, user scenarios and custom presentation, see
+[Manage and accept invitations](../product-admin/invitations.md).
 
 Paths in this guide are relative to `/api/v1`. The interactive API reference at
 `/docs` documents schemas, authentication and error responses.
@@ -195,6 +194,64 @@ unconfirmed tagged session; confirmed abort conflicts. Confirmation expires in
 60 seconds and a database-only minute sweep revokes overdue pending sessions.
 Pending/aborted sessions cannot refresh into an ordinary child or use personal
 invitation endpoints. Repeating the same auth attempt never issues another session.
+
+## Browser BFF contract
+
+Browser paths use `/api`, not the direct API `/api/v1`. Use the public typed
+clients rather than manually duplicating schemas. A flow binding is
+`{flowId,flowRevision,sessionBinding}`; IDs/revisions select state but are not
+credentials. Requests also require the current HttpOnly browser proof, exact
+origin and appropriate personal session. Changed authority retires the flow.
+
+Invitation managers use the direct API described above. Browser management
+adapters and its ready screen are not supplied yet.
+
+| Method and path suffix under `/api/invitation-flows/{flowId}` | Body | Successful result |
+| --- | --- | --- |
+| `GET context` | None | `200 {binding,data:{email,expiresAt}}` or pending auth state |
+| `GET inspect` | None | `200 {binding,data:<private inspect state>}` or pending auth state |
+| `POST login` | `{binding,email,password}` | `200 {binding,data:{user},handoff:{attemptId}}` |
+| `POST register` | `{binding,password,name?,locale?}` | Same envelope,201; server selects email |
+| `POST auth-handoffs/{attemptId}/ack` | `{binding}` | Same auth envelope,200; confirms current new cookie |
+| `POST accept` | `{binding,operationId,expectedInviteId,expectedGeneration}` | `200 {binding,data:<acceptance result>}` |
+| `POST switch-account` | `{binding}` | `200 {binding,data:{status:"signed_out"}}` |
+| `POST oauth/{provider}` | `{binding}` | `200 {binding,authorizeHref}` for a code-owned local redirect |
+| `POST verification-status` | `{binding}` | `200 {binding,data:{user,inspection}}` |
+| `POST verification-return` | `{binding}` | `200 {verifyHref}`; explicit same-browser return selector |
+
+Pending reads return `{state:"authenticating",binding}` or
+`{state:"completing_signin",binding,handoff:{attemptId}}`. They never confirm
+login themselves. Acknowledgment checks the exact current cookie/session and
+attempt; authentication does not accept membership. A lost authentication result
+requires observation/acknowledgment recovery, without automatic credential replay.
+The ready UI synchronizes a known incorrect-password rejection before allowing retry.
+
+`GET /api/invitation-operations/{operationId}` performs read-only acceptance
+recovery under the current personal session without an active flow. Match the
+saved intent and show current access, including removed access. Storage contains
+only nonsecret operation/intent descriptors; no password or continuation secret.
+
+Explicit verification return consumes
+`POST /api/invitation-verification-return/{selectorId}` with
+`{expectedSessionBinding}` and returns `{binding,destination}`. Its single-use
+selector is bound to owner, origin, epoch, flow revision and current session;
+ordinary verification email contains no such selector. Navigation is returned only after fresh
+verified-account observation; an invalid/expired selector requires reopening.
+
+The initial `/{locale}/invite/accept?token=<invitation-token>` ingress exchanges
+its token server-side and redirects 303 through an optional cookie-confirming
+bootstrap to a clean flow address. GET never joins. Raw tokens do not enter
+rendered props, query-cache keys or Redis owner records. The initial URL still
+reaches browser/request infrastructure: disable email link tracking and redact
+it at ingress. A clean flow URL cannot be copied as authority to another browser.
+Late cookie replacement closes previous flows with original-link reopen guidance.
+
+HTTPS uses `__Host-amcore_invite_browser` (HttpOnly, Secure, SameSite=Lax,
+Path=/, no Domain). Owner lifetime is an absolute 24 hours; flows expire at the
+shorter continuation deadline. Local HTTP requires the explicit exact trusted
+loopback `WEB_INVITATION_LOCAL_HTTP_ORIGIN`; it uses
+`amcore_invite_browser_local` with Secure=false. No `NODE_ENV` or forwarded-host
+bypass exists. See [browser proof configuration](../frontend/browser-security-and-csp.md#invitation-browser-proof).
 
 ## Security, limits and operations
 

@@ -1,5 +1,6 @@
 import { setRequestLocale } from 'next-intl/server'
 
+import { InvitationVerificationMount } from '@/_app/invitation-flow/index.server'
 import { VerifyEmailPage } from '@/_pages/auth'
 import { resolveLocaleParam } from '@/i18n/params'
 
@@ -16,13 +17,15 @@ export default async function VerifyEmail({
   searchParams,
 }: {
   params: Promise<{ locale: string }>
-  searchParams: Promise<{ token?: string | string[] }>
+  searchParams: Promise<{ token?: string | string[]; inviteReturn?: string | string[] }>
 }) {
   const locale = await resolveLocaleParam(params)
   setRequestLocale(locale)
 
-  const { token: rawToken } = await searchParams
+  const { token: rawToken, inviteReturn } = await searchParams
   const token = typeof rawToken === 'string' ? rawToken : undefined
 
-  return <VerifyEmailPage token={token} />
+  return typeof inviteReturn === 'string'
+    ? <InvitationVerificationMount token={token} selectorId={inviteReturn} />
+    : <VerifyEmailPage token={token} />
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { useCurrentUser } from '@/entities/user'
@@ -16,6 +16,8 @@ interface VerifyEmailStatusProps {
   /** The `?token=` query param `(auth)/verify-email/page.tsx` read from the
    * emailed link. Absent when the page is opened without one. */
   token?: string
+  withoutTokenContent?: ReactNode
+  successContent?: ReactNode
 }
 
 /**
@@ -26,7 +28,7 @@ interface VerifyEmailStatusProps {
  * second call would hit the token's real single-use guard
  * (`used: true` after the first) and show a false failure.
  */
-export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
+export function VerifyEmailStatus({ token, withoutTokenContent, successContent }: VerifyEmailStatusProps) {
   const t = useTranslations('auth')
   const tErrors = useTranslations('errors')
   const { mutate, isSuccess, isError, error } = useVerifyEmail()
@@ -40,6 +42,7 @@ export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
   }, [token, mutate])
 
   if (!token) {
+    if (withoutTokenContent) return withoutTokenContent
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-destructive">{tErrors('TOKEN_INVALID')}</p>
@@ -55,6 +58,7 @@ export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-muted-foreground">{t('verifyEmailSuccess')}</p>
+        {successContent}
         <RouteProgressLink href={destination} className={cn(buttonVariants(), 'w-full')}>
           {currentUser?.user ? t('goToDashboard') : t('login')}
         </RouteProgressLink>

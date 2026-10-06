@@ -1,4 +1,9 @@
 export const LOCALE_DISPLAY_ORDER = [
+  'apps/web/src/_pages/invitation-recipient/ui/recipient-auth.stories.tsx',
+  'apps/web/src/_pages/invitation-recipient/ui/recipient-status.stories.tsx',
+  'apps/web/src/features/invitation-acceptance/ui/invitation-consent.stories.tsx',
+  'apps/web/src/features/invitation-acceptance/ui/invitation-consent.test.tsx',
+
   'apps/web/src/features/console-storage-setting/ui/StorageProbeIntervalEditor.test.tsx',
   'apps/web/e2e/shared/storage-setting-journey.ts',
   'apps/web/e2e/real-stack/storage-runtime-settings.spec.ts',
@@ -95,6 +100,11 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/src/shared/ui/primary-unavailable-fallback.test.tsx',
   'apps/web/src/app/layout.tsx',
   'apps/web/src/app/(auth)/layout.tsx',
+  'apps/web/src/app/(auth)/invite/accept/route.ts',
+  'apps/web/src/app/(auth)/invite/bootstrap/[pendingId]/route.ts',
+  'apps/web/src/app/(auth)/invite/flow/[flowId]/page.tsx',
+  'apps/web/src/app/(auth)/invite/flow/[flowId]/loading.tsx',
+  'apps/web/src/app/(auth)/invite/unusable/page.tsx',
   'apps/web/src/app/auth/callback/route.ts',
   'apps/web/src/app/(auth)/forgot-password/page.tsx',
   'apps/web/src/app/(auth)/resend-verification/page.tsx',

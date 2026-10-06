@@ -1,69 +1,36 @@
-import type { UserResponse } from '@amcore/shared'
+import { type OAuthExchangeResponse, oauthExchangeResponseSchema, profileResponseSchema, type UserResponse } from '@amcore/shared'
+
+import { invitationBackend,InvitationBackendError } from './invitation-upstream'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
-
-/** The backend's own `ApiErrorResponse` shape, forwarded verbatim. */
+/** Safe classification only: upstream diagnostics may contain credential material. */
 export class UpstreamOAuthError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly body: unknown
-  ) {
+  constructor(public readonly status: number, public readonly body: unknown = null) {
     super(`Upstream OAuth call failed with status ${status}`)
     this.name = 'UpstreamOAuthError'
   }
 }
 
-/**
- * `POST /auth/oauth/exchange` — unlike login/register, this does not set a
- * fresh `Set-Cookie`: the `refresh_token` was already minted and cookie-set
- * by the callback step (relayed onto the frontend's origin by
- * `oauth-provider-proxy.ts`). Exchange only *validates* it's present and
- * bound to the ticket's session (`oauth.controller.ts` `exchange()`), so the
- * caller must supply it explicitly as a `Cookie` header — server-side
- * `fetch` has no cookie jar of its own. Returns `{ accessToken }` only, no
- * `user` — callers need a separate `fetchCurrentUser` call.
- */
-export async function callUpstreamOAuthExchange(
-  ticket: string,
-  refreshToken: string
-): Promise<string> {
-  const response = await fetch(`${API_URL}/api/v1/auth/oauth/exchange`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Cookie: `refresh_token=${refreshToken}`,
-    },
-    body: JSON.stringify({ ticket }),
-  })
-
-  if (!response.ok) {
-    throw new UpstreamOAuthError(response.status, await safeJson(response))
+async function containOAuth<T>(work: () => Promise<{ data: T }>): Promise<T> {
+  try { return (await work()).data }
+  catch (error) {
+    throw new UpstreamOAuthError(error instanceof InvitationBackendError ? error.status : 503)
   }
-
-  const data = (await response.json()) as { accessToken: string }
-  return data.accessToken
 }
 
-/** `GET /auth/me` with the freshly-issued access token, for the vault's `userSnapshot`. */
-export async function fetchCurrentUser(accessToken: string): Promise<UserResponse | null> {
-  const response = await fetch(`${API_URL}/api/v1/auth/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
+/** Keep exact invitation correlation until publication; never project backend tokens to the browser. */
+export function callUpstreamOAuthExchange(ticket: string, refreshToken: string,
+  source = new Headers(), signal = AbortSignal.timeout(15000)): Promise<OAuthExchangeResponse> {
+  return containOAuth(() => invitationBackend('/auth/oauth/exchange', oauthExchangeResponseSchema, {
+    source, signal, method: 'POST', expectedStatus: 200, body: { ticket }, refreshToken,
+  }))
+}
 
-  if (!response.ok) {
-    throw new UpstreamOAuthError(response.status, await safeJson(response))
-  }
-
-  const data = (await response.json()) as { user: UserResponse | null }
+export async function fetchCurrentUser(accessToken: string,
+  source = new Headers(), signal = AbortSignal.timeout(10000)): Promise<UserResponse | null> {
+  const data = await containOAuth(() => invitationBackend('/auth/me', profileResponseSchema, {
+    source, signal, method: 'GET', expectedStatus: 200, accessToken,
+  }))
   return data.user
-}
-
-async function safeJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json()
-  } catch {
-    return null
-  }
 }

@@ -81,6 +81,17 @@ its early-rejection tests, and add a deliberate safe server handler if the
 browser needs the operation. Do not depend on dedicated-route precedence alone
 or add a response scanner that buffers uploads or SSE.
 
+## Invitation adapters
+
+Personal recipient journeys use the dedicated `/api/invitation-flows/{flowId}`
+and `/api/invitation-operations/{operationId}` adapters. Success carries the
+current `binding` and safe `data`; confirming a published login is separate from
+explicit invitation acceptance. These adapters never expose backend credentials.
+See the [browser contract](../auth/invites.md#browser-bff-contract) and
+[custom composition](../product-admin/integration.md#custom-invitation-forms).
+Invitation management remains available through the direct API; its browser
+adapters and ready management screen are not supplied yet.
+
 ## Server Components: direct backend transport (ADR-079)
 
 The rule above is about the **browser**. A Server Component runs on the Next

@@ -91,7 +91,8 @@ export const apiClient = {
     options?: { headers?: Record<string, string>; signal?: AbortSignal }
   ): Promise<T> =>
     request<T>(path, { method: 'GET', headers: options?.headers, signal: options?.signal }),
-  post: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('POST', body)),
+  post: <T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T> =>
+    request<T>(path, { ...jsonInit('POST', body), signal: options?.signal }),
   patch: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('PATCH', body)),
   put: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('PUT', body)),
   delete: <T>(path: string): Promise<T> => request<T>(path, { method: 'DELETE' }),

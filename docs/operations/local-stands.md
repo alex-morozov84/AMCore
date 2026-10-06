@@ -81,7 +81,8 @@ invocation-scoped lease/target capability. Bootstrap is a separate bounded step.
 Manual preview always uses `demo.user@preview.amcore.test` (USER) and
 `demo.super-admin@preview.amcore.test` (SUPER_ADMIN when enabled), with the public
 demo password `Demo!AMCore2026`. Recreating the stand preserves these credentials.
-Preview login checks use the checkout's base-locale catalogue.
+Preview login checks use the checkout's base-locale catalogue for the login form
+and accept the account's saved supported locale on the product home page.
 Tests that need unique users or password changes create separate test accounts;
 technical DB/JWT secrets remain random. Production never seeds these accounts.
 
@@ -172,6 +173,11 @@ from successful disposal.
 
 Each Docker stand has unique `.localhost` hostnames: cookies do not isolate by
 port. Product HTTP preview is the default.
+
+Managed HTTP stands set `WEB_INVITATION_LOCAL_HTTP_ORIGIN` to their exact admitted
+product origin for invitation continuation cookies. HTTPS stands leave it empty
+and use the secure prefixed cookie. This local exception is independent of
+`NODE_ENV`; an arbitrary HTTP Host or forwarded protocol cannot enable it.
 
 <!-- AMCORE_CONSOLE_STAND_ORIGIN_START -->
 

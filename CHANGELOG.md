@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
-- Organization invitation API with complete role intent, generation checks and durable operation recovery.
+- Shared password visibility toggle across product and Console authentication forms.
+
+- Invitation recipient journey with explicit consent and replaceable headless presentation.
   Existing installations require the controlled upgrade in `docs/auth/invites.md`.
 
 - Organization members and atomic multi-role assignment with reusable headless

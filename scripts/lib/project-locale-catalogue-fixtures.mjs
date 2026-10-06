@@ -66,6 +66,23 @@ function catalogueObject(model, locale, ctx) {
 }
 
 export function singleCatalogueFixture(model, { locale, variant }, ctx) {
+  if (variant === 'invitation') {
+    const [catalogue, ...extra] = jsonImports(model, 'en')
+    if (!catalogue || extra.length)
+      throw new Error('invitation catalogue import is missing or ambiguous')
+    model.replaceNode(
+      catalogue.moduleSpecifier,
+      `'${catalogue.moduleSpecifier.text.replace('/en.json', `/${locale}.json`)}'`,
+      ctx
+    )
+    for (const node of findAllNodes(
+      model,
+      (node) => ts.isJsxAttribute(node) && node.name.getText() === 'locale'
+    )) {
+      model.replaceNode(node.initializer, `"${locale}"`, ctx)
+    }
+    return
+  }
   retainImport(model, locale, variant === 'errors', ctx)
   if (variant === 'errors') {
     catalogueObject(model, locale, ctx)
@@ -105,4 +122,6 @@ export const fixtureParams = (params) =>
   typeof params === 'object' &&
   Object.keys(params).length === 2 &&
   ['en', 'ru'].includes(params.locale) &&
-  ['errors', 'sessions', 'oauth', 'section', 'storage-setting'].includes(params.variant)
+  ['errors', 'sessions', 'oauth', 'section', 'storage-setting', 'invitation'].includes(
+    params.variant
+  )

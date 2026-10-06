@@ -51,7 +51,7 @@ const below = (...types) =>
   types.flatMap((type) => [
     { element: { type, fileInternalPath: PUBLIC_API } },
     ...(type === 'entities'
-      ? [{ element: { type, captured: { slice: 'organization-context' }, fileInternalPath: 'index.server.ts' } }]
+      ? ['organization-context', 'invitation-flow'].map(slice => ({ element: { type, captured: { slice }, fileInternalPath: 'index.server.ts' } }))
       : []),
   ]);
 
@@ -326,6 +326,9 @@ export default [
                   ...below('composition', 'pages', 'widgets', 'features', 'entities'),
                   ...['index.server.ts', 'index.client.ts', 'index.config.ts'].map((fileInternalPath) => ({
                     element: { type: 'composition', captured: { slice: 'organization-access' }, fileInternalPath },
+                  })),
+                  ...['index.server.ts', 'index.client.ts', 'index.config.ts'].map((fileInternalPath) => ({
+                    element: { type: 'composition', captured: { slice: 'invitation-flow' }, fileInternalPath },
                   })),
                   ...sharedAndNeutral,
                 ],

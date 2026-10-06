@@ -363,3 +363,22 @@ envelope as `GET /auth/me`.
 | ---------------- | ---- | ------------------------------------------------ |
 | validation error | 400  | Unsupported `locale` or invalid `timezone`       |
 | `UNAUTHORIZED`   | 401  | Missing/invalid Bearer token (API keys rejected) |
+
+## Registration policy and invitations
+
+`AUTH_PUBLIC_SIGNUP_ENABLED` defaults to `true`. Set it to `false` to disable
+ordinary email registration; existing accounts can still sign in. The API enforces
+this policy regardless of visible links. `GET /auth/signup-policy` returns the
+public projection used by application registration screens. OAuth new-account
+creation follows the same policy.
+
+A valid [organization invitation](invites.md#scoped-signup-and-authentication)
+permits registration for its fixed email even when public signup is closed.
+The account is unverified and has no organization membership until explicit
+acceptance after verification. If registration succeeds but its response is lost,
+use sign-in or password reset; do not automatically resubmit the password.
+
+An ordinary verification email opened in a new tab contains no invitation-flow
+selector. Return to the invitation tab and refresh current identity, or reopen
+the original invitation. Password reset preserves all-session revocation; sign
+in again and reopen rather than transferring invitation authority through reset.
