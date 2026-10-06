@@ -187,6 +187,8 @@ export class AiToolActionService {
       return { status: 'terminal' }
     }
     if (start.value !== 'started' && start.value !== 'adopted') return { status: 'exit' }
+    // The admission await may have completed just before seal; start no transport after cutoff.
+    if (this.latch.sealed) return { status: 'exit' }
 
     const run = await this.runTool(ctx, action, tool, frozenArgs, toolCallId)
     return this.record(ctx, action, tool, toolCallId, frozenArgs, run)

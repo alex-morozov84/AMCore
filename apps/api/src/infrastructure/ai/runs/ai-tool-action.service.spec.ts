@@ -508,6 +508,31 @@ describe('AiToolActionService', () => {
   })
 
   describe('shutdown seal', () => {
+    it('starts no tool when the seal lands after start admission but before execution', async () => {
+      const latch = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
+      const sealedService = new AiToolActionService(
+        guard as unknown as AiRunGuard,
+        repository,
+        transitions as unknown as AiRunTransitions,
+        { get: jest.fn(() => 200) } as unknown as EnvService,
+        metrics as unknown as MetricsService,
+        audit as unknown as AuditLogService,
+        latch,
+        logger as never
+      )
+      guard.admit.mockImplementationOnce(async () => {
+        queueMicrotask(() => latch.seal())
+        return { kind: 'ok', value: 'started', stop: null }
+      })
+      const tool = makeTool()
+      const execute = jest.spyOn(tool, 'execute')
+
+      expect(await sealedService.execute(ctx, row(), tool, 'call-1')).toEqual({ status: 'exit' })
+      expect(execute).not.toHaveBeenCalled()
+      expect(ctx.runtime.onTransportStarted).not.toHaveBeenCalled()
+      expect(guard.record).not.toHaveBeenCalled()
+    })
+
     it('the tool-outcome audit write does not start after the seal (the outcome itself is already committed)', async () => {
       const sealed = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
       const sealedService = new AiToolActionService(

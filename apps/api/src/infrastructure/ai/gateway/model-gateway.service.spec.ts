@@ -60,6 +60,36 @@ function makeGateway(
 }
 
 describe('ModelGateway.generateText', () => {
+  it.each(['text', 'object'] as const)(
+    'starts no %s adapter when abort lands between prepare and dispatch',
+    async (operation) => {
+      const controller = new AbortController()
+      const text = jest.fn()
+      const object = jest.fn()
+      const gateway = makeGateway(
+        {
+          resolveDefaultModel: jest.fn(async () =>
+            model({ capabilities: { text: true, structured_output: true } })
+          ),
+          hasCredential: () => {
+            queueMicrotask(() => controller.abort())
+            return true
+          },
+        },
+        [{ supportedTypes: [AiProviderType.MOCK], generateText: text, generateObject: object }]
+      )
+      const request = { messages: [], abortSignal: controller.signal }
+      const call =
+        operation === 'text'
+          ? gateway.generateText(request)
+          : gateway.generateObject(request, z.object({ ok: z.boolean() }))
+
+      await expect(call).rejects.toMatchObject({ code: 'aborted' })
+      expect(text).not.toHaveBeenCalled()
+      expect(object).not.toHaveBeenCalled()
+    }
+  )
+
   it('resolves the gated default and dispatches to the mock adapter', async () => {
     const gateway = makeGateway({
       resolveDefaultModel: jest.fn(async () => model()),

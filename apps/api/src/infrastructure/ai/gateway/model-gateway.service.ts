@@ -67,6 +67,8 @@ export class ModelGateway {
 
   async generateText(request: AiGenerateRequest): Promise<AiTextResult> {
     const { model, adapter, call } = await this.prepare(request)
+    // Preparation itself yields: the caller may abort before this continuation dispatches.
+    if (request.abortSignal?.aborted === true) throw AiGatewayException.aborted(model.provider.type)
     try {
       const result = await adapter.generateText(call)
       await this.settle(model, 'text', result.usage, request)
@@ -82,6 +84,7 @@ export class ModelGateway {
     schema: ZodType<T>
   ): Promise<AiObjectResult<T>> {
     const { model, adapter, call } = await this.prepare(request)
+    if (request.abortSignal?.aborted === true) throw AiGatewayException.aborted(model.provider.type)
     if (model.capabilities.structured_output !== true || adapter.generateObject === undefined) {
       throw AiGatewayException.capabilityUnsupported(model.slug, 'structured_output')
     }

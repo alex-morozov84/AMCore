@@ -95,11 +95,13 @@ export class AiRunExecutorService {
         })
       )
       if (run === CUTOFF || !run) return
-      await this.publisher.publish(
-        run.conversation.ownerUserId,
-        runId,
-        run.status.toLowerCase() as AiRunStatusValue,
-        RUN_STATUS_CHANGED
+      await this.latch.run(() =>
+        this.publisher.publish(
+          run.conversation.ownerUserId,
+          runId,
+          run.status.toLowerCase() as AiRunStatusValue,
+          RUN_STATUS_CHANGED
+        )
       )
     } catch {
       // Best-effort: the client repairs a missed hint on its next reconnect/refetch.

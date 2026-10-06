@@ -563,6 +563,24 @@ describe('AiRunExecutorService', () => {
     // on later microtasks; flush them before asserting the detached work ran.
     const flush = () => new Promise((resolve) => setImmediate(resolve))
 
+    it('starts no publish if seal lands after the status read returns but before its continuation', async () => {
+      const real = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
+      latch.run = jest.fn(async (operation: () => Promise<unknown>) => {
+        const value = await real.run(operation)
+        if (value && typeof value === 'object' && 'status' in value) {
+          queueMicrotask(() => real.seal())
+        }
+        return value
+      })
+      Object.defineProperty(latch, 'closed', { get: () => real.closed })
+
+      await executor.execute(claim(), runtime)
+      await flush()
+
+      expect(real.sealed).toBe(true)
+      expect(publisher.publish).not.toHaveBeenCalled()
+    })
+
     it('publishes a content-free hint with the committed status + owner after an attempt', async () => {
       await executor.execute(claim(), runtime)
       await flush()
