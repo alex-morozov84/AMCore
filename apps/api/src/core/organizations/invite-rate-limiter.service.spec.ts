@@ -1,100 +1,30 @@
-import type { Cache } from 'cache-manager'
-import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
-import { PinoLogger } from 'nestjs-pino'
-
-import { AppException } from '../../common/exceptions'
-
 import { InviteRateLimiterService } from './invite-rate-limiter.service'
 
-describe('InviteRateLimiterService', () => {
-  let service: InviteRateLimiterService
-  let cache: DeepMockProxy<Cache>
-  let logger: jest.Mocked<PinoLogger>
+function setup(result: unknown = 1) {
+  const redis = { eval: jest.fn(async () => result) }
+  return { redis, service: new InviteRateLimiterService(redis as never) }
+}
 
-  const orgId = 'org-1'
-  const emailCanonical = 'invitee@example.com'
-  const inviterId = 'user-admin'
-
-  beforeEach(() => {
-    cache = mockDeep<Cache>()
-    logger = {
-      setContext: jest.fn(),
-      warn: jest.fn(),
-      info: jest.fn(),
-      debug: jest.fn(),
-      error: jest.fn(),
-    } as unknown as jest.Mocked<PinoLogger>
-
-    service = new InviteRateLimiterService(cache as unknown as Cache, logger)
+describe('atomic invitation issuance allowance', () => {
+  it('uses one decision for both budgets with no plaintext email key', async () => {
+    const { service, redis } = setup()
+    await service.consume('org', 'recipient@example.test', 'actor')
+    expect(redis.eval).toHaveBeenCalledTimes(1)
+    const [script, input] = redis.eval.mock.calls[0] as unknown as [string, { keys: string[]; arguments: string[] }]
+    expect(script).toContain('pair >= 3 or actor >= 30')
+    expect(input.keys).toHaveLength(2)
+    expect(JSON.stringify(input)).not.toContain('recipient@example.test')
+    expect(input.arguments).toEqual(['3600000'])
   })
-
-  describe('check', () => {
-    it('passes when both counters are below their limits', async () => {
-      cache.get.mockResolvedValue(1)
-      await expect(service.check(orgId, emailCanonical, inviterId)).resolves.toBeUndefined()
-    })
-
-    it('passes when counters are absent (first attempt)', async () => {
-      cache.get.mockResolvedValue(undefined as unknown as number)
-      await expect(service.check(orgId, emailCanonical, inviterId)).resolves.toBeUndefined()
-    })
-
-    it('throws 429 when per-pair counter is at limit (3/h)', async () => {
-      cache.get.mockImplementation(async <T>(key: string) => {
-        if (typeof key === 'string' && key.startsWith('rate:org_invite_pair:')) {
-          return 3 as T
-        }
-        return 0 as T
-      })
-      await expect(service.check(orgId, emailCanonical, inviterId)).rejects.toThrow(AppException)
-    })
-
-    it('throws 429 when per-inviter counter is at limit (30/h)', async () => {
-      cache.get.mockImplementation(async <T>(key: string) => {
-        if (typeof key === 'string' && key.startsWith('rate:org_invite_actor:')) {
-          return 30 as T
-        }
-        return 0 as T
-      })
-      await expect(service.check(orgId, emailCanonical, inviterId)).rejects.toThrow(AppException)
-    })
-
-    it('throws with retryAfterSeconds=3600 detail', async () => {
-      cache.get.mockResolvedValue(30)
-      const error = await service.check(orgId, emailCanonical, inviterId).catch((e) => e)
-      expect(error).toBeInstanceOf(AppException)
-      expect(error.details).toEqual({ retryAfterSeconds: 3600 })
+  it('returns a bounded Retry-After on exhausted allowance', async () => {
+    const { service } = setup(0)
+    await expect(service.consume('org', 'recipient@example.test', 'actor')).rejects.toMatchObject({
+      errorCode: 'RATE_LIMIT_EXCEEDED', details: { retryAfterSeconds: 3600 },
     })
   })
-
-  describe('consume', () => {
-    it('increments both counters with 1h TTL', async () => {
-      cache.get.mockResolvedValue(1)
-      await service.consume(orgId, emailCanonical, inviterId)
-
-      expect(cache.set).toHaveBeenCalledWith(
-        expect.stringContaining(`rate:org_invite_pair:${orgId}:${emailCanonical}`),
-        2,
-        60 * 60 * 1000
-      )
-      expect(cache.set).toHaveBeenCalledWith(
-        expect.stringContaining(`rate:org_invite_actor:${inviterId}:${orgId}`),
-        2,
-        60 * 60 * 1000
-      )
-    })
-
-    it('starts counters from 1 when previously absent', async () => {
-      cache.get.mockResolvedValue(undefined as unknown as number)
-      await service.consume(orgId, emailCanonical, inviterId)
-      expect(cache.set).toHaveBeenCalledWith(expect.any(String), 1, 60 * 60 * 1000)
-    })
-
-    it('logs at debug level — invite rate-limits are not abuse signals on their own', async () => {
-      cache.get.mockResolvedValue(0)
-      await service.consume(orgId, emailCanonical, inviterId)
-      expect(logger.debug).toHaveBeenCalledTimes(1)
-      expect(logger.warn).not.toHaveBeenCalled()
-    })
+  it('does not silently admit during Redis failure', async () => {
+    const { service, redis } = setup()
+    redis.eval.mockRejectedValue(new Error('unavailable'))
+    await expect(service.consume('org', 'recipient@example.test', 'actor')).rejects.toThrow('unavailable')
   })
 })

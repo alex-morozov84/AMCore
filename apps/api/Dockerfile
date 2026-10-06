@@ -29,6 +29,9 @@ WORKDIR /app
 # ===========================================
 FROM base AS build
 
+# pnpm 11 may reinstall before scripts after COPY; every install must keep the lockfile frozen.
+ENV pnpm_config_frozen_lockfile=true
+
 # Prisma CLI runs in this build/migrator stage. Install OpenSSL explicitly so
 # Prisma can resolve the Debian libssl target instead of falling back.
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && \

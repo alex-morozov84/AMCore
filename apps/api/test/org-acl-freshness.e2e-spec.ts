@@ -1,9 +1,18 @@
 import { createHash, randomBytes } from 'node:crypto'
 
+import { createInvitationOperationId, SystemRole } from '@amcore/shared'
+
 import { OrgAclVersionService } from '../src/core/auth/org-acl-version.service'
 import { EnvService } from '../src/env/env.service'
 
-import { type E2ETestContext, seedSystemRoles, setupE2ETest, teardownE2ETest } from './helpers'
+import {
+  type E2ETestContext,
+  seedSystemRoles,
+  setupE2ETest,
+  signAccessToken,
+  teardownE2ETest,
+} from './helpers'
+import { invitationAcceptBody, invitationSeedRole } from './helpers/invitation-contract'
 import { aclFailureCases } from './org-acl-failures'
 import { type AclFixture, aclFixture, deferredGate } from './org-acl-freshness.fixture'
 import { snapshotBarrier } from './org-acl-snapshot-barrier'
@@ -214,6 +223,21 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
 
   it('actual invitation acceptance/rejoin invalidates cached empty permissions', async () => {
     await f.grant()
+    const session = await f.prisma.session.create({
+      data: {
+        userId: f.target.id,
+        familyId: 'acl-invitation',
+        refreshToken: createInvitationOperationId(),
+        expiresAt: new Date(Date.now() + 3600000),
+        lastAuthAt: new Date(),
+      },
+    })
+    const personal = signAccessToken(context.app, {
+      sub: f.target.id,
+      email: f.target.email,
+      systemRole: SystemRole.User,
+      sid: session.id,
+    })
     for (let round = 0; round < 2; round++) {
       const v = await f.version()
       await expect(f.permissions.getPermissions(f.target.id, f.org.id, v)).resolves.toEqual([])
@@ -224,15 +248,16 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
           organizationId: f.org.id,
           email: f.target.email,
           emailCanonical: f.target.emailCanonical,
-          roleId: f.role.id,
+          ...(await invitationSeedRole(f.prisma, f.role.id)),
           invitedById: f.admin.id,
           tokenHash: createHash('sha256').update(raw).digest('hex'),
           expiresAt: new Date(Date.now() + 60000),
         },
       })
       await f
-        .http('post', '/auth/invites/accept', f.token(f.target))
-        .send({ token: raw })
+        .http('post', '/auth/invites/accept', personal)
+        .set('X-Invitation-Operation-Id', createInvitationOperationId())
+        .send(await invitationAcceptBody(f.prisma, raw))
         .expect(200)
       expect(await f.version()).toBe(v + 1)
       await f.read().expect(200)

@@ -51,12 +51,16 @@ The generic proxy returns 404 for these effective upstream paths under `/api/v1`
 
 - `auth/login`, `auth/register`, `auth/refresh`, `auth/step-up`;
 - `auth/oauth/exchange`;
-- `organizations/:id/switch` (one nonempty organization-ID segment).
+- `organizations/:id/switch` (one nonempty organization-ID segment);
+- the entire `auth/invites` family, including continuation admission, registration,
+  private inspection, acceptance, receipt recovery and authentication handoff.
 
 The check covers all exported HTTP methods, static words regardless of case, and
 an optional trailing slash. It checks the same URL that is fetched, after URL
-construction resolves dot segments. It does not decode again, rewrite IDs or
-block unrelated paths by prefix. Request/response streams remain unbuffered.
+construction resolves dot segments. For security classification it normalizes unreserved percent escapes, repeated
+slashes and case; malformed escapes, encoded separators and nested encoding fail
+closed. It never rewrites the outbound URL or dynamic IDs. Invitation-family
+containment deliberately applies to the whole prefix. Request/response streams remain unbuffered.
 
 Canonical `/api/auth/login` and `/api/auth/register` select dedicated handlers
 and return `{ user }` plus an opaque session cookie. Unsupported methods belong

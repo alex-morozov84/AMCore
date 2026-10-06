@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
 import { staleTerminalApiKeyWhere } from '../../core/api-keys/api-key-lifecycle'
+import { InvitationRetentionService } from '../../core/invitations/invitation-retention.service'
 
 import { SingletonCronRunner } from './singleton-cron.runner'
 
@@ -33,13 +34,6 @@ export interface CleanupResult {
   failures: CleanupRecordType[]
 }
 
-// Terminal (accepted/revoked) invites are kept for an audit window after
-// they reach their terminal state, then garbage-collected. Hardcoded
-// starter constant (tune by code change) — see ai/SECURITY_AUDIT.md
-// rationale shared with the invite expiry / limiter constants.
-const INVITE_TERMINAL_RETENTION_DAYS = 30
-const INVITE_TERMINAL_RETENTION_MS = INVITE_TERMINAL_RETENTION_DAYS * 24 * 60 * 60 * 1000
-
 // Distributed-lock key + TTL for the nightly sweep (EQS-05). TTL is generous
 // (30 min) so the lock comfortably outlives a slow sweep on large tables, yet
 // still auto-expires if the holder crashes — the daily cron will not re-fire
@@ -62,7 +56,8 @@ export class CleanupService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly singletonCron: SingletonCronRunner,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly invitationRetention: InvitationRetentionService
   ) {
     this.logger.setContext(CleanupService.name)
   }
@@ -101,7 +96,6 @@ export class CleanupService {
    */
   async runCleanup(): Promise<CleanupResult> {
     const now = new Date()
-    const terminalCutoff = new Date(now.getTime() - INVITE_TERMINAL_RETENTION_MS)
 
     const tasks: { field: CleanupRecordType; run: () => Promise<{ count: number }> }[] = [
       {
@@ -122,24 +116,12 @@ export class CleanupService {
         run: () => this.prisma.apiKey.deleteMany({ where: staleTerminalApiKeyWhere(now) }),
       },
       {
-        // Expired pending invites: past expiry and never accepted/revoked.
         field: 'expiredPendingInvites',
-        run: () =>
-          this.prisma.orgInvite.deleteMany({
-            where: { expiresAt: { lt: now }, acceptedAt: null, revokedAt: null },
-          }),
+        run: () => this.invitationRetention.prune('pending'),
       },
       {
-        // Terminal invites past the audit-retention window. A terminal row has
-        // exactly one of acceptedAt / revokedAt set, so the OR keeps active and
-        // not-yet-expired pending rows untouched.
         field: 'staleTerminalInvites',
-        run: () =>
-          this.prisma.orgInvite.deleteMany({
-            where: {
-              OR: [{ acceptedAt: { lt: terminalCutoff } }, { revokedAt: { lt: terminalCutoff } }],
-            },
-          }),
+        run: () => this.invitationRetention.prune('terminal'),
       },
     ]
 

@@ -15,6 +15,7 @@ import {
   registerSchema,
   resendVerificationSchema,
   resetPasswordSchema,
+  signupPolicyResponseSchema,
   stepUpSchema,
   updateProfileSchema,
   verifyEmailSchema,
@@ -42,3 +43,5 @@ export class AvatarResponseDto extends createZodDto(avatarResponseSchema) {}
 export class MessageResponseDto extends createZodDto(messageResponseSchema) {}
 export class OAuthProvidersResponseDto extends createZodDto(oauthProvidersResponseSchema) {}
 export class OAuthExchangeResponseDto extends createZodDto(oauthExchangeResponseSchema) {}
+
+export class SignupPolicyResponseDto extends createZodDto(signupPolicyResponseSchema) {}

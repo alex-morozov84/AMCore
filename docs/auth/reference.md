@@ -54,7 +54,9 @@ loaded owner role is reused without widening scopes or accepted credentials.
 Organization team administration is separately authorized by exact unrestricted
 `manage:TeamAccess`, matching org context and live membership (the existing JWT
 SUPER_ADMIN management exception remains). Keys need exact `manage:TeamAccess`;
-limited org update grants cannot assign roles/permissions. Org PATCH checks actual
+limited org update grants cannot assign roles/permissions. Invitation and member-role
+assignment routes are stricter: personal JWT plus actual membership and full
+TeamAccess, without platform bypass or API-key admission. Org PATCH checks actual
 pre/post records and all response fields transactionally; org DELETE additionally
 requires delete on every scalar. Ordinary failures are 403 `FORBIDDEN`; positive-all
 or partial TeamAccess permission assignments fail 400 validation. See [RBAC](rbac.md)
@@ -158,6 +160,22 @@ Returned in the response root `errorCode`:
 | `STEP_UP_REQUIRED`              | 403  | Destructive admin op needs recent re-auth — call `POST /auth/step-up` |
 | `STEP_UP_METHOD_UNAVAILABLE`    | 403  | Step-up impossible: OAuth-only account, no password                   |
 
+### Invitation and signup errors
+
+Invitation handlers use stable codes including `INVITE_ALREADY_PENDING`,
+`INVITE_GENERATION_CONFLICT`, `INVITE_SETTLED`, `INVITE_ROLE_INTENT_INVALID`,
+`INVITE_OPERATION_CONFLICT`, `INVITE_OPERATION_EXPIRED`,
+`INVITE_ACCOUNT_MISMATCH`, `INVITE_FLOW_CHANGED` and `INVITE_FLOW_BUSY`.
+Invalid credentials use the generic `INVITE_INVALID_OR_EXPIRED` where the
+endpoint must conceal their state. Interpret these in the endpoint context;
+see [invitation recovery](invites.md#recover-an-uncertain-outcome).
+
+Closed ordinary signup returns `PUBLIC_SIGNUP_DISABLED`. Durable authentication
+handoff uses `AUTH_HANDOFF_INVALID`, `AUTH_HANDOFF_ALREADY_STARTED` and
+`AUTH_HANDOFF_CONFIRMED`. A lost response is not a rejection: observe current
+state rather than repeat authentication. OpenAPI supplies endpoint status codes;
+frontend catalogues map these codes to localized messages.
+
 ### API-key scope error codes
 
 Returned per element in `errors[]` on `POST /api-keys` (on `errors[i].errorCode`,
@@ -187,6 +205,7 @@ not the top-level field). See [API Keys](./api-keys.md) for the scope grammar.
 
 | Variable                          | Default              | Description                                     |
 | --------------------------------- | -------------------- | ----------------------------------------------- |
+| `AUTH_PUBLIC_SIGNUP_ENABLED` | `true` | Ordinary email/new-account OAuth signup; valid invited signup remains available |
 | `JWT_ACCESS_EXPIRATION`           | `15m`                | Access-token lifetime                           |
 | `JWT_REFRESH_DAYS`                | `7`                  | Refresh-token lifetime (days)                   |
 | `PASSWORD_RESET_EXPIRY_MINUTES`   | `15`                 | Reset-link lifetime                             |

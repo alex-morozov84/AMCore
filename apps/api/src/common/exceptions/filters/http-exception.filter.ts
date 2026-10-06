@@ -32,6 +32,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const errorCode = this.extractErrorCode(exceptionResponse)
     const details = this.extractDetails(exceptionResponse)
     const validationErrors = this.extractValidationErrors(exceptionResponse)
+    // Only validated server-owned retry hints become transport headers.
+    const retryAfter = details?.retryAfterSeconds
+    if (statusCode === 429 && typeof retryAfter === 'number' && Number.isFinite(retryAfter) && retryAfter > 0 && retryAfter <= 86400)
+      response.setHeader('Retry-After', String(Math.ceil(retryAfter)))
 
     // Build error response
     const errorResponse: ErrorResponse = {

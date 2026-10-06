@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common'
 
 import { ForbiddenException } from '../../common/exceptions'
 
+import { isRoleAssignable } from './role-assignability-policy'
+
 import type { Prisma } from '@/generated/prisma/client'
 
 type PrismaTx = Prisma.TransactionClient
@@ -37,10 +39,7 @@ export class RoleAssignabilityService {
       select: { organizationId: true, isSystem: true },
     })
 
-    const isSystemRole = role?.isSystem === true && role.organizationId === null
-    const isOwnedCustomRole = role !== null && role.organizationId === orgId
-
-    if (!isSystemRole && !isOwnedCustomRole) {
+    if (!isRoleAssignable(role, orgId)) {
       throw new ForbiddenException('Role is not assignable in this organization')
     }
   }

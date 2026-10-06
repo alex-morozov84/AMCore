@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common'
 
+import { InvitationAuthorityModule } from '../../core/invitations/invitation-authority.module'
+
 import { CleanupService } from './cleanup.service'
 import { SingletonCronRunner } from './singleton-cron.runner'
 
@@ -13,7 +15,7 @@ import { PrismaModule } from '@/prisma'
  * `NestScheduleModule.forRoot()`) is present — i.e. worker/all, never `web`.
  */
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, InvitationAuthorityModule],
   providers: [SingletonCronRunner, CleanupService],
   exports: [CleanupService, SingletonCronRunner],
 })

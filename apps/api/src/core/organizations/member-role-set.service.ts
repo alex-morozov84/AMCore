@@ -18,6 +18,7 @@ import { AuditLogService } from '../audit'
 import { recordMemberRoles } from './member-role-audit'
 import { lockOrganizationMembers } from './organization-mutation-lock'
 import { OrganizationsService } from './organizations.service'
+import { assignableRolesWhere } from './role-assignability-policy'
 import { getSystemRoleId } from './system-role'
 
 import type { Prisma } from '@/generated/prisma/client'
@@ -79,7 +80,7 @@ export class MemberRoleSetService {
     const roles = await tx.role.findMany({
       where: {
         id: { in: dto.roleIds },
-        OR: [{ isSystem: true, organizationId: null }, { organizationId: orgId }],
+        ...assignableRolesWhere(orgId),
       },
       select: { id: true },
     })

@@ -4,6 +4,7 @@ import type { ExecutionContext } from '@nestjs/common'
 
 import { SystemRole } from '@amcore/shared'
 
+import { InviteOperationsController } from '../../organizations/invite-operations.controller'
 import { InvitesController } from '../../organizations/invites.controller'
 import { MembersController } from '../../organizations/members.controller'
 import { OrganizationsController } from '../../organizations/organizations.controller'
@@ -85,7 +86,7 @@ describe('TeamAccessGuard', () => {
     req.teamAccess.aclVersion = 1
     await expect(guard.canActivate(context(req))).rejects.toThrow()
   })
-  it('only the thirteen selected handlers require full team authority', () => {
+  it('only the selected handlers require full team authority', () => {
     const groups: [object, string[], string][] = [
       [
         RolesController.prototype,
@@ -101,10 +102,11 @@ describe('TeamAccessGuard', () => {
       ],
       [
         MembersController.prototype,
-        ['invite', 'removeMember', 'assignRole', 'removeRole'],
+        ['removeMember', 'assignRole', 'removeRole'],
         'orgId',
       ],
-      [InvitesController.prototype, ['listInvites', 'revokeInvite'], 'orgId'],
+      [InvitesController.prototype, ['listInvites', 'roleChoices', 'create', 'reissue', 'revokeInvite'], 'orgId'],
+      [InviteOperationsController.prototype, ['operation'], 'orgId'],
       [OrganizationsController.prototype, ['remove'], 'id'],
     ]
     for (const [prototype, handlers, param] of groups) {

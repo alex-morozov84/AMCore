@@ -5,7 +5,8 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRealRepoCopy, git } from './test-fixture.mjs'
+import { git } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 export const INIT_PROJECT = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -41,7 +42,7 @@ export function runInitProject(root, args, { skipVerify = true } = {}) {
 }
 
 export function createCommittedCopy(copies) {
-  const fixture = createRealRepoCopy()
+  const fixture = createWorkingTreeCopy()
   commit(fixture.root)
   copies.push(fixture)
   return fixture.root

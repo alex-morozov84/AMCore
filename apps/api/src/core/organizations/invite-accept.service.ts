@@ -1,24 +1,43 @@
-import { createHash } from 'node:crypto'
-
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { type AcceptInviteResponse, InviteErrorCode, type RequestPrincipal } from '@amcore/shared'
+import {
+  type AcceptIntent,
+  type AcceptInviteResponse,
+  type InvitationOperationResponse,
+  invitationOperationResponseSchema,
+  InviteErrorCode,
+  type RequestPrincipal,
+} from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 import { AuditLogService } from '../audit'
+import {
+  type InvitationCredential,
+  invitationCredentialHint,
+  invitationSecretHash,
+} from '../invitations/invitation-credential'
+import { InvitationLiveSessionService } from '../invitations/invitation-live-session.service'
+import { currentInvitationIntent } from '../invitations/invitation-role-intent'
 
 import {
   invalidInvitation,
   invitationClock,
   lockInvitation,
   lockInvitationOrg,
-  lockInvitationRole,
   lockInvitationUser,
 } from './invitation-locks'
+import {
+  completeInvitationOperation,
+  INVITATION_RETENTION_MS,
+  invitationFingerprint,
+  lockInvitationOperation,
+  parseInvitationOperationId,
+  replayInvitationOperation,
+} from './invitation-operation'
 import { invitationPostCommit } from './invitation-post-commit'
-import { invitationFailure, invitationTransaction } from './invitation-transaction'
+import { invitationTransaction } from './invitation-transaction'
 import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
 import { OrganizationsService } from './organizations.service'
 
@@ -31,102 +50,169 @@ export class InviteAcceptService {
     private readonly organizations: OrganizationsService,
     private readonly audit: AuditLogService,
     private readonly limiter: InviteAcceptLimiterService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly liveSession: InvitationLiveSessionService
   ) {
     this.logger.setContext(InviteAcceptService.name)
   }
 
   async accept(
-    token: string,
+    credential: InvitationCredential,
+    intent: AcceptIntent,
+    operationId: string,
     principal: RequestPrincipal,
     ip: string
   ): Promise<AcceptInviteResponse> {
-    const fingerprint = InviteAcceptLimiterService.fingerprint(token)
+    const secret = ('token' in credential ? credential.token : credential.continuation) ?? ''
+    const fingerprint = InviteAcceptLimiterService.fingerprint(secret)
     await this.limiter.check(ip, fingerprint)
-    const tokenHash = createHash('sha256').update(token).digest('hex')
-    let result: AcceptInviteResponse
-    try {
-      const hint = await this.prisma.orgInvite
-        .findUnique({ where: { tokenHash }, select: { id: true, organizationId: true } })
-        .catch(invitationFailure)
-      if (!hint) throw invalidInvitation()
-      result = await invitationTransaction(this.prisma, (tx) =>
-        this.acceptLocked(tx, hint, tokenHash, principal)
+    const stableIntent = { kind: 'accept', ...intent }
+    const result = await invitationTransaction(this.prisma, async (tx) => {
+      const receipt = await lockInvitationOperation(tx, principal.sub, 'personal', operationId)
+      const user = await lockInvitationUser(tx, principal.sub)
+      await this.liveSession.assert(principal, tx)
+      const replay = await replayInvitationOperation(
+        tx,
+        receipt,
+        operationId,
+        invitationFingerprint(stableIntent)
       )
-    } catch (error) {
+      if (replay !== undefined)
+        return invitationOperationResponseSchema.options[1].shape.result.parse(replay)
+      if (!user) throw invalidInvitation()
+      const fresh = await this.acceptLocked(tx, credential, intent, user, principal)
+      await completeInvitationOperation(tx, {
+        actorId: user.id,
+        organizationId: fresh.organizationId,
+        scope: 'personal',
+        operationId,
+        kind: 'accept',
+        intent: stableIntent,
+        result: fresh,
+      })
+      return fresh
+    }).catch(async (error: unknown) => {
       if (
         error instanceof AppException &&
         Object.values(InviteErrorCode).includes(error.errorCode as InviteErrorCode)
       )
         await this.limiter.consume(ip, fingerprint)
       throw error
-    }
-    await Promise.allSettled([
-      this.sideEffect('acl_invalidation', () =>
-        this.organizations.invalidateAclVersion(result.organizationId)
-      ),
-      this.sideEffect('accept_limiter_reset', () => this.limiter.reset(fingerprint)),
-    ])
+    })
+    const reason = await invitationPostCommit(() =>
+      this.organizations.invalidateAclVersion(result.organizationId)
+    )
+    if (reason)
+      this.logger.warn(
+        { event: 'org.invite.post_commit_failed', category: 'acl_invalidation', reason },
+        'Invitation committed'
+      )
+    const resetReason = await invitationPostCommit(() => this.limiter.reset(fingerprint))
+    if (resetReason)
+      this.logger.warn(
+        {
+          event: 'org.invite.post_commit_failed',
+          category: 'accept_limiter_reset',
+          reason: resetReason,
+        },
+        'Invite committed; post-commit operation failed'
+      )
     return result
+  }
+
+  async operation(id: string, principal: RequestPrincipal): Promise<InvitationOperationResponse> {
+    parseInvitationOperationId(id)
+    return invitationTransaction(this.prisma, async (tx) => {
+      await this.liveSession.assert(principal, tx)
+      const row = await tx.invitationOperation.findUnique({
+        where: {
+          actorId_scope_operationId: { actorId: principal.sub, scope: 'personal', operationId: id },
+        },
+      })
+      const now = await invitationClock(tx)
+      if (!row || now.getTime() - row.completedAt.getTime() >= INVITATION_RETENTION_MS)
+        return { state: 'unknown' }
+      const result = invitationOperationResponseSchema.options[1].shape.result.parse(row.result)
+      const member = await tx.orgMember.findUnique({
+        where: {
+          userId_organizationId: { userId: principal.sub, organizationId: result.organizationId },
+        },
+        select: { id: true },
+      })
+      // A replacement membership is not proof the original accepted membership survived.
+      const present =
+        !!member && (result.status === 'already_access' || member.id === result.memberId)
+      const stored = row.intent as unknown as AcceptIntent
+      return {
+        state: 'committed',
+        intent: {
+          expectedInviteId: stored.expectedInviteId,
+          expectedGeneration: stored.expectedGeneration,
+        },
+        result,
+        access: present ? 'present' : 'removed',
+      }
+    })
   }
 
   private async acceptLocked(
     tx: Prisma.TransactionClient,
-    hint: { id: string; organizationId: string },
-    hash: string,
+    credential: InvitationCredential,
+    intent: AcceptIntent,
+    user: { id: string; emailCanonical: string; emailVerified: boolean },
     actor: RequestPrincipal
   ): Promise<AcceptInviteResponse> {
-    const user = await lockInvitationUser(tx, actor.sub)
-    if (!user) throw invalidInvitation()
-    const orgId = hint.organizationId
+    const hint = await invitationCredentialHint(tx, credential)
+    const orgId = hint.invite.organizationId
     await lockInvitationOrg(tx, orgId, true)
-    const candidate = await tx.orgInvite.findUnique({
-      where: { tokenHash: hash },
-      select: { roleId: true },
-    })
-    await lockInvitationRole(tx, candidate?.roleId ?? null, orgId, true)
-    const invite = await lockInvitation(tx, hint.id, orgId)
+    const roles = await currentInvitationIntent(tx, hint.invite.id, orgId, true)
+    const invite = await lockInvitation(tx, hint.invite.id, orgId)
     const now = await invitationClock(tx)
     if (
       !invite ||
-      invite.tokenHash !== hash ||
-      !invite.roleId ||
-      invite.roleId !== candidate?.roleId ||
+      invite.id !== intent.expectedInviteId ||
+      invite.generation !== intent.expectedGeneration ||
+      invite.generation !== hint.generation ||
+      invite.tokenHash !== hint.invite.tokenHash ||
+      invite.intentInvalid ||
       invite.acceptedAt ||
       invite.revokedAt ||
       invite.expiresAt <= now ||
+      hint.expiresAt <= now ||
       user.emailCanonical !== invite.emailCanonical
     )
       throw invalidInvitation()
     if (!user.emailVerified)
       throw new AppException(
-        'Verify your email address before accepting an invite',
+        'Email verification required',
         403,
         InviteErrorCode.INVITE_EMAIL_NOT_VERIFIED
       )
     const existing = await tx.orgMember.findUnique({
-      where: { userId_organizationId: { userId: user.id, organizationId: orgId } },
+      where: {
+        userId_organizationId: { userId: user.id, organizationId: orgId },
+      },
       select: { id: true },
     })
-    if (existing)
-      throw new AppException('You are already a member', 409, InviteErrorCode.INVITE_ALREADY_MEMBER)
-    const claimed = await tx.$queryRaw<{ roleId: string }[]>`
-      WITH claim_clock AS MATERIALIZED (
-        SELECT date_trunc('milliseconds', clock_timestamp() AT TIME ZONE 'UTC') AS value
-      )
-      UPDATE core.org_invites SET "acceptedAt" = claim_clock.value,
-        "acceptedByUserId" = ${user.id}, "updatedAt" = claim_clock.value
-      FROM claim_clock WHERE id = ${invite.id} AND "organizationId" = ${orgId}
-        AND "tokenHash" = ${hash} AND "roleId" = ${invite.roleId}
+    const claimed = await tx.$queryRaw<{ id: string }[]>`
+      WITH claim_clock AS MATERIALIZED (SELECT date_trunc('milliseconds', clock_timestamp() AT TIME ZONE 'UTC') AS value)
+      UPDATE core.org_invites SET "acceptedAt" = claim_clock.value, "acceptedByUserId" = ${user.id}, "updatedAt" = claim_clock.value
+      FROM claim_clock WHERE id = ${invite.id} AND generation = ${intent.expectedGeneration}
         AND "acceptedAt" IS NULL AND "revokedAt" IS NULL AND "expiresAt" > claim_clock.value
-      RETURNING "roleId"`
+        AND ${hint.expiresAt} > claim_clock.value RETURNING id`
     if (!claimed[0]) throw invalidInvitation()
-    const member = await tx.orgMember.create({
-      data: { userId: user.id, organizationId: orgId },
-      select: { id: true },
-    })
-    await tx.memberRole.create({ data: { memberId: member.id, roleId: claimed[0].roleId } })
-    await this.organizations.bumpAclVersionTx(orgId, tx)
+    const member =
+      existing ??
+      (await tx.orgMember.create({
+        data: { userId: user.id, organizationId: orgId },
+        select: { id: true },
+      }))
+    if (!existing) {
+      await tx.memberRole.createMany({
+        data: roles.map((role) => ({ memberId: member.id, roleId: role.id })),
+      })
+      await this.organizations.bumpAclVersionTx(orgId, tx)
+    }
     await this.audit.record(
       {
         action: 'org.invite_accepted',
@@ -137,23 +223,16 @@ export class InviteAcceptService {
         targetType: AuditTargetType.ORG_INVITE,
         metadata: {
           actorCredentialType: actor.type,
-          emailHash: createHash('sha256').update(invite.emailCanonical).digest('hex'),
-          roleId: claimed[0].roleId,
-          pinoEvent: 'org.invite.accepted',
+          generation: invite.generation,
+          branch: existing ? 'already_access' : 'accepted',
+          emailHash: invitationSecretHash(invite.emailCanonical),
+          roleIds: roles.map((r) => r.id),
         },
       },
       { tx }
     )
-    return { organizationId: orgId, roleId: claimed[0].roleId }
-  }
-
-  private async sideEffect(category: string, work: () => Promise<void>): Promise<void> {
-    const reason = await invitationPostCommit(work)
-    if (reason) {
-      this.logger.warn(
-        { event: 'org.invite.post_commit_failed', category, reason },
-        'Invite committed; post-commit operation failed'
-      )
-    }
+    return existing
+      ? { status: 'already_access', organizationId: orgId }
+      : { status: 'accepted', organizationId: orgId, memberId: member.id }
   }
 }

@@ -9,7 +9,7 @@ import { operationsConsoleDocSeams } from './operations-console-ownership-doc-se
 import { operationsConsoleOwnership } from './operations-console-ownership.mjs'
 import { assertExactScaffoldCounts } from './scaffold-exact-counts.mjs'
 import { validateOwnership } from './ownership-validate.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 import { resolvePublicRepoRoot } from './working-tree-fixture.mjs'
 
 const root = resolvePublicRepoRoot()
@@ -126,7 +126,7 @@ test('a duplicate owned-block anchor fails closed', () => {
 })
 
 test('a new file inside a closed-world Console root is discovered automatically', () => {
-  const copy = createRealRepoCopy()
+  const copy = createWorkingTreeCopy()
   try {
     const relative = 'apps/web/src/features/console-login/new-owned-helper.ts'
     writeFileSync(path.join(copy.root, relative), 'export const owned = true\n')

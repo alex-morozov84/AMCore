@@ -27,6 +27,17 @@
     "INVITE_INVALID_OR_EXPIRED": "This invitation is invalid or has expired.",
     "INVITE_ALREADY_MEMBER": "You are already a member of this organization.",
     "INVITE_EMAIL_NOT_VERIFIED": "Please verify your email address before accepting this invitation.",
+    "PUBLIC_SIGNUP_DISABLED": "Public registration is closed. Use an invitation or sign in to your existing account.",
+    "AUTH_HANDOFF_INVALID": "Sign-in could not be completed. Reopen the invitation and sign in again.",
+    "INVITE_ALREADY_PENDING": "An invitation already exists for this email. Find it in pending or expired invitations.",
+    "INVITE_GENERATION_CONFLICT": "This invitation changed. Refresh its details before continuing.",
+    "INVITE_SETTLED": "This invitation has already been accepted or revoked.",
+    "INVITE_ROLE_INTENT_INVALID": "Some invited roles are unavailable. Choose a complete replacement role set.",
+    "INVITE_OPERATION_CONFLICT": "This operation ID was used for a different action. Check the original result.",
+    "INVITE_OPERATION_EXPIRED": "This action can no longer be retried safely. Check its current state before starting a new action.",
+    "INVITE_ACCOUNT_MISMATCH": "This invitation is unavailable for the signed-in account. Switch accounts or reopen the original invitation.",
+    "INVITE_FLOW_CHANGED": "This invitation session changed. Reopen the invitation to continue.",
+    "INVITE_FLOW_BUSY": "Another sign-in is in progress. Finish or cancel it before trying again.",
     "BUSINESS_RULE_VIOLATION": "This action isn't allowed right now.",
     "PERMISSION_RULE_UNSUPPORTED": "This permission rule cannot be safely used.",
     "PERMISSION_FIELD_UNSUPPORTED": "This permission contains an unsupported field.",
@@ -35,6 +46,7 @@
     "NETWORK_ERROR": "Can't reach the server. Check your connection and try again.",
     "TIMEOUT": "The request took too long. Please try again.",
     "UNKNOWN_ERROR": "Something went wrong. Please try again.",
+    "AUTH_CONTINUATION_CHANGED": "This sign-in flow has changed. Reload the page or reopen your invitation.",
     "correlationHint": "Reference: {id}",
     "MEMBER_UNAVAILABLE": "Member unavailable.",
     "MEMBER_ROLES_CONFLICT": "Roles or organization access changed. Refresh before editing.",
@@ -42,7 +54,9 @@
     "ORGANIZATION_LAST_ADMIN": "The last organization administrator must retain the ADMIN role.",
     "MEMBER_ROLES_SAVE_UNAVAILABLE": "The role save could not be confirmed.",
     "MEMBER_READ_UNAVAILABLE": "Member data could not be loaded within the size limit. Try a smaller page.",
-    "SETTING_REVISION_CONFLICT": "The saved setting changed. Your draft is preserved; review the current revision before saving again."
+    "SETTING_REVISION_CONFLICT": "The saved setting changed. Your draft is preserved; review the current revision before saving again.",
+    "AUTH_HANDOFF_ALREADY_STARTED": "This sign-in attempt has already started. Sign in again from the invitation.",
+    "AUTH_HANDOFF_CONFIRMED": "This sign-in has already been confirmed."
   },
   "validation": {
     "required": "This field is required.",
@@ -212,7 +226,8 @@
         "telegram.connection_linked": "Telegram connection linked",
         "telegram.connection_unlinked": "Telegram connection unlinked",
         "org.member_roles_changed": "Organization member roles changed",
-        "admin.runtime_setting.changed": "Runtime setting changed"
+        "admin.runtime_setting.changed": "Runtime setting changed",
+        "org.invite_reissued": "Organization invitation reissued"
       },
       "draftTimeZone": "Invalid time entered in {zone}. Correct it using the selected time zone.",
       "summaryInterval": "Probe interval",

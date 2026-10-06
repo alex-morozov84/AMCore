@@ -29,7 +29,7 @@ export const localeOwnership = defineOwnershipManifest({
     'falls back to the negotiated Accept-Language locale when the body omits it',
     'renders detailed content only from the allowlisted projection (no raw payload leak)',
     'renderStored (version-aware, fail-closed)',
-    'sends an org invite email with hasAccount=false for an unknown email',
+    'acknowledges known=%s nonmembers uniformly and captures truthful email intent',
     "prisma.user.findUnique.mockResolvedValue({ locale: 'en' } as never)",
     'renders items in the recipient locale and reports no more when within limit',
     'accepts supported locales and rejects others',

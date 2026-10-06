@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '../constants'
 
+import { invitationOAuthCorrelationSchema } from './invitation-common'
 import { paginatedResponseSchema } from './pagination'
 
 export const emailInputSchema = z.string().trim().pipe(z.email())
@@ -242,8 +243,9 @@ export const refreshResponseSchema = z.object({
 export type RefreshResponse = z.infer<typeof refreshResponseSchema>
 
 /** OAuth login ticket exchange response */
-export const oauthExchangeResponseSchema = z.object({
+export const oauthExchangeResponseSchema = z.strictObject({
   accessToken: z.string(),
+  invitation: invitationOAuthCorrelationSchema.optional(),
 })
 
 export type OAuthExchangeResponse = z.infer<typeof oauthExchangeResponseSchema>
@@ -282,3 +284,6 @@ export const oauthProvidersResponseSchema = z.object({
 })
 
 export type OAuthProvidersResponse = z.infer<typeof oauthProvidersResponseSchema>
+
+export const signupPolicyResponseSchema = z.strictObject({ publicSignupEnabled: z.boolean() })
+export type SignupPolicyResponse = z.infer<typeof signupPolicyResponseSchema>

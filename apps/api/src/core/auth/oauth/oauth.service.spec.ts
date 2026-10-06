@@ -50,6 +50,8 @@ const mockProfile = {
 }
 
 describe('OAuthService', () => {
+  let env: { get: jest.Mock }
+  let invitationAuthority: { lockValid: jest.Mock; lockOAuthIntent: jest.Mock }
   let service: OAuthService
   let prisma: jest.Mocked<any>
   let sessionService: jest.Mocked<any>
@@ -71,6 +73,7 @@ describe('OAuthService', () => {
     }
 
     prisma = {
+      invitationAuthHandoff: { findUnique: jest.fn().mockResolvedValue(null) },
       oAuthAccount: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
@@ -81,7 +84,13 @@ describe('OAuthService', () => {
         create: jest.fn().mockResolvedValue(mockUser()),
         update: jest.fn().mockResolvedValue(mockUser()),
       },
-      $transaction: jest.fn().mockImplementation((ops: any[]) => Promise.all(ops)),
+      $executeRaw: jest.fn(async () => 1),
+      $queryRaw: jest.fn(async () => [{ id: 'user-1' }]),
+      $transaction: jest
+        .fn()
+        .mockImplementation((ops: any) =>
+          typeof ops === 'function' ? ops(prisma) : Promise.all(ops)
+        ),
     }
 
     sessionService = {
@@ -118,6 +127,8 @@ describe('OAuthService', () => {
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
 
+    env = { get: jest.fn(() => true) }
+    invitationAuthority = { lockValid: jest.fn(), lockOAuthIntent: jest.fn() }
     service = new OAuthService(
       prisma,
       sessionService,
@@ -125,7 +136,9 @@ describe('OAuthService', () => {
       providerFactory,
       stateService,
       new EmailIdentityService(),
-      mockLogger
+      mockLogger,
+      env as never,
+      invitationAuthority as never
     )
   })
 
@@ -549,6 +562,79 @@ describe('OAuthService', () => {
       await service.handleCallback('telegram', 'code', 'state', TEST_NONCE, requestInfo)
 
       expect(prisma.$transaction).toHaveBeenCalled()
+    })
+  })
+  describe('invitation correlation and public signup policy', () => {
+    const correlation = {
+      attemptId: 'AAAAAAAAAAAAAAAAAAAAAA',
+      provider: 'google' as const,
+      expectedInviteId: 'invite-one',
+      expectedGeneration: 1,
+    }
+    const expiresAt = new Date(Date.now() + 600000).toISOString()
+    const scopedState = {
+      provider: 'google',
+      codeVerifier: 'verifier',
+      mode: 'login',
+      browserNonceHash: TEST_NONCE_HASH,
+      invitation: { correlation, cleanupKeyHash: 'fake-hash', expiresAt },
+    }
+    beforeEach(() => {
+      prisma.$queryRaw.mockResolvedValue([{ value: new Date(), id: 'user-1' }])
+      invitationAuthority.lockOAuthIntent.mockResolvedValue({ emailCanonical: 'user@example.com' })
+      env.get.mockReturnValue(false)
+    })
+    it('blocks a new ordinary OAuth account when public signup is disabled', async () => {
+      await expect(
+        service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
+      ).rejects.toMatchObject({ errorCode: 'PUBLIC_SIGNUP_DISABLED' })
+      expect(prisma.user.create).not.toHaveBeenCalled()
+      expect(sessionService.createSession).not.toHaveBeenCalled()
+    })
+    it('keeps existing provider login available when public signup is disabled', async () => {
+      prisma.oAuthAccount.findUnique.mockResolvedValue({ userId: 'user-1', user: mockUser() })
+      expect(
+        (await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)).mode
+      ).toBe('login')
+      expect(prisma.user.create).not.toHaveBeenCalled()
+    })
+    it('allows fixed-email invited signup and carries only server correlation to the ticket', async () => {
+      stateService.consume.mockResolvedValue(scopedState)
+      const result = await service.handleCallback(
+        'google',
+        'code',
+        'state',
+        TEST_NONCE,
+        requestInfo
+      )
+      expect(result).toMatchObject({
+        invitation: { ...correlation, backendSessionId: 'session-123' },
+      })
+      expect(sessionService.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          handoff: { attemptId: correlation.attemptId, cleanupKeyHash: 'fake-hash' },
+        }),
+        prisma
+      )
+      expect(result).not.toHaveProperty('cleanupKeyHash')
+    })
+    it('rejects mismatched provider email before account or session creation', async () => {
+      stateService.consume.mockResolvedValue(scopedState)
+      invitationAuthority.lockOAuthIntent.mockResolvedValue({
+        emailCanonical: 'different@example.com',
+      })
+      await expect(
+        service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
+      ).rejects.toMatchObject({ errorCode: 'INVITE_INVALID_OR_EXPIRED' })
+      expect(prisma.user.create).not.toHaveBeenCalled()
+      expect(sessionService.createSession).not.toHaveBeenCalled()
+    })
+    it('rejects browser nonce mismatch before resolving invitation authority', async () => {
+      stateService.consume.mockResolvedValue(scopedState)
+      await expect(
+        service.handleCallback('google', 'code', 'state', 'wrong-nonce', requestInfo)
+      ).rejects.toMatchObject({ errorCode: 'OAUTH_STATE_INVALID' })
+      expect(invitationAuthority.lockOAuthIntent).not.toHaveBeenCalled()
     })
   })
 })

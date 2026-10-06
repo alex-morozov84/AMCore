@@ -207,9 +207,11 @@ Role names, `manage:Organization`, and model-management grants cannot substitute
 API keys additionally need the exact `manage:TeamAccess` scope. Owner trust is checked
 before scopes, so narrower scopes cannot hide a restrictive owner rule.
 
-Invitation create/revoke recheck primary identity and complete owner permissions
-inside their write transaction; [the invitation contract](invites.md#authorization-and-concurrency)
-explains platform admission, API-key scope and role-deletion behavior.
+Invitation issue, reissue and revoke require an organization-scoped user bearer,
+actual membership and full TeamAccess; API keys and platform administration do
+not provide invitation admission. Writes recheck primary identity and complete
+owner permissions inside their transaction; [the invitation contract](invites.md#issue-find-and-manage-invitations)
+explains admission, generation checks and role-deletion behavior.
 
 ```typescript
 @RequireTeamAccess('orgId')
