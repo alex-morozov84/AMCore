@@ -23,21 +23,34 @@ export function computeNextAttemptAt(attemptCount: number, now: Date = new Date(
 }
 
 /**
+ * Normalize a provider-requested retry delay into the earliest permitted next attempt, once,
+ * before any branching (transient retry, exhausted terminal row). `undefined`, zero, negative or
+ * non-finite → no floor (ordinary backoff). A valid delay above `NOTIFICATION_RETRY_AFTER_MAX_MS`
+ * (24 h) is clamped to it — the ADR-052 policy; callers and docs treat this as a deliberate
+ * exception to "never earlier than the provider asked", not as invalid input.
+ */
+export function resolveRetryFloor(
+  retryAfterMs: number | undefined,
+  now: Date = new Date()
+): Date | undefined {
+  if (retryAfterMs === undefined || !Number.isFinite(retryAfterMs) || retryAfterMs <= 0) {
+    return undefined
+  }
+  const clamped = Math.min(retryAfterMs, NOTIFICATION_RETRY_AFTER_MAX_MS)
+  return new Date(now.getTime() + clamped)
+}
+
+/**
  * Apply a provider-requested retry **floor** to the computed backoff (corr. E). The next
- * attempt is the LATER of the normal jittered backoff and `now + retryAfterMs`, so we never
- * retry before the provider's requested delay, and never earlier than the normal schedule.
- * The floor is clamped to `NOTIFICATION_RETRY_AFTER_MAX_MS` (24h) so a corrupt value can't
- * park a row indefinitely. `undefined`/non-positive → the plain backoff.
+ * attempt is the LATER of the normal jittered backoff and the floor, so we never retry before
+ * the provider's requested delay (up to the 24 h policy clamp), and never earlier than the
+ * normal schedule. `undefined`/non-positive → the plain backoff.
  */
 export function applyRetryAfterFloor(
   backoffAt: Date,
   retryAfterMs: number | undefined,
   now: Date = new Date()
 ): Date {
-  if (retryAfterMs === undefined || !Number.isFinite(retryAfterMs) || retryAfterMs <= 0) {
-    return backoffAt
-  }
-  const clamped = Math.min(retryAfterMs, NOTIFICATION_RETRY_AFTER_MAX_MS)
-  const floorAt = new Date(now.getTime() + clamped)
-  return floorAt > backoffAt ? floorAt : backoffAt
+  const floorAt = resolveRetryFloor(retryAfterMs, now)
+  return floorAt && floorAt > backoffAt ? floorAt : backoffAt
 }

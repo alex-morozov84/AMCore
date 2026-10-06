@@ -8,6 +8,7 @@ import {
   logSlowQuery,
   PrismaService,
   resolveSlowQueryThresholdMs,
+  SHUTDOWN_BARRIER_MAX_MS,
 } from './prisma.service'
 
 describe('PrismaService slow query logging', () => {
@@ -114,5 +115,117 @@ describe('PrismaService constructor', () => {
     } as unknown as MetricsService
 
     expect(() => new PrismaService(env, logger, metrics)).not.toThrow()
+  })
+})
+
+describe('PrismaService shutdown barriers and teardown', () => {
+  const envValues: Record<string, unknown> = {
+    DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
+    DATABASE_POOL_MAX: 10,
+    DATABASE_POOL_IDLE_MS: 30_000,
+    DATABASE_CONNECT_MS: 5_000,
+    DATABASE_STATEMENT_TIMEOUT_MS: 30_000,
+    DATABASE_QUERY_TIMEOUT_MS: 30_000,
+    NODE_ENV: 'test',
+    SLOW_QUERY_THRESHOLD_MS: 100,
+    PROCESS_ROLE: 'worker',
+  }
+  let logger: { setContext: jest.Mock; warn: jest.Mock; error: jest.Mock }
+  let service: PrismaService
+  let calls: string[]
+
+  beforeEach(() => {
+    calls = []
+    logger = { setContext: jest.fn(), warn: jest.fn(), error: jest.fn() }
+    service = new PrismaService(
+      { get: (key: string) => envValues[key] } as unknown as EnvService,
+      logger as unknown as PinoLogger,
+      { incDbSlowQuery: jest.fn() } as unknown as MetricsService
+    )
+    jest.spyOn(service, '$disconnect').mockImplementation(async () => {
+      calls.push('disconnect')
+    })
+    jest
+      .spyOn((service as unknown as { pool: { end: () => Promise<void> } }).pool, 'end')
+      .mockImplementation(async () => {
+        calls.push('pool.end')
+      })
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
+
+  it('runs every registered barrier BEFORE disconnecting the database', async () => {
+    service.registerShutdownBarrier(async () => {
+      await Promise.resolve()
+      calls.push('barrier-a')
+    })
+    service.registerShutdownBarrier(async () => {
+      calls.push('barrier-b')
+    })
+
+    await service.onModuleDestroy()
+
+    expect(calls.indexOf('disconnect')).toBeGreaterThan(calls.indexOf('barrier-a'))
+    expect(calls.indexOf('disconnect')).toBeGreaterThan(calls.indexOf('barrier-b'))
+    expect(calls).toContain('pool.end')
+  })
+
+  it('still disconnects and ends the pool when a barrier rejects (bounded log, no details)', async () => {
+    service.registerShutdownBarrier(async () => {
+      throw new Error('SECRET barrier failure')
+    })
+
+    await service.onModuleDestroy()
+
+    expect(calls).toEqual(['disconnect', 'pool.end'])
+    expect(logger.error).toHaveBeenCalledWith(
+      { event: 'prisma.shutdown_barrier_failed' },
+      expect.any(String)
+    )
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain('SECRET')
+  })
+
+  it('continues with teardown when a barrier exceeds the safety cap (the cap does not cancel it)', async () => {
+    jest.useFakeTimers()
+    let finished = false
+    service.registerShutdownBarrier(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            finished = true
+            resolve()
+          }, SHUTDOWN_BARRIER_MAX_MS * 5)
+        })
+    )
+
+    const destroying = service.onModuleDestroy()
+    await jest.advanceTimersByTimeAsync(SHUTDOWN_BARRIER_MAX_MS)
+    await destroying
+
+    expect(calls).toEqual(['disconnect', 'pool.end'])
+    expect(logger.warn).toHaveBeenCalledWith(
+      { event: 'prisma.shutdown_barrier_timeout' },
+      expect.any(String)
+    )
+    expect(finished).toBe(false) // still running — cancellation was never promised
+  })
+
+  it('attempts pool.end even when $disconnect rejects, then surfaces the first error', async () => {
+    jest.spyOn(service, '$disconnect').mockRejectedValue(new Error('disconnect failed'))
+
+    await expect(service.onModuleDestroy()).rejects.toThrow('disconnect failed')
+
+    expect(calls).toEqual(['pool.end'])
+  })
+
+  it('rejects a registration made after teardown has started', async () => {
+    const destroying = service.onModuleDestroy()
+    expect(() => service.registerShutdownBarrier(async () => undefined)).toThrow(
+      'prisma_shutdown_barrier_registration_closed'
+    )
+    await destroying
   })
 })

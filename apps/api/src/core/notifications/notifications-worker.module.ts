@@ -7,11 +7,14 @@ import type { ChannelDeliverer } from './channels/channel-deliverer.types'
 import { EmailChannelDeliverer } from './channels/email-channel.deliverer'
 import { TelegramBotApiClient } from './channels/telegram/telegram-bot-api.client'
 import { TelegramChannelDeliverer } from './channels/telegram/telegram-channel.deliverer'
+import { NotificationAttemptAdmission } from './dispatch/notification-attempt-admission'
 import { NotificationDeliveryRepository } from './dispatch/notification-delivery.repository'
 import { NotificationDeliveryBacklogCollector } from './dispatch/notification-delivery-backlog.collector'
+import { NotificationDispatchGate } from './dispatch/notification-dispatch.gate'
 import { NotificationDispatchProcessor } from './dispatch/notification-dispatch.processor'
 import { NotificationDispatchService } from './dispatch/notification-dispatch.service'
 import { NotificationRecoveryService } from './dispatch/notification-recovery.service'
+import { NotificationShutdownLatch } from './dispatch/notification-shutdown.latch'
 import { NotificationRetentionService } from './notification-retention.service'
 import { NotificationsCoreModule } from './notifications-core.module'
 
@@ -36,6 +39,16 @@ import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.ru
 @Module({
   imports: [PrismaModule, NotificationsCoreModule, EmailModule],
   providers: [
+    // Process-wide dispatch capacity gate + shutdown latch: ONE instance shared by the BullMQ
+    // wake path and the recovery cron (a per-entry instance would defeat the cap).
+    NotificationShutdownLatch,
+    {
+      provide: NotificationDispatchGate,
+      useFactory: (latch: NotificationShutdownLatch): NotificationDispatchGate =>
+        new NotificationDispatchGate(latch),
+      inject: [NotificationShutdownLatch],
+    },
+    NotificationAttemptAdmission,
     NotificationDeliveryRepository,
     NotificationDeliveryBacklogCollector,
     EmailChannelDeliverer,

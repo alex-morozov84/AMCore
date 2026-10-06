@@ -72,15 +72,33 @@ delivery, applies the definition's content policy, renders the generic
 `SECRET` notification content is rejected at definition registration. Secret
 token emails stay in direct email paths.
 
+The worker authorizes each send just before it happens (lease still owned, attempt
+not timed out) and passes an in-memory abort `signal` in the send parameters so the
+attempt's timeout or a shutdown can abort the request. The signal is never
+serialized — it is not part of any queue payload or schema — and direct and queued
+callers are unaffected. If the provider answers a rate limit with a retry delay
+(Resend sends `Retry-After`), the adapter reports it as `retryAfterMs` and the
+notification retry schedule will not retry before it (a delay above 24 hours is
+clamped to 24 hours; see
+[Delivery guarantees](../notifications/README.md#delivery-guarantees-and-operating-limits)).
+A provider that reports no delay just uses the ordinary backoff. Capacity is a
+per-worker concurrency cap, not a team-wide rate limiter: if your account's request
+rate is limited, replicas multiply the cap.
+
 ## Provider Contract
 
 Providers implement `EmailProvider.send(params)` from `email.types.ts`.
 
 Provider responsibilities:
 
-- accept rendered `html`, optional `text`, `subject`, recipient metadata, and
-  optional `idempotencyKey`;
-- return `success`, provider `id`, optional `error`, and optional `retryable`;
+- accept rendered `html`, optional `text`, `subject`, recipient metadata,
+  optional `idempotencyKey`, and an optional in-memory abort `signal` (ignore it if
+  the transport cannot abort; never serialize it);
+- return `success`, provider `id`, optional `error`, optional `retryable`, and — only
+  when the transport exposes one — a normalized `retryAfterMs` (a number of
+  milliseconds; never headers or error text). `ResendEmailProvider` reads the
+  `Retry-After` header (positive whole seconds with at most 10 ASCII digits, or an
+  IMF-fixdate). Zero, past dates and unsupported values use ordinary backoff;
 - classify deterministic provider/config/payload failures as
   `retryable: false`;
 - never log rendered HTML, plaintext bodies, raw payloads, or token URLs.

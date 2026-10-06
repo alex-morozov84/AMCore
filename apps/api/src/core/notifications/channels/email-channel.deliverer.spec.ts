@@ -17,6 +17,7 @@ import {
 import { NotificationDefinitionRegistry } from '../notification-definition.registry'
 import type { NotificationDefinition } from '../notification-definition.types'
 
+import type { DeliveryAdmission, DeliveryContext } from './channel-deliverer.types'
 import { EmailChannelDeliverer } from './email-channel.deliverer'
 
 import type { EnvService } from '@/env/env.service'
@@ -87,14 +88,27 @@ describe('EmailChannelDeliverer', () => {
   let email: jest.Mocked<Pick<EmailService, 'renderTemplate' | 'send' | 'queue'>>
   let env: jest.Mocked<Pick<EnvService, 'get'>>
 
-  const build = (defs: NotificationDefinition[]): EmailChannelDeliverer =>
-    new EmailChannelDeliverer(
+  /** Admission double: authorizes the single transport call immediately (records the signal). */
+  let admissionSend: jest.Mock
+  const admission: DeliveryAdmission = {
+    send: (transport) => admissionSend(transport),
+  }
+
+  const build = (
+    defs: NotificationDefinition[]
+  ): { deliver: (context: DeliveryContext) => ReturnType<EmailChannelDeliverer['deliver']> } => {
+    const real = new EmailChannelDeliverer(
       new NotificationDefinitionRegistry(defs),
       email as unknown as EmailService,
       env as unknown as EnvService
     )
+    return { deliver: (context: DeliveryContext) => real.deliver(context, admission) }
+  }
 
   beforeEach(() => {
+    admissionSend = jest.fn((transport: (signal: AbortSignal) => Promise<unknown>) =>
+      transport(new AbortController().signal)
+    )
     email = {
       renderTemplate: jest.fn().mockResolvedValue({ html: '<p>', text: 'p', subject: 's' }),
       send: jest.fn().mockResolvedValue({ id: 'prov-1', success: true }),
@@ -207,5 +221,63 @@ describe('EmailChannelDeliverer', () => {
     email.renderTemplate.mockRejectedValueOnce(new Error('render boom'))
     const result = await deliverer.deliver({ delivery: claim(), notification: notification() })
     expect(result).toEqual({ status: 'permanent', errorCode: 'email_render_failed' })
+  })
+
+  describe('actual-start admission and Retry-After', () => {
+    it('admits AFTER rendering and immediately before the single send, forwarding the attempt signal', async () => {
+      const deliverer = build([detailedDef])
+      const order: string[] = []
+      email.renderTemplate.mockImplementation(async () => {
+        order.push('render')
+        return { html: '<p>', text: 'p', subject: 's' }
+      })
+      admissionSend.mockImplementation(async (transport: (s: AbortSignal) => Promise<unknown>) => {
+        order.push('admit')
+        return transport(new AbortController().signal)
+      })
+      email.send.mockImplementation(async () => {
+        order.push('send')
+        return { id: 'prov-1', success: true }
+      })
+
+      await deliverer.deliver({ delivery: claim(), notification: notification() })
+
+      expect(order).toEqual(['render', 'admit', 'send'])
+      expect(email.send).toHaveBeenCalledWith(
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+        { template: 'notification', mode: 'worker' }
+      )
+    })
+
+    it('makes ZERO sends and returns not_started when admission refuses', async () => {
+      const deliverer = build([detailedDef])
+      admissionSend.mockResolvedValue({ status: 'not_started', reason: 'lease_expired' })
+      const result = await deliverer.deliver({ delivery: claim(), notification: notification() })
+      expect(result).toEqual({ status: 'not_started', reason: 'lease_expired' })
+      expect(email.send).not.toHaveBeenCalled()
+    })
+
+    it('turns a normalized provider retry delay into a retry floor', async () => {
+      const deliverer = build([detailedDef])
+      email.send.mockResolvedValueOnce({
+        id: '',
+        success: false,
+        retryable: true,
+        retryAfterMs: 120_000,
+      })
+      expect(await deliverer.deliver({ delivery: claim(), notification: notification() })).toEqual({
+        status: 'transient',
+        errorCode: 'email_provider_transient',
+        retryAfterMs: 120_000,
+      })
+    })
+
+    it('keeps the ordinary backoff (no floor) when the transport gave no signal', async () => {
+      const deliverer = build([detailedDef])
+      email.send.mockResolvedValueOnce({ id: '', success: false, retryable: true })
+      const result = await deliverer.deliver({ delivery: claim(), notification: notification() })
+      expect(result).toEqual({ status: 'transient', errorCode: 'email_provider_transient' })
+      expect(result).not.toHaveProperty('retryAfterMs')
+    })
   })
 })

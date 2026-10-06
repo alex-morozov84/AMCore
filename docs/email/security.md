@@ -36,7 +36,12 @@ Application logs must not contain:
 
 Provider error names/messages are untrusted: they can echo a rendered token URL.
 The Resend adapter returns and logs only a finite safe failure category, never
-raw error messages, arbitrary error names or causes. `sendNow()` also sanitizes
+raw error messages, arbitrary error names or causes. The Resend SDK itself prints
+the raw parsed provider error to the console outside production; the adapter turns
+that off for its own instance (no global console patch), and a contract test against
+the real installed SDK fails if an SDK upgrade changes this. The notification
+dispatcher likewise logs only bounded event codes, delivery id and channel — never an
+error name or message. `sendNow()` also sanitizes
 render/custom-provider throws and failed results. Custom adapters must enforce
 the same rule inside their own logging; an outer catch cannot remove a log
 already emitted by a provider.

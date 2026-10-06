@@ -2,13 +2,14 @@ import { createHash } from 'node:crypto'
 
 import { HttpStatus } from '@nestjs/common'
 
+import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation'
 import { NotificationChannel } from '../../notification.constants'
 
 import { TelegramCancelReason } from './telegram.constants'
 import type { TelegramStartCommand } from './telegram-update.schema'
 
 import { AppException } from '@/common/exceptions'
-import { NotificationDeliveryStatus, Prisma } from '@/generated/prisma/client'
+import { Prisma } from '@/generated/prisma/client'
 
 /** A successful bind, signalled to the post-commit confirmation/audit step. */
 export interface BindResult {
@@ -98,25 +99,20 @@ async function lockToken(
   return rows[0] ?? null
 }
 
-/** Cancel + delete the user's existing connection (relink = unlink-fence + bind, R5). */
+/**
+ * Cancel + delete the user's existing connection (relink = unlink-fence + bind, R5). The row is
+ * locked `FOR UPDATE` first (lock order: connection → deliveries) and ALL its active deliveries —
+ * including a `PROCESSING` one — are cancelled, so an old generation cannot resurrect.
+ */
 async function replaceOwnerConnection(tx: Prisma.TransactionClient, userId: string): Promise<void> {
-  const existing = await tx.telegramConnection.findUnique({
-    where: { userId },
-    select: { id: true },
-  })
+  const [existing] = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+    SELECT id FROM "notifications"."telegram_connections" WHERE "userId" = ${userId} FOR UPDATE
+  `)
   if (!existing) return
-  await tx.notificationDelivery.updateMany({
-    where: {
-      targetRef: existing.id,
-      channel: NotificationChannel.TELEGRAM,
-      status: {
-        in: [NotificationDeliveryStatus.PENDING, NotificationDeliveryStatus.RETRY_SCHEDULED],
-      },
-    },
-    data: {
-      status: NotificationDeliveryStatus.CANCELLED,
-      terminalReasonCode: TelegramCancelReason.CONNECTION_REPLACED,
-    },
+  await cancelActiveDeliveries(tx, {
+    channel: NotificationChannel.TELEGRAM,
+    targetRef: existing.id,
+    reason: TelegramCancelReason.CONNECTION_REPLACED,
   })
   await tx.telegramConnection.delete({ where: { id: existing.id } })
 }

@@ -28,6 +28,12 @@ export type FinalizeResult =
   | { state: 'failed'; reasonCode: string; deadLettered: boolean }
   /** The CAS matched no row — the lease was lost/expired and reclaimed elsewhere. */
   | { state: 'lease_lost' }
+  /**
+   * The shutdown latch was sealed: nothing was recorded by this call. The transaction either
+   * rolled back (sealed before its last write) or had already committed; the row's state is
+   * uncertain until settled and a surviving `PROCESSING` lease is recovered by the reaper.
+   */
+  | { state: 'cutoff' }
 
 /** Aggregate outcome of one reaper pass over expired `PROCESSING` leases. */
 export interface ReapResult {

@@ -7,7 +7,14 @@ import { resolveExternalMode } from '../notification-content-policy'
 import { NotificationDefinitionRegistry } from '../notification-definition.registry'
 import type { RenderedNotificationContent } from '../notification-definition.types'
 
-import type { ChannelDeliverer, DeliveryContext, DeliveryResult } from './channel-deliverer.types'
+import {
+  type ChannelDeliverer,
+  type DeliveryAdmission,
+  type DeliveryContext,
+  type DeliveryResult,
+  isNotStarted,
+  type NotStarted,
+} from './channel-deliverer.types'
 
 import { EnvService } from '@/env/env.service'
 import { EmailService, EmailTemplate } from '@/infrastructure/email'
@@ -28,7 +35,7 @@ const EmailDeliveryError = {
  * otherwise a neutral summary that never touches the raw payload — and sends it via
  * `EmailService.send()` with a stable provider idempotency key
  * (`notification-delivery:<id>`), which mitigates the at-least-once duplicate-send risk
- * (the dispatcher's timeout does not abort an in-flight provider call). It NEVER uses
+ * (abort is best-effort and cannot recall an accepted provider request). It NEVER uses
  * `EmailService.queue()` — a notification email must not enter the EMAIL queue.
  */
 @Injectable()
@@ -41,7 +48,10 @@ export class EmailChannelDeliverer implements ChannelDeliverer {
     private readonly env: EnvService
   ) {}
 
-  async deliver(context: DeliveryContext): Promise<DeliveryResult> {
+  async deliver(
+    context: DeliveryContext,
+    admission: DeliveryAdmission
+  ): Promise<DeliveryResult | NotStarted> {
     const { delivery, notification } = context
     const locale = coerceSupportedLocale(delivery.locale)
 
@@ -72,23 +82,35 @@ export class EmailChannelDeliverer implements ChannelDeliverer {
       return { status: 'permanent', errorCode: EmailDeliveryError.RENDER_FAILED }
     }
 
-    const result = await this.email.send(
-      {
-        to: delivery.targetKey,
-        subject: rendered.subject,
-        html: rendered.html,
-        text: rendered.text,
-        idempotencyKey: `notification-delivery:${delivery.id}`,
-      },
-      { template: 'notification', mode: 'worker' }
+    // Rendering (above) is async; the actual-start admission is adjacent to the send itself.
+    const result = await admission.send((signal) =>
+      this.email.send(
+        {
+          to: delivery.targetKey,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+          idempotencyKey: `notification-delivery:${delivery.id}`,
+          signal,
+        },
+        { template: 'notification', mode: 'worker' }
+      )
     )
+    if (isNotStarted(result)) return result
 
     if (result.success) {
       return { status: 'delivered', providerMessageId: result.id }
     }
-    return result.retryable === false
-      ? { status: 'permanent', errorCode: EmailDeliveryError.PROVIDER_PERMANENT }
-      : { status: 'transient', errorCode: EmailDeliveryError.PROVIDER_TRANSIENT }
+    if (result.retryable === false) {
+      return { status: 'permanent', errorCode: EmailDeliveryError.PROVIDER_PERMANENT }
+    }
+    // A transport that exposes a retry delay (Resend's `Retry-After` on a rate limit) becomes a
+    // retry floor; one that does not simply keeps the ordinary backoff.
+    return {
+      status: 'transient',
+      errorCode: EmailDeliveryError.PROVIDER_TRANSIENT,
+      ...(result.retryAfterMs !== undefined ? { retryAfterMs: result.retryAfterMs } : {}),
+    }
   }
 
   /**

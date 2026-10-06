@@ -273,8 +273,27 @@ plus these seams:
    (see the storage health probe) — behind an opt-in flag when the check has a cost.
    Don't fail liveness on a non-critical dependency.
 4. **Lifecycle.** Release sockets/handles on shutdown via `OnModuleDestroy`
-   (Nest already runs shutdown hooks — see `main.ts`), so `SIGTERM` drains cleanly
-   and tests don't leak handles.
+   (Nest already runs shutdown hooks — see `main.ts`), so tests don't leak handles.
+   That alone does **not** let work finish before the database goes away: Nest runs
+   every `onModuleDestroy` before `beforeApplicationShutdown`, the hooks of one
+   module run concurrently, and `PrismaService` disconnects in its own
+   `onModuleDestroy` — so nothing orders your hook before it. A process-role drain
+   that must record in-flight results first (the notification dispatcher is the
+   reference) registers a **shutdown barrier** with
+   `PrismaService.registerShutdownBarrier(fn)`. Prisma awaits all barriers at the
+   start of its teardown, so the ordering holds regardless of module distance or
+   provider order. A barrier must bound itself (the notification dispatcher closes,
+   waits at most ~15 s, then seals); Prisma caps all barriers at 20 s
+   (`SHUTDOWN_BARRIER_MAX_MS`) only as a safety net — the cap neither cancels a
+   barrier nor makes it safe — and `$disconnect()` and `pool.end()` are always
+   attempted afterwards, even if a barrier or the disconnect fails. Registration is
+   rejected once teardown has started. Not every existing drain participates (AI
+   runs do not yet), and none of this bounds Redis cleanup, other queues or the HTTP
+   server. The notification dispatcher uses its own shutdown latch
+   (`NotificationShutdownLatch.transaction`): its guarded client makes the next
+   query throw after the seal so the transaction rolls back whole. Other domains
+   implement their own bounded drain and transaction interruption mechanism;
+   registering a barrier does not require a dependency on notifications.
 5. **Process role.** Put the module in the right list (see step 5 of the module
    recipe): a producer/shared client → `coreImports`; a consumer that only runs work
    → a worker-only module.
