@@ -73,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Docker image builds keep the pnpm store and metadata cache in shared BuildKit
+  cache mounts, so rebuilding after a lockfile, prisma or source change no longer
+  re-downloads packages. See `docs/operations/local-stands.md`.
+
 - Advanced permission writes reject unsupported conditions, fields and principal
   templates before saving. Existing valid custom rules remain usable; incompatible
   stored rules fail closed. Numeric DateTime conditions use integer epoch
