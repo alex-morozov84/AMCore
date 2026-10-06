@@ -84,7 +84,7 @@ test('path-mode: demoting with an aged session requires step-up, retries automat
 
   const stepUpDialog = page.getByRole('dialog', { name: /confirm your password/i })
   await expect(stepUpDialog).toBeVisible()
-  await stepUpDialog.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await stepUpDialog.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUpDialog.getByRole('button', { name: /confirm/i }).click()
 
   await expect(stepUpDialog).toBeHidden()
@@ -127,11 +127,11 @@ test('path-mode: a wrong step-up password stays recoverable and leaves the role 
 
   const stepUpDialog = page.getByRole('dialog', { name: /confirm your password/i })
   await expect(stepUpDialog).toBeVisible()
-  await stepUpDialog.getByLabel(/password/i).fill('DefinitelyWrong123')
+  await stepUpDialog.getByLabel(/^password$/i).fill('DefinitelyWrong123')
   await stepUpDialog.getByRole('button', { name: /confirm/i }).click()
 
   await expect(stepUpDialog.getByText(/incorrect email or password/i)).toBeVisible()
-  await expect(stepUpDialog.getByLabel(/password/i)).toBeVisible()
+  await expect(stepUpDialog.getByLabel(/^password$/i)).toBeVisible()
 
   await stepUpDialog.getByRole('button', { name: /cancel/i }).click()
   await expect(

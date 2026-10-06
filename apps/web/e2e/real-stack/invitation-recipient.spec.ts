@@ -10,6 +10,9 @@ import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { TEST_PASSWORD, uniqueEmail } from './helpers'
 import { inviteRecipient, membershipCount } from './invitation-recipient.helpers'
+import { resetInvitationRegistrationIpBudget } from './invitation-registration-budget.helpers'
+
+test.beforeEach(() => resetInvitationRegistrationIpBudget())
 
 for (const locale of SUPPORTED_LOCALES) {
   for (const loseResponse of [false, true]) {

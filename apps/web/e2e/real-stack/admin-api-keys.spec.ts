@@ -96,7 +96,7 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   await confirm.getByRole('button', { name: 'Revoke', exact: true }).click()
   const stepUp = page.getByRole('dialog')
   await expect(stepUp).toBeVisible()
-  await stepUp.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await stepUp.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUp.getByRole('button', { name: /confirm|continue|verify/i }).click()
   await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 00' })).toContainText('Revoked')
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeFocused()

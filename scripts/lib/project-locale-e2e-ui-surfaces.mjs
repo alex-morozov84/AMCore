@@ -1,6 +1,5 @@
 export const E2E_UI_PROFILES = Object.freeze({
   auth: [
-    ['/password/i', '/пароль/i'],
     ['/^password$/i', '/^пароль$/i'],
     ['/^show password$/i', '/^показать пароль$/i'],
     ['/^hide password$/i', '/^скрыть пароль$/i'],
@@ -26,7 +25,7 @@ export const E2E_UI_PROFILES = Object.freeze({
   common: [["'Something went wrong'", "'Что-то пошло не так'"]],
   console: [
     ['/email/i', '/электронная почта/i'],
-    ['/password/i', '/пароль/i'],
+    ['/^password$/i', '/^пароль$/i'],
     ['/sign in/i', '/войти/i'],
     ['/sign out/i', '/выйти/i'],
   ],

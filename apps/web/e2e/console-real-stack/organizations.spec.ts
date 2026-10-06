@@ -33,7 +33,7 @@ test('host-mode Organizations panel renders real data via the console session, w
   const consolePage = await console.newPage()
   await consolePage.goto('/en/login')
   await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/password/i).fill('Test1234Secure')
+  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
@@ -79,7 +79,7 @@ test('host-mode Organizations panel denies a demoted session with a live re-chec
   const consolePage = await console.newPage()
   await consolePage.goto('/en/login')
   await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/password/i).fill('Test1234Secure')
+  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')

@@ -34,7 +34,7 @@ test('key controls use the isolated Console host and exact origin with live admi
     const page = await console.newPage()
     await page.goto('/en/login')
     await page.getByLabel(/email/i).fill(email)
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD)
+    await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await expect(page).toHaveURL(`${target.origins.console}/en`)
     await page.goto(`/en/api-keys?id=${id}`)

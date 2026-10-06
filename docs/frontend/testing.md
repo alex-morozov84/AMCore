@@ -529,3 +529,9 @@ there are no independent endpoint overrides. See
 - [Bundle baseline and budget](./bundle-budget.md) — the per-route client
   bundle methodology this verification loop sits alongside, and why it
   rides on a documented baseline rather than a CI-enforced gate today.
+
+Invited-registration browser scenarios share one IP in the serial managed real-stack
+lane. Their fixture resets only `ratelimit:v1:invite-register-ip:*` through the
+lease-checked Redis command before each scenario. Per-email and other budgets
+remain intact; production limits are unchanged. Rate-limit enforcement is checked
+separately in API tests. This fixture cannot run against an owner preview.

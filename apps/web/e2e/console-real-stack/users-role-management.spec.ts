@@ -31,7 +31,7 @@ async function signInToConsole(
   const page = await context.newPage()
   await page.goto('/en/login')
   await page.getByLabel(/email/i).fill(email)
-  await page.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
   await expect(page).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
@@ -107,7 +107,7 @@ test('host-mode: demoting with an aged session requires step-up and never expose
 
   const stepUpDialog = admin.page.getByRole('dialog', { name: /confirm your password/i })
   await expect(stepUpDialog).toBeVisible()
-  await stepUpDialog.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await stepUpDialog.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUpDialog.getByRole('button', { name: /confirm/i }).click()
 
   await expect(stepUpDialog).toBeHidden()
