@@ -10,8 +10,10 @@ describe('operation inventory against the real plans', () => {
   test('reports every stale measured exact count together', () => {
     assertExactScaffoldCounts([
       // Counts include board and invitation routes, selected-catalogue fixtures and story removals.
+      // Retiring the two obsolete security-exception seams removes four measured
+      // operations, eight facts/claims and four final operations across these scenarios.
       // They are measured from every real plan, not estimated from file counts.
-      { name: 'measured operations', expected: 650, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 646, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -30,17 +32,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 907,
+        expected: 899,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1582,
+        expected: 1574,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 634,
+        expected: 630,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

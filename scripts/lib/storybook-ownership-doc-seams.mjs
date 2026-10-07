@@ -58,13 +58,4 @@ export const storybookGeneralDocSeams = [
     ['test:storybook', 'docs/frontend/storybook.md'],
     'storybook.docs-shared-ui'
   ),
-  owned(
-    'storybook.ci-security-example',
-    'docs/operations/ci-security.md',
-    block('Current example: `image-size@2.0.2`', '`.github/workflows/dependency-review.yml`.', {
-      consumeBlankLine: true,
-    }),
-    ['@storybook/nextjs-vite'],
-    'storybook.docs-ci-security'
-  ),
 ]

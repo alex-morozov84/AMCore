@@ -56,16 +56,6 @@ export const storybookCoreSeams = [
     ['storybook-job', 'test:storybook', 'msw-storybook-addon']
   ),
   seam(
-    'storybook.workflow-dependency-review',
-    '.github/workflows/dependency-review.yml',
-    'owned-block',
-    block(
-      '# amcore:sentinel-block start=storybook-allowlist',
-      '# amcore:sentinel-block end=storybook-allowlist'
-    ),
-    ['storybook-allowlist', '@storybook/nextjs-vite']
-  ),
-  seam(
     'storybook.gitignore',
     'apps/web/.gitignore',
     'owned-block',
