@@ -4,7 +4,10 @@ import { MEMBER_REQUEST_BYTES, ROLE_REQUEST_BYTES } from '@amcore/shared'
 
 import { configureInvitationBoundary, invitationJsonLimit } from './invitation-request-boundary'
 import { isMemberRoleJsonRequest } from './member-role-body-parser'
-import { isRoleDefinitionJsonRequest } from './role-definition-body-parser'
+import {
+  isRoleDefinitionFormRequest,
+  isRoleDefinitionJsonRequest,
+} from './role-definition-body-parser'
 
 /**
  * Maximum accepted size, in bytes, of a parsed request body.
@@ -59,6 +62,11 @@ export function configureBodyParser(app: NestExpressApplication, prefix = '/api/
   app.useBodyParser('json', {
     limit: ROLE_REQUEST_BYTES,
     type: (req) => isRoleDefinitionJsonRequest(req, prefix),
+  })
+  app.useBodyParser('urlencoded', {
+    limit: ROLE_REQUEST_BYTES,
+    extended: true,
+    type: (req) => isRoleDefinitionFormRequest(req, prefix),
   })
   app.useBodyParser('json', { limit: REQUEST_BODY_LIMIT_BYTES })
   app.useBodyParser('urlencoded', { limit: REQUEST_BODY_LIMIT_BYTES, extended: true })

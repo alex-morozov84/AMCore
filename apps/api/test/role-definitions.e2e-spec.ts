@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 
 import { JwtService } from '@nestjs/jwt'
 import { Pool } from 'pg'
@@ -514,6 +515,182 @@ describe('Role definitions: list, detail, atomic save, confirmed delete (real DB
         ])
       ).rows[0].n
     ).toBe(200)
+  })
+
+  it('applies the 16 KiB cap to every spelling of the commands, to form bodies and to gzip inflation', async () => {
+    const head = '{"name":"Padded","description":null}'
+    const padded = (bytes: number): string => head + ' '.repeat(bytes - head.length)
+    const role = await newRole('Cap role')
+    const encodedFirst = `%${orgId.charCodeAt(0).toString(16)}${orgId.slice(1)}`
+    const json = (test: request.Test, body: string | Buffer) =>
+      test.auth(token, { type: 'bearer' }).set('content-type', 'application/json').send(body)
+    const spellings = [
+      base(),
+      `${base()}/`,
+      `/Organizations/${orgId}/Role-Definitions`,
+      `/organizations/${encodedFirst}/role-definitions`,
+    ]
+    for (const url of spellings) await json(http().post(url), padded(16_385)).expect(413)
+    await json(http().patch(`${base()}/${role.role.id}/`), padded(16_385)).expect(413)
+    await json(http().post(`${base()}/${role.role.id}/deletion`), padded(16_385)).expect(413)
+    // A tiny gzip body that inflates past the cap is refused on decoded size.
+    const gzipped = gzipSync(Buffer.from(padded(60_000)))
+    expect(gzipped.length).toBeLessThan(2_000)
+    await http()
+      .post(base())
+      .auth(token, { type: 'bearer' })
+      .set('content-type', 'application/json')
+      .set('content-encoding', 'gzip')
+      .serialize(() => gzipped as unknown as string)
+      .send({})
+      .expect(413)
+    // Form bodies are admitted by the global parser, so they share the same decoded cap.
+    await http()
+      .post(base())
+      .auth(token, { type: 'bearer' })
+      .type('form')
+      .send(`name=${encodeURIComponent(' '.repeat(17_000) + 'Demo')}`)
+      .expect(413)
+    // Exactly at the cap, a trailing-slash spelling is not refused by the parser.
+    const atCap = await json(http().post(`${base()}/`), padded(16_384))
+    expect(atCap.status).not.toBe(413)
+  })
+
+  it('refuses to edit a role whose actual advanced projection exceeds its budget even when the SQL estimate fits', async () => {
+    const role = await newRole('Projection')
+    const ids = ['proj-0', 'proj-1', 'proj-2']
+    // Each rule fits the legacy request ceiling; three together exceed the 262,144-byte projection.
+    await prisma.permission.createMany({
+      data: ids.map((id) => ({
+        id,
+        action: 'read',
+        subject: 'User',
+        conditions: { name: 'x'.repeat(87_320) },
+        fields: [],
+        inverted: true,
+        organizationId: orgId,
+      })),
+    })
+    await prisma.rolePermission.createMany({
+      data: ids.map((permissionId) => ({ roleId: role.role.id, permissionId })),
+    })
+    const detail = (await get(`/${role.role.id}`).expect(200)).body
+    expect(detail).toMatchObject({ editMode: 'oversized', ruleCount: 3, advancedRules: null })
+    const rev = await revision()
+    const audits = (await auditRows('org.role_updated')).length
+    await save(role.role.id, definition(detail, { name: 'Projection renamed' }))
+      .expect(409)
+      .then((r) => expect(r.body.errorCode).toBe('ROLE_DEFINITION_OVERSIZED'))
+    expect(await revision()).toBe(rev)
+    expect((await auditRows('org.role_updated')).length).toBe(audits)
+    expect((await prisma.role.findUniqueOrThrow({ where: { id: role.role.id } })).name).toBe(
+      'Projection'
+    )
+  })
+
+  it('applies the response budget to the no-op branch and the read path', async () => {
+    const role = await newRole('Heavy holders')
+    for (let i = 0; i < 10; i += 1) {
+      const user = await prisma.user.create({
+        data: {
+          email: `heavy${i}@example.test`,
+          emailCanonical: `heavy${i}@example.test`,
+          emailVerified: true,
+          name: 'n'.repeat(90_000),
+        },
+      })
+      const member = await prisma.orgMember.create({
+        data: { userId: user.id, organizationId: orgId },
+      })
+      await prisma.memberRole.create({ data: { memberId: member.id, roleId: role.role.id } })
+    }
+    await prisma.organization.update({
+      where: { id: orgId },
+      data: { aclVersion: { increment: 1 } },
+    })
+    const listed = (await get('?search=heavy%20holders').expect(200)).body
+    const rev = await revision()
+    expect(listed.aclVersion).toBe(rev)
+    await get(`/${role.role.id}`)
+      .expect(503)
+      .then((r) => expect(r.body.errorCode).toBe('ROLE_READ_UNAVAILABLE'))
+    // An unchanged definition would otherwise succeed with a response over the cap.
+    await save(role.role.id, {
+      expectedAclVersion: rev,
+      name: role.role.name,
+      description: role.role.description,
+      presets: [],
+    })
+      .expect(409)
+      .then((r) => expect(r.body.errorCode).toBe('ROLE_DEFINITION_OVERSIZED'))
+    expect(await revision()).toBe(rev)
+  })
+
+  it('treats a normalization-only save and an unchanged legacy patch as true no-ops', async () => {
+    const role = await newRole('Big')
+    const rev = await revision()
+    const audits = (await auditRows('org.role_updated')).length
+    const normalized = await save(role.role.id, {
+      expectedAclVersion: rev,
+      name: ' Big ',
+      description: ' ',
+      presets: [],
+    }).expect(200)
+    expect(normalized.body.changed).toBe(false)
+    for (const patch of [{ name: 'Big' }, {}])
+      await http()
+        .patch(`/organizations/${orgId}/roles/${role.role.id}`)
+        .auth(token, { type: 'bearer' })
+        .send(patch)
+        .expect(200)
+    expect(await revision()).toBe(rev)
+    expect((await auditRows('org.role_updated')).length).toBe(audits)
+    expect((await prisma.role.findUniqueOrThrow({ where: { id: role.role.id } })).name).toBe('Big')
+  })
+
+  it('refuses a nonmember platform administrator and a member whose policy vetoes full team access', async () => {
+    const root = await register('root@example.test')
+    const rootId = context.app.get(JwtService).verify(root.accessToken).sub
+    await prisma.user.update({ where: { id: rootId }, data: { systemRole: 'SUPER_ADMIN' } })
+    const relogin = await http()
+      .post('/auth/login')
+      .send({ email: 'root@example.test', password: 'StrongP@ss123' })
+      .expect(200)
+    await get('', relogin.body.accessToken).expect((res) =>
+      expect([403, 404]).toContain(res.status)
+    )
+
+    const vetoed = await register('vetoed@example.test')
+    const vetoedId = context.app.get(JwtService).verify(vetoed.accessToken).sub
+    const role = await prisma.role.create({
+      data: { name: 'Full but vetoed', organizationId: orgId, isSystem: false },
+    })
+    await prisma.permission.createMany({
+      data: [
+        {
+          id: 'veto-ta',
+          action: 'manage',
+          subject: 'TeamAccess',
+          fields: [],
+          inverted: false,
+          organizationId: orgId,
+        },
+        {
+          id: 'veto-deny',
+          action: 'read',
+          subject: 'User',
+          conditions: { id: 'someone' },
+          fields: [],
+          inverted: true,
+          organizationId: orgId,
+        },
+      ],
+    })
+    await prisma.rolePermission.createMany({
+      data: ['veto-ta', 'veto-deny'].map((permissionId) => ({ roleId: role.id, permissionId })),
+    })
+    await seedOrgMember(prisma, { orgId, userId: vetoedId, roleId: role.id })
+    await get('', vetoed.accessToken).expect(403)
   })
 
   it('accepts a decoded body at the 16384-byte limit and rejects one byte more', async () => {

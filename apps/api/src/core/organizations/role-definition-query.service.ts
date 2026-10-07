@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from '@nestjs/common'
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
 
 import {
   escapeLikeLiteral,
@@ -39,82 +39,76 @@ const LIST_CLASSIFY_ROLE_BYTES = 65_536
 export class RoleDefinitionQueryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(
+  async list(
     orgId: string,
     actorOrg: string | undefined,
     query: RoleDefinitionListQuery
   ): Promise<RoleDefinitionListResponse> {
     this.assertContext(orgId, actorOrg)
-    return this.prisma.$transaction(
-      async (tx) => {
-        const aclVersion = await this.aclVersion(tx, orgId)
-        const where: Prisma.RoleWhereInput = {
-          ...assignableRolesWhere(orgId),
-          ...(query.search && {
-            name: { contains: escapeLikeLiteral(query.search), mode: 'insensitive' },
-          }),
+    return this.read(async (tx) => {
+      const aclVersion = await this.aclVersion(tx, orgId)
+      const where: Prisma.RoleWhereInput = {
+        ...assignableRolesWhere(orgId),
+        ...(query.search && {
+          name: { contains: escapeLikeLiteral(query.search), mode: 'insensitive' },
+        }),
+      }
+      const total = await tx.role.count({ where })
+      const rows = await tx.role.findMany({
+        where,
+        select: roleMetaSelect,
+        orderBy: [...order],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      })
+      const ids = rows.map((row) => row.id)
+      const [counts, preflight] = await Promise.all([
+        this.holderCounts(tx, orgId, ids),
+        rulePreflight(tx, ids),
+      ])
+      const advanced = await this.advancedStates(tx, rows, preflight)
+      const data: RoleSummary[] = rows.map((row) => {
+        const rules = preflight.get(row.id)!
+        return {
+          ...row,
+          holderCount: counts.get(row.id) ?? 0,
+          ruleCount: rules.ruleCount,
+          grantsFullControl: rules.fullControl,
+          advancedState: rules.ruleCount === 0 ? 'none' : (advanced.get(row.id) ?? 'unknown'),
         }
-        const total = await tx.role.count({ where })
-        const rows = await tx.role.findMany({
-          where,
-          select: roleMetaSelect,
-          orderBy: [...order],
-          skip: (query.page - 1) * query.limit,
-          take: query.limit,
-        })
-        const ids = rows.map((row) => row.id)
-        const [counts, preflight] = await Promise.all([
-          this.holderCounts(tx, orgId, ids),
-          rulePreflight(tx, ids),
-        ])
-        const advanced = await this.advancedStates(tx, rows, preflight)
-        const data: RoleSummary[] = rows.map((row) => {
-          const rules = preflight.get(row.id)!
-          return {
-            ...row,
-            holderCount: counts.get(row.id) ?? 0,
-            ruleCount: rules.ruleCount,
-            grantsFullControl: rules.fullControl,
-            advancedState: rules.ruleCount === 0 ? 'none' : (advanced.get(row.id) ?? 'unknown'),
-          }
-        })
-        const response = { data, total, page: query.page, limit: query.limit, aclVersion }
-        if (serializedJsonBytes(response) > ROLE_LIST_API_RESPONSE_BYTES) throw this.unavailable()
-        return response
-      },
-      { isolationLevel: 'RepeatableRead' }
-    )
+      })
+      const response = { data, total, page: query.page, limit: query.limit, aclVersion }
+      if (serializedJsonBytes(response) > ROLE_LIST_API_RESPONSE_BYTES) throw this.unavailable()
+      return response
+    })
   }
 
-  detail(
+  async detail(
     orgId: string,
     roleId: string,
     principal: RequestPrincipal
   ): Promise<RoleDefinitionDetail> {
     this.assertContext(orgId, principal.organizationId)
-    return this.prisma.$transaction(
-      async (tx) => {
-        const aclVersion = await this.aclVersion(tx, orgId)
-        const role = await tx.role.findFirst({
-          where: { id: roleId, ...assignableRolesWhere(orgId) },
-          select: roleMetaSelect,
-        })
-        if (!role)
-          throw new AppException('Role unavailable', HttpStatus.NOT_FOUND, Code.ROLE_UNAVAILABLE)
-        const preflight = (await rulePreflight(tx, [role.id])).get(role.id)!
-        const detail = await buildRoleDetail(tx, {
-          orgId,
-          role,
-          aclVersion,
-          actorUserId: principal.sub,
-          now: new Date(),
-          preflight,
-        })
-        if (serializedJsonBytes(detail) > ROLE_DETAIL_API_RESPONSE_BYTES) throw this.unavailable()
-        return detail
-      },
-      { isolationLevel: 'RepeatableRead' }
-    )
+    return this.read(async (tx) => {
+      const aclVersion = await this.aclVersion(tx, orgId)
+      const role = await tx.role.findFirst({
+        where: { id: roleId, ...assignableRolesWhere(orgId) },
+        select: roleMetaSelect,
+      })
+      if (!role)
+        throw new AppException('Role unavailable', HttpStatus.NOT_FOUND, Code.ROLE_UNAVAILABLE)
+      const preflight = (await rulePreflight(tx, [role.id])).get(role.id)!
+      const detail = await buildRoleDetail(tx, {
+        orgId,
+        role,
+        aclVersion,
+        actorUserId: principal.sub,
+        now: new Date(),
+        preflight,
+      })
+      if (serializedJsonBytes(detail) > ROLE_DETAIL_API_RESPONSE_BYTES) throw this.unavailable()
+      return detail
+    })
   }
 
   /** Memberships of THIS organization per role in one grouped query (never a cross-tenant count). */
@@ -184,6 +178,20 @@ export class RoleDefinitionQueryService {
       states.set(roleId, splitRules(rules).advanced.length > 0 ? 'present' : 'none')
     }
     return states
+  }
+
+  /**
+   * One RepeatableRead snapshot per read. Deliberate semantic rejections (403/404) escape unchanged;
+   * any unexpected failure is the single agreed `ROLE_READ_UNAVAILABLE`, never a partial detail or a
+   * raw infrastructure error.
+   */
+  private async read<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    try {
+      return await this.prisma.$transaction(work, { isolationLevel: 'RepeatableRead' })
+    } catch (error) {
+      if (error instanceof HttpException) throw error
+      throw this.unavailable()
+    }
   }
 
   private assertContext(orgId: string, actorOrg: string | undefined): void {

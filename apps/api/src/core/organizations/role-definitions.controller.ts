@@ -169,6 +169,10 @@ export class RoleDefinitionsController {
       'Invalid body, CAPABILITY_UNSUPPORTED, ROLE_NAME_RESERVED, ROLE_FULL_CONTROL_ACK_REQUIRED or ROLE_SELF_HELD_ACK_REQUIRED',
   })
   @ApiNotFoundResponse({ description: 'ROLE_UNAVAILABLE' })
+  @ApiForbiddenResponse({
+    description:
+      'ROLE_SYSTEM_IMMUTABLE for a built-in role; otherwise current membership or full TeamAccess is missing',
+  })
   @ApiConflictResponse({
     description:
       'ROLE_DEFINITION_CONFLICT (stale revision), ROLE_NAME_CONFLICT or ROLE_DEFINITION_OVERSIZED',
@@ -197,6 +201,10 @@ export class RoleDefinitionsController {
   @ApiParam({ name: 'roleId', description: 'Custom role ID' })
   @ApiBadRequestResponse({ description: 'Invalid body or ROLE_SELF_HELD_ACK_REQUIRED' })
   @ApiNotFoundResponse({ description: 'ROLE_UNAVAILABLE' })
+  @ApiForbiddenResponse({
+    description:
+      'ROLE_SYSTEM_IMMUTABLE for a built-in role; otherwise current membership or full TeamAccess is missing',
+  })
   @ApiConflictResponse({
     description: 'ROLE_DEFINITION_CONFLICT (stale revision) or ROLE_DELETE_IMPACT_CHANGED',
   })

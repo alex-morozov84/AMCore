@@ -71,9 +71,14 @@ raises the revision once, writes one audit event and returns `{detail, changed}`
 the post-write state. The server **preserves** every rule it does not manage — advanced
 rules, DENY rules and unchanged preset rows keep their ids. Deselecting a preset detaches
 all of its duplicate rows from this role only; a permission row shared with another role is
-kept for that role and collected only when no role links it any more. A save that changes
-nothing validates the fence but writes no row, revision or audit event and returns
-`changed: false`.
+kept for that role and collected only when no role links it any more. A save whose
+**resulting** definition equals the stored one — including a draft that differs only by
+surrounding whitespace or an empty description, which normalizes to the stored values —
+validates the fence but writes no row, revision or audit event and returns `changed: false`.
+A save is also refused with `ROLE_DEFINITION_OVERSIZED`, before anything is committed, when
+the role's actual advanced-rule projection already exceeds its budget, when the change would
+push it over, or when the response itself would exceed the response budget (for example
+because holder names are unusually long); that applies to an unchanged save as well.
 
 Acknowledgments are interaction controls enforced by the server, not a delegation limit:
 
@@ -104,21 +109,26 @@ N people's effective access changes, because their other roles may keep or veto 
 
 ## Errors
 
-| Status | Code                             | Meaning                                                                |
-| ------ | -------------------------------- | ---------------------------------------------------------------------- |
-| 400    | `CAPABILITY_UNSUPPORTED`         | Unknown capability/preset pair                                         |
-| 400    | `ROLE_NAME_RESERVED`             | A new or changed name is a built-in role name                          |
-| 400    | `ROLE_FULL_CONTROL_ACK_REQUIRED` | Adding full control without `acknowledgeFullControl`                   |
-| 400    | `ROLE_SELF_HELD_ACK_REQUIRED`    | Changing/deleting a role you hold without `acknowledgeSelfHeld`        |
-| 403    | `ROLE_SYSTEM_IMMUTABLE`          | Writing a built-in role                                                |
-| 404    | `ROLE_UNAVAILABLE`               | Missing, foreign or unassignable role (no foreign metadata is exposed) |
-| 409    | `ROLE_DEFINITION_CONFLICT`       | The organization revision changed since the definition was read        |
-| 409    | `ROLE_NAME_CONFLICT`             | Another role already uses the name                                     |
-| 409    | `ROLE_DEFINITION_OVERSIZED`      | The current or resulting definition exceeds the editable budget        |
-| 409    | `ROLE_DELETE_IMPACT_CHANGED`     | The live-invitation count differs from the confirmed one               |
-| 413    | `PAYLOAD_TOO_LARGE`              | Decoded request body over 16,384 bytes                                 |
-| 503    | `ROLE_READ_UNAVAILABLE`          | A read exceeded its response budget                                    |
-| 503    | `ROLE_SAVE_UNAVAILABLE`          | The write outcome is unconfirmed                                       |
+| Status | Code                             | Meaning                                                                    |
+| ------ | -------------------------------- | -------------------------------------------------------------------------- |
+| 400    | `CAPABILITY_UNSUPPORTED`         | Unknown capability/preset pair                                             |
+| 400    | `BAD_REQUEST`                    | A changed name is shorter than 2 or longer than 50 characters once trimmed |
+| 400    | `ROLE_NAME_RESERVED`             | A new or changed name is a built-in role name                              |
+| 400    | `ROLE_FULL_CONTROL_ACK_REQUIRED` | Adding full control without `acknowledgeFullControl`                       |
+| 400    | `ROLE_SELF_HELD_ACK_REQUIRED`    | Changing/deleting a role you hold without `acknowledgeSelfHeld`            |
+| 403    | `ROLE_SYSTEM_IMMUTABLE`          | Writing a built-in role                                                    |
+| 404    | `ROLE_UNAVAILABLE`               | Missing, foreign or unassignable role (no foreign metadata is exposed)     |
+| 409    | `ROLE_DEFINITION_CONFLICT`       | The organization revision changed since the definition was read            |
+| 409    | `ROLE_NAME_CONFLICT`             | Another role already uses the name                                         |
+| 409    | `ROLE_DEFINITION_OVERSIZED`      | The current or resulting definition exceeds the editable budget            |
+| 409    | `ROLE_DELETE_IMPACT_CHANGED`     | The live-invitation count differs from the confirmed one                   |
+| 413    | `PAYLOAD_TOO_LARGE`              | Decoded request body over 16,384 bytes                                     |
+| 503    | `ROLE_READ_UNAVAILABLE`          | Any read failure: a response over its budget or an infrastructure fault    |
+| 503    | `ROLE_SAVE_UNAVAILABLE`          | The write outcome is unconfirmed                                           |
+
+`403` on a write names `ROLE_SYSTEM_IMMUTABLE` for a built-in role; the same status without
+that code means current membership or full TeamAccess is missing. A built-in role is readable
+but never writable.
 
 ### Recover from an unconfirmed write
 
@@ -147,11 +157,44 @@ removed your own full control. Treat that as "saved; your access changed", not a
 | Holder sample                                      | 10 members                                |
 | List offset                                        | `(page − 1) × limit` ≤ 100,000            |
 
+The 16,384-byte request cap is decoded size and covers every accepted spelling of these paths
+(trailing slash, letter case, percent-encoded ids) and both JSON and form bodies, including
+compressed requests after inflation; a request over it answers `413` before any handler runs.
+
 The web BFF caps responses 1,024 bytes higher than the API so that an API response at its own
 limit still fits the `{binding, data}` envelope. Counts are preflighted from metadata before
 any rule payload is read, so an oversized role is recognized without materializing its rules.
 A list page reports `advancedState: "unknown"` for roles outside its per-page classification
 budget (2,000 rows / 512 KiB) instead of reading an unbounded set of rules.
+
+## Upgrading an existing installation
+
+The release that adds these routes also adds one index, `member_roles_roleId_memberId_idx` on
+`core.member_roles ("roleId", "memberId")`. It serves holder counts and samples and the
+foreign-key lookup that runs when a role is deleted (the existing unique index starts with
+`memberId`). Building a plain `CREATE INDEX` blocks writes to the table while it runs
+([PostgreSQL `CREATE INDEX`](https://www.postgresql.org/docs/18/sql-createindex.html)), which
+matters only on a very large `member_roles` table. For such an installation, build it before
+deploying, without blocking writes:
+
+```sql
+CREATE INDEX CONCURRENTLY "member_roles_roleId_memberId_idx"
+  ON core.member_roles ("roleId", "memberId");
+```
+
+Then check that the index is valid and has the expected definition — the migration uses
+`IF NOT EXISTS`, so it keeps **any** index of that name, including an invalid one left by an
+interrupted build or one with a different column list:
+
+```sql
+SELECT i.indisvalid, pg_get_indexdef(i.indexrelid)
+  FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+ WHERE c.relname = 'member_roles_roleId_memberId_idx';
+-- expect: true | CREATE INDEX ... USING btree ("roleId", "memberId")
+```
+
+If it is invalid, drop it with `DROP INDEX CONCURRENTLY core."member_roles_roleId_memberId_idx"`
+and build it again. Smaller installations can simply run the normal migration.
 
 ## Audit
 

@@ -270,7 +270,10 @@ transactionally with the role-definition change, from the
 [role definitions API](../product-admin/role-definitions.md) (`source: "editor"`)
 and from every legacy role/permission route (`source: "legacy"`). The target is the
 organization; metadata holds `roleId`, `revisionBefore`/`revisionAfter`, preset or rule
-counts, `fullControl` (`added`, `removed` or `none`), measured `holderCount` and
+counts, `fullControl` (`added`, `removed` or `none`: the editor compares the configured grant before
+and after, while a legacy per-rule call reports the shape of the one rule it linked or
+unlinked, so `removed` does not prove the role lost every full-control grant — neither value
+is effective authority), measured `holderCount` and
 `liveInvitationCount` where the command computed them, `nameChanged`,
 `descriptionChanged` and `actorCredentialType` (`jwt` or `api_key`). Names, descriptions,
 conditions, emails and holder lists are never recorded. A locked no-op writes nothing; an

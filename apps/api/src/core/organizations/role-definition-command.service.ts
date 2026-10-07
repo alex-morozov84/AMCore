@@ -26,6 +26,7 @@ import {
   buildRoleDetail,
   isOversized,
   loadRoleRules,
+  projectionOversized,
   type RulePreflight,
   rulePreflight,
 } from './role-definition-detail'
@@ -38,6 +39,7 @@ import {
   conflict,
   customRole,
   fail,
+  isRoleNameConflict,
   liveInvitations,
   normalizeDescription,
   oversized,
@@ -101,7 +103,7 @@ export class RoleDefinitionCommandService {
         descriptionChanged: description !== null,
         source: 'editor',
       })
-      return detail
+      return this.within(detail)
     })
   }
 
@@ -133,27 +135,30 @@ export class RoleDefinitionCommandService {
     }
   ): Promise<SaveRoleDefinitionResponse> {
     const { orgId, role, dto, principal, before } = ctx
-    const plan = planPresetChange(
-      await loadRoleRules(tx, role.id),
-      this.desiredPresets(dto.presets)
-    )
-    // Raw equality with the stored value preserves it verbatim (a preset-only save is not a rename).
-    const nameChanged = dto.name !== role.name
-    const name = nameChanged ? dto.name.trim() : role.name
-    const descriptionChanged = dto.description !== role.description
-    const description = descriptionChanged
-      ? normalizeDescription(dto.description)
-      : role.description
-    if (nameChanged) {
+    const rules = await loadRoleRules(tx, role.id)
+    // The ACTUAL advanced projection must fit: never edit a role whose rules would be discarded.
+    if (projectionOversized(rules)) throw oversized()
+    const plan = planPresetChange(rules, this.desiredPresets(dto.presets))
+    // Raw equality with the stored value preserves it verbatim (a preset-only save is not a rename);
+    // a raw-changed name always passes the rename checks, then the RESULT decides what persists.
+    const rawNameChanged = dto.name !== role.name
+    const name = rawNameChanged ? dto.name.trim() : role.name
+    if (rawNameChanged) {
       assertNameBounds(name)
       assertNewName(name)
       await assertNoCollision(tx, orgId, name, role.id)
     }
+    const description =
+      dto.description !== role.description
+        ? normalizeDescription(dto.description)
+        : role.description
+    const nameChanged = name !== role.name
+    const descriptionChanged = description !== role.description
     const presetChange = plan.removeIds.length > 0 || plan.additions.length > 0
     await assertAcknowledgments(tx, orgId, role.id, principal, dto, plan.additions, presetChange)
     if (!nameChanged && !descriptionChanged && !presetChange) {
       const current = await this.detail(tx, orgId, role, dto.expectedAclVersion, principal)
-      return { detail: current, changed: false }
+      return this.within({ detail: current, changed: false })
     }
 
     if (nameChanged || descriptionChanged)
@@ -171,8 +176,8 @@ export class RoleDefinitionCommandService {
       aclVersion,
       principal
     )
-    const response = { detail, changed: true }
-    if (serializedJsonBytes(response) > ROLE_DETAIL_API_RESPONSE_BYTES) throw oversized()
+    if (detail.editMode !== 'editable') throw oversized()
+    const response = this.within({ detail, changed: true })
     await recordRoleDefinition(this.audit, tx, 'org.role_updated', orgId, principal, {
       roleId: role.id,
       revisionBefore: dto.expectedAclVersion,
@@ -186,6 +191,12 @@ export class RoleDefinitionCommandService {
       descriptionChanged,
       source: 'editor',
     })
+    return response
+  }
+
+  /** Every successful command branch, no-op included, must fit the response budget. */
+  private within<T>(response: T): T {
+    if (serializedJsonBytes(response) > ROLE_DETAIL_API_RESPONSE_BYTES) throw oversized()
     return response
   }
 
@@ -299,7 +310,7 @@ export class RoleDefinitionCommandService {
       if (error instanceof HttpException) throw error
       const code = (error as { code?: string } | null)?.code
       if (code === 'P2034') throw conflict()
-      if (code === 'P2002')
+      if (isRoleNameConflict(error))
         throw fail(HttpStatus.CONFLICT, Code.ROLE_NAME_CONFLICT, 'Role name already exists')
       throw fail(
         HttpStatus.SERVICE_UNAVAILABLE,

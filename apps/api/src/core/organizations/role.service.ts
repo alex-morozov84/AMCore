@@ -165,19 +165,20 @@ export class RoleService {
       const descriptionChanged =
         dto.description !== undefined && dto.description !== role.description
 
+      // A true no-op (unchanged or empty patch) returns the stored role without any write.
+      if (!nameChanged && !descriptionChanged)
+        return tx.role.findUniqueOrThrow({ where: { id: roleId }, include: withPermissions })
       const row = await tx.role.update({
         where: { id: roleId },
         data: dto,
         include: withPermissions,
       })
       // A real change advances the revision so no stale definition save can overwrite it.
-      if (nameChanged || descriptionChanged) {
-        await this.orgsService.bumpAclVersionTx(orgId, tx)
-        await this.record(tx, 'org.role_updated', orgId, principal, roleId, org.aclVersion, {
-          nameChanged,
-          descriptionChanged,
-        })
-      }
+      await this.orgsService.bumpAclVersionTx(orgId, tx)
+      await this.record(tx, 'org.role_updated', orgId, principal, roleId, org.aclVersion, {
+        nameChanged,
+        descriptionChanged,
+      })
       return row
     })
     await this.orgsService.invalidateAclVersion(orgId)

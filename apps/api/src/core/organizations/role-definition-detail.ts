@@ -55,6 +55,13 @@ export async function rulePreflight(
   return result
 }
 
+/**
+ * The ACTUAL advanced-rule projection (not the SQL estimate) must fit its budget; an editor must
+ * never present a role whose rules were silently discarded as editable.
+ */
+export const projectionOversized = (rules: StoredRule[]): boolean =>
+  serializedJsonBytes(splitRules(rules).advanced) > ROLE_RULE_BYTES_LIMIT
+
 export const isOversized = (preflight: RulePreflight): boolean =>
   preflight.ruleCount > ROLE_EDITABLE_RULE_LIMIT || preflight.ruleBytes > ROLE_RULE_BYTES_LIMIT
 

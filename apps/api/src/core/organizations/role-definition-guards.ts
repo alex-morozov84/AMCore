@@ -30,6 +30,29 @@ export const oversized = (): AppException =>
 export const normalizeDescription = (value: string | null | undefined): string | null =>
   value?.trim() ? value.trim() : null
 
+const ROLE_NAME_UNIQUE_INDEX = 'roles_organizationId_name_key'
+
+/**
+ * A unique violation of the role `(organizationId, name)` constraint ONLY. Prisma 7 with the pg
+ * driver adapter reports `meta.modelName` and `meta.driverAdapterError.cause.constraint.index`
+ * (verified against the installed client); any other unique violation is not a name conflict.
+ */
+export function isRoleNameConflict(error: unknown): boolean {
+  const known = error as {
+    code?: string
+    meta?: {
+      modelName?: string
+      target?: unknown
+      driverAdapterError?: { cause?: { constraint?: { index?: string } } }
+    }
+  } | null
+  if (known?.code !== 'P2002') return false
+  const index = known.meta?.driverAdapterError?.cause?.constraint?.index
+  if (index !== undefined) return index === ROLE_NAME_UNIQUE_INDEX
+  const target = known.meta?.target
+  return known.meta?.modelName === 'Role' && Array.isArray(target) && target.includes('name')
+}
+
 /** A custom role of this organization; built-in roles are readable elsewhere but never writable. */
 export async function customRole(tx: Tx, orgId: string, roleId: string): Promise<Role> {
   const role = await tx.role.findFirst({ where: { id: roleId, ...assignableRolesWhere(orgId) } })

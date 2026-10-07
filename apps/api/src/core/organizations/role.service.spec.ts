@@ -206,6 +206,22 @@ describe('RoleService', () => {
       expect(result.name).toBe('Senior Editor')
     })
 
+    it('returns the stored role without any write for an unchanged or empty patch', async () => {
+      prisma.role.findFirst.mockResolvedValue(mockCustomRole)
+      prisma.role.findUniqueOrThrow.mockResolvedValue({
+        ...mockCustomRole,
+        permissions: [],
+      } as never)
+
+      for (const patch of [{ name: 'Editor' }, { description: undefined }, {}] as UpdateRoleDto[]) {
+        const result = await service.updateRole('org-1', 'role-custom', patch, principal)
+        expect(result.name).toBe('Editor')
+      }
+      expect(prisma.role.update).not.toHaveBeenCalled()
+      expect(orgsService.bumpAclVersionTx).not.toHaveBeenCalled()
+      expect(audit.record).not.toHaveBeenCalled()
+    })
+
     it('throws NotFoundException when custom role not found', async () => {
       prisma.role.findFirst.mockResolvedValue(null)
       await expect(service.updateRole('org-1', 'role-custom', dto, principal)).rejects.toThrow(
