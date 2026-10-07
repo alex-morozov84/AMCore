@@ -9,27 +9,36 @@ const lines = (output) =>
     .map((line) => line.trim())
     .filter(Boolean)
 
-// Physical ownership proof for one built image: the full ownership tuple, the Compose
-// project/service labels, and references limited to this stand's own generated name.
-// A name pattern or the current `m.images` map alone never proves anything.
+// Physical ownership proof for one built image: the full ownership tuple (which only this
+// stand's generated override writes), a Compose project label that matches if present, and
+// references limited to this stand's own generated names. A name pattern or the current
+// `m.images` map alone never proves anything.
+//
+// One image may carry SEVERAL generated names: engines that merge identical builds (the
+// classic image store on Linux) export `api` and `worker` as one image with two tags, and
+// then keep a single `com.docker.compose.service` label, so the service label is not part
+// of the proof. Every reference must still be one of this stand's own names.
 export function ownedImage(m, image) {
   const tags = image.Config?.Labels ?? {}
-  const service = tags['com.docker.compose.service']
+  const wrong = Object.entries(labels(m)).filter(([key, value]) => tags[key] !== value)
+  const project = tags['com.docker.compose.project']
+  if (!fullId.test(image.Id) || wrong.length || (project !== undefined && project !== m.project))
+    throw new Error(
+      `Unproved image ownership (${[
+        ...(fullId.test(image.Id) ? [] : ['id']),
+        ...wrong.map(([key]) => key),
+        ...(project === undefined || project === m.project ? [] : ['compose project']),
+      ].join(', ')})`
+    )
+  const names = builtServices.map((service) => `${m.project}-${service}`)
+  const allowed = new Set(names.map((name) => `${name}:latest`))
+  const digest = new RegExp(`^(${names.join('|')})@sha256:[0-9a-f]{64}$`)
   if (
-    !fullId.test(image.Id) ||
-    Object.entries(labels(m)).some(([key, value]) => tags[key] !== value) ||
-    tags['com.docker.compose.project'] !== m.project ||
-    !builtServices.includes(service)
-  )
-    throw new Error('Unproved image ownership')
-  const repository = `${m.project}-${service}`
-  const digest = new RegExp(`^${repository}@sha256:[0-9a-f]{64}$`)
-  if (
-    (image.RepoTags ?? []).some((tag) => tag !== `${repository}:latest`) ||
+    (image.RepoTags ?? []).some((tag) => !allowed.has(tag)) ||
     (image.RepoDigests ?? []).some((ref) => !digest.test(ref))
   )
     throw new Error('Foreign image reference')
-  return service
+  return image.RepoTags ?? []
 }
 
 // Positive label census of everything this stand built, including dangling and
@@ -45,7 +54,7 @@ export async function imageCensus(m, execute) {
   const found = JSON.parse(await execute(['image', 'inspect', ...ids], { capture: true }))
   return orderedInspection('image', ids, found).map((item) => ({
     id: item.Id,
-    service: ownedImage(m, item),
+    tags: ownedImage(m, item),
   }))
 }
 
@@ -62,8 +71,12 @@ async function assertUnreferenced(execute, candidates) {
   }
 }
 
-// Removes proved-owned images by full ID (never by tag, never forced, never pruning
-// parents) and succeeds only on positively verified absence.
+// Removes proved-owned images, never forced and never pruning parents, and succeeds only
+// on positively verified absence. Every reference of a candidate is proved to be this
+// stand's own generated name, so those names are untagged first (an image that carries
+// several cannot be removed by ID while a second reference remains; the last untag
+// deletes it), then the full ID is removed. A foreign alias added after the proof leaves
+// the ID removal refused, which is reported, never forced.
 export async function disposeImages(m, execute, save) {
   const owned = await imageCensus(m, execute)
   if (!owned.length) return []
@@ -73,17 +86,21 @@ export async function disposeImages(m, execute, save) {
   )
   m.imageDisposal = { candidates: owned, startedAt: new Date().toISOString() }
   await save(m)
+  const remove = (target) =>
+    execute(['image', 'rm', '--no-prune', target], { capture: true }).catch((error) => {
+      if (!gone(error)) throw new Error(`Owned image removal refused: ${error.message}`)
+    })
   for (const { id } of owned) {
+    let references
     try {
       const [fresh] = JSON.parse(await execute(['image', 'inspect', id], { capture: true }))
-      ownedImage(m, fresh)
+      references = ownedImage(m, fresh)
     } catch (error) {
       if (gone(error)) continue
       throw error
     }
-    await execute(['image', 'rm', '--no-prune', id], { capture: true }).catch((error) => {
-      if (!gone(error)) throw new Error(`Owned image removal refused: ${error.message}`)
-    })
+    for (const reference of references) await remove(reference)
+    await remove(id)
   }
   if ((await imageCensus(m, execute)).length)
     throw new Error('Owned image removal could not be verified')

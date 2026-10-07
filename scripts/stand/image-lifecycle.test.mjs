@@ -39,6 +39,16 @@ async function buildOwned(m, context, services = builtServices) {
   }
 }
 
+// What the classic image store does on Linux: identical builds become one image that
+// carries several generated names and a single `com.docker.compose.service` label.
+async function buildShared(m, context, dropServiceLabel) {
+  const tags = { ...labels(m), 'com.docker.compose.project': m.project }
+  if (!dropServiceLabel) tags['com.docker.compose.service'] = 'api'
+  const flags = Object.entries(tags).flatMap(([key, value]) => ['--label', `${key}=${value}`])
+  const names = ['api', 'worker'].flatMap((service) => ['-t', `${m.project}-${service}`])
+  await docker(m, ['build', '-q', ...names, ...flags, context], { capture: true })
+}
+
 async function withStand(name, body) {
   const id = `${name}-${randomUUID()}`
   const held = await lease(id, 'image-lifecycle-proof')
@@ -101,10 +111,37 @@ test('purge removes proved images by ID, keeps pulled images and is idempotent',
         capture: true,
       }
     ).catch(() => '')
-    assert.equal(after, pulled, 'pulled base images are never touched')
+    // A clean runner may not have the base image yet (another test can pull it meanwhile),
+    // so compare only when it was present before.
+    if (pulled) assert.equal(after, pulled, 'pulled base images are never touched')
     await cleanup(m, true)
     assert.equal(m.state, 'purged')
   })
+})
+
+test('one image carrying the api and worker names (classic store behaviour) is purged', async () => {
+  for (const dropServiceLabel of [false, true])
+    await withStand('image-shared', async (m, context) => {
+      await buildShared(m, context, dropServiceLabel)
+      await buildOwned(m, context, ['web'])
+      const shared = await docker(
+        m,
+        ['image', 'inspect', `${m.project}-api`, '--format', '{{.Id}} {{len .RepoTags}}'],
+        { capture: true }
+      )
+      assert.match(shared.trim(), /^sha256:[0-9a-f]{64} 2$/, 'one image with two generated names')
+      assert.equal((await census(m)).length, 2)
+      m.builds = [{ invocation: 'proof', state: 'settled', outcome: 'succeeded' }]
+      await save(m)
+      await cleanup(m, true)
+      assert.equal(m.state, 'purged')
+      assert.deepEqual(await census(m), [])
+      for (const service of ['api', 'worker', 'web'])
+        await assert.rejects(
+          () => docker(m, ['image', 'inspect', `${m.project}-${service}`], { capture: true }),
+          /No such/
+        )
+    })
 })
 
 test('ordinary stop keeps images; an unresolved build keeps the record until acceptance', async () => {

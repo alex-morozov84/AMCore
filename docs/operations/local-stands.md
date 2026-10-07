@@ -159,13 +159,17 @@ The images a stand builds (`migrate`, `api`, `worker`, `web`) carry the same own
 labels as its containers, through `build.labels` in the generated override. Purge
 (`down --purge`, `recover --purge`, `down --orphan --purge`, the end of every Docker
 e2e run, and `closeout`) removes only images that pass a physical proof: the stand's
-UUID, attempt, worktree and Compose project/service labels, a service from that fixed
-built set, and references limited to the stand's own generated
-`<project>-<service>:latest` name (a dangling generation has none). Discovery is a
+UUID, attempt and worktree labels, a Compose project label that matches when present,
+and references that are all among the stand's own generated
+`<project>-<service>:latest` names (a dangling generation has none). One image may
+carry several of them: some engines (the classic image store on Linux) merge identical
+builds, so `api` and `worker` become one image with two names and a single service
+label, which is why the service label is not part of the proof. Discovery is a
 label census (`image ls -a --no-trunc`), so older generations and partial or
 interrupted builds are found even when the stand's current image map does not list
-them. Images are removed last, after the stand's containers, by full image ID: never
-forced, never by tag, never pruning parent images. A foreign tag or alias, or any
+them. Images are removed last, after the stand's containers: the stand's own proved
+names are untagged first (the last untag deletes the image), then the full image ID is
+removed; never forced, never pruning parent images. A foreign tag or alias, or any
 container in any state that still uses the image, refuses removal, and success
 requires a fresh census proving absence; a zero exit status alone is not proof.
 Base images that Compose or Testcontainers pull (`postgres`, `redis`, `node`,

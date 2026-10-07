@@ -59,14 +59,23 @@ function fakeDocker({ images = [], containers = [], keepAfterRemove = [] } = {})
       return JSON.stringify(args.slice(2).map((id) => containers.find((c) => c.Id === id)))
     if (group === 'image' && verb === 'rm') {
       assert.equal(args[2], '--no-prune')
-      const item = find(args[3])
-      if (!item) throw dockerError(`Error response from daemon: No such image: ${args[3]}`)
-      if ((item.RepoTags ?? []).length > 1)
+      const target = args[3]
+      const byId = find(target)
+      const byTag = state.images.find((item) => (item.RepoTags ?? []).includes(target))
+      const item = byId ?? byTag
+      if (!item) throw dockerError(`Error response from daemon: No such image: ${target}`)
+      // Like the engine: an ID with several references is refused; a tag is just untagged,
+      // and removing the last tag deletes the image.
+      if (byId && (item.RepoTags ?? []).length > 1)
         throw dockerError(
           'conflict: unable to delete (must be forced) - referenced in multiple repositories'
         )
-      state.events.push(`rm:${args[3]}`)
-      if (!keepAfterRemove.includes(args[3]))
+      state.events.push(`rm:${target}`)
+      if (!byId) {
+        item.RepoTags = item.RepoTags.filter((tag) => tag !== target)
+        if (item.RepoTags.length) return ''
+      }
+      if (!keepAfterRemove.includes(item.Id))
         state.images = state.images.filter((other) => other !== item)
       return ''
     }
@@ -78,9 +87,25 @@ function fakeDocker({ images = [], containers = [], keepAfterRemove = [] } = {})
 const noSave = async () => {}
 
 test('ownership proof accepts each built service with its exact generated references', () => {
-  for (const service of builtServices) assert.equal(ownedImage(m, image(1, service)), service)
-  assert.equal(ownedImage(m, image(2, 'api', { RepoTags: [], RepoDigests: [] })), 'api')
-  assert.equal(ownedImage(m, image(3, 'web', { RepoTags: null, RepoDigests: null })), 'web')
+  for (const service of builtServices)
+    assert.deepEqual(ownedImage(m, image(1, service)), [`${m.project}-${service}:latest`])
+  assert.deepEqual(ownedImage(m, image(2, 'api', { RepoTags: [], RepoDigests: [] })), [])
+  assert.deepEqual(ownedImage(m, image(3, 'web', { RepoTags: null, RepoDigests: null })), [])
+})
+
+test('ownership proof accepts one image carrying several of the stand’s own generated names', () => {
+  // The classic image store merges identical builds: api and worker become ONE image with
+  // two tags and a single service label (observed on the Linux CI runner).
+  const shared = image(20, 'api', {
+    RepoTags: [`${m.project}-api:latest`, `${m.project}-worker:latest`],
+  })
+  assert.deepEqual(ownedImage(m, shared), [`${m.project}-api:latest`, `${m.project}-worker:latest`])
+  // Neither the service label nor the compose project label is needed to prove it.
+  for (const drop of ['com.docker.compose.service', 'com.docker.compose.project']) {
+    const item = image(21, 'api', { RepoTags: [`${m.project}-worker:latest`] })
+    delete item.Config.Labels[drop]
+    assert.doesNotThrow(() => ownedImage(m, item), drop)
+  }
 })
 
 test('ownership proof refuses every deviation from the full tuple and reference set', () => {
@@ -94,13 +119,13 @@ test('ownership proof refuses every deviation from the full tuple and reference 
     ['other attempt', labelled({ 'org.amcore.attempt': '44444444-4444-4444-8444-444444444444' })],
     ['other worktree', labelled({ 'org.amcore.worktree': '/other' })],
     ['other project', labelled({ 'com.docker.compose.project': 'amcore-other' })],
-    ['pulled service', labelled({ 'com.docker.compose.service': 'postgres' })],
-    ['missing service', labelled({ 'com.docker.compose.service': undefined })],
+    ['no tuple at all', image(12, 'api', { Config: { Labels: {} } })],
     ['short id', image(5, 'api', { Id: 'sha256:abc' })],
     ['foreign sole tag', image(6, 'api', { RepoTags: ['postgres:18-alpine'] })],
     ['tag suffix', image(7, 'api', { RepoTags: [`${m.project}-api:other`] })],
     ['prefix match', image(8, 'api', { RepoTags: [`${m.project}-apix:latest`] })],
-    ['wrong service tag', image(9, 'api', { RepoTags: [`${m.project}-web:latest`] })],
+    ['not a built service name', image(9, 'api', { RepoTags: [`${m.project}-postgres:latest`] })],
+    ['another stand project name', image(13, 'api', { RepoTags: ['amcore-other-api:latest'] })],
     ['extra alias', image(10, 'api', { RepoTags: [`${m.project}-api:latest`, 'alias:latest'] })],
     ['foreign digest', image(11, 'api', { RepoDigests: [`registry.example/x@${hex(11)}`] })],
   ]
@@ -120,9 +145,9 @@ test('census deduplicates repeated IDs and finds partial or dangling generations
     ],
   })
   const found = await imageCensus(m, execute)
-  assert.deepEqual(found.map((item) => [item.id, item.service]).sort(), [
-    [hex(1), 'api'],
-    [hex(2), 'web'],
+  assert.deepEqual(found.map((item) => [item.id, item.tags]).sort(), [
+    [hex(1), [`${m.project}-api:latest`]],
+    [hex(2), []],
   ])
   assert.deepEqual(await imageCensus(m, fakeDocker().execute), [])
 })
@@ -141,7 +166,7 @@ test('census fails closed on malformed, incomplete or unproved results', async (
   await assert.rejects(() => imageCensus(m, transport), /Cannot connect/)
 })
 
-test('disposal removes only proved IDs without force, tag or prune, persisting first', async () => {
+test('disposal untags only the stand’s own proved names, then removes the ID, persisting first', async () => {
   const docker = fakeDocker({ images: [image(1, 'api'), image(2, 'web'), image(3, 'worker')] })
   const execute = async (args, options) => {
     if (args[1] === 'rm') docker.state.events.push('about-to-rm')
@@ -158,12 +183,32 @@ test('disposal removes only proved IDs without force, tag or prune, persisting f
   assert.ok(saved[0].candidates.length === 3 && !saved[0].verifiedAt)
   assert.ok(saved.at(-1).verifiedAt, 'verified absence is persisted')
   const removals = docker.state.calls.filter((call) => call.startsWith('image rm'))
+  const own = ['api', 'web', 'worker'].map((service) => `${m.project}-${service}:latest`)
   assert.deepEqual(
     removals.sort(),
-    [hex(1), hex(2), hex(3)].map((id) => `image rm --no-prune ${id}`)
+    [...own, hex(1), hex(2), hex(3)].map((target) => `image rm --no-prune ${target}`).sort()
   )
-  for (const call of docker.state.calls)
-    assert.doesNotMatch(call, /prune(?!\s)|--force|\s-f\b|:latest/)
+  for (const call of docker.state.calls) assert.doesNotMatch(call, /prune(?!\s)|--force|\s-f\b/)
+})
+
+test('one image carrying the api and worker names is untagged name by name, then removed', async () => {
+  const shared = image(30, 'api', {
+    RepoTags: [`${m.project}-api:latest`, `${m.project}-worker:latest`],
+  })
+  const docker = fakeDocker({ images: [shared, image(31, 'web')] })
+  assert.equal((await disposeImages(m, docker.execute, noSave)).length, 2)
+  assert.deepEqual(docker.state.images, [])
+  const order = docker.state.events
+  assert.ok(
+    order.indexOf(`rm:${m.project}-worker:latest`) < order.indexOf(`rm:${hex(30)}`) ||
+      !order.includes(`rm:${hex(30)}`),
+    'the ID is never removed while a second name remains'
+  )
+  assert.deepEqual(
+    docker.state.calls.filter((call) => call.includes(hex(30)) && call.includes('rm')),
+    [`image rm --no-prune ${hex(30)}`],
+    'the ID removal is a harmless no-op after the last untag deleted the image'
+  )
 })
 
 test('disposal is idempotent and never targets another stand or pulled images', async () => {
@@ -200,7 +245,8 @@ test('a foreign alias, a foreign sole tag or any referencing container refuses b
 test('an engine conflict is a refusal, while an already-gone image is idempotent success', async () => {
   const docker = fakeDocker({ images: [image(1), image(2, 'web')] })
   const refusing = async (args, options) => {
-    if (args[1] === 'rm' && args[3] === hex(1)) throw dockerError('conflict: must be forced')
+    if (args[1] === 'rm' && args[3] === `${m.project}-api:latest`)
+      throw dockerError('conflict: must be forced')
     return docker.execute(args, options)
   }
   await assert.rejects(() => disposeImages(m, refusing, noSave), /Owned image removal refused/)
