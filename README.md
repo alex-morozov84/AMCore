@@ -115,7 +115,7 @@ verified team-access status without adding a role editor.
 | **i18n**          | next-intl (web) + FormatJS (email), ICU MessageFormat, CLDR plurals            |
 | **Architecture**  | Feature-Sliced Design (FSD)                                                    |
 | **Monorepo**      | pnpm workspaces + Turborepo                                                    |
-| **Testing**       | Jest 30, Vitest 4, MSW 2, Playwright 1.62, axe-core, Testcontainers            |
+| **Testing**       | Jest 30, Vitest 5, MSW 2, Playwright 1.62, axe-core, Testcontainers            |
 | **Observability** | Prometheus, Grafana, Alertmanager (optional dev-only monitoring profile)       |
 
 ## Project Structure
