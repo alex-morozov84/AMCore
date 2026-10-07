@@ -27,10 +27,14 @@ export const organizationRecordAffordancesSchema = z.strictObject({
   'organization.delete': recordActionSchema,
 })
 
+/** Confirmation kinds the role editor understands; a descriptor may declare one of them. */
+export const capabilityRiskSchema = z.enum(['fullControl'])
+
 export const capabilityCatalogueResponseSchema = z.strictObject({
   capabilities: z.array(
     z.strictObject({
       id: capabilityIdSchema,
+      risk: capabilityRiskSchema.optional(),
       subject: z.enum(Subject),
       action: z.enum(Action),
       operation: z.string(),

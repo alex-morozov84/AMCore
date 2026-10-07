@@ -11,6 +11,8 @@ export interface CapabilityDescriptor<TSubject extends string = Subject> {
   labelKey: string
   presets: readonly string[]
   editableFields: readonly string[]
+  /** A high-risk grant the role editor confirms (e.g. `fullControl` = unrestricted team administration). */
+  risk?: 'fullControl'
 }
 
 /** Code-declared implemented operations; registration never grants authority. */
@@ -26,6 +28,7 @@ export const CAPABILITY_CATALOGUE = [
     labelKey: 'teamAccessManagement',
     presets: ['all'] as const,
     editableFields: [] as const,
+    risk: 'fullControl' as const,
   },
   {
     id: 'organization.read',

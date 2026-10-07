@@ -9,6 +9,7 @@ import type {
 
 import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
+import { AuditLogService } from '../audit'
 import {
   type PermissionWriteInput,
   validatePermissionRule,
@@ -18,16 +19,26 @@ import type { CreateRoleDto, UpdateRoleDto } from './dto'
 import { lockOrganization } from './organization-mutation-lock'
 import { OrganizationsService } from './organizations.service'
 import { assignableRolesWhere } from './role-assignability-policy'
+import { recordRoleDefinition, type RoleAuditFacts } from './role-definition-audit'
 
 import type { Permission, Prisma, Role } from '@/generated/prisma/client'
 
 export type RoleWithPermissions = Role & { permissions: { permission: Permission }[] }
 
+const withPermissions = { permissions: { include: { permission: true } } } as const
+
+/**
+ * Legacy per-rule / metadata role routes. Every writer now serializes on the parent organization
+ * lock, bumps the revision once and writes one in-transaction audit row, so no older writer can
+ * change persisted role state without the revision fence the role-definition editor relies on.
+ * Request/response shapes and the case-sensitive name semantics of these routes are unchanged.
+ */
 @Injectable()
 export class RoleService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly orgsService: OrganizationsService
+    private readonly orgsService: OrganizationsService,
+    private readonly audit: AuditLogService
   ) {}
 
   /**
@@ -64,7 +75,7 @@ export class RoleService {
         skip,
         take: limit,
         orderBy: [{ isSystem: 'desc' }, { name: 'asc' }, { id: 'asc' }],
-        include: { permissions: { include: { permission: true } } },
+        include: withPermissions,
       }),
       this.prisma.role.count({ where }),
     ])
@@ -106,22 +117,30 @@ export class RoleService {
     principal: RequestPrincipal
   ): Promise<OrgRoleResponse> {
     this.assertOrgContext(principal, orgId)
-
-    const existing = await this.prisma.role.findFirst({
-      where: { name: dto.name, organizationId: orgId },
+    const role = await this.prisma.$transaction(async (tx) => {
+      const org = await lockOrganization(tx, orgId)
+      const existing = await tx.role.findFirst({
+        where: { name: dto.name, organizationId: orgId },
+      })
+      if (existing)
+        throw new ConflictException(`Role '${dto.name}' already exists in this organization`)
+      const created = await tx.role.create({
+        data: {
+          name: dto.name,
+          description: dto.description ?? null,
+          organizationId: orgId,
+          isSystem: false,
+        },
+        include: withPermissions,
+      })
+      await this.orgsService.bumpAclVersionTx(orgId, tx)
+      await this.record(tx, 'org.role_created', orgId, principal, created.id, org.aclVersion, {
+        nameChanged: true,
+        descriptionChanged: created.description !== null,
+      })
+      return created
     })
-    if (existing)
-      throw new ConflictException(`Role '${dto.name}' already exists in this organization`)
-
-    const role = await this.prisma.role.create({
-      data: {
-        name: dto.name,
-        description: dto.description ?? null,
-        organizationId: orgId,
-        isSystem: false,
-      },
-      include: { permissions: { include: { permission: true } } },
-    })
+    await this.orgsService.invalidateAclVersion(orgId)
     return this.toOrgRoleResponse(role)
   }
 
@@ -132,20 +151,36 @@ export class RoleService {
     principal: RequestPrincipal
   ): Promise<OrgRoleResponse> {
     this.assertOrgContext(principal, orgId)
-    const role = await this.findCustomRole(orgId, roleId)
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const org = await lockOrganization(tx, orgId)
+      const role = await this.findCustomRole(orgId, roleId, tx)
 
-    if (dto.name && dto.name !== role.name) {
-      const nameConflict = await this.prisma.role.findFirst({
-        where: { name: dto.name, organizationId: orgId, id: { not: roleId } },
+      if (dto.name && dto.name !== role.name) {
+        const nameConflict = await tx.role.findFirst({
+          where: { name: dto.name, organizationId: orgId, id: { not: roleId } },
+        })
+        if (nameConflict) throw new ConflictException(`Role '${dto.name}' already exists`)
+      }
+      const nameChanged = dto.name !== undefined && dto.name !== role.name
+      const descriptionChanged =
+        dto.description !== undefined && dto.description !== role.description
+
+      const row = await tx.role.update({
+        where: { id: roleId },
+        data: dto,
+        include: withPermissions,
       })
-      if (nameConflict) throw new ConflictException(`Role '${dto.name}' already exists`)
-    }
-
-    const updated = await this.prisma.role.update({
-      where: { id: roleId },
-      data: dto,
-      include: { permissions: { include: { permission: true } } },
+      // A real change advances the revision so no stale definition save can overwrite it.
+      if (nameChanged || descriptionChanged) {
+        await this.orgsService.bumpAclVersionTx(orgId, tx)
+        await this.record(tx, 'org.role_updated', orgId, principal, roleId, org.aclVersion, {
+          nameChanged,
+          descriptionChanged,
+        })
+      }
+      return row
     })
+    await this.orgsService.invalidateAclVersion(orgId)
     return this.toOrgRoleResponse(updated)
   }
 
@@ -169,7 +204,7 @@ export class RoleService {
     //   2. now linked to no roles (`roles: { none: {} }` — survives a
     //      shared-permission case where another role still uses it).
     await this.prisma.$transaction(async (tx) => {
-      await lockOrganization(tx, orgId)
+      const org = await lockOrganization(tx, orgId)
       await this.findCustomRole(orgId, roleId, tx)
       const links = await tx.rolePermission.findMany({
         where: { roleId },
@@ -190,6 +225,9 @@ export class RoleService {
       }
 
       await this.orgsService.bumpAclVersionTx(orgId, tx)
+      await this.record(tx, 'org.role_deleted', orgId, principal, roleId, org.aclVersion, {
+        removedPresetCount: permissionIds.length,
+      })
     })
     await this.orgsService.invalidateAclVersion(orgId)
   }
@@ -210,7 +248,7 @@ export class RoleService {
     // window in part — full OA-10 fix is its own stage, but the
     // transactional bump makes the rolling-back case cleaner.
     const permission = await this.prisma.$transaction(async (tx) => {
-      await lockOrganization(tx, orgId)
+      const org = await lockOrganization(tx, orgId)
       await this.findCustomRole(orgId, roleId, tx)
       const permission = await tx.permission.create({
         data: {
@@ -224,13 +262,20 @@ export class RoleService {
       })
       await tx.rolePermission.create({ data: { roleId, permissionId: permission.id } })
       await this.orgsService.bumpAclVersionTx(orgId, tx)
+      await this.record(tx, 'org.role_updated', orgId, principal, roleId, org.aclVersion, {
+        addedPresetCount: 1,
+        fullControl: dto.subject === 'TeamAccess' && !dto.inverted ? 'added' : 'none',
+      })
       return permission
     })
     await this.orgsService.invalidateAclVersion(orgId)
     return this.toPermissionResponse(permission)
   }
 
-  /** Remove a permission from the role and delete the permission record */
+  /**
+   * Detach the permission from THIS role only. The Permission row itself is collected only when it
+   * is org-scoped and no other role still links it — a shared row keeps serving its other roles.
+   */
   async removePermission(
     orgId: string,
     roleId: string,
@@ -239,24 +284,65 @@ export class RoleService {
   ): Promise<void> {
     this.assertOrgContext(principal, orgId)
 
-    // OA-12: delete + bump in the same transaction. Deleting Permission
-    // cascades to RolePermission via the FK relation.
+    // OA-12: detach + bump in the same transaction.
     await this.prisma.$transaction(async (tx) => {
-      await lockOrganization(tx, orgId)
+      const org = await lockOrganization(tx, orgId)
       await this.findCustomRole(orgId, roleId, tx)
       const link = await tx.rolePermission.findUnique({
         where: { roleId_permissionId: { roleId, permissionId: permId } },
-        include: { permission: { select: { organizationId: true } } },
+        include: {
+          permission: {
+            select: { organizationId: true, subject: true, inverted: true, action: true },
+          },
+        },
       })
       if (!link) throw new NotFoundException('Permission not found on this role')
       if (link.permission.organizationId !== orgId) {
         throw new ForbiddenException('Cannot remove system-level permissions')
       }
 
-      await tx.permission.delete({ where: { id: permId } })
+      await tx.rolePermission.delete({
+        where: { roleId_permissionId: { roleId, permissionId: permId } },
+      })
+      await tx.permission.deleteMany({
+        where: { id: permId, organizationId: orgId, roles: { none: {} } },
+      })
       await this.orgsService.bumpAclVersionTx(orgId, tx)
+      await this.record(tx, 'org.role_updated', orgId, principal, roleId, org.aclVersion, {
+        removedPresetCount: 1,
+        fullControl:
+          link.permission.subject === 'TeamAccess' &&
+          link.permission.action === 'manage' &&
+          !link.permission.inverted
+            ? 'removed'
+            : 'none',
+      })
     })
     await this.orgsService.invalidateAclVersion(orgId)
+  }
+
+  /** Strict in-transaction audit; counts for the per-rule routes are rules, not presets. */
+  private record(
+    tx: Prisma.TransactionClient,
+    action: 'org.role_created' | 'org.role_updated' | 'org.role_deleted',
+    orgId: string,
+    principal: RequestPrincipal,
+    roleId: string,
+    revisionBefore: number,
+    facts: Partial<RoleAuditFacts>
+  ): Promise<void> {
+    return recordRoleDefinition(this.audit, tx, action, orgId, principal, {
+      roleId,
+      revisionBefore,
+      revisionAfter: revisionBefore + 1,
+      addedPresetCount: 0,
+      removedPresetCount: 0,
+      fullControl: 'none',
+      nameChanged: false,
+      descriptionChanged: false,
+      ...facts,
+      source: 'legacy',
+    })
   }
 
   /** Only org-specific, non-system roles can be managed */

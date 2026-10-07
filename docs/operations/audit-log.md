@@ -263,6 +263,21 @@ are visible by default. HTTP query redaction covers search, userId,
 organizationId and id in URL and structured query. Cleanup metadata names
 `staleTerminalApiKeys`. Audit retention is independent of key metadata retention.
 
+## Organization role definition events
+
+`org.role_created`, `org.role_updated` and `org.role_deleted` are written
+transactionally with the role-definition change, from the
+[role definitions API](../product-admin/role-definitions.md) (`source: "editor"`)
+and from every legacy role/permission route (`source: "legacy"`). The target is the
+organization; metadata holds `roleId`, `revisionBefore`/`revisionAfter`, preset or rule
+counts, `fullControl` (`added`, `removed` or `none`), measured `holderCount` and
+`liveInvitationCount` where the command computed them, `nameChanged`,
+`descriptionChanged` and `actorCredentialType` (`jwt` or `api_key`). Names, descriptions,
+conditions, emails and holder lists are never recorded. A locked no-op writes nothing; an
+audit insert failure rolls the whole change back, and a lost commit acknowledgment can leave
+a persisted event with an unconfirmed client outcome, so clients read state before another
+deliberate write.
+
 ## Organization role assignment events
 
 `org.member_roles_changed` is written transactionally for actual assignment

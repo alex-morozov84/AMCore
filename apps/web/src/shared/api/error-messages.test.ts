@@ -7,6 +7,7 @@ import {
   OrganizationMemberErrorCode,
   PermissionErrorCode,
   ResourceErrorCode,
+  RoleDefinitionErrorCode,
   SUPPORTED_LOCALES,
 } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
@@ -33,6 +34,7 @@ const backendCodes = [
   ...Object.values(OrganizationMemberErrorCode),
   ...Object.values(CommonErrorCode),
   ...Object.values(PermissionErrorCode),
+  ...Object.values(RoleDefinitionErrorCode),
 ]
 
 const clientCodes = Object.values(ClientErrorCode)

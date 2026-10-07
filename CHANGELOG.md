@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Organization **role definitions API** (`/organizations/:orgId/role-definitions`): list roles with
+  organization-local holder counts, read a role as one atomic snapshot, create an empty custom role,
+  save the complete definition (metadata and catalogue presets) in one revision-fenced transaction
+  that preserves advanced and DENY rules, and delete a role after confirming holders and pending
+  invitations. High-risk (`fullControl`) and self-held changes need explicit acknowledgments, and
+  every change is audited transactionally. Bearer-only, TeamAccess and membership required.
+  Legacy `/roles` routes keep their contracts but now serialize on the organization, raise the
+  revision once, write the same audit events (`org.role_created/updated/deleted`), and removing a
+  permission from a role detaches only that role's link. A role-leading index on
+  `member_roles(roleId, memberId)` speeds holder counts. A ready role-editor screen follows separately.
+
 - Organization invitation management and explicit recipient consent, complete role
   intent, generation checks and durable operation recovery; replaceable ready UI.
   Existing installations require the controlled upgrade described in the invitation guide.
