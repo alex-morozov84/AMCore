@@ -31,11 +31,16 @@ function image(n, service = 'api', patch = {}) {
 const dockerError = (stderr) => Object.assign(new Error(`docker failed: ${stderr}`), { stderr })
 
 // Minimal in-memory engine: only the commands the census/disposal may issue.
-function fakeDocker({ images = [], containers = [], keepAfterRemove = [] } = {}) {
-  const state = { images: [...images], calls: [], events: [] }
+// `before(args, state)` runs ahead of each command so a test can inject a transition
+// (a late alias, a rebound name, a late container) at an exact point of the sequence.
+function fakeDocker({ images = [], containers = [], keepAfterRemove = [], before } = {}) {
+  const state = { images: [...images], containers, calls: [], events: [] }
   const find = (id) => state.images.find((item) => item.Id === id)
+  const findAny = (target) =>
+    find(target) ?? state.images.find((item) => (item.RepoTags ?? []).includes(target))
   const execute = async (args) => {
     state.calls.push(args.join(' '))
+    before?.(args, state)
     const [group, verb] = args
     if (group === 'image' && verb === 'ls') {
       const [, kv] = args[args.indexOf('--filter') + 1].split('label=')
@@ -47,16 +52,16 @@ function fakeDocker({ images = [], containers = [], keepAfterRemove = [] } = {})
         .join('\n')
     }
     if (group === 'image' && verb === 'inspect') {
-      const found = args.slice(2).map((id) => {
-        const item = find(id)
-        if (!item) throw dockerError(`Error response from daemon: No such image: ${id}`)
+      const found = args.slice(2).map((target) => {
+        const item = findAny(target)
+        if (!item) throw dockerError(`Error response from daemon: No such image: ${target}`)
         return item
       })
       return JSON.stringify(found)
     }
-    if (group === 'container' && verb === 'ls') return containers.map((c) => c.Id).join('\n')
+    if (group === 'container' && verb === 'ls') return state.containers.map((c) => c.Id).join('\n')
     if (group === 'container' && verb === 'inspect')
-      return JSON.stringify(args.slice(2).map((id) => containers.find((c) => c.Id === id)))
+      return JSON.stringify(args.slice(2).map((id) => state.containers.find((c) => c.Id === id)))
     if (group === 'image' && verb === 'rm') {
       assert.equal(args[2], '--no-prune')
       const target = args[3]
@@ -70,6 +75,9 @@ function fakeDocker({ images = [], containers = [], keepAfterRemove = [] } = {})
         throw dockerError(
           'conflict: unable to delete (must be forced) - referenced in multiple repositories'
         )
+      const wouldDelete = byId || (item.RepoTags ?? []).length <= 1
+      if (wouldDelete && state.containers.some((container) => container.Image === item.Id))
+        throw dockerError('conflict: unable to delete - image is being used by stopped container')
       state.events.push(`rm:${target}`)
       if (!byId) {
         item.RepoTags = item.RepoTags.filter((tag) => tag !== target)
@@ -183,10 +191,10 @@ test('disposal untags only the stand’s own proved names, then removes the ID, 
   assert.ok(saved[0].candidates.length === 3 && !saved[0].verifiedAt)
   assert.ok(saved.at(-1).verifiedAt, 'verified absence is persisted')
   const removals = docker.state.calls.filter((call) => call.startsWith('image rm'))
-  const own = ['api', 'web', 'worker'].map((service) => `${m.project}-${service}:latest`)
+  // Single-name images keep their only name as the anchor: removed by ID alone.
   assert.deepEqual(
     removals.sort(),
-    [...own, hex(1), hex(2), hex(3)].map((target) => `image rm --no-prune ${target}`).sort()
+    [hex(1), hex(2), hex(3)].map((target) => `image rm --no-prune ${target}`).sort()
   )
   for (const call of docker.state.calls) assert.doesNotMatch(call, /prune(?!\s)|--force|\s-f\b/)
 })
@@ -198,17 +206,126 @@ test('one image carrying the api and worker names is untagged name by name, then
   const docker = fakeDocker({ images: [shared, image(31, 'web')] })
   assert.equal((await disposeImages(m, docker.execute, noSave)).length, 2)
   assert.deepEqual(docker.state.images, [])
-  const order = docker.state.events
-  assert.ok(
-    order.indexOf(`rm:${m.project}-worker:latest`) < order.indexOf(`rm:${hex(30)}`) ||
-      !order.includes(`rm:${hex(30)}`),
-    'the ID is never removed while a second name remains'
-  )
   assert.deepEqual(
-    docker.state.calls.filter((call) => call.includes(hex(30)) && call.includes('rm')),
-    [`image rm --no-prune ${hex(30)}`],
-    'the ID removal is a harmless no-op after the last untag deleted the image'
+    docker.state.calls.filter((call) => call.startsWith('image rm')),
+    [
+      `image rm --no-prune ${m.project}-api:latest`, // untag only: the worker name is the anchor
+      `image rm --no-prune ${hex(30)}`, // one reference left: the engine deletes it
+      `image rm --no-prune ${hex(31)}`,
+    ]
   )
+  assert.ok(
+    !docker.state.calls.includes(`image rm --no-prune ${m.project}-worker:latest`),
+    'the last own name is never untagged separately'
+  )
+})
+
+// Transitions injected at exact points of the removal sequence. A foreign reference must
+// survive and make cleanup fail; a name that no longer points at the proved image must
+// not be touched; nothing is forced.
+const names = (...services) => services.map((service) => `${m.project}-${service}:latest`)
+const addAlias = (state, id) =>
+  state.images.find((item) => item.Id === id).RepoTags.push('foreign-keep:latest')
+const aliasOf = (state, id) => state.images.find((item) => item.Id === id)?.RepoTags
+
+test('a late foreign alias is preserved: before the first untag, between untags and before the ID', async () => {
+  const shared = (services, id = 40) =>
+    image(id, 'api', { RepoTags: names(...services), RepoDigests: [] })
+
+  // Before the first own untag: the alias appears while the first name is being untagged.
+  let docker = fakeDocker({
+    images: [shared(['api', 'worker'])],
+    before(args, state) {
+      if (args.join(' ') === `image rm --no-prune ${names('api')[0]}`) addAlias(state, hex(40))
+    },
+  })
+  await assert.rejects(() => disposeImages(m, docker.execute, noSave), /Foreign image reference/)
+  assert.deepEqual(aliasOf(docker.state, hex(40)), [names('worker')[0], 'foreign-keep:latest'])
+  assert.ok(!docker.state.calls.includes(`image rm --no-prune ${hex(40)}`), 'no ID removal')
+
+  // Between own untags (three names, the alias appears at the second untag's check).
+  docker = fakeDocker({
+    images: [shared(['api', 'worker', 'web'])],
+    before(args, state) {
+      if (args.join(' ') === `image inspect ${names('worker')[0]}`) addAlias(state, hex(40))
+    },
+  })
+  await assert.rejects(() => disposeImages(m, docker.execute, noSave), /Foreign image reference/)
+  assert.ok(aliasOf(docker.state, hex(40)).includes('foreign-keep:latest'), 'alias survives')
+  assert.ok(!docker.state.calls.includes(`image rm --no-prune ${hex(40)}`), 'no ID removal')
+
+  // Right before the final ID removal (single name, the most important case): the engine
+  // refuses because two references exist, and the alias is never deleted.
+  docker = fakeDocker({
+    images: [image(41, 'api')],
+    before(args, state) {
+      if (args.join(' ') === `image rm --no-prune ${hex(41)}`) addAlias(state, hex(41))
+    },
+  })
+  await assert.rejects(
+    () => disposeImages(m, docker.execute, noSave),
+    /Owned image removal refused/
+  )
+  assert.deepEqual(aliasOf(docker.state, hex(41)), [names('api')[0], 'foreign-keep:latest'])
+})
+
+test('a generated name rebound to another image is never untagged or deleted', async () => {
+  const other = (id) => ({ Id: hex(id), Config: { Labels: {} }, RepoTags: [], RepoDigests: [] })
+  const rebind = (target, owner) => (state) => {
+    const candidate = state.images.find((item) => item.Id === owner)
+    candidate.RepoTags = candidate.RepoTags.filter((tag) => tag !== target)
+    state.images.find((item) => item.Id === hex(60)).RepoTags = [target]
+  }
+
+  // The first own name is rebound after the proof.
+  let docker = fakeDocker({
+    images: [image(50, 'api', { RepoTags: names('api', 'worker') }), other(60)],
+    before(args, state) {
+      if (args.join(' ') === `image inspect ${names('api')[0]}`)
+        rebind(names('api')[0], hex(50))(state)
+    },
+  })
+  await assert.rejects(() => disposeImages(m, docker.execute, noSave), /no longer resolves/)
+  assert.deepEqual(aliasOf(docker.state, hex(60)), names('api'), 'the foreign image keeps its name')
+  assert.ok(
+    docker.state.images.some((item) => item.Id === hex(60)),
+    'and exists'
+  )
+  assert.ok(!docker.state.calls.some((call) => call.startsWith('image rm')), 'nothing removed')
+
+  // A LATER own name is rebound: the first untag already happened, the rest must stop.
+  docker = fakeDocker({
+    images: [image(51, 'api', { RepoTags: names('api', 'worker', 'web') }), other(60)],
+    before(args, state) {
+      if (args.join(' ') === `image inspect ${names('worker')[0]}`)
+        rebind(names('worker')[0], hex(51))(state)
+    },
+  })
+  await assert.rejects(() => disposeImages(m, docker.execute, noSave), /no longer resolves/)
+  assert.deepEqual(aliasOf(docker.state, hex(60)), names('worker'))
+  assert.deepEqual(
+    docker.state.calls.filter((call) => call.startsWith('image rm')),
+    [`image rm --no-prune ${names('api')[0]}`]
+  )
+})
+
+test('a consumer that appears after the inventory leaves the image in place, never forced', async () => {
+  const docker = fakeDocker({
+    images: [image(70, 'api', { RepoTags: names('api', 'worker') })],
+    before(args, state) {
+      if (args.join(' ') === `image rm --no-prune ${hex(70)}`)
+        state.containers.push({ Id: 'c'.repeat(64), Image: hex(70), Mounts: [] })
+    },
+  })
+  await assert.rejects(
+    () => disposeImages(m, docker.execute, noSave),
+    /Owned image removal refused/
+  )
+  assert.ok(
+    docker.state.images.some((item) => item.Id === hex(70)),
+    'image preserved'
+  )
+  for (const call of docker.state.calls) assert.doesNotMatch(call, /--force|\s-f\b/)
 })
 
 test('disposal is idempotent and never targets another stand or pulled images', async () => {
@@ -245,8 +362,7 @@ test('a foreign alias, a foreign sole tag or any referencing container refuses b
 test('an engine conflict is a refusal, while an already-gone image is idempotent success', async () => {
   const docker = fakeDocker({ images: [image(1), image(2, 'web')] })
   const refusing = async (args, options) => {
-    if (args[1] === 'rm' && args[3] === `${m.project}-api:latest`)
-      throw dockerError('conflict: must be forced')
+    if (args[1] === 'rm' && args[3] === hex(1)) throw dockerError('conflict: must be forced')
     return docker.execute(args, options)
   }
   await assert.rejects(() => disposeImages(m, refusing, noSave), /Owned image removal refused/)

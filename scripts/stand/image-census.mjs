@@ -71,12 +71,29 @@ async function assertUnreferenced(execute, candidates) {
   }
 }
 
+// Fresh physical proof of one candidate by full ID: it must still exist and every
+// reference it carries must still be one of this stand's own generated names.
+async function proveCandidate(m, execute, id) {
+  const [image] = JSON.parse(await execute(['image', 'inspect', id], { capture: true }))
+  return ownedImage(m, image)
+}
+
 // Removes proved-owned images, never forced and never pruning parents, and succeeds only
-// on positively verified absence. Every reference of a candidate is proved to be this
-// stand's own generated name, so those names are untagged first (an image that carries
-// several cannot be removed by ID while a second reference remains; the last untag
-// deletes it), then the full ID is removed. A foreign alias added after the proof leaves
-// the ID removal refused, which is reported, never forced.
+// on positively verified absence.
+//
+// An image may carry several of the stand's own generated names. The engine refuses to
+// delete an ID while a SECOND reference remains, and deletes it (with that one reference,
+// whatever it is) when exactly one remains. So one own name is kept as an anchor until the
+// final ID removal: a foreign alias that appears at any point either fails the fresh
+// re-proof below or makes the engine refuse the ID removal (two references), and is never
+// deleted. Each own name is untagged only after it is freshly resolved to the candidate's
+// physical ID, and the candidate is re-proved before every mutation.
+//
+// Boundary: Docker offers no compare-and-delete, so a name rebound, or an alias added, in
+// the few milliseconds between a check and its operation cannot be excluded. A rebound
+// name could then be untagged (or deleted, if it was that image's only name); an alias
+// added before the final removal is refused by the engine. This is the same cooperative
+// boundary as the rest of the stand tooling, not a defence against a hostile local actor.
 export async function disposeImages(m, execute, save) {
   const owned = await imageCensus(m, execute)
   if (!owned.length) return []
@@ -91,15 +108,20 @@ export async function disposeImages(m, execute, save) {
       if (!gone(error)) throw new Error(`Owned image removal refused: ${error.message}`)
     })
   for (const { id } of owned) {
-    let references
     try {
-      const [fresh] = JSON.parse(await execute(['image', 'inspect', id], { capture: true }))
-      references = ownedImage(m, fresh)
+      const references = await proveCandidate(m, execute, id)
+      for (const name of references.slice(0, -1)) {
+        await proveCandidate(m, execute, id) // a late alias fails here, before any mutation
+        const [target] = JSON.parse(await execute(['image', 'inspect', name], { capture: true }))
+        if (target.Id !== id)
+          throw new Error('Owned reference no longer resolves to the proved image')
+        await remove(name)
+      }
+      await proveCandidate(m, execute, id) // last proof right before the ID removal
     } catch (error) {
       if (gone(error)) continue
       throw error
     }
-    for (const reference of references) await remove(reference)
     await remove(id)
   }
   if ((await imageCensus(m, execute)).length)

@@ -167,11 +167,21 @@ builds, so `api` and `worker` become one image with two names and a single servi
 label, which is why the service label is not part of the proof. Discovery is a
 label census (`image ls -a --no-trunc`), so older generations and partial or
 interrupted builds are found even when the stand's current image map does not list
-them. Images are removed last, after the stand's containers: the stand's own proved
-names are untagged first (the last untag deletes the image), then the full image ID is
-removed; never forced, never pruning parent images. A foreign tag or alias, or any
-container in any state that still uses the image, refuses removal, and success
-requires a fresh census proving absence; a zero exit status alone is not proof.
+them. Images are removed last, after the stand's containers. An image that carries
+several of the stand's names is untagged name by name, but one own name stays as an
+anchor until the final removal by full image ID (the engine deletes an image together
+with its last remaining reference, whatever it is, and refuses while a second one
+exists). The ownership proof is repeated before every step, and each name is resolved
+to the proved image ID before it is untagged. Nothing is forced and parent images are
+never pruned. A foreign tag or alias present at the start, or any container in any
+state that uses the image, refuses removal before anything changes. A foreign alias
+or a consumer that appears while the removal runs is preserved: it fails the repeated
+proof or makes the engine refuse the final removal, and cleanup reports failure
+(partial: some own names may already be gone). Docker has no compare-and-delete, so a
+name rebound, or an alias added, within the few milliseconds between a check and its
+operation cannot be excluded; this is the same cooperative boundary as the rest of the
+stand tooling. Success requires a fresh census proving absence; a zero exit status
+alone is not proof.
 Base images that Compose or Testcontainers pull (`postgres`, `redis`, `node`,
 `testcontainers/ryuk`) are never labelled and never touched. Ordinary `down` and a
 source refresh keep the images so a restart stays fast. Images built before this
