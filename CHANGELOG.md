@@ -182,6 +182,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Refresh patched dependency resolutions and Node 24 image bases, retire redundant
+  dependency overrides, and remove fixed Storybook advisory exceptions.
+
 - Bull Board is read-only by construction: read-only adapters, only `GET`/`HEAD` on a
   closed list of paths, a closed projection of every response (no raw payloads, return values,
   failure text, stack traces, logs or flows; only a few reviewed identifiers per queue, and

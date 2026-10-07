@@ -15,7 +15,6 @@ const STORYBOOK_KEYS = [
   'readme-storybook',
   'storybook.docs-agents',
   'storybook.docs-brand',
-  'storybook.docs-ci-security',
   'storybook.docs-console-development',
   'storybook.docs-contributing',
   'storybook.docs-route-progress',
@@ -24,7 +23,6 @@ const STORYBOOK_KEYS = [
   'storybook.gitignore',
   'storybook.vitest-project',
   'storybook.workflow-ci',
-  'storybook.workflow-dependency-review',
 ]
 
 function isNested(candidate, parent) {

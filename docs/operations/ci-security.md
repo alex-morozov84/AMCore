@@ -206,10 +206,6 @@ of the following hold, and remove it the moment any one stops holding:
    understand and re-verify the exception, since that's the part every fork
    actually gets.
 
-Current example: `image-size@2.0.2` (transitive via
-`@storybook/nextjs-vite`, Track 8) — see the comment above `allow-ghsas` in
-`.github/workflows/dependency-review.yml`.
-
 ## What a fork inherits (and what it doesn't)
 
 A clone or fork receives the repository **files** that _declare_ the intended policy — but
