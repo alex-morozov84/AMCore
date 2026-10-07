@@ -15,7 +15,7 @@ of workflow self-hardening to keep the example forkable.
 | `ci.yml`                     | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job)  | blocking                             |
 | `ci.yml`                     | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                            | blocking                             |
 | `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — fast (`scripts/lib/*.test.mjs`, structural/fixture checks, no nested install) | blocking                             |
-| `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — six-row covering array plus shadow selector telemetry                         | blocking; full lane always runs      |
+| `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — six-row covering array in two parallel shards plus shadow selector telemetry  | blocking; full lane always runs      |
 | `scaffolding-exhaustive.yml` | weekly schedule, manual                 | Original eight real-install scaffolding recipes (`pnpm test:scripts:exhaustive`)                     | backstop, not required               |
 | `workflow-lint.yml`          | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                              | blocking                             |
 | `pr-title.yml`               | `pull_request`                          | Conventional-Commits PR-title lint                                                                   | blocking (squash title = commit msg) |
@@ -95,12 +95,21 @@ of workflow self-hardening to keep the example forkable.
   drift a scaffolding fixture (this job exists because exactly that
   happened — `apps/web` and `docs/` changes drifted `scripts/lib/*.mjs`
   fixtures across several PRs with nothing in CI to catch it).
-- **Scaffolding contract (full)** — job id `scaffolding-contract-full` has a bounded
-  25-minute job budget including installation, the full matrix and artifact/cleanup
-  overhead. It keeps
-  its required display name unchanged and runs
-  `pnpm test:scripts:generated`, the generated-project half of the local
-  `pnpm test:scripts` aggregate. Its six independent repositories cover
+- **Scaffolding contract (full)** — job id `scaffolding-contract-full` is a small
+  aggregate that keeps the required display name unchanged. It runs with
+  `if: always()` and is green only when the whole `scaffolding-generated-shard`
+  matrix result is `success`; failed, cancelled or skipped shards make it red.
+  It is the only whole-matrix verdict. The work runs in two parallel shards
+  (`Scaffolding generated shard (a|b)`, `fail-fast: false`, own runner, 25-minute
+  budget each) over fixed three-scenario lists in
+  `scripts/lib/scaffold-ci-shards.mjs`; a fast contract test proves the lists
+  partition the six rows exactly. Shard `a` also runs the non-matrix
+  `scripts/*.test.mjs` files once; shard `b` runs only the matrix file. Together
+  they run the generated-project half of the local `pnpm test:scripts` aggregate
+  (`AMCORE_SCAFFOLD_SHARD` selects a shard; unset runs all six, and an invalid
+  value or use with the exhaustive matrix fails before any install). Each shard
+  uploads `scaffold-diagnostics-<shard>-<run-id>-<attempt>` (best effort, none
+  after a hard job timeout). The six independent repositories cover
   the cross-product of multi/single locale routing and Console
   path/host/disabled topology. en/ru and both optional project toggles are
   distributed pairwise; multi- and single-locale host rows verify the distinct
@@ -123,10 +132,13 @@ of workflow self-hardening to keep the example forkable.
 
   Shadow output never controls execution: setup, install, and all six generated
   rows remain unconditional, and the fast job remains universal. With
-  `if: always()`, the job appends a bounded summary and uploads the full
-  versioned JSON as `scaffold-selector-shadow-<run-id>-<attempt>` for 30 days.
-  The artifact records merge-base provenance, matched/unknown inputs, reasons,
-  would-run versus actually-ran state, and the full-step outcome. The bootstrap
+  `if: always()`, each shard appends a bounded summary headed "Shard <id> only —
+  not the whole matrix" and uploads `scaffold-shard-evidence-<shard>-<run-id>-<attempt>`
+  for 30 days: the versioned selector JSON (`shadow-result.json`) plus
+  `shard-scope.json` (shard id, its three scenario names, `scope: "shard-only"`
+  and that shard's outcome). Neither file is a whole-matrix result.
+  The selector JSON records merge-base provenance, matched/unknown inputs, reasons,
+  would-run versus actually-ran state, and that shard's step outcome. The bootstrap
   PR is expected to report `trusted_selector_missing` and choose full because
   its merge base has no trusted selector yet. Missing or invalid output is full.
   The job has only `contents: read`; no skip is enabled in this phase.

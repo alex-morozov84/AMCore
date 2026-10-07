@@ -3,12 +3,19 @@ import { describe, test } from 'node:test'
 import { execute } from './measure/instrumented-run.mjs'
 import { SCAFFOLD_COVERING_SCENARIOS } from './lib/scaffold-covering-recipes.mjs'
 import { SCAFFOLD_EXHAUSTIVE_SCENARIOS } from './lib/scaffold-scenario-recipes.mjs'
+import { selectShard } from './lib/scaffold-ci-shards.mjs'
 import { assertGeneratedScaffold } from './lib/scaffold-generated-assertions.mjs'
 import { commit } from './lib/init-project-test-helpers.mjs'
 import { createRealRepoCopy } from './lib/test-fixture.mjs'
 
 const exhaustive = process.env.AMCORE_SCAFFOLD_MATRIX === 'exhaustive'
-const scenarios = exhaustive ? SCAFFOLD_EXHAUSTIVE_SCENARIOS : SCAFFOLD_COVERING_SCENARIOS
+const shard = process.env.AMCORE_SCAFFOLD_SHARD
+// Resolved at import time: an invalid shard fails before any repo copy or install.
+const scenarios = selectShard(
+  shard,
+  exhaustive ? SCAFFOLD_EXHAUSTIVE_SCENARIOS : SCAFFOLD_COVERING_SCENARIOS,
+  exhaustive
+)
 
 async function runScenario(scenario) {
   const copy = createRealRepoCopy()
@@ -32,7 +39,8 @@ async function runScenario(scenario) {
   }
 }
 
-describe(`scaffolding ${exhaustive ? 'exhaustive backstop' : 'required covering array'}`, () => {
+const label = exhaustive ? 'exhaustive backstop' : 'required covering array'
+describe(`scaffolding ${label}${shard ? ` (shard ${shard})` : ''}`, () => {
   for (const scenario of scenarios) {
     test(scenario.name, { timeout: 15 * 60 * 1000 }, () => runScenario(scenario))
   }
