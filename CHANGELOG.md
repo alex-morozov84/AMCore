@@ -68,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- API Docker images install Debian's patched Perl package instead of retaining
+  the vulnerable version bundled in the pinned base image.
+
 - Browser accessibility checks wait for finite visual transitions and loaded fonts
   through one guarded helper, preserving real contrast failures.
 - AI runs now execute correctly under load, cancellation, deadlines and crashes.

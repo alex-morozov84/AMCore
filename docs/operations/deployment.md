@@ -3,6 +3,12 @@
 How to take AMCore from clone → migrated schema → running app, locally and in
 production.
 
+The API Dockerfile refreshes `perl-base` from Debian security repositories in
+build/migrator and runner targets. The pinned Node base still includes an older
+package; remove this explicit refresh only after a base update includes the fixes
+and the final image scan confirms them. Existing deployed images need a rebuild
+and rollout to receive the update.
+
 ## Branch, release & environments model
 
 AMCore uses **GitHub Flow**: a single protected trunk `main`, short-lived PR

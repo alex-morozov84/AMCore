@@ -9,6 +9,11 @@
 # resolution inside the final runner image.
 FROM node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS base
 
+# The pinned base still carries vulnerable Perl; refresh it from Debian security
+# updates in every API target until the base image includes the patched package.
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade perl-base && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 # The pnpm content-addressed store lives in a BuildKit cache mount (see the
@@ -132,7 +137,7 @@ ENV NODE_ENV=production
 
 # TLS clients (S3, email providers, OAuth, HTTPS webhooks) need the system CA
 # bundle; the Rust-free Prisma client no longer needs a bundled query engine.
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates perl-base && \
     rm -rf /var/lib/apt/lists/*
 
 # Non-root user (Debian: groupadd/useradd; uid 1001 per k8s convention).
