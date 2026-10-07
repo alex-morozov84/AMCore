@@ -7,7 +7,7 @@ import { assertSupervisorAbsent } from './process-identity.mjs'
 import { disposeControlSocket } from './control-socket.mjs'
 import { verifyRunnerRemoval } from './wrapper-removal.mjs'
 
-export async function recover(id, purge) {
+export async function recover(id, purge, options = {}) {
   const m = await load(id)
   const guard = `${directory(id)}/recovery`
   await mkdir(guard, { mode: 0o700 }).catch(() => {
@@ -19,13 +19,13 @@ export async function recover(id, purge) {
     { mode: 0o600 }
   )
   try {
-    await inspectAndRecover(m, id, purge)
+    await inspectAndRecover(m, id, purge, options)
   } finally {
     await rm(guard, { recursive: true })
   }
 }
 
-async function inspectAndRecover(m, id, purge) {
+async function inspectAndRecover(m, id, purge, options) {
   const path = `${directory(id)}/lease`
   if ((await lstat(path)).isSymbolicLink()) throw new Error('Symlink recovery refused')
   const owner = JSON.parse(await readFile(`${path}/owner.json`, 'utf8'))
@@ -46,7 +46,7 @@ async function inspectAndRecover(m, id, purge) {
       delete m.relay
       m.state = purge ? 'purged' : 'stopped'
       await save(m)
-    } else await cleanup(m, purge)
+    } else await cleanup(m, purge, options)
   } finally {
     await held.release()
   }

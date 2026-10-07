@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { run, stopChildren } from './process.mjs'
 import { directory, load } from './state.mjs'
 import { cleanup, discover } from './ownership.mjs'
+import { unresolvedBuilds } from './build-intent.mjs'
 import { assertNoSurvivors } from './survivors.mjs'
 
 for (const [state, signal] of [
@@ -50,6 +51,18 @@ for (const [state, signal] of [
       await assert.rejects(() => readFile(`${directory(id)}/lease/owner.json`), { code: 'ENOENT' })
       await assertNoSurvivors(m)
       assert.deepEqual(await discover(m, false), { container: [], network: [], volume: [] })
+      if (unresolvedBuilds(m).length) {
+        // Interrupted while `compose build` ran: nothing proves Docker finished exporting,
+        // so the record is kept and purge reports incomplete until risk is accepted.
+        assert.equal(m.state, 'cleanup-incomplete', 'the e2e finally keeps the precise state')
+        assert.equal(m.cleanup.code, 'BUILD_UNRESOLVED')
+        await assert.rejects(() => cleanup(m, true), { code: 'BUILD_UNRESOLVED' })
+        await cleanup(m, true, {
+          acceptReason: 'startup signal proof accepts an interrupted build',
+        })
+        assert.equal(m.builds.at(-1).state, 'accepted-risk')
+      }
+      assert.equal(m.state, 'purged')
     } finally {
       await stopChildren()
       await result

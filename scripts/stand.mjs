@@ -2,7 +2,7 @@ import { snapshot } from './stand/snapshot.mjs'
 import { refresh } from './stand/refresh.mjs'
 import { randomUUID } from 'node:crypto'
 import { create } from './stand/create.mjs'
-import { root, load, lease, save } from './stand/state.mjs'
+import { root, load, lease } from './stand/state.mjs'
 import { boot } from './stand/boot.mjs'
 import { cleanup, dataAdmission } from './stand/ownership.mjs'
 import { test } from './stand/playwright.mjs'
@@ -21,6 +21,9 @@ lanes.push('console-real-stack')
 if (lane === 'console-real-stack') topology = 'host'
 // AMCORE_CONSOLE_LANES_END
 const id = value('--id', action === 'e2e' ? `e2e-${randomUUID()}` : 'preview')
+// Explicit risk acceptance for a build whose Docker export is not proved finished;
+// recorded in the manifest as acceptance, never as proof (see local-stands guide).
+const cleanupOptions = { acceptReason: value('--accept-unresolved-build') }
 let interrupted = false
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, async () => {
@@ -36,7 +39,7 @@ for (const signal of ['SIGINT', 'SIGTERM'])
 async function execute() {
   if (action === 'help') {
     console.log(
-      `pnpm stand up|preview|e2e|status|list|down|recover|closeout [--id ID] [--purge]\ne2e --lane ${lanes.join('|')}\nManaged local stands; never owner .env. Native pnpm dev is outside these guards.`
+      `pnpm stand up|preview|e2e|status|list|down|recover|closeout [--id ID] [--purge] [--accept-unresolved-build "<reason>"]\ne2e --lane ${lanes.join('|')}\nManaged local stands; never owner .env. Native pnpm dev is outside these guards.`
     )
     return
   }
@@ -69,7 +72,7 @@ async function execute() {
   }
   if (action === 'recover') {
     const { recover } = await import('./stand/recovery.mjs')
-    await recover(id, args.includes('--purge'))
+    await recover(id, args.includes('--purge'), cleanupOptions)
     return
   }
   if (!['up', 'preview', 'e2e', 'down'].includes(action)) throw new Error('Unknown stand action')
@@ -83,7 +86,7 @@ async function execute() {
   try {
     if (action === 'down') {
       m = await load(id, args.includes('--orphan'))
-      await cleanup(m, args.includes('--purge'))
+      await cleanup(m, args.includes('--purge'), cleanupOptions)
       return
     }
     const existing = await load(id).catch((e) => {
@@ -136,10 +139,8 @@ async function execute() {
     let cleanupError
     if (m && action === 'e2e' && lane !== 'mocked') {
       try {
-        await cleanup(m, true)
+        await cleanup(m, true) // records its own failure/incomplete state
       } catch (e) {
-        m.state = 'cleanup-failed'
-        await save(m)
         cleanupError = e
       }
     }

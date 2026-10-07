@@ -6,6 +6,8 @@ import { docker, inspect, composeArguments, withDockerEngine } from './docker.mj
 import { label, validateModel } from './config.mjs'
 import { save } from './state.mjs'
 import { assertNoSurvivors } from './survivors.mjs'
+import { disposeImages } from './image-census.mjs'
+import { acceptBuildRisk, assertBuildsResolved } from './build-intent.mjs'
 
 export function owned(m, resource, kind) {
   const tags = resource.Config?.Labels ?? resource.Labels
@@ -23,6 +25,15 @@ export function owned(m, resource, kind) {
     const service = tags['com.docker.compose.service']
     if (!m.services.includes(service) || resource.HostConfig.NetworkMode === 'host')
       throw new Error('Foreign container service/network')
+    // A container inherits its image's labels (the ownership tuple and the Compose
+    // project/service), so labels alone cannot show that THIS Compose allocation created
+    // it. Labels that Compose sets on containers it creates and an image never carries can.
+    const snapshots = [m.snapshot, ...(m.approvedSnapshots ?? [])]
+    if (
+      !tags['com.docker.compose.container-number'] ||
+      !snapshots.includes(tags['com.docker.compose.project.working_dir'])
+    )
+      throw new Error('Container lacks Compose creation evidence')
     for (const mount of resource.Mounts ?? []) {
       if (
         mount.Type === 'bind' &&
@@ -129,7 +140,28 @@ export async function dataAdmission(m, bootstrap = false) {
     await save(m)
   })
 }
-export async function cleanup(m, purge) {
+// Every entry point (down, recover, the e2e finally, the bind-race retry and closeout)
+// goes through here, so a failed or incomplete cleanup is recorded the same way: the
+// latest attempt replaces any earlier state, including a stale `purged`. An unresolved
+// build is distinguishable from an ordinary removal conflict by `state` and `cleanup.code`.
+const unresolvedCodes = ['BUILD_UNRESOLVED', 'BUILD_REASON_REQUIRED']
+export async function cleanup(m, purge, { acceptReason } = {}) {
+  try {
+    await removeOwned(m, purge, acceptReason)
+  } catch (error) {
+    m.state = unresolvedCodes.includes(error.code) ? 'cleanup-incomplete' : 'cleanup-failed'
+    m.cleanup = {
+      incomplete: true,
+      failedAt: new Date().toISOString(),
+      code: error.code,
+      reason: error.message,
+    }
+    await save(m).catch(() => {}) // never mask the original failure
+    throw error
+  }
+}
+
+async function removeOwned(m, purge, acceptReason) {
   await assertNoSurvivors(m)
   await discover(m)
   for (const id of m.resources.network) {
@@ -150,11 +182,25 @@ export async function cleanup(m, purge) {
       await docker(m, [kind, 'rm', ...(kind === 'container' ? ['-f'] : []), id])
     }
   }
+  // Images go last, once no container can reference them. Ordinary `down` and source
+  // refresh keep them so a restart stays fast; purge and closeout dispose of them.
+  if (purge) await withDockerEngine(m, (execute) => disposeImages(m, execute, save))
+  await concludeCleanup(m, purge, acceptReason)
+}
+
+async function concludeCleanup(m, purge, acceptReason) {
   const remaining = await discover(m, false)
   if (remaining.container.length || remaining.network.length || (purge && remaining.volume.length))
     throw new Error('Owned resource removal could not be verified')
   await assertNoSurvivors(m)
   m.resources = remaining
+  // Acceptance only when the owner passed a reason; without it an unresolved build is
+  // reported as unresolved, never as a missing-reason error.
+  if (purge && acceptReason !== undefined) await acceptBuildRisk(m, acceptReason)
+  // Proved-owned resources are already gone; an unresolved build keeps the record and
+  // source for recovery (cleanup() records `cleanup-incomplete`) and never reads as purged.
+  if (purge) assertBuildsResolved(m)
   m.state = purge ? 'purged' : 'stopped'
+  m.cleanup = { verifiedAt: new Date().toISOString(), purge }
   await save(m)
 }

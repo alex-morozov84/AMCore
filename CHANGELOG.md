@@ -134,6 +134,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Managed local stands label the images they build and remove only proved-owned
+  images on purge, at the end of every Docker e2e run and in `closeout`, so images
+  no longer accumulate on the developer machine. A build whose Docker export is not
+  proved finished (a non-zero exit, Ctrl-C, a crash) stays unresolved and blocks
+  closeout until it is accepted explicitly with `--accept-unresolved-build`. See
+  `docs/operations/local-stands.md`.
+
 - Web E2E runs independent isolated CI lanes with an unchanged fail-closed
   aggregate check and a shared local CI reproduction command.
 

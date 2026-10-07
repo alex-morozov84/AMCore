@@ -21,6 +21,11 @@ let cancelled = false
 export const requestCancellation = () => {
   cancelled = true
 }
+// Monotonic count of signals this process delivered to managed process groups. Unlike the
+// cancellation flag it is never reset, so a caller can tell whether anything was signalled
+// while it ran (a signalled child that still exits 0 proves nothing about its work).
+let signalCount = 0
+export const signalsSent = () => signalCount
 export const allowCleanup = () => {
   cancelled = false
 }
@@ -193,6 +198,7 @@ async function stopGroups(targets = children) {
         // A live member with the recorded birth identity anchors this group.
         try {
           process.kill(-group.pid, signal)
+          signalCount++
         } catch (error) {
           if (error.code !== 'ESRCH') throw error
         }
@@ -213,4 +219,5 @@ function signalLeader(child, signal) {
   if (leader.pgid !== child.pid || leader.started !== child.standLeaderStarted)
     throw new Error('Runner PID identity unproved or reused; cancellation refused')
   process.kill(child.pid, signal)
+  signalCount++
 }
