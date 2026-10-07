@@ -177,11 +177,14 @@ never pruned. A foreign tag or alias present at the start, or any container in a
 state that uses the image, refuses removal before anything changes. A foreign alias
 or a consumer that appears while the removal runs is preserved: it fails the repeated
 proof or makes the engine refuse the final removal, and cleanup reports failure
-(partial: some own names may already be gone). Docker has no compare-and-delete, so a
-name rebound, or an alias added, within the few milliseconds between a check and its
-operation cannot be excluded; this is the same cooperative boundary as the rest of the
-stand tooling. Success requires a fresh census proving absence; a zero exit status
-alone is not proof.
+(partial: some own names may already be gone). That protection for an alias depends on
+the retained anchor: a dangling image has no own name and therefore no anchor, so a
+single foreign alias added to it after the last proof becomes its only reference and is
+deleted together with the image. Docker has no compare-and-delete, so a name rebound,
+or an alias added, between a check and the operation that follows it cannot be
+excluded (the length of that interval is not bounded here); this is the same
+cooperative boundary as the rest of the stand tooling. Success requires a fresh census
+proving absence; a zero exit status alone is not proof.
 Base images that Compose or Testcontainers pull (`postgres`, `redis`, `node`,
 `testcontainers/ryuk`) are never labelled and never touched. Ordinary `down` and a
 source refresh keep the images so a restart stays fast. Images built before this

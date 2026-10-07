@@ -82,18 +82,24 @@ async function proveCandidate(m, execute, id) {
 // on positively verified absence.
 //
 // An image may carry several of the stand's own generated names. The engine refuses to
-// delete an ID while a SECOND reference remains, and deletes it (with that one reference,
-// whatever it is) when exactly one remains. So one own name is kept as an anchor until the
-// final ID removal: a foreign alias that appears at any point either fails the fresh
-// re-proof below or makes the engine refuse the ID removal (two references), and is never
-// deleted. Each own name is untagged only after it is freshly resolved to the candidate's
-// physical ID, and the candidate is re-proved before every mutation.
+// delete an ID while a SECOND reference remains, and deletes it (together with that one
+// reference, whatever it is) when exactly one remains. Protection of a late foreign alias
+// therefore DEPENDS ON THE RETAINED ANCHOR: one own name is kept until the final ID
+// removal, so an alias that appears at any point either fails the fresh re-proof below or
+// makes the engine see two references and refuse the ID removal, and it is never deleted.
+// Each own name is untagged only after it is freshly resolved to the candidate's physical
+// ID, and the candidate is re-proved before every mutation.
 //
-// Boundary: Docker offers no compare-and-delete, so a name rebound, or an alias added, in
-// the few milliseconds between a check and its operation cannot be excluded. A rebound
-// name could then be untagged (or deleted, if it was that image's only name); an alias
-// added before the final removal is refused by the engine. This is the same cooperative
-// boundary as the rest of the stand tooling, not a defence against a hostile local actor.
+// Limit of that protection: a dangling image has NO own name, hence no anchor. A single
+// foreign alias added to it after the last proof becomes its only reference, and the final
+// ID removal then deletes the image together with that alias. (An image that still has its
+// anchor is not affected.)
+//
+// Boundary: Docker offers no compare-and-delete, so a name rebound, or an alias added,
+// between a check and the operation that follows it cannot be excluded; the length of that
+// interval is neither bounded nor measured here. A rebound name could then be untagged (or
+// deleted, if it was that image's only name). This is the same cooperative boundary as the
+// rest of the stand tooling, not a defence against a hostile local actor.
 export async function disposeImages(m, execute, save) {
   const owned = await imageCensus(m, execute)
   if (!owned.length) return []
