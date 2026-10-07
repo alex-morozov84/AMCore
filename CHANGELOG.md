@@ -134,6 +134,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refresh Vitest, request-context storage, environment loading and email
+  localization dependencies; update the pinned CI security scanners together.
+
 - Managed local stands label the images they build and remove only proved-owned
   images on purge, at the end of every Docker e2e run and in `closeout`, so images
   no longer accumulate on the developer machine. A build whose Docker export is not
