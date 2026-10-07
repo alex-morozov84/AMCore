@@ -35,7 +35,8 @@ describe('AuditLogService', () => {
         emailHash: 'hash-1',
         password: 'never',
         pinoEvent: 'org.invite.created',
-        roleId: 'role-1',
+        roleId: 'legacy-role',
+        roleIds: ['role-1', 'role-2'],
       },
       organizationId: 'org-1',
       targetId: 'invite-1',
@@ -59,7 +60,7 @@ describe('AuditLogService', () => {
       branch: 'pending_new_email',
       emailHash: 'hash-1',
       pinoEvent: 'org.invite.created',
-      roleId: 'role-1',
+      roleIds: ['role-1', 'role-2'],
     })
   })
 

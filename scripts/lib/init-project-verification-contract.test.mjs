@@ -4,7 +4,7 @@ import { realpathSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { INIT_PROJECT, commit } from './init-project-test-helpers.mjs'
 import { createRecordingPnpm } from './recording-pnpm-test-helper.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 const EXPECTED_COMMANDS = [
   ['typecheck'],
@@ -49,7 +49,7 @@ function assertCalls(recording, root) {
 
 describe('init:project production verification wiring', () => {
   test('runs all five project verification commands through pnpm', () => {
-    copy = createRealRepoCopy()
+    copy = createWorkingTreeCopy()
     commit(copy.root)
     fake = createRecordingPnpm()
     const result = runProject(copy.root, fake)
@@ -60,7 +60,7 @@ describe('init:project production verification wiring', () => {
   })
 
   test('reports a pnpm failure and exits non-zero', () => {
-    copy = createRealRepoCopy()
+    copy = createWorkingTreeCopy()
     commit(copy.root)
     fake = createRecordingPnpm()
     const result = runProject(copy.root, fake, ['--filter', 'api', 'test'])

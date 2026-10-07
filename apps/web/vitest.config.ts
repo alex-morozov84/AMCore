@@ -58,6 +58,7 @@ export default defineConfig({
             // Cold discovery of these primitives reloads the browser before stories run.
             '@base-ui/react/checkbox',
             '@base-ui/react/select',
+            '@base-ui/react/tabs',
             // msw's browser handler-matching pulls in `path-to-regexp`, a
             // CJS package. Without this, Vitest's browser mode serves it
             // raw via `/@fs/` instead of pre-bundling it, and the browser's

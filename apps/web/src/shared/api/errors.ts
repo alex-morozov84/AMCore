@@ -1,4 +1,4 @@
-import { ClientErrorCode } from './error-codes'
+import { ClientErrorCode, ClientStateError } from './error-codes'
 import { ApiNetworkError, ApiRequestError } from './http-client'
 import type { ValidationError } from './types'
 
@@ -94,6 +94,7 @@ export function getRetryAfterMs(error: unknown): number | undefined {
  * Get error code from API error response
  */
 export function getErrorCode(error: unknown): string | undefined {
+  if (error instanceof ClientStateError) return error.code
   if (isApiError(error)) {
     return error.body.errorCode
   }

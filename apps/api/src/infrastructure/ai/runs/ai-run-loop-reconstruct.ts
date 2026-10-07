@@ -1,65 +1,79 @@
 import { AI_TOOL_REJECTION_NOTICE } from '../tools/ai-tool.constants'
 
 import type { CompletedToolRound } from './ai-run-transcript'
+import { INVOCATION_SELECT, type InvocationRow } from './ai-tool-invocation.store'
 
-import {
-  AiRunStepType,
-  AiToolInvocationStatus,
-  type AiToolRiskClass,
-  type Prisma,
-} from '@/generated/prisma/client'
+import { AiRunStepType, AiToolInvocationStatus, type Prisma } from '@/generated/prisma/client'
+import { CUTOFF, type Cutoff } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
 /**
- * An approval-gated invocation whose owner decision has landed but whose effect is not yet applied to
- * the transcript (Arc E.5): status `APPROVED` (execute on resume), `EXECUTING` (a crashed execution to
- * re-apply idempotently on reclaim), or `REJECTED` with no `TOOL_INVOCATION` step yet (feed the rejection
- * notice on resume). Carries the approved `riskClass` + persisted `argsSnapshot` for re-validation.
+ * Runs ONE database operation under the shutdown latch: sealed → not invoked, `CUTOFF`. Every query of a
+ * multi-query helper goes through it individually, because a single wrapper around the whole helper would
+ * let a continuation that resumes after the seal start its next query.
  */
-export interface PendingApprovalInvocation {
-  id: string
-  toolId: string
-  riskClass: AiToolRiskClass
-  status: AiToolInvocationStatus
-  argsSnapshot: Prisma.JsonValue
-}
+export type FencedRun = <T>(operation: () => Promise<T>) => Promise<T | Cutoff>
+
+/** What recovery found: nothing, exactly one action to resolve, or an inconsistent set (fail closed). */
+export type UnresolvedAction = InvocationRow | 'ambiguous' | null
 
 /**
- * The run's single pending-application invocation, if any (Arc E.5, worker resume). `APPROVED` and a
- * stranded `EXECUTING` (worker crashed after the execution gate, before the SUCCEEDED commit) both need
- * execution; `REJECTED` is pending only until its `TOOL_INVOCATION` step is written. Returns `null` when
- * there is nothing to apply (normal E.4b loop).
+ * The run's unresolved tool action, if any (E12 recovery). At the start of every epoch — BEFORE the model
+ * is asked again — recovery evaluates what is still pending:
+ *
+ * 1. **Any** recorded `OUTCOME_UNKNOWN` has absolute precedence, whatever its age or what else is pending:
+ *    an uncertain side effect must stop the run before anything executable continues (legacy data can hold
+ *    several invocations, so "the newest one" is not enough).
+ * 2. Otherwise the pending actions are `REQUESTED`/`APPROVED` (start it), `EXECUTING` (same epoch: exit;
+ *    older epoch: adopt a read-only one), `REJECTED`/`SUCCEEDED` whose application marker is unset, and a
+ *    `FAILED` row on a still-running run (apply its terminal policy). New code leaves at most ONE; more than
+ *    one is an inconsistent legacy set and returns `'ambiguous'` (fail closed — nothing is executed).
+ *
+ * `null` means nothing is pending (the normal loop). `AWAITING_APPROVAL`/`SKIPPED`/applied rows are never
+ * selected.
  */
-export async function findPendingApproval(
+export async function findUnresolvedAction(
   prisma: PrismaService,
-  runId: string
-): Promise<PendingApprovalInvocation | null> {
-  const inv = await prisma.aiToolInvocation.findFirst({
-    where: {
-      runId,
-      status: {
-        in: [
-          AiToolInvocationStatus.APPROVED,
-          AiToolInvocationStatus.EXECUTING,
-          AiToolInvocationStatus.REJECTED,
+  runId: string,
+  run: FencedRun
+): Promise<UnresolvedAction | Cutoff> {
+  const unknown = await run(() =>
+    prisma.aiToolInvocation.findFirst({
+      where: { runId, status: AiToolInvocationStatus.OUTCOME_UNKNOWN },
+      orderBy: { createdAt: 'asc' },
+      select: INVOCATION_SELECT,
+    })
+  )
+  if (unknown === CUTOFF || unknown !== null) return unknown
+  const pending = await run(() =>
+    prisma.aiToolInvocation.findMany({
+      where: {
+        runId,
+        OR: [
+          {
+            status: {
+              in: [
+                AiToolInvocationStatus.REQUESTED,
+                AiToolInvocationStatus.APPROVED,
+                AiToolInvocationStatus.EXECUTING,
+                AiToolInvocationStatus.FAILED,
+              ],
+            },
+          },
+          {
+            status: { in: [AiToolInvocationStatus.SUCCEEDED, AiToolInvocationStatus.REJECTED] },
+            appliedAt: null,
+          },
         ],
       },
-    },
-    orderBy: { createdAt: 'desc' },
-    select: { id: true, toolId: true, riskClass: true, status: true, argsSnapshot: true },
-  })
-  if (inv === null) return null
-  if (inv.status !== AiToolInvocationStatus.REJECTED) return inv // APPROVED / EXECUTING → execute on resume
-  // REJECTED is applied once its ordering step exists — then reconstruction replays it (not this path).
-  const step = await prisma.aiRunStep.findFirst({
-    where: {
-      runId,
-      type: AiRunStepType.TOOL_INVOCATION,
-      detail: { path: ['invocationId'], equals: inv.id },
-    },
-    select: { id: true },
-  })
-  return step === null ? inv : null
+      orderBy: { createdAt: 'asc' },
+      select: INVOCATION_SELECT,
+      take: 2,
+    })
+  )
+  if (pending === CUTOFF) return CUTOFF
+  if (pending.length > 1) return 'ambiguous'
+  return pending[0] ?? null
 }
 
 /**
@@ -75,23 +89,30 @@ export async function findPendingApproval(
 /** Applied tool rounds in `TOOL_INVOCATION` step order, joined to their SUCCEEDED/REJECTED invocations. */
 export async function reconstructRounds(
   prisma: PrismaService,
-  runId: string
-): Promise<CompletedToolRound[]> {
-  const steps = await prisma.aiRunStep.findMany({
-    where: { runId, type: AiRunStepType.TOOL_INVOCATION },
-    orderBy: { stepNumber: 'asc' },
-    select: { detail: true },
-  })
+  runId: string,
+  run: FencedRun
+): Promise<CompletedToolRound[] | Cutoff> {
+  const steps = await run(() =>
+    prisma.aiRunStep.findMany({
+      where: { runId, type: AiRunStepType.TOOL_INVOCATION },
+      orderBy: { stepNumber: 'asc' },
+      select: { detail: true },
+    })
+  )
+  if (steps === CUTOFF) return CUTOFF
   const refs = steps.map((step) => parseToolStepDetail(step.detail)).filter(isPresent)
   if (refs.length === 0) return []
 
-  const invocations = await prisma.aiToolInvocation.findMany({
-    where: {
-      id: { in: refs.map((ref) => ref.invocationId) },
-      status: { in: [AiToolInvocationStatus.SUCCEEDED, AiToolInvocationStatus.REJECTED] },
-    },
-    select: { id: true, toolId: true, status: true, argsSnapshot: true, resultSummary: true },
-  })
+  const invocations = await run(() =>
+    prisma.aiToolInvocation.findMany({
+      where: {
+        id: { in: refs.map((ref) => ref.invocationId) },
+        status: { in: [AiToolInvocationStatus.SUCCEEDED, AiToolInvocationStatus.REJECTED] },
+      },
+      select: { id: true, toolId: true, status: true, argsSnapshot: true, resultSummary: true },
+    })
+  )
+  if (invocations === CUTOFF) return CUTOFF
   const byId = new Map(invocations.map((inv) => [inv.id, inv]))
 
   const rounds: CompletedToolRound[] = []

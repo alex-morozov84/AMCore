@@ -39,7 +39,7 @@
         "requireSuperAdmin",
         "returns the negotiated supported locale for a matching header",
         "seeds locale from Accept-Language when no explicit locale is given",
-        "sends an org invite email with hasAccount=false for an unknown email",
+        "acknowledges known=%s nonmembers uniformly and captures truthful email intent",
         "storybook-static",
         "test:e2e:console-real-stack",
         "test:storybook",

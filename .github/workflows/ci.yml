@@ -172,7 +172,8 @@ jobs:
     name: Scaffolding contract (full, real install/build/test)
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
-    timeout-minutes: 20
+    # Full matrix plus install and artifact/cleanup overhead must fit the job budget.
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
@@ -478,18 +479,36 @@ jobs:
         if: always()
         run: docker compose down -v
 
-  web-e2e:
-    name: Web E2E
+  web-e2e-plan:
+    name: Web E2E plan
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
-    # Same apt-hang exposure as the storybook job below (see its comment):
-    # `playwright install --with-deps chromium` can hang indefinitely on an
-    # unanswered needrestart prompt instead of failing fast, and this job had
-    # no timeout-minutes, so a hang would run until GitHub's default 6-hour
-    # job timeout. 45 minutes is a reasoned bound, not a measured one — this
-    # job runs both existing Playwright E2E lanes plus two full real-stack Docker
-    # topologies, so it needs more headroom than storybook's 20.
-    timeout-minutes: 45
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Select all applicable E2E lanes
+        id: plan
+        run: |
+          matrix="$(node scripts/e2e-ci.mjs --matrix)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  web-e2e-lanes:
+    name: Web E2E (${{ matrix.lane }})
+    runs-on: ubuntu-latest
+    needs: [web-e2e-plan]
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.web-e2e-plan.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -512,44 +531,49 @@ jobs:
       - name: Build @amcore/shared
         run: pnpm --filter @amcore/shared build
 
-      # DEBIAN_FRONTEND/NEEDRESTART_MODE: see the storybook job's identical
-      # step below for why these are needed (`--with-deps` can otherwise hang
-      # on an unanswered apt prompt).
+      # Apt must not wait for interactive service-restart prompts.
       - name: Install Playwright Chromium
         working-directory: apps/web
         env:
           DEBIAN_FRONTEND: noninteractive
           NEEDRESTART_MODE: a
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
-      - name: Verify managed stand safety and transport
-        run: pnpm test:stands
+      - name: Run isolated E2E lane
+        env:
+          E2E_CI_LANE: ${{ matrix.lane }}
+        run: node scripts/e2e-ci.mjs "$E2E_CI_LANE"
 
-      # Mocked + server-mocked lanes: infra-free, Playwright manages its own `next dev`
-      # via playwright.config.ts's webServer. No env file needed — verified
-      # empirically that both lanes boot and pass with none present.
-      - name: Run mocked + server-mocked E2E lanes
-        working-directory: apps/web
-        run: pnpm test:e2e
-
-      # Real-stack lane: the only one that proves auth/BFF/cookies/Redis/App
-      # Router end to end (§4). Builds fresh rather than reusing another
-      # job's image — this job's own point is the E2E suite, not image
-      # provenance (that's `docker-image-smoke`'s job).
-      - name: Run managed real-stack E2E lane
-        run: pnpm stand e2e --lane real-stack
-
-      - name: Run HTTPS console host-mode real-stack E2E lane
-        run: pnpm test:console-session-e2e
-
-      - name: Upload Playwright reports on failure
-        if: failure()
+      - name: Upload E2E reports, inventories and test results
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-reports
-          path: .amcore/stands/**/report/
+          name: playwright-${{ matrix.lane }}
+          path: |
+            .amcore/stands/**/report/
+            .amcore/stands/**/test-results/
+            .amcore/stands/**/inventory.json
           include-hidden-files: true
           retention-days: 7
+
+  web-e2e:
+    name: Web E2E
+    runs-on: ubuntu-latest
+    needs: [web-e2e-plan, web-e2e-lanes]
+    if: ${{ always() }}
+    timeout-minutes: 2
+    steps:
+      - name: Require every planned E2E lane to succeed
+        env:
+          E2E_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e '
+            const results = JSON.parse(process.env.E2E_RESULTS);
+            if (["web-e2e-plan", "web-e2e-lanes"].some(name => results[name]?.result !== "success")) {
+              console.error("Every planned E2E lane must succeed", results);
+              process.exit(1);
+            }
+          '
 
   promtool:
     name: Observability contract (static)

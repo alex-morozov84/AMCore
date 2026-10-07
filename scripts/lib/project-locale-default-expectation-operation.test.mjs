@@ -38,11 +38,11 @@ function apply(text, name, locale) {
   return applyStructuralPlan(registry, plan, text)
 }
 
-test('projects both default-locale expectations to concrete Russian results', () => {
+test('projects issuance snapshot and feed locale fixtures to Russian', () => {
   const invite = apply(source('invite'), 'invite', 'ru')
   const feed = apply(source('feed'), 'feed', 'ru')
-  assert.match(invite, /expect\(data\.locale\)\.toBe\('ru'\)/)
-  assert.match(invite, /falls back to the base locale/)
+  assert.match(invite, /locale: known \? 'ru' : null/)
+  assert.match(invite, /captures truthful email intent/)
   assert.match(feed, /mockResolvedValue\(\{ locale: 'ru' \} as never\)/)
   assert.match(feed, /title: 'Профиль обновлён'/)
   assert.doesNotMatch(feed, /locale: 'en' \} as never/)
@@ -51,14 +51,14 @@ test('projects both default-locale expectations to concrete Russian results', ()
 test('keeps EN projection bytes and expectations unchanged', () => {
   const feed = source('feed')
   assert.equal(apply(feed, 'feed', 'en'), feed)
-  assert.match(apply(source('invite'), 'invite', 'en'), /expect\(data\.locale\)\.toBe\('en'\)/)
+  assert.match(apply(source('invite'), 'invite', 'en'), /locale: known \? 'en' : null/)
 })
 
 test('preserves pagination, identity, read state, and invite scenario assertions', () => {
   const invite = apply(source('invite'), 'invite', 'ru')
   const feed = apply(source('feed'), 'feed', 'ru')
-  assert.match(invite, /expect\(data\.hasAccount\)\.toBe\(false\)/)
-  assert.match(invite, /newperson@example\.com/)
+  assert.match(invite, /hasAccount: known/)
+  assert.match(invite, /dana@example\.com/)
   assert.match(feed, /expect\(result\.hasMore\)\.toBe\(false\)/)
   assert.match(feed, /id: 'n1'/)
   assert.match(feed, /type: 'account\.profile_updated'/)
@@ -66,7 +66,7 @@ test('preserves pagination, identity, read state, and invite scenario assertions
 })
 
 test('fails closed for missing and duplicated semantic anchors', () => {
-  const inviteTitle = 'sends an org invite email with hasAccount=false for an unknown email'
+  const inviteTitle = 'acknowledges known=%s nonmembers uniformly and captures truthful email intent'
   const feedTitle = 'renders items in the recipient locale and reports no more when within limit'
   assert.throws(() => apply(source('invite').replace(inviteTitle, 'drifted'), 'invite', 'ru'), seam)
   assert.throws(

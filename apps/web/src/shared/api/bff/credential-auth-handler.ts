@@ -3,9 +3,11 @@ import { AuthErrorCode, type UserResponse } from '@amcore/shared'
 import type { ZodType } from 'zod'
 
 import { apiErrorResponse, zodValidationErrors } from './api-error-response'
+import { retireFlowsForOrdinaryAuth } from './invitation-auth-lifecycle'
 import { mintSession } from './mint-session'
 import { isTrustedOrigin } from './origin-guard'
 import { SESSION_COOKIE_NAME, sessionCookieOptions } from './session-cookie'
+import { redisVaultStore } from './session-vault-store'
 import { callUpstreamAuth, UpstreamAuthError } from './upstream-auth'
 
 import 'server-only'
@@ -55,6 +57,12 @@ export async function handleCredentialAuth<TInput>(
   }
 
   const { sessionId, user } = await mintSession(upstream)
+  try {
+    await retireFlowsForOrdinaryAuth(request, { sessionId, actorId: user.id })
+  } catch (error) {
+    await redisVaultStore.delete(sessionId).catch(() => undefined)
+    throw error
+  }
 
   const response = NextResponse.json({ user }, { status: options.successStatus })
   response.cookies.set(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions())

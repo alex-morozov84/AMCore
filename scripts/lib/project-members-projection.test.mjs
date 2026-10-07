@@ -5,7 +5,7 @@ import { test } from 'node:test'
 
 import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
 import { prepareProjectInit } from './project-init-plan.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 const scenarios = [
   ['single-en', { mode: 'single', locale: 'en' }],
@@ -19,7 +19,7 @@ const scenarios = [
 ]
 for (const [name, flags] of scenarios) {
   test(`member public routes and headless seams survive ${name}`, () => {
-    const copy = createRealRepoCopy()
+    const copy = createWorkingTreeCopy()
     try {
       const plan = prepareProjectInit(copy.root, flags, 'admin')
       applyFilesystemTransaction({
@@ -36,6 +36,21 @@ for (const [name, flags] of scenarios) {
         )
       )
       assert.ok(exists('apps/web/src/app/api/product-access/organizations/[id]/members/route.ts'))
+      assert.ok(
+        exists(
+          `apps/web/src/app/${prefix}(organization-access)/organizations/[id]/invites/page.tsx`
+        )
+      )
+      for (const route of [
+        'accept/route.ts',
+        'bootstrap/[pendingId]/route.ts',
+        'flow/[flowId]/page.tsx',
+        'flow/[flowId]/loading.tsx',
+        'unusable/page.tsx',
+      ]) {
+        assert.ok(exists(`apps/web/src/app/${prefix}(auth)/invite/${route}`), route)
+      }
+      assert.ok(exists('apps/web/src/entities/organization-context/api/invitations-client.ts'))
       assert.match(
         read('apps/web/src/entities/organization-context/index.ts'),
         /useMemberRoleAssignments/

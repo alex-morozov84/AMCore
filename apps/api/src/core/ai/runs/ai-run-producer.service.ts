@@ -1,7 +1,12 @@
-import { Injectable } from '@nestjs/common'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { aiModelSelectionSchema, type AiRunResponse, type CreateAiRunInput } from '@amcore/shared'
+import {
+  aiModelSelectionSchema,
+  type AiRunResponse,
+  type CreateAiRunInput,
+  ResourceErrorCode,
+} from '@amcore/shared'
 
 import {
   BadRequestException,
@@ -22,7 +27,9 @@ import {
 } from '../artifacts/ai-artifact.constants'
 
 import { toAiRunResponse } from './ai-run.mapper'
+import { aiRunInputFingerprint } from './ai-run-input-fingerprint'
 
+import { AppException } from '@/common/exceptions/domain'
 import { EnvService } from '@/env/env.service'
 import {
   AiArtifactKind,
@@ -116,7 +123,10 @@ export class AiRunProducerService {
       const existing = await tx.aiRun.findFirst({
         where: { conversationId: input.conversationId, idempotencyKey: input.idempotencyKey },
       })
-      if (existing) return { run: existing, created: false }
+      if (existing) {
+        await this.assertSameInput(tx, existing, input)
+        return { run: existing, created: false }
+      }
     }
 
     // Resolve the model AFTER the idempotency check (never on a replay). A bound assistant supplies the
@@ -145,8 +155,17 @@ export class AiRunProducerService {
         modelSnapshot,
         idempotencyKey: input.idempotencyKey ?? null,
         maxAttempts: AI_RUN_DEFAULT_MAX_ATTEMPTS,
+        inputFingerprint: aiRunInputFingerprint(input.inputParts),
       },
     })
+    // Immutable absolute lifetime: queue time, backoff and approval waits all count against it. Stamped from
+    // the row's own database-generated `createdAt`, so `deadlineAt = createdAt + AI_RUN_DEADLINE_MS` holds
+    // exactly regardless of application clock skew.
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE "ai"."ai_runs"
+      SET "deadlineAt" = "createdAt" + make_interval(secs => ${this.env.get('AI_RUN_DEADLINE_MS') / 1000}::double precision)
+      WHERE id = ${run.id}
+    `)
     const sequence = await this.nextSequence(tx, input.conversationId)
     const message = await tx.aiMessage.create({
       data: {
@@ -170,6 +189,43 @@ export class AiRunProducerService {
     }
 
     return { run, created: true }
+  }
+
+  /**
+   * An idempotent replay must carry the SAME input as the run it returns: a different input under the same
+   * key is a conflict, never a silent return of the old run. A run created before fingerprints existed
+   * (`inputFingerprint` NULL) is compared against its own persisted USER turn and backfilled; a missing or
+   * malformed original fails closed. Never compares against today's artifact bindings or live catalog.
+   */
+  private async assertSameInput(
+    tx: Prisma.TransactionClient,
+    existing: Prisma.AiRunGetPayload<object>,
+    input: CreateAiRunInput
+  ): Promise<void> {
+    const fingerprint = aiRunInputFingerprint(input.inputParts)
+    if (existing.inputFingerprint !== null) {
+      if (existing.inputFingerprint !== fingerprint) throw this.idempotencyConflict()
+      return
+    }
+    const original = await tx.aiMessage.findFirst({
+      where: { runId: existing.id, role: AiMessageRole.USER },
+      orderBy: { sequence: 'asc' },
+      select: { content: true },
+    })
+    if (original === null || !Array.isArray(original.content)) throw this.idempotencyConflict()
+    if (aiRunInputFingerprint(original.content) !== fingerprint) throw this.idempotencyConflict()
+    await tx.aiRun.updateMany({
+      where: { id: existing.id, inputFingerprint: null },
+      data: { inputFingerprint: fingerprint },
+    })
+  }
+
+  private idempotencyConflict(): AppException {
+    return new AppException(
+      'This idempotency key was already used for a different request.',
+      HttpStatus.CONFLICT,
+      ResourceErrorCode.AI_RUN_IDEMPOTENCY_CONFLICT
+    )
   }
 
   /**

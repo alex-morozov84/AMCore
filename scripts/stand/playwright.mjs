@@ -7,8 +7,9 @@ import { directory, save } from './state.mjs'
 import { supervise } from './supervisor.mjs'
 import { mockEnvironment } from './mock-environment.mjs'
 import { allocateControlSocket } from './control-socket.mjs'
+import { groupArguments } from './test-inventory.mjs'
 
-export async function test(m, lane, token, extra = []) {
+export async function test(m, lane, token, extra = [], group) {
   const mocked = lane === 'mocked'
   const cwd = m.snapshot
   const tmp = `${m.worktree}/.amcore/stands/${m.id}/tmp`
@@ -32,18 +33,20 @@ export async function test(m, lane, token, extra = []) {
     if (!mocked) await admitInvocation(m)
     close = await supervise(m, token)
     const config = mocked ? 'playwright.config.ts' : `playwright.${lane}.config.ts`
+    const options = {
+      cwd,
+      env: cleanEnvironment({
+        ...(mocked ? mockEnvironment(m) : {}),
+        TMPDIR: tmp,
+        AMCORE_STAND_MANIFEST: join(directory(m.id), 'manifest.json'),
+        AMCORE_STAND_TOKEN: token,
+      }),
+    }
+    const filters = group ? await groupArguments(m, group, options) : []
     await run(
       'pnpm',
-      ['--filter', 'web', 'exec', 'playwright', 'test', `--config=${config}`, ...extra],
-      {
-        cwd,
-        env: cleanEnvironment({
-          ...(mocked ? mockEnvironment(m) : {}),
-          TMPDIR: tmp,
-          AMCORE_STAND_MANIFEST: join(directory(m.id), 'manifest.json'),
-          AMCORE_STAND_TOKEN: token,
-        }),
-      }
+      ['--filter', 'web', 'exec', 'playwright', 'test', `--config=${config}`, ...filters, ...extra],
+      options
     )
     m.testOutcome = 'passed'
   } catch (error) {

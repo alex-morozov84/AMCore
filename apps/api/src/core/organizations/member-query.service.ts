@@ -15,6 +15,8 @@ import {
 import { AppException, ForbiddenException } from '../../common/exceptions'
 import { PrismaService } from '../../prisma'
 
+import { assignableRolesWhere } from './role-assignability-policy'
+
 import type { Prisma } from '@/generated/prisma/client'
 
 const summary = { id: true, name: true, description: true, isSystem: true } as const
@@ -109,7 +111,7 @@ export class MemberQueryService {
               ).map((x) => x.role)
             : null
         const where: Prisma.RoleWhereInput = {
-          OR: [{ isSystem: true, organizationId: null }, { organizationId: orgId }],
+          ...assignableRolesWhere(orgId),
           ...(q.search && { name: { contains: escapeLikeLiteral(q.search), mode: 'insensitive' } }),
           ...(q.section === 'assigned' && { members: { some: { memberId: member.id } } }),
         }

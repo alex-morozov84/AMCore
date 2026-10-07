@@ -105,6 +105,26 @@ describe('AiModelRegistry', () => {
       expect(metrics.incCacheOperation).toHaveBeenCalledWith('ai_catalog', 'hit')
     })
 
+    it('starts no Redis, database or refill operation once the caller signal fired', async () => {
+      registry = build({})
+      const aborted = AbortSignal.abort()
+      await expect(registry.resolveModel('x', aborted)).rejects.toBeDefined()
+      expect(prisma.aiProvider.findMany).not.toHaveBeenCalled()
+      expect(redis.store.size).toBe(0)
+
+      // The signal fires while the cache read is in flight: the database fallback never starts.
+      const controller = new AbortController()
+      const get = redis.get.bind(redis)
+      ;(redis as { get: unknown }).get = (async (key: string) => {
+        const value = await get(key)
+        controller.abort()
+        return value
+      }) as never
+      await expect(registry.resolveModel('x', controller.signal)).rejects.toBeDefined()
+      expect(prisma.aiProvider.findMany).not.toHaveBeenCalled()
+      expect(redis.store.size).toBe(0)
+    })
+
     it('returns null for an unknown slug', async () => {
       prisma.aiProvider.findMany.mockResolvedValue([] as never)
       registry = build({})

@@ -1,3 +1,5 @@
+import { securityPath } from './organization-family'
+
 import 'server-only'
 
 // Classify the effective fetch pathname: URL construction has already resolved
@@ -9,5 +11,11 @@ const JWT_PATHS = [
 ]
 
 export function isCredentialRoute(upstream: URL): boolean {
-  return JWT_PATHS.some((shape) => shape.test(upstream.pathname))
+  const path = securityPath(upstream.pathname)
+  if (path === null) return true
+  return (
+    path === '/api/v1/auth/invites' ||
+    path.startsWith('/api/v1/auth/invites/') ||
+    JWT_PATHS.some((shape) => shape.test(path))
+  )
 }

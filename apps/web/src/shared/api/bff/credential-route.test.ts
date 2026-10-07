@@ -17,6 +17,10 @@ describe('effective credential pathname', () => {
     'AUTH/OAUTH/EXCHANGE',
     'Organizations/x%2Fy/Switch',
     'auth/login/',
+    'auth/login//',
+    'auth/%6cogin',
+    'auth/%256cogin',
+    'auth%2Flogin',
     'auth/../auth/login',
     'x/../auth/login',
     'auth/./login',
@@ -30,16 +34,34 @@ describe('effective credential pathname', () => {
     'auth/me',
     'auth/logins',
     'auth/login/extra',
-    'auth%2Flogin',
-    'auth/%256cogin',
-    'auth/%6cogin',
     'organizations/id/switching',
     'organizations/id/extra/switch',
     'organizations//switch',
     'auth/oauth/providers',
     'api-keys',
-    'auth/login//',
-  ])('preserves unrelated raw pathname %s', (path) => {
+  ])('preserves unrelated effective pathname %s', (path) => {
     expect(isCredentialRoute(new URL(`http://api/api/v1/${path}?route=auth/login`))).toBe(false)
+  })
+})
+
+describe('generic BFF invitation containment', () => {
+  it.each([
+    '/auth/invites',
+    '/auth/invites/accept',
+    '/auth/invites/register',
+    '/auth/invites/continuations/context',
+    '/auth/invites/auth-handoffs/attempt/abort',
+    '/auth/%69nvites/inspect',
+    '/AUTH/INVITES/operations/id',
+    '/auth//invites/accept',
+    '/auth/invites%2Faccept',
+    '/auth/%2569nvites/accept',
+  ])('closes every invitation capability, including encoded aliases: %s', (path) => {
+    expect(isCredentialRoute(new URL(`https://api.example.com/api/v1${path}`))).toBe(true)
+  })
+
+  it('keeps ordinary authenticated routes available', () => {
+    expect(isCredentialRoute(new URL('https://api.example.com/api/v1/auth/me'))).toBe(false)
+    expect(isCredentialRoute(new URL('https://api.example.com/api/v1/notifications'))).toBe(false)
   })
 })

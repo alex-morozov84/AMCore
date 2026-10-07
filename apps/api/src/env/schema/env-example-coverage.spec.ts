@@ -51,6 +51,8 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // allowlist, read directly via `process.env` in apps/web (no EnvService
   // there yet) — not part of apps/api's own runtime env at all.
   'WEB_TRUSTED_ORIGINS',
+  // Web invitation proof-cookie startup policy; validated by apps/web, not the API.
+  'WEB_INVITATION_LOCAL_HTTP_ORIGIN',
   // apps/web-only (ADR-072): which inbound header apps/web trusts as the
   // real visitor IP before relaying it to apps/api — same reasoning as
   // WEB_TRUSTED_ORIGINS above.

@@ -39,6 +39,11 @@ export function useOrganizationContext(binding: string, input: OrganizationConte
     scheduler.getSnapshot,
     scheduler.getSnapshot
   )
+  const initialPending = useSyncExternalStore(
+    scheduler.subscribe,
+    scheduler.isInitialPending,
+    () => true
+  )
   const query = useQuery<OrganizationContextData>({
     queryKey: organizationContextKey(binding, input),
     queryFn: skipToken,
@@ -100,6 +105,7 @@ export function useOrganizationContext(binding: string, input: OrganizationConte
   }, [controller, state.status, query.data])
   return {
     controller,
+    initialPending,
     busy,
     state: state.target === target ? state : { target, status: 'pending' as const },
     data: state.target === target && state.status === 'ready' ? query.data : undefined,

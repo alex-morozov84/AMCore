@@ -4,11 +4,13 @@ import type { AcceptInviteResponse, RequestPrincipal } from '@amcore/shared'
 
 import type { InvitationActor } from '../../src/core/organizations/invitation-actor'
 import type { InviteService } from '../../src/core/organizations/invite.service'
-import type { AuditLog, Organization, OrgInvite, Prisma } from '../../src/generated/prisma/client'
+import type { AuditLog, Organization, Prisma } from '../../src/generated/prisma/client'
 import type { PrismaService } from '../../src/prisma'
 import type { E2ETestContext } from '../helpers'
 
 import type { invitationFence } from './invitation-race'
+
+type OrgInvite = Prisma.OrgInviteGetPayload<{ include: { roleIntents: true } }>
 
 type Fence = ReturnType<typeof invitationFence>
 export interface InvitationProofFixture {

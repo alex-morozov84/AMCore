@@ -11,6 +11,7 @@ import { MediaModule } from '../../infrastructure/media'
 import { PrismaModule } from '../../prisma'
 import { ApiKeysModule } from '../api-keys/api-keys.module'
 import { AuditModule } from '../audit'
+import { InvitationAuthorityModule } from '../invitations/invitation-authority.module'
 import { NotificationsCoreModule } from '../notifications/notifications-core.module'
 
 import { AuthController } from './auth.controller'
@@ -28,6 +29,7 @@ import {
   SystemRolesGuard,
 } from './guards'
 import { TeamAccessGuard } from './guards/team-access.guard'
+import { InvitationHandoffsController } from './invitation-handoffs.controller'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
 import { OAuthController } from './oauth/oauth.controller'
 import { OAuthService } from './oauth/oauth.service'
@@ -49,6 +51,7 @@ import { UserCacheService } from './user-cache.service'
 @Module({
   imports: [
     PrismaModule,
+    InvitationAuthorityModule,
     PassportModule,
     EmailModule,
     ApiKeysModule,
@@ -67,7 +70,7 @@ import { UserCacheService } from './user-cache.service'
       }),
     }),
   ],
-  controllers: [AuthController, OAuthController],
+  controllers: [AuthController, OAuthController, InvitationHandoffsController],
   providers: [
     AuthService,
     AvatarService,

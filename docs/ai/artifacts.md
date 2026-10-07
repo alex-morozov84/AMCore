@@ -28,6 +28,12 @@ curl -X POST /ai/runs \
 JSON
 ```
 
+Repeating the request with the same `idempotencyKey` and the same `inputParts`
+(artifact ids and their order included) returns the original run — even after the
+artifact has since been bound, consumed or the run finished — and binds nothing
+again; the same key with different parts is `409 AI_RUN_IDEMPOTENCY_CONFLICT`
+(see [Runs](./runs.md#idempotent-creation)).
+
 An artifact-only run input is valid:
 
 ```json

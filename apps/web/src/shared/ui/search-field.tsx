@@ -19,13 +19,14 @@ export interface SearchFieldProps {
   placeholder: string
   clearLabel: string
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
+  disabled?: boolean
   maxLength?: number
   className?: string
 }
 
 interface SearchTextInputProps extends Pick<
   SearchFieldProps,
-  'id' | 'name' | 'value' | 'onValueChange' | 'placeholder' | 'maxLength' | 'onKeyDown'
+  'id' | 'name' | 'value' | 'onValueChange' | 'placeholder' | 'maxLength' | 'onKeyDown' | 'disabled'
 > {
   inputRef: RefObject<HTMLInputElement | null>
 }
@@ -45,7 +46,8 @@ function SearchFieldLabel({ id, label }: Pick<SearchFieldProps, 'id' | 'label'>)
 }
 
 function SearchTextInput(props: SearchTextInputProps) {
-  const { inputRef, id, name, value, onValueChange, placeholder, maxLength, onKeyDown } = props
+  const { inputRef, id, name, value, onValueChange, placeholder, maxLength, onKeyDown, disabled } =
+    props
   return (
     <Input
       ref={inputRef}
@@ -57,19 +59,29 @@ function SearchTextInput(props: SearchTextInputProps) {
       onChange={(event) => onValueChange(event.target.value)}
       placeholder={placeholder}
       maxLength={maxLength}
+      disabled={disabled}
       className="pr-8 pl-8"
       autoComplete="off"
     />
   )
 }
 
-function SearchClearButton({ label, onClear }: { label: string; onClear: () => void }) {
+function SearchClearButton({
+  label,
+  onClear,
+  disabled,
+}: {
+  label: string
+  onClear: () => void
+  disabled?: boolean
+}) {
   return (
     <Button
       type="button"
       variant="ghost"
       size="icon-sm"
       onClick={onClear}
+      disabled={disabled}
       className="absolute top-1/2 right-1 -translate-y-1/2"
     >
       <X aria-hidden="true" />
@@ -98,8 +110,15 @@ export function SearchField(props: SearchFieldProps) {
         placeholder={props.placeholder}
         maxLength={props.maxLength}
         onKeyDown={props.onKeyDown}
+        disabled={props.disabled}
       />
-      {props.value && <SearchClearButton label={props.clearLabel} onClear={handleClear} />}
+      {props.value && (
+        <SearchClearButton
+          label={props.clearLabel}
+          onClear={handleClear}
+          disabled={props.disabled}
+        />
+      )}
     </div>
   )
 }

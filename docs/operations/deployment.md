@@ -105,6 +105,21 @@ Compose supplies `STORAGE_DRIVER=local` when it is unset, even with
 For production files on the same VPS instead, use the
 [local storage setup](#production-local-files) below.
 
+### Invitation signup and local browser configuration
+
+`AUTH_PUBLIC_SIGNUP_ENABLED` is passed to both backend process roles. Set it to
+`false` to close ordinary email/new-account OAuth signup while retaining valid
+invitation signup and existing-account login. The API enforces the decision;
+frontend visibility is a projection of that policy.
+
+Invitation browser entry requires HTTPS by default. For local HTTP Compose only,
+set both `WEB_TRUSTED_ORIGINS` and `WEB_INVITATION_LOCAL_HTTP_ORIGIN` to the exact
+origin you actually open, such as `http://localhost:3000`. For bare Next development
+use its port3002 instead. The local setting is empty on HTTPS deployments; it
+cannot authorize public HTTP hosts. Both settings are forwarded to the web service.
+See [cookie policy](../frontend/browser-security-and-csp.md#invitation-browser-proof)
+and [invitation scenarios](../product-admin/invitations.md).
+
 ### Upgrades (new migrations in a release)
 
 The `migrate` service is one-shot; `docker compose up` does not re-run a container
@@ -117,11 +132,60 @@ docker compose run --rm migrate                 # apply new migrations once
 docker compose up -d --no-deps api worker web   # recreate the app with the new image
 ```
 
-The invitation data repair `20261003180000_invitation_role_intent` requires
-all old invitation writers to be drained before migration. Restart only repaired
-instances; [the invitation upgrade guide](../auth/invites.md#upgrade-existing-installations)
-explains affected rows and compatible recovery. This data repair needs a
-maintenance window rather than overlapping old/new invitation writers.
+Invitation upgrades require draining old invitation writers before migration.
+The earlier `20261003180000_invitation_role_intent` repair is followed by
+`20261004190000_invitation_intent_and_settlement`, which introduces complete role
+intent, generations and durable recovery. Restart only the matching application;
+[the invitation upgrade guide](../auth/invites.md#upgrade-an-existing-installation)
+explains legacy rows, removed routes and compatible rollback. Use a maintenance
+window rather than overlapping old/new invitation writers.
+
+#### AI run engine upgrade (maintenance stop)
+
+The migrations `20261005120000_ai_run_ownership_and_effect_identity` and
+`20261005120100_ai_run_legacy_state_conversion` change what an AI run's retry
+counter, lease and tool records mean, and convert existing rows. They must not
+overlap an old process that can still write AI state — that is **every** `web`,
+`worker` and `all`-role process, not only workers (the HTTP handlers also create
+runs, cancel them and decide approvals). Use a short maintenance stop; there is no
+rolling mix and no down migration (roll back by restoring the pre-migration
+backup, see [Backup & restore](./backup-restore.md)).
+
+1. Stop **all** old API processes of every role and keep them (and any
+   auto-restart policy) stopped for the whole migration. A stopped worker's lease
+   expiring does not prove a remote tool effect stopped: such effects stay
+   uncertain (below).
+2. Verify nothing old is connected:
+   `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND application_name IN ('amcore-web', 'amcore-worker', 'amcore-all');`
+   must return `0`.
+3. Run `docker compose run --rm migrate`. Both migrations repeat that check
+   themselves and **fail before changing anything** if a process named
+   `amcore-web`, `amcore-worker` or `amcore-all` is still connected — on **every**
+   database, including a fresh install with empty AI tables (an empty table does
+   not prove an old process cannot write to it later). The check is a tripwire on
+   the connection name, not a permanent fence: it cannot see a client with another
+   name, so keep every old process and auto-restart stopped until the new version
+   starts. In local development, stop `pnpm dev` / the local API before
+   `pnpm --filter api db:migrate` for the same reason. If a migration
+   fails, read its name from Prisma's failure output. Stop the writer, then mark
+   that failed migration rolled back with
+   `docker compose run --rm migrate ./node_modules/.bin/prisma migrate resolve --rolled-back <failed-migration-name>`.
+   The name is `20261005120000_ai_run_ownership_and_effect_identity` or
+   `20261005120100_ai_run_legacy_state_conversion`; use the reported failed name,
+   because the preceding migration may already have succeeded. Then run
+   `docker compose run --rm migrate` again (until the failure is resolved, Prisma
+   refuses further deploys with `P3009`). Test harnesses migrate a fresh database
+   **before** starting the application for exactly this reason.
+4. Start **only** the new version, `web` and `worker`/`all` together.
+
+What the conversion does to existing data: a run's retry counter is converted to
+"consumed retries" (queued runs keep it; running and waiting runs drop their
+current claim); tool results and rejections that were already applied are marked
+applied; an interrupted side-effecting tool call (`EXECUTING`) on any run, and an
+ambiguous failure on an open run, become **outcome unknown** — a run holding one
+fails `tool_effect_unknown` instead of asking the model again, and no history
+is invented for attempts that happened before the upgrade. Terminal runs keep
+their status and evidence.
 
 ### Validate the compose graph
 
@@ -147,6 +211,15 @@ This supports replacing one live web version, including rollback. It does not
 keep old web containers or make an obsolete Action succeed against a new build.
 Tabs loaded before this protection shipped require an initial manual refresh.
 Malformed external `next-action` requests are outside this recovery mechanism.
+
+### Build dependency lock
+
+The API and web Docker build stages enforce a frozen pnpm lockfile for both the
+explicit dependency installation and any automatic installation before a script.
+pnpm 11 can recheck dependencies after source files are copied into a cached
+install layer. That recheck must preserve the checked-in dependency versions;
+manifest/lockfile disagreement fails the build instead of resolving new versions.
+Dependency changes require updating and reviewing `pnpm-lock.yaml` first.
 
 ### Build identity
 
@@ -494,13 +567,15 @@ live deployment's value.
 
 What the worker does within that budget:
 
-1. The **notification dispatcher closes**: it starts no new claims, sends or
-   recovery passes, and lets deliveries already in flight record their result.
-2. Within **15 seconds** (`NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s`), or earlier
-   once the logical work finishes, it
-   **seals**: nothing new starts and every wait on in-flight work is released, so
-   the BullMQ worker is not held open by notification work. A database transaction
-   interrupted between two dependent writes is rolled back as a whole.
+1. The **notification dispatcher** and the **AI run dispatcher close**: each
+   starts no new claims, sends, runs or recovery passes, and lets work already in
+   flight record its result.
+2. Within **15 seconds** (`NOTIFICATION_PROVIDER_TIMEOUT_MS + 5 s` for
+   notifications, 15 s for AI runs), or earlier once the logical work finishes, each
+   dispatcher **seals**: nothing new starts and every wait on in-flight work is
+   released, so the BullMQ worker is not held open by that work. A database
+   transaction interrupted between two dependent writes is rolled back as a whole.
+   Sealing also aborts in-flight AI provider calls.
 3. Only then does `PrismaService` disconnect (it runs registered shutdown barriers,
    capped at 20 s, before closing the pool).
 
@@ -511,8 +586,11 @@ commit or roll back after the seal; its outcome is unknown until it settles. A
 rolled-back claim leaves the delivery pending, and a committed finalize needs no
 reaper. Shutdown attempts to abort provider requests, but an adapter may
 ignore abort and an already accepted message cannot be recalled. Requests still
-pending at process termination end with the process. The 15 s bound covers
-notification work only: it does not bound
+pending at process termination end with the process. An AI run whose result was
+not recorded keeps its lease and is recovered by lease expiry on the next worker
+(the model call may be repeated; a tool call whose effect may have happened is
+**not** repeated — the run fails `tool_effect_unknown`). The 15 s bounds cover
+notification and AI run work only: they do not bound
 Redis cleanup, other queues, the HTTP server or the database disconnect, so budget
 those separately inside the platform's grace period.
 
@@ -668,7 +746,7 @@ server {
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
     }
 
     # SSE endpoints (see "Realtime SSE behind a proxy" below) need buffering
@@ -679,7 +757,7 @@ server {
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_buffering off;
         proxy_read_timeout 75s;
     }
@@ -778,7 +856,10 @@ would otherwise redirect it to the slashless address and that redirect would nam
 
 `docker/nginx/operations-console.conf` is the nginx reference include. Its
 default TLS vhost rejects unmatched hosts, and both vhosts forward the exact
-`Host` header. `docker/caddy/Caddyfile.console-host` carries the equivalent
+`Host` header, including an explicit external port. The web BFF matches this
+authority against configured trusted origins; preserve it (`$http_host` in nginx,
+`{hostport}` in Caddy) instead of stripping a non-default port or trusting
+browser-supplied forwarded headers. `docker/caddy/Caddyfile.console-host` carries the equivalent
 Caddy block and rejects unmatched HTTP hosts before proxying.
 The trailing-slash redirect runs before the internal page mapping, so an
 upstream redirect cannot expose `/{locale}/admin/...` as a public location.

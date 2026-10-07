@@ -2,7 +2,7 @@ import type { OrganizationContextFamily } from '@amcore/shared'
 
 const UNRESERVED = /^[A-Za-z0-9._~-]$/
 
-function securityPath(path: string): string | null {
+export function securityPath(path: string): string | null {
   if (/%(?![0-9a-f]{2})/i.test(path) || /%(?:2f|5c|25)/i.test(path) || path.includes('\\'))
     return null
   const normalized = path.replace(/%([0-9a-f]{2})/gi, (encoded, hex: string) => {

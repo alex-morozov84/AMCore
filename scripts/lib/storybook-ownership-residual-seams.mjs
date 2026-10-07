@@ -80,37 +80,4 @@ export const storybookResidualSeams = [
   ),
 ]
 
-export const storybookWorkflowResidualSeams = [
-  owned(
-    'storybook.workflow-e2e-timeout-comment',
-    '.github/workflows/ci.yml',
-    block(
-      '    # Same apt-hang exposure as the storybook job below (see its comment):',
-      "    # topologies, so it needs more headroom than storybook's 20.",
-      {
-        replacement:
-          '    # `playwright install --with-deps chromium` can hang indefinitely on an\n' +
-          '    # unanswered needrestart prompt instead of failing fast. This job runs\n' +
-          '    # both Playwright E2E lanes plus two full real-stack Docker topologies,\n' +
-          '    # so 45 minutes bounds the install and the materially heavier test work.\n',
-      }
-    ),
-    ['storybook-job'],
-    'storybook.workflow-ci'
-  ),
-  owned(
-    'storybook.workflow-e2e-install-comment',
-    '.github/workflows/ci.yml',
-    block(
-      "      # DEBIAN_FRONTEND/NEEDRESTART_MODE: see the storybook job's identical",
-      '      # on an unanswered apt prompt).',
-      {
-        replacement:
-          '      # `--with-deps` invokes apt; force non-interactive needrestart behavior\n' +
-          '      # so an unattended runner cannot hang on a service-restart prompt.\n',
-      }
-    ),
-    ['storybook-job'],
-    'storybook.workflow-ci'
-  ),
-]
+export const storybookWorkflowResidualSeams = []

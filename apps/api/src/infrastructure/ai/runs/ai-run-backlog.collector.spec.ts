@@ -1,3 +1,4 @@
+import { AI_RUN_MAX_EPOCHS } from './ai-run.constants'
 import { AiRunBacklogCollector } from './ai-run-backlog.collector'
 
 import { AiRunStatus } from '@/generated/prisma/client'
@@ -70,6 +71,8 @@ describe('AiRunBacklogCollector', () => {
     expect(where.AND).toEqual([
       { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: expect.any(Date) } }] },
       { OR: [{ deadlineAt: null }, { deadlineAt: { gt: expect.any(Date) } }] },
+      // A run whose attempt history is full is never claimed (it is failed by the sweep), so not "due".
+      { leaseEpoch: { lt: AI_RUN_MAX_EPOCHS } },
     ])
 
     const output = await metrics.metrics()

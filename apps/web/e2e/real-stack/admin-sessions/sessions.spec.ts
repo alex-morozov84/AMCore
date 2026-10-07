@@ -14,7 +14,7 @@ async function signInAsPathAdmin(page: Page, email: string, create = true) {
   await page.context().clearCookies()
   await page.goto('/en/login')
   await page.getByRole('textbox', { name: /email/i }).fill(email)
-  await page.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
   await expect(page).toHaveURL(/\/en\/?$/)
 }
@@ -25,7 +25,7 @@ async function addExtraSession(browser: Browser, email: string, userAgent: strin
   const page = await context.newPage()
   await page.goto('/en/login')
   await page.getByRole('textbox', { name: /email/i }).fill(email)
-  await page.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
   await expect(page).toHaveURL(/\/en\/?$/)
   await context.close()
@@ -151,7 +151,7 @@ test('path-mode: revoking with an aged admin session requires step-up', async ({
 
   const stepUpDialog = page.getByRole('dialog', { name: /confirm your password/i })
   await expect(stepUpDialog).toBeVisible()
-  await stepUpDialog.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await stepUpDialog.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUpDialog.getByRole('button', { name: /confirm/i }).click()
 
   await expect(stepUpDialog).toBeHidden()

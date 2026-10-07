@@ -51,7 +51,7 @@ const below = (...types) =>
   types.flatMap((type) => [
     { element: { type, fileInternalPath: PUBLIC_API } },
     ...(type === 'entities'
-      ? [{ element: { type, captured: { slice: 'organization-context' }, fileInternalPath: 'index.server.ts' } }]
+      ? ['organization-context', 'invitation-flow'].map(slice => ({ element: { type, captured: { slice }, fileInternalPath: 'index.server.ts' } }))
       : []),
   ]);
 
@@ -327,6 +327,9 @@ export default [
                   ...['index.server.ts', 'index.client.ts', 'index.config.ts'].map((fileInternalPath) => ({
                     element: { type: 'composition', captured: { slice: 'organization-access' }, fileInternalPath },
                   })),
+                  ...['index.server.ts', 'index.client.ts', 'index.config.ts'].map((fileInternalPath) => ({
+                    element: { type: 'composition', captured: { slice: 'invitation-flow' }, fileInternalPath },
+                  })),
                   ...sharedAndNeutral,
                 ],
               },
@@ -519,6 +522,24 @@ export default [
           message: 'Scope application alerts with data-slot="alert" or a component locator; Next also renders an alert route announcer.',
         })),
       ],
+    },
+  },
+
+  {
+    name: 'project/e2e-accessibility-entrypoint',
+    files: ['e2e/**/*.{ts,tsx,js,mjs}'],
+    ignores: ['e2e/shared/axe.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@axe-core/playwright',
+          message: 'Use e2e/shared/axe.ts expectNoAxeViolations: it waits for fonts and finite visual transitions before scanning.',
+        }, {
+          name: 'axe-core',
+          allowTypeImports: true,
+          message: 'Run accessibility checks through e2e/shared/axe.ts; direct scans bypass visual stabilization.',
+        }],
+      }],
     },
   },
 

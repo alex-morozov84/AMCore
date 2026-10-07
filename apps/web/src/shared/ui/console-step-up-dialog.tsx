@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from './dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './form'
-import { Input } from './input'
+import { PasswordInput } from './password-input'
 
 interface ConsoleStepUpDialogProps {
   phase: StepUpPhase
@@ -90,7 +90,12 @@ export function ConsoleStepUpDialog({
                   <FormItem>
                     <FormLabel>{t('loginPassword')}</FormLabel>
                     <FormControl>
-                      <Input type="password" autoComplete="current-password" {...field} />
+                      <PasswordInput
+                        showLabel={tCommon('showPassword')}
+                        hideLabel={tCommon('hidePassword')}
+                        autoComplete="current-password"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

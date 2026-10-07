@@ -8,10 +8,12 @@ import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
 import { Input } from '@/shared/ui/input'
+import { PasswordInput } from '@/shared/ui/password-input'
 
 import { useConsoleLogin } from '../model/use-console-login'
 
 export function ConsoleLoginForm() {
+  const passwordT = useTranslations('common')
   const t = useTranslations('console')
   const form = useLocalizedForm<LoginInput>(loginSchema, {
     defaultValues: { email: '', password: '' },
@@ -42,7 +44,12 @@ export function ConsoleLoginForm() {
             <FormItem>
               <FormLabel>{t('loginPassword')}</FormLabel>
               <FormControl>
-                <Input type="password" autoComplete="current-password" {...field} />
+                <PasswordInput
+                  showLabel={passwordT('showPassword')}
+                  hideLabel={passwordT('hidePassword')}
+                  autoComplete="current-password"
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { VerifyEmailStatus } from '@/features/auth-verify-email'
@@ -6,9 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 interface VerifyEmailPageProps {
   /** The `?token=` query param the route file read from the URL. */
   token?: string
+  withoutTokenContent?: ReactNode
+  successContent?: ReactNode
 }
 
-export function VerifyEmailPage({ token }: VerifyEmailPageProps) {
+export function VerifyEmailPage({
+  token,
+  withoutTokenContent,
+  successContent,
+}: VerifyEmailPageProps) {
   const t = useTranslations('auth')
 
   return (
@@ -19,7 +26,11 @@ export function VerifyEmailPage({ token }: VerifyEmailPageProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <VerifyEmailStatus token={token} />
+        <VerifyEmailStatus
+          token={token}
+          withoutTokenContent={withoutTokenContent}
+          successContent={successContent}
+        />
       </CardContent>
     </Card>
   )

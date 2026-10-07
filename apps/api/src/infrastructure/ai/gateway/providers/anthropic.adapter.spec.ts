@@ -139,3 +139,43 @@ describe('AnthropicAdapter', () => {
     })
   })
 })
+
+describe('AnthropicAdapter caller abort', () => {
+  /** A provider that never answers; it only rejects when the request signal aborts. */
+  function hangingFetch(): typeof globalThis.fetch {
+    return ((_input: string | URL | Request, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        const signal = init?.signal
+        if (signal?.aborted) return reject(signal.reason)
+        // Like real `fetch`: reject with the signal's own reason (TimeoutError / AbortError).
+        signal?.addEventListener('abort', () => reject(signal.reason))
+      })) as typeof globalThis.fetch
+  }
+
+  it('surfaces a caller abort as the non-retryable `aborted` error', async () => {
+    const controller = new AbortController()
+    const adapter = new AnthropicAdapter(hangingFetch())
+    const pending = adapter.generateText({ ...call(), abortSignal: controller.signal })
+    controller.abort()
+
+    await expect(pending).rejects.toMatchObject({ code: 'aborted', retryable: false })
+  })
+
+  it('keeps an ordinary per-call timeout retryable and distinct from a caller abort', async () => {
+    const adapter = new AnthropicAdapter(hangingFetch())
+
+    await expect(
+      adapter.generateText({ ...call(), timeoutMs: 20, abortSignal: new AbortController().signal })
+    ).rejects.toMatchObject({ retryable: true, code: expect.not.stringMatching(/^aborted$/) })
+  })
+
+  it('makes no provider request when the caller signal is already aborted', async () => {
+    const fetchImpl = fakeFetch(MESSAGES_RESPONSE)
+    const adapter = new AnthropicAdapter(fetchImpl)
+
+    await expect(
+      adapter.generateText({ ...call(), abortSignal: AbortSignal.abort() })
+    ).rejects.toMatchObject({ code: 'aborted' })
+    expect(fetchImpl.calls).toHaveLength(0)
+  })
+})

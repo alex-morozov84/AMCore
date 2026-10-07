@@ -4,14 +4,20 @@ import { EmailModule } from '../../infrastructure/email'
 import { PrismaModule } from '../../prisma'
 import { AuditModule } from '../audit'
 import { AuthModule } from '../auth/auth.module'
+import { InvitationAuthorityModule } from '../invitations/invitation-authority.module'
 
 import { AuthInvitesController } from './auth-invites.controller'
 import { CapabilitiesController } from './capabilities.controller'
 import { CapabilityRegistry } from './capability-registry.service'
 import { InvitationAuthorization } from './invitation-authorization'
+import { InvitationCommandService } from './invitation-command.service'
+import { InvitationEmailService } from './invitation-email.service'
+import { InvitationPublicController } from './invitation-public.controller'
+import { InvitationQueryService } from './invitation-query.service'
 import { InviteService } from './invite.service'
 import { InviteAcceptService } from './invite-accept.service'
 import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
+import { InviteOperationsController } from './invite-operations.controller'
 import { InviteRateLimiterService } from './invite-rate-limiter.service'
 import { InviteRevokeService } from './invite-revoke.service'
 import { InvitesController } from './invites.controller'
@@ -29,6 +35,7 @@ import { RolesController } from './roles.controller'
 @Module({
   imports: [
     PrismaModule,
+    InvitationAuthorityModule,
     AuthModule, // Provides TokenService (for /switch) + AuthenticationGuard (global) + UserCacheService + EmailIdentityService
     AuditModule,
     EmailModule, // Provides EmailService for invite dispatch (OB-02 Stage D)
@@ -41,6 +48,8 @@ import { RolesController } from './roles.controller'
     RolesController,
     InvitesController,
     AuthInvitesController,
+    InvitationPublicController,
+    InviteOperationsController,
   ],
   providers: [
     OrganizationsService,
@@ -51,6 +60,10 @@ import { RolesController } from './roles.controller'
     RoleService,
     RoleAssignabilityService,
     InviteService,
+    InvitationCommandService,
+    InvitationEmailService,
+    InvitationQueryService,
+
     InviteAcceptService,
     InviteRevokeService,
     InvitationAuthorization,

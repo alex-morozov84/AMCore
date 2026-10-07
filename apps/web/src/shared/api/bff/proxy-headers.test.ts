@@ -31,6 +31,20 @@ describe('forwardRequestHeaders', () => {
     expect(forwarded.get('authorization')).toBe('Bearer at-1')
   })
 
+  it('strips browser-supplied invitation authority and operation headers', () => {
+    const names = [
+      'x-invitation-continuation',
+      'x-invitation-attempt-id',
+      'x-invitation-auth-attempt-id',
+      'x-invitation-handoff-key',
+      'x-invitation-operation-id',
+    ]
+    const source = new Headers(Object.fromEntries(names.map((name) => [name, 'browser-supplied'])))
+    const forwarded = forwardRequestHeaders(source, 'vault-access')
+    for (const name of names) expect(forwarded.has(name)).toBe(false)
+    expect(forwarded.get('authorization')).toBe('Bearer vault-access')
+  })
+
   it('overrides a client-supplied Authorization header with the vault-derived one', () => {
     const source = new Headers({ authorization: 'Bearer client-supplied' })
     const forwarded = forwardRequestHeaders(source, 'at-1')

@@ -10,6 +10,7 @@ import type {
 
 import { NotFoundException } from '../../../common/exceptions'
 import { AI_APPROVAL_RUN_CANCELLED, AI_RUN_CANCELLED_BY_USER } from '../ai-run.constants'
+import { lockRun } from '../ai-run-locks'
 
 import { toAiRunResponse } from './ai-run.mapper'
 import { decodeAiRunCursor, encodeAiRunCursor } from './ai-run-cursor'
@@ -99,10 +100,13 @@ export class AiRunService {
   }
 
   /**
-   * Cooperative cancel. A `QUEUED` run is claimed to terminal `CANCELLED` by CAS; a `WAITING_APPROVAL`
-   * run is terminalized `CANCELLED` and its parked gate voided atomically; a `RUNNING` run records
-   * `cancellationRequestedAt` for the worker to honor; a terminal run is an idempotent no-op. Returns
-   * the run's status after the call.
+   * Cooperative cancel. Serialized with every other state transition of the run by its row lock, and
+   * decided UNDER that lock — there is no fall-through between states, so a cancel cannot be lost to an
+   * approve/park/claim that races it: a `QUEUED` run is cancelled by CAS (a not-started approved tool is
+   * skipped, never run); a `WAITING_APPROVAL` run is cancelled and its parked gate voided atomically; a
+   * `RUNNING` run records `cancellationRequestedAt` (first request time preserved) for the worker's next
+   * admission to observe — a recorded request is NOT terminal and the response says so; a terminal run is
+   * an idempotent no-op. Returns the run's status after the call.
    */
   async cancel(userId: string, id: string): Promise<AiRunCancelResponse> {
     const run = await this.prisma.aiRun.findUnique({
@@ -117,13 +121,38 @@ export class AiRunService {
     return this.projectCancel(id)
   }
 
-  /**
-   * CAS a `QUEUED` run terminal, else cancel-while-waiting (void the parked gate), else (already
-   * `RUNNING`) record a cooperative request. The three states are mutually exclusive; each attempt is
-   * a no-op when the run has raced to a different state (the projection then reports the real status).
-   */
+  /** Lock the run, then cancel according to the status seen UNDER the lock (lock order: run → approval). */
   private async requestCancel(userId: string, id: string): Promise<void> {
-    const claimed = await this.prisma.aiRun.updateMany({
+    await this.prisma.$transaction(async (tx) => {
+      const locked = await lockRun(tx, id)
+      if (locked === null) return
+      switch (locked.status) {
+        case AiRunStatus.QUEUED:
+          return this.cancelQueued(tx, id)
+        case AiRunStatus.WAITING_APPROVAL:
+          return this.cancelWaitingApproval(tx, userId, id)
+        case AiRunStatus.RUNNING:
+          await tx.aiRun.updateMany({
+            where: { id, status: AiRunStatus.RUNNING, cancellationRequestedAt: null },
+            data: { cancellationRequestedAt: new Date() },
+          })
+          return
+        default:
+          return // terminal (or an unclaimable state): idempotent no-op
+      }
+    })
+  }
+
+  /** Cancel a `QUEUED` run; an approved-but-not-started tool never runs (a started effect is kept). */
+  private async cancelQueued(tx: Prisma.TransactionClient, id: string): Promise<void> {
+    await tx.aiToolInvocation.updateMany({
+      where: {
+        runId: id,
+        status: { in: [AiToolInvocationStatus.REQUESTED, AiToolInvocationStatus.APPROVED] },
+      },
+      data: { status: AiToolInvocationStatus.SKIPPED },
+    })
+    await tx.aiRun.updateMany({
       where: { id, status: AiRunStatus.QUEUED },
       data: {
         status: AiRunStatus.CANCELLED,
@@ -131,63 +160,45 @@ export class AiRunService {
         terminalReasonCode: AI_RUN_CANCELLED_BY_USER,
       },
     })
-    if (claimed.count === 1) return
-    if (await this.cancelWaitingApproval(userId, id)) return
-    await this.prisma.aiRun.updateMany({
-      where: { id, status: AiRunStatus.RUNNING, cancellationRequestedAt: null },
-      data: { cancellationRequestedAt: new Date() },
+  }
+
+  /**
+   * Cancel-while-waiting (Arc E.5), the run row already locked: take the pending approval lock AFTER it
+   * (the global run → approval order every path shares), then CAS `WAITING_APPROVAL → CANCELLED`, void the
+   * pending approval (`EXPIRED`) and skip the gated invocation (`SKIPPED`), all count-enforced (a mismatch
+   * rolls back), and write the content-free `ai.approval.expired` audit (`reasonCode=run_cancelled`)
+   * in-tx. A later approve then sees a non-`PENDING` approval + a terminal run → 409/non-effect.
+   */
+  private async cancelWaitingApproval(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    id: string
+  ): Promise<void> {
+    const approvalId = await this.lockPendingApproval(tx, id)
+    const now = new Date()
+    const run = await tx.aiRun.updateMany({
+      where: { id, status: AiRunStatus.WAITING_APPROVAL },
+      data: {
+        status: AiRunStatus.CANCELLED,
+        finishedAt: now,
+        terminalReasonCode: AI_RUN_CANCELLED_BY_USER,
+      },
     })
+    if (run.count !== 1) throw new CancelRaceError()
+    if (approvalId === null) return
+    const voided = await tx.aiApproval.updateMany({
+      where: { id: approvalId, state: AiApprovalState.PENDING },
+      data: { state: AiApprovalState.EXPIRED },
+    })
+    const skipped = await tx.aiToolInvocation.updateMany({
+      where: { runId: id, status: AiToolInvocationStatus.AWAITING_APPROVAL },
+      data: { status: AiToolInvocationStatus.SKIPPED },
+    })
+    if (voided.count !== 1 || skipped.count !== 1) throw new CancelRaceError()
+    await this.recordApprovalVoided(tx, userId, approvalId, id)
   }
 
-  /**
-   * Cancel-while-waiting (Arc E.5). To avoid a cancel-vs-decide/expiry DEADLOCK, it acquires the SAME
-   * approval+run lock **in the same order** as the decision path (`FOR UPDATE OF a, r`, approval-driven)
-   * BEFORE any mutation — so concurrent cancel/decide/cron serialize (first-writer-wins) instead of
-   * lock-cycling into a Postgres abort. Under the lock it CASes `WAITING_APPROVAL → CANCELLED`, voids the
-   * pending approval (`EXPIRED`) + skips the gated invocation (`SKIPPED`), all count-enforced (any ≠1
-   * rolls back), and writes the content-free `ai.approval.expired` audit (`reasonCode=run_cancelled`)
-   * in-tx. A later approve then sees a non-`PENDING` approval + non-`WAITING` run → 409/non-effect.
-   * Returns false when the run is not a parked `WAITING_APPROVAL` (no pending approval) → try RUNNING.
-   */
-  private async cancelWaitingApproval(userId: string, id: string): Promise<boolean> {
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        const approvalId = await this.lockPendingApproval(tx, id)
-        if (approvalId === null) return false
-
-        const now = new Date()
-        const run = await tx.aiRun.updateMany({
-          where: { id, status: AiRunStatus.WAITING_APPROVAL },
-          data: {
-            status: AiRunStatus.CANCELLED,
-            finishedAt: now,
-            terminalReasonCode: AI_RUN_CANCELLED_BY_USER,
-          },
-        })
-        const voided = await tx.aiApproval.updateMany({
-          where: { id: approvalId, state: AiApprovalState.PENDING },
-          data: { state: AiApprovalState.EXPIRED },
-        })
-        const skipped = await tx.aiToolInvocation.updateMany({
-          where: { runId: id, status: AiToolInvocationStatus.AWAITING_APPROVAL },
-          data: { status: AiToolInvocationStatus.SKIPPED },
-        })
-        if (run.count !== 1 || voided.count !== 1 || skipped.count !== 1)
-          throw new CancelRaceError()
-        await this.recordApprovalVoided(tx, userId, approvalId, id)
-        return true
-      })
-    } catch (error) {
-      if (error instanceof CancelRaceError) return false
-      throw error
-    }
-  }
-
-  /**
-   * Lock the run's pending approval + run rows in the decision path's order (`FOR UPDATE OF a, r`,
-   * driven from the approval) and return the approval id, or `null` when the run is not parked with a
-   * pending approval. This raw lock MUST precede any mutation so cancel shares the lock order.
-   */
+  /** The run's pending approval id, locked `FOR UPDATE` (the run row is already held by the caller). */
   private async lockPendingApproval(
     tx: Prisma.TransactionClient,
     runId: string
@@ -195,11 +206,9 @@ export class AiRunService {
     const rows = await tx.$queryRaw<{ approvalId: string }[]>(Prisma.sql`
       SELECT a.id AS "approvalId"
       FROM "ai"."ai_approvals" a
-      JOIN "ai"."ai_runs" r ON r.id = a."runId"
       WHERE a."runId" = ${runId}
         AND a.state = 'PENDING'::"ai"."AiApprovalState"
-        AND r.status = 'WAITING_APPROVAL'::"ai"."AiRunStatus"
-      FOR UPDATE OF a, r
+      FOR UPDATE
     `)
     return rows[0]?.approvalId ?? null
   }

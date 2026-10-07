@@ -16,6 +16,7 @@ export async function preview(m, profile = 'default') {
   const labels = await previewLabels(m)
   const require = createRequire(join(m.worktree, 'apps/web/package.json'))
   const { chromium, request } = require('@playwright/test')
+  const { SUPPORTED_LOCALES } = require('@amcore/shared')
   const tmp = `${m.worktree}/.amcore/stands/${m.id}/tmp`
   await mkdir(tmp, { recursive: true, mode: 0o700 })
   const proxy = await relay(Object.values(m.origins))
@@ -54,7 +55,8 @@ export async function preview(m, profile = 'default') {
         await page.getByLabel(labels.product.email, { exact: true }).fill(account.email)
         await page.getByLabel(labels.product.password, { exact: true }).fill(account.password)
         await page.getByRole('button', { name: labels.product.submit, exact: true }).click()
-        await page.waitForURL(`${m.origins.product}${m.localePrefix}`)
+        await page.waitForURL(url => url.origin === m.origins.product &&
+          (m.localePrefix ? SUPPORTED_LOCALES.some(locale => url.pathname === `/${locale}`) : url.pathname === '/'))
         // AMCORE_CONSOLE_PREVIEW_ACCESS_START
         if (account.role === 'SUPER_ADMIN') {
           await page.goto(

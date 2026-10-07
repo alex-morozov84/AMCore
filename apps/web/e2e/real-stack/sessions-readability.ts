@@ -1,20 +1,9 @@
 import { expect, type Locator, type Page, type Route } from '@playwright/test'
 
-/** Observe only finite transitions in the tested Session surface, never its spinner. */
+import { waitForStableSurface } from '../shared/visual-stability'
+
 export async function waitForSessionTransitions(surface: Locator): Promise<void> {
-  await expect(surface).toBeVisible()
-  await expect
-    .poll(() =>
-      surface.evaluate((element) => {
-        // Force style resolution before inspecting transitions created by the latest state change.
-        element.getBoundingClientRect()
-        return element.getAnimations({ subtree: true }).filter((animation) => {
-          const timing = animation.effect?.getComputedTiming()
-          return timing?.iterations !== Infinity && animation.playState === 'running'
-        }).length
-      })
-    )
-    .toBe(0)
+  await waitForStableSurface(surface)
 }
 
 /** Relay a real authenticated response unchanged, but keep the refetch pending until release. */

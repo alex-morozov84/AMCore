@@ -1,14 +1,11 @@
-import { Action, Subject, SystemRole } from '@amcore/shared'
+import { Action, Subject } from '@amcore/shared'
 
-import { ApiKeyRevocationService } from '../../src/core/api-keys/api-key-revocation.service'
-import { ApiKeysService } from '../../src/core/api-keys/api-keys.service'
 import { MemberService } from '../../src/core/organizations/member.service'
 import { RoleService } from '../../src/core/organizations/role.service'
 import { EmailService } from '../../src/infrastructure/email/email.service'
 import { seedOrgMember } from '../helpers'
 import { afterInvitationAdmission, invitationHttp, invitationJwt } from '../helpers/invitation-http'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
-import { databaseClockPast, observeInvitationWait } from '../helpers/invitation-race'
 const jest = import.meta.jest
 
 async function secondAdmin(f: InvitationProofFixture): Promise<void> {
@@ -88,85 +85,10 @@ export function registerAdmittedAuthorityProofs(getFixture: () => InvitationProo
     )
   })
 
-  it.each(['delete', 'revoke', 'membership', 'deny', 'super-membership', 'super-scope'] as const)(
-    'F2/R11 real crypto admission followed by %s fails closed for the exact key',
-    async (loss) => {
-      const f = getFixture()
-      const { context, prisma, owner, orgId, invites, pending, truth } = f
-      await secondAdmin(f)
-      if (loss.startsWith('super'))
-        await prisma.user.update({
-          where: { id: owner.sub },
-          data: { systemRole: SystemRole.SuperAdmin },
-        })
-      const key = await context.app.get(ApiKeysService).create(owner.sub, {
-        name: 'Exact real admission',
-        organizationId: orgId,
-        scopes: ['manage:TeamAccess'],
-      })
-      await context.app.get(ApiKeysService).create(owner.sub, {
-        name: 'Cannot substitute',
-        organizationId: orgId,
-        scopes: ['manage:TeamAccess'],
-      })
-      const { invite } = await pending()
-      const mail = jest
-        .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
-        .mockResolvedValue(undefined)
-      let baseline: Awaited<ReturnType<typeof truth>> | undefined
-      try {
-        const response = await afterInvitationAdmission(
-          invites,
-          'createInvite',
-          () => invitationHttp(f, key.key, 'create', invite.id),
-          async () => {
-            if (loss === 'delete') await prisma.apiKey.delete({ where: { id: key.id } })
-            else if (loss === 'revoke')
-              await context.app.get(ApiKeyRevocationService).revoke([key.id], owner.sub, false)
-            else if (loss.includes('membership'))
-              await context.app.get(MemberService).removeMember(orgId, owner.sub, owner)
-            else if (loss === 'super-scope')
-              await prisma.apiKey.update({ where: { id: key.id }, data: { scopes: ['read:Role'] } })
-            else {
-              const roles = context.app.get(RoleService)
-              const role = await roles.createRole(orgId, { name: 'Late owner veto' }, owner)
-              await roles.assignPermission(
-                orgId,
-                role.id,
-                {
-                  action: Action.Read,
-                  subject: Subject.Role,
-                  inverted: true,
-                  fields: ['name'],
-                  conditions: { id: 'unmatched' },
-                },
-                owner
-              )
-              await context.app.get(MemberService).assignRole(orgId, owner.sub, role.id, owner)
-            }
-            baseline = await truth(invite.id)
-          }
-        )
-        expect(response.status).toBe(['delete', 'revoke', 'super-scope'].includes(loss) ? 401 : 403)
-        expect(await truth(invite.id)).toEqual(baseline)
-        expect(
-          await prisma.auditLog.count({
-            where: {
-              action: { in: ['org.invite_created', 'org.invite_revoked'] },
-              organizationId: orgId,
-            },
-          })
-        ).toBe(0)
-        expect(mail).not.toHaveBeenCalled()
-      } finally {
-        mail.mockRestore()
-      }
-    }
-  )
   it('F2 HTTP barrier teardown awaits actual work when an observer refuses after resume', async () => {
     const f = getFixture()
-    const { context, prisma, orgId, invites, pending } = f
-    const { invite } = await pending()
+    const { context, prisma, orgId, invites } = f
+    const invite = { id: 'new-invitation' }
     const jwt = await invitationJwt(f)
     const mail = jest
       .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
@@ -196,56 +118,6 @@ export function registerAdmittedAuthorityProofs(getFixture: () => InvitationProo
       ).toBe(1)
       expect(mail).toHaveBeenCalledTimes(1)
     } finally {
-      mail.mockRestore()
-    }
-  })
-
-  it('F2/R11 real admitted key expires after the exact invite-row wait', async () => {
-    const f = getFixture()
-    const { context, prisma, pool, owner, orgId, invites, pending, truth } = f
-    const { invite } = await pending()
-    const key = await context.app.get(ApiKeysService).create(owner.sub, {
-      name: 'Row wait expiry',
-      organizationId: orgId,
-      scopes: ['manage:TeamAccess'],
-    })
-    const client = await pool.connect()
-    let pid = 0
-    let expiry = new Date()
-    let before: Awaited<ReturnType<typeof truth>> | undefined
-    const mail = jest
-      .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
-      .mockResolvedValue(undefined)
-    try {
-      const response = await afterInvitationAdmission(
-        invites,
-        'createInvite',
-        () => invitationHttp(f, key.key, 'create', invite.id),
-        async () => {
-          expiry = new Date(Date.now() + 400)
-          await prisma.apiKey.update({ where: { id: key.id }, data: { expiresAt: expiry } })
-          before = await truth(invite.id)
-          await client.query('BEGIN')
-          pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
-          await client.query('SELECT id FROM core.org_invites WHERE id=$1 FOR UPDATE', [invite.id])
-        },
-        async (operation) => {
-          await observeInvitationWait(pool, operation, pid, 'core.org_invites')
-          await databaseClockPast(pool, expiry)
-          await client.query('COMMIT')
-        }
-      )
-      expect(response.status).toBe(401)
-      expect(await truth(invite.id)).toEqual(before)
-      expect(
-        await prisma.auditLog.count({
-          where: { action: 'org.invite_created', organizationId: orgId },
-        })
-      ).toBe(0)
-      expect(mail).not.toHaveBeenCalled()
-    } finally {
-      await client.query('ROLLBACK')
-      client.release()
       mail.mockRestore()
     }
   })

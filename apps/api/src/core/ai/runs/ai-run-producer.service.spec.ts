@@ -10,6 +10,7 @@ import {
   ServiceUnavailableException,
 } from '../../../common/exceptions'
 
+import { aiRunInputFingerprint } from './ai-run-input-fingerprint'
 import { AiRunProducerService } from './ai-run-producer.service'
 
 import type { EnvService } from '@/env/env.service'
@@ -35,6 +36,8 @@ const DEFAULT_MODEL: ResolvedAiModel = {
     config: null,
   },
 }
+
+const RUN_DEADLINE_MS = 172_800_000
 
 const INPUT: CreateAiRunInput = {
   conversationId: 'conv-1',
@@ -69,7 +72,11 @@ describe('AiRunProducerService', () => {
     registry = mockDeep<AiModelRegistry>()
     queue = mockDeep<QueueService>()
     env = {
-      get: jest.fn((key: string) => (key === 'AI_ARTIFACT_MAX_PARTS_PER_MESSAGE' ? 4 : 33_554_432)),
+      get: jest.fn((key: string) => {
+        if (key === 'AI_ARTIFACT_MAX_PARTS_PER_MESSAGE') return 4
+        if (key === 'AI_RUN_DEADLINE_MS') return RUN_DEADLINE_MS
+        return 33_554_432
+      }),
     } as unknown as EnvService
     logger = mockDeep<PinoLogger>()
     service = new AiRunProducerService(prisma, registry, queue, env, logger)
@@ -155,15 +162,128 @@ describe('AiRunProducerService', () => {
     expect(prisma.aiRun.create).not.toHaveBeenCalled()
   })
 
-  it('is idempotent: an existing (conversationId, idempotencyKey) run is replayed, not re-created', async () => {
-    prisma.aiRun.findFirst.mockResolvedValue(fakeRun({ id: 'run-existing' }) as never)
+  it('stamps the versioned input fingerprint and an immutable lifetime derived from the row own createdAt', async () => {
+    await service.create('user-1', INPUT)
 
-    const result = await service.create('user-1', { ...INPUT, idempotencyKey: 'evt-1' })
+    const data = prisma.aiRun.create.mock.calls[0]![0]!.data as Record<string, unknown>
+    expect(data.inputFingerprint).toBe(aiRunInputFingerprint(INPUT.inputParts))
+    expect(data).not.toHaveProperty('deadlineAt') // never from the application clock
 
-    expect(result.id).toBe('run-existing')
-    expect(prisma.aiRun.create).not.toHaveBeenCalled()
-    expect(prisma.aiMessage.create).not.toHaveBeenCalled()
-    expect(queue.add).not.toHaveBeenCalled()
+    // One statement, in the creating transaction, computes deadlineAt = createdAt + the configured lifetime.
+    const [query] = prisma.$executeRaw.mock.calls[0] as unknown as [
+      { strings: string[]; values: unknown[] },
+    ]
+    const sql = query.strings.join('?')
+    expect(sql).toContain('"deadlineAt" = "createdAt" +')
+    expect(query.values).toEqual([RUN_DEADLINE_MS / 1000, 'run-1'])
+    expect(prisma.aiRun.create.mock.invocationCallOrder[0]!).toBeLessThan(
+      prisma.$executeRaw.mock.invocationCallOrder[0]!
+    )
+  })
+
+  it('a replay never re-arms the lifetime', async () => {
+    prisma.aiRun.findFirst.mockResolvedValue(
+      fakeRun({ inputFingerprint: aiRunInputFingerprint(INPUT.inputParts) }) as never
+    )
+
+    await service.create('user-1', { ...INPUT, idempotencyKey: 'evt-1' })
+
+    expect(prisma.$executeRaw).not.toHaveBeenCalled()
+  })
+
+  describe('idempotent replay', () => {
+    const KEYED = { ...INPUT, idempotencyKey: 'evt-1' }
+
+    it('replays the SAME input: returns the existing run, creates nothing, never re-arms the deadline', async () => {
+      prisma.aiRun.findFirst.mockResolvedValue(
+        fakeRun({
+          id: 'run-existing',
+          inputFingerprint: aiRunInputFingerprint(INPUT.inputParts),
+        }) as never
+      )
+
+      const result = await service.create('user-1', KEYED)
+
+      expect(result.id).toBe('run-existing')
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+      expect(prisma.aiMessage.create).not.toHaveBeenCalled()
+      expect(prisma.aiArtifact.updateMany).not.toHaveBeenCalled()
+      expect(queue.add).not.toHaveBeenCalled()
+    })
+
+    it('conflicts (409, shared error code) when the same key carries a DIFFERENT input', async () => {
+      prisma.aiRun.findFirst.mockResolvedValue(
+        fakeRun({ id: 'run-existing', inputFingerprint: aiRunInputFingerprint([]) }) as never
+      )
+
+      await expect(service.create('user-1', KEYED)).rejects.toMatchObject({
+        errorCode: 'AI_RUN_IDEMPOTENCY_CONFLICT',
+        status: 409,
+      })
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+      expect(queue.add).not.toHaveBeenCalled()
+    })
+
+    it('treats part order and artifact ids as part of the request identity', async () => {
+      const parts = [
+        { type: 'text', text: 'see' },
+        { type: 'artifact_ref', artifactId: 'a1' },
+      ] as CreateAiRunInput['inputParts']
+      prisma.aiRun.findFirst.mockResolvedValue(
+        fakeRun({ inputFingerprint: aiRunInputFingerprint(parts) }) as never
+      )
+
+      await expect(
+        service.create('user-1', { ...KEYED, inputParts: [parts[1]!, parts[0]!] })
+      ).rejects.toMatchObject({ errorCode: 'AI_RUN_IDEMPOTENCY_CONFLICT' })
+      await expect(
+        service.create('user-1', {
+          ...KEYED,
+          inputParts: [parts[0]!, { type: 'artifact_ref', artifactId: 'a2' }],
+        })
+      ).rejects.toMatchObject({ errorCode: 'AI_RUN_IDEMPOTENCY_CONFLICT' })
+      await expect(service.create('user-1', { ...KEYED, inputParts: parts })).resolves.toBeDefined()
+    })
+
+    it('legacy run (NULL fingerprint): compares against its own USER turn and backfills the fingerprint', async () => {
+      prisma.aiRun.findFirst.mockResolvedValue(
+        fakeRun({ id: 'run-legacy', inputFingerprint: null }) as never
+      )
+      prisma.aiMessage.findFirst.mockResolvedValue({ content: INPUT.inputParts } as never)
+
+      const result = await service.create('user-1', KEYED)
+
+      expect(result.id).toBe('run-legacy')
+      expect(prisma.aiRun.updateMany).toHaveBeenCalledWith({
+        where: { id: 'run-legacy', inputFingerprint: null },
+        data: { inputFingerprint: aiRunInputFingerprint(INPUT.inputParts) },
+      })
+      expect(prisma.aiRun.create).not.toHaveBeenCalled()
+    })
+
+    it('legacy run with a DIFFERENT input conflicts and is not backfilled', async () => {
+      prisma.aiRun.findFirst.mockResolvedValue(fakeRun({ inputFingerprint: null }) as never)
+      prisma.aiMessage.findFirst.mockResolvedValue({
+        content: [{ type: 'text', text: 'something else' }],
+      } as never)
+
+      await expect(service.create('user-1', KEYED)).rejects.toMatchObject({
+        errorCode: 'AI_RUN_IDEMPOTENCY_CONFLICT',
+      })
+      expect(prisma.aiRun.updateMany).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['missing', null],
+      ['malformed', { content: 'not-an-array' }],
+    ])('legacy run whose original turn is %s fails closed (409)', async (_label, message) => {
+      prisma.aiRun.findFirst.mockResolvedValue(fakeRun({ inputFingerprint: null }) as never)
+      prisma.aiMessage.findFirst.mockResolvedValue(message as never)
+
+      await expect(service.create('user-1', KEYED)).rejects.toMatchObject({
+        errorCode: 'AI_RUN_IDEMPOTENCY_CONFLICT',
+      })
+    })
   })
 
   it('rejects a run on a missing or not-owned conversation (404, no leak)', async () => {

@@ -1,3 +1,5 @@
+import { createInvitationOperationId } from '@amcore/shared'
+
 import { UserCacheService } from '../../src/core/auth/user-cache.service'
 import { EmailService } from '../../src/infrastructure/email/email.service'
 import { invitationPoolQuery, trackInvitationOperation } from '../helpers/invitation-operation'
@@ -41,14 +43,20 @@ export function registerIdentityProofs(getFixture: () => InvitationProofFixture)
         operation === 'accept'
           ? accept(token)
           : operation === 'revoke'
-            ? invites.revokeInvite(orgId, invite.id, actor())
-            : invites.createInvite(orgId, { email: recipient.email! }, actor())
+            ? invites.revokeInvite(orgId, invite.id, 1, actor(), createInvitationOperationId())
+            : invites.reissueInvite(
+                orgId,
+                invite.id,
+                { mode: 'repeat', expectedGeneration: 1 },
+                actor(),
+                createInvitationOperationId()
+              )
       )
       const result = outcome(work)
       try {
         await observeInvitationWait(pool, result, pid, 'core.users')
         await client.query('COMMIT')
-        expect(await result).toBe(operation === 'accept' ? 400 : 401)
+        expect(await result).toBe(401)
         expect((await truth(invite.id)).invite!.acceptedAt).toBeNull()
         expect((await truth(invite.id)).invite!.revokedAt).toBeNull()
       } finally {
@@ -117,8 +125,14 @@ export function registerIdentityProofs(getFixture: () => InvitationProofFixture)
         operation === 'accept'
           ? accept(token)
           : operation === 'revoke'
-            ? invites.revokeInvite(orgId, invite.id, actor())
-            : invites.createInvite(orgId, { email: recipient.email! }, actor())
+            ? invites.revokeInvite(orgId, invite.id, 1, actor(), createInvitationOperationId())
+            : invites.reissueInvite(
+                orgId,
+                invite.id,
+                { mode: 'repeat', expectedGeneration: 1 },
+                actor(),
+                createInvitationOperationId()
+              )
       )
       const result = outcome(work)
       let deletion: Promise<unknown> | undefined

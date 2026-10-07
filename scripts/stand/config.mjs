@@ -47,6 +47,7 @@ export async function configuration(m) {
       API_URL: 'http://api:5002',
       REDIS_URL: 'redis://redis:6379',
       WEB_TRUSTED_ORIGINS: m.origins.product,
+      WEB_INVITATION_LOCAL_HTTP_ORIGIN: m.origins.product.startsWith('http:') ? m.origins.product : '',
       // AMCORE_CONSOLE_WEB_ENV_START
       ADMIN_CONSOLE_HOSTNAME: m.hostnames.console ?? '',
       ADMIN_CONSOLE_ORIGIN: m.origins.console ?? '',
@@ -185,4 +186,7 @@ export function validateModel(m) {
       throw new Error('Foreign Redis target')
   if (m.model.services.web.environment.API_URL !== 'http://api:5002')
     throw new Error('Foreign API target')
+  const invitationHttpOrigin = m.origins.product.startsWith('http:') ? m.origins.product : ''
+  if (m.model.services.web.environment.WEB_INVITATION_LOCAL_HTTP_ORIGIN !== invitationHttpOrigin)
+    throw new Error('Foreign invitation HTTP origin')
 }

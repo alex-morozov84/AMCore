@@ -6,13 +6,13 @@ import { afterEach, test } from 'node:test'
 import { prepareBrandInit } from './brand-init-plan.mjs'
 import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
 import { prepareProjectInit } from './project-init-plan.mjs'
-import { createRealRepoCopy } from './test-fixture.mjs'
+import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
 let fixture
 afterEach(() => fixture?.cleanup())
 
 test('representative init:project composition remains valid after init:brand', () => {
-  fixture = createRealRepoCopy()
+  fixture = createWorkingTreeCopy()
   const brand = prepareBrandInit(fixture.root, {
     productName: 'Acme',
     productDescription: 'Downstream product',

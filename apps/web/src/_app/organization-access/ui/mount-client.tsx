@@ -18,12 +18,16 @@ export function OrganizationAccessClientMount({
   id,
   page,
   explicitList,
+  initialOrganizationName,
+  initialCanManageTeamAccess,
 }: {
   admission: ProductAccessBootstrap
   placement?: OrganizationAccessPlacement
   id?: string
   page: number
   explicitList: boolean
+  initialOrganizationName?: string
+  initialCanManageTeamAccess?: boolean
 }) {
   const router = useRouteProgressRouter()
   const locale = useLocale()
@@ -31,9 +35,12 @@ export function OrganizationAccessClientMount({
   return (
     <OrganizationAccessClient
       admission={admission}
+      initialOrganizationName={initialOrganizationName}
+      initialCanManageTeamAccess={initialCanManageTeamAccess}
       input={id ? { kind: 'selected', id, locale } : { kind: 'list', page, locale }}
       explicitList={explicitList}
       membersHref={hrefs.membersHref}
+      invitationsHref={hrefs.invitationsHref}
       contextHref={hrefs.contextHref}
       pageHref={hrefs.pageHref}
       listHref={hrefs.listHref}

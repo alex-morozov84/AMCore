@@ -34,7 +34,7 @@ export async function registerViaUi(
     await page.getByLabel(/name/i).fill(options.name)
   }
   await page.getByRole('textbox', { name: /email/i }).fill(email)
-  await page.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign up/i }).click()
   // Callers may immediately close this context or assign a role to the new account.
   await page.waitForURL(/\/en\/?$/)
@@ -43,6 +43,6 @@ export async function registerViaUi(
 export async function loginViaUi(page: Page, email: string): Promise<void> {
   await page.goto('/en/login')
   await page.getByRole('textbox', { name: /email/i }).fill(email)
-  await page.getByLabel(/password/i).fill(TEST_PASSWORD)
+  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
 }

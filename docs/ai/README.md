@@ -18,11 +18,14 @@ model, the extension points, and the invariants OpenAPI does not express.
 ## What it provides
 
 - **Conversations & runs** — owner-scoped durable transcripts; a run is one user
-  turn plus its worker execution. Run creation is idempotent; state lives in
-  Postgres, not the worker. See [Runs](./runs.md).
+  turn plus its worker execution. Run creation is idempotent (the same key with
+  a different input is a conflict); state lives in Postgres, not the worker; every
+  run has an absolute lifetime and a bounded attempt history. See [Runs](./runs.md).
 - **Worker-owned execution** — the web role never calls a provider. A worker
   resolves a frozen model snapshot, calls the `ModelGateway`, retries, recovers
-  leases, and writes the transcript and usage ledger durably.
+  leases, and writes the transcript and usage ledger durably. Only the current
+  lease holder can write, cancel and deadline are honoured between steps, and a
+  side-effecting tool is never repeated after an uncertain outcome.
 - **Status-only realtime** — an SSE stream of run-status hints, never token or
   content streaming; clients refetch durable state over HTTP.
 - **Assistants** — a SUPER_ADMIN registry of versioned, **immutable** assistant
@@ -80,7 +83,8 @@ schemas rather than string-building JSON. Multimodal input (`artifact_ref`) is i
 4. The worker executes the run and writes the assistant turn durably.
 5. Clients subscribe to the status-only SSE hint (or poll), then refetch state.
 6. If a non-`SAFE` tool is requested, the run parks for owner approval.
-7. If a human takes over, stale bot writes are fenced off.
+7. The owner can cancel at any point; the run also ends at its lifetime limit.
+8. If a human takes over, stale bot writes are fenced off.
 
 ## HTTP surface
 

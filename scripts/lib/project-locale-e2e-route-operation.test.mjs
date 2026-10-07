@@ -90,6 +90,7 @@ test('root navigation assertions remain exact after removing the locale segment'
     assert.match(containment, /from '\.\/credential-containment\.helpers'/)
     assert.doesNotMatch(containment, /test\.skip/)
     assert.match(sessions, /toHaveURL\('\/'\)/)
+    assert.doesNotMatch(projected.get('apps/web/e2e/console-real-stack/sessions.spec.ts'), /function escapeOrigin/)
     assert.doesNotMatch(sessions, /toHaveURL\(\/\\\/\?\$\/\)/)
     assert.match(consoleSession, /toHaveURL\(\s*standTarget\.origins\.product \+ '\/'\s*\)/)
     assert.match(consoleSession, /toHaveURL\(\s*standTarget\.origins\.console \+ '\/'\s*\)/)

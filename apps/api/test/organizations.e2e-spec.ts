@@ -4,7 +4,11 @@ import { JwtService } from '@nestjs/jwt'
 import Redis from 'ioredis'
 import request from 'supertest'
 
-import { ORGANIZATION_CONTEXT_FAMILY, SystemRole } from '@amcore/shared'
+import {
+  createInvitationOperationId,
+  ORGANIZATION_CONTEXT_FAMILY,
+  SystemRole,
+} from '@amcore/shared'
 
 import { OrgAclVersionService } from '../src/core/auth/org-acl-version.service'
 import { PermissionsCacheService } from '../src/core/auth/permissions-cache.service'
@@ -770,7 +774,7 @@ describe('Organizations (e2e)', () => {
         .expect(200)
     })
 
-    it('POST /organizations/:id/members/invite — returns uniform 202 and does NOT auto-create membership (OB-02 Stage C)', async () => {
+    it('POST /organizations/:id/invites — returns uniform 202 and does NOT auto-create membership (OB-02 Stage C)', async () => {
       await registerAndLogin('member@example.com')
 
       const rolesRes = await request(app.getHttpServer())
@@ -779,9 +783,10 @@ describe('Organizations (e2e)', () => {
       const memberRole = rolesRes.body.data.find((r: { name: string }) => r.name === 'MEMBER')
 
       const inviteRes = await request(app.getHttpServer())
-        .post(`/organizations/${orgId}/members/invite`)
+        .post(`/organizations/${orgId}/invites`)
+        .set('X-Invitation-Operation-Id', createInvitationOperationId())
         .set('Authorization', `Bearer ${orgToken}`)
-        .send({ email: 'Member@Example.COM', roleId: memberRole.id })
+        .send({ email: 'Member@Example.COM', roleIds: [memberRole.id] })
         .expect(202)
 
       expect(inviteRes.body).toEqual({ status: 'invited' })
@@ -1114,9 +1119,10 @@ describe('Organizations (e2e)', () => {
       // role-assignability check fires inside the createInvite tx
       // before any email lookup, so target user existence is irrelevant.
       await request(app.getHttpServer())
-        .post(`/organizations/${orgA}/members/invite`)
+        .post(`/organizations/${orgA}/invites`)
+        .set('X-Invitation-Operation-Id', createInvitationOperationId())
         .set('Authorization', `Bearer ${orgAToken}`)
-        .send({ email: 'target@example.com', roleId: foreignRoleId })
+        .send({ email: 'target@example.com', roleIds: [foreignRoleId] })
         .expect(403)
 
       // No membership should have been created for the target — proves
@@ -1147,9 +1153,10 @@ describe('Organizations (e2e)', () => {
       // assignability check fires before any email lookup, so target
       // user existence is irrelevant.
       await request(app.getHttpServer())
-        .post(`/organizations/${orgId}/members/invite`)
+        .post(`/organizations/${orgId}/invites`)
+        .set('X-Invitation-Operation-Id', createInvitationOperationId())
         .set('Authorization', `Bearer ${orgToken}`)
-        .send({ email: 'target@example.com', roleId: 'cmp9aaaaa0000000000000000' })
+        .send({ email: 'target@example.com', roleIds: ['cmp9aaaaa0000000000000000'] })
         .expect(403)
     })
   })

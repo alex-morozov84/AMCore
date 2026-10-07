@@ -1,5 +1,6 @@
 import request from 'supertest'
 
+import { createInvitationOperationId } from '@amcore/shared'
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import { registerApiKeyAdmission } from '../../src/core/api-keys/api-key-admission'
@@ -7,13 +8,7 @@ import { ApiKeyRevocationService } from '../../src/core/api-keys/api-key-revocat
 import { ApiKeysService } from '../../src/core/api-keys/api-keys.service'
 import { invitationActor } from '../../src/core/organizations/invitation-actor'
 import { EmailService } from '../../src/infrastructure/email/email.service'
-import { trackInvitationOperation } from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
-import {
-  databaseClockPast,
-  invitationFence,
-  observeInvitationWait,
-} from '../helpers/invitation-race'
 const jest = import.meta.jest
 
 export function registerAuthorityProofs(getFixture: () => InvitationProofFixture): void {
@@ -24,10 +19,10 @@ export function registerAuthorityProofs(getFixture: () => InvitationProofFixture
       .create(owner.sub, { name: 'Proof', organizationId: orgId, scopes: ['manage:TeamAccess'] })
     const server = context.app.getHttpServer()
     await request(server)
-      .post(`/organizations/${orgId}/members/invite`)
+      .post(`/organizations/${orgId}/invites`)
       .auth(key.key, { type: 'bearer' })
       .send({ email: recipient.email })
-      .expect(202)
+      .expect(401)
     await request(server)
       .get(`/organizations/${orgId}/invites`)
       .auth(key.key, { type: 'bearer' })
@@ -64,9 +59,16 @@ export function registerAuthorityProofs(getFixture: () => InvitationProofFixture
     registerApiKeyAdmission(admitted, old.id, principal)
     const keyActor = invitationActor(admitted)
     await context.app.get(ApiKeyRevocationService).revoke([old.id], owner.sub, false)
-    expect(await outcome(invites.createInvite(orgId, { email: recipient.email! }, keyActor))).toBe(
-      401
-    )
+    expect(
+      await outcome(
+        invites.createInvite(
+          orgId,
+          { email: recipient.email! },
+          keyActor,
+          createInvitationOperationId()
+        )
+      )
+    ).toBe(403)
     expect(await prisma.orgInvite.count({ where: { organizationId: orgId } })).toBe(0)
     expect(() =>
       invitationActor({
@@ -99,7 +101,14 @@ export function registerAuthorityProofs(getFixture: () => InvitationProofFixture
         .mockResolvedValue(undefined)
       try {
         expect(
-          await outcome(invites.createInvite(orgId, { email: recipient.email! }, actor()))
+          await outcome(
+            invites.createInvite(
+              orgId,
+              { email: recipient.email! },
+              actor(),
+              createInvitationOperationId()
+            )
+          )
         ).toBe(grant ? 200 : 403)
       } finally {
         mail.mockRestore()
@@ -107,17 +116,16 @@ export function registerAuthorityProofs(getFixture: () => InvitationProofFixture
     }
   )
 
-  it('R10 complete owner DENY outside key scope vetoes an admitted request', async () => {
+  it('R10 complete owner DENY vetoes a personal admitted request', async () => {
     const { context, prisma, invites, orgId, owner, recipient, outcome } = getFixture()
-    const key = await context.app
+    await context.app
       .get(ApiKeysService)
       .create(owner.sub, { name: 'Veto', organizationId: orgId, scopes: ['manage:TeamAccess'] })
-    const principal: RequestPrincipal = { ...owner, type: 'api_key', scopes: ['manage:TeamAccess'] }
+    const principal: RequestPrincipal = owner
     const request = {
       user: principal,
       privilegedAdmission: { authenticated: principal, principal },
     }
-    registerApiKeyAdmission(request, key.id, principal)
     const admitted = invitationActor(request)
     const role = await prisma.role.create({
       data: { name: 'Post-admission veto', organizationId: orgId },
@@ -137,9 +145,16 @@ export function registerAuthorityProofs(getFixture: () => InvitationProofFixture
       where: { userId_organizationId: { userId: owner.sub, organizationId: orgId } },
     })
     await prisma.memberRole.create({ data: { memberId: member.id, roleId: role.id } })
-    expect(await outcome(invites.createInvite(orgId, { email: recipient.email! }, admitted))).toBe(
-      403
-    )
+    expect(
+      await outcome(
+        invites.createInvite(
+          orgId,
+          { email: recipient.email! },
+          admitted,
+          createInvitationOperationId()
+        )
+      )
+    ).toBe(403)
     expect(await prisma.orgInvite.count({ where: { organizationId: orgId } })).toBe(0)
   })
 
@@ -151,78 +166,16 @@ export function registerAuthorityProofs(getFixture: () => InvitationProofFixture
       where: { id: owner.sub },
       data: { systemRole: SystemRole.SuperAdmin },
     })
-    expect(await outcome(invites.createInvite(orgId, { email: recipient.email! }, admitted))).toBe(
-      403
-    )
-  })
-
-  it('R11 key SHARE first makes supported revocation wait until issuance commit', async () => {
-    const { context, prisma, invites, orgId, owner, recipient, race } = getFixture()
-    const key = await context.app
-      .get(ApiKeysService)
-      .create(owner.sub, { name: 'Fence', organizationId: orgId, scopes: ['manage:TeamAccess'] })
-    const principal: RequestPrincipal = { ...owner, type: 'api_key', scopes: ['manage:TeamAccess'] }
-    const request = {
-      user: principal,
-      privilegedAdmission: { authenticated: principal, principal },
-    }
-    registerApiKeyAdmission(request, key.id, principal)
-    const fence = invitationFence(
-      prisma,
-      (model, method) => model === 'orgInvite' && method === 'create'
-    )
-    const mail = jest
-      .spyOn(context.app.get(EmailService), 'sendOrgInviteEmail')
-      .mockResolvedValue(undefined)
-    try {
-      expect(
-        await race(
-          fence,
-          () => invites.createInvite(orgId, { email: recipient.email! }, invitationActor(request)),
-          () => context.app.get(ApiKeyRevocationService).revoke([key.id], owner.sub, false),
-          'core.api_keys'
+    expect(
+      await outcome(
+        invites.createInvite(
+          orgId,
+          { email: recipient.email! },
+          admitted,
+          createInvitationOperationId()
         )
-      ).toEqual([200, 200])
-      expect(
-        (await prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).revokedAt
-      ).not.toBeNull()
-    } finally {
-      mail.mockRestore()
-    }
-  })
-
-  it('R11 key expiry crossing actual org wait rejects before issuance', async () => {
-    const { context, prisma, pool, invites, orgId, owner, recipient, outcome } = getFixture()
-    const key = await context.app
-      .get(ApiKeysService)
-      .create(owner.sub, { name: 'Expiring', organizationId: orgId, scopes: ['manage:TeamAccess'] })
-    const expiry = new Date(Date.now() + 350)
-    await prisma.apiKey.update({ where: { id: key.id }, data: { expiresAt: expiry } })
-    const principal: RequestPrincipal = { ...owner, type: 'api_key', scopes: ['manage:TeamAccess'] }
-    const request = {
-      user: principal,
-      privilegedAdmission: { authenticated: principal, principal },
-    }
-    registerApiKeyAdmission(request, key.id, principal)
-    const client = await pool.connect()
-    await client.query('BEGIN')
-    const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
-    await client.query('SELECT id FROM core.organizations WHERE id=$1 FOR UPDATE', [orgId])
-    const creating = outcome(
-      trackInvitationOperation(() =>
-        invites.createInvite(orgId, { email: recipient.email! }, invitationActor(request))
       )
-    )
-    try {
-      await observeInvitationWait(pool, creating, pid, 'core.organizations')
-      await databaseClockPast(pool, expiry)
-      await client.query('COMMIT')
-      expect(await creating).toBe(401)
-    } finally {
-      await client.query('ROLLBACK')
-      client.release()
-      await creating
-    }
+    ).toBe(403)
   })
 
   it.each([true, false])(
@@ -249,7 +202,14 @@ export function registerAuthorityProofs(getFixture: () => InvitationProofFixture
         .mockResolvedValue(undefined)
       try {
         expect(
-          await outcome(invites.createInvite(orgId, { email: recipient.email! }, admitted))
+          await outcome(
+            invites.createInvite(
+              orgId,
+              { email: recipient.email! },
+              admitted,
+              createInvitationOperationId()
+            )
+          )
         ).toBe(hasTeam ? 200 : 403)
       } finally {
         mail.mockRestore()
@@ -261,9 +221,16 @@ export function registerAuthorityProofs(getFixture: () => InvitationProofFixture
     const { prisma, invites, orgId, owner, recipient, actor, outcome } = getFixture()
     const admitted = actor()
     await prisma.orgMember.deleteMany({ where: { userId: owner.sub } })
-    expect(await outcome(invites.createInvite(orgId, { email: recipient.email! }, admitted))).toBe(
-      403
-    )
+    expect(
+      await outcome(
+        invites.createInvite(
+          orgId,
+          { email: recipient.email! },
+          admitted,
+          createInvitationOperationId()
+        )
+      )
+    ).toBe(403)
     expect(await prisma.orgInvite.count()).toBe(0)
   })
 }

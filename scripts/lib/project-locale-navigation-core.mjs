@@ -18,10 +18,25 @@ export function dropLocalePushOption(model, ctx) {
       ts.isArrowFunction(node.initializer),
     { ...ctx, describe: 'onSuccess navigation callback' }
   )
-  const statements = callback.initializer.body.statements
-  if (statements.length !== 2) throw new Error('onSuccess navigation statements drifted')
-  const retained = model.text.slice(callback.initializer.getStart(), statements[0].end)
-  model.replaceNode(callback.initializer, `${retained}\n      router.push('/')\n    }`, ctx)
+  const push = findUniqueNode(
+    model,
+    (node) => ts.isCallExpression(node) && node.expression.getText() === 'router.push',
+    { ...ctx, describe: 'ordinary authentication locale navigation' },
+    callback
+  )
+  if (
+    push.arguments.length !== 2 ||
+    push.arguments[0].getText() !== "'/'" ||
+    !ts.isObjectLiteralExpression(push.arguments[1])
+  )
+    throw new Error('authentication locale push contract drifted')
+  const locale = objectProperty(model, push.arguments[1], 'locale', ctx)
+  if (
+    locale.initializer.getText() !== 'response.user.locale' ||
+    push.arguments[1].properties.length !== 1
+  )
+    throw new Error('authentication locale option contract drifted')
+  model.removeNode(push.arguments[1], ctx)
 }
 
 export function rewriteDal(model, ctx) {

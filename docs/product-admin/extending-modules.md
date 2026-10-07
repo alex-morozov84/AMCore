@@ -34,7 +34,9 @@ a custom omission needs its own dependency inventory, source and runtime proof.
 
 The members module derives `membersHref(id)` from the same app-owned placement
 source and reuses the explicit selected organization contract. Its ready mount
-and public headless hooks are described in [organization members](organization-members.md). Invitations, keys and settings do not
+and public headless hooks are described in [organization members](organization-members.md).
+[Invitations](invitations.md) use the same placement and context owner with separate
+command recovery and recipient continuation. Invitations, keys and settings do not
 need to share a forced administration prefix. Do not introduce a global navigation
 registry or universal admin provider for ordinary composition.
 
@@ -59,5 +61,5 @@ retirement. Explicitly reread context/capabilities after success: a disabled Que
 observer using `skipToken` does not refetch through `invalidateQueries()`.
 Distinguish a committed write followed by failed reread from a failed write. Never
 blindly retry an ambiguous write; retirement cannot undo committed SQL. Share one
-context owner across related blocks. The members module supplies atomic assignment replacement; other management
-journeys remain downstream-owned.
+context owner across related blocks. The members module supplies atomic assignment replacement; invitation management supplies generation-fenced commands and explicit recipient
+consent; product-specific management journeys remain downstream-owned.

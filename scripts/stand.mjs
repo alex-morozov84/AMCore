@@ -11,6 +11,9 @@ import { stopChildren, setJournal, requestCancellation, allowCleanup } from './s
 const [action = 'help', ...args] = process.argv.slice(2)
 const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : fallback)
 const lane = value('--lane', 'real-stack')
+const group = value('--ci-group')
+if (group && (lane !== 'real-stack' || !['standard', 'disruptive'].includes(group)))
+  throw new Error('Invalid E2E CI group')
 const lanes = ['mocked', 'real-stack']
 let topology
 // AMCORE_CONSOLE_LANES_START
@@ -125,7 +128,7 @@ async function execute() {
         handled = true
       }
       // AMCORE_CONSOLE_PROXY_SMOKE_END
-      if (!handled) await test(m, lane, held.token, extra)
+      if (!handled) await test(m, lane, held.token, extra, group)
     } else if (action === 'preview') {
       const { preview } = await import('./stand/preview.mjs')
       await preview(m, value('--profile', 'default'))

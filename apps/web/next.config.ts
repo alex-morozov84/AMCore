@@ -3,10 +3,16 @@ import path from 'node:path'
 
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
+import { SUPPORTED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 const deploymentVersion = process.env.NEXT_DEPLOYMENT_ID || randomUUID()
+const invitationPrivacyHeaders = [
+  { key: 'Referrer-Policy', value: 'no-referrer' },
+  { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+  { key: 'Cache-Control', value: 'private, no-store' },
+]
 if (
   !z
     .string()
@@ -44,8 +50,7 @@ const nextConfig: NextConfig = {
 
   experimental: {
     // Enables Next's first-party Playwright+MSW server-side test fixture
-    // (`next/experimental/testmode/playwright/msw`, Track 7 FINAL PLAN §3,
-    // `ai/models-talk.md`) — intercepts server-side `fetch` calls the Next
+    // (`next/experimental/testmode/playwright/msw`) — intercepts server-side `fetch` calls the Next
     // server makes to `apps/api` (a boundary browser-side `page.route()`
     // can't reach). `PLAYWRIGHT_TEST_PROXY` is only ever set by
     // `playwright.config.ts`'s `webServer.env`, never by a real dev/prod
@@ -64,8 +69,7 @@ const nextConfig: NextConfig = {
   // exact rewrite previously intercepted `GET /api/auth/me` and returned
   // the backend's raw 404 instead of the BFF's proxied response.
 
-  // Browser security-header baseline (Track 3 PR1, ai/models-talk.md FINAL
-  // PLAN §3). Static and environment-independent — no per-request state, so
+  // Browser security-header baseline. Static and environment-independent — no per-request state, so
   // it belongs in `headers()` rather than `src/proxy.ts`. `source: '/(.*)'`
   // is deliberate: `proxy.ts`'s matcher excludes `/api/*`, `_next`,
   // `_vercel`, and any dotted path (see its own comment), so this is the
@@ -122,8 +126,7 @@ const nextConfig: NextConfig = {
           // it is a no-op (and harmless) under `next dev`/local HTTP and only
           // takes effect once a deployment actually terminates TLS in front
           // of this origin. No `preload`: that's a domain-wide,
-          // effectively-irreversible-for-months commitment (owner decision,
-          // `ai/models-talk.md` FINAL PLAN §0.2) — documented as an opt-in
+          // effectively-irreversible-for-months commitment — documented as an opt-in
           // hardening step for a production deployment that wants it, not a
           // starter default.
           {
@@ -140,6 +143,20 @@ const nextConfig: NextConfig = {
         source: '/api/console/bull-board/:path*',
         headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
       },
+      {
+        // Locale topology follows the shared locale set, including scaffolded single-locale forks.
+        source: SUPPORTED_LOCALES.length > 1 ? '/:locale/invite/:path*' : '/invite/:path*',
+        headers: invitationPrivacyHeaders,
+      },
+      {
+        source: SUPPORTED_LOCALES.length > 1 ? '/:locale/verify-email' : '/verify-email',
+        headers: invitationPrivacyHeaders,
+      },
+      ...[
+        '/api/invitation-flows/:path*',
+        '/api/invitation-operations/:path*',
+        '/api/invitation-verification-return/:path*',
+      ].map((source) => ({ source, headers: invitationPrivacyHeaders })),
       {
         source: '/sw.js',
         headers: [

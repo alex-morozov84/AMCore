@@ -13,10 +13,11 @@ describe('R17 invitation role-intent migration', () => {
     const pool = new Pool({ connectionString: container.getConnectionUri() })
     const directory = mkdtempSync(resolve(tmpdir(), 't028-migration-'))
     const migration = '20261003180000_invitation_role_intent'
+    const settlement = '20261004190000_invitation_intent_and_settlement'
     try {
       cpSync(resolve('prisma'), resolve(directory, 'prisma'), {
         recursive: true,
-        filter: (path) => !path.includes(migration),
+        filter: (path) => !path.includes(migration) && !path.includes(settlement),
       })
       writeFileSync(
         resolve(directory, 'prisma.config.ts'),
@@ -83,6 +84,47 @@ describe('R17 invitation role-intent migration', () => {
           )
         ).rowCount
       ).toBe(1)
+      const preserved = (await pool.query('SELECT * FROM core.org_invites ORDER BY id')).rows
+      cpSync(
+        resolve('prisma/migrations', settlement),
+        resolve(directory, 'prisma/migrations', settlement),
+        { recursive: true }
+      )
+      deploy()
+      const upgraded = (await pool.query('SELECT * FROM core.org_invites ORDER BY id')).rows
+      for (const row of upgraded) {
+        const old = preserved.find((r) => r.id === row.id)
+        const { generation, issuedAt, issuedAtEstimated, intentInvalid, ...remaining } = row
+        const { roleId, ...oldRemaining } = old
+        expect(remaining).toEqual(oldRemaining)
+        expect(generation).toBe(1)
+        expect(issuedAt).toEqual(old.createdAt)
+        expect(issuedAtEstimated).toBe(true)
+        expect(intentInvalid).toBe(roleId === null)
+        const roles = (
+          await pool.query('SELECT * FROM core.org_invite_role_intents WHERE "inviteId"=$1', [
+            row.id,
+          ])
+        ).rows
+        const expectedRole = expect.objectContaining({
+          ordinal: 0,
+          requestedRoleId: roleId,
+          liveRoleId: roleId,
+          roleNameAtIssue: 'MEMBER',
+        })
+        expect(roles).toEqual(roleId ? [expectedRole] : [])
+      }
+      await pool.query("DELETE FROM core.roles WHERE id='member'")
+      const deleted = (await pool.query('SELECT * FROM core.org_invite_role_intents')).rows
+      expect(deleted.length).toBeGreaterThan(0)
+      expect(
+        deleted.every(
+          (r) =>
+            r.requestedRoleId === 'member' &&
+            r.liveRoleId === null &&
+            r.roleNameAtIssue === 'MEMBER'
+        )
+      ).toBe(true)
     } finally {
       await pool.end()
       await container.stop()

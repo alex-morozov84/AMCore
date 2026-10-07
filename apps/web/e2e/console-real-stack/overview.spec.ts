@@ -35,7 +35,7 @@ test('host-mode Overview panel renders real readiness, version and process role,
   const consolePage = await console.newPage()
   await consolePage.goto('/en/login')
   await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/password/i).fill('Test1234Secure')
+  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
@@ -100,7 +100,7 @@ test('host-mode Overview panel denies a demoted session with a live re-check, no
   const consolePage = await console.newPage()
   await consolePage.goto('/en/login')
   await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/password/i).fill('Test1234Secure')
+  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
@@ -136,7 +136,7 @@ test('host-mode Overview locale switcher stays on the console host and switches 
   const consolePage = await console.newPage()
   await consolePage.goto('/en/login')
   await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/password/i).fill('Test1234Secure')
+  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')

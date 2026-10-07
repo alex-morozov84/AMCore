@@ -2,24 +2,42 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { OAuthUserProfile, SupportedLocale, UserResponse } from '@amcore/shared'
+import type {
+  InvitationOAuthCorrelation,
+  OAuthUserProfile,
+  SupportedLocale,
+  UserResponse,
+} from '@amcore/shared'
 import { AuthErrorCode, parseSupportedLocale } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions'
+import { EnvService } from '../../../env/env.service'
 import { PrismaService } from '../../../prisma'
+import {
+  type InvitationHandoffProof,
+  lockInvitationAuthAttempt,
+} from '../../invitations/invitation-auth-handoff'
+import { InvitationContinuationService } from '../../invitations/invitation-continuation.service'
+import {
+  invalidInvitation,
+  invitationClock,
+  lockInvitationSignupEmail,
+  lockInvitationUser,
+} from '../../invitations/invitation-locks'
 import { EmailIdentityService } from '../email-identity.service'
 import { SessionService } from '../session.service'
 import type { AccessTokenPayload } from '../token.service'
 import { UserCacheService } from '../user-cache.service'
 
 import { generateOAuthStateNonce, hashOAuthStateNonce } from './oauth-nonce'
-import { OAuthStateService } from './oauth-state.service'
+import { type OAuthInvitationState, OAuthStateService } from './oauth-state.service'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory'
 
-import type { OAuthProvider, User } from '@/generated/prisma/client'
+import type { OAuthProvider, Prisma, User } from '@/generated/prisma/client'
 
 interface LoginCallbackResult {
   mode: 'login'
+  invitation?: InvitationOAuthCorrelation
   user: UserResponse
   refreshToken: string
   sessionId: string
@@ -47,24 +65,54 @@ export class OAuthService {
     private readonly providerFactory: OAuthProviderFactory,
     private readonly stateService: OAuthStateService,
     private readonly emailIdentity: EmailIdentityService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly env: EnvService,
+    private readonly invitationAuthority: InvitationContinuationService
   ) {
     this.logger.setContext(OAuthService.name)
   }
 
   async getAuthorizationURL(
     providerName: string,
-    locale?: SupportedLocale
+    locale?: SupportedLocale,
+    invited?: { credential: string; attemptId: string; handoff: InvitationHandoffProof }
   ): Promise<{ url: string; browserNonce: string }> {
     const provider = this.providerFactory.get(providerName)
     const state = randomBytes(32).toString('base64url')
     const codeVerifier = randomBytes(32).toString('base64url')
     const browserNonce = generateOAuthStateNonce()
 
+    let invitation: OAuthInvitationState | undefined
+    if (invited) {
+      if (
+        invited.attemptId !== invited.handoff.attemptId ||
+        !['google', 'github', 'apple'].includes(providerName)
+      )
+        throw invalidInvitation()
+      invitation = await this.prisma.$transaction(
+        async (tx) => {
+          const { invite, expiresAt } = await this.invitationAuthority.lockValid(tx, {
+            continuation: invited.credential,
+          })
+          return {
+            correlation: {
+              attemptId: invited.attemptId,
+              provider: providerName as 'google' | 'github' | 'apple',
+              expectedInviteId: invite.id,
+              expectedGeneration: invite.generation,
+            },
+            cleanupKeyHash: invited.handoff.cleanupKeyHash,
+            expiresAt: expiresAt.toISOString(),
+          }
+        },
+        { maxWait: 2000, timeout: 4000 }
+      )
+    }
     await this.stateService.store(state, {
       provider: providerName,
       codeVerifier,
       mode: 'login',
+      ...(invitation ? { invitation } : {}),
       browserNonceHash: hashOAuthStateNonce(browserNonce),
       ...(locale ? { locale } : {}),
     })
@@ -141,18 +189,77 @@ export class OAuthService {
       )
     }
 
-    const user = await this.findOrCreateUser(profile, providerName, stateData.locale)
-
+    const { user, session, refreshToken } = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
+        const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
+        if (stateData.invitation) {
+          await lockInvitationAuthAttempt(tx, {
+            attemptId: stateData.invitation.correlation.attemptId,
+            cleanupKeyHash: stateData.invitation.cleanupKeyHash,
+          })
+          await lockInvitationSignupEmail(tx, emailCanonical)
+        }
+        const provider = providerName.toUpperCase() as OAuthProvider
+        const account = await tx.oAuthAccount.findUnique({
+          where: {
+            provider_providerAccountId: { provider, providerAccountId: profile.providerId },
+          },
+          select: { userId: true },
+        })
+        const existingUser = account
+          ? { id: account.userId }
+          : await tx.user.findUnique({ where: { emailCanonical }, select: { id: true } })
+        if (existingUser) await lockInvitationUser(tx, existingUser.id, true)
+        if (stateData.invitation) {
+          const invite = await this.invitationAuthority.lockOAuthIntent(
+            tx,
+            stateData.invitation.correlation,
+            stateData.invitation.expiresAt
+          )
+          if (invite.emailCanonical !== emailCanonical) throw invalidInvitation()
+        }
+        const user = await this.findOrCreateUser(
+          tx,
+          profile,
+          providerName,
+          stateData.locale,
+          !!stateData.invitation,
+          existingUser?.id
+        )
+        if (stateData.invitation && user.emailCanonical !== emailCanonical)
+          throw invalidInvitation()
+        const issuance = await this.sessionService.createSession(
+          {
+            userId: user.id,
+            userAgent: requestInfo.userAgent,
+            ipAddress: requestInfo.ipAddress,
+            ...(stateData.invitation
+              ? {
+                  handoff: {
+                    attemptId: stateData.invitation.correlation.attemptId,
+                    cleanupKeyHash: stateData.invitation.cleanupKeyHash,
+                  },
+                }
+              : {}),
+          },
+          tx
+        )
+        if (
+          stateData.invitation &&
+          new Date(stateData.invitation.expiresAt) <= (await invitationClock(tx))
+        )
+          throw invalidInvitation()
+        return { user, ...issuance }
+      },
+      { maxWait: 2000, timeout: 4000 }
+    )
+    await this.userCacheService.invalidateUser(user.id)
     const accessClaims: AccessTokenPayload = {
       sub: user.id,
       email: user.email,
       systemRole: user.systemRole,
     }
-    const { session, refreshToken } = await this.sessionService.createSession({
-      userId: user.id,
-      userAgent: requestInfo.userAgent,
-      ipAddress: requestInfo.ipAddress,
-    })
 
     this.logger.info({ userId: user.id, provider: providerName }, 'oauth login')
 
@@ -162,6 +269,9 @@ export class OAuthService {
       refreshToken,
       sessionId: session.id,
       accessClaims,
+      ...(stateData.invitation
+        ? { invitation: { ...stateData.invitation.correlation, backendSessionId: session.id } }
+        : {}),
     }
   }
 
@@ -218,18 +328,27 @@ export class OAuthService {
   }
 
   private async findOrCreateUser(
+    tx: Prisma.TransactionClient,
     profile: OAuthUserProfile,
     providerName: string,
-    locale?: SupportedLocale
+    locale?: SupportedLocale,
+    invited = false,
+    expectedUserId?: string
   ): Promise<User> {
     const provider = providerName.toUpperCase() as OAuthProvider
 
-    const existing = await this.prisma.oAuthAccount.findUnique({
+    const existing = await tx.oAuthAccount.findUnique({
       where: { provider_providerAccountId: { provider, providerAccountId: profile.providerId } },
       include: { user: true },
     })
     if (existing) {
-      await this.prisma.user.update({
+      if (existing.userId !== expectedUserId)
+        throw new AppException(
+          'Identity changed during sign-in',
+          409,
+          AuthErrorCode.OAUTH_ACCOUNT_ALREADY_LINKED
+        )
+      await tx.user.update({
         where: { id: existing.userId },
         data: { lastLoginAt: new Date() },
       })
@@ -237,38 +356,47 @@ export class OAuthService {
     }
 
     const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
-    const userByEmail = await this.prisma.user.findUnique({ where: { emailCanonical } })
+    const userByEmail = await tx.user.findUnique({ where: { emailCanonical } })
     if (userByEmail) {
+      if (userByEmail.id !== expectedUserId)
+        throw new AppException(
+          'Identity changed during sign-in',
+          409,
+          AuthErrorCode.EMAIL_ALREADY_EXISTS
+        )
       // Existing account linked by email — keep its stored locale (D2: never
       // overwrite an established preference with a browser hint).
-      return this.linkAndReturnUser(userByEmail, profile, provider)
+      return this.linkAndReturnUser(tx, userByEmail, profile, provider)
     }
 
-    return this.createOAuthUser(profile, provider, locale)
+    if (!invited && !this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED'))
+      throw new AppException('Public signup is disabled', 403, AuthErrorCode.PUBLIC_SIGNUP_DISABLED)
+    return this.createOAuthUser(tx, profile, provider, locale)
   }
 
   private async linkAndReturnUser(
+    tx: Prisma.TransactionClient,
     existingUser: User,
     profile: OAuthUserProfile,
     provider: OAuthProvider
   ): Promise<User> {
     const shouldVerifyEmail = profile.emailVerified && !existingUser.emailVerified
 
-    await this.prisma.$transaction([
-      this.prisma.oAuthAccount.create({
+    await Promise.all([
+      tx.oAuthAccount.create({
         data: { userId: existingUser.id, provider, providerAccountId: profile.providerId },
       }),
-      this.prisma.user.update({
+      tx.user.update({
         where: { id: existingUser.id },
         data: { lastLoginAt: new Date(), ...(shouldVerifyEmail && { emailVerified: true }) },
       }),
     ])
 
-    await this.userCacheService.invalidateUser(existingUser.id)
-    return this.prisma.user.findUniqueOrThrow({ where: { id: existingUser.id } })
+    return tx.user.findUniqueOrThrow({ where: { id: existingUser.id } })
   }
 
   private createOAuthUser(
+    tx: Prisma.TransactionClient,
     profile: OAuthUserProfile,
     provider: OAuthProvider,
     locale?: SupportedLocale
@@ -276,7 +404,7 @@ export class OAuthService {
     const email = this.emailIdentity.normalizeForStorage(profile.email!)
     const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
 
-    return this.prisma.user.create({
+    return tx.user.create({
       data: {
         email,
         emailCanonical,

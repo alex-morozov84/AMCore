@@ -33,7 +33,7 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
 
   await consolePage.goto('/en/login')
   await consolePage.getByLabel(/email/i).fill(email)
-  await consolePage.getByLabel(/password/i).fill('Test1234Secure')
+  await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   const [deniedLogin] = await Promise.all([
     consolePage.waitForResponse(
       (response) =>

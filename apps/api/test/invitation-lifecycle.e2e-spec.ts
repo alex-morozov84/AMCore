@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 
 import { Pool } from 'pg'
 
+import { createInvitationOperationId } from '@amcore/shared'
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import { invitationActor } from '../src/core/organizations/invitation-actor'
@@ -17,6 +18,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { acceptInvitationForTest, invitationSeedRole } from './helpers/invitation-contract'
 import {
   carryInvitationBackend,
   observeInvitationTransactions,
@@ -31,7 +33,10 @@ import { registerDurabilityProofs } from './invitation-lifecycle/durability'
 import { registerExpiryProofs } from './invitation-lifecycle/expiry'
 import { registerFenceProofs } from './invitation-lifecycle/fences'
 import { registerForeignKeysProofs } from './invitation-lifecycle/foreignKeys'
+import { registerHandoffProofs } from './invitation-lifecycle/handoff'
 import { registerIdentityProofs } from './invitation-lifecycle/identity'
+import { registerIssuanceBudgetProofs } from './invitation-lifecycle/issuance-budget'
+import { registerReceiptProofs } from './invitation-lifecycle/receipts'
 import { registerTransitionsProofs } from './invitation-lifecycle/transitions'
 
 describe('Invitation lifecycle transaction proofs', () => {
@@ -92,6 +97,17 @@ describe('Invitation lifecycle transaction proofs', () => {
       email: users[1]!.email,
       systemRole: SystemRole.User,
     }
+    recipient.sid = (
+      await prisma.session.create({
+        data: {
+          userId: recipient.sub,
+          familyId: 'invitation-proof',
+          refreshToken: createInvitationOperationId(),
+          expiresAt: new Date(Date.now() + 3600000),
+          lastAuthAt: new Date(),
+        },
+      })
+    ).id
     roleId = (await prisma.role.findFirstOrThrow({ where: { name: 'MEMBER', isSystem: true } })).id
     const admin = await prisma.role.findFirstOrThrow({ where: { name: 'ADMIN', isSystem: true } })
     await seedOrgMember(prisma, { orgId, userId: owner.sub, roleId: admin.id })
@@ -109,14 +125,16 @@ describe('Invitation lifecycle transaction proofs', () => {
         email: recipient.email!,
         emailCanonical: recipient.email!,
         tokenHash: createHash('sha256').update(token).digest('hex'),
-        roleId: assignedRole,
+        ...(await invitationSeedRole(prisma, assignedRole)),
         invitedById: owner.sub,
         expiresAt: new Date(Date.now() + 60000),
       },
+      include: { roleIntents: true },
     })
     return { token, invite }
   }
-  const accept = (token: string) => invites.acceptInvite(token, recipient, '127.0.0.1')
+  const accept = (token: string) =>
+    acceptInvitationForTest(invites, prisma, token, recipient, '127.0.0.1')
   const outcome = (work: Promise<unknown>) =>
     carryInvitationBackend(
       work,
@@ -135,7 +153,7 @@ describe('Invitation lifecycle transaction proofs', () => {
     invitationFence(prisma, (model, method) => model === 'orgInvite' && method === 'update')
   async function truth(id: string) {
     return {
-      invite: await prisma.orgInvite.findUnique({ where: { id } }),
+      invite: await prisma.orgInvite.findUnique({ where: { id }, include: { roleIntents: true } }),
       members: await prisma.orgMember.findMany({
         where: { userId: recipient.sub },
         include: { roles: true },
@@ -184,8 +202,11 @@ describe('Invitation lifecycle transaction proofs', () => {
     race,
   })
   registerFenceProofs(getFixture)
+  registerHandoffProofs(getFixture)
+  registerReceiptProofs(getFixture)
   registerTransitionsProofs(getFixture)
   registerForeignKeysProofs(getFixture)
+  registerIssuanceBudgetProofs(getFixture)
   registerIdentityProofs(getFixture)
   registerAuthorityProofs(getFixture)
   registerAdmittedAuthorityProofs(getFixture)

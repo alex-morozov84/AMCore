@@ -449,3 +449,27 @@ The raw OAuth tokens (provider access token, refresh token) are stored in `OAuth
 | `OAUTH_EMAIL_REQUIRED`          | 400  | Provider didn't return an email and no existing account was found |
 | `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | Provider is not set up (missing env vars)                         |
 | `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Linking: that provider account belongs to a different user        |
+
+## Public signup and invited sign-in
+
+`AUTH_PUBLIC_SIGNUP_ENABLED=false` prevents creation of new ordinary OAuth
+accounts while preserving existing-account login. A validated invitation can
+permit new-account creation for the matching canonical provider email. Provider
+email/linking verification rules apply; Telegram remains link-only. OAuth callback
+never grants organization membership: a verified recipient explicitly accepts
+the inspected invitation afterwards.
+
+A dedicated server BFF can start invited OAuth with a scoped continuation and
+paired authentication handoff proof. The one-time API state stores attempt,
+provider, invitation ID/generation, continuation deadline and cleanup-key hash
+alongside existing PKCE/browser binding. These fields never enter the provider
+URL. Validated callback carries correlation into the one-time login ticket;
+exchange returns optional `invitation` metadata with the exact backend session ID.
+It is server correlation, never a browser-chosen return destination.
+
+The new session is pending until the BFF receives its matching browser cookie
+and explicitly confirms the authentication handoff. Failed publication can abort
+only that unconfirmed session; a database-only deadline sweep provides cleanup
+when Redis is unavailable. See [invitation authentication](invites.md#scoped-signup-and-authentication)
+for headers, endpoints, deadlines and recovery. Ordinary OAuth retains its
+existing destinations and cookie/nonce/ticket protections.

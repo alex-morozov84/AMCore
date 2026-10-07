@@ -1,7 +1,6 @@
 import type { AiTextResult } from '../gateway/ai-gateway.types'
 
 import type { ClaimedRun } from './ai-run-dispatch.types'
-import { lockAndAssertBotOwnership } from './ai-run-ownership-fence'
 import type { RunAttribution } from './ai-run-plan'
 
 import { AiAuthorType, AiMessageRole, AiRunStepType, Prisma } from '@/generated/prisma/client'
@@ -82,17 +81,16 @@ export async function writeUsageLedger(
 }
 
 /**
- * Persist the final assistant text turn. The lock is the ownership fence (ADR-049, Arc F): it locks the
- * conversation `FOR UPDATE` (serializing concurrent appends) AND throws `ConversationSupersededError`
- * if a human took over since this run was queued — the whole success transaction then rolls back and
- * the finalizer abandons the run superseded, so no stale bot turn lands in a human-owned conversation.
+ * Persist the final assistant text turn. It runs inside the run guard's transaction, which already holds
+ * the conversation `FOR UPDATE` lock (serializing concurrent appends) and has verified the ownership
+ * fence (ADR-049, Arc F): the finalizer calls this ONLY when no stop cause (cancel, takeover, deadline)
+ * is visible, so no stale bot turn can land in a human-owned conversation.
  */
 export async function writeAssistantTurn(
   tx: Prisma.TransactionClient,
   claim: ClaimedRun,
   text: string
 ): Promise<void> {
-  await lockAndAssertBotOwnership(tx, claim.conversationId, claim.ownershipGeneration)
   const sequence = await nextSequence(tx, claim.conversationId)
   await tx.aiMessage.create({
     data: {

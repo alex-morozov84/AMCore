@@ -19,7 +19,7 @@ This guide covers everything — from "how do I log a user in" to "how do I rest
 | [Capability catalogue](./capability-catalogue.md)     | Implemented actions, permission presets and actor/record access hints              |
 | [Organization context](./organization-context.md)     | Explicit API-verified targets, typed session-fenced transport and tenant extension |
 | [Authorization upgrade](./authorization-upgrade.md)   | Audit and controlled transition to explicit defaults and TeamAccess                |
-| [Invites](./invites.md)                               | Inviting people to an organization by email                                        |
+| [Invites](./invites.md)                               | Complete role intent, explicit consent, scoped signup and recovery                 |
 | [API Keys](./api-keys.md)                             | Machine-to-machine access with scoped keys                                         |
 | [Auth contracts](./reference.md)                      | Credential model, error codes, environment variables                               |
 | [Operations Console](../operations-console/README.md) | Separate `SUPER_ADMIN` control-plane admission and host session boundary           |
@@ -122,6 +122,9 @@ JWT-only by default; only the explicit API-key allowlist accepts
 [API Keys](./api-keys.md).
 
 ---
+
+The [ready invitation UI](../product-admin/invitations.md) provides manager and
+recipient scenarios; custom downstream screens can reuse its headless contracts.
 
 ## Environments
 

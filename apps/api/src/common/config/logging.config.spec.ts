@@ -43,6 +43,46 @@ describe('createLoggingConfig', () => {
     )
   })
 
+  it('redacts invitation proof headers and credential-bearing response headers in actual output', () => {
+    const stream = new PassThrough()
+    let output = ''
+    stream.on('data', (chunk) => {
+      output += chunk.toString()
+    })
+    const pinoPath = require.resolve('pino', { paths: [require.resolve('nestjs-pino')] })
+    const pino = require(pinoPath)
+    const config = createLoggingConfig(clsServiceMock, 4096)
+    const logger = pino({ redact: (config.pinoHttp as { redact: object }).redact }, stream)
+    logger.info(
+      {
+        req: {
+          body: { ticket: 'fake-exchange-secret', credential: 'fake-body-secret' },
+          headers: {
+            'x-invitation-continuation': 'fake-scope-secret',
+            'x-invitation-handoff-key': 'fake-cleanup-secret',
+          },
+        },
+        res: {
+          headers: {
+            'set-cookie': ['refresh_token=fake-session-secret; HttpOnly'],
+            location: '/auth/callback?ticket=fake-ticket-secret',
+          },
+        },
+      },
+      'test'
+    )
+    for (const value of [
+      'fake-scope-secret',
+      'fake-cleanup-secret',
+      'fake-session-secret',
+      'fake-ticket-secret',
+      'fake-exchange-secret',
+      'fake-body-secret',
+    ])
+      expect(output).not.toContain(value)
+    expect(output).toContain('[REDACTED]')
+  })
+
   it('redacts token-bearing action URLs in actual log output (EQS-02)', () => {
     const config = createLoggingConfig(clsServiceMock, 4096)
     const stream = new PassThrough()

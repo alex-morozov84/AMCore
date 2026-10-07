@@ -17,18 +17,21 @@ read-only “Your access” / “Ваш доступ” card shows the verified
 reminder that actions are checked again. It makes no claim about assigned
 records. It is a read-only landing point for future downstream
 work. The [members page](../product-admin/organization-members.md) adds role assignment;
-role-definition and invitation screens are not included. No inactive links
-promise them. A missing/removed target stays unavailable at that URL; it never
+[invitations](../product-admin/invitations.md) add management and a separate recipient
+journey. Role-definition editing remains downstream-owned. A missing/removed target stays unavailable at that URL; it never
 silently adopts another organization. Capability text never grants authority.
 
 ## Ordered data and identity lifecycle
 
 The organization frame admits a safe binding through the entity server DAL,
-without an API request or credential refresh. It does not loop back through
-its own HTTP routes or prefetch list/context for duplicate hydration. Client
-mount verifies bootstrap then reads exactly one active list or overview.
-Single-entry redirection creates the selected mount: two bootstrap plus two
-domain requests in total, zero switches. Fresh sessions need zero refreshes.
+without an API request or credential refresh. Selected ready mounts also read
+current organization context directly on the server to verify access and seed
+the heading; they do not loop back through their own HTTP routes. This initial
+server-authorized name remains visible during the first client verification.
+It is not reused after a terminal authority observation. Client mount verifies
+bootstrap and reads its active list or selected context; it does not exchange
+organization tokens. This heading admission adds a server context read, rather
+than promising the earlier list-only request count.
 
 Focus, visible visibilitychange and persisted pageshow suspend old content
 immediately and coalesce through one100ms trailing scheduler. Manual Refresh

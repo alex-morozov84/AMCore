@@ -10,6 +10,7 @@ import type {
 
 import { ConflictException, NotFoundException } from '../../../common/exceptions'
 import { AI_APPROVAL_LIST_LIMIT, AI_RUN_WAKE_JOB_OPTIONS } from '../ai-run.constants'
+import { lockRun, runIdOfApproval } from '../ai-run-locks'
 import type { AiRunWakeJob } from '../runs/ai-run-producer.service'
 
 import { toAiApprovalResponse } from './ai-approval.mapper'
@@ -37,7 +38,6 @@ interface ApprovalLockRow {
   runId: string
   runStatus: string
   deadlineAt: Date | null
-  attemptCount: number
   ownerUserId: string
 }
 
@@ -54,8 +54,8 @@ type DecisionOutcome =
  * caller's approvals and records approve/reject decisions. A decision runs under a `FOR UPDATE` lock on
  * the approval **and** its run so the freshness gate + multi-CAS is atomic: a stale approval is
  * inline-expired (never re-queued), a duplicate decision is idempotent, a conflicting one is 409, and a
- * fresh decision flips the approval + invocation and re-queues the run (decrementing `attemptCount` so
- * the resume does not consume a provider-retry attempt). Every `ai.approval.*` event is written in the
+ * fresh decision flips the approval + invocation and re-queues the run (a resume is a new lease epoch
+ * and spends no retry budget). Every `ai.approval.*` event is written in the
  * same transaction (security evidence); the wake + metric are post-commit. No provider or tool I/O.
  */
 @Injectable()
@@ -127,9 +127,14 @@ export class AiApprovalService {
     approvalId: string,
     input: DecideAiApprovalInput
   ): Promise<DecisionOutcome> {
+    // Lock order: run BEFORE approval (see `ai-run-locks`), so decide never lock-cycles with cancel,
+    // the expiry sweep, a takeover or the worker's ownership guard.
+    const lockedRunId = await runIdOfApproval(tx, approvalId)
+    if (lockedRunId === null || (await lockRun(tx, lockedRunId)) === null)
+      return { kind: 'not_found' }
     const rows = await tx.$queryRaw<ApprovalLockRow[]>(Prisma.sql`
       SELECT a.id, a.state::text AS state, a."expiresAt", a."runId",
-             r.status::text AS "runStatus", r."deadlineAt", r."attemptCount",
+             r.status::text AS "runStatus", r."deadlineAt",
              c."ownerUserId"
       FROM "ai"."ai_approvals" a
       JOIN "ai"."ai_runs" r ON r.id = a."runId"
@@ -173,7 +178,7 @@ export class AiApprovalService {
     }
   }
 
-  /** Flip approval + invocation to the decision and re-queue the run (attemptCount-preserving). */
+  /** Flip approval + invocation to the decision and re-queue the run (no retry budget is spent). */
   private async applyDecision(
     tx: Prisma.TransactionClient,
     row: ApprovalLockRow,
@@ -189,14 +194,13 @@ export class AiApprovalService {
       where: { id: row.id, state: AiApprovalState.PENDING },
       data: { state: approvalState, decidedById: userId, decidedAt: now },
     })
-    // Re-queue; decrement the claim budget ONLY when attemptCount > 0 (A2-R1 #2) so a broken invariant
-    // can never mint a negative budget, and the resume claim's +1 nets zero.
+    // Re-queue. The resume is a fresh lease epoch; `attemptCount` counts consumed retries only, so a
+    // decision neither spends nor refunds retry budget.
     const run = await tx.aiRun.updateMany({
       where: { id: row.runId, status: AiRunStatus.WAITING_APPROVAL },
       data: {
         status: AiRunStatus.QUEUED,
         availableAt: now,
-        ...(row.attemptCount > 0 ? { attemptCount: { decrement: 1 } } : {}),
       },
     })
     // The gated invocation is NOT under the row lock, so its flip can race — enforce all three CAS

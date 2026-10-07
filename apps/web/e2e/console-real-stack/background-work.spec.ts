@@ -33,7 +33,7 @@ async function operator(
   const page = await consoleContext.newPage()
   await page.goto('/en/login')
   await page.getByLabel(/email/i).fill(email)
-  await page.getByLabel(/password/i).fill('Test1234Secure')
+  await page.getByLabel(/^password$/i).fill('Test1234Secure')
   await page.getByRole('button', { name: /sign in/i }).click()
   await expect(page).toHaveURL(/\/en\/?$/)
   return { page, close: () => Promise.all([product.close(), consoleContext.close()]) }

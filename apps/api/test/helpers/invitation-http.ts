@@ -1,6 +1,8 @@
 import { JwtService } from '@nestjs/jwt'
 import request from 'supertest'
 
+import { createInvitationOperationId } from '@amcore/shared'
+
 import type { InviteService } from '../../src/core/organizations/invite.service'
 
 import { boundedFailure, trackInvitationOperation } from './invitation-operation'
@@ -71,14 +73,16 @@ export function invitationHttp(
   const server = context.app.getHttpServer()
   return operation === 'create'
     ? request(server)
-        .post(`/organizations/${orgId}/members/invite`)
+        .post(`/organizations/${orgId}/invites`)
         .auth(credential, { type: 'bearer' })
+        .set('X-Invitation-Operation-Id', createInvitationOperationId())
         .timeout({ response: 5000, deadline: 6000 })
         .send({ email: recipient.email })
         .then((r) => r)
     : request(server)
-        .delete(`/organizations/${orgId}/invites/${inviteId}`)
+        .delete(`/organizations/${orgId}/invites/${inviteId}?expectedGeneration=1`)
         .auth(credential, { type: 'bearer' })
+        .set('X-Invitation-Operation-Id', createInvitationOperationId())
         .timeout({ response: 5000, deadline: 6000 })
         .then((r) => r)
 }

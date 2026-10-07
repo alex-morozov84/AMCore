@@ -3,6 +3,8 @@ import { createHash, randomBytes } from 'node:crypto'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
+import { createInvitationOperationId } from '@amcore/shared'
+
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -13,6 +15,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { invitationAcceptBody, invitationSeedRole } from './helpers/invitation-contract'
 
 describe('Audit capture points (e2e)', () => {
   let app: INestApplication
@@ -146,7 +149,8 @@ describe('Audit capture points (e2e)', () => {
 
     const createBaseline = await prisma.auditLog.count()
     await request(app.getHttpServer())
-      .post(`/organizations/${orgId}/members/invite`)
+      .post(`/organizations/${orgId}/invites`)
+      .set('X-Invitation-Operation-Id', createInvitationOperationId())
       .set('Authorization', `Bearer ${orgToken}`)
       .send({ email: 'invitee@example.com' })
       .expect(202)
@@ -158,14 +162,14 @@ describe('Audit capture points (e2e)', () => {
     const createdAudit = findAudit(await auditRowsSince(createBaseline), 'org.invite_created')
     expect(createdAudit?.metadata).toMatchObject({
       actorCredentialType: 'jwt',
-      branch: 'pending_known_user',
+      branch: 'created',
       emailHash: createHash('sha256').update('invitee@example.com').digest('hex'),
-      pinoEvent: 'org.invite.created',
     })
 
     const revokeBaseline = await prisma.auditLog.count()
     await request(app.getHttpServer())
-      .delete(`/organizations/${orgId}/invites/${createdInvite.id}`)
+      .delete(`/organizations/${orgId}/invites/${createdInvite.id}?expectedGeneration=1`)
+      .set('X-Invitation-Operation-Id', createInvitationOperationId())
       .set('Authorization', `Bearer ${orgToken}`)
       .expect(204)
 
@@ -174,15 +178,15 @@ describe('Audit capture points (e2e)', () => {
     ).toMatchObject({
       actorCredentialType: 'jwt',
       emailHash: createHash('sha256').update('invitee@example.com').digest('hex'),
-      pinoEvent: 'org.invite.revoked',
     })
 
     const acceptBaseline = await prisma.auditLog.count()
     const seeded = await seedInvite(orgId, admin.userId, 'invitee@example.com')
     await request(app.getHttpServer())
       .post('/auth/invites/accept')
+      .set('X-Invitation-Operation-Id', createInvitationOperationId())
       .set('Authorization', `Bearer ${invitee.token}`)
-      .send({ token: seeded.rawToken })
+      .send(await invitationAcceptBody(prisma, seeded.rawToken))
       .expect(200)
 
     expect(
@@ -190,8 +194,7 @@ describe('Audit capture points (e2e)', () => {
     ).toMatchObject({
       actorCredentialType: 'jwt',
       emailHash: createHash('sha256').update('invitee@example.com').digest('hex'),
-      pinoEvent: 'org.invite.accepted',
-      roleId: expect.any(String),
+      roleIds: [expect.any(String)],
     })
     expect(JSON.stringify(await auditRowsSince(createBaseline))).not.toContain(
       'invitee@example.com'
@@ -220,7 +223,8 @@ describe('Audit capture points (e2e)', () => {
     const orgId = await createOrganization(admin.token)
     const orgToken = await switchOrganization(admin.token, orgId)
     await request(app.getHttpServer())
-      .post(`/organizations/${orgId}/members/invite`)
+      .post(`/organizations/${orgId}/invites`)
+      .set('X-Invitation-Operation-Id', createInvitationOperationId())
       .set('Authorization', `Bearer ${orgToken}`)
       .send({ email: 'pending@example.com' })
       .expect(202)
@@ -232,7 +236,8 @@ describe('Audit capture points (e2e)', () => {
     await blockAuditInserts()
 
     await request(app.getHttpServer())
-      .delete(`/organizations/${orgId}/invites/${invite.id}`)
+      .delete(`/organizations/${orgId}/invites/${invite.id}?expectedGeneration=1`)
+      .set('X-Invitation-Operation-Id', createInvitationOperationId())
       .set('Authorization', `Bearer ${orgToken}`)
       .expect(503)
 
@@ -301,7 +306,7 @@ describe('Audit capture points (e2e)', () => {
         email,
         emailCanonical: email,
         invitedById,
-        roleId: role.id,
+        ...(await invitationSeedRole(prisma, role.id)),
         tokenHash: createHash('sha256').update(rawToken).digest('hex'),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },

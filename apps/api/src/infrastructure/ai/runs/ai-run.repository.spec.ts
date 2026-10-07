@@ -9,6 +9,7 @@ import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun, GuardrailRefusalInput } from './ai-run-dispatch.types'
 
 import { AiRunStepType } from '@/generated/prisma/client'
+import { ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
 function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
@@ -16,6 +17,7 @@ function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
     id: 'run-1',
     conversationId: 'conv-1',
     modelSnapshot: { modelSlug: 'claude-default' },
+    epoch: 2,
     attemptNumber: 1,
     maxAttempts: 3,
     deadlineAt: null,
@@ -28,25 +30,28 @@ function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
 describe('AiRunRepository', () => {
   let prisma: DeepMockProxy<PrismaService>
   let repo: AiRunRepository
+  let latch: ShutdownLatch
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>()
-    repo = new AiRunRepository(prisma)
+    latch = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
+    repo = new AiRunRepository(prisma, latch)
     prisma.$transaction.mockImplementation(((cb: (tx: PrismaService) => Promise<unknown>) =>
       cb(prisma)) as never)
   })
 
   describe('claimDueBatch', () => {
-    it('maps claimed rows to ClaimedRun with the post-increment attempt and a lease token', async () => {
+    it('maps claimed rows to ClaimedRun: the new epoch, the retry ordinal (retries + 1) and a lease token', async () => {
       prisma.$queryRaw.mockResolvedValue([
         {
           id: 'run-1',
           conversationId: 'conv-1',
           modelSnapshot: { modelSlug: 'claude-default' },
-          attemptCount: 1,
+          attemptCount: 1, // consumed retries — the claim itself spends no budget
           maxAttempts: 3,
           deadlineAt: null,
           ownershipGeneration: 4,
+          leaseEpoch: 5,
         },
       ] as never)
 
@@ -54,7 +59,8 @@ describe('AiRunRepository', () => {
 
       expect(run).toMatchObject({
         id: 'run-1',
-        attemptNumber: 1,
+        epoch: 5,
+        attemptNumber: 2,
         maxAttempts: 3,
         ownershipGeneration: 4,
       })
@@ -125,10 +131,8 @@ describe('AiRunRepository', () => {
     }
 
     beforeEach(() => {
-      // The refusal write fences + locks the conversation first; default to fresh, bot-owned, active.
-      prisma.$queryRaw.mockResolvedValue([
-        { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE' },
-      ] as never)
+      // The conversation lock + fence are the run guard's job (proved in its own spec): here the
+      // refusal write only composes into the caller's guarded transaction.
       prisma.aiMessage.aggregate.mockResolvedValue({ _max: { sequence: 0 } } as never)
       prisma.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 0 } } as never)
       prisma.aiMessage.create.mockResolvedValue({} as never)
@@ -137,7 +141,7 @@ describe('AiRunRepository', () => {
     })
 
     it('CAS win → terminal FAILED (non-retryable) with the guardrail terminalReasonCode', async () => {
-      await expect(repo.finalizeRefusal(claim(), refusal())).resolves.toBe(true)
+      await expect(repo.finalizeRefusal(prisma, claim(), refusal())).resolves.toBe(true)
       expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'run-1', status: 'RUNNING', leaseToken: 'lease-abc' },
@@ -157,7 +161,7 @@ describe('AiRunRepository', () => {
     })
 
     it('persists a canned, content-free refusal turn as ASSISTANT / authorType SYSTEM', async () => {
-      await repo.finalizeRefusal(claim(), refusal())
+      await repo.finalizeRefusal(prisma, claim(), refusal())
       expect(prisma.aiMessage.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -172,7 +176,7 @@ describe('AiRunRepository', () => {
     })
 
     it('writes a content-free check step (bounded categories) + a REFUSAL step', async () => {
-      await repo.finalizeRefusal(claim(), refusal())
+      await repo.finalizeRefusal(prisma, claim(), refusal())
       const [{ data }] = prisma.aiRunStep.createMany.mock.calls.at(-1) as unknown as [
         { data: { type: string; detail?: unknown; errorCode?: string }[] },
       ]
@@ -185,15 +189,8 @@ describe('AiRunRepository', () => {
       expect(JSON.stringify(data)).not.toContain('amcore:user-data-')
     })
 
-    it('locks the conversation FOR UPDATE before allocating the refusal sequence', async () => {
-      await repo.finalizeRefusal(claim(), refusal())
-      const lockOrder = prisma.$queryRaw.mock.invocationCallOrder[0]
-      const seqOrder = prisma.aiMessage.aggregate.mock.invocationCallOrder[0]
-      expect(lockOrder).toBeLessThan(seqOrder as number)
-    })
-
     it('omits step detail when no categories are supplied', async () => {
-      await repo.finalizeRefusal(claim(), refusal({ categories: [] }))
+      await repo.finalizeRefusal(prisma, claim(), refusal({ categories: [] }))
       const [{ data }] = prisma.aiRunStep.createMany.mock.calls.at(-1) as unknown as [
         { data: { detail?: unknown }[] },
       ]
@@ -202,6 +199,7 @@ describe('AiRunRepository', () => {
 
     it('defensively drops malicious/invalid categories (marker, snippet, bad count) from detail', async () => {
       await repo.finalizeRefusal(
+        prisma,
         claim(),
         refusal({
           categories: [
@@ -227,39 +225,21 @@ describe('AiRunRepository', () => {
 
     it('caps the persisted category list length defensively', async () => {
       const many = Array.from({ length: 30 }, (_, i) => ({ category: `cat_${i}`, count: 1 }))
-      await repo.finalizeRefusal(claim(), refusal({ categories: many }))
+      await repo.finalizeRefusal(prisma, claim(), refusal({ categories: many }))
       const [{ data }] = prisma.aiRunStep.createMany.mock.calls.at(-1) as unknown as [
         { data: { detail?: { categories: unknown[] } }[] },
       ]
       expect(data[0]!.detail!.categories).toHaveLength(16)
     })
 
-    it('CAS loss → returns false (message + steps + terminal update roll back together)', async () => {
+    it('CAS loss → returns false so the guarded transaction rolls message + steps + terminal back together', async () => {
       prisma.aiRun.updateMany.mockResolvedValue({ count: 0 } as never)
-      await expect(repo.finalizeRefusal(claim(), refusal())).resolves.toBe(false)
-    })
-
-    it('a human takeover during a refusal write abandons the run superseded, no transcript turn', async () => {
-      // The fence read shows the generation moved → the refusal write rolls back and the run is
-      // instead CANCELLED / superseded_by_human, with NO assistant refusal message written.
-      prisma.$queryRaw.mockResolvedValue([
-        { ownershipGeneration: 1, controlledBy: 'HUMAN', state: 'PAUSED_FOR_HUMAN' },
-      ] as never)
-
-      await expect(repo.finalizeRefusal(claim(), refusal())).resolves.toBe(true)
-      expect(prisma.aiMessage.create).not.toHaveBeenCalled()
-      expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            status: 'CANCELLED',
-            terminalReasonCode: 'superseded_by_human',
-          }),
-        })
-      )
+      await expect(repo.finalizeRefusal(prisma, claim(), refusal())).resolves.toBe(false)
     })
 
     it('records the output-block reason + OUTPUT_VALIDATION check step', async () => {
       await repo.finalizeRefusal(
+        prisma,
         claim(),
         refusal({
           reasonCode: AiRunTerminalReason.GUARDRAIL_OUTPUT_BLOCKED,
@@ -278,18 +258,85 @@ describe('AiRunRepository', () => {
     })
   })
 
-  describe('finalizeRetry', () => {
-    it('re-queues with a future nextAttemptAt while attempts remain', async () => {
+  describe('attempt history + in-flight tools close with the transition', () => {
+    /** SQL text of every raw statement executed inside the transaction. */
+    function executedSql(): string[] {
+      return prisma.$executeRaw.mock.calls.map((call) =>
+        (call[0] as unknown as { strings: string[] }).strings.join('?')
+      )
+    }
+
+    it("closes the epoch's attempt row in the same transaction as a terminal CAS", async () => {
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
+
+      await repo.finalizeFailed(prisma, claim(), 'provider_rejected')
+
+      const attempt = executedSql().find((sql) => sql.includes('"ai"."ai_run_attempts"'))
+      expect(attempt).toContain('"endedAt" IS NULL')
+      expect(attempt).toContain('epoch =')
+    })
+
+    it('resolves in-flight tools on a terminal transition: side-effecting EXECUTING → OUTCOME_UNKNOWN, unstarted → SKIPPED', async () => {
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
+
+      await repo.finalizeCancelled(prisma, claim(), 'cancelled_by_user')
+
+      const sql = executedSql().join('\n')
+      expect(sql).toContain("'OUTCOME_UNKNOWN'")
+      expect(sql).toContain("COALESCE(idempotency, 'idempotent') <> 'read_only'")
+      expect(sql).toContain("'tool_abandoned'")
+      expect(sql).toContain("'SKIPPED'")
+    })
+
+    it('writes nothing when the CAS lost (a stale holder closes no history, resolves no tool)', async () => {
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 0 } as never)
+
+      await expect(repo.finalizeCompleted(prisma, claim())).resolves.toBe(false)
+      expect(prisma.$executeRaw).not.toHaveBeenCalled()
+    })
+
+    it('parking for approval closes the attempt as awaiting_approval and leaves tools alone', async () => {
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
+
+      await repo.parkForApproval(prisma, claim())
+
+      expect(executedSql()).toHaveLength(1)
+      expect(executedSql()[0]).toContain('"ai"."ai_run_attempts"')
+    })
+  })
+
+  describe('finalizeRetry (retry budget counts consumed retries, never claims)', () => {
+    beforeEach(() => {
+      prisma.aiRun.findUnique.mockResolvedValue({ cancellationRequestedAt: null } as never)
+    })
+
+    it('re-queues with a future nextAttemptAt and records the retry ordinal as attemptCount', async () => {
       prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
       const outcome = await repo.finalizeRetry(
         prisma,
-        claim({ attemptNumber: 1 }),
+        claim({ attemptNumber: 2 }),
         'provider_timeout'
       )
       expect(outcome.state).toBe('retry_scheduled')
       expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ status: 'QUEUED' }) })
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'QUEUED', attemptCount: 2 }),
+        })
       )
+    })
+
+    it('a fresh run still gets exactly maxAttempts executions (retry ordinals 1 and 2 re-queue, 3 fails)', async () => {
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
+      const states: string[] = []
+      for (const attemptNumber of [1, 2, 3]) {
+        const outcome = await repo.finalizeRetry(
+          prisma,
+          claim({ attemptNumber, maxAttempts: 3 }),
+          'provider_unavailable'
+        )
+        states.push(outcome.state)
+      }
+      expect(states).toEqual(['retry_scheduled', 'retry_scheduled', 'failed'])
     })
 
     it('fails terminally once attempts are exhausted', async () => {
@@ -310,6 +357,26 @@ describe('AiRunRepository', () => {
       )
     })
 
+    it('a recorded user cancel wins over a retry: the run is cancelled, never re-queued', async () => {
+      prisma.aiRun.findUnique.mockResolvedValue({ cancellationRequestedAt: new Date() } as never)
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
+
+      const outcome = await repo.finalizeRetry(prisma, claim(), 'provider_timeout')
+
+      expect(outcome).toEqual({ state: 'failed', reasonCode: 'cancelled_by_user' })
+      expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'CANCELLED',
+            terminalReasonCode: 'cancelled_by_user',
+          }),
+        })
+      )
+      expect(prisma.aiRun.updateMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'QUEUED' }) })
+      )
+    })
+
     it('reports lease_lost when the CAS matches no row', async () => {
       prisma.aiRun.updateMany.mockResolvedValue({ count: 0 } as never)
       const outcome = await repo.finalizeRetry(prisma, claim(), 'provider_timeout')
@@ -318,34 +385,64 @@ describe('AiRunRepository', () => {
   })
 
   describe('reapExpiredLeases', () => {
-    it('re-queues a reclaimed run with attempts remaining', async () => {
-      prisma.$queryRaw.mockResolvedValue([
-        { id: 'run-1', attemptCount: 1, maxAttempts: 3, deadlineAt: null },
-      ] as never)
+    function reapRow(over: Record<string, unknown> = {}): Record<string, unknown> {
+      return {
+        id: 'run-1',
+        attemptCount: 0,
+        maxAttempts: 3,
+        deadlineAt: null,
+        cancellationRequestedAt: null,
+        leaseEpoch: 4,
+        ioStarted: true,
+        ...over,
+      }
+    }
+
+    it('re-queues a reclaimed run that may have started I/O, consuming one retry', async () => {
+      prisma.$queryRaw.mockResolvedValue([reapRow({ attemptCount: 1 })] as never)
       const result = await repo.reapExpiredLeases()
       expect(result).toEqual({ rescheduled: 1, failed: 0 })
       expect(prisma.aiRun.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ status: 'QUEUED' }) })
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'QUEUED', attemptCount: 2 }),
+        })
       )
     })
 
-    it('fails a reclaimed run whose attempts are exhausted', async () => {
-      prisma.$queryRaw.mockResolvedValue([
-        { id: 'run-1', attemptCount: 3, maxAttempts: 3, deadlineAt: null },
-      ] as never)
+    it('re-queues an attempt that NEVER admitted I/O without consuming retry budget (and with no backoff)', async () => {
+      prisma.$queryRaw.mockResolvedValue([reapRow({ attemptCount: 2, ioStarted: false })] as never)
+      const result = await repo.reapExpiredLeases()
+      expect(result).toEqual({ rescheduled: 1, failed: 0 })
+      const [{ data }] = prisma.aiRun.update.mock.calls[0] as unknown as [
+        { data: { attemptCount: number; nextAttemptAt: Date; status: string } },
+      ]
+      expect(data.status).toBe('QUEUED')
+      expect(data.attemptCount).toBe(2)
+    })
+
+    it('never fails a pre-I/O reclaim as exhausted (the epoch cap bounds it instead)', async () => {
+      prisma.$queryRaw.mockResolvedValue([reapRow({ attemptCount: 2, ioStarted: false })] as never)
+      const result = await repo.reapExpiredLeases()
+      expect(result.failed).toBe(0)
+    })
+
+    it('fails a reclaimed run whose retries are exhausted and whose attempt may have started I/O', async () => {
+      prisma.$queryRaw.mockResolvedValue([reapRow({ attemptCount: 2 })] as never)
       const result = await repo.reapExpiredLeases()
       expect(result).toEqual({ rescheduled: 0, failed: 1 })
       expect(prisma.aiRun.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'FAILED', errorCode: 'lease_expired' }),
+          data: expect.objectContaining({
+            status: 'FAILED',
+            errorCode: 'lease_expired',
+            terminalReasonCode: 'attempts_exhausted',
+          }),
         })
       )
     })
 
     it('expires a reclaimed run whose deadline has already passed', async () => {
-      prisma.$queryRaw.mockResolvedValue([
-        { id: 'run-1', attemptCount: 1, maxAttempts: 3, deadlineAt: new Date(0) },
-      ] as never)
+      prisma.$queryRaw.mockResolvedValue([reapRow({ deadlineAt: new Date(0) })] as never)
       const result = await repo.reapExpiredLeases()
       expect(result).toEqual({ rescheduled: 0, failed: 1 })
       expect(prisma.aiRun.update).toHaveBeenCalledWith(
@@ -358,6 +455,82 @@ describe('AiRunRepository', () => {
         })
       )
     })
+
+    it('turns a reclaimed run with a recorded cancel into CANCELLED, not a requeue or a failure', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        reapRow({ cancellationRequestedAt: new Date(), attemptCount: 2 }),
+      ] as never)
+      const result = await repo.reapExpiredLeases()
+      expect(result).toEqual({ rescheduled: 0, failed: 1 })
+      expect(prisma.aiRun.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'CANCELLED',
+            terminalReasonCode: 'cancelled_by_user',
+          }),
+        })
+      )
+    })
+
+    it('reaps with SKIP LOCKED on the run row ONLY (never the conversation: no lock cycle with the guard)', async () => {
+      prisma.$queryRaw.mockResolvedValue([] as never)
+      await repo.reapExpiredLeases()
+      const sql = (
+        prisma.$queryRaw.mock.calls[0]![0] as unknown as { strings: string[] }
+      ).strings.join('?')
+      expect(sql).toContain('FOR UPDATE OF r SKIP LOCKED')
+      expect(sql).not.toContain('ai_conversations')
+      expect(sql).toContain('clock_timestamp()')
+    })
+  })
+
+  describe('shutdown seal (sweeps run through the latch guarded transaction)', () => {
+    it('a reaper transaction resumed AFTER the seal rolls its tail back: no later query, no update', async () => {
+      const release = deferred()
+      prisma.$queryRaw.mockImplementation((async () => {
+        await release.promise // the first (lock) query of the sweep is still pending when the seal happens
+        return [reapRow()]
+      }) as never)
+      const reaping = repo.reapExpiredLeases()
+      await new Promise((resolve) => setImmediate(resolve))
+
+      latch.seal()
+      release.resolve()
+      const result = await reaping
+
+      expect(result).toEqual({ rescheduled: 0, failed: 0 }) // sealed: reported as nothing done
+      expect(prisma.aiRun.update).not.toHaveBeenCalled() // the forbidden tail never reached the database
+      expect(prisma.$executeRaw).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['expireDeadlinedRuns', 0],
+      ['failEpochCappedRuns', 0],
+    ] as const)('%s starts no transaction once sealed', async (method, empty) => {
+      latch.seal()
+
+      expect(await repo[method]()).toBe(empty)
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    function reapRow(): Record<string, unknown> {
+      return {
+        id: 'run-1',
+        attemptCount: 0,
+        maxAttempts: 3,
+        deadlineAt: null,
+        cancellationRequestedAt: null,
+        leaseEpoch: 1,
+        ioStarted: true,
+      }
+    }
+    function deferred(): { promise: Promise<void>; resolve: () => void } {
+      let resolve!: () => void
+      const promise = new Promise<void>((done) => {
+        resolve = done
+      })
+      return { promise, resolve }
+    }
   })
 
   describe('expireDeadlinedRuns', () => {
@@ -373,6 +546,24 @@ describe('AiRunRepository', () => {
           }),
         })
       )
+    })
+  })
+
+  describe('failEpochCappedRuns', () => {
+    it('fails queued runs whose attempt history is full (never evicting a row) and resolves their tools', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'run-1' }] as never)
+      const count = await repo.failEpochCappedRuns()
+      expect(count).toBe(1)
+      expect(prisma.aiRun.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'FAILED',
+            errorCode: 'attempt_history_exhausted',
+            terminalReasonCode: 'attempts_exhausted',
+          }),
+        })
+      )
+      expect(prisma.aiRunStep.deleteMany).not.toHaveBeenCalled()
     })
   })
 })
