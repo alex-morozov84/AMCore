@@ -161,10 +161,12 @@ test('exit 0 after our own signal is not E1: real executor, child handles SIGTER
   // The child reports readiness once its handler is installed, so the signal is sent
   // only when the SIGTERM -> exit 0 behaviour is actually in place (no fixed delay).
   const ready = join(tmpdir(), `amcore-signal-ready-${randomUUID()}`)
-  const child = `process.on('SIGTERM', () => process.exit(0)); require('node:fs').writeFileSync(${JSON.stringify(ready)}, '1'); setInterval(() => {}, 1000)`
+  // The marker path is passed as an argument, never spliced into the code string.
+  const child =
+    "process.on('SIGTERM', () => process.exit(0)); require('node:fs').writeFileSync(process.argv[1], '1'); setInterval(() => {}, 1000)"
   const running = runBuild(
     m,
-    () => run(process.execPath, ['-e', child], { capture: true }),
+    () => run(process.execPath, ['-e', child, ready], { capture: true }),
     persist
   )
   const outcome = running.then(
