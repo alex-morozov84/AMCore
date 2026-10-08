@@ -970,5 +970,12 @@
     "storageUnavailable": "Recovery is available while this page stays open. Browser storage is unavailable; after reopening, inspect the current state before taking another action.",
     "invalidQuery": "Invalid filters were replaced with the default view.",
     "javascriptRequired": "Invitation management requires JavaScript. Enable it and reload this page."
+  },
+  "organizationNav": {
+    "sections": "Organization sections",
+    "overview": "Overview",
+    "members": "Members",
+    "invitations": "Invitations",
+    "roles": "Roles"
   }
 }

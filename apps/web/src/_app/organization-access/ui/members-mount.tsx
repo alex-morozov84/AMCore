@@ -64,6 +64,7 @@ export async function OrganizationMembersMount({
       backHref={organizationAccessHrefs(placement).contextHref(id)}
       membersHref={organizationAccessHrefs(placement).membersHref(id)}
       invitationsHref={organizationAccessHrefs(placement).invitationsHref(id)}
+      rolesHref={organizationAccessHrefs(placement).rolesHref(id)}
       listHref={organizationAccessHrefs(placement).listHref}
     />
   )

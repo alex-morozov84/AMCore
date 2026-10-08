@@ -13,8 +13,8 @@ import { Alert, AlertDescription } from '@/shared/ui/alert'
 import { BackLink } from '@/shared/ui/back-link'
 import { Button } from '@/shared/ui/button'
 import { PageTitle } from '@/shared/ui/page-title'
-import { SectionNavigation } from '@/shared/ui/section-navigation'
 import { OrganizationContextSummary } from '@/widgets/organization-context-summary'
+import { OrganizationSectionNav } from '@/widgets/organization-nav'
 
 import { useAccessNavigation } from '../model/use-access-navigation'
 
@@ -29,6 +29,7 @@ export interface OrganizationAccessClientProps {
   explicitList: boolean
   membersHref?: (id: string) => string
   invitationsHref?: (id: string) => string
+  rolesHref?: (id: string) => string
   contextHref: (id: string) => string
   pageHref: (page: number) => string
   listHref: string
@@ -40,8 +41,6 @@ export interface OrganizationAccessClientProps {
 
 export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
   const t = useTranslations('organizationAccess')
-  const membersT = useTranslations('organizationMembers')
-  const invitesT = useTranslations('organizationInvitations')
   const { admission, input } = props
   const { state, data, refresh, initialPending } = useOrganizationContext(admission.binding, input)
   const navigation = useAccessNavigation({ ...props, state, data, refresh })
@@ -81,29 +80,14 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
         </Button>
       </div>
       {sectionId && props.membersHref && (
-        <SectionNavigation
-          label={membersT('sections')}
-          items={[
-            {
-              label: membersT('overview'),
-              href: props.contextHref(sectionId),
-              active: true,
-            },
-            {
-              label: membersT('title'),
-              href: props.membersHref(sectionId),
-              active: false,
-            },
-            ...(props.invitationsHref
-              ? [
-                  {
-                    label: invitesT('title'),
-                    href: props.invitationsHref(sectionId),
-                    active: false,
-                  },
-                ]
-              : []),
-          ]}
+        <OrganizationSectionNav
+          active="overview"
+          hrefs={{
+            overview: props.contextHref(sectionId),
+            members: props.membersHref(sectionId),
+            invitations: props.invitationsHref?.(sectionId),
+            roles: props.rolesHref?.(sectionId),
+          }}
         />
       )}
       <div role="status" aria-live="polite" className="sr-only">

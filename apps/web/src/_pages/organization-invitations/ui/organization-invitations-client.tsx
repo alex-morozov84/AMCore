@@ -9,8 +9,8 @@ import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { BackLink } from '@/shared/ui/back-link'
 import { Button } from '@/shared/ui/button'
 import { PageTitle } from '@/shared/ui/page-title'
-import { SectionNavigation } from '@/shared/ui/section-navigation'
 import { OrganizationInvitations } from '@/widgets/organization-invitations'
+import { OrganizationSectionNav } from '@/widgets/organization-nav'
 
 import { invitationListHref, type InvitationListView } from '../model/list-navigation'
 
@@ -24,6 +24,7 @@ export function OrganizationInvitationsClient({
   backHref,
   membersHref,
   invitationsHref,
+  rolesHref,
   invalidQuery = false,
 }: {
   admission: ProductAccessBootstrap
@@ -34,6 +35,7 @@ export function OrganizationInvitationsClient({
   backHref: string
   membersHref: string
   invitationsHref: string
+  rolesHref?: string
   invalidQuery?: boolean
 }) {
   const t = useTranslations('organizationInvitations')
@@ -60,13 +62,14 @@ export function OrganizationInvitationsClient({
             ? initialOrganizationName
             : undefined}
       </PageTitle>
-      <SectionNavigation
-        label={t('sections')}
-        items={[
-          { label: t('overview'), href: backHref, active: false },
-          { label: t('members'), href: membersHref, active: false },
-          { label: t('title'), href: invitationsHref, active: true },
-        ]}
+      <OrganizationSectionNav
+        active="invitations"
+        hrefs={{
+          overview: backHref,
+          members: membersHref,
+          invitations: invitationsHref,
+          roles: rolesHref,
+        }}
       />
       {invalidQuery && <p role="status">{t('invalidQuery')}</p>}
       <ApiErrorAlert error={access.state.error} />

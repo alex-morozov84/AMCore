@@ -8,8 +8,8 @@ import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { BackLink } from '@/shared/ui/back-link'
 import { Button } from '@/shared/ui/button'
 import { PageTitle } from '@/shared/ui/page-title'
-import { SectionNavigation } from '@/shared/ui/section-navigation'
 import { OrganizationMembers } from '@/widgets/organization-members'
+import { OrganizationSectionNav } from '@/widgets/organization-nav'
 
 import { memberListHref, type MemberListView } from '../model/member-list-navigation'
 
@@ -20,6 +20,7 @@ export function OrganizationMembersClient({
   backHref,
   membersHref,
   invitationsHref,
+  rolesHref,
   listHref,
   query,
 }: {
@@ -29,13 +30,13 @@ export function OrganizationMembersClient({
   backHref: string
   membersHref?: string
   invitationsHref?: string
+  rolesHref?: string
   listHref?: string
   query?: MemberListView
 }) {
   const router = useRouteProgressRouter()
   const locale = useLocale()
   const t = useTranslations('organizationMembers')
-  const invitesT = useTranslations('organizationInvitations')
   const input = { kind: 'selected' as const, id: organizationId, locale }
   const access = useOrganizationContext(admission.binding, input)
   const allowed =
@@ -50,15 +51,14 @@ export function OrganizationMembersClient({
             ? initialOrganizationName
             : undefined}
       </PageTitle>
-      <SectionNavigation
-        label={t('sections')}
-        items={[
-          { label: t('overview'), href: backHref, active: false },
-          { label: t('title'), href: membersHref ?? `${backHref}/members`, active: true },
-          ...(invitationsHref
-            ? [{ label: invitesT('title'), href: invitationsHref, active: false }]
-            : []),
-        ]}
+      <OrganizationSectionNav
+        active="members"
+        hrefs={{
+          overview: backHref,
+          members: membersHref ?? `${backHref}/members`,
+          invitations: invitationsHref,
+          roles: rolesHref,
+        }}
       />
       <ApiErrorAlert error={access.state.error} />
       <OrganizationMembers

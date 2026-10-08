@@ -69,6 +69,7 @@ export async function OrganizationInvitationsMount({
       backHref={hrefs.contextHref(id)}
       membersHref={hrefs.membersHref(id)}
       invitationsHref={hrefs.invitationsHref(id)}
+      rolesHref={hrefs.rolesHref(id)}
     />
   )
 }

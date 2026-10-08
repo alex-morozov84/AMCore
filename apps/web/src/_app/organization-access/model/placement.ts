@@ -41,6 +41,9 @@ export function organizationAccessHrefs(placement: OrganizationAccessPlacement) 
     listHref: `${path}?view=list`,
     invitationsHref: (id: string) => `${path}/${encodeURIComponent(id)}/invites`,
     membersHref: (id: string) => `${path}/${encodeURIComponent(id)}/members`,
+    rolesHref: (id: string) => `${path}/${encodeURIComponent(id)}/roles`,
+    roleHref: (id: string, roleId: string) =>
+      `${path}/${encodeURIComponent(id)}/roles/${encodeURIComponent(roleId)}`,
     contextHref: (id: string) => `${path}/${encodeURIComponent(id)}`,
     pageHref: (page: number) => `${path}?view=list&page=${page}`,
     homeHref,
