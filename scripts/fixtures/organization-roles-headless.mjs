@@ -80,5 +80,5 @@ await writeFile(
 )
 console.log(`Prepared custom-roles headless fixture: ${fixture}`)
 console.log(
-  `Install dependencies first: pnpm --dir ${fixture} install --frozen-lockfile --ignore-scripts\nCheck the generated code against the repository rules (targets present): pnpm --dir ${fixture}/apps/web exec eslint src/_app/organization-access src/_pages/custom-roles 'src/app/[locale]/(organization-access)/organizations/[id]/roles/page.tsx' && pnpm --dir ${fixture}/apps/web exec tsc --noEmit\nRun: pnpm --dir ${fixture} stand e2e --lane real-stack -- organization-roles-headless.spec.ts`
+  `Install dependencies first: pnpm --dir ${fixture} install --frozen-lockfile --ignore-scripts\nBuild the shared package and check the generated code against the repository rules (targets present): pnpm --dir ${fixture} --filter shared build && pnpm --dir ${fixture}/apps/web exec eslint src/_app/organization-access src/_pages/custom-roles 'src/app/[locale]/(organization-access)/organizations/[id]/roles/page.tsx' && pnpm --dir ${fixture}/apps/web exec tsc --noEmit\nRun: pnpm --dir ${fixture} stand e2e --lane real-stack -- organization-roles-headless.spec.ts`
 )
