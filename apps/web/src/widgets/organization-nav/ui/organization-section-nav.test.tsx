@@ -1,4 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -24,7 +25,7 @@ const messages = {
 
 function renderNav(props: React.ComponentProps<typeof OrganizationSectionNav>) {
   return render(
-    <NextIntlClientProvider locale="en" messages={messages}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       <OrganizationSectionNav {...props} />
     </NextIntlClientProvider>
   )

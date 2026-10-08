@@ -18,9 +18,12 @@ test('roles: create, edit, protect an unsaved draft, confirm full control and de
 }) => {
   test.setTimeout(180000)
   const target = activeTarget()
-  const t = JSON.parse(
+  const catalogue = JSON.parse(
     readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
-  ).organizationRoles
+  )
+  const t = catalogue.organizationRoles
+  const nav = catalogue.organizationNav
+  const like = (text: string) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   const email = uniqueEmail('roles-ui')
   const registration = await context.request.post('/api/auth/register', {
     headers: { origin: target.origins.product },
@@ -60,7 +63,7 @@ test('roles: create, edit, protect an unsaved draft, confirm full control and de
   const level = (name: RegExp, label: string) => group(name).getByRole('checkbox', { name: label })
 
   // Save a preset -> 200, then a full reload shows it from the server.
-  await level(/View the organization/, t.levels.all).click()
+  await level(like(t.capabilities.organizationRead.label), t.levels.all).click()
   await expect(page.getByText(t.unsaved)).toBeVisible()
   const saved = page.waitForResponse(
     (r) => r.request().method() === 'PATCH' && r.url().includes('/role-definitions/')
@@ -69,23 +72,23 @@ test('roles: create, edit, protect an unsaved draft, confirm full control and de
   expect((await saved).status()).toBe(200)
   await expect(page.getByText(t.saved)).toBeVisible()
   await page.reload()
-  await expect(level(/View the organization/, t.levels.all)).toBeChecked()
+  await expect(level(like(t.capabilities.organizationRead.label), t.levels.all)).toBeChecked()
   await expectNoAxeViolations(page)
 
   // An unsaved draft is protected when following a link; staying keeps it.
-  await level(/Edit organization details/, t.levels.own).click()
+  await level(like(t.capabilities.organizationUpdate.label), t.levels.own).click()
   await page
-    .getByRole('navigation', { name: 'Organization sections' })
-    .getByRole('link', { name: 'Members' })
+    .getByRole('navigation', { name: nav.sections })
+    .getByRole('link', { name: nav.members })
     .click()
   await expect(page.getByRole('alertdialog', { name: t.leaveTitle })).toBeVisible()
   await page.getByRole('button', { name: t.leaveStay }).click()
-  await expect(level(/Edit organization details/, t.levels.own)).toBeChecked()
+  await expect(level(like(t.capabilities.organizationUpdate.label), t.levels.own)).toBeChecked()
   await page.getByRole('button', { name: t.discard }).click()
-  await expect(level(/Edit organization details/, t.levels.own)).not.toBeChecked()
+  await expect(level(like(t.capabilities.organizationUpdate.label), t.levels.own)).not.toBeChecked()
 
   // Full control needs an explicit confirmation; cancelling sends nothing.
-  await level(/Manage roles and members/, t.levels.all).click()
+  await level(like(t.capabilities.teamAccessManagement.label), t.levels.all).click()
   let writes = 0
   page.on('request', (r) => r.method() === 'PATCH' && (writes += 1))
   await page.getByRole('button', { name: t.save }).click()

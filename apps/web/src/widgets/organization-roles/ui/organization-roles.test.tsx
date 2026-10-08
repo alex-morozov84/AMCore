@@ -1,13 +1,16 @@
-import { NextIntlClientProvider } from 'next-intl'
+import { createTranslator, NextIntlClientProvider } from 'next-intl'
 import { DEFAULT_LOCALE, type RoleSummary } from '@amcore/shared'
 import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { RoleLinkProvider } from '@/shared/lib/role-links'
 
-import messages from '../../../../messages/en.json'
-
 import { OrganizationRoles } from './organization-roles'
+
+// The catalogue of the project's default locale, loaded by code so no locale file is hard-wired.
+const messages = (await import(`../../../../messages/${DEFAULT_LOCALE}.json`)).default
+const t = messages.organizationRoles
+const say = createTranslator({ locale: DEFAULT_LOCALE, messages, namespace: 'organizationRoles' })
 
 const role = (over: Partial<RoleSummary> & { id: string; name: string }): RoleSummary => ({
   description: null,
@@ -86,23 +89,25 @@ describe('OrganizationRoles', () => {
       }),
     ])
     render(view())
-    const builtin = screen.getByRole('region', { name: 'Built-in roles' })
-    expect(within(builtin).getByRole('link', { name: 'Open role ADMIN' })).toBeInTheDocument()
+    const builtin = screen.getByRole('region', { name: t.builtinTitle })
+    expect(
+      within(builtin).getByRole('link', { name: say('openRoleNamed', { name: 'ADMIN' }) })
+    ).toBeInTheDocument()
     expect(within(builtin).queryByText('Support')).toBeNull()
-    const custom = screen.getByRole('region', { name: 'Your roles' })
+    const custom = screen.getByRole('region', { name: t.customTitle })
     expect(within(custom).getAllByText('Support').length).toBeGreaterThan(0)
     expect(within(custom).queryByText('ADMIN')).toBeNull()
-    expect(within(custom).getAllByText('3 rules').length).toBeGreaterThan(0)
-    expect(within(custom).getAllByText('Advanced rules').length).toBeGreaterThan(0)
-    expect(within(custom).getAllByText('Full control').length).toBeGreaterThan(0)
+    expect(within(custom).getAllByText(say('rules', { count: 3 })).length).toBeGreaterThan(0)
+    expect(within(custom).getAllByText(t.flagAdvanced).length).toBeGreaterThan(0)
+    expect(within(custom).getAllByText(t.flagFullControl).length).toBeGreaterThan(0)
   })
 
   it('tells an empty organization from an empty search', () => {
     available([role({ id: 'a', name: 'ADMIN', isSystem: true, organizationId: null })])
     const { rerender } = render(view())
-    expect(screen.getByText(/No custom roles yet/)).toBeInTheDocument()
+    expect(screen.getByText(t.customEmpty)).toBeInTheDocument()
     rerender(view({ page: 1, search: 'zzz' }))
-    expect(screen.getByText('No roles match this search.')).toBeInTheDocument()
+    expect(screen.getByText(t.emptySearch)).toBeInTheDocument()
   })
 
   it('hides stale rows when the current read failed and offers a retry', () => {
@@ -122,8 +127,8 @@ describe('OrganizationRoles', () => {
     }
     render(view())
     expect(screen.queryByText('Stale role')).toBeNull()
-    expect(screen.getByText('Roles could not be loaded. Nothing was changed.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+    expect(screen.getByText(t.readUnavailable)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: t.retry })).toBeEnabled()
   })
 
   it.each([31, 1, 0])('moves a page past the end back once: total %s', (total) => {

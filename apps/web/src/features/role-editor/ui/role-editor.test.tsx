@@ -1,12 +1,10 @@
-import { NextIntlClientProvider } from 'next-intl'
+import { createTranslator, NextIntlClientProvider } from 'next-intl'
 import { CAPABILITY_CATALOGUE, DEFAULT_LOCALE, type RoleDefinitionDetail } from '@amcore/shared'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiRequestError } from '@/shared/api/http-client'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
-
-import messages from '../../../../messages/en.json'
 
 import { RoleEditor } from './role-editor'
 
@@ -20,7 +18,12 @@ vi.mock('@/shared/ui/route-progress-link', () => ({
   ),
 }))
 
+// The catalogue of the project's default locale, loaded by code so no locale file is hard-wired.
+const messages = (await import(`../../../../messages/${DEFAULT_LOCALE}.json`)).default
 const t = messages.organizationRoles
+const say = createTranslator({ locale: DEFAULT_LOCALE, messages, namespace: 'organizationRoles' })
+const like = (text: string) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+const label = t.capabilities
 const detail = (over: Partial<RoleDefinitionDetail> = {}): RoleDefinitionDetail => ({
   role: { id: 'r1', name: 'Support', description: null, isSystem: false, organizationId: 'o' },
   aclVersion: 4,
@@ -67,7 +70,7 @@ describe('RoleEditor', () => {
   it('shows no action bar until something changes, then offers save and discard', () => {
     show(detail())
     expect(screen.queryByRole('button', { name: t.save })).toBeNull()
-    fireEvent.click(level(/View the organization/, t.levels.all))
+    fireEvent.click(level(like(label.organizationRead.label), t.levels.all))
     expect(screen.getByText(t.unsaved)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: t.discard }))
     expect(screen.queryByRole('button', { name: t.save })).toBeNull()
@@ -75,7 +78,7 @@ describe('RoleEditor', () => {
 
   it('asks to confirm full control, sends nothing on cancel and the acknowledgment on confirm', async () => {
     show(detail())
-    fireEvent.click(level(/Manage roles and members/, t.levels.all))
+    fireEvent.click(level(like(label.teamAccessManagement.label), t.levels.all))
     fireEvent.click(screen.getByRole('button', { name: t.save }))
     const dialog = await screen.findByRole('alertdialog', { name: t.fullControlTitle })
     fireEvent.click(within(dialog).getByRole('button', { name: t.cancel }))
@@ -95,7 +98,7 @@ describe('RoleEditor', () => {
 
   it('asks the self-held confirmation when the person changes a role they hold', async () => {
     show(detail({ selfHeld: true }))
-    fireEvent.click(level(/View the organization/, t.levels.own))
+    fireEvent.click(level(like(label.organizationRead.label), t.levels.own))
     fireEvent.click(screen.getByRole('button', { name: t.save }))
     fireEvent.click(
       within(await screen.findByRole('alertdialog', { name: t.selfHeldTitle })).getByRole(
@@ -121,7 +124,7 @@ describe('RoleEditor', () => {
       } as never),
     })
     show(detail())
-    fireEvent.click(level(/View the organization/, t.levels.all))
+    fireEvent.click(level(like(label.organizationRead.label), t.levels.all))
     fireEvent.click(screen.getByRole('button', { name: t.save }))
     expect(await screen.findByRole('button', { name: t.reviewCurrent })).toBeInTheDocument()
     expect(screen.getByText(t.conflict)).toBeInTheDocument()
@@ -144,7 +147,7 @@ describe('RoleEditor', () => {
         </NextIntlClientProvider>
       </>
     )
-    fireEvent.click(level(/View the organization/, t.levels.all))
+    fireEvent.click(level(like(label.organizationRead.label), t.levels.all))
     fireEvent.click(screen.getByRole('link', { name: 'Elsewhere' }))
     const dialog = await screen.findByRole('alertdialog', { name: t.leaveTitle })
     expect(onLeave).not.toHaveBeenCalled()
@@ -188,7 +191,7 @@ describe('RoleEditor', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: t.delete }))
     const affected = await screen.findByRole('dialog', { name: t.deleteTitle })
-    expect(within(affected).getByText('3 people will lose this role.')).toBeInTheDocument()
+    expect(within(affected).getByText(say('deletePeople', { holders: 3 }))).toBeInTheDocument()
     expect(within(affected).getByRole('button', { name: t.deleteConfirm })).toBeDisabled()
     fireEvent.click(within(affected).getByRole('checkbox', { name: t.deleteAck }))
     expect(within(affected).getByRole('button', { name: t.deleteConfirm })).toBeEnabled()
