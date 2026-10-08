@@ -2,8 +2,17 @@
 import { useTranslations } from 'next-intl'
 import type { RoleDefinitionDetail } from '@amcore/shared'
 
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
+
 /** Who is affected by edits to this role: a bounded sample, the total and pending invitations. */
-export function HoldersSummary({ detail }: { detail: RoleDefinitionDetail }) {
+export function HoldersSummary({
+  detail,
+  holderHref,
+}: {
+  detail: RoleDefinitionDetail
+  /** Where a person's roles are changed; the role page itself never edits memberships. */
+  holderHref?: (email: string) => string
+}) {
   const t = useTranslations('organizationRoles')
   const { holders, impact } = detail
   return (
@@ -18,7 +27,17 @@ export function HoldersSummary({ detail }: { detail: RoleDefinitionDetail }) {
         <ul className="space-y-1 text-sm">
           {holders.sample.map((holder) => (
             <li key={holder.memberId} className="break-words">
-              {holder.name ?? holder.email}
+              {holderHref ? (
+                <RouteProgressLink
+                  href={holderHref(holder.email)}
+                  aria-label={t('holderOpen', { name: holder.name ?? holder.email })}
+                  className="underline-offset-4 hover:underline"
+                >
+                  {holder.name ?? holder.email}
+                </RouteProgressLink>
+              ) : (
+                (holder.name ?? holder.email)
+              )}
               {holder.name && <span className="text-muted-foreground"> · {holder.email}</span>}
             </li>
           ))}

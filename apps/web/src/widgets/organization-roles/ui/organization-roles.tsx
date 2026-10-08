@@ -56,27 +56,29 @@ export function OrganizationRoles({
   return (
     <div className="space-y-4">
       <h2 className="sr-only">{t('title')}</h2>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <FilterPanel>
-          <DebouncedSearchField
-            identity={JSON.stringify([controller.binding, controller.organizationId, navigation])}
-            search={query.search}
-            page={query.page}
-            id="organization-role-search"
-            label={t('search')}
-            placeholder={t('searchPlaceholder')}
-            clearLabel={t('clear')}
-            maxLength={100}
-            onCommit={(search) => onQueryChange({ search, page: 1 }, 'search')}
+      <FilterPanel>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
+            <DebouncedSearchField
+              identity={JSON.stringify([controller.binding, controller.organizationId, navigation])}
+              search={query.search}
+              page={query.page}
+              id="organization-role-search"
+              label={t('search')}
+              placeholder={t('searchPlaceholder')}
+              clearLabel={t('clear')}
+              maxLength={100}
+              onCommit={(search) => onQueryChange({ search, page: 1 }, 'search')}
+            />
+          </div>
+          <CreateRoleDialog
+            controller={controller}
+            disabled={!roles.ready}
+            onCreated={onOpenRole}
+            onSearchName={(search) => onQueryChange({ search, page: 1 }, 'search')}
           />
-        </FilterPanel>
-        <CreateRoleDialog
-          controller={controller}
-          disabled={!roles.ready}
-          onCreated={onOpenRole}
-          onSearchName={(search) => onQueryChange({ search, page: 1 }, 'search')}
-        />
-      </div>
+        </div>
+      </FilterPanel>
       <ApiErrorAlert error={roles.error} />
       {Boolean(roles.error) && (
         <div className="space-y-2">

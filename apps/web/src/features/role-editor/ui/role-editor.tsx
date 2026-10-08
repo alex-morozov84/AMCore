@@ -6,6 +6,7 @@ import type { CapabilityCatalogueResponse, RoleDefinitionDetail } from '@amcore/
 import type { useRoleDefinition } from '@/entities/organization-context'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
+import { Card, CardContent } from '@/shared/ui/card'
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
@@ -29,6 +30,7 @@ export function RoleEditor({
   onDeleted,
   onLeave,
   onReview,
+  holderHref,
 }: {
   role: ReturnType<typeof useRoleDefinition>
   detail: RoleDefinitionDetail
@@ -36,6 +38,7 @@ export function RoleEditor({
   onDeleted: () => void
   onLeave: (href: string) => void
   onReview: () => void
+  holderHref?: (email: string) => string
 }) {
   const t = useTranslations('organizationRoles')
   const editor = useRoleEditor(role, detail, capabilities)
@@ -54,7 +57,8 @@ export function RoleEditor({
   }
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
+      <Panel>
+        <h3 className="text-base font-semibold">{t('detailsTitle')}</h3>
         <div className="space-y-2">
           <Label htmlFor="role-name">{t('nameLabel')}</Label>
           <Input
@@ -73,49 +77,63 @@ export function RoleEditor({
             onChange={(e) => editor.change({ description: e.target.value })}
           />
         </div>
-      </div>
+      </Panel>
       {detail.managedPresets !== null && (
-        <section aria-labelledby="role-capabilities-title" className="space-y-3">
-          <h3 id="role-capabilities-title" className="text-base font-semibold">
-            {t('capabilitiesTitle')}
-          </h3>
-          <p className="text-sm text-muted-foreground">{t('capabilitiesHint')}</p>
-          <CapabilityEditor
-            capabilities={capabilities}
-            keys={editor.draft.keys}
-            disabled={!editable || role.busy}
-            onToggle={editor.toggle}
-          />
-        </section>
+        <Panel>
+          <section aria-labelledby="role-capabilities-title" className="space-y-3">
+            <h3 id="role-capabilities-title" className="text-base font-semibold">
+              {t('capabilitiesTitle')}
+            </h3>
+            <p className="text-sm text-muted-foreground">{t('capabilitiesHint')}</p>
+            <CapabilityEditor
+              capabilities={capabilities}
+              keys={editor.draft.keys}
+              disabled={!editable || role.busy}
+              onToggle={editor.toggle}
+            />
+          </section>
+        </Panel>
       )}
-      <AdvancedRules rules={detail.advancedRules ?? []} />
-      <HoldersSummary detail={detail} />
-      <SaveStatus
-        result={editor.result}
-        stale={editor.stale}
-        dirty={editor.dirty}
-        onReview={() => {
-          editor.discard()
-          onReview()
-        }}
-      />
-      {editor.result.kind === 'rejected' && <ApiErrorAlert error={editor.result.error} />}
-      {editable && (
-        <div className="flex flex-wrap gap-3">
-          <Button disabled={!editor.dirty || role.busy} onClick={startSave}>
-            {role.busy ? t('saving') : t('save')}
-          </Button>
-          <Button variant="outline" disabled={!editor.dirty || role.busy} onClick={editor.discard}>
-            {t('discard')}
-          </Button>
-          <DeleteRoleDialog
-            role={role}
-            detail={detail}
-            disabled={role.busy}
-            onDeleted={onDeleted}
-          />
-        </div>
+      {(detail.advancedRules?.length ?? 0) > 0 && (
+        <Panel>
+          <AdvancedRules rules={detail.advancedRules ?? []} />
+        </Panel>
       )}
+      <Panel>
+        <HoldersSummary detail={detail} holderHref={holderHref} />
+      </Panel>
+      <Panel>
+        <SaveStatus
+          result={editor.result}
+          stale={editor.stale}
+          dirty={editor.dirty}
+          onReview={() => {
+            editor.discard()
+            onReview()
+          }}
+        />
+        {editor.result.kind === 'rejected' && <ApiErrorAlert error={editor.result.error} />}
+        {editable && (
+          <div className="flex flex-wrap gap-3">
+            <Button disabled={!editor.dirty || role.busy} onClick={startSave}>
+              {role.busy ? t('saving') : t('save')}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!editor.dirty || role.busy}
+              onClick={editor.discard}
+            >
+              {t('discard')}
+            </Button>
+            <DeleteRoleDialog
+              role={role}
+              detail={detail}
+              disabled={role.busy}
+              onDeleted={onDeleted}
+            />
+          </div>
+        )}
+      </Panel>
       <ConfirmDialog
         open={current !== undefined}
         onOpenChange={(open) => !open && setStep(undefined)}
@@ -139,5 +157,14 @@ export function RoleEditor({
         }}
       />
     </div>
+  )
+}
+
+/** Every section sits on a card so text stays readable on the page background. */
+function Panel({ children }: { children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="space-y-4">{children}</CardContent>
+    </Card>
   )
 }

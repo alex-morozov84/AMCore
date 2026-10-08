@@ -41,8 +41,11 @@ export function OrganizationRoleClient({
   })
   const role = useRoleDefinition(access.controller, roleId)
   const catalogue = useCapabilityCatalogue(access.controller)
-  const detail = role.available ? role.data : undefined
-  const capabilities = catalogue.available ? catalogue.data?.capabilities : undefined
+  // A background reread or an authority recheck keeps the editor (and any draft) in place; only a
+  // failed read or really lost authority hides it, so stale data is never shown as current.
+  const authorityLost = !['pending', 'ready'].includes(access.state.status)
+  const detail = !authorityLost && !role.error ? role.data : undefined
+  const capabilities = !authorityLost && !catalogue.error ? catalogue.data?.capabilities : undefined
   const missing = getErrorCode(role.error) === 'ROLE_UNAVAILABLE'
   const failed = Boolean(role.error ?? catalogue.error)
   const name =
@@ -85,6 +88,9 @@ export function OrganizationRoleClient({
           role={role}
           detail={detail}
           capabilities={capabilities}
+          holderHref={(email) =>
+            `${hrefs.members ?? hrefs.overview}?search=${encodeURIComponent(email)}`
+          }
           onDeleted={() => router.push(hrefs.roles)}
           onLeave={(href) => router.push(href)}
           onReview={() => void role.refresh().catch(() => undefined)}

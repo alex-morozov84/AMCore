@@ -2,6 +2,7 @@
 import { useTranslations } from 'next-intl'
 import type { RoleSummary } from '@amcore/shared'
 
+import { DataTableSurface } from '@/shared/ui/data-table-surface'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 /** Platform roles, kept apart from the editable table: readable, never changed or deleted. */
@@ -20,22 +21,27 @@ export function BuiltinRoles({
         {t('builtinTitle')}
       </h3>
       <p className="text-sm text-muted-foreground">{t('builtinHint')}</p>
-      <ul className="divide-y divide-line-soft rounded-lg border border-border bg-surface-elevated">
-        {rows.map((role) => (
-          <li key={role.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-            <RouteProgressLink
-              href={roleHref(role.id)}
-              aria-label={t('openRoleNamed', { name: role.name })}
-              className="font-medium underline-offset-4 hover:underline"
+      <DataTableSurface>
+        <ul className="divide-y divide-line-soft">
+          {rows.map((role) => (
+            <li
+              key={role.id}
+              className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
             >
-              {role.name}
-            </RouteProgressLink>
-            <span className="text-sm text-muted-foreground">
-              {t('holdersCount', { count: role.holderCount })}
-            </span>
-          </li>
-        ))}
-      </ul>
+              <RouteProgressLink
+                href={roleHref(role.id)}
+                aria-label={t('openRoleNamed', { name: role.name })}
+                className="font-medium underline-offset-4 hover:underline"
+              >
+                {role.name}
+              </RouteProgressLink>
+              <span className="text-sm text-muted-foreground">
+                {t('holdersCount', { count: role.holderCount })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </DataTableSurface>
     </section>
   )
 }

@@ -1105,6 +1105,7 @@
     "leaveBody": "Your changes to this role have not been saved.",
     "leaveStay": "Keep editing",
     "leaveConfirm": "Leave",
-    "backToOrganizations": "All organizations"
+    "backToOrganizations": "All organizations",
+    "holderOpen": "Open {name} in Members to change their roles"
   }
 }

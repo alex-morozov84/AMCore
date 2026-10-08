@@ -1105,6 +1105,7 @@
     "leaveBody": "Изменения в этой роли не сохранены.",
     "leaveStay": "Продолжить редактирование",
     "leaveConfirm": "Уйти",
-    "backToOrganizations": "Все организации"
+    "backToOrganizations": "Все организации",
+    "holderOpen": "Открыть {name} в разделе участников, чтобы изменить роли"
   }
 }

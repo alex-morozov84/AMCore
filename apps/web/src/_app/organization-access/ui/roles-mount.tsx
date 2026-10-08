@@ -30,7 +30,6 @@ export async function OrganizationRolesMount({
       initialOrganizationName={loaded.organizationName}
       query={organizationRoleListQuery(await searchParams)}
       listHref={hrefs.listHref}
-      roleHref={(roleId) => hrefs.roleHref(id, roleId)}
       hrefs={{
         overview: hrefs.contextHref(id),
         members: hrefs.membersHref(id),

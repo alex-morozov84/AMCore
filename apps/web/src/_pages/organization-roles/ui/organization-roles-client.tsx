@@ -18,7 +18,6 @@ export function OrganizationRolesClient({
   organizationId,
   initialOrganizationName,
   hrefs,
-  roleHref,
   listHref,
   query,
 }: {
@@ -26,11 +25,12 @@ export function OrganizationRolesClient({
   organizationId: string
   initialOrganizationName?: string
   hrefs: React.ComponentProps<typeof OrganizationSectionNav>['hrefs'] & { roles: string }
-  roleHref: (roleId: string) => string
   listHref: string
   query: RoleListView
 }) {
   const router = useRouteProgressRouter()
+  // A role page is the child route of the roles tab; strings (not functions) cross the server boundary.
+  const roleHref = (roleId: string) => `${hrefs.roles}/${encodeURIComponent(roleId)}`
   const locale = useLocale()
   const t = useTranslations('organizationRoles')
   const access = useOrganizationContext(admission.binding, {
