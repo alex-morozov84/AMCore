@@ -8,9 +8,13 @@ import { sql } from './ownership.mjs'
 import { relay } from './relay.mjs'
 import { save } from './state.mjs'
 import { fixtureAccounts } from './fixture-accounts.mjs'
+import {
+  organizationRolesAddresses,
+  organizationRolesFixture,
+} from './organization-roles-fixture.mjs'
 
 export async function preview(m, profile = 'default') {
-  if (!['default', 'user', 'organization'].includes(profile))
+  if (!['default', 'user', 'organization', 'organization-roles'].includes(profile))
     throw new Error('Unknown fixture profile')
   await admitInvocation(m)
   const labels = await previewLabels(m)
@@ -37,6 +41,7 @@ export async function preview(m, profile = 'default') {
       const { organizationFixture } = await import('./organization-fixture.mjs')
       await organizationFixture(m, api)
     }
+    if (profile === 'organization-roles') await organizationRolesFixture(m, api)
     for (const account of m.accounts) {
       const existing = await sql(
         m,
@@ -55,8 +60,13 @@ export async function preview(m, profile = 'default') {
         await page.getByLabel(labels.product.email, { exact: true }).fill(account.email)
         await page.getByLabel(labels.product.password, { exact: true }).fill(account.password)
         await page.getByRole('button', { name: labels.product.submit, exact: true }).click()
-        await page.waitForURL(url => url.origin === m.origins.product &&
-          (m.localePrefix ? SUPPORTED_LOCALES.some(locale => url.pathname === `/${locale}`) : url.pathname === '/'))
+        await page.waitForURL(
+          (url) =>
+            url.origin === m.origins.product &&
+            (m.localePrefix
+              ? SUPPORTED_LOCALES.some((locale) => url.pathname === `/${locale}`)
+              : url.pathname === '/')
+        )
         // AMCORE_CONSOLE_PREVIEW_ACCESS_START
         if (account.role === 'SUPER_ADMIN') {
           await page.goto(
@@ -87,6 +97,9 @@ export async function preview(m, profile = 'default') {
       `Stand: ${m.id}\nBranch: ${m.branch}\nSource: ${m.sourceHash}\nURL: ${m.origins.product}${m.localePrefix}`
     )
     for (const a of m.accounts) console.log(`${a.role}: ${a.email}\nPassword: ${a.password}`)
+    if (profile === 'organization-roles')
+      for (const line of organizationRolesAddresses(m, m.localePrefix, m.origins.product))
+        console.log(line)
     let scenario = 'login, inspect current changes'
     // AMCORE_CONSOLE_PREVIEW_SCENARIO_START
     scenario += ' and Console access'
