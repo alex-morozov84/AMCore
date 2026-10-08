@@ -1,0 +1,45 @@
+import { localizedFrontendUrl, DEFAULT_LOCALE } from '@amcore/shared'
+import { expect, test } from '@playwright/test'
+import { expectNoAxeViolations } from '../shared/axe'
+import { activeTarget } from '../support/managed-target.mjs'
+import { directApi } from './credential-containment.helpers'
+import { TEST_PASSWORD, uniqueEmail } from './helpers'
+
+test('a different custom UI manages roles through the public headless API, real BFF and no ready widget', async ({ page, context }) => {
+  const target = activeTarget()
+  const email = uniqueEmail('custom-roles')
+  const register = await context.request.post('/api/auth/register', { headers: { origin: target.origins.product }, data: { email, password: TEST_PASSWORD } })
+  expect(register.status()).toBe(201)
+  const login = await directApi('auth/login', { email, password: TEST_PASSWORD })
+  const org = await directApi('organizations', { name: 'Custom roles composition' }, login.accessToken)
+  const authorized: string[] = []
+  page.on('request', (request) => {
+    if (request.url().includes('/api/product-access/') && request.headers()['authorization']) authorized.push(request.url())
+  })
+  await page.goto(new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, `organizations/${org.id}/roles`)).pathname)
+  await expect(page.getByTestId('custom-headless-roles')).toBeVisible()
+  // List: the built-in roles are readable and the seeded ADMIN holds the creator.
+  await expect(page.getByRole('button', { name: 'ADMIN', exact: true })).toBeVisible()
+  // Create -> 201 -> the new role's snapshot opens.
+  await page.getByLabel('New role name').fill('Fixture role')
+  const created = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/role-definitions'))
+  await page.getByRole('button', { name: 'Create role' }).click()
+  expect((await created).status()).toBe(201)
+  await expect(page.getByTestId('custom-headless-editor')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Fixture role' })).toBeVisible()
+  // Save a catalogue preset through the typed BFF -> 200 with the follow-up refresh.
+  await page.getByRole('checkbox', { name: 'organization.read' }).check()
+  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/role-definitions/'))
+  await page.getByRole('button', { name: 'Save role' }).click()
+  expect((await saved).status()).toBe(200)
+  await expect(page.getByText('save:committed')).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: 'organization.read' })).toBeChecked()
+  // Delete -> 200 and the list no longer shows the role.
+  const deleted = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/deletion'))
+  await page.getByRole('button', { name: 'Delete role' }).click()
+  expect((await deleted).status()).toBe(200)
+  await expect(page.getByRole('button', { name: 'Fixture role', exact: true })).toHaveCount(0)
+  // The browser never held or sent a bearer credential to the same-origin BFF.
+  expect(authorized).toEqual([])
+  await expectNoAxeViolations(page)
+})

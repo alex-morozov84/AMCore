@@ -26,4 +26,11 @@ export {
   type RoleWriteOutcome,
 } from './model/members/controller'
 export { useMemberRoleAssignments, useOrganizationMembers } from './model/members/hooks'
+export {
+  useCapabilityCatalogue,
+  useCreateRoleDefinition,
+  useRoleDefinition,
+  useRoleDefinitions,
+} from './model/roles/hooks'
+export type { RoleCreateOutcome, RoleDeleteOutcome, RoleSaveOutcome } from './model/roles/outcomes'
 export { useOrganizationContext } from './model/use-organization-context'

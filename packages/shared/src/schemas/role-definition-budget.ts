@@ -29,3 +29,6 @@ export const ROLE_PRESET_SELECTION_LIMIT = 64
 export const ROLE_MANAGED_PERMISSION_IDS_LIMIT = 16
 /** `(page - 1) * limit` ceiling for the role list. */
 export const ROLE_LIST_MAX_OFFSET = 100_000
+
+/** The capability catalogue is a small static document; the BFF caps its response at this size. */
+export const CAPABILITY_CATALOGUE_RESPONSE_BYTES = 65_536

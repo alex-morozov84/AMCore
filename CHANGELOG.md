@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Role-definition **browser transport and headless hooks**: typed same-origin routes for the
+  capability catalogue, role list and snapshot, create, save and confirmed delete, with
+  `useCapabilityCatalogue`, `useRoleDefinitions`, `useRoleDefinition` and
+  `useCreateRoleDefinition` on the shared organization controller (structured
+  committed/rejected/unknown/busy/retired outcomes, no automatic replay), plus an executable
+  custom-consumer fixture proven on the real stack. A ready role-editor screen follows separately.
+
 - Organization **role definitions API** (`/organizations/:orgId/role-definitions`): list roles with
   organization-local holder counts, read a role as one atomic snapshot, create an empty custom role,
   save the complete definition (metadata and catalogue presets) in one revision-fenced transaction

@@ -1,0 +1,129 @@
+'use client'
+
+import { useState } from 'react'
+import { useLocale } from 'next-intl'
+import type { ProductAccessBootstrap, RoleDefinitionDetail } from '@amcore/shared'
+
+import {
+  type OrganizationAccessController,
+  useCapabilityCatalogue,
+  useCreateRoleDefinition,
+  useOrganizationContext,
+  useRoleDefinition,
+  useRoleDefinitions,
+} from '@/entities/organization-context'
+
+// A deliberately different presentation: one flat list, a create field and an inline editor.
+// It imports ONLY the entity's public headless API, never a ready widget, page or shell.
+export function CustomRoles({ admission, id }: { admission: ProductAccessBootstrap; id: string }) {
+  const locale = useLocale()
+  const context = useOrganizationContext(admission.binding, { kind: 'selected', id, locale })
+  const roles = useRoleDefinitions(context.controller, { page: 1, search: '' })
+  const creation = useCreateRoleDefinition(context.controller)
+  const [name, setName] = useState('')
+  const [selected, setSelected] = useState<string>()
+  const [notice, setNotice] = useState('')
+  async function create() {
+    const outcome = await creation.create({ name })
+    setNotice(`create:${outcome.status}`)
+    if (outcome.status === 'committed') {
+      setName('')
+      setSelected(outcome.result.role.id)
+    }
+  }
+  return (
+    <section data-testid="custom-headless-roles">
+      <h1>Custom roles</h1>
+      <p role="status">{notice}</p>
+      <input aria-label="New role name" value={name} onChange={(e) => setName(e.target.value)} />
+      <button disabled={!roles.ready || creation.busy} onClick={() => void create()}>
+        Create role
+      </button>
+      <ul>
+        {roles.ready &&
+          roles.data?.data.map((role) => (
+            <li key={role.id}>
+              <button onClick={() => setSelected(role.id)}>{role.name}</button>
+              <span> holders:{role.holderCount}</span>
+            </li>
+          ))}
+      </ul>
+      {selected && (
+        <Editor key={selected} controller={context.controller} roleId={selected} onGone={() => setSelected(undefined)} />
+      )}
+    </section>
+  )
+}
+
+function Editor({
+  controller,
+  roleId,
+  onGone,
+}: {
+  controller: OrganizationAccessController
+  roleId: string
+  onGone: () => void
+}) {
+  const role = useRoleDefinition(controller, roleId)
+  const catalogue = useCapabilityCatalogue(controller)
+  const [snapshot, setSnapshot] = useState<RoleDefinitionDetail>()
+  const [picked, setPicked] = useState<string[]>()
+  const [notice, setNotice] = useState('')
+  if (!snapshot && role.data) setSnapshot(role.data)
+  const current =
+    picked ?? snapshot?.managedPresets?.map((p) => `${p.capabilityId}:${p.presetId}`) ?? []
+  async function save() {
+    if (!snapshot) return
+    const outcome = await role.save({
+      expectedAclVersion: snapshot.aclVersion,
+      name: snapshot.role.name,
+      description: snapshot.role.description,
+      presets: current.map((key) => {
+        const [capabilityId, presetId] = key.split(':')
+        return { capabilityId, presetId } as never
+      }),
+    })
+    setNotice(`save:${outcome.status}`)
+    if (outcome.status === 'committed') {
+      setSnapshot(outcome.result.detail)
+      setPicked(undefined)
+    }
+  }
+  async function remove() {
+    if (!snapshot) return
+    const outcome = await role.remove({
+      expectedAclVersion: snapshot.aclVersion,
+      expectedLiveInvitationCount: snapshot.impact.liveInvitationCount,
+    })
+    setNotice(`delete:${outcome.status}`)
+    if (outcome.status === 'committed') onGone()
+  }
+  return (
+    <section data-testid="custom-headless-editor">
+      <h2>{snapshot?.role.name}</h2>
+      <p role="status">{notice}</p>
+      {catalogue.data?.capabilities
+        .filter((c) => c.presets.includes('own'))
+        .map((c) => {
+          const key = `${c.id}:own`
+          return (
+            <label key={key}>
+              <input
+                type="checkbox"
+                checked={current.includes(key)}
+                disabled={!role.ready || role.busy || snapshot?.editMode !== 'editable'}
+                onChange={(e) => setPicked(e.target.checked ? [...current, key] : current.filter((k) => k !== key))}
+              />
+              {c.id}
+            </label>
+          )
+        })}
+      <button disabled={!role.ready || role.busy} onClick={() => void save()}>
+        Save role
+      </button>
+      <button disabled={!role.ready || role.busy} onClick={() => void remove()}>
+        Delete role
+      </button>
+    </section>
+  )
+}
