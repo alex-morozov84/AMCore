@@ -1,8 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
-import type { CapabilityCatalogueResponse, RoleDefinitionDetail } from '@amcore/shared'
+import {
+  type CapabilityCatalogueResponse,
+  type RoleDefinitionDetail,
+  saveRoleDefinitionSchema,
+} from '@amcore/shared'
 
 import type { useRoleDefinition } from '@/entities/organization-context'
 import { getErrorCode } from '@/shared/api/errors'
+import { useZodErrorMap } from '@/shared/lib/zod-error-map'
 
 import {
   baselineDraft,
@@ -23,6 +28,8 @@ export type SaveResult =
   | { kind: 'busy' }
 
 type RoleHandle = ReturnType<typeof useRoleDefinition>
+/** Messages for the fields a person can edit, already localized. */
+export type FieldErrors = { name?: string; description?: string }
 
 /**
  * One role's edit session. The draft stays based on the revision it was started from, so a
@@ -37,13 +44,21 @@ export function useRoleEditor(
   const base = useMemo(() => baselineDraft(detail), [detail])
   const [edited, setEdited] = useState<typeof base>()
   const [result, setResult] = useState<SaveResult>({ kind: 'idle' })
+  const [invalid, setInvalid] = useState<FieldErrors>({})
+  const errorMap = useZodErrorMap()
   const draft = edited ?? base
   const dirty = edited !== undefined && isDirty(edited, base)
   const stale = edited !== undefined && edited.revision !== detail.aclVersion
   const needs = requiredAcknowledgments(draft, base, detail.selfHeld, capabilities)
   const change = useCallback(
-    (next: Partial<Pick<typeof base, 'name' | 'description'>>) =>
-      setEdited({ ...(edited ?? base), ...next }),
+    (next: Partial<Pick<typeof base, 'name' | 'description'>>) => {
+      setInvalid((current) => ({
+        ...current,
+        ...(next.name !== undefined ? { name: undefined } : {}),
+        ...(next.description !== undefined ? { description: undefined } : {}),
+      }))
+      setEdited({ ...(edited ?? base), ...next })
+    },
     [edited, base]
   )
   const toggle = useCallback(
@@ -51,7 +66,24 @@ export function useRoleEditor(
       setEdited(togglePreset(edited ?? base, capabilityId, presetId)),
     [edited, base]
   )
+  /** Checks the whole draft against the shared save schema before any command or confirmation. */
+  const validate = useCallback(() => {
+    const parsed = saveRoleDefinitionSchema.safeParse(
+      toSaveRequest(draft, detail, { fullControl: false, selfHeld: false }),
+      { error: errorMap }
+    )
+    const errors: FieldErrors = {}
+    if (!parsed.success)
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0]
+        if ((field === 'name' || field === 'description') && !errors[field])
+          errors[field] = issue.message
+      }
+    setInvalid(errors)
+    return parsed.success
+  }, [draft, detail, errorMap])
   const discard = useCallback(() => {
+    setInvalid({})
     setEdited(undefined)
     setResult({ kind: 'idle' })
   }, [])
@@ -73,5 +105,5 @@ export function useRoleEditor(
     },
     [role, draft, detail]
   )
-  return { draft, dirty, stale, needs, result, change, toggle, discard, save }
+  return { draft, dirty, stale, needs, result, invalid, validate, change, toggle, discard, save }
 }

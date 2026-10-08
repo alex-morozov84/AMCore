@@ -19,7 +19,7 @@ export function RoleFilter({
 }) {
   const t = useTranslations('organizationMembers')
   const role = useRoleDefinition(controller, roleId)
-  const name = role.data?.role.name
+  const name = role.available ? role.data?.role.name : undefined
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm">
       <span>{name ? t('roleFilter', { name }) : t('roleFilterUnknown')}</span>

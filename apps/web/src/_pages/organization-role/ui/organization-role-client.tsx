@@ -45,8 +45,14 @@ export function OrganizationRoleClient({
   // A background reread or an authority recheck keeps the editor (and any draft) in place; only a
   // failed read or really lost authority hides it, so stale data is never shown as current.
   const authorityLost = !['pending', 'ready'].includes(access.state.status)
-  const detail = !authorityLost && !role.error ? role.data : undefined
-  const capabilities = !authorityLost && !catalogue.error ? catalogue.data?.capabilities : undefined
+  // A finished check that says "no team access" is different from a check still in flight: the
+  // first hides privileged data and commands, the second keeps the editor and its draft.
+  const allowed =
+    access.data && 'canManageTeamAccess' in access.data.data && access.data.data.canManageTeamAccess
+  const denied = access.state.status === 'ready' && !allowed
+  const hidden = authorityLost || denied
+  const detail = !hidden && !role.error ? role.data : undefined
+  const capabilities = !hidden && !catalogue.error ? catalogue.data?.capabilities : undefined
   const missing = getErrorCode(role.error) === 'ROLE_UNAVAILABLE'
   const failed = Boolean(role.error ?? catalogue.error)
   const name =
@@ -62,8 +68,9 @@ export function OrganizationRoleClient({
       {name && detail && <p className="text-sm text-muted-foreground">{name}</p>}
       <OrganizationSectionNav active="roles" hrefs={hrefs} />
       <ApiErrorAlert error={access.state.error ?? role.error ?? catalogue.error} />
-      {missing && <p role="status">{t('notFound')}</p>}
-      {failed && !missing && (
+      {denied && <p role="status">{t('denied')}</p>}
+      {missing && !denied && <p role="status">{t('notFound')}</p>}
+      {failed && !missing && !denied && (
         <div className="space-y-2">
           <p role="status">{t('readUnavailable2')}</p>
           <Button
@@ -74,7 +81,7 @@ export function OrganizationRoleClient({
           </Button>
         </div>
       )}
-      {!failed && (!detail || !capabilities) && (
+      {!failed && !denied && (!detail || !capabilities) && (
         <div role="status" aria-busy="true" className="space-y-3">
           <span className="sr-only">{t('loading')}</span>
           <Skeleton className="h-10 motion-reduce:animate-none" />
@@ -108,6 +115,9 @@ export function OrganizationRoleClient({
           onReview={() => void role.refresh().catch(() => undefined)}
         />
       )}
+      <noscript>
+        <p>{t('javascriptRequired')}</p>
+      </noscript>
     </section>
   )
 }

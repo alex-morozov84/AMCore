@@ -20,10 +20,22 @@ import {
 } from '@/shared/ui/dialog'
 import { toast } from '@/shared/ui/toast'
 
+/** What a person confirms when deleting: the role, its revision and the people it affects. */
+const impactKey = (detail: RoleDefinitionDetail) =>
+  JSON.stringify([
+    detail.role.id,
+    detail.aclVersion,
+    detail.holders.total,
+    detail.impact.liveInvitationCount,
+    detail.selfHeld,
+  ])
+
 /**
- * Deleting names the exact numbers it was loaded with; the server rejects the command if either
- * changed, so a stale confirmation can never go through. An acknowledgment is asked only when
- * something is actually affected: people, pending invitations or the person deleting.
+ * Deleting names the exact numbers the person saw and acknowledged. The dialog keeps that snapshot:
+ * the command is sent for it, never for newer data. If the live role drifts while the dialog is
+ * open (a new holder, an invitation that expired, a new revision) the acknowledgment is dropped and
+ * confirming stays off until the person reviews the current numbers. An acknowledgment is asked
+ * only when something is actually affected: people, pending invitations or the person deleting.
  */
 export function DeleteRoleDialog({
   role,
@@ -38,24 +50,31 @@ export function DeleteRoleDialog({
 }) {
   const t = useTranslations('organizationRoles')
   const [open, setOpen] = useState(false)
+  const [frozen, setFrozen] = useState<RoleDefinitionDetail>()
   const [understood, setUnderstood] = useState(false)
   const [failure, setFailure] = useState<{ error?: unknown; unknown?: boolean }>()
-  const holders = detail.holders.total
-  const invitations = detail.impact.liveInvitationCount
-  const needsAck = holders > 0 || invitations > 0 || detail.selfHeld
+  const shown = frozen ?? detail
+  const drifted = frozen !== undefined && impactKey(frozen) !== impactKey(detail)
+  const holders = shown.holders.total
+  const invitations = shown.impact.liveInvitationCount
+  const needsAck = holders > 0 || invitations > 0 || shown.selfHeld
+  const review = () => {
+    setFrozen(detail)
+    setUnderstood(false)
+    setFailure(undefined)
+  }
   const change = (next: boolean) => {
     setOpen(next)
-    if (!next) {
-      setUnderstood(false)
-      setFailure(undefined)
-    }
+    setUnderstood(false)
+    setFailure(undefined)
+    setFrozen(next ? detail : undefined)
   }
   const run = async () => {
     setFailure(undefined)
     const outcome = await role.remove({
-      expectedAclVersion: detail.aclVersion,
+      expectedAclVersion: shown.aclVersion,
       expectedLiveInvitationCount: invitations,
-      ...(detail.selfHeld ? { acknowledgeSelfHeld: true as const } : {}),
+      ...(shown.selfHeld ? { acknowledgeSelfHeld: true as const } : {}),
     })
     if (outcome.status === 'committed') {
       toast.add({ type: 'success', title: t('deletedToast') })
@@ -83,8 +102,18 @@ export function DeleteRoleDialog({
             </AlertDescription>
           </Alert>
         )}
-        {detail.selfHeld && <p role="status">{t('selfHeldBody')}</p>}
-        {needsAck && (
+        {shown.selfHeld && <p role="status">{t('selfHeldBody')}</p>}
+        {drifted && (
+          <Alert variant="warning">
+            <AlertDescription className="gap-3">
+              <p className="font-medium text-card-foreground">{t('deleteImpactChanged')}</p>
+              <Button type="button" variant="outline" size="sm" onClick={review}>
+                {t('reviewCurrent')}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        {needsAck && !drifted && (
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={understood} onCheckedChange={(v) => setUnderstood(v === true)} />
             {t('deleteAck')}
@@ -105,7 +134,7 @@ export function DeleteRoleDialog({
           </Button>
           <Button
             variant="destructive"
-            disabled={(needsAck && !understood) || role.busy}
+            disabled={drifted || (needsAck && !understood) || role.busy}
             onClick={() => void run()}
           >
             {t('deleteConfirm')}

@@ -79,6 +79,9 @@ export function OrganizationRolesClient({
           {t('retry')}
         </Button>
       )}
+      <noscript>
+        <p>{t('javascriptRequired')}</p>
+      </noscript>
     </section>
   )
 }

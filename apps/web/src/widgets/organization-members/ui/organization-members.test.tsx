@@ -22,7 +22,7 @@ import { OrganizationMembers } from './organization-members'
 
 const state = vi.hoisted(() => ({ total: 31 }))
 vi.mock('@/entities/organization-context', () => ({
-  useRoleDefinition: () => ({ data: { role: { name: 'Support agent' } } }),
+  useRoleDefinition: () => ({ available: true, data: { role: { name: 'Support agent' } } }),
   useOrganizationMembers: (_c: unknown, q: { page: number }) => ({
     ready: true,
     pending: false,

@@ -202,4 +202,39 @@ describe('RoleEditor', () => {
     expect(screen.queryByRole('button', { name: t.delete })).toBeNull()
     expect(screen.queryByText(t.capabilitiesTitle)).toBeNull()
   })
+
+  it.each([
+    ['empty', ''],
+    ['one character', 'a'],
+    ['over fifty characters', 'x'.repeat(51)],
+  ])('sends nothing and says why when the name is invalid: %s', async (_case, name) => {
+    show(detail())
+    fireEvent.change(screen.getByLabelText(t.nameLabel), { target: { value: name } })
+    fireEvent.click(screen.getByRole('button', { name: t.save }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.getByLabelText(t.nameLabel)).toHaveAttribute('aria-invalid', 'true')
+    expect(save).not.toHaveBeenCalled()
+    expect(screen.queryByText(t.saveUnknown)).toBeNull()
+  })
+
+  it('sends nothing for an overlong description and clears the message when it is edited', async () => {
+    show(detail())
+    const field = screen.getByLabelText(t.descriptionLabel)
+    fireEvent.change(field, { target: { value: 'x'.repeat(256) } })
+    fireEvent.click(screen.getByRole('button', { name: t.save }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(save).not.toHaveBeenCalled()
+    fireEvent.change(field, { target: { value: 'short' } })
+    expect(screen.queryByRole('alert')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: t.save }))
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+  })
+
+  it('keeps an unchanged stored name exactly as it is, even with spaces', async () => {
+    show(detail({ role: { ...detail().role, name: ' Support ' } }))
+    fireEvent.click(level(like(label.organizationRead.label), t.levels.all))
+    fireEvent.click(screen.getByRole('button', { name: t.save }))
+    await waitFor(() => expect(save).toHaveBeenCalled())
+    expect(save.mock.calls[0][0]).toMatchObject({ name: ' Support ' })
+  })
 })

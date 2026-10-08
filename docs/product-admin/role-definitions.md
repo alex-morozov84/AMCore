@@ -302,7 +302,11 @@ the revision it started from, so a change made elsewhere shows as a conflict wit
 version** and never overwrites; adding **Full control** and changing a role you hold need explicit
 confirmation; leaving with unsaved changes asks first; deleting names the people and invitations
 affected and asks for an acknowledgment only when something is affected; an unknown result is never
-replayed. A background reread or an authority recheck keeps the editor and its draft in place.
+replayed. A background reread or an authority recheck keeps the editor and its draft in place; a finished
+check that says the person no longer has team access hides the editor and its cached data. The name and
+description are checked against the shared schema before anything is sent, so a local mistake is shown at
+the field and never reported as an uncertain save; a delete confirmation is tied to the numbers that were
+shown and has to be given again if they change.
 
 **Wording for your capabilities.** Every descriptor `labelKey` needs
 `organizationRoles.capabilities.<labelKey>.label` and `.description` in every catalogue, its subject

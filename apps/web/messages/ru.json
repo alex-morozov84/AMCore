@@ -1123,6 +1123,7 @@
     "invitationsLiveHint": "Изменения роли распространяются и на них.",
     "conflictTitle": "Нужна проверка",
     "unsavedBarTitle": "Несохранённые изменения",
-    "holdersViewAll": "Показать всех: {count, plural, one {# человек} few {# человека} many {# человек} other {# человека}}"
+    "holdersViewAll": "Показать всех: {count, plural, one {# человек} few {# человека} many {# человек} other {# человека}}",
+    "javascriptRequired": "Для управления ролями нужен JavaScript. Включите его и перезагрузите страницу."
   }
 }

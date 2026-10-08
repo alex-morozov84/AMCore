@@ -49,7 +49,11 @@ export function RoleEditor({
   const steps = (['fullControl', 'selfHeld'] as const).filter((step) => editor.needs[step])
   const [step, setStep] = useState<number>()
   const current: Step | undefined = step === undefined ? undefined : steps[step]
-  const startSave = () => (steps.length > 0 ? setStep(0) : void editor.save(editor.needs))
+  const startSave = () => {
+    if (!editor.validate()) return
+    if (steps.length > 0) setStep(0)
+    else void editor.save(editor.needs)
+  }
   const confirmed = () => {
     if (step !== undefined && step + 1 < steps.length) setStep(step + 1)
     else {
@@ -80,7 +84,10 @@ export function RoleEditor({
             value={editor.draft.name}
             disabled={!editable || role.busy}
             onChange={(e) => editor.change({ name: e.target.value })}
+            aria-invalid={editor.invalid.name ? true : undefined}
+            aria-describedby={editor.invalid.name ? 'role-name-error' : undefined}
           />
+          <FieldError id="role-name-error" message={editor.invalid.name} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="role-description">{t('descriptionLabel')}</Label>
@@ -89,7 +96,10 @@ export function RoleEditor({
             value={editor.draft.description}
             disabled={!editable || role.busy}
             onChange={(e) => editor.change({ description: e.target.value })}
+            aria-invalid={editor.invalid.description ? true : undefined}
+            aria-describedby={editor.invalid.description ? 'role-description-error' : undefined}
           />
+          <FieldError id="role-description-error" message={editor.invalid.description} />
         </div>
       </Panel>
       {detail.managedPresets !== null && (
@@ -190,5 +200,15 @@ function Panel({ children, danger }: { children: React.ReactNode; danger?: boole
     <Card className={danger ? 'border-destructive/40' : undefined}>
       <CardContent className="space-y-4">{children}</CardContent>
     </Card>
+  )
+}
+
+/** A field's own problem, announced when it appears and tied to the input by `aria-describedby`. */
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null
+  return (
+    <p id={id} role="alert" className="text-sm text-destructive">
+      {message}
+    </p>
   )
 }

@@ -1123,6 +1123,7 @@
     "invitationsLiveHint": "Changes to this role apply to them too.",
     "conflictTitle": "Review needed",
     "unsavedBarTitle": "Unsaved changes",
-    "holdersViewAll": "Show all {count, plural, one {# person} other {# people}}"
+    "holdersViewAll": "Show all {count, plural, one {# person} other {# people}}",
+    "javascriptRequired": "Managing roles requires JavaScript. Enable it and reload this page."
   }
 }
