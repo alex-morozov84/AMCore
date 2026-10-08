@@ -200,7 +200,7 @@ Require **exactly one row** with `indisvalid` = `t` and the definition
 `CREATE INDEX "member_roles_roleId_memberId_idx" ON core.member_roles USING btree ("roleId", "memberId")`
 (no `WHERE` predicate, no expression, not `UNIQUE`). No row, an invalid index or a different
 definition is not acceptable: stop the deployment, remove the index with
-`DROP INDEX CONCURRENTLY core."member_roles_roleId_memberId_idx"` (also its own statement),
+`DROP INDEX CONCURRENTLY IF EXISTS core."member_roles_roleId_memberId_idx"` (also its own statement),
 build it again, and repeat the check. Installations that can tolerate a short write pause can
 skip all of this and simply run the normal migration.
 
