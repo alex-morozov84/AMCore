@@ -13,13 +13,18 @@ test('a different custom UI manages roles through the public headless API, real 
   const login = await directApi('auth/login', { email, password: TEST_PASSWORD })
   const org = await directApi('organizations', { name: 'Custom roles composition' }, login.accessToken)
   const authorized: string[] = []
+  const traffic: string[] = []
   page.on('request', (request) => {
-    if (request.url().includes('/api/product-access/') && request.headers()['authorization']) authorized.push(request.url())
+    if (!request.url().includes('/api/product-access/')) return
+    if (request.headers()['authorization']) authorized.push(request.url())
+    traffic.push(`${request.method()} ${new URL(request.url()).pathname}`)
   })
-  await page.goto(new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, `organizations/${org.id}/roles`)).pathname)
+  const rolesUrl = new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, `organizations/${org.id}/roles`)).pathname
+  await page.goto(rolesUrl)
   await expect(page.getByTestId('custom-headless-roles')).toBeVisible()
-  // List: the built-in roles are readable and the seeded ADMIN holds the creator.
-  await expect(page.getByRole('button', { name: 'ADMIN', exact: true })).toBeVisible()
+  // List: built-in roles with this organization's holder counts (the creator holds ADMIN).
+  const admin = page.getByRole('listitem').filter({ has: page.getByRole('button', { name: 'ADMIN', exact: true }) })
+  await expect(admin).toContainText('holders:1')
   // Create -> 201 -> the new role's snapshot opens.
   await page.getByLabel('New role name').fill('Fixture role')
   const created = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/role-definitions'))
@@ -27,12 +32,33 @@ test('a different custom UI manages roles through the public headless API, real 
   expect((await created).status()).toBe(201)
   await expect(page.getByTestId('custom-headless-editor')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Fixture role' })).toBeVisible()
-  // Save a catalogue preset through the typed BFF -> 200 with the follow-up refresh.
+  // Save a catalogue preset -> 200, and the follow-up refresh must REREAD the persisted state.
   await page.getByRole('checkbox', { name: 'organization.read' }).check()
   const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/role-definitions/'))
+  const before = traffic.length
   await page.getByRole('button', { name: 'Save role' }).click()
   expect((await saved).status()).toBe(200)
   await expect(page.getByText('save:committed')).toBeVisible()
+  await expect.poll(() => traffic.slice(before).filter((t) => t.startsWith('GET ') && t.includes('/role-definitions/')).length).toBeGreaterThan(0)
+  // Server-derived proof: a full reload and a fresh read show the persisted preset.
+  await page.reload()
+  await page.getByRole('button', { name: 'Fixture role', exact: true }).click()
+  await expect(page.getByRole('checkbox', { name: 'organization.read' })).toBeChecked()
+  // Graceful degradation: when the role read fails the stale snapshot is hidden and commands are gone.
+  await page.route('**/api/product-access/organizations/*/role-definitions/*', (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ statusCode: 503, errorCode: 'ROLE_READ_UNAVAILABLE', message: 'x' }) })
+      : route.continue()
+  )
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(page.getByRole('button', { name: 'Reload role' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Fixture role' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Save role' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Delete role' })).toHaveCount(0)
+  // Recovery: the next successful read restores the editor from server state.
+  await page.unroute('**/api/product-access/organizations/*/role-definitions/*')
+  await page.getByRole('button', { name: 'Reload role' }).click()
+  await expect(page.getByRole('heading', { name: 'Fixture role' })).toBeVisible()
   await expect(page.getByRole('checkbox', { name: 'organization.read' })).toBeChecked()
   // Delete -> 200 and the list no longer shows the role.
   const deleted = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/deletion'))

@@ -36,14 +36,28 @@ import 'server-only'
 
 export async function CustomRolesMount({ id }: { id: string }) {
   if (!isOrganizationContextId(id)) notFound()
+  let admission
   try {
-    return <CustomRoles admission={await safeOrganizationAdmission()} id={id} />
+    admission = await safeOrganizationAdmission()
   } catch (error) {
     if (error instanceof SessionNotFoundError) return redirectToLogin()
     throw error
   }
+  return <CustomRoles admission={admission} id={id} />
 }
 `
+)
+// A route may import composition only through its public server entry (FSD boundary), so the copy's
+// entry exports the fixture mount exactly like it exports the ready ones.
+const serverEntry = join(fixture, 'apps/web/src/_app/organization-access/index.server.ts')
+const entry = await readFile(serverEntry, 'utf8')
+const anchor = "export { OrganizationInvitationsMount } from './ui/invitations-mount'"
+if (!entry.includes(anchor))
+  throw new Error('Server entry layout changed; update the fixture generator')
+// Placed in module-path order so the copy still satisfies the repository export-sorting rule.
+await writeFile(
+  serverEntry,
+  entry.replace(anchor, "export { CustomRolesMount } from './ui/custom-roles-mount'\n" + anchor)
 )
 const route = join(
   fixture,
@@ -52,7 +66,7 @@ const route = join(
 await mkdir(route, { recursive: true })
 await writeFile(
   join(route, 'page.tsx'),
-  `import { CustomRolesMount } from '@/_app/organization-access/ui/custom-roles-mount'
+  `import { CustomRolesMount } from '@/_app/organization-access/index.server'
 
 export const dynamic = 'force-dynamic'
 export default async function Roles({ params }: { params: Promise<{ id: string }> }) {
@@ -66,5 +80,5 @@ await writeFile(
 )
 console.log(`Prepared custom-roles headless fixture: ${fixture}`)
 console.log(
-  `Install dependencies first: pnpm --dir ${fixture} install --frozen-lockfile --ignore-scripts\nRun: pnpm --dir ${fixture} stand e2e --lane real-stack -- organization-roles-headless.spec.ts`
+  `Install dependencies first: pnpm --dir ${fixture} install --frozen-lockfile --ignore-scripts\nCheck the generated code against the repository rules (targets present): pnpm --dir ${fixture}/apps/web exec eslint src/_app/organization-access src/_pages/custom-roles 'src/app/[locale]/(organization-access)/organizations/[id]/roles/page.tsx' && pnpm --dir ${fixture}/apps/web exec tsc --noEmit\nRun: pnpm --dir ${fixture} stand e2e --lane real-stack -- organization-roles-headless.spec.ts`
 )

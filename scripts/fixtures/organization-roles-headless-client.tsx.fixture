@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useLocale } from 'next-intl'
-import type { ProductAccessBootstrap, RoleDefinitionDetail } from '@amcore/shared'
+import type { ProductAccessBootstrap } from '@amcore/shared'
 
 import {
   type OrganizationAccessController,
@@ -12,9 +12,12 @@ import {
   useRoleDefinition,
   useRoleDefinitions,
 } from '@/entities/organization-context'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 
 // A deliberately different presentation: one flat list, a create field and an inline editor.
 // It imports ONLY the entity's public headless API, never a ready widget, page or shell.
+// Rule: `ready` is controller authority; `available` means THIS resource's current read succeeded.
+// Cached rows, the editor and every command are gated on `available`, never on `ready` alone.
 export function CustomRoles({ admission, id }: { admission: ProductAccessBootstrap; id: string }) {
   const locale = useLocale()
   const context = useOrganizationContext(admission.binding, { kind: 'selected', id, locale })
@@ -35,12 +38,16 @@ export function CustomRoles({ admission, id }: { admission: ProductAccessBootstr
     <section data-testid="custom-headless-roles">
       <h1>Custom roles</h1>
       <p role="status">{notice}</p>
+      <ApiErrorAlert error={context.state.error ?? roles.error} />
       <input aria-label="New role name" value={name} onChange={(e) => setName(e.target.value)} />
-      <button disabled={!roles.ready || creation.busy} onClick={() => void create()}>
+      <button disabled={!roles.available || creation.busy} onClick={() => void create()}>
         Create role
       </button>
+      {!roles.available && roles.ready && (
+        <button onClick={() => void roles.refresh().catch(() => undefined)}>Reload roles</button>
+      )}
       <ul>
-        {roles.ready &&
+        {roles.available &&
           roles.data?.data.map((role) => (
             <li key={role.id}>
               <button onClick={() => setSelected(role.id)}>{role.name}</button>
@@ -49,7 +56,12 @@ export function CustomRoles({ admission, id }: { admission: ProductAccessBootstr
           ))}
       </ul>
       {selected && (
-        <Editor key={selected} controller={context.controller} roleId={selected} onGone={() => setSelected(undefined)} />
+        <Editor
+          key={`${admission.binding}:${id}:${selected}`}
+          controller={context.controller}
+          roleId={selected}
+          onGone={() => setSelected(undefined)}
+        />
       )}
     </section>
   )
@@ -66,14 +78,16 @@ function Editor({
 }) {
   const role = useRoleDefinition(controller, roleId)
   const catalogue = useCapabilityCatalogue(controller)
-  const [snapshot, setSnapshot] = useState<RoleDefinitionDetail>()
-  const [picked, setPicked] = useState<string[]>()
+  // A draft belongs to one complete identity (session, organization, role) and one snapshot revision.
+  const [draft, setDraft] = useState<{ revision: number; keys: string[] }>()
   const [notice, setNotice] = useState('')
-  if (!snapshot && role.data) setSnapshot(role.data)
-  const current =
-    picked ?? snapshot?.managedPresets?.map((p) => `${p.capabilityId}:${p.presetId}`) ?? []
+  // Only a current, successful read is an authoritative snapshot; stale data is never presented.
+  const snapshot = role.available ? role.data : undefined
+  const saved = snapshot?.managedPresets?.map((p) => `${p.capabilityId}:${p.presetId}`) ?? []
+  const current = draft && draft.revision === snapshot?.aclVersion ? draft.keys : saved
+  const editable = snapshot?.editMode === 'editable'
   async function save() {
-    if (!snapshot) return
+    if (!snapshot || !editable) return
     const outcome = await role.save({
       expectedAclVersion: snapshot.aclVersion,
       name: snapshot.role.name,
@@ -84,10 +98,7 @@ function Editor({
       }),
     })
     setNotice(`save:${outcome.status}`)
-    if (outcome.status === 'committed') {
-      setSnapshot(outcome.result.detail)
-      setPicked(undefined)
-    }
+    if (outcome.status === 'committed') setDraft(undefined)
   }
   async function remove() {
     if (!snapshot) return
@@ -100,30 +111,44 @@ function Editor({
   }
   return (
     <section data-testid="custom-headless-editor">
-      <h2>{snapshot?.role.name}</h2>
+      <ApiErrorAlert error={role.error ?? catalogue.error} />
       <p role="status">{notice}</p>
-      {catalogue.data?.capabilities
-        .filter((c) => c.presets.includes('own'))
-        .map((c) => {
-          const key = `${c.id}:own`
-          return (
-            <label key={key}>
-              <input
-                type="checkbox"
-                checked={current.includes(key)}
-                disabled={!role.ready || role.busy || snapshot?.editMode !== 'editable'}
-                onChange={(e) => setPicked(e.target.checked ? [...current, key] : current.filter((k) => k !== key))}
-              />
-              {c.id}
-            </label>
-          )
-        })}
-      <button disabled={!role.ready || role.busy} onClick={() => void save()}>
-        Save role
-      </button>
-      <button disabled={!role.ready || role.busy} onClick={() => void remove()}>
-        Delete role
-      </button>
+      {!snapshot && role.ready && (
+        <button onClick={() => void role.refresh().catch(() => undefined)}>Reload role</button>
+      )}
+      {snapshot && (
+        <>
+          <h2>{snapshot.role.name}</h2>
+          {catalogue.available &&
+            catalogue.data?.capabilities
+              .filter((c) => c.presets.includes('own'))
+              .map((c) => {
+                const key = `${c.id}:own`
+                return (
+                  <label key={key}>
+                    <input
+                      type="checkbox"
+                      checked={current.includes(key)}
+                      disabled={!editable || role.busy}
+                      onChange={(e) =>
+                        setDraft({
+                          revision: snapshot.aclVersion,
+                          keys: e.target.checked ? [...current, key] : current.filter((k) => k !== key),
+                        })
+                      }
+                    />
+                    {c.id}
+                  </label>
+                )
+              })}
+          <button disabled={!editable || role.busy} onClick={() => void save()}>
+            Save role
+          </button>
+          <button disabled={role.busy} onClick={() => void remove()}>
+            Delete role
+          </button>
+        </>
+      )}
     </section>
   )
 }

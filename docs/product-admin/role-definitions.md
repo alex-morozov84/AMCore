@@ -263,9 +263,15 @@ registered reads of the same controller, so the open role and the list update wi
 
 An executable example, `node scripts/fixtures/organization-roles-headless.mjs`, creates a
 disposable consumer — a flat list, a create field and an inline editor that imports only the
-public hooks — and prints the managed real-stack browser command. It exercises list, create
-(`201`), save with the follow-up refresh, delete, the absence of any bearer credential in the
-browser, and accessibility through the real BFF; no sample route is added to the starter.
+public hooks and reaches the app through the composition layer's public server entry — and
+prints three commands: install, a lint and type check of the generated code against the
+repository rules, and the managed real-stack browser run. The browser run exercises list with
+holder counts, create (`201`), save (`200`) followed by an observable reread and a reload that
+shows the persisted preset, a failed role read that hides the stale snapshot and its commands
+until the next successful read, delete, the absence of any bearer credential in the browser, and
+accessibility through the real BFF. The example gates cached rows, the editor and every command
+on `available`, and keeps its draft keyed to the session, organization, role and snapshot
+revision. No sample route is added to the starter.
 
 ## Build your own editor
 

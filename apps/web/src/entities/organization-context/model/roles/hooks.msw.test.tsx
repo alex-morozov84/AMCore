@@ -114,7 +114,37 @@ describe('role-definition hooks', () => {
     })
     expect(outcome).toMatchObject({ status: 'committed', followup: 'ready' })
     expect(writes).toBe(1)
+    // The follow-up REREAD of the registered detail read actually happened (initial read + refresh).
+    await waitFor(() => expect(reads).toBeGreaterThanOrEqual(2))
+    expect(result.current.data?.aclVersion).toBe(3 + reads)
     expect(result.current.busy).toBe(false)
+  })
+
+  it('a failed refresh keeps authority ready but the read is no longer available, and it recovers', async () => {
+    let failing = false
+    server.use(
+      http.get(`${base}/role-definitions/role-1`, () =>
+        failing
+          ? HttpResponse.json({ errorCode: 'ROLE_READ_UNAVAILABLE' }, { status: 503 })
+          : envelope(detail)
+      )
+    )
+    const { controller, wrapper } = setup()
+    const { result } = renderHook(() => useRoleDefinition(controller, 'role-1'), { wrapper })
+    await waitFor(() => expect(result.current.available).toBe(true))
+    failing = true
+    await act(async () => {
+      await controller.refresh().catch(() => undefined)
+    })
+    // Authority is still ready, yet stale data must not count as the current resource.
+    expect(result.current.ready).toBe(true)
+    expect(result.current.available).toBe(false)
+    expect(result.current.error).toBeDefined()
+    failing = false
+    await act(async () => {
+      await result.current.refresh().catch(() => undefined)
+    })
+    await waitFor(() => expect(result.current.available).toBe(true))
   })
 
   it('an unconfirmed save is UNKNOWN and is never replayed; a stable conflict is REJECTED', async () => {
