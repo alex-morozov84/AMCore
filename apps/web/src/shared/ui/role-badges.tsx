@@ -1,4 +1,7 @@
 'use client'
+import { useRoleHref } from '@/shared/lib/role-links'
+
+import { RouteProgressLink } from './route-progress-link'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 
 export function RoleBadges({
@@ -10,6 +13,7 @@ export function RoleBadges({
   empty: string
   missingDescription?: string
 }) {
+  const roleHref = useRoleHref()
   if (roles.length === 0) return <span className="text-muted-foreground">{empty}</span>
   return (
     <TooltipProvider>
@@ -19,10 +23,17 @@ export function RoleBadges({
             <Tooltip key={role.id}>
               <TooltipTrigger
                 render={
-                  <button
-                    type="button"
-                    className="rounded border border-border px-2 py-0.5 text-xs"
-                  />
+                  roleHref ? (
+                    <RouteProgressLink
+                      href={roleHref(role.id)}
+                      className="rounded border border-border px-2 py-0.5 text-xs underline-offset-4 hover:bg-muted hover:underline"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="rounded border border-border px-2 py-0.5 text-xs"
+                    />
+                  )
                 }
               >
                 {role.name}

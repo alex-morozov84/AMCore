@@ -10,7 +10,7 @@ import 'client-only'
 
 export function useOrganizationMembers(
   controller: OrganizationAccessController,
-  query: { page: number; search: string }
+  query: { page: number; search: string; roleId?: string }
 ) {
   const identity = JSON.stringify([controller.binding, controller.organizationId, query])
   const read = useMemberRead(controller, identity, (signal) =>

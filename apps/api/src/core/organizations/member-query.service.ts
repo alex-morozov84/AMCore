@@ -39,6 +39,7 @@ export class MemberQueryService {
         const contains = q.search ? escapeLikeLiteral(q.search) : undefined
         const where: Prisma.OrgMemberWhereInput = {
           organizationId: orgId,
+          ...(q.roleId && { roles: { some: { roleId: q.roleId } } }),
           ...(contains && {
             user: {
               OR: [

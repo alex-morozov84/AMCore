@@ -266,7 +266,7 @@ Use `useRoleDefinitions`, `useRoleDefinition`, `useCreateRoleDefinition` and
 save. Handle the `committed`, `rejected`, `unknown`, `busy` and `retired` outcomes, enable
 controls from `ready` and gate writes on `available`. Details, the command contracts and the
 executable fixture are in the [role definitions guide](role-definitions.md#browser-and-headless-transport).
-A ready roles screen is not part of this release.
+The ready Roles tab is built on these same hooks; see [Ready role screens](role-definitions.md#ready-role-screens).
 
 ## Custom invitation manager
 

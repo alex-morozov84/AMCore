@@ -18,10 +18,11 @@ export const membersClient = {
   async list(
     binding: string,
     orgId: string,
-    query: { page: number; search: string },
+    query: { page: number; search: string; roleId?: string },
     signal: AbortSignal
   ) {
     const q = new URLSearchParams({ page: String(query.page), limit: '20', search: query.search })
+    if (query.roleId) q.set('roleId', query.roleId)
     return parseContextResponse(
       binding,
       organizationMembersResponseSchema,

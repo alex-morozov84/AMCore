@@ -1,6 +1,10 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { isOrganizationContextId, organizationMembersQuerySchema } from '@amcore/shared'
+import {
+  isOrganizationContextId,
+  memberIdSchema,
+  organizationMembersQuerySchema,
+} from '@amcore/shared'
 
 import { OrganizationMembersClient } from '@/_pages/organization-members'
 import { readOrganizationContext } from '@/entities/organization-context/index.server'
@@ -52,9 +56,13 @@ export async function OrganizationMembersMount({
     search: raw.search,
     limit: 20,
   })
-  const query = parsed.success
-    ? { page: parsed.data.page, search: parsed.data.search ?? '' }
-    : { page: 1, search: '' }
+  const role = memberIdSchema.safeParse(raw.role)
+  const query = {
+    ...(parsed.success
+      ? { page: parsed.data.page, search: parsed.data.search ?? '' }
+      : { page: 1, search: '' }),
+    ...(role.success ? { roleId: role.data } : {}),
+  }
   return (
     <OrganizationMembersClient
       admission={admission}
@@ -64,6 +72,7 @@ export async function OrganizationMembersMount({
       backHref={organizationAccessHrefs(placement).contextHref(id)}
       membersHref={organizationAccessHrefs(placement).membersHref(id)}
       invitationsHref={organizationAccessHrefs(placement).invitationsHref(id)}
+      rolesHref={organizationAccessHrefs(placement).rolesHref(id)}
       listHref={organizationAccessHrefs(placement).listHref}
     />
   )

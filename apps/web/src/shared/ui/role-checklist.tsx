@@ -2,7 +2,9 @@
 
 import { useId } from 'react'
 
+import { useRoleHref } from '@/shared/lib/role-links'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 type RoleChoice = { id: string; name: string; description: string | null; isSystem: boolean }
 
@@ -20,10 +22,19 @@ export function RoleChecklist({
   disabled: boolean
   readOnly: boolean
   onChange: (ids: string[]) => void
-  labels: { system: string; custom: string; noDescription: string; empty: string }
+  labels: {
+    system: string
+    custom: string
+    noDescription: string
+    empty: string
+    /** Wording of the optional details link; needed only with `roleHref`. */
+    details?: string
+    detailsFor?: (name: string) => string
+  }
   maxSelected?: number
 }) {
   const prefix = useId()
+  const roleHref = useRoleHref()
   return (
     <div className="space-y-3">
       {roles.map((role) => (
@@ -47,7 +58,7 @@ export function RoleChecklist({
               }
             />
           )}
-          <div className="min-w-0 space-y-1">
+          <div className="min-w-0 flex-1 space-y-1">
             {readOnly ? (
               <p className="break-words font-medium">{role.name}</p>
             ) : (
@@ -62,6 +73,17 @@ export function RoleChecklist({
               {role.description ?? labels.noDescription}
             </p>
           </div>
+          {roleHref && labels.details && (
+            <RouteProgressLink
+              href={roleHref(role.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={labels.detailsFor?.(role.name)}
+              className="shrink-0 self-start text-sm underline underline-offset-4"
+            >
+              {labels.details}
+            </RouteProgressLink>
+          )}
         </div>
       ))}
       {roles.length === 0 && <p className="text-muted-foreground">{labels.empty}</p>}

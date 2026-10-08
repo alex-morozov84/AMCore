@@ -21,15 +21,25 @@ export const Default: Story = {
   ),
 }
 
-// Full-strength `text-destructive`, not `/90` — see alert.tsx's inline
-// comment: the 90%-opacity variant measured below the 4.5:1 WCAG AA
-// contrast minimum, found scanning the real login error state.
+// Colour lives in the border, tinted surface and icon; the text keeps the normal foreground colour
+// because red text on a red tint measured below the 4.5:1 WCAG AA minimum — see alert.tsx.
 export const Destructive: Story = {
   render: () => (
     <Alert variant="destructive" className="w-96">
       <AlertCircle />
       <AlertTitle>Something went wrong</AlertTitle>
       <AlertDescription>Your session has expired. Please sign in again.</AlertDescription>
+    </Alert>
+  ),
+}
+
+// Something to notice but not a failure: a conflict, an unknown result, pending impact.
+export const Warning: Story = {
+  render: () => (
+    <Alert variant="warning" className="w-96">
+      <AlertCircle />
+      <AlertTitle>Review needed</AlertTitle>
+      <AlertDescription>This role was changed somewhere else.</AlertDescription>
     </Alert>
   ),
 }

@@ -51,7 +51,7 @@ member lists, atomic multi-role assignment and the
 [invitation management and recipient journey](docs/product-admin/invitations.md)
 are reusable with ready pages and replaceable presentation. A
 [role definitions API](docs/product-admin/role-definitions.md) saves a whole custom role
-atomically for a downstream editor; a ready role-editor screen and product-specific screens
+atomically; the ready Roles tab (list and role page) uses it, and product-specific screens
 remain downstream-owned.
 The API also publishes a bounded [implemented-action catalogue and access
 hints](docs/auth/capability-catalogue.md) for future product role editors and
@@ -81,8 +81,8 @@ record controls. Catalogue metadata never grants a permission.
 | **Accessibility (a11y)**              | ✅ Shipped      | Solid token-pair contrast tests, browser checks of destructive-button normal/hover states, real-page WCAG A/AA scans including retained Sessions refetch, and CI-gating Storybook a11y checks                                                         |
 | **i18n (web)**                        | ✅ Shipped      | `next-intl` locale routing (`/en`, `/ru`), API/form errors localized by machine-readable code (never raw backend `message`), ICU plurals via `useLocalizedForm()`                                                                                     |
 | **Auth & sessions**                   | ✅ Shipped      | BFF/Token-Handler pattern, full email/password reference flow (login, register, forgot/reset, email verification), OAuth, active-sessions screen                                                                                                      |
-| **Organization access**               | ✅ Foundational | Read-only selected overview with verified team-access status; headless context includes actor and actual-record hints, without a bundled role editor                                                                                                  |
-| **Product administration foundation** | ✅ Foundational | Organization selector, read-only overview and one-placement headless integration; member list, atomic multi-role assignment and invitations; product-domain screens remain downstream-owned                                                           |
+| **Organization access**               | ✅ Foundational | Read-only selected overview with verified team-access status; headless context includes actor and actual-record hints, role editing is the separate Roles tab                                                                                         |
+| **Product administration foundation** | ✅ Foundational | Organization selector, read-only overview and one-placement headless integration; member list, atomic multi-role assignment, invitations and a custom role editor; product-domain screens remain downstream-owned                                     |
 | **Shared UI**                         | ✅ Shipped      | shadcn/Base UI primitives kept to AMCore's lint/i18n/token contract, a Sidebar app shell                                                                                                                                                              |
 | **Route progress bar**                | ✅ Shipped      | First-party (no dependency) top navigation-progress indicator, reduced-motion aware, toggleable via a documented dev/agent-facing flag                                                                                                                |
 | **Component workshop**                | ✅ Shipped      | Storybook wired to the same MSW/theme/i18n stack as the real app; every story doubles as a Vitest test with a CI-gating axe check                                                                                                                     |

@@ -12,8 +12,10 @@ describe('operation inventory against the real plans', () => {
       // Counts include board and invitation routes, selected-catalogue fixtures and story removals.
       // Retiring the two obsolete security-exception seams removes four measured
       // operations, eight facts/claims and four final operations across these scenarios.
+      // The roles list and capability editor stories add two story removals in each of the two
+      // Storybook-disabled scenarios: four operations, four facts/claims and four final operations.
       // They are measured from every real plan, not estimated from file counts.
-      { name: 'measured operations', expected: 646, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 650, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -32,17 +34,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 899,
+        expected: 903,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1574,
+        expected: 1578,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 630,
+        expected: 634,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

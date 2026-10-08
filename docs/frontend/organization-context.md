@@ -18,8 +18,8 @@ reminder that actions are checked again. It makes no claim about assigned
 records. It is a read-only landing point for future downstream
 work. The [members page](../product-admin/organization-members.md) adds role assignment;
 [invitations](../product-admin/invitations.md) add management and a separate recipient
-journey. A ready role-definition editor screen is not shipped; the
-[role definitions API](../product-admin/role-definitions.md) is available and the screen remains downstream-owned. A missing/removed target stays unavailable at that URL; it never
+journey. The [Roles tab](../product-admin/role-definitions.md#ready-role-screens) edits custom roles through the
+[role definitions API](../product-admin/role-definitions.md); product-specific screens remain downstream-owned. A missing/removed target stays unavailable at that URL; it never
 silently adopts another organization. Capability text never grants authority.
 
 ## Ordered data and identity lifecycle

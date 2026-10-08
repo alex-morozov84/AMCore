@@ -12,6 +12,9 @@ const messages = {
     pageStatus: 'Page {page} of {totalPages}',
     previous: 'Previous',
     next: 'Next',
+    roleFilter: 'Showing people with the role {name}',
+    roleFilterUnknown: 'Showing people with one role',
+    roleFilterClear: 'Show everyone',
   },
 }
 
@@ -19,6 +22,7 @@ import { OrganizationMembers } from './organization-members'
 
 const state = vi.hoisted(() => ({ total: 31 }))
 vi.mock('@/entities/organization-context', () => ({
+  useRoleDefinition: () => ({ available: true, data: { role: { name: 'Support agent' } } }),
   useOrganizationMembers: (_c: unknown, q: { page: number }) => ({
     ready: true,
     pending: false,
@@ -35,13 +39,17 @@ vi.mock('./member-table', () => ({
   ),
 }))
 const controller = { binding: 'binding', organizationId: 'org' } as never
-function view(page: number, change: (q: { page: number; search: string }) => void) {
+function view(
+  page: number,
+  change: (q: { page: number; search: string; roleId?: string }) => void,
+  roleId?: string
+) {
   return (
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       <OrganizationMembers
         controller={controller}
         actorId="actor"
-        query={{ page, search: 'literal' }}
+        query={{ page, search: 'literal', ...(roleId ? { roleId } : {}) }}
         onQueryChange={change}
       />
     </NextIntlClientProvider>
@@ -74,4 +82,12 @@ it('total shrink preserves dirty editor and delegates navigation', () => {
   rerender(view(2, change))
   expect(change).toHaveBeenLastCalledWith({ page: 1, search: 'literal' }, 'page')
   expect(screen.getByLabelText('dirty draft')).toHaveValue('unsaved')
+})
+
+it('names the role filter and clearing it keeps the search and returns to page one', () => {
+  const change = vi.fn()
+  render(view(2, change, 'role-1'))
+  expect(screen.getByText('Showing people with the role Support agent')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Show everyone' }))
+  expect(change).toHaveBeenCalledWith({ page: 1, search: 'literal' }, 'search')
 })

@@ -15,6 +15,9 @@ import { ListPagination } from '@/shared/ui/list-pagination'
 
 import { MemberListSkeleton } from './member-list-skeleton'
 import { MemberTable } from './member-table'
+import { RoleFilter } from './role-filter'
+
+type MemberListQuery = { page: number; search: string; roleId?: string }
 
 export function OrganizationMembers({
   controller,
@@ -26,12 +29,12 @@ export function OrganizationMembers({
   controller: OrganizationAccessController
   actorId: string
   authorityStatus?: OrganizationContextState['status']
-  query?: { page: number; search: string }
-  onQueryChange?: (query: { page: number; search: string }, reason: 'search' | 'page') => void
+  query?: MemberListQuery
+  onQueryChange?: (query: MemberListQuery, reason: 'search' | 'page') => void
 }) {
   const t = useTranslations('organizationMembers')
   const heading = useRef<HTMLHeadingElement>(null)
-  const [localQuery, setLocalQuery] = useState({ page: 1, search: '' })
+  const [localQuery, setLocalQuery] = useState<MemberListQuery>({ page: 1, search: '' })
   const query = controlledQuery ?? localQuery
   const setQuery = useCallback(
     (next: typeof localQuery, reason: 'search' | 'page' = 'search') => {
@@ -96,8 +99,15 @@ export function OrganizationMembers({
           page={query.page}
           id="organization-member-search"
           placeholder={t('memberSearchPlaceholder')}
-          onCommit={(search) => setQuery({ search, page: 1 })}
+          onCommit={(search) => setQuery({ ...query, search, page: 1 })}
         />
+        {query.roleId && (
+          <RoleFilter
+            controller={controller}
+            roleId={query.roleId}
+            onClear={() => setQuery({ search: query.search, page: 1 })}
+          />
+        )}
       </FilterPanel>
       <ApiErrorAlert error={members.error} />
       {Boolean(members.error) && (

@@ -101,6 +101,17 @@ describe('Organization member reads and atomic role set (real DB)', () => {
     )
     return { links: links.rows.map((r) => r.roleId), org: org.rows[0], audit: audit.rows }
   }
+  it('filters the list by role and matches nobody for an unknown or invalid role', async () => {
+    const list = (suffix: string) =>
+      request(context.app.getHttpServer())
+        .get(`/organizations/${orgId}/members?${suffix}`)
+        .auth(token, { type: 'bearer' })
+    const held = (await list(`roleId=${roleId}`).expect(200)).body
+    expect(held.total).toBe(1)
+    expect(held.data[0].user.email).toBe('member@example.test')
+    expect((await list('roleId=no-such-role').expect(200)).body.total).toBe(0)
+    await list('roleId=bad%20id').expect(400)
+  })
   it('reads safe list/search and empty replacement; locked no-op leaves timestamp/audit untouched', async () => {
     const list = await request(context.app.getHttpServer())
       .get(`/organizations/${orgId}/members?search=member%40example.test`)

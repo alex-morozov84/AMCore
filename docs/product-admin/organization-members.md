@@ -9,7 +9,8 @@ belong to that organization and have full TeamAccess. Being a platform
 super-administrator does not waive membership on these endpoints. API keys cannot
 use the member list, role snapshot or full replacement endpoints.
 
-Role-definition editing (see the [role definitions API](role-definitions.md)), invitations and member removal are separate workflows;
+The members tab can be narrowed to the holders of one role with `?role=<roleId>` (the role page links
+there). Role-definition editing (see the [Roles tab](role-definitions.md#ready-role-screens)), invitations and member removal are separate workflows;
 this page changes assignments of existing roles only. For route placement and a
 different custom presentation, use the [integration guide](integration.md#custom-member-editor).
 
@@ -92,11 +93,11 @@ All routes below are under `/api/v1/organizations/:orgId` and require bearer aut
 current membership and full TeamAccess. Use the development OpenAPI document at
 `/docs` for complete schemas and route security metadata:
 
-| Method and suffix              | Contract                                                                                                                     |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `GET /members`                 | Literal name/email search, `page`, `limit`; safe user fields, joined date, role count and preview of at most 10 roles        |
-| `GET /members/:userId/roles`   | Member identity, ACL revision, complete assigned set when editable and paginated role choices; `section=available\|assigned` |
-| `PATCH /members/:userId/roles` | `{expectedMemberId, expectedAclVersion, roleIds}`; 200 with canonical IDs, resulting revision and `changed`                  |
+| Method and suffix              | Contract                                                                                                                                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /members`                 | Literal name/email search, optional `roleId` (only holders of that role; unknown matches nobody), `page`, `limit`; safe user fields, joined date, role count and preview of at most 10 roles |
+| `GET /members/:userId/roles`   | Member identity, ACL revision, complete assigned set when editable and paginated role choices; `section=available\|assigned`                                                                 |
+| `PATCH /members/:userId/roles` | `{expectedMemberId, expectedAclVersion, roleIds}`; 200 with canonical IDs, resulting revision and `changed`                                                                                  |
 
 Queries default to page 1 and limit 20; limit is at most 100. Search is trimmed
 and limited to 100 Unicode code points. Member search matches name/email and role
