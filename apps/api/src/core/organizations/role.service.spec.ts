@@ -5,6 +5,7 @@ import { SystemRole } from '@amcore/shared'
 
 import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
 import type { PrismaService } from '../../prisma'
+import type { AuditLogService } from '../audit'
 
 import type { AssignPermissionDto, CreateRoleDto, UpdateRoleDto } from './dto'
 import type { OrganizationsService } from './organizations.service'
@@ -19,6 +20,7 @@ describe('RoleService', () => {
   let orgsService: jest.Mocked<
     Pick<OrganizationsService, 'bumpAclVersion' | 'bumpAclVersionTx' | 'invalidateAclVersion'>
   >
+  let audit: { record: jest.Mock }
 
   const mockCustomRole: Role = {
     id: 'role-custom',
@@ -63,9 +65,11 @@ describe('RoleService', () => {
       bumpAclVersionTx: jest.fn().mockResolvedValue(undefined),
       invalidateAclVersion: jest.fn().mockResolvedValue(undefined),
     }
+    audit = { record: jest.fn().mockResolvedValue(undefined) }
     service = new RoleService(
       prisma as unknown as PrismaService,
-      orgsService as unknown as OrganizationsService
+      orgsService as unknown as OrganizationsService,
+      audit as unknown as AuditLogService
     )
     // OA-12: deleteRole / assignPermission / removePermission all
     // wrap their DB writes + bump in a $transaction. Delegate tx to
@@ -200,6 +204,22 @@ describe('RoleService', () => {
       const result = await service.updateRole('org-1', 'role-custom', dto, principal)
 
       expect(result.name).toBe('Senior Editor')
+    })
+
+    it('returns the stored role without any write for an unchanged or empty patch', async () => {
+      prisma.role.findFirst.mockResolvedValue(mockCustomRole)
+      prisma.role.findUniqueOrThrow.mockResolvedValue({
+        ...mockCustomRole,
+        permissions: [],
+      } as never)
+
+      for (const patch of [{ name: 'Editor' }, { description: undefined }, {}] as UpdateRoleDto[]) {
+        const result = await service.updateRole('org-1', 'role-custom', patch, principal)
+        expect(result.name).toBe('Editor')
+      }
+      expect(prisma.role.update).not.toHaveBeenCalled()
+      expect(orgsService.bumpAclVersionTx).not.toHaveBeenCalled()
+      expect(audit.record).not.toHaveBeenCalled()
     })
 
     it('throws NotFoundException when custom role not found', async () => {
@@ -358,20 +378,35 @@ describe('RoleService', () => {
     beforeEach(() => {
       prisma.role.findFirst.mockResolvedValue(mockCustomRole)
     })
-    it('deletes org-level permission and bumps aclVersion', async () => {
+    it('detaches only this role link, collects an unshared permission and bumps aclVersion', async () => {
       prisma.rolePermission.findUnique.mockResolvedValue({
         roleId: 'role-custom',
         permissionId: 'perm-1',
-        permission: { organizationId: 'org-1' },
+        permission: {
+          organizationId: 'org-1',
+          subject: 'Contact',
+          action: 'read',
+          inverted: false,
+        },
       } as never)
-      prisma.permission.delete.mockResolvedValue(mockPermission)
 
       await service.removePermission('org-1', 'role-custom', 'perm-1', principal)
 
-      expect(prisma.permission.delete).toHaveBeenCalledWith({ where: { id: 'perm-1' } })
+      // A shared Permission row must keep serving its other roles: only this link is deleted.
+      expect(prisma.rolePermission.delete).toHaveBeenCalledWith({
+        where: { roleId_permissionId: { roleId: 'role-custom', permissionId: 'perm-1' } },
+      })
+      expect(prisma.permission.delete).not.toHaveBeenCalled()
+      expect(prisma.permission.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'perm-1', organizationId: 'org-1', roles: { none: {} } },
+      })
       expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
       expect(orgsService.bumpAclVersionTx.mock.calls[0]?.[0]).toBe('org-1')
       expect(orgsService.invalidateAclVersion).toHaveBeenCalledWith('org-1')
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'org.role_updated', organizationId: 'org-1' }),
+        { tx: prisma }
+      )
     })
 
     it('throws NotFoundException when permission link not found', async () => {

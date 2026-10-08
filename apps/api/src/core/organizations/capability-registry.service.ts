@@ -7,6 +7,7 @@ import {
   type AssignPermissionInput,
   CAPABILITY_CATALOGUE,
   type CapabilityCatalogueResponse,
+  type CapabilityDescriptor,
   type CapabilityId,
   type CreatePresetPermissionInput,
   type OrganizationRecordAffordances,
@@ -34,6 +35,7 @@ interface CapabilityAdapter {
   credentials: readonly ('bearer' | 'apiKey')[]
   presets: readonly string[]
   editableFields: readonly string[]
+  risk?: 'fullControl'
   preset: (id: string) => AssignPermissionInput
 }
 
@@ -64,6 +66,7 @@ export const CAPABILITY_ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
     credentials: ['bearer', 'apiKey'],
     presets: ['all'],
     editableFields: [],
+    risk: 'fullControl',
     preset: () => ({
       action: Action.Manage,
       subject: Subject.TeamAccess,
@@ -179,7 +182,8 @@ export class CapabilityRegistry {
           adapter.action !== entry.action ||
           JSON.stringify(adapter.credentials) !== JSON.stringify(entry.credentials) ||
           JSON.stringify(adapter.presets) !== JSON.stringify(entry.presets) ||
-          JSON.stringify(adapter.editableFields) !== JSON.stringify(entry.editableFields)
+          JSON.stringify(adapter.editableFields) !== JSON.stringify(entry.editableFields) ||
+          adapter.risk !== (entry as CapabilityDescriptor).risk
         )
       })
     )

@@ -354,6 +354,8 @@ model MemberRole {
   role   Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([memberId, roleId])
+  // Role-leading lookup: holder counts/samples and role-deletion joins read by role, not by member.
+  @@index([roleId, memberId])
   @@map("member_roles")
   @@schema("core")
 }

@@ -1,8 +1,17 @@
 # Capability catalogue and access hints
 
 The catalogue describes operations the starter actually implements. It is
-code-declared metadata for a future role editor, not a role grant or a route
-authorization decision. Current entries cover full team-access management and
+code-declared metadata for the role editor (see the
+[role definitions API](../product-admin/role-definitions.md)), not a role grant or a route
+authorization decision. A descriptor may carry `risk: 'fullControl'` (today
+`teamAccess.manage`): an editor must confirm that grant, and the server requires
+`acknowledgeFullControl` when a save adds it. Declare `risk` in `CAPABILITY_CATALOGUE`, the
+strict response schema and the matching `CapabilityRegistry` adapter, whose startup check
+fails when they differ. The server recognizes a stored rule as a managed preset only when its
+action, subject, inverted flag, **uninterpolated** condition template and field set equal the
+adapter's preset output exactly (key and field order do not matter; `[]` all-fields never
+equals a restricted list); every other rule is advanced and is shown read-only, never
+rewritten. Current entries cover full team-access management and
 organization read, update and delete. A product adds its own resources through
 the shared/API extension points below.
 

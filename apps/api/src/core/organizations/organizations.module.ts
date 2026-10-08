@@ -30,6 +30,9 @@ import { OrganizationsService } from './organizations.service'
 import { PresetPermissionsController } from './preset-permissions.controller'
 import { RoleService } from './role.service'
 import { RoleAssignabilityService } from './role-assignability.service'
+import { RoleDefinitionCommandService } from './role-definition-command.service'
+import { RoleDefinitionQueryService } from './role-definition-query.service'
+import { RoleDefinitionsController } from './role-definitions.controller'
 import { RolesController } from './roles.controller'
 
 @Module({
@@ -45,6 +48,7 @@ import { RolesController } from './roles.controller'
     CapabilitiesController,
     PresetPermissionsController,
     MembersController,
+    RoleDefinitionsController,
     RolesController,
     InvitesController,
     AuthInvitesController,
@@ -58,6 +62,8 @@ import { RolesController } from './roles.controller'
     MemberQueryService,
     MemberRoleSetService,
     RoleService,
+    RoleDefinitionQueryService,
+    RoleDefinitionCommandService,
     RoleAssignabilityService,
     InviteService,
     InvitationCommandService,

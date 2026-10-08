@@ -566,10 +566,14 @@ Supported keys additionally require exact `manage:TeamAccess`. See
 
 - **Roles list** is paginated and ordered `isSystem DESC, name ASC` so system
   roles head the list.
-- **Roles and permissions are created separately** — the API does not accept
-  inline permissions on role creation. Each permission is validated, audited,
-  and linked on its own; the join row and the `aclVersion` bump are
-  transactional.
+- **Roles and permissions are created separately** — the legacy API does not
+  accept inline permissions on role creation. Each permission is validated and
+  linked on its own; the join row, the `aclVersion` bump and one `org.role_updated`
+  audit event are written in the same transaction, serialized on the organization.
+  Removing a permission detaches only that role's link; the row is deleted only
+  when no role references it. The
+  [role definitions API](../product-admin/role-definitions.md) saves a whole role
+  (metadata and its complete preset selection) atomically under a revision fence.
 - **Named presets** are bearer-only and require full TeamAccess and a custom
   role. The older advanced-rule POST remains available for valid custom allow
   and DENY rules, including known-model pairs absent from the UI catalogue.

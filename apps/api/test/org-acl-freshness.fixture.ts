@@ -48,9 +48,12 @@ export async function aclFixture(context: E2ETestContext) {
           console.error('ACL fixture authentication failure', method, path, res.body)
         }
       })
-  const role = (
-    await http('post', `${base}/roles`).send({ name: 'Controlled capability' }).expect(201)
-  ).body as { id: string }
+  // Seeded directly: the legacy create route now advances the organization revision (role writers
+  // share one fence), and these scenarios start from the documented revision-zero baseline.
+  const role = await prisma.role.create({
+    data: { name: 'Controlled capability', organizationId: org.id, isSystem: false },
+    select: { id: true },
+  })
   const versions = app.get(OrgAclVersionService)
   const permissions = app.get(PermissionsCacheService)
   const key = (v: number): string => `auth:perm:v2:${org.id}:${target.id}:${v}`

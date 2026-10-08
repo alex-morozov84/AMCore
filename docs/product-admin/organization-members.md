@@ -9,7 +9,7 @@ belong to that organization and have full TeamAccess. Being a platform
 super-administrator does not waive membership on these endpoints. API keys cannot
 use the member list, role snapshot or full replacement endpoints.
 
-Role-definition editing, invitations and member removal are separate workflows;
+Role-definition editing (see the [role definitions API](role-definitions.md)), invitations and member removal are separate workflows;
 this page changes assignments of existing roles only. For route placement and a
 different custom presentation, use the [integration guide](integration.md#custom-member-editor).
 

@@ -159,6 +159,24 @@ export const DEFAULT_LOCALE: SupportedLocale = 'en'
 // the header name.
 export const AMCORE_CLIENT_IP_HEADER = 'x-amcore-client-ip'
 
+/** Stable codes of the role-definition editor commands; the web translates by code only. */
+export enum RoleDefinitionErrorCode {
+  /** Missing, foreign or unassignable role; never discloses foreign metadata. */
+  ROLE_UNAVAILABLE = 'ROLE_UNAVAILABLE',
+  ROLE_SYSTEM_IMMUTABLE = 'ROLE_SYSTEM_IMMUTABLE',
+  ROLE_NAME_CONFLICT = 'ROLE_NAME_CONFLICT',
+  ROLE_NAME_RESERVED = 'ROLE_NAME_RESERVED',
+  /** The organization revision changed since the definition was read. */
+  ROLE_DEFINITION_CONFLICT = 'ROLE_DEFINITION_CONFLICT',
+  ROLE_FULL_CONTROL_ACK_REQUIRED = 'ROLE_FULL_CONTROL_ACK_REQUIRED',
+  ROLE_SELF_HELD_ACK_REQUIRED = 'ROLE_SELF_HELD_ACK_REQUIRED',
+  ROLE_DEFINITION_OVERSIZED = 'ROLE_DEFINITION_OVERSIZED',
+  ROLE_DELETE_IMPACT_CHANGED = 'ROLE_DELETE_IMPACT_CHANGED',
+  ROLE_READ_UNAVAILABLE = 'ROLE_READ_UNAVAILABLE',
+  /** The write outcome is unconfirmed; read persisted state before another deliberate edit. */
+  ROLE_SAVE_UNAVAILABLE = 'ROLE_SAVE_UNAVAILABLE',
+}
+
 export enum OrganizationMemberErrorCode {
   MEMBER_UNAVAILABLE = 'MEMBER_UNAVAILABLE',
   MEMBER_ROLES_CONFLICT = 'MEMBER_ROLES_CONFLICT',

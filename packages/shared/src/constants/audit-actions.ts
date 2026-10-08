@@ -34,6 +34,9 @@ export const AUDIT_ACTIONS = [
   'org.invite_revoked',
   'org.invite_reissued',
   'org.member_roles_changed',
+  'org.role_created',
+  'org.role_deleted',
+  'org.role_updated',
   'telegram.connection_linked',
   'telegram.connection_unlinked',
 ] as const

@@ -335,15 +335,15 @@ index f6b2d08..4700b15 100644
 +import { FixtureOrdersController } from './fixture-orders.controller'
  import { RoleService } from './role.service'
  import { RoleAssignabilityService } from './role-assignability.service'
- import { RolesController } from './roles.controller'
+ import { RoleDefinitionCommandService } from './role-definition-command.service'
 @@ -32,6 +33,7 @@ import { RolesController } from './roles.controller'
      OrganizationsController,
      CapabilitiesController,
      PresetPermissionsController,
 +    FixtureOrdersController,
      MembersController,
+     RoleDefinitionsController,
      RolesController,
-     InvitesController,
 diff --git a/apps/api/test/fixture-order-extension.e2e-spec.ts b/apps/api/test/fixture-order-extension.e2e-spec.ts
 new file mode 100644
 index 0000000..5795deb

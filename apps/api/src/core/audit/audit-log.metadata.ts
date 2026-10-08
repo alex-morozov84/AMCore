@@ -102,6 +102,25 @@ const aiConversationControlContext: MetadataSpec = {
   reasonRef: aiReasonRef,
 }
 
+/**
+ * Role-definition audit metadata: the actor's credential type, ids and counts only. A role's name,
+ * description and stored conditions, member emails and holder lists are never audited.
+ */
+const roleDefinitionAuditMetadata: MetadataSpec = {
+  actorCredentialType: boundedString(7, /^(jwt|api_key)$/),
+  roleId: boundedString(128, /^[A-Za-z0-9_-]+$/),
+  revisionBefore: memberRoleCount,
+  revisionAfter: memberRoleCount,
+  addedPresetCount: memberRoleCount,
+  removedPresetCount: memberRoleCount,
+  fullControl: boundedString(5, /^(added|removed|none)$/),
+  holderCount: memberRoleCount,
+  liveInvitationCount: memberRoleCount,
+  nameChanged: auditFilterFlag,
+  descriptionChanged: auditFilterFlag,
+  source: boundedString(12, /^(editor|legacy)$/),
+}
+
 const specs: Record<AuditAction, MetadataSpec> = {
   'admin.audit_logs.viewed': {
     actor: auditFilterFlag,
@@ -189,6 +208,10 @@ const specs: Record<AuditAction, MetadataSpec> = {
     removedCount: memberRoleCount,
     source: boundedString(7, /^(replace|assign|remove)$/),
   },
+  // Role-definition events carry counts and ids only: never names, descriptions, conditions or emails.
+  'org.role_created': roleDefinitionAuditMetadata,
+  'org.role_updated': roleDefinitionAuditMetadata,
+  'org.role_deleted': roleDefinitionAuditMetadata,
   // No metadata — the security event is bounded to actor + target; no chat/user id or token.
   'telegram.connection_linked': {},
   'telegram.connection_unlinked': {},

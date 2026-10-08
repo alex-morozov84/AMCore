@@ -123,6 +123,15 @@ const EXPECTED: Record<string, Expected> = {
   'delete /organizations/{orgId}/members/{userId}': { status: '204', kind: 'none' },
   'post /organizations/{orgId}/members/{userId}/roles/{roleId}': { status: '204', kind: 'none' },
   'delete /organizations/{orgId}/members/{userId}/roles/{roleId}': { status: '204', kind: 'none' },
+  // role definitions (bearer-only editor contracts)
+  'get /organizations/{orgId}/role-definitions': { status: '200', kind: 'json' },
+  'post /organizations/{orgId}/role-definitions': { status: '201', kind: 'json' },
+  'get /organizations/{orgId}/role-definitions/{roleId}': { status: '200', kind: 'json' },
+  'patch /organizations/{orgId}/role-definitions/{roleId}': { status: '200', kind: 'json' },
+  'post /organizations/{orgId}/role-definitions/{roleId}/deletion': {
+    status: '200',
+    kind: 'json',
+  },
   // roles
   'get /organizations/{orgId}/roles': { status: '200', kind: 'json' },
   'post /organizations/{orgId}/roles': { status: '201', kind: 'json' },
@@ -447,6 +456,28 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation?.responses).toHaveProperty('200')
     expect(operation?.responses).toHaveProperty('401')
     expect(operation?.responses).toHaveProperty('403')
+  })
+
+  it('documents the bearer-only role-definition editor contracts with their stable failure statuses', () => {
+    const base = '/organizations/{orgId}/role-definitions'
+    const operations = [
+      [document.paths[base]?.get, ['200', '400', '401', '403', '503']],
+      [document.paths[base]?.post, ['201', '400', '401', '403', '409', '413', '503']],
+      [document.paths[`${base}/{roleId}`]?.get, ['200', '401', '403', '404', '503']],
+      [
+        document.paths[`${base}/{roleId}`]?.patch,
+        ['200', '400', '401', '403', '404', '409', '413', '503'],
+      ],
+      [
+        document.paths[`${base}/{roleId}/deletion`]?.post,
+        ['200', '400', '401', '403', '404', '409', '413', '503'],
+      ],
+    ] as const
+    for (const [operation, statuses] of operations) {
+      expect(operation?.security).toEqual([{ bearer: [] }])
+      expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
+      for (const status of statuses) expect(operation?.responses).toHaveProperty(status)
+    }
   })
 
   it('documents the bearer-only, no-content Operations Console access probe', () => {
