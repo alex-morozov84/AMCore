@@ -1,7 +1,9 @@
+import { HttpStatus } from '@nestjs/common'
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import type { ZodType } from 'zod'
 
+import { endpointBinding, freezeAiModel } from '../registry/ai-execution-descriptor'
 import { AiModelRegistry } from '../registry/ai-model-registry.service'
 import type { ResolvedAiModel } from '../registry/ai-registry.types'
 import { AiUsageLedgerService } from '../usage/ai-usage-ledger.service'
@@ -18,6 +20,7 @@ import {
 } from './ai-gateway.types'
 import { AiCredentialResolver } from './credential-resolver'
 import { findUnsupportedMultimodalCapability } from './multimodal-capability'
+import { providerReceipt } from './provider-receipt'
 
 import { EnvService } from '@/env/env.service'
 import {
@@ -66,7 +69,9 @@ export class ModelGateway {
   }
 
   async generateText(request: AiGenerateRequest): Promise<AiTextResult> {
-    const { model, adapter, call } = await this.prepare(request)
+    const { model, adapter } = await this.prepare(request)
+    await request.beforeDispatch?.()
+    const call = this.adapterCall(model, request)
     // Preparation itself yields: the caller may abort before this continuation dispatches.
     if (request.abortSignal?.aborted === true) throw AiGatewayException.aborted(model.provider.type)
     try {
@@ -74,7 +79,7 @@ export class ModelGateway {
       await this.settle(model, 'text', result.usage, request)
       return result
     } catch (error) {
-      this.recordFailure(model, 'text')
+      await this.settleFailureReceipt(model, 'text', error, request)
       throw this.normalizeError(error, model)
     }
   }
@@ -83,17 +88,19 @@ export class ModelGateway {
     request: AiGenerateRequest,
     schema: ZodType<T>
   ): Promise<AiObjectResult<T>> {
-    const { model, adapter, call } = await this.prepare(request)
+    const { model, adapter } = await this.prepare(request)
     if (request.abortSignal?.aborted === true) throw AiGatewayException.aborted(model.provider.type)
     if (model.capabilities.structured_output !== true || adapter.generateObject === undefined) {
       throw AiGatewayException.capabilityUnsupported(model.slug, 'structured_output')
     }
+    await request.beforeDispatch?.()
+    const call = this.adapterCall(model, request)
     try {
       const result = await adapter.generateObject(call, schema)
       await this.settle(model, 'object', result.usage, request)
       return result
     } catch (error) {
-      this.recordFailure(model, 'object')
+      await this.settleFailureReceipt(model, 'object', error, request)
       throw this.normalizeError(error, model)
     }
   }
@@ -111,10 +118,32 @@ export class ModelGateway {
   ): Promise<void> {
     const provider = providerLabel(model)
     this.metrics.incAiGeneration(provider, operation, 'success')
-    this.metrics.incAiTokens(provider, 'input', usage.inputTokens)
-    this.metrics.incAiTokens(provider, 'output', usage.outputTokens)
+    if (usage.inputTokens !== null) this.metrics.incAiTokens(provider, 'input', usage.inputTokens)
+    if (usage.outputTokens !== null)
+      this.metrics.incAiTokens(provider, 'output', usage.outputTokens)
     if (request.recordUsage === false) return
     await this.usageLedger.record({ modelSlug: model.slug, usage, context: request.context })
+  }
+
+  private async settleFailureReceipt(
+    model: ResolvedAiModel,
+    operation: AiMetricsOperation,
+    error: unknown,
+    request: AiGenerateRequest
+  ): Promise<void> {
+    this.recordFailure(model, operation)
+    const receipt = providerReceipt(error)
+    if (!receipt) return
+    if (receipt.usage.inputTokens !== null)
+      this.metrics.incAiTokens(providerLabel(model), 'input', receipt.usage.inputTokens)
+    if (receipt.usage.outputTokens !== null)
+      this.metrics.incAiTokens(providerLabel(model), 'output', receipt.usage.outputTokens)
+    if (request.recordUsage !== false)
+      await this.usageLedger.record({
+        modelSlug: model.slug,
+        usage: receipt.usage,
+        context: request.context,
+      })
   }
 
   private recordFailure(model: ResolvedAiModel, operation: AiMetricsOperation): void {
@@ -123,8 +152,51 @@ export class ModelGateway {
 
   private async prepare(
     request: AiGenerateRequest
-  ): Promise<{ model: ResolvedAiModel; adapter: AiProviderAdapter; call: AiAdapterCall }> {
-    const model = await this.resolveModel(request.modelSlug, request.abortSignal)
+  ): Promise<{ model: ResolvedAiModel; adapter: AiProviderAdapter }> {
+    const resolved = request.execution
+      ? null
+      : await this.resolveModel(request.modelSlug, request.abortSignal)
+    let selected
+    try {
+      selected = request.execution ?? freezeAiModel(resolved!)
+    } catch {
+      throw AiGatewayException.modelNotConfigured(resolved!.slug)
+    }
+    const live = await this.registry.resolveLiveModel(
+      selected.modelId,
+      request.abortSignal,
+      selected
+    )
+    let matches = false
+    try {
+      const endpoint = live ? endpointBinding(live) : null
+      matches =
+        !!live &&
+        live.provider.id === selected.providerId &&
+        live.provider.type === selected.providerType &&
+        live.provider.credentialSlot === selected.credentialSlot &&
+        endpoint?.kind === selected.endpoint.kind &&
+        (endpoint.kind === 'built_in' ||
+          (selected.endpoint.kind === 'compatible' && endpoint.sha256 === selected.endpoint.sha256))
+    } catch {
+      /* malformed live endpoint refuses binding */
+    }
+    if (!live || !matches)
+      throw new AiGatewayException(
+        'model_binding_changed',
+        HttpStatus.SERVICE_UNAVAILABLE,
+        false,
+        'AI model binding changed'
+      )
+    const model: ResolvedAiModel = {
+      ...live,
+      slug: selected.modelSlug,
+      providerModelName: selected.providerModelName,
+      capabilities: selected.capabilities,
+      contextLimit: selected.contextLimit,
+      maxOutputTokens: selected.maxOutputTokens,
+      provider: { ...live.provider, slug: selected.providerSlug },
+    }
     // The catalog read may have resumed after the caller's cutoff: start no transport then.
     if (request.abortSignal?.aborted === true) {
       throw AiGatewayException.aborted(model.provider.type)
@@ -140,7 +212,12 @@ export class ModelGateway {
     if (unsupported !== null) {
       throw AiGatewayException.capabilityUnsupported(model.slug, unsupported)
     }
-    const call: AiAdapterCall = {
+    return { model, adapter }
+  }
+
+  private adapterCall(model: ResolvedAiModel, request: AiGenerateRequest): AiAdapterCall {
+    if (request.abortSignal?.aborted === true) throw AiGatewayException.aborted(model.provider.type)
+    return {
       model,
       credential: this.credentials.getCredential(
         model.provider.type,
@@ -153,7 +230,6 @@ export class ModelGateway {
       timeoutMs: this.env.get('AI_REQUEST_TIMEOUT_MS'),
       abortSignal: request.abortSignal,
     }
-    return { model, adapter, call }
   }
 
   private async resolveModel(

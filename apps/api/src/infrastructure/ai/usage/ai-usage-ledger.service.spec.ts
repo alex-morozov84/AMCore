@@ -37,8 +37,14 @@ describe('AiUsageLedgerService', () => {
         conversationId: null,
         inputTokens: 10,
         outputTokens: 5,
-        providerReportedUsage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
-        usageVersion: 1,
+        providerReportedUsage: {
+          inputTokens: 10,
+          outputTokens: 5,
+          totalTokens: 15,
+          source: 'reported',
+          availability: 'complete',
+        },
+        usageVersion: 2,
       }),
     })
   })

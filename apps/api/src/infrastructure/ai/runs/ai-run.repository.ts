@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
+import type { ProviderRetryHint } from '../gateway/providers/provider-retry-hint'
+
+import { AiQueuedRestrictionDiagnosis } from './ai-queued-restriction-diagnosis'
 import {
   AI_RUN_CLAIM_BATCH_LIMIT,
   AI_RUN_GUARDRAIL_REFUSAL_CLASSIFICATION,
@@ -13,15 +16,17 @@ import {
   AiRunTerminalReason,
 } from './ai-run.constants'
 import { closeAttempt, closeRunInvocations } from './ai-run-attempts'
-import { applyRunRetryAfterFloor, computeNextRunAttemptAt } from './ai-run-backoff'
+import { computeNextRunAttemptAt } from './ai-run-backoff'
 import type {
   ClaimedRun,
   GuardrailRefusalInput,
   RunReapResult,
   RunRetryOutcome,
 } from './ai-run-dispatch.types'
+import { aiRunExecutionEligibility } from './ai-run-execution-eligibility'
 import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
 import { sanitizeGuardrailCategories } from './guardrail-step-detail'
+import { persistProviderRestriction, type SettledRestriction } from './provider-retry-restriction'
 
 import {
   AiAuthorType,
@@ -55,6 +60,7 @@ interface ReapRow {
   cancellationRequestedAt: Date | null
   leaseEpoch: number
   ioStarted: boolean
+  providerNotBefore: Date | null
 }
 
 /** How a transition out of `RUNNING` is recorded in the attempt history and on in-flight tools. */
@@ -82,10 +88,16 @@ interface Leaving {
  */
 @Injectable()
 export class AiRunRepository {
+  private diagnosis: AiQueuedRestrictionDiagnosis | undefined
   constructor(
     private readonly prisma: PrismaService,
     @Inject(AI_RUN_SHUTDOWN_LATCH) private readonly latch: ShutdownLatch
   ) {}
+
+  diagnoseQueuedRestrictions(): Promise<number> {
+    this.diagnosis ??= new AiQueuedRestrictionDiagnosis(this.prisma, this.latch)
+    return this.diagnosis.sweep()
+  }
 
   /**
    * Atomically claim up to `limit` due runs (one per dispatch lane): lease them (`RUNNING`), bump the
@@ -102,21 +114,17 @@ export class AiRunRepository {
     const ttlSeconds = AI_RUN_LEASE_TTL_MS / 1000
 
     const rows = await this.prisma.$queryRaw<ClaimedRow[]>(Prisma.sql`
-      WITH claimed AS (
+      WITH timing AS MATERIALIZED (SELECT clock_timestamp() AS at), claimed AS (
         UPDATE "ai"."ai_runs" AS r
         SET status = 'RUNNING'::"ai"."AiRunStatus",
             "leaseToken" = ${leaseToken},
-            "leaseExpiresAt" = clock_timestamp() + make_interval(secs => ${ttlSeconds}::double precision),
+            "leaseExpiresAt" = (SELECT at FROM timing) + make_interval(secs => ${ttlSeconds}::double precision),
             "leaseEpoch" = r."leaseEpoch" + 1,
-            "startedAt" = COALESCE(r."startedAt", now()),
-            "updatedAt" = now()
+            "startedAt" = COALESCE(r."startedAt", (SELECT at FROM timing)),
+            "updatedAt" = (SELECT at FROM timing)
         FROM (
           SELECT id FROM "ai"."ai_runs"
-          WHERE status = 'QUEUED'::"ai"."AiRunStatus"
-            AND "availableAt" <= now()
-            AND ("nextAttemptAt" IS NULL OR "nextAttemptAt" <= now())
-            AND ("deadlineAt" IS NULL OR "deadlineAt" > now())
-            AND "leaseEpoch" < ${AI_RUN_MAX_EPOCHS}
+          WHERE ${aiRunExecutionEligibility(Prisma.sql`(SELECT at FROM timing)`)}
           ORDER BY COALESCE("nextAttemptAt", "availableAt")
           FOR UPDATE SKIP LOCKED
           LIMIT ${limit}
@@ -237,7 +245,8 @@ export class AiRunRepository {
   async finalizeRefusal(
     tx: Prisma.TransactionClient,
     claim: ClaimedRun,
-    refusal: GuardrailRefusalInput
+    refusal: GuardrailRefusalInput,
+    errorCode: string = AiRunErrorCode.GUARDRAIL_BLOCKED
   ): Promise<boolean> {
     const sequence = await this.nextSequence(tx, claim.conversationId)
     await tx.aiMessage.create({
@@ -256,7 +265,7 @@ export class AiRunRepository {
       },
     })
     await this.writeRefusalSteps(tx, claim.id, refusal)
-    return this.finalizeFailed(tx, claim, AiRunErrorCode.GUARDRAIL_BLOCKED, refusal.reasonCode)
+    return this.finalizeFailed(tx, claim, errorCode, refusal.reasonCode)
   }
 
   /**
@@ -269,9 +278,17 @@ export class AiRunRepository {
     tx: Prisma.TransactionClient,
     claim: ClaimedRun,
     errorCode: string,
-    retryAfterMs?: number
+    hint?: ProviderRetryHint | number,
+    prepared?: SettledRestriction
   ): Promise<RunRetryOutcome> {
-    const now = new Date()
+    const restriction =
+      prepared ??
+      (await persistProviderRestriction(
+        tx,
+        claim.id,
+        typeof hint === 'number' ? { kind: 'relative', seconds: hint / 1000 } : hint
+      ))
+    const now = restriction.now
     const cancel = await tx.aiRun.findUnique({
       where: { id: claim.id },
       select: { cancellationRequestedAt: true },
@@ -281,6 +298,20 @@ export class AiRunRepository {
       return won
         ? { state: 'failed', reasonCode: AiRunTerminalReason.CANCELLED_BY_USER }
         : { state: 'lease_lost' }
+    }
+    if (
+      claim.deadlineAt &&
+      (now >= claim.deadlineAt || (restriction.floor && restriction.floor >= claim.deadlineAt))
+    ) {
+      const won = await this.finalizeExpired(tx, claim)
+      return won ? { state: 'failed', reasonCode: 'deadline_exceeded' } : { state: 'lease_lost' }
+    }
+    if (restriction.refused) {
+      const code = restriction.invalid
+        ? 'provider_retry_restriction_invalid'
+        : 'provider_retry_after_exceeds_horizon'
+      const won = await this.finalizeFailed(tx, claim, code)
+      return won ? { state: 'failed', reasonCode: code } : { state: 'lease_lost' }
     }
     if (claim.attemptNumber >= claim.maxAttempts) {
       const won = await this.leave(
@@ -297,11 +328,9 @@ export class AiRunRepository {
         : { state: 'lease_lost' }
     }
 
-    const nextAttemptAt = applyRunRetryAfterFloor(
-      computeNextRunAttemptAt(claim.attemptNumber, now),
-      retryAfterMs,
-      now
-    )
+    const backoff = computeNextRunAttemptAt(claim.attemptNumber, now)
+    const nextAttemptAt =
+      restriction.floor && restriction.floor > backoff ? restriction.floor : backoff
     const won = await this.leave(
       tx,
       claim,
@@ -331,10 +360,10 @@ export class AiRunRepository {
     // The sweep's transaction runs through the shutdown latch: a sealed latch starts none, and the guarded
     // client rejects the next query of one already open, so its tail rolls back whole.
     const outcome = await this.latch.transaction(this.prisma, async (tx) => {
-      const now = new Date()
       const expired = await tx.$queryRaw<ReapRow[]>(Prisma.sql`
         SELECT r.id, r."attemptCount", r."maxAttempts", r."deadlineAt", r."cancellationRequestedAt",
                r."leaseEpoch",
+               (SELECT not_before FROM ai.classify_provider_retry_restriction(r."providerRetryRestriction", clock_timestamp())) AS "providerNotBefore",
                COALESCE(
                  (SELECT a."ioStartedAt" IS NOT NULL FROM "ai"."ai_run_attempts" a
                   WHERE a."runId" = r.id AND a.epoch = r."leaseEpoch"),
@@ -347,6 +376,8 @@ export class AiRunRepository {
         LIMIT ${limit}
       `)
 
+      const clock = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
+      const now = clock[0]!.now
       let rescheduled = 0
       let failed = 0
       for (const run of expired) {
@@ -397,6 +428,9 @@ export class AiRunRepository {
   private async reapRetry(tx: Prisma.TransactionClient, run: ReapRow, now: Date): Promise<boolean> {
     const consumed = run.ioStarted
     const exhausted = consumed && run.attemptCount + 1 >= run.maxAttempts
+    const backoff = consumed ? computeNextRunAttemptAt(run.attemptCount + 1, now) : now
+    const nextAttemptAt =
+      run.providerNotBefore && run.providerNotBefore > backoff ? run.providerNotBefore : backoff
     await tx.aiRun.update({
       where: { id: run.id },
       data: exhausted
@@ -411,7 +445,7 @@ export class AiRunRepository {
         : {
             status: AiRunStatus.QUEUED,
             attemptCount: consumed ? run.attemptCount + 1 : run.attemptCount,
-            nextAttemptAt: consumed ? computeNextRunAttemptAt(run.attemptCount + 1, now) : now,
+            nextAttemptAt,
             errorCode: AiRunErrorCode.LEASE_EXPIRED,
             terminalReasonCode: null,
             leaseToken: null,
@@ -436,6 +470,7 @@ export class AiRunRepository {
       const overdue = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
         SELECT id FROM "ai"."ai_runs"
         WHERE status = 'QUEUED'::"ai"."AiRunStatus"
+          AND (SELECT classification FROM ai.classify_provider_retry_restriction("providerRetryRestriction", clock_timestamp())) NOT IN ('invalid','unknown')
           AND "deadlineAt" IS NOT NULL AND "deadlineAt" <= now()
         ORDER BY "deadlineAt"
         FOR UPDATE SKIP LOCKED
@@ -465,7 +500,9 @@ export class AiRunRepository {
       const now = new Date()
       const capped = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
         SELECT id FROM "ai"."ai_runs"
-        WHERE status = 'QUEUED'::"ai"."AiRunStatus" AND "leaseEpoch" >= ${AI_RUN_MAX_EPOCHS}
+        WHERE status = 'QUEUED'::"ai"."AiRunStatus"
+          AND (SELECT classification FROM ai.classify_provider_retry_restriction("providerRetryRestriction", clock_timestamp())) NOT IN ('invalid','unknown')
+          AND "leaseEpoch" >= ${AI_RUN_MAX_EPOCHS}
         ORDER BY "updatedAt"
         FOR UPDATE SKIP LOCKED
         LIMIT ${limit}

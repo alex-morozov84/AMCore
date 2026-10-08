@@ -86,6 +86,7 @@ describe('AiRunLoopFinalizer', () => {
     repository = mockDeep<AiRunRepository>()
     repository.finalizeCompleted.mockResolvedValue(true)
     repository.finalizeFailed.mockResolvedValue(true)
+    repository.finalizeRefusal.mockResolvedValue(true)
     repository.finalizeCancelled.mockResolvedValue(true)
     repository.finalizeSuperseded.mockResolvedValue(true)
     repository.finalizeExpired.mockResolvedValue(true)
@@ -204,14 +205,31 @@ describe('AiRunLoopFinalizer', () => {
     })
 
     it('outputBlocked → a guarded canned refusal with the OUTPUT_VALIDATION check step', async () => {
-      await finalizer.outputBlocked(CLAIM, [{ category: 'envelope_marker_abuse', count: 1 }], 2)
+      await finalizer.outputBlocked(
+        CLAIM,
+        [{ category: 'envelope_marker_abuse', count: 1 }],
+        2,
+        PLAN,
+        {
+          modelId: 'model-fixture',
+          providerId: 'provider-fixture',
+          modelSlug: PLAN.modelSlug,
+          providerType: 'MOCK',
+          finishReason: 'stop',
+          durationMs: 1,
+          toolCallCount: 0,
+          usage: RESULT.usage,
+        }
+      )
 
-      expect(transitions.refusal).toHaveBeenCalledWith(
+      expect(repository.finalizeRefusal).toHaveBeenCalledWith(
+        tx,
         CLAIM,
         expect.objectContaining({
           reasonCode: 'guardrail_output_blocked',
           checkStepType: AiRunStepType.OUTPUT_VALIDATION,
-        })
+        }),
+        'guardrail_blocked'
       )
       expect(metrics.observeAiToolLoopSteps).toHaveBeenCalledWith('failed', 2)
     })
@@ -229,7 +247,7 @@ describe('AiRunLoopFinalizer', () => {
     it('retries a retryable gateway error under its bounded code', async () => {
       await finalizer.gatewayError(CLAIM, AiGatewayException.providerUnavailable('MOCK' as never))
 
-      expect(transitions.retry).toHaveBeenCalledWith(CLAIM, 'provider_unavailable')
+      expect(transitions.retry).toHaveBeenCalledWith(CLAIM, 'provider_unavailable', undefined)
       expect(transitions.failed).not.toHaveBeenCalled()
     })
 

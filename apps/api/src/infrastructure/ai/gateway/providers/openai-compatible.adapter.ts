@@ -1,6 +1,7 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
 
+import { canonicalCompatibleEndpoint } from '../../registry/ai-execution-descriptor'
 import { AiGatewayException } from '../ai-gateway.error'
 import type { AiAdapterCall } from '../ai-gateway.types'
 
@@ -39,6 +40,14 @@ export class OpenAICompatibleAdapter extends AbstractAiSdkAdapter {
     AiProviderType.YANDEX_AI_STUDIO,
   ] as const
 
+  private compatibleEndpoint(call: AiAdapterCall): string {
+    try {
+      return canonicalCompatibleEndpoint(call.model.provider.baseUrl)
+    } catch {
+      throw AiGatewayException.modelNotConfigured(call.model.slug)
+    }
+  }
+
   protected resolveLanguageModel(call: AiAdapterCall): LanguageModel {
     const type = call.model.provider.type
     const family = FAMILY[type]
@@ -48,7 +57,7 @@ export class OpenAICompatibleAdapter extends AbstractAiSdkAdapter {
     // Named families use ONLY the code-owned base URL (DB `baseUrl` is ignored — anti-exfiltration);
     // the generic compatible type is the sole case that reads the catalog-supplied base URL.
     const baseURL =
-      type === AiProviderType.OPENAI_COMPATIBLE ? call.model.provider.baseUrl : family.baseUrl
+      type === AiProviderType.OPENAI_COMPATIBLE ? this.compatibleEndpoint(call) : family.baseUrl
     if (baseURL === undefined || baseURL === null) {
       throw AiGatewayException.modelNotConfigured(call.model.slug)
     }

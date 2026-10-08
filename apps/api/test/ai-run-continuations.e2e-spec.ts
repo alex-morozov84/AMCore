@@ -4,10 +4,12 @@ import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
 import { AI_PROVIDER_ADAPTERS } from '../src/infrastructure/ai/gateway/ai-gateway.types'
 import { ModelGateway } from '../src/infrastructure/ai/gateway/model-gateway.service'
+import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { reconstructRounds } from '../src/infrastructure/ai/runs/ai-run-loop-reconstruct'
 import { callProvider } from '../src/infrastructure/ai/runs/ai-run-provider-call'
 import { AiToolRecoveryService } from '../src/infrastructure/ai/runs/ai-tool-recovery.service'
+import type { AppRedisClient } from '../src/infrastructure/redis'
 import { REDIS_CLIENT } from '../src/infrastructure/redis'
 import { AttemptRuntime, CUTOFF, ShutdownLatch } from '../src/infrastructure/worker-lifecycle'
 
@@ -38,6 +40,7 @@ describe('AI run shutdown seal inside nested helpers (e2e)', () => {
     controls.reset()
     await cleanDatabase(context.prisma, context.cache, context.throttlerStorage)
     await seedAiCatalog(context.prisma)
+    await context.app.get(AiModelRegistry, { strict: false }).invalidate()
   })
 
   async function queueRun() {
@@ -174,25 +177,23 @@ describe('AI run shutdown seal inside nested helpers (e2e)', () => {
     const runtime = new AttemptRuntime(latch.openAttempt())
     const entered = deferred()
     const release = deferred()
-    const redis = context.app.get(REDIS_CLIENT, { strict: false }) as {
-      get: (...args: unknown[]) => Promise<unknown>
-    }
-    const originalGet = redis.get
-    const providers = context.prisma.aiProvider as unknown as {
-      findMany: (...args: never[]) => unknown
-    }
-    const originalFind = providers.findMany
+    const redis = context.app.get<AppRedisClient>(REDIS_CLIENT, { strict: false })
+    const originalOptions = redis.withCommandOptions
+    const runner = context.prisma.observedTransactions('ai-catalogue')
+    const originalStart = runner.start
+    const start = runner.start.bind(runner)
     let databaseReads = 0
-    redis.get = async function (...args: unknown[]) {
-      if (args[0] !== 'ai:catalog:v1') return originalGet.apply(this, args)
-      entered.resolve()
-      await release.promise
-      return null
+    redis.withCommandOptions = (() => ({
+      eval: async () => {
+        entered.resolve()
+        await release.promise
+        return ['00000000-0000-0000-0000-000000000000', null]
+      },
+    })) as unknown as typeof originalOptions
+    runner.start = (operation) => {
+      databaseReads++
+      return start(operation)
     }
-    providers.findMany = ((...args: never[]) => {
-      databaseReads += 1
-      return originalFind.apply(providers, args)
-    }) as never
     try {
       const gateway = context.app.get(ModelGateway, { strict: false })
       const call = callProvider(
@@ -219,8 +220,8 @@ describe('AI run shutdown seal inside nested helpers (e2e)', () => {
     } finally {
       release.resolve()
       runtime.attempt.dispose()
-      redis.get = originalGet
-      providers.findMany = originalFind
+      redis.withCommandOptions = originalOptions
+      runner.start = originalStart
     }
   })
 })

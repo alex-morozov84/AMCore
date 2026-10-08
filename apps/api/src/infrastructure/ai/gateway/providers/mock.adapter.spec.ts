@@ -11,6 +11,7 @@ import { AiProviderType } from '@/generated/prisma/client'
 function call(over: Partial<AiAdapterCall> = {}): AiAdapterCall {
   return {
     model: {
+      id: 'model-fixture',
       slug: 'mock-default',
       providerModelName: 'mock',
       capabilities: { text: true },
@@ -18,6 +19,7 @@ function call(over: Partial<AiAdapterCall> = {}): AiAdapterCall {
       maxOutputTokens: null,
       isDefault: false,
       provider: {
+        id: 'provider-fixture',
         slug: 'mock',
         type: AiProviderType.MOCK,
         baseUrl: null,
@@ -41,7 +43,7 @@ describe('MockAiAdapter', () => {
     expect(result.text).toBe('[mock:mock] hello')
     expect(result.finishReason).toBe('stop')
     expect(result.providerType).toBe(AiProviderType.MOCK)
-    expect(result.usage.totalTokens).toBe(result.usage.inputTokens + result.usage.outputTokens)
+    expect(result.usage.totalTokens).toBe(result.usage.inputTokens! + result.usage.outputTokens!)
     expect(result.usage.inputTokens).toBeGreaterThan(0)
   })
 

@@ -115,7 +115,7 @@ jobs:
       - name: Run tests
         run: |
           pnpm test
-          pnpm --filter api test:e2e -- process-role.e2e-spec.ts shutdown-drain.e2e-spec.ts
+          pnpm --filter api test:e2e --runTestsByPath test/process-role.e2e-spec.ts test/shutdown-drain.e2e-spec.ts test/ai-gateway-consistency.e2e-spec.ts test/ai-catalog-degradation.e2e-spec.ts test/ai-provider-receipt.e2e-spec.ts test/ai-gateway-upgrade.e2e-spec.ts
           pnpm test:capability-extension
           pnpm --filter web test:integration
 

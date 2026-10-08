@@ -61,6 +61,21 @@ function claim(over: Partial<ClaimedRun> = {}): ClaimedRun {
 function plan(over: Partial<RunPlan> = {}): RunPlan {
   return {
     modelSlug: 'claude-default',
+    assistantId: null,
+    execution: {
+      version: 1,
+      modelId: 'model-fixture',
+      providerId: 'provider-fixture',
+      modelSlug: 'claude-default',
+      providerSlug: 'anthropic',
+      providerType: 'ANTHROPIC',
+      providerModelName: 'claude',
+      capabilities: {},
+      contextLimit: null,
+      maxOutputTokens: null,
+      credentialSlot: 'default',
+      endpoint: { kind: 'built_in' },
+    },
     system: 'GUARD INSTRUCTION UNTRUSTED',
     userMessages: [
       { role: 'user', content: '<amcore:user-data-x>{"text":"hi"}</amcore:user-data-x>' },
@@ -246,16 +261,16 @@ describe('AiRunLoopExecutor', () => {
   })
 
   describe('final-text path (Arc C single-shot behavior when no tools apply)', () => {
-    it('admits (marking possible I/O start), calls the provider once with no tools, then finalizes', async () => {
+    it('admits early, delegates final dispatch admission to the gateway, then finalizes', async () => {
       await run()
 
-      expect(guard.admit).toHaveBeenCalledWith(expect.anything(), expect.any(Function), {
-        markIoStarted: true,
-      })
+      expect(guard.admit).toHaveBeenCalledWith(expect.anything(), expect.any(Function), {})
       expect(gateway.generateText).toHaveBeenCalledTimes(1)
       expect(gateway.generateText).toHaveBeenCalledWith(
         expect.objectContaining({
           modelSlug: 'claude-default',
+          execution: expect.objectContaining({ version: 1 }),
+          beforeDispatch: expect.any(Function),
           tools: undefined,
           recordUsage: false,
           abortSignal: expect.any(AbortSignal),
@@ -607,7 +622,9 @@ describe('AiRunLoopExecutor', () => {
       expect(finalizer.outputBlocked).toHaveBeenCalledWith(
         expect.anything(),
         [{ category: 'envelope_marker_abuse', count: 1 }],
-        1
+        1,
+        expect.objectContaining({ modelSlug: 'claude-default' }),
+        expect.objectContaining({ modelId: 'model-fixture', usage: expect.any(Object) })
       )
       expect(finalizer.success).not.toHaveBeenCalled()
     })
@@ -689,7 +706,8 @@ describe('AiRunLoopExecutor', () => {
 
       expect(finalizer.gatewayError).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'run-1' }),
-        error
+        error,
+        expect.objectContaining({ modelSlug: 'claude-default' })
       )
       expect(finalizer.success).not.toHaveBeenCalled()
     })

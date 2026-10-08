@@ -1,4 +1,4 @@
-import { generateObject, generateText, type LanguageModel } from 'ai'
+import { generateObject, generateText, type LanguageModel, NoObjectGeneratedError } from 'ai'
 import type { ZodType } from 'zod'
 
 import { AiGatewayException } from '../ai-gateway.error'
@@ -8,6 +8,11 @@ import type {
   AiProviderAdapter,
   AiTextResult,
 } from '../ai-gateway.types'
+import {
+  type AiProviderReceipt,
+  attachProviderReceipt,
+  observeProviderReceipt,
+} from '../provider-receipt'
 
 import {
   mapProviderError,
@@ -33,12 +38,18 @@ export type AdapterFetch = typeof globalThis.fetch
 export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
   abstract readonly supportedTypes: readonly AiProviderType[]
 
-  constructor(protected readonly fetchImpl?: AdapterFetch) {}
+  protected readonly fetchImpl: AdapterFetch
+
+  constructor(fetchImpl: AdapterFetch = globalThis.fetch) {
+    this.fetchImpl = (input, init) => fetchImpl(input, { ...init, redirect: 'error' })
+  }
 
   protected abstract resolveLanguageModel(call: AiAdapterCall): LanguageModel
 
   async generateText(call: AiAdapterCall): Promise<AiTextResult> {
     assertNotAborted(call)
+    const started = performance.now()
+    let receipt: AiProviderReceipt | undefined
     const hasTools = call.tools !== undefined && call.tools.length > 0
     try {
       const result = await generateText({
@@ -56,14 +67,28 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
         // ADR-052). Hidden SDK retries would double-count attempts and fight that schedule.
         maxRetries: 0,
       })
-      return mapTextResult(result, call)
+      receipt = observeProviderReceipt(
+        call,
+        mapUsage(result.usage, call.model.provider.type),
+        result.finishReason,
+        started,
+        result.toolCalls.length
+      )
+      return { ...mapTextResult(result, call), receipt }
     } catch (error) {
-      throw mapAdapterError(error, call)
+      throw attachProviderReceipt(
+        receipt?.finishReason === 'content_filtered' && !call.abortSignal?.aborted
+          ? AiGatewayException.contentFiltered(call.model.provider.type)
+          : mapAdapterError(error, call),
+        receipt
+      )
     }
   }
 
   async generateObject<T>(call: AiAdapterCall, schema: ZodType<T>): Promise<AiObjectResult<T>> {
     assertNotAborted(call)
+    const started = performance.now()
+    let receipt: AiProviderReceipt | undefined
     try {
       const result = await generateObject({
         model: this.resolveLanguageModel(call),
@@ -74,14 +99,43 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
         abortSignal: callSignal(call),
         maxRetries: 0,
       })
+      receipt = observeProviderReceipt(
+        call,
+        mapUsage(result.usage, call.model.provider.type),
+        result.finishReason,
+        started
+      )
+      assertNotAborted(call)
+      if (receipt.finishReason === 'content_filtered')
+        throw AiGatewayException.contentFiltered(call.model.provider.type)
       return {
+        receipt,
         object: result.object,
-        usage: mapUsage(result.usage),
+        usage: mapUsage(result.usage, call.model.provider.type),
         modelSlug: call.model.slug,
         providerType: call.model.provider.type,
       }
     } catch (error) {
-      throw mapAdapterError(error, call)
+      if (
+        !receipt &&
+        NoObjectGeneratedError.isInstance(error) &&
+        (error.response !== undefined ||
+          error.usage !== undefined ||
+          error.finishReason !== undefined)
+      ) {
+        receipt = observeProviderReceipt(
+          call,
+          mapUsage(error.usage, call.model.provider.type),
+          error.finishReason === 'content-filter' ? 'content-filter' : 'output_validation_failed',
+          started
+        )
+      }
+      throw attachProviderReceipt(
+        receipt?.finishReason === 'content_filtered' && !call.abortSignal?.aborted
+          ? AiGatewayException.contentFiltered(call.model.provider.type)
+          : mapAdapterError(error, call),
+        receipt
+      )
     }
   }
 }

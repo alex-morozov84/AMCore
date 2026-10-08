@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 
-import { AI_RUN_MAX_EPOCHS } from './ai-run.constants'
+import { aiRunExecutionEligibility } from './ai-run-execution-eligibility'
 
-import { AiRunStatus } from '@/generated/prisma/client'
+import { AiRunStatus, Prisma } from '@/generated/prisma/client'
 import { METRIC_NAMES, MetricsService } from '@/infrastructure/observability'
 import { PrismaService } from '@/prisma'
 
@@ -49,7 +49,7 @@ export class AiRunBacklogCollector {
 
     metrics.registerGauge<never>({
       name: METRIC_NAMES.aiRunDue,
-      help: 'AI run rows actionable now — QUEUED, past availableAt, with no future nextAttemptAt, and not past its deadline. Excludes waiting_approval/waiting_human, which are intentionally parked for a human, not stuck. The alertable backlog quantity.',
+      help: 'AI run rows eligible for execution now at PostgreSQL clock; excludes future, invalid and unknown provider retry restrictions — QUEUED, past availableAt, with no future nextAttemptAt, and not past its deadline. Excludes waiting_approval/waiting_human, which are intentionally parked for a human, not stuck. The alertable backlog quantity.',
       labelNames: [],
       collect: async (gauge) => {
         const due = await metrics.withCollectorTimeout<number | null>(
@@ -96,17 +96,11 @@ export class AiRunBacklogCollector {
    * the false-green case an operator staring at this gauge cares about most.
    */
   private async collectDue(prisma: PrismaService): Promise<number> {
-    const now = new Date()
-    return prisma.aiRun.count({
-      where: {
-        status: AiRunStatus.QUEUED,
-        availableAt: { lte: now },
-        AND: [
-          { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] },
-          { OR: [{ deadlineAt: null }, { deadlineAt: { gt: now } }] },
-          { leaseEpoch: { lt: AI_RUN_MAX_EPOCHS } },
-        ],
-      },
-    })
+    const rows = await prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      WITH timing AS MATERIALIZED (SELECT clock_timestamp() AS at)
+      SELECT count(*) AS count FROM ai.ai_runs, timing
+      WHERE ${aiRunExecutionEligibility(Prisma.sql`timing.at`)}
+    `)
+    return Number(rows[0]?.count ?? 0n)
   }
 }

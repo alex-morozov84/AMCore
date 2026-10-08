@@ -1,6 +1,9 @@
 import type { ZodType } from 'zod'
 
+import type { AiExecutionDescriptor } from '../registry/ai-execution-descriptor'
 import type { ResolvedAiModel } from '../registry/ai-registry.types'
+
+import type { AiProviderReceipt } from './provider-receipt'
 
 import type { AiProviderType } from '@/generated/prisma/client'
 
@@ -82,6 +85,9 @@ export interface AiUsageContext {
 /** What a caller asks the gateway to generate. `modelSlug` omitted → the gated default model. */
 export interface AiGenerateRequest {
   modelSlug?: string
+  execution?: AiExecutionDescriptor
+  /** Caller-owned final admission after preparation, before resolving the secret. */
+  beforeDispatch?: () => Promise<void>
   system?: string
   messages: AiGenerateMessage[]
   maxOutputTokens?: number
@@ -106,9 +112,13 @@ export interface AiGenerateRequest {
 
 /** Provider-reported (or estimated) token usage, normalized across adapters. */
 export interface AiUsage {
-  inputTokens: number
-  outputTokens: number
-  totalTokens: number
+  /** SDK-derived total from known counters; never claimed provider-reported. */
+  totalDerived?: boolean
+  inputTokens: number | null
+  outputTokens: number | null
+  totalTokens: number | null
+  source?: 'reported' | 'estimated' | 'unavailable'
+  availability?: 'complete' | 'partial' | 'unavailable'
 }
 
 /** Why generation stopped (bounded; a provider refusal is surfaced as a `content_filtered` error). */
@@ -120,6 +130,7 @@ export interface AiTextResult {
   finishReason: AiFinishReason
   toolCalls: AiToolCall[]
   usage: AiUsage
+  receipt?: AiProviderReceipt
   modelSlug: string
   providerType: AiProviderType
 }
@@ -128,6 +139,7 @@ export interface AiTextResult {
 export interface AiObjectResult<T> {
   object: T
   usage: AiUsage
+  receipt?: AiProviderReceipt
   modelSlug: string
   providerType: AiProviderType
 }

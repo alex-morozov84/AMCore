@@ -36,6 +36,7 @@ function fakeFetch(
 function call(baseUrl: string | null = null): AiAdapterCall {
   return {
     model: {
+      id: 'model-fixture',
       slug: 'claude-default',
       providerModelName: 'claude-opus-4-8',
       capabilities: { text: true },
@@ -43,6 +44,7 @@ function call(baseUrl: string | null = null): AiAdapterCall {
       maxOutputTokens: null,
       isDefault: true,
       provider: {
+        id: 'provider-fixture',
         slug: 'anthropic',
         type: AiProviderType.ANTHROPIC,
         baseUrl,
@@ -77,7 +79,14 @@ describe('AnthropicAdapter', () => {
 
     expect(result.text).toBe('hi from claude')
     expect(result.finishReason).toBe('stop')
-    expect(result.usage).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15 })
+    expect(result.usage).toEqual({
+      totalDerived: true,
+      source: 'reported',
+      availability: 'complete',
+      inputTokens: 10,
+      outputTokens: 5,
+      totalTokens: 15,
+    })
     expect(result.providerType).toBe(AiProviderType.ANTHROPIC)
     expect(fetchImpl.calls[0]!.url).toContain('/messages')
     expect(fetchImpl.calls[0]!.headers.get('x-api-key')).toBe('sk-aB0_-Zz9')

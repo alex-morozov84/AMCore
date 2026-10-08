@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import type { AiAdapterCall } from '../ai-gateway.types'
+import { providerReceipt } from '../provider-receipt'
 
 import { OpenAICompatibleAdapter } from './openai-compatible.adapter'
 
@@ -47,6 +48,7 @@ function call(
 ): AiAdapterCall {
   return {
     model: {
+      id: 'model-fixture',
       slug: 'm',
       providerModelName,
       capabilities,
@@ -54,6 +56,7 @@ function call(
       maxOutputTokens: null,
       isDefault: false,
       provider: {
+        id: 'provider-fixture',
         slug: 'p',
         type,
         baseUrl,
@@ -87,7 +90,13 @@ describe('OpenAICompatibleAdapter', () => {
     const result = await adapter.generateText(call(AiProviderType.OPENAI, 'gpt-4o'))
 
     expect(result.text).toBe('hi from gpt')
-    expect(result.usage).toEqual({ inputTokens: 8, outputTokens: 4, totalTokens: 12 })
+    expect(result.usage).toEqual({
+      source: 'reported',
+      availability: 'complete',
+      inputTokens: 8,
+      outputTokens: 4,
+      totalTokens: 12,
+    })
     expect(fetchImpl.calls[0]!.url).toContain('https://api.openai.com/v1/chat/completions')
     expect(fetchImpl.calls[0]!.headers.get('authorization')).toBe('Bearer sk-aB0_-Zz9')
   })
@@ -165,10 +174,44 @@ describe('OpenAICompatibleAdapter', () => {
     )
 
     expect(result.object).toEqual({ answer: '42' })
-    expect(result.usage).toEqual({ inputTokens: 6, outputTokens: 3, totalTokens: 9 })
+    expect(result.usage).toEqual({
+      source: 'reported',
+      availability: 'complete',
+      inputTokens: 6,
+      outputTokens: 3,
+      totalTokens: 9,
+    })
     const responseFormat = fetchImpl.calls[0]!.body.response_format as { type: string }
     expect(responseFormat.type).toBe('json_schema')
   })
+
+  it.each([false, true])(
+    'rejects schema-valid filtered objects, retaining only safe receipt (observed abort=%s)',
+    async (abortAfterValidation) => {
+      const sentinel = 'filtered-valid-object-sentinel'
+      const body = completion(JSON.stringify({ answer: sentinel }))
+      body.choices[0]!.finish_reason = 'content_filter'
+      const fetchImpl = fakeFetch(body)
+      const adapter = new OpenAICompatibleAdapter(fetchImpl)
+      const controller = new AbortController()
+      const schema = z.object({ answer: z.string() }).superRefine(() => {
+        if (abortAfterValidation) controller.abort()
+      })
+      const error = await adapter
+        .generateObject(
+          { ...call(AiProviderType.OPENAI, 'gpt-4o'), abortSignal: controller.signal },
+          schema
+        )
+        .catch((value: unknown) => value)
+      expect(error).toMatchObject({ code: abortAfterValidation ? 'aborted' : 'content_filtered' })
+      expect(providerReceipt(error)).toMatchObject({
+        finishReason: 'content_filtered',
+        usage: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+      })
+      expect(fetchImpl.calls).toHaveLength(1)
+      expect(JSON.stringify({ error, receipt: providerReceipt(error) })).not.toContain(sentinel)
+    }
+  )
 
   it('round-trips a tool call provider-agnostically and sends the tool schema (Arc E)', async () => {
     const toolCompletion = {
@@ -222,5 +265,18 @@ describe('OpenAICompatibleAdapter', () => {
     await expect(
       adapter.generateText(call(AiProviderType.OPENAI_COMPATIBLE, 'local-model', null))
     ).rejects.toMatchObject({ code: 'model_not_configured' })
+  })
+
+  it('documents the installed compatible SDK limitation for message.refusal', async () => {
+    const body = completion('')
+    const message = { ...body.choices[0]!.message, refusal: 'provider-refusal-sentinel' }
+    const fetchImpl = fakeFetch({ ...body, choices: [{ ...body.choices[0], message }] })
+    const result = await new OpenAICompatibleAdapter(fetchImpl).generateText(
+      call(AiProviderType.OPENAI_COMPATIBLE, 'm', 'https://endpoint.example/v1')
+    )
+    expect(result.finishReason).toBe('stop')
+    expect(result.text).toBe('')
+    expect(JSON.stringify(result)).not.toContain('provider-refusal-sentinel')
+    expect(result.usage).toMatchObject({ source: 'reported', totalTokens: 12 })
   })
 })

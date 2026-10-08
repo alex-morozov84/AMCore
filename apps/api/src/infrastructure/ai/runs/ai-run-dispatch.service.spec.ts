@@ -68,6 +68,7 @@ describe('AiRunDispatchService', () => {
     prisma = { registerShutdownBarrier: jest.fn() }
     executor = { execute: jest.fn().mockResolvedValue(undefined) }
     repository.reapExpiredLeases.mockResolvedValue({ rescheduled: 0, failed: 0 })
+    repository.diagnoseQueuedRestrictions.mockResolvedValue(0)
     repository.expireDeadlinedRuns.mockResolvedValue(0)
     repository.failEpochCappedRuns.mockResolvedValue(0)
     build()
@@ -195,6 +196,48 @@ describe('AiRunDispatchService', () => {
       expect(repository.expireDeadlinedRuns).toHaveBeenCalledTimes(1)
       expect(repository.failEpochCappedRuns).toHaveBeenCalledTimes(1)
       expect(repository.claimDueBatch).toHaveBeenCalled()
+    })
+
+    it.each(['diagnosis query failed', 'observed_transaction_unavailable'])(
+      'continues main sweeps and execution after %s without exposing the failure',
+      async (failure) => {
+        repository.diagnoseQueuedRestrictions.mockRejectedValue(new Error(failure))
+        repository.claimDueBatch.mockResolvedValueOnce([claim('eligible')]).mockResolvedValue([])
+        await service.runDispatchCycle()
+        expect(repository.expireDeadlinedRuns).toHaveBeenCalledTimes(1)
+        expect(repository.failEpochCappedRuns).toHaveBeenCalledTimes(1)
+        expect(executor.execute).toHaveBeenCalledTimes(1)
+        expect(logger.warn).toHaveBeenCalledWith(
+          { event: 'ai.run.diagnosis_unavailable' },
+          'AI queued restriction diagnosis unavailable; ordinary recovery continues'
+        )
+        expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(failure)
+      }
+    )
+
+    it('seal cuts off held diagnosis and consumes late rejection without later sweeps or claims', async () => {
+      const entered = deferred()
+      const held = deferred()
+      repository.diagnoseQueuedRestrictions.mockImplementation(async () => {
+        entered.resolve()
+        await held.promise
+        throw new Error('late diagnosis payload sentinel')
+      })
+      const cycle = service.runDispatchCycle()
+      await entered.promise
+      latch.seal()
+      await cycle
+      held.resolve()
+      await new Promise((resolve) => setImmediate(resolve))
+      expect(repository.expireDeadlinedRuns).not.toHaveBeenCalled()
+      expect(repository.failEpochCappedRuns).not.toHaveBeenCalled()
+      expect(repository.claimDueBatch).not.toHaveBeenCalled()
+      expect(logger.warn.mock.calls).toEqual([
+        [{ event: 'ai.run.shutdown.late_rejection' }, 'Operation rejected after the shutdown seal'],
+      ])
+      expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(
+        'late diagnosis payload sentinel'
+      )
     })
 
     it('a reaper resumed after the seal starts NO later sweep (each sweep is its own bounded operation)', async () => {

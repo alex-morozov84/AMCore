@@ -11,6 +11,7 @@ import {
   TypeValidationError,
 } from 'ai'
 
+import { normalizeAiUsage } from '../../usage/ai-usage-v2'
 import { AiGatewayException } from '../ai-gateway.error'
 import type {
   AiAdapterCall,
@@ -22,6 +23,8 @@ import type {
   AiUsage,
   AiUserContentPart,
 } from '../ai-gateway.types'
+
+import { attachRetryHint, parseProviderRetryHint } from './provider-retry-hint'
 
 import type { AiProviderType } from '@/generated/prisma/client'
 
@@ -42,10 +45,19 @@ function mapFinishReason(reason: string): AiFinishReason {
 }
 
 /** Normalize SDK token usage (any field may be undefined) into our bounded `AiUsage`. */
-export function mapUsage(usage: LanguageModelUsage): AiUsage {
-  const inputTokens = usage.inputTokens ?? 0
-  const outputTokens = usage.outputTokens ?? 0
-  return { inputTokens, outputTokens, totalTokens: usage.totalTokens ?? inputTokens + outputTokens }
+export function mapUsage(usage: LanguageModelUsage | undefined, family?: AiProviderType): AiUsage {
+  // The compatible SDK converter defaults omitted raw counters to zero. Preserve the provider's
+  // actual presence/absence through its supported raw-usage projection, never its response body.
+  if (usage?.raw && family && family !== 'ANTHROPIC' && family !== 'MOCK') {
+    return normalizeAiUsage({
+      inputTokens: usage.raw.prompt_tokens,
+      outputTokens: usage.raw.completion_tokens,
+      totalTokens: usage.raw.total_tokens,
+    })
+  }
+  if (family === 'ANTHROPIC' && usage?.raw)
+    return normalizeAiUsage({ ...usage, totalDerived: true })
+  return normalizeAiUsage(usage ?? {})
 }
 
 /** A structural view of one SDK tool call — the fields we normalize (SDK adds provider extras). */
@@ -83,7 +95,7 @@ export function mapTextResult(
     text: result.text,
     finishReason: mapFinishReason(result.finishReason),
     toolCalls: mapToolCalls(result.toolCalls),
-    usage: mapUsage(result.usage),
+    usage: mapUsage(result.usage, call.model.provider.type),
     modelSlug: call.model.slug,
     providerType,
   }
@@ -176,9 +188,13 @@ export function mapProviderError(error: unknown, providerType: AiProviderType): 
     return AiGatewayException.outputValidationFailed(providerType)
   }
   if (APICallError.isInstance(error)) {
-    return error.isRetryable
+    const normalized = error.isRetryable
       ? AiGatewayException.providerUnavailable(providerType)
       : AiGatewayException.providerRejected(providerType)
+    const header = Object.entries(error.responseHeaders ?? {}).find(
+      ([name]) => name.toLowerCase() === 'retry-after'
+    )?.[1]
+    return attachRetryHint(normalized, parseProviderRetryHint(header))
   }
   return AiGatewayException.providerUnavailable(providerType)
 }

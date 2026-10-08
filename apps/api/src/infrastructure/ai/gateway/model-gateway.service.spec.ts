@@ -18,6 +18,7 @@ import { AiProviderType } from '@/generated/prisma/client'
 
 function model(over: Partial<ResolvedAiModel> = {}): ResolvedAiModel {
   return {
+    id: 'model-fixture',
     slug: 'mock-default',
     providerModelName: 'mock',
     capabilities: { text: true },
@@ -25,6 +26,7 @@ function model(over: Partial<ResolvedAiModel> = {}): ResolvedAiModel {
     maxOutputTokens: null,
     isDefault: true,
     provider: {
+      id: 'provider-fixture',
       slug: 'mock',
       type: AiProviderType.MOCK,
       baseUrl: null,
@@ -50,7 +52,14 @@ function makeGateway(
   const credentials = { getCredential: () => null } as unknown as AiCredentialResolver
   return new ModelGateway(
     adapters,
-    registry as AiModelRegistry,
+    {
+      ...registry,
+      resolveLiveModel: async () => {
+        const lookup = registry.resolveModel ?? registry.resolveDefaultModel
+        const responses = (lookup as jest.Mock | undefined)?.mock?.results
+        return responses?.length ? await responses.at(-1)?.value : null
+      },
+    } as unknown as AiModelRegistry,
     credentials,
     env,
     logger as never,

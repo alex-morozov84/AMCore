@@ -39,6 +39,11 @@ of workflow self-hardening to keep the example forkable.
   - boot the API and serve `/api/v1/health/ready`;
   - let the Next.js web container return `/` `200`;
   - keep the worker healthy.
+- **Test** runs API process-role/shutdown-drain E2E and the four focused AI
+  suites: gateway consistency, catalogue degradation, provider receipt settlement
+  and maintenance upgrade. They use isolated PG18/Redis Testcontainers and injected
+  SDK HTTP fixtures. The broader durable AI regression inventory remains a local
+  delivery gate; these focused suites do not claim full API E2E coverage.
 - **Test** also runs `pnpm test:capability-extension`: an isolated disposable
   resource variant compiles shared, API and web consumers and exercises
   authorization against PostgreSQL and Redis Testcontainers. The fixture does

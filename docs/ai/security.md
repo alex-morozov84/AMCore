@@ -114,3 +114,22 @@ responses use bounded machine-readable codes.
 | `AI_ARTIFACT_MAX_IMAGE_BYTES`       | Max raw image upload size.                 |
 | `AI_ARTIFACT_MAX_DOCUMENT_BYTES`    | Max raw PDF upload size.                   |
 | `AI_ARTIFACT_MAX_PARTS_PER_MESSAGE` | Max artifact refs per run input.           |
+
+## Provider refusal and accounting boundary
+
+Refusal receipts contain only diagnostic identities, provider family, bounded
+finish classification/duration/tool count and normalized usage. They never carry
+text, objects, tool arguments, headers, body, destination, credential or raw SDK
+cause. The exception carrier is private nonserialized storage; error DTOs do not
+expose it. No raw SDK payload is written to the ledger or logs.
+
+Detection follows the installed SDK's `content-filter` finish reason for both text
+and structured output. A schema-valid object is still rejected when that finish
+reason reports filtering; only safe observed usage is retained. Caller abort after
+observation takes precedence over filter classification. Its
+OpenAI-compatible adapter does not expose `message.refusal`; AMCore does not claim
+to detect every provider safety refusal. Structured-output validation failures
+retain observed usage when the SDK supplies response evidence. A timeout before
+observation does not invent usage. See [Runs](./runs.md#usage-after-refusal) and
+[Providers](./providers.md#frozen-execution-and-live-permission) for atomic
+settlement and credential-destination admission.

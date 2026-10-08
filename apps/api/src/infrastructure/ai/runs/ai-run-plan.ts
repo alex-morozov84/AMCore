@@ -1,4 +1,5 @@
 import type { AiGenerateMessage } from '../gateway/ai-gateway.types'
+import type { AiExecutionDescriptor } from '../registry/ai-execution-descriptor'
 
 import type { GuardrailStepCategory } from './ai-run-dispatch.types'
 
@@ -15,6 +16,8 @@ export interface RunAttribution {
  */
 export interface RunPlan {
   modelSlug: string
+  execution: AiExecutionDescriptor
+  assistantId: string | null
   /** Trusted instruction channel (Arc D structural trust boundary), before any tool augmentation. */
   system: string
   /** The untrusted user turn, JSON-encoded inside the salted boundary container (Arc D). */

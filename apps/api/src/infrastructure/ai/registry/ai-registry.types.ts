@@ -1,6 +1,11 @@
 import { z } from 'zod'
 
-import { aiCapabilityMapSchema, aiConfigObjectSchema } from '@amcore/shared'
+import {
+  aiCapabilityMapSchema,
+  aiConfigObjectSchema,
+  aiIdentifierSchema,
+  aiSlugSchema,
+} from '@amcore/shared'
 
 import { AiProviderType } from '@/generated/prisma/client'
 
@@ -14,18 +19,20 @@ import { AiProviderType } from '@/generated/prisma/client'
  */
 
 export const resolvedAiProviderSchema = z.object({
-  slug: z.string(),
+  id: z.string().min(1).max(128),
+  slug: aiSlugSchema,
   type: z.enum(AiProviderType),
-  baseUrl: z.string().nullable(),
-  credentialSlot: z.string().nullable(),
-  dataRetentionClass: z.string(),
+  baseUrl: z.string().max(2048).nullable(),
+  credentialSlot: z.string().max(128).nullable(),
+  dataRetentionClass: aiIdentifierSchema,
   config: aiConfigObjectSchema.nullable(),
 })
 export type ResolvedAiProvider = z.infer<typeof resolvedAiProviderSchema>
 
 export const resolvedAiModelSchema = z.object({
-  slug: z.string(),
-  providerModelName: z.string(),
+  id: z.string().min(1).max(128),
+  slug: aiSlugSchema,
+  providerModelName: z.string().min(1).max(256),
   capabilities: aiCapabilityMapSchema,
   contextLimit: z.number().int().nullable(),
   maxOutputTokens: z.number().int().nullable(),
@@ -35,5 +42,5 @@ export const resolvedAiModelSchema = z.object({
 export type ResolvedAiModel = z.infer<typeof resolvedAiModelSchema>
 
 /** The cached snapshot: every enabled, schema-valid model (with its provider) in the catalog. */
-export const aiCatalogSnapshotSchema = z.array(resolvedAiModelSchema)
+export const aiCatalogSnapshotSchema = z.array(resolvedAiModelSchema).max(1024)
 export type AiCatalogSnapshot = z.infer<typeof aiCatalogSnapshotSchema>

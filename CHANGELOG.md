@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Reliability
+
+- AI runs freeze executable model identity, recheck live permission before each
+  provider call, retain provider retry floors without shortening them, bound
+  catalogue fallback physically and account for observed refusals atomically.
+  Upgrade requires stopping all API roles; legacy snapshots fail before external I/O.
+  Unknown catalogue/diagnostic transaction completion can require process restart.
+
 ### Features
 
 - Role-definition **browser transport and headless hooks**: typed same-origin routes for the

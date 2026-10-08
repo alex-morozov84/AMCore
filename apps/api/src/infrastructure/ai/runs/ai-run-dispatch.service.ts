@@ -103,6 +103,8 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
     if (reaped !== CUTOFF) {
       ;({ rescheduled, failed } = reaped)
       if (!this.latch.closed) {
+        await this.diagnoseQueuedRestrictions()
+        if (this.latch.closed) return
         const overdue = await this.latch.run(() => this.repository.expireDeadlinedRuns())
         if (overdue !== CUTOFF) {
           expired = overdue
@@ -118,6 +120,20 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
         { event: 'ai.run.reaped', rescheduled, failed, expired, capped },
         'Reclaimed expired AI run leases and swept overdue/over-attempted runs'
       )
+    }
+  }
+
+  /** Diagnosis is an independent capability; failure must not disable healthy main-client recovery. */
+  private async diagnoseQueuedRestrictions(): Promise<void> {
+    try {
+      await this.latch.run(() => this.repository.diagnoseQueuedRestrictions())
+    } catch {
+      // Do not serialize database errors or reset the diagnosis runner's physical token/quarantine.
+      if (!this.latch.closed)
+        this.logger.warn(
+          { event: 'ai.run.diagnosis_unavailable' },
+          'AI queued restriction diagnosis unavailable; ordinary recovery continues'
+        )
     }
   }
 

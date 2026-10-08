@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
+import type { ProviderRetryHint } from '../gateway/providers/provider-retry-hint'
+
 import { AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
 import type {
@@ -10,6 +12,7 @@ import type {
   StopCause,
 } from './ai-run-dispatch.types'
 import { AiRunGuard, type GuardOutcome, RunLeaseLostError } from './ai-run-guard.service'
+import { persistProviderRestriction } from './provider-retry-restriction'
 
 import type { Prisma } from '@/generated/prisma/client'
 
@@ -86,14 +89,27 @@ export class AiRunTransitions {
   async retry(
     claim: ClaimedRun,
     errorCode: string,
-    retryAfterMs?: number
+    retryAfterMs?: number | ProviderRetryHint
   ): Promise<RunRetryOutcome | { state: 'cutoff' }> {
     const outcome = await this.guard.record(claim, async (tx, ctx) => {
+      const restriction = await persistProviderRestriction(
+        tx,
+        claim.id,
+        typeof retryAfterMs === 'number'
+          ? { kind: 'relative', seconds: retryAfterMs / 1000 }
+          : retryAfterMs
+      )
       if (ctx.stop) {
         await applyStop(tx, this.repository, claim, ctx.stop)
         return { state: 'failed', reasonCode: ctx.stop } as RunRetryOutcome
       }
-      const result = await this.repository.finalizeRetry(tx, claim, errorCode, retryAfterMs)
+      const result = await this.repository.finalizeRetry(
+        tx,
+        claim,
+        errorCode,
+        retryAfterMs,
+        restriction
+      )
       if (result.state === 'lease_lost') throw new RunLeaseLostError()
       return result
     })

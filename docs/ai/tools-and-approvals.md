@@ -59,7 +59,7 @@ then publish an assistant version whose `toolAllowlist` includes `"echo"`.
 ## Side Effects and Uncertain Outcomes
 
 A model that requests a tool produces one **action**: the run records it durably
-*before* anything happens (the requested tool, its validated arguments, its
+_before_ anything happens (the requested tool, its validated arguments, its
 idempotency class, and which provider call asked for it). One requested action is
 exactly one record — it is never created twice, and it is never replaced by a
 fresh action when a worker crashes or times out. `ctx.idempotencyKey` is
@@ -67,12 +67,12 @@ fresh action when a worker crashes or times out. `ctx.idempotencyKey` is
 
 A tool execution ends in one of four outcomes:
 
-| Outcome              | When                                                                                          | What the run does                                          |
-| -------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| succeeded            | `execute` returned.                                                                           | The result is applied to the transcript exactly once; the loop continues. |
-| rejected, no effect  | `execute` threw `AiToolRejectedError` (it refused the call and is **certain** nothing happened). | The run fails `tool_execution_failed`.                     |
-| retryable, no effect | `execute` threw `AiToolRetryableError` (certain nothing happened; a later retry is reasonable). | The run fails `tool_execution_failed`; the code is recorded as `tool_retryable_no_effect`. |
-| effect unknown       | Anything else from an `idempotent` tool: a timeout, a thrown error, a crash or lost lease while it ran. | The action becomes `outcome_unknown`; the run fails `tool_effect_unknown`. |
+| Outcome              | When                                                                                                    | What the run does                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| succeeded            | `execute` returned.                                                                                     | The result is applied to the transcript exactly once; the loop continues.                  |
+| rejected, no effect  | `execute` threw `AiToolRejectedError` (it refused the call and is **certain** nothing happened).        | The run fails `tool_execution_failed`.                                                     |
+| retryable, no effect | `execute` threw `AiToolRetryableError` (certain nothing happened; a later retry is reasonable).         | The run fails `tool_execution_failed`; the code is recorded as `tool_retryable_no_effect`. |
+| effect unknown       | Anything else from an `idempotent` tool: a timeout, a thrown error, a crash or lost lease while it ran. | The action becomes `outcome_unknown`; the run fails `tool_effect_unknown`.                 |
 
 An exception does **not** prove nothing happened (a request can be accepted and
 the connection reset afterwards), and a timeout says nothing about the remote
@@ -126,7 +126,7 @@ Requirements the tool author owns:
   it returns.
 - **Be re-parseable.** The stored arguments are the action. When an action is
   resumed (after a crash or an approval) they are validated again and must parse
-  to *themselves*; if a schema transform makes `parse(parse(x))` differ from
+  to _themselves_; if a schema transform makes `parse(parse(x))` differ from
   `parse(x)`, or the schema changed incompatibly after a deploy, the action is
   not executed and the run fails `tool_schema_incompatible`.
 - **Know your downstream's key retention.** Providers typically keep idempotency
@@ -169,3 +169,17 @@ never receive approval authority.
 | `AI_TOOL_EXECUTION_TIMEOUT_MS` | Per-tool host-side execution timeout.                    |
 | `AI_APPROVAL_TTL_MS`           | How long a run may wait for approval before expiry.      |
 | `AI_RUN_DEADLINE_MS`           | Absolute lifetime of a run, including approval waits.    |
+
+## Execution contract upgrades and anomalous queued runs
+
+Tool recovery and approval resumes keep the run's original versioned executable
+model descriptor. An unversioned/malformed snapshot fails before tool recovery or
+provider I/O; a matching slug cannot supply replacement identity. Existing terminal
+history is preserved. Use the [maintenance upgrade procedure](../operations/deployment.md#ai-run-engine-upgrade-maintenance-stop),
+not a rolling mix of old/new producers.
+
+Queued restriction diagnosis never executes an action. It retains known/unknown
+outcomes, marks abandoned executing side effects unknown, fails abandoned read-only
+execution and skips requested/approved actions that never started. Pending approval
+evidence remains unchanged and cannot resume a terminal run. This diagnosis does
+not add reconciliation or operator management commands.

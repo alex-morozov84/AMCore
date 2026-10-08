@@ -310,6 +310,12 @@ describe('AiRunRepository', () => {
       prisma.aiRun.findUnique.mockResolvedValue({ cancellationRequestedAt: null } as never)
     })
 
+    beforeEach(() => {
+      prisma.$queryRaw.mockResolvedValue([{ now: new Date(), anchor: new Date() }] as never)
+      prisma.aiRun.findUniqueOrThrow.mockResolvedValue({ providerRetryRestriction: null } as never)
+      prisma.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 0 } } as never)
+    })
+
     it('re-queues with a future nextAttemptAt and records the retry ordinal as attemptCount', async () => {
       prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
       const outcome = await repo.finalizeRetry(
@@ -398,8 +404,12 @@ describe('AiRunRepository', () => {
       }
     }
 
+    beforeEach(() => {
+      prisma.$queryRaw.mockResolvedValue([{ now: new Date() }] as never)
+    })
+
     it('re-queues a reclaimed run that may have started I/O, consuming one retry', async () => {
-      prisma.$queryRaw.mockResolvedValue([reapRow({ attemptCount: 1 })] as never)
+      prisma.$queryRaw.mockResolvedValueOnce([reapRow({ attemptCount: 1 })] as never)
       const result = await repo.reapExpiredLeases()
       expect(result).toEqual({ rescheduled: 1, failed: 0 })
       expect(prisma.aiRun.update).toHaveBeenCalledWith(
@@ -410,7 +420,9 @@ describe('AiRunRepository', () => {
     })
 
     it('re-queues an attempt that NEVER admitted I/O without consuming retry budget (and with no backoff)', async () => {
-      prisma.$queryRaw.mockResolvedValue([reapRow({ attemptCount: 2, ioStarted: false })] as never)
+      prisma.$queryRaw.mockResolvedValueOnce([
+        reapRow({ attemptCount: 2, ioStarted: false }),
+      ] as never)
       const result = await repo.reapExpiredLeases()
       expect(result).toEqual({ rescheduled: 1, failed: 0 })
       const [{ data }] = prisma.aiRun.update.mock.calls[0] as unknown as [
@@ -421,13 +433,15 @@ describe('AiRunRepository', () => {
     })
 
     it('never fails a pre-I/O reclaim as exhausted (the epoch cap bounds it instead)', async () => {
-      prisma.$queryRaw.mockResolvedValue([reapRow({ attemptCount: 2, ioStarted: false })] as never)
+      prisma.$queryRaw.mockResolvedValueOnce([
+        reapRow({ attemptCount: 2, ioStarted: false }),
+      ] as never)
       const result = await repo.reapExpiredLeases()
       expect(result.failed).toBe(0)
     })
 
     it('fails a reclaimed run whose retries are exhausted and whose attempt may have started I/O', async () => {
-      prisma.$queryRaw.mockResolvedValue([reapRow({ attemptCount: 2 })] as never)
+      prisma.$queryRaw.mockResolvedValueOnce([reapRow({ attemptCount: 2 })] as never)
       const result = await repo.reapExpiredLeases()
       expect(result).toEqual({ rescheduled: 0, failed: 1 })
       expect(prisma.aiRun.update).toHaveBeenCalledWith(
@@ -442,7 +456,7 @@ describe('AiRunRepository', () => {
     })
 
     it('expires a reclaimed run whose deadline has already passed', async () => {
-      prisma.$queryRaw.mockResolvedValue([reapRow({ deadlineAt: new Date(0) })] as never)
+      prisma.$queryRaw.mockResolvedValueOnce([reapRow({ deadlineAt: new Date(0) })] as never)
       const result = await repo.reapExpiredLeases()
       expect(result).toEqual({ rescheduled: 0, failed: 1 })
       expect(prisma.aiRun.update).toHaveBeenCalledWith(
@@ -457,7 +471,7 @@ describe('AiRunRepository', () => {
     })
 
     it('turns a reclaimed run with a recorded cancel into CANCELLED, not a requeue or a failure', async () => {
-      prisma.$queryRaw.mockResolvedValue([
+      prisma.$queryRaw.mockResolvedValueOnce([
         reapRow({ cancellationRequestedAt: new Date(), attemptCount: 2 }),
       ] as never)
       const result = await repo.reapExpiredLeases()
@@ -473,7 +487,7 @@ describe('AiRunRepository', () => {
     })
 
     it('reaps with SKIP LOCKED on the run row ONLY (never the conversation: no lock cycle with the guard)', async () => {
-      prisma.$queryRaw.mockResolvedValue([] as never)
+      prisma.$queryRaw.mockResolvedValueOnce([] as never)
       await repo.reapExpiredLeases()
       const sql = (
         prisma.$queryRaw.mock.calls[0]![0] as unknown as { strings: string[] }
