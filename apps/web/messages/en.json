@@ -841,7 +841,10 @@
     "roleFilters": "Role filters",
     "readUnavailable": "Current roles are unavailable. Your selection has been preserved.",
     "pageStatus": "Page {page} of {totalPages}",
-    "roleList": "Role choices"
+    "roleList": "Role choices",
+    "roleFilter": "Showing people with the role {name}",
+    "roleFilterUnknown": "Showing people with one role",
+    "roleFilterClear": "Show everyone"
   },
   "invitationRecipient": {
     "signInTitle": "Continue your invitation",
@@ -1115,6 +1118,7 @@
     "deletedToast": "Role deleted.",
     "invitationsLiveHint": "Changes to this role apply to them too.",
     "conflictTitle": "Review needed",
-    "unsavedBarTitle": "Unsaved changes"
+    "unsavedBarTitle": "Unsaved changes",
+    "holdersViewAll": "Show all {count, plural, one {# person} other {# people}}"
   }
 }

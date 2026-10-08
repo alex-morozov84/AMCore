@@ -31,6 +31,7 @@ export function RoleEditor({
   onLeave,
   onReview,
   holderHref,
+  allHoldersHref,
 }: {
   role: ReturnType<typeof useRoleDefinition>
   detail: RoleDefinitionDetail
@@ -39,6 +40,7 @@ export function RoleEditor({
   onLeave: (href: string) => void
   onReview: () => void
   holderHref?: (email: string) => string
+  allHoldersHref?: string
 }) {
   const t = useTranslations('organizationRoles')
   const editor = useRoleEditor(role, detail, capabilities)
@@ -112,7 +114,7 @@ export function RoleEditor({
         </Panel>
       )}
       <Panel>
-        <HoldersSummary detail={detail} holderHref={holderHref} />
+        <HoldersSummary detail={detail} holderHref={holderHref} allHoldersHref={allHoldersHref} />
       </Panel>
       {editable && (
         <Panel danger>

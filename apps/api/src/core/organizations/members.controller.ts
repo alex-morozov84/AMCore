@@ -88,6 +88,12 @@ export class MembersController {
     type: String,
     description: 'Literal name/email contains; maximum100 Unicode code points',
   })
+  @ApiQuery({
+    name: 'roleId',
+    required: false,
+    type: String,
+    description: 'Only members who hold this role; an unknown role matches nobody',
+  })
   @ApiBadRequestResponse({ description: 'Invalid query or selector' })
   @ApiNotFoundResponse({ description: 'Organization/member unavailable' })
   @ApiServiceUnavailableResponse({

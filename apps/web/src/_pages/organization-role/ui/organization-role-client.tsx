@@ -102,6 +102,7 @@ export function OrganizationRoleClient({
           holderHref={(email) =>
             `${hrefs.members ?? hrefs.overview}?search=${encodeURIComponent(email)}`
           }
+          allHoldersHref={`${hrefs.members ?? hrefs.overview}?role=${encodeURIComponent(roleId)}`}
           onDeleted={() => router.push(hrefs.roles)}
           onLeave={(href) => router.push(href)}
           onReview={() => void role.refresh().catch(() => undefined)}

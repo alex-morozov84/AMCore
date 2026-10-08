@@ -841,7 +841,10 @@
     "roleFilters": "Фильтры ролей",
     "readUnavailable": "Актуальные роли недоступны. Ваш выбор сохранён.",
     "pageStatus": "Страница {page} из {totalPages}",
-    "roleList": "Список ролей"
+    "roleList": "Список ролей",
+    "roleFilter": "Показаны люди с ролью {name}",
+    "roleFilterUnknown": "Показаны люди с одной ролью",
+    "roleFilterClear": "Показать всех"
   },
   "invitationRecipient": {
     "signInTitle": "Продолжить приглашение",
@@ -1115,6 +1118,7 @@
     "deletedToast": "Роль удалена.",
     "invitationsLiveHint": "Изменения роли распространяются и на них.",
     "conflictTitle": "Нужна проверка",
-    "unsavedBarTitle": "Несохранённые изменения"
+    "unsavedBarTitle": "Несохранённые изменения",
+    "holdersViewAll": "Показать всех: {count, plural, one {# человек} few {# человека} many {# человек} other {# человека}}"
   }
 }

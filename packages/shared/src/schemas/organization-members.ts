@@ -20,7 +20,10 @@ const pagination = {
   search,
 }
 const safeOffset = (q: { page: number; limit: number }) => (q.page - 1) * q.limit <= 2_147_483_647
-export const organizationMembersQuerySchema = z.strictObject(pagination).refine(safeOffset)
+/** `roleId` keeps only members who hold that role; an unknown or foreign role simply matches nobody. */
+export const organizationMembersQuerySchema = z
+  .strictObject({ ...pagination, roleId: memberIdSchema.optional() })
+  .refine(safeOffset)
 export const memberRolesQuerySchema = z
   .strictObject({
     ...pagination,
