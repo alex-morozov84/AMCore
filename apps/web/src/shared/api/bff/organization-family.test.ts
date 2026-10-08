@@ -10,6 +10,9 @@ describe('organization generic-family closure', () => {
   it.each([
     '/api/v1/organizations',
     '/api/v1/organizations/org-a/roles',
+    '/api/v1/organizations/org-a/role-definitions',
+    '/api/v1/organizations/org-a/role-definitions/role-1/deletion',
+    '/api/v1/organizations/org-a/capabilities',
     '/api/v1/ORGANIZATIONS/org-a/context/',
     '/api/v1//organizations//org-a',
     '/api/v1/%6Frganizations/org-a',

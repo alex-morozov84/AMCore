@@ -24,6 +24,9 @@ describe('composed generic organization aliases close before authentication', ()
       for (const path of [
         ['organizations'],
         ['organizations', 'org-a', 'roles'],
+        ['organizations', 'org-a', 'role-definitions'],
+        ['organizations', 'org-a', 'role-definitions', 'role-1', 'deletion'],
+        ['organizations', 'org-a', 'capabilities'],
         ['product-access', 'bootstrap'],
         ['other', '..', 'organizations', 'org-a'],
       ]) {

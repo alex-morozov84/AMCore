@@ -225,6 +225,54 @@ permission row itself is deleted only when no role references it any more. Namin
 documented case-sensitive semantics on the legacy routes; only the definition routes reject
 case-insensitive collisions, and historical collisions that already exist stay saveable.
 
+## Browser and headless transport
+
+A browser consumer uses the typed same-origin routes and the public hooks of
+`@/entities/organization-context`; it never talks to the API with a bearer token.
+
+| Same-origin route (`/api/product-access/organizations/:id`) | Hook / purpose                                       |
+| ----------------------------------------------------------- | ---------------------------------------------------- |
+| `GET /capabilities`                                         | `useCapabilityCatalogue` — operations, presets, risk |
+| `GET /role-definitions?page&search`                         | `useRoleDefinitions` — page of roles with counts     |
+| `GET /role-definitions/:roleId`                             | `useRoleDefinition` — atomic snapshot of one role    |
+| `POST /role-definitions` (`201`)                            | `useCreateRoleDefinition().create`                   |
+| `PATCH /role-definitions/:roleId` (`200`)                   | `useRoleDefinition().save`                           |
+| `POST /role-definitions/:roleId/deletion` (`200`)           | `useRoleDefinition().remove`                         |
+
+All hooks take the same `context.controller` that `useOrganizationContext` returns, so the
+list, the role page and the commands share one session and organization lifecycle. A command
+returns a structured outcome:
+
+- `committed` — the API acknowledged the exact success status; `followup` says whether the
+  authority and reads were refreshed (`ready`) or could not be (`error`, `denied`, …). A failed
+  follow-up never means the write was rolled back.
+- `rejected` — a stable 4xx code (for example `ROLE_DEFINITION_CONFLICT`,
+  `ROLE_NAME_CONFLICT`, an acknowledgment code). Nothing was written; show the code.
+- `unknown` — a lost response, a deadline, a 5xx such as `ROLE_SAVE_UNAVAILABLE`, or a wrong
+  success status. The write may have committed: read the role again and compare; **never
+  replay it automatically**.
+- `busy` — a command for the same role is already in flight; nothing is sent.
+- `retired` — the session, organization or target changed under the command; its result is
+  discarded.
+
+Use the hook's **`ready`** flag, not `controller.allowed()`, to enable controls: `ready` is
+reactive state, while `allowed()` is a plain call whose result a compiler-optimized production
+build may cache for a stable controller. Gate writes and any presentation of a cached role on
+`available` (the current read succeeded), not on `ready` alone. A committed command refreshes the
+registered reads of the same controller, so the open role and the list update without extra code.
+
+An executable example, `node scripts/fixtures/organization-roles-headless.mjs`, creates a
+disposable consumer — a flat list, a create field and an inline editor that imports only the
+public hooks and reaches the app through the composition layer's public server entry — and
+prints three commands: install, build the shared package and run lint and type checks of the
+generated code against the repository rules, and the managed real-stack browser run. The browser
+run exercises list with holder counts, create (`201`), save (`200`) followed by an observable reread and a reload that
+shows the persisted preset, a failed role read that hides the stale snapshot and its commands
+until the next successful read, delete, the absence of any bearer credential in the browser, and
+accessibility through the real BFF. The example gates cached rows, the editor and every command
+on `available`, and keeps its draft keyed to the session, organization, role and snapshot
+revision. No sample route is added to the starter.
+
 ## Build your own editor
 
 1. Read `GET /organizations/:orgId/capabilities` for the supported operations, presets and

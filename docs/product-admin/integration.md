@@ -257,6 +257,17 @@ command; no standalone sample product route is added to the starter. See the
 [members contract](organization-members.md) for permissions, complete-set/byte
 limits, truthful self-edit warnings and safe recovery.
 
+## Custom role manager
+
+Use `useRoleDefinitions`, `useRoleDefinition`, `useCreateRoleDefinition` and
+`useCapabilityCatalogue` from the public entity API with the same parent
+`context.controller`. Seed your draft from the role's `managedPresets`, keep the snapshot's
+`aclVersion` with it, show `advancedRules` read-only and send the complete preset selection on
+save. Handle the `committed`, `rejected`, `unknown`, `busy` and `retired` outcomes, enable
+controls from `ready` and gate writes on `available`. Details, the command contracts and the
+executable fixture are in the [role definitions guide](role-definitions.md#browser-and-headless-transport).
+A ready roles screen is not part of this release.
+
 ## Custom invitation manager
 
 Run `node scripts/fixtures/organization-invitations-headless.mjs` to prepare a

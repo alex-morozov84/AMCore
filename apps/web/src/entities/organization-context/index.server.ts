@@ -16,3 +16,11 @@ export {
   revokeOrganizationInvitation,
 } from './api/invitations.server'
 export { readMemberRoles, readOrganizationMembers, replaceMemberRoles } from './api/members.server'
+export {
+  createRoleDefinition,
+  deleteRoleDefinition,
+  listRoleDefinitions,
+  readCapabilityCatalogue,
+  readRoleDefinition,
+  saveRoleDefinition,
+} from './api/roles.server'

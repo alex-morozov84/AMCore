@@ -106,6 +106,15 @@ a real write outside `/organizations`, tenant isolation and rollback.
 The foundation's dedicated GET routes are `/api/product-access/bootstrap`,
 `/api/product-access/organizations?page=1` (fixed page size 20), and
 `/api/product-access/organizations/:id/context`.
+Role-definition transport adds GET `/api/product-access/organizations/:id/capabilities`,
+GET and POST (`201`) `/role-definitions`, GET and PATCH `/role-definitions/:roleId`, and
+POST `/role-definitions/:roleId/deletion` (`200`). They use the same typed executor, Origin
+policy, `{binding, data}` envelope and `private, no-store` responses; every other method
+answers an explicit `405` with `Allow`. A command body is strict JSON of at most 16,384
+decoded bytes with no query string or `Content-Encoding`. The BFF caps a response at the
+shared role budget while the API caps its own payload 1,024 bytes lower, so an API success
+at its limit still fits the envelope. The browser never sends or receives a bearer token. See
+the [role definitions guide](../product-admin/role-definitions.md#browser-and-headless-transport).
 Member transport adds GET `/api/product-access/organizations/:id/members`
 and GET/PATCH `/api/product-access/organizations/:id/members/:userId/roles`.
 Unsupported methods explicitly return `405`; there is no implicit unfenced HEAD
