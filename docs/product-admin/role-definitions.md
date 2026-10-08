@@ -173,28 +173,36 @@ The release that adds these routes also adds one index, `member_roles_roleId_mem
 `core.member_roles ("roleId", "memberId")`. It serves holder counts and samples and the
 foreign-key lookup that runs when a role is deleted (the existing unique index starts with
 `memberId`). Building a plain `CREATE INDEX` blocks writes to the table while it runs
-([PostgreSQL `CREATE INDEX`](https://www.postgresql.org/docs/18/sql-createindex.html)), which
-matters only on a very large `member_roles` table. For such an installation, build it before
-deploying, without blocking writes:
+([PostgreSQL `CREATE INDEX`](https://www.postgresql.org/docs/18/sql-createindex.html)), so
+whether that is acceptable depends on your write load and table size, not on size alone: a busy
+installation can feel it even on a modest table. If writes must not be blocked, build the index
+before deploying. `CREATE INDEX CONCURRENTLY` cannot run inside a transaction block, so send it
+as its own statement (for example a single `psql -c`), not inside `BEGIN … COMMIT`:
 
 ```sql
 CREATE INDEX CONCURRENTLY "member_roles_roleId_memberId_idx"
   ON core.member_roles ("roleId", "memberId");
 ```
 
-Then check that the index is valid and has the expected definition — the migration uses
-`IF NOT EXISTS`, so it keeps **any** index of that name, including an invalid one left by an
-interrupted build or one with a different column list:
+Then verify the result **before** deploying. The migration uses `IF NOT EXISTS`, so it keeps
+any index with that name — including an invalid one left by an interrupted build, or one with a
+different definition. Qualify both the index and its table, because the same name can exist in
+another schema:
 
 ```sql
 SELECT i.indisvalid, pg_get_indexdef(i.indexrelid)
-  FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
- WHERE c.relname = 'member_roles_roleId_memberId_idx';
--- expect: true | CREATE INDEX ... USING btree ("roleId", "memberId")
+  FROM pg_index i
+ WHERE i.indexrelid = to_regclass('core."member_roles_roleId_memberId_idx"')
+   AND i.indrelid = 'core.member_roles'::regclass;
 ```
 
-If it is invalid, drop it with `DROP INDEX CONCURRENTLY core."member_roles_roleId_memberId_idx"`
-and build it again. Smaller installations can simply run the normal migration.
+Require **exactly one row** with `indisvalid` = `t` and the definition
+`CREATE INDEX "member_roles_roleId_memberId_idx" ON core.member_roles USING btree ("roleId", "memberId")`
+(no `WHERE` predicate, no expression, not `UNIQUE`). No row, an invalid index or a different
+definition is not acceptable: stop the deployment, remove the index with
+`DROP INDEX CONCURRENTLY core."member_roles_roleId_memberId_idx"` (also its own statement),
+build it again, and repeat the check. Installations that can tolerate a short write pause can
+skip all of this and simply run the normal migration.
 
 ## Audit
 

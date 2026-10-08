@@ -50,7 +50,14 @@ export function isRoleNameConflict(error: unknown): boolean {
   const index = known.meta?.driverAdapterError?.cause?.constraint?.index
   if (index !== undefined) return index === ROLE_NAME_UNIQUE_INDEX
   const target = known.meta?.target
-  return known.meta?.modelName === 'Role' && Array.isArray(target) && target.includes('name')
+  // Fallback for clients that report columns instead of an index: exactly the compound key.
+  return (
+    known.meta?.modelName === 'Role' &&
+    Array.isArray(target) &&
+    target.length === 2 &&
+    target.includes('organizationId') &&
+    target.includes('name')
+  )
 }
 
 /** A custom role of this organization; built-in roles are readable elsewhere but never writable. */

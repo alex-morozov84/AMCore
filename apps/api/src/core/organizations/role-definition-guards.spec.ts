@@ -18,6 +18,19 @@ describe('isRoleNameConflict', () => {
     ).toBe(true)
   })
 
+  it('refuses a target that is not exactly the compound role-name key', () => {
+    for (const target of [
+      ['name'],
+      ['id', 'name'],
+      ['organizationId'],
+      ['organizationId', 'name', 'id'],
+    ])
+      expect(isRoleNameConflict(p2002({ modelName: 'Role', target }))).toBe(false)
+    expect(
+      isRoleNameConflict(p2002({ modelName: 'Role', target: ['name', 'organizationId'] }))
+    ).toBe(true)
+  })
+
   it('refuses other unique violations, other models, absent metadata and other codes', () => {
     expect(
       isRoleNameConflict(
