@@ -1,15 +1,15 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { CapabilityCatalogueResponse, RoleDefinitionDetail } from '@amcore/shared'
 
 import type { useRoleDefinition } from '@/entities/organization-context'
-import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import { toast } from '@/shared/ui/toast'
 
 import { useRoleEditor } from '../model/use-role-editor'
 import { useUnsavedGuard } from '../model/use-unsaved-guard'
@@ -55,6 +55,18 @@ export function RoleEditor({
       void editor.save(editor.needs)
     }
   }
+  const saved = editor.result.kind === 'saved' ? editor.result : undefined
+  useEffect(() => {
+    if (saved)
+      toast.add({
+        type: 'success',
+        title: saved.accessChanged ? t('savedAccessChanged') : t('saved'),
+      })
+  }, [saved, t])
+  const attention =
+    editor.dirty ||
+    editor.stale ||
+    ['conflict', 'unknown', 'rejected', 'busy'].includes(editor.result.kind)
   return (
     <div className="space-y-6">
       <Panel>
@@ -102,38 +114,48 @@ export function RoleEditor({
       <Panel>
         <HoldersSummary detail={detail} holderHref={holderHref} />
       </Panel>
-      <Panel>
-        <SaveStatus
-          result={editor.result}
-          stale={editor.stale}
-          dirty={editor.dirty}
-          onReview={() => {
-            editor.discard()
-            onReview()
-          }}
-        />
-        {editor.result.kind === 'rejected' && <ApiErrorAlert error={editor.result.error} />}
-        {editable && (
-          <div className="flex flex-wrap gap-3">
-            <Button disabled={!editor.dirty || role.busy} onClick={startSave}>
-              {role.busy ? t('saving') : t('save')}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!editor.dirty || role.busy}
-              onClick={editor.discard}
-            >
-              {t('discard')}
-            </Button>
+      {editable && (
+        <Panel danger>
+          <section aria-labelledby="role-danger-title" className="space-y-2">
+            <h3 id="role-danger-title" className="text-base font-semibold">
+              {t('dangerTitle')}
+            </h3>
+            <p className="text-sm text-muted-foreground">{t('dangerBody')}</p>
             <DeleteRoleDialog
               role={role}
               detail={detail}
               disabled={role.busy}
               onDeleted={onDeleted}
             />
+          </section>
+        </Panel>
+      )}
+      {editable && attention && (
+        <div className="sticky bottom-4 z-10 space-y-3 rounded-xl border border-border bg-card p-4 shadow-lg">
+          <SaveStatus
+            result={editor.result}
+            stale={editor.stale}
+            dirty={editor.dirty}
+            onReview={() => {
+              editor.discard()
+              onReview()
+            }}
+          />
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button variant="outline" disabled={role.busy} onClick={editor.discard}>
+              {t('discard')}
+            </Button>
+            <Button
+              disabled={
+                !editor.dirty || editor.stale || editor.result.kind === 'conflict' || role.busy
+              }
+              onClick={startSave}
+            >
+              {role.busy ? t('saving') : t('save')}
+            </Button>
           </div>
-        )}
-      </Panel>
+        </div>
+      )}
       <ConfirmDialog
         open={current !== undefined}
         onOpenChange={(open) => !open && setStep(undefined)}
@@ -161,9 +183,9 @@ export function RoleEditor({
 }
 
 /** Every section sits on a card so text stays readable on the page background. */
-function Panel({ children }: { children: React.ReactNode }) {
+function Panel({ children, danger }: { children: React.ReactNode; danger?: boolean }) {
   return (
-    <Card>
+    <Card className={danger ? 'border-destructive/40' : undefined}>
       <CardContent className="space-y-4">{children}</CardContent>
     </Card>
   )

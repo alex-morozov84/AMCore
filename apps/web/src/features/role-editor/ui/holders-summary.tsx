@@ -2,6 +2,7 @@
 import { useTranslations } from 'next-intl'
 import type { RoleDefinitionDetail } from '@amcore/shared'
 
+import { Alert, AlertDescription } from '@/shared/ui/alert'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 /** Who is affected by edits to this role: a bounded sample, the total and pending invitations. */
@@ -49,7 +50,14 @@ export function HoldersSummary({
         </p>
       )}
       {impact.liveInvitationCount > 0 && (
-        <p className="text-sm">{t('invitationsLive', { count: impact.liveInvitationCount })}</p>
+        <Alert variant="warning">
+          <AlertDescription>
+            <p className="font-medium text-card-foreground">
+              {t('invitationsLive', { count: impact.liveInvitationCount })}
+            </p>
+            <p>{t('invitationsLiveHint')}</p>
+          </AlertDescription>
+        </Alert>
       )}
     </section>
   )

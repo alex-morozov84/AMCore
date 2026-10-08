@@ -5,6 +5,7 @@ import type { RoleDefinitionDetail } from '@amcore/shared'
 
 import type { useRoleDefinition } from '@/entities/organization-context'
 import { getErrorCode } from '@/shared/api/errors'
+import { Alert, AlertDescription } from '@/shared/ui/alert'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
@@ -17,11 +18,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/shared/ui/dialog'
+import { toast } from '@/shared/ui/toast'
 
 /**
- * Deleting names the exact numbers it was loaded with and asks to confirm those; the server
- * rejects the command if either number changed, so a stale confirmation can never go through.
- * A persistent dialog (not a fire-and-forget confirm) keeps its result visible.
+ * Deleting names the exact numbers it was loaded with; the server rejects the command if either
+ * changed, so a stale confirmation can never go through. An acknowledgment is asked only when
+ * something is actually affected: people, pending invitations or the person deleting.
  */
 export function DeleteRoleDialog({
   role,
@@ -38,6 +40,9 @@ export function DeleteRoleDialog({
   const [open, setOpen] = useState(false)
   const [understood, setUnderstood] = useState(false)
   const [failure, setFailure] = useState<{ error?: unknown; unknown?: boolean }>()
+  const holders = detail.holders.total
+  const invitations = detail.impact.liveInvitationCount
+  const needsAck = holders > 0 || invitations > 0 || detail.selfHeld
   const change = (next: boolean) => {
     setOpen(next)
     if (!next) {
@@ -49,11 +54,13 @@ export function DeleteRoleDialog({
     setFailure(undefined)
     const outcome = await role.remove({
       expectedAclVersion: detail.aclVersion,
-      expectedLiveInvitationCount: detail.impact.liveInvitationCount,
+      expectedLiveInvitationCount: invitations,
       ...(detail.selfHeld ? { acknowledgeSelfHeld: true as const } : {}),
     })
-    if (outcome.status === 'committed') onDeleted()
-    else if (outcome.status === 'rejected') setFailure({ error: outcome.error })
+    if (outcome.status === 'committed') {
+      toast.add({ type: 'success', title: t('deletedToast') })
+      onDeleted()
+    } else if (outcome.status === 'rejected') setFailure({ error: outcome.error })
     else if (outcome.status === 'unknown') setFailure({ unknown: true })
   }
   return (
@@ -65,17 +72,24 @@ export function DeleteRoleDialog({
         <DialogHeader>
           <DialogTitle>{t('deleteTitle')}</DialogTitle>
           <DialogDescription>
-            {t('deleteBody', {
-              holders: detail.holders.total,
-              invitations: detail.impact.liveInvitationCount,
-            })}
+            {holders === 0 && invitations === 0 ? t('deleteNone') : t('deleteIrreversible')}
           </DialogDescription>
         </DialogHeader>
+        {(holders > 0 || invitations > 0) && (
+          <Alert variant="warning">
+            <AlertDescription className="font-medium text-card-foreground">
+              {holders > 0 && <p>{t('deletePeople', { holders })}</p>}
+              {invitations > 0 && <p>{t('deleteInvites', { invitations })}</p>}
+            </AlertDescription>
+          </Alert>
+        )}
         {detail.selfHeld && <p role="status">{t('selfHeldBody')}</p>}
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox checked={understood} onCheckedChange={(v) => setUnderstood(v === true)} />
-          {t('deleteAck')}
-        </label>
+        {needsAck && (
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={understood} onCheckedChange={(v) => setUnderstood(v === true)} />
+            {t('deleteAck')}
+          </label>
+        )}
         {failure?.error !== undefined && (
           <div role="status" className="space-y-1">
             <ApiErrorAlert error={failure.error} />
@@ -91,7 +105,7 @@ export function DeleteRoleDialog({
           </Button>
           <Button
             variant="destructive"
-            disabled={!understood || role.busy}
+            disabled={(needsAck && !understood) || role.busy}
             onClick={() => void run()}
           >
             {t('deleteConfirm')}

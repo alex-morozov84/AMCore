@@ -10,6 +10,7 @@ import {
 import { RoleEditor } from '@/features/role-editor'
 import { getErrorCode } from '@/shared/api/errors'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
+import { Alert, AlertDescription } from '@/shared/ui/alert'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { BackLink } from '@/shared/ui/back-link'
 import { Button } from '@/shared/ui/button'
@@ -80,8 +81,18 @@ export function OrganizationRoleClient({
           <Skeleton className="h-48 motion-reduce:animate-none" />
         </div>
       )}
-      {detail?.editMode === 'system' && <p role="status">{t('builtinNotice')}</p>}
-      {detail?.editMode === 'oversized' && <p role="status">{t('oversizedNotice')}</p>}
+      {detail?.editMode === 'system' && (
+        <Alert>
+          <AlertDescription>{t('builtinNotice')}</AlertDescription>
+        </Alert>
+      )}
+      {detail?.editMode === 'oversized' && (
+        <Alert variant="warning">
+          <AlertDescription className="font-medium text-card-foreground">
+            {t('oversizedNotice', { count: detail.ruleCount })}
+          </AlertDescription>
+        </Alert>
+      )}
       {detail && capabilities && (
         <RoleEditor
           key={`${admission.binding}:${organizationId}:${roleId}`}

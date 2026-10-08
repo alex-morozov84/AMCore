@@ -1,11 +1,13 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
+import { Alert, AlertDescription } from '@/shared/ui/alert'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 
 import type { SaveResult } from '../model/use-role-editor'
 
-/** One live region for the outcome of the last save and the unsaved/stale state of the draft. */
+/** What the person must know before saving again; shown in the action bar so it cannot be missed. */
 export function SaveStatus({
   result,
   stale,
@@ -19,23 +21,24 @@ export function SaveStatus({
 }) {
   const t = useTranslations('organizationRoles')
   const review = (message: string) => (
-    <div className="space-y-2">
-      <p>{message}</p>
-      <Button type="button" variant="outline" onClick={onReview}>
-        {t('reviewCurrent')}
-      </Button>
-    </div>
+    <Alert variant="warning">
+      <AlertDescription className="gap-3">
+        <p className="font-medium text-card-foreground">{message}</p>
+        <Button type="button" variant="outline" size="sm" onClick={onReview}>
+          {t('reviewCurrent')}
+        </Button>
+      </AlertDescription>
+    </Alert>
   )
-  let content = null
-  if (result.kind === 'saved')
-    content = <p>{result.accessChanged ? t('savedAccessChanged') : t('saved')}</p>
-  else if (result.kind === 'conflict' || stale) content = review(t('conflict'))
-  else if (result.kind === 'unknown') content = review(t('saveUnknown'))
-  else if (result.kind === 'busy') content = <p>{t('createBusy')}</p>
-  else if (dirty) content = <p>{t('unsaved')}</p>
-  return (
-    <div role="status" aria-live="polite">
-      {content}
-    </div>
-  )
+  if (result.kind === 'rejected') return <ApiErrorAlert error={result.error} />
+  if (result.kind === 'conflict' || stale) return review(t('conflict'))
+  if (result.kind === 'unknown') return review(t('saveUnknown'))
+  if (result.kind === 'busy') return <p role="status">{t('createBusy')}</p>
+  if (dirty)
+    return (
+      <p role="status" className="text-sm font-medium">
+        {t('unsaved')}
+      </p>
+    )
+  return null
 }

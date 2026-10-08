@@ -9,11 +9,14 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: 'bg-card text-card-foreground',
-        // Full-strength `text-destructive`, not `/90`: the 90%-opacity
-        // description text measured 4.3:1 against `bg-card` — below the
-        // 4.5:1 WCAG AA minimum for normal-size text (axe `color-contrast`,
-        // found scanning the real login error state).
-        destructive: 'text-destructive bg-card [&>svg]:text-current',
+        // A tinted surface and a coloured border make a failure stand out from the white cards it
+        // sits on. The text stays in the normal foreground colour: red text on a red tint measured
+        // below the 4.5:1 WCAG AA minimum (axe `color-contrast`), so colour is carried by the
+        // border, the surface and the icon instead.
+        destructive:
+          'border-destructive/60 bg-destructive/10 text-card-foreground [&>svg]:text-destructive',
+        // Something to notice but not a failure (a conflict, an unknown result, pending impact).
+        warning: 'border-warning/60 bg-warning-soft text-card-foreground [&>svg]:text-warning',
       },
     },
     defaultVariants: {
