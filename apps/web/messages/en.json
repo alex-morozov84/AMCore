@@ -1104,6 +1104,7 @@
     "leaveTitle": "Leave without saving?",
     "leaveBody": "Your changes to this role have not been saved.",
     "leaveStay": "Keep editing",
-    "leaveConfirm": "Leave"
+    "leaveConfirm": "Leave",
+    "backToOrganizations": "All organizations"
   }
 }

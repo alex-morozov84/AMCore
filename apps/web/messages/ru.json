@@ -1104,6 +1104,7 @@
     "leaveTitle": "Уйти без сохранения?",
     "leaveBody": "Изменения в этой роли не сохранены.",
     "leaveStay": "Продолжить редактирование",
-    "leaveConfirm": "Уйти"
+    "leaveConfirm": "Уйти",
+    "backToOrganizations": "Все организации"
   }
 }

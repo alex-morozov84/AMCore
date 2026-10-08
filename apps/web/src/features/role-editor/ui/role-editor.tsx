@@ -74,25 +74,30 @@ export function RoleEditor({
           />
         </div>
       </div>
-      <section aria-labelledby="role-capabilities-title" className="space-y-3">
-        <h3 id="role-capabilities-title" className="text-base font-semibold">
-          {t('capabilitiesTitle')}
-        </h3>
-        <p className="text-sm text-muted-foreground">{t('capabilitiesHint')}</p>
-        <CapabilityEditor
-          capabilities={capabilities}
-          keys={editor.draft.keys}
-          disabled={!editable || role.busy}
-          onToggle={editor.toggle}
-        />
-      </section>
+      {detail.managedPresets !== null && (
+        <section aria-labelledby="role-capabilities-title" className="space-y-3">
+          <h3 id="role-capabilities-title" className="text-base font-semibold">
+            {t('capabilitiesTitle')}
+          </h3>
+          <p className="text-sm text-muted-foreground">{t('capabilitiesHint')}</p>
+          <CapabilityEditor
+            capabilities={capabilities}
+            keys={editor.draft.keys}
+            disabled={!editable || role.busy}
+            onToggle={editor.toggle}
+          />
+        </section>
+      )}
       <AdvancedRules rules={detail.advancedRules ?? []} />
       <HoldersSummary detail={detail} />
       <SaveStatus
         result={editor.result}
         stale={editor.stale}
         dirty={editor.dirty}
-        onReview={onReview}
+        onReview={() => {
+          editor.discard()
+          onReview()
+        }}
       />
       {editor.result.kind === 'rejected' && <ApiErrorAlert error={editor.result.error} />}
       {editable && (

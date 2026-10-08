@@ -8,3 +8,5 @@ export {
 } from './server/invitation-handlers'
 export { OrganizationInvitationsMount } from './ui/invitations-mount'
 export { OrganizationMembersMount } from './ui/members-mount'
+export { OrganizationRoleMount } from './ui/role-mount'
+export { OrganizationRolesMount } from './ui/roles-mount'
