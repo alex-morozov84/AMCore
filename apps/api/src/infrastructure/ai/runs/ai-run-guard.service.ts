@@ -168,7 +168,10 @@ function pickStop(lease: LeaseRow, superseded: boolean): StopCause | null {
   return null
 }
 
-async function markIoStarted(tx: Prisma.TransactionClient, claim: ClaimedRun): Promise<void> {
+export async function markIoStarted(
+  tx: Prisma.TransactionClient,
+  claim: ClaimedRun
+): Promise<void> {
   await tx.$executeRaw(Prisma.sql`
     UPDATE "ai"."ai_run_attempts"
     SET "ioStartedAt" = COALESCE("ioStartedAt", clock_timestamp())

@@ -6,6 +6,7 @@ import { ConflictException } from '../src/common/exceptions'
 import { AiApprovalService } from '../src/core/ai/approvals/ai-approval.service'
 import { AiRunService } from '../src/core/ai/runs/ai-run.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiApprovalExpiryService } from '../src/infrastructure/ai/runs/ai-approval-expiry.service'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
@@ -66,6 +67,7 @@ describe('AI approval lifecycle (e2e)', () => {
   beforeEach(async () => {
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     await seedAiCatalog(prisma)
+    await context.app.get(AiModelRegistry, { strict: false }).invalidate()
   })
 
   let seq = 0

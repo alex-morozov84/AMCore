@@ -71,8 +71,9 @@ Only `enabled` and `displayName` are patchable in place.
 ## Operational Rules
 
 - `enabled` is a kill switch. Disabled assistants cannot be bound or start new
-  runs; a queued run fails at execution if its assistant is disabled before the
-  worker reaches it.
+  runs. The worker rechecks binding and enabled state at final admission before
+  every provider call, including calls after tools or approval resume. Disabling
+  an assistant does not recall a call already admitted.
 - `systemPrompt` is trusted admin text, but AMCore always appends the structural
   trust-boundary policy. Assistant prompts cannot weaken user/tool/file isolation.
 - `modelSelection` is credential-gated. A pinned assistant model with no usable

@@ -6,6 +6,7 @@ import { AiApprovalService } from '../src/core/ai/approvals/ai-approval.service'
 import { AiRunService } from '../src/core/ai/runs/ai-run.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
 import { AI_PROVIDER_ADAPTERS } from '../src/infrastructure/ai/gateway/ai-gateway.types'
+import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
@@ -87,6 +88,7 @@ describe('AI run ownership, cancel/deadline and tool effects (e2e)', () => {
     controls.reset()
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     await seedAiCatalog(prisma)
+    await context.app.get(AiModelRegistry, { strict: false }).invalidate()
   })
 
   let seq = 0

@@ -8,6 +8,8 @@ import type { Env } from '../env'
 import { EnvService } from '../env/env.service'
 import { MetricsService } from '../infrastructure/observability'
 
+import { ObservedTransactionRunner } from './observed-transaction'
+
 import { PrismaClient } from '@/generated/prisma/client'
 
 type SlowQueryEvent = {
@@ -64,6 +66,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly pool: Pool
   private readonly shutdownBarriers: Array<() => Promise<void>> = []
   private tearingDown = false
+  private readonly observedRunners = new Map<
+    'ai-catalogue' | 'ai-diagnosis',
+    ObservedTransactionRunner
+  >()
 
   constructor(
     env: EnvService,
@@ -106,6 +112,22 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     })
   }
 
+  /** Two named capabilities share this pool; an uncertain token cannot be reset by its consumer. */
+  observedTransactions(name: 'ai-catalogue' | 'ai-diagnosis'): ObservedTransactionRunner {
+    if (this.tearingDown) throw new Error('prisma_shutdown_registration_closed')
+    let runner = this.observedRunners.get(name)
+    if (!runner) {
+      runner = new ObservedTransactionRunner(this.pool, () =>
+        this.logger.warn(
+          { event: 'prisma.observed_transaction_quarantined', consumer: name },
+          'Physical transaction completion is unknown; restart is required to restore this capability'
+        )
+      )
+      this.observedRunners.set(name, runner)
+    }
+    return runner
+  }
+
   async onModuleInit(): Promise<void> {
     await this.$connect()
   }
@@ -129,9 +151,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleDestroy(): Promise<void> {
     this.tearingDown = true
+    for (const runner of this.observedRunners.values()) runner.close()
     try {
       await this.runShutdownBarriers()
     } finally {
+      await this.disconnectObservedRunners()
       // Always attempt BOTH, even when a barrier or the disconnect rejects.
       try {
         await this.$disconnect()
@@ -141,11 +165,30 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
   }
 
+  private async disconnectObservedRunners(): Promise<void> {
+    if (!this.observedRunners.size) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, 2000)
+    })
+    try {
+      const cleanup = Promise.allSettled(
+        [...this.observedRunners.values()].map((runner) => runner.disconnect())
+      )
+      await Promise.race([cleanup, deadline])
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+  }
+
   private async runShutdownBarriers(): Promise<void> {
     if (this.shutdownBarriers.length === 0) return
     let timer: ReturnType<typeof setTimeout> | undefined
     const cap = new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(() => resolve('timeout'), SHUTDOWN_BARRIER_MAX_MS)
+      timer = setTimeout(
+        () => resolve('timeout'),
+        SHUTDOWN_BARRIER_MAX_MS - (this.observedRunners.size ? 2000 : 0)
+      )
     })
     try {
       const settled = Promise.allSettled(

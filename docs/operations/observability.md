@@ -265,7 +265,9 @@ ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
 
 - `ai_generations_total{provider,operation,result,role}` (`provider` is the
   lowercase provider _type_, `operation=text|object`, `result=success|error`),
-  `ai_tokens_total{provider,direction,role}` (`direction=input|output`).
+  `ai_tokens_total{provider,direction,role}` (`direction=input|output`). Token counts
+  include observed refusals and increment only known normalized counters; unavailable
+  usage is not represented as a reported zero. Durable ledger v2 carries availability.
 - `ai_guardrail_checks_total{stage,verdict,role}` (`stage=input|output`,
   `verdict=allow|flag|block`).
 - `ai_tool_invocations_total{tool_id,risk_class,outcome,role}` (`tool_id` bounded
@@ -667,3 +669,11 @@ fails on any citation not in that exact baseline; a baseline entry may only
 shrink. Regenerate it with `node scripts/observability-contract/generate-private-path-baseline.mjs`
 only when deliberately fixing a listed `debt` entry — never to silently admit
 a new one.
+
+The `amcore_ai_run_due` collector uses the same PostgreSQL-clock predicate as
+normal execution claim, including epoch/deadline and provider restriction checks.
+Future, malformed and unknown restrictions are not executable due work. The
+nonterminal backlog still includes anomalous queued rows until the separate bounded
+worker diagnosis settles them. A collector failure increments its bounded error
+metric; do not interpret the zero-label gauge's fallback zero as proof of an empty
+backlog. See [AI runs](../ai/runs.md#provider-retry-restrictions-and-diagnosis).

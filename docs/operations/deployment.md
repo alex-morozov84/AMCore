@@ -148,23 +148,28 @@ window rather than overlapping old/new invitation writers.
 
 #### AI run engine upgrade (maintenance stop)
 
-The migrations `20261005120000_ai_run_ownership_and_effect_identity` and
-`20261005120100_ai_run_legacy_state_conversion` change what an AI run's retry
-counter, lease and tool records mean, and convert existing rows. They must not
+The migrations `20261005120000_ai_run_ownership_and_effect_identity`,
+`20261005120100_ai_run_legacy_state_conversion` and
+`20261007180000_ai_gateway_consistency` change what an AI run's retry
+counter, lease and tool records mean, and convert existing rows. The execution-contract upgrade adds durable retry restrictions and strict
+version-1 model identity; it does not rewrite old snapshots. Unversioned nonterminal
+runs fail before tool/provider I/O with `model_snapshot_legacy_unsupported`; malformed
+versioned snapshots fail with `model_snapshot_invalid`. Historical terminal rows are
+unchanged. These migrations must not
 overlap an old process that can still write AI state — that is **every** `web`,
 `worker` and `all`-role process, not only workers (the HTTP handlers also create
 runs, cancel them and decide approvals). Use a short maintenance stop; there is no
 rolling mix and no down migration (roll back by restoring the pre-migration
 backup, see [Backup & restore](./backup-restore.md)).
 
-1. Stop **all** old API processes of every role and keep them (and any
+1. Take and verify a pre-migration database backup, then stop **all** old API processes of every role and keep them (and any
    auto-restart policy) stopped for the whole migration. A stopped worker's lease
    expiring does not prove a remote tool effect stopped: such effects stay
    uncertain (below).
 2. Verify nothing old is connected:
    `SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND application_name IN ('amcore-web', 'amcore-worker', 'amcore-all');`
    must return `0`.
-3. Run `docker compose run --rm migrate`. Both migrations repeat that check
+3. Run `docker compose run --rm migrate`. These migrations repeat that check
    themselves and **fail before changing anything** if a process named
    `amcore-web`, `amcore-worker` or `amcore-all` is still connected — on **every**
    database, including a fresh install with empty AI tables (an empty table does
@@ -177,7 +182,8 @@ backup, see [Backup & restore](./backup-restore.md)).
    that failed migration rolled back with
    `docker compose run --rm migrate ./node_modules/.bin/prisma migrate resolve --rolled-back <failed-migration-name>`.
    The name is `20261005120000_ai_run_ownership_and_effect_identity` or
-   `20261005120100_ai_run_legacy_state_conversion`; use the reported failed name,
+   `20261005120100_ai_run_legacy_state_conversion` or
+   `20261007180000_ai_gateway_consistency`; use the reported failed name,
    because the preceding migration may already have succeeded. Then run
    `docker compose run --rm migrate` again (until the failure is resolved, Prisma
    refuses further deploys with `P3009`). Test harnesses migrate a fresh database
@@ -582,8 +588,18 @@ What the worker does within that budget:
    released, so the BullMQ worker is not held open by that work. A database
    transaction interrupted between two dependent writes is rolled back as a whole.
    Sealing also aborts in-flight AI provider calls.
-3. Only then does `PrismaService` disconnect (it runs registered shutdown barriers,
-   capped at 20 s, before closing the pool).
+3. `PrismaService` synchronously closes its private catalogue/diagnosis capabilities
+   before running consumer barriers. The two lazy clients share its existing pool;
+   they create no additional connection quota. Their disconnect gets a reserved
+   2 s of the aggregate 20 s barrier/child-cleanup budget, then main-client disconnect
+   and pool teardown are attempted. This bounds waiting, not physical completion.
+   A hung acquisition/cleanup may require the supervisor's final process termination.
+
+An unknown physical completion quarantines only the named capability and logs
+`prisma.observed_transaction_quarantined` with a bounded consumer name. Restart
+that process after investigating the DB/driver problem; elapsed cooldown never
+resets the physical token. Destroying a suspect connection likewise does not
+invent acknowledged rollback. Main-client traffic retains the ordinary pool policy.
 
 A delivery whose result was not recorded is recovered by lease expiry and the
 lease reaper on the next worker (it may be sent again — notification delivery is

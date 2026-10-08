@@ -66,6 +66,7 @@ describe('AI multimodal artifact lifecycle (e2e)', () => {
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     await seedSystemRoles(prisma)
     await seedAiCatalog(prisma)
+    await context.app.get(AiModelRegistry, { strict: false }).invalidate()
     await seedMultimodalMockModel()
     await registry.invalidate() // drop any snapshot cached before the test model existed
   })

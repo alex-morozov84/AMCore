@@ -11,6 +11,7 @@ import {
   buildTrustBoundaryRequest,
   multimodalUntrustedPolicy,
 } from '../guardrails/trust-boundary.builder'
+import { aiExecutionDescriptorSchema, descriptorFailure } from '../registry/ai-execution-descriptor'
 
 import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
@@ -123,11 +124,13 @@ export class AiRunExecutorService {
     }
     if (admitted.kind !== 'ok') return null
 
-    const modelSlug = modelSlugFromSnapshot(claim.modelSnapshot)
-    if (modelSlug === null) {
-      await this.transitions.failed(claim, AiRunErrorCode.MODEL_SNAPSHOT_INVALID)
+    const parsed = aiExecutionDescriptorSchema.safeParse(claim.modelSnapshot)
+    if (!parsed.success) {
+      await this.transitions.failed(claim, descriptorFailure(claim.modelSnapshot))
       return null
     }
+    const execution = parsed.data
+    const modelSlug = execution.modelSlug
 
     // Every pre-flight read and download is its own latch-bounded operation: after the shutdown seal no
     // later query or storage fetch of this attempt starts (an outer wrapper would not stop the tail).
@@ -136,6 +139,7 @@ export class AiRunExecutorService {
         where: { id: claim.conversationId },
         select: {
           ownerUserId: true,
+          assistantId: true,
           organizationId: true,
           assistant: { select: { toolAllowlist: true, systemPrompt: true, enabled: true } },
         },
@@ -227,6 +231,8 @@ export class AiRunExecutorService {
       : boundary.messages
     return {
       modelSlug,
+      execution,
+      assistantId: conversation.assistantId,
       system,
       userMessages,
       marker: boundary.marker,
@@ -340,13 +346,6 @@ export class AiRunExecutorService {
     }
     return verdict.verdict === 'flag' ? verdict.categories : []
   }
-}
-
-/** Read the frozen model slug from the run's secret-free snapshot; `null` if absent/malformed. */
-function modelSlugFromSnapshot(snapshot: Prisma.JsonValue): string | null {
-  if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null
-  const slug = (snapshot as Record<string, unknown>).modelSlug
-  return typeof slug === 'string' && slug.length > 0 ? slug : null
 }
 
 /** Concatenate the text parts of a structured message content. */

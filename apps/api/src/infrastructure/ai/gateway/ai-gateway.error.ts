@@ -10,6 +10,8 @@ import type { AiProviderType } from '@/generated/prisma/client'
  * here, and no prompt/response content or credential is ever placed in the message or `details`.
  */
 export const AI_GATEWAY_ERROR_CODES = [
+  'model_binding_changed',
+  'catalogue_unavailable',
   'model_not_found', // an explicit slug that is not in the enabled catalog
   'no_default_model', // default resolution found no credentialed default and no mock
   'model_not_configured', // the model's provider has no usable credential / no adapter
@@ -33,6 +35,15 @@ export class AiGatewayException extends AppException {
     details?: Record<string, unknown>
   ) {
     super(message, status, code, details)
+  }
+
+  static catalogueUnavailable(): AiGatewayException {
+    return new AiGatewayException(
+      'catalogue_unavailable',
+      HttpStatus.SERVICE_UNAVAILABLE,
+      true,
+      'AI catalogue is temporarily unavailable'
+    )
   }
 
   static modelNotFound(modelSlug: string): AiGatewayException {

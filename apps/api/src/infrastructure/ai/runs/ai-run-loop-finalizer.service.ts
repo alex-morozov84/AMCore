@@ -3,7 +3,10 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { AiGatewayException } from '../gateway/ai-gateway.error'
 import type { AiTextResult } from '../gateway/ai-gateway.types'
+import { type AiProviderReceipt, providerReceipt } from '../gateway/provider-receipt'
+import { retryHint } from '../gateway/providers/provider-retry-hint'
 
+import { writeProviderReceipt } from './ai-provider-receipt-persistence'
 import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
@@ -109,13 +112,17 @@ export class AiRunLoopFinalizer {
   async outputBlocked(
     claim: ClaimedRun,
     categories: GuardrailStepCategory[],
-    providerCalls: number
+    providerCalls: number,
+    plan: RunPlan,
+    receipt: AiProviderReceipt
   ): Promise<void> {
-    const result = await this.transitions.refusal(claim, {
-      reasonCode: AiRunTerminalReason.GUARDRAIL_OUTPUT_BLOCKED,
-      checkStepType: AiRunStepType.OUTPUT_VALIDATION,
-      categories,
-    })
+    const result = await this.settleObservedFailure(
+      claim,
+      plan,
+      receipt,
+      'guardrail_output_blocked',
+      categories
+    )
     if (result === 'applied') this.metrics.observeAiToolLoopSteps('failed', providerCalls)
   }
 
@@ -125,9 +132,19 @@ export class AiRunLoopFinalizer {
    * stop instead of scheduling a retry or writing a stale FAILED. An abort the caller itself caused (run
    * deadline) is handled by the loop before this is reached and is never retried as a provider fault.
    */
-  async gatewayError(claim: ClaimedRun, error: unknown): Promise<void> {
+  async gatewayError(claim: ClaimedRun, error: unknown, plan?: RunPlan): Promise<void> {
+    const receipt = providerReceipt(error)
+    if (receipt && plan) {
+      await this.settleObservedFailure(
+        claim,
+        plan,
+        receipt,
+        error instanceof AiGatewayException ? error.code : 'output_validation_failed'
+      )
+      return
+    }
     if (error instanceof AiGatewayException) {
-      if (error.retryable) await this.transitions.retry(claim, error.code)
+      if (error.retryable) await this.transitions.retry(claim, error.code, retryHint(error))
       else await this.transitions.failed(claim, error.code)
       return
     }
@@ -136,6 +153,34 @@ export class AiRunLoopFinalizer {
       'Unexpected non-gateway error during AI run loop; scheduling retry'
     )
     await this.transitions.retry(claim, AiRunErrorCode.UNKNOWN_ERROR)
+  }
+
+  private async settleObservedFailure(
+    claim: ClaimedRun,
+    plan: RunPlan,
+    receipt: AiProviderReceipt,
+    reason: string,
+    categories: GuardrailStepCategory[] = []
+  ): Promise<'applied' | 'cutoff' | 'lease_lost'> {
+    const outcome = await this.guard.record(claim, async (tx, ctx) => {
+      await writeProviderReceipt(tx, claim, plan, receipt)
+      if (ctx.stop) return applyStop(tx, this.repository, claim, ctx.stop)
+      const refusal = reason === 'content_filtered' || reason === 'guardrail_output_blocked'
+      const won = refusal
+        ? await this.repository.finalizeRefusal(
+            tx,
+            claim,
+            {
+              reasonCode: reason,
+              checkStepType: AiRunStepType.OUTPUT_VALIDATION,
+              categories,
+            },
+            reason === 'content_filtered' ? reason : AiRunErrorCode.GUARDRAIL_BLOCKED
+          )
+        : await this.repository.finalizeFailed(tx, claim, reason)
+      if (!won) throw new RunLeaseLostError()
+    })
+    return outcome.kind === 'ok' ? 'applied' : outcome.kind === 'cutoff' ? 'cutoff' : 'lease_lost'
   }
 
   /** The caller's own abort fired during a provider call: terminalize the (precedence-resolved) stop. */

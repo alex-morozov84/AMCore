@@ -3,6 +3,8 @@ import { SchedulerRegistry } from '@nestjs/schedule'
 
 import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { freezeAiModel } from '../src/infrastructure/ai/registry/ai-execution-descriptor'
+import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
@@ -58,6 +60,7 @@ describe('AI run durable worker (e2e)', () => {
   beforeEach(async () => {
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     await seedAiCatalog(prisma)
+    await context.app.get(AiModelRegistry, { strict: false }).invalidate()
   })
 
   let seq = 0
@@ -98,18 +101,13 @@ describe('AI run durable worker (e2e)', () => {
   ): Promise<string> {
     const userId = await createUser()
     const conversationId = await createConversation(userId)
+    const model = await context.app.get(AiModelRegistry).resolveDefaultModel()
+    if (!model) throw new Error('missing fixture model')
     const run = await prisma.aiRun.create({
       data: {
         conversationId,
         status: AiRunStatus.QUEUED,
-        modelSnapshot: {
-          modelSlug: 'mock-default',
-          providerType: 'MOCK',
-          providerModelName: 'mock',
-          capabilities: { text: true },
-          contextLimit: null,
-          maxOutputTokens: null,
-        } satisfies Prisma.InputJsonValue,
+        modelSnapshot: freezeAiModel(model) as Prisma.InputJsonValue,
         maxAttempts: opts.maxAttempts ?? 3,
         ...(opts.deadlineAt ? { deadlineAt: opts.deadlineAt } : {}),
       },
@@ -255,8 +253,8 @@ describe('AI run durable worker (e2e)', () => {
       const run = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })
       expect(run.status).toBe(AiRunStatus.FAILED)
       expect(run.errorCode).toBe('content_filtered')
-      expect(run.terminalReasonCode).toBe('permanent_failure')
-      expect(await prisma.aiUsageLedger.count({ where: { runId } })).toBe(0)
+      expect(run.terminalReasonCode).toBe('content_filtered')
+      expect(await prisma.aiUsageLedger.count({ where: { runId } })).toBe(1)
     })
   })
 

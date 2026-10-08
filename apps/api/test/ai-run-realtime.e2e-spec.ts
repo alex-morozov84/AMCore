@@ -8,6 +8,7 @@ import type { AiRunSseEvent } from '@amcore/shared'
 import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiRunRealtimePublisher } from '../src/core/ai/realtime/ai-run-realtime.publisher'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import type { PrismaService } from '../src/prisma'
@@ -95,6 +96,7 @@ describe('AI run realtime SSE (e2e)', () => {
   beforeEach(async () => {
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     await seedAiCatalog(prisma)
+    await context.app.get(AiModelRegistry, { strict: false }).invalidate()
   })
 
   afterEach(() => {

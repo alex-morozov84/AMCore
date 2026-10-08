@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
+import { normalizeAiUsage } from '../../usage/ai-usage-v2'
 import { AiGatewayException } from '../ai-gateway.error'
 import type {
   AiAdapterCall,
@@ -11,6 +12,7 @@ import type {
   AiUsage,
   AiUserContentPart,
 } from '../ai-gateway.types'
+import { attachProviderReceipt, observeProviderReceipt } from '../provider-receipt'
 
 import { AiProviderType } from '@/generated/prisma/client'
 
@@ -92,7 +94,10 @@ export class MockAiAdapter implements AiProviderAdapter {
 
     if (userContent.includes('__mock_error__')) throw new Error('mock adapter forced failure')
     if (userContent.includes('__mock_refusal__')) {
-      throw AiGatewayException.contentFiltered(call.model.provider.type)
+      throw attachProviderReceipt(
+        AiGatewayException.contentFiltered(call.model.provider.type),
+        observeProviderReceipt(call, usageFor(call, ''), 'content-filter', performance.now())
+      )
     }
 
     const toolCalls = scriptToolCalls(userContent, call.tools ?? [])
@@ -149,5 +154,8 @@ function usageFor(call: AiAdapterCall, outputText: string): AiUsage {
     call.messages.reduce((sum, message) => sum + estimateTokens(messageText(message)), 0) +
     estimateTokens(call.system ?? '')
   const outputTokens = estimateTokens(outputText)
-  return { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
+  return normalizeAiUsage(
+    { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+    'estimated'
+  )
 }

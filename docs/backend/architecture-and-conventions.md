@@ -283,12 +283,11 @@ plus these seams:
    `PrismaService.registerShutdownBarrier(fn)`. Prisma awaits all barriers at the
    start of its teardown, so the ordering holds regardless of module distance or
    provider order. A barrier must bound itself (the notification dispatcher closes,
-   waits at most ~15 s, then seals); Prisma caps all barriers at 20 s
+   waits at most ~15 s, then seals); Prisma caps barriers and observed-child cleanup together at 20 s
    (`SHUTDOWN_BARRIER_MAX_MS`) only as a safety net — the cap neither cancels a
    barrier nor makes it safe — and `$disconnect()` and `pool.end()` are always
    attempted afterwards, even if a barrier or the disconnect fails. Registration is
-   rejected once teardown has started. Not every existing drain participates (AI
-   runs do not yet), and none of this bounds Redis cleanup, other queues or the HTTP
+   rejected once teardown has started. AI runs also register their close/drain/seal barrier; none of this bounds Redis cleanup, other queues or the HTTP
    server. The notification dispatcher uses its own shutdown latch
    (`NotificationShutdownLatch.transaction`): its guarded client makes the next
    query throw after the seal so the transaction rolls back whole. Other domains
@@ -454,3 +453,21 @@ FreshAuth's session/reason requirements remain separate. See [RBAC](../auth/rbac
 Organization exchange uses TokenService.generateDerivedAccessToken with the verified
 parent expiry; ordinary login/refresh/step-up uses generateAccessToken. Do not use
 ordinary issuance for `/switch`: repeated exchanges must not extend residual access.
+
+## Physically bounded Prisma consumers
+
+`PrismaService.observedTransactions('ai-catalogue' | 'ai-diagnosis')` exposes two
+named private single-transaction capabilities on the existing pool. Their supported
+Prisma driver-adapter boundary observes acquisition/startup through acknowledged
+COMMIT/ROLLBACK and driver release; the public transaction promise alone cannot
+prove late cleanup after `maxWait`. A capability holds its one slot until physical
+and logical completion. Startup/cleanup/release failures with unknown disposition
+quarantine it until restart. Consumers cannot reset it or obtain an unrestricted
+child client. Uncertain sockets are destroyed with pg's supported `release(error)`.
+
+This seam is shared core and retained in every process role and Console topology.
+It is not a general replacement for the main Prisma client. Adding a named consumer
+requires explicit lifecycle, physical-completion and process-role proof. Shutdown
+closes starts before barriers, reserves 2 s for private-client disconnect within the
+20 s aggregate cap, then tears down the main client/pool. A wait cap is not evidence
+that a database operation ended; process supervision owns ultimate cleanup.

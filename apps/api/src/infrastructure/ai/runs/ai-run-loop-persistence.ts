@@ -1,4 +1,5 @@
 import type { AiTextResult } from '../gateway/ai-gateway.types'
+import { usageLedgerV2 } from '../usage/ai-usage-v2'
 
 import type { ClaimedRun } from './ai-run-dispatch.types'
 import type { RunAttribution } from './ai-run-plan'
@@ -66,16 +67,8 @@ export async function writeUsageLedger(
       userId: attribution.userId,
       organizationId: attribution.organizationId,
       modelSlug,
-      inputTokens: result.usage.inputTokens,
-      outputTokens: result.usage.outputTokens,
-      // The tool calls this provider step requested (0 on a final-text step) — honest per-call accounting.
+      ...usageLedgerV2(result.usage),
       toolCalls: result.toolCalls.length,
-      providerReportedUsage: {
-        inputTokens: result.usage.inputTokens,
-        outputTokens: result.usage.outputTokens,
-        totalTokens: result.usage.totalTokens,
-      } satisfies Prisma.InputJsonValue,
-      usageVersion: 1,
     },
   })
 }

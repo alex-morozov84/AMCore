@@ -11,6 +11,7 @@ import { AiProviderType } from '@/generated/prisma/client'
 function call(type: AiProviderType = AiProviderType.OPENAI): AiAdapterCall {
   return {
     model: {
+      id: 'model-fixture',
       slug: 's',
       providerModelName: 'pm',
       capabilities: { text: true },
@@ -18,6 +19,7 @@ function call(type: AiProviderType = AiProviderType.OPENAI): AiAdapterCall {
       maxOutputTokens: null,
       isDefault: false,
       provider: {
+        id: 'provider-fixture',
         slug: 'p',
         type,
         baseUrl: null,

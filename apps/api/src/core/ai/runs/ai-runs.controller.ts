@@ -54,7 +54,11 @@ export class AiRunsController {
     description:
       '`AI_RUN_IDEMPOTENCY_CONFLICT` (the idempotency key was already used for a different request) or the conversation is under human control / closed',
   })
-  @ApiResponse({ status: 503, description: 'No AI model is configured (`model_not_configured`)' })
+  @ApiResponse({
+    status: 503,
+    description:
+      'No AI model is configured (`model_not_configured`), or bounded catalogue selection is temporarily unavailable (`catalogue_unavailable`)',
+  })
   @ZodResponse({ type: AiRunResponseDto, status: 201, description: 'Queued (or replayed) run' })
   create(@CurrentUser('sub') userId: string, @Body() body: CreateAiRunDto): Promise<AiRunResponse> {
     return this.producer.create(userId, body)
@@ -76,7 +80,11 @@ export class AiRunsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Fetch one owned AI run' })
+  @ApiOperation({
+    summary: 'Fetch one owned AI run',
+    description:
+      'Returns durable state and bounded reason/error codes. Execution may refuse model_snapshot_legacy_unsupported, model_snapshot_invalid, model_binding_changed, assistant_binding_changed, provider_retry_restriction_invalid or provider_retry_after_exceeds_horizon. Retry restrictions and provider receipts are internal and are not exposed by this response.',
+  })
   @ZodResponse({ type: AiRunResponseDto, status: 200, description: 'Run' })
   get(@CurrentUser('sub') userId: string, @Param('id') id: string): Promise<AiRunResponse> {
     return this.runs.getOwned(userId, id)

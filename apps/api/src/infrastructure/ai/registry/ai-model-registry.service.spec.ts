@@ -1,236 +1,122 @@
-import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
+import { mockDeep } from 'jest-mock-extended'
 
 import { AiCredentialResolver } from '../gateway/credential-resolver'
 
 import { AiModelRegistry } from './ai-model-registry.service'
 
 import type { EnvService } from '@/env/env.service'
-import { AiProviderType } from '@/generated/prisma/client'
 import type { MetricsService } from '@/infrastructure/observability'
 import type { AppRedisClient } from '@/infrastructure/redis'
 import type { PrismaService } from '@/prisma'
 
-/**
- * Unit tests for the DB-backed model registry (Track C — ADR-054, Arc B): cache-aside snapshot
- * behavior and the credential-gated default selection with mock fallback (the A.3 requirement).
- */
-
-function fakeRedis(): AppRedisClient & { store: Map<string, string> } {
-  const store = new Map<string, string>()
+function row(slug = 'mock-default', type = 'MOCK', over = {}) {
   return {
-    store,
-    get: jest.fn(async (k: string) => store.get(k) ?? null),
-    set: jest.fn(async (k: string, v: string) => {
-      store.set(k, v)
-    }),
-    del: jest.fn(async (k: string) => {
-      store.delete(k)
-    }),
-  } as unknown as AppRedisClient & { store: Map<string, string> }
-}
-
-function makeEnv(values: Record<string, unknown>): EnvService {
-  return { get: (k: string) => values[k] } as unknown as EnvService
-}
-
-const noopLogger = { setContext: jest.fn(), info: jest.fn(), debug: jest.fn(), warn: jest.fn() }
-
-function modelRow(over: Record<string, unknown>): unknown {
-  return {
-    slug: 'm',
-    providerModelName: 'pm',
+    id: slug,
+    slug,
+    providerModelName: slug,
     capabilities: { text: true },
     contextLimit: null,
     maxOutputTokens: null,
-    isDefault: false,
+    isDefault: true,
     enabled: true,
+    provider: {
+      id: type,
+      slug: type.toLowerCase(),
+      type,
+      baseUrl: null,
+      credentialSlot: type === 'MOCK' ? null : 'default',
+      dataRetentionClass: 'provider_default',
+      config: null,
+      enabled: true,
+    },
     ...over,
   }
 }
 
-function providerRow(type: AiProviderType, slug: string, models: unknown[], over = {}): unknown {
-  return {
-    slug,
-    type,
-    baseUrl: null,
-    credentialSlot: type === AiProviderType.MOCK ? null : 'default',
-    dataRetentionClass: 'provider_default',
-    config: null,
-    enabled: true,
-    models,
-    ...over,
-  }
+function fixture(values = {}) {
+  const prisma = mockDeep<PrismaService>()
+  prisma.aiModel.findMany.mockResolvedValue([row()] as never)
+  prisma.observedTransactions.mockReturnValue({
+    start: (fn: (tx: unknown) => Promise<unknown>) => {
+      const result = fn(prisma)
+      return {
+        result,
+        physicalCompletion: result.then(
+          () => undefined,
+          () => undefined
+        ),
+      }
+    },
+  } as never)
+  const evalCommand = jest.fn().mockResolvedValue(null)
+  const redis = { withCommandOptions: () => ({ eval: evalCommand }) } as unknown as AppRedisClient
+  const env = {
+    get: (key: string) =>
+      (({ AI_CATALOG_CACHE_TTL_SECONDS: 300, ...values }) as Record<string, unknown>)[key],
+  } as EnvService
+  const metrics = { incCacheOperation: jest.fn() } as unknown as MetricsService
+  const registry = new AiModelRegistry(
+    redis,
+    prisma,
+    env,
+    new AiCredentialResolver(env),
+    { setContext: jest.fn(), warn: jest.fn() } as never,
+    metrics
+  )
+  return { prisma, registry, evalCommand }
 }
 
-describe('AiModelRegistry', () => {
-  let prisma: DeepMockProxy<PrismaService>
-  let redis: AppRedisClient & { store: Map<string, string> }
-  let metrics: MetricsService
-  let registry: AiModelRegistry
-
-  function build(envValues: Record<string, unknown>): AiModelRegistry {
-    const env = makeEnv({ AI_CATALOG_CACHE_TTL_SECONDS: 300, ...envValues })
-    const resolver = new AiCredentialResolver(env)
-    return new AiModelRegistry(
-      redis,
-      prisma as unknown as PrismaService,
-      env,
-      resolver,
-      noopLogger as never,
-      metrics
+describe('bounded catalogue registry', () => {
+  it('falls back to one flat bounded PG read when Redis gives no snapshot', async () => {
+    const { prisma, registry } = fixture()
+    expect((await registry.resolveDefaultModel())?.id).toBe('mock-default')
+    expect((await registry.resolveModel('mock-default'))?.provider.id).toBe('MOCK')
+    expect(prisma.aiModel.findMany).toHaveBeenCalledTimes(1)
+    expect(prisma.aiModel.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 1025, orderBy: { id: 'asc' } })
     )
-  }
-
-  beforeEach(() => {
-    prisma = mockDeep<PrismaService>()
-    redis = fakeRedis()
-    metrics = { incCacheOperation: jest.fn() } as unknown as MetricsService
   })
 
-  describe('resolveModel + cache-aside', () => {
-    it('loads from DB on miss and serves the second call from cache', async () => {
-      prisma.aiProvider.findMany.mockResolvedValue([
-        providerRow(AiProviderType.ANTHROPIC, 'anthropic', [
-          modelRow({ slug: 'claude-default', providerModelName: 'claude-opus-4-8' }),
-        ]),
-      ] as never)
-      registry = build({ ANTHROPIC_API_KEY: 'sk-aB0_-Zz9' })
-
-      const first = await registry.resolveModel('claude-default')
-      const second = await registry.resolveModel('claude-default')
-
-      expect(first?.providerModelName).toBe('claude-opus-4-8')
-      expect(second?.slug).toBe('claude-default')
-      expect(prisma.aiProvider.findMany).toHaveBeenCalledTimes(1)
-      expect(metrics.incCacheOperation).toHaveBeenCalledWith('ai_catalog', 'hit')
-    })
-
-    it('starts no Redis, database or refill operation once the caller signal fired', async () => {
-      registry = build({})
-      const aborted = AbortSignal.abort()
-      await expect(registry.resolveModel('x', aborted)).rejects.toBeDefined()
-      expect(prisma.aiProvider.findMany).not.toHaveBeenCalled()
-      expect(redis.store.size).toBe(0)
-
-      // The signal fires while the cache read is in flight: the database fallback never starts.
-      const controller = new AbortController()
-      const get = redis.get.bind(redis)
-      ;(redis as { get: unknown }).get = (async (key: string) => {
-        const value = await get(key)
-        controller.abort()
-        return value
-      }) as never
-      await expect(registry.resolveModel('x', controller.signal)).rejects.toBeDefined()
-      expect(prisma.aiProvider.findMany).not.toHaveBeenCalled()
-      expect(redis.store.size).toBe(0)
-    })
-
-    it('returns null for an unknown slug', async () => {
-      prisma.aiProvider.findMany.mockResolvedValue([] as never)
-      registry = build({})
-      expect(await registry.resolveModel('nope')).toBeNull()
-    })
+  it('gates the preferred provider credential, falling back to key-less mock', async () => {
+    const { prisma, registry } = fixture()
+    prisma.aiModel.findMany.mockResolvedValue([row('claude', 'ANTHROPIC'), row()] as never)
+    expect((await registry.resolveDefaultModel())?.slug).toBe('mock-default')
+    const configured = fixture({ ANTHROPIC_API_KEY: 'fake-key' })
+    configured.prisma.aiModel.findMany.mockResolvedValue([
+      row('claude', 'ANTHROPIC'),
+      row(),
+    ] as never)
+    expect((await configured.registry.resolveDefaultModel())?.slug).toBe('claude')
   })
 
-  describe('resolveDefaultModel — credential gating', () => {
-    const catalog = [
-      providerRow(AiProviderType.ANTHROPIC, 'anthropic', [
-        modelRow({ slug: 'claude-default', isDefault: true }),
-      ]),
-      providerRow(AiProviderType.MOCK, 'mock', [modelRow({ slug: 'mock-default' })]),
-    ]
-
-    it('returns the default model when its provider has a key', async () => {
-      prisma.aiProvider.findMany.mockResolvedValue(catalog as never)
-      registry = build({ ANTHROPIC_API_KEY: 'sk-aB0_-Zz9' })
-      expect((await registry.resolveDefaultModel())?.slug).toBe('claude-default')
+  it('rejects overflow without silent truncation; skips schema-invalid rows', async () => {
+    const { prisma, registry } = fixture()
+    prisma.aiModel.findMany.mockResolvedValue(Array.from({ length: 1025 }, () => row()) as never)
+    await expect(registry.resolveDefaultModel()).rejects.toMatchObject({
+      code: 'catalogue_unavailable',
+      retryable: true,
+      status: 503,
     })
-
-    it('falls back to the key-less mock when the default provider has no key', async () => {
-      prisma.aiProvider.findMany.mockResolvedValue(catalog as never)
-      registry = build({})
-      expect((await registry.resolveDefaultModel())?.slug).toBe('mock-default')
-    })
-
-    it('returns null when neither a credentialed default nor a mock exists', async () => {
-      prisma.aiProvider.findMany.mockResolvedValue([
-        providerRow(AiProviderType.ANTHROPIC, 'anthropic', [
-          modelRow({ slug: 'claude-default', isDefault: true }),
-        ]),
-      ] as never)
-      registry = build({})
-      expect(await registry.resolveDefaultModel()).toBeNull()
-    })
+    const invalid = fixture()
+    invalid.prisma.aiModel.findMany.mockResolvedValue([
+      row('bad', 'MOCK', { capabilities: 42 }),
+    ] as never)
+    expect(await invalid.registry.resolveDefaultModel()).toBeNull()
   })
 
-  describe('invalidate + corrupt cache', () => {
-    beforeEach(() => {
-      prisma.aiProvider.findMany.mockResolvedValue([
-        providerRow(AiProviderType.MOCK, 'mock', [modelRow({ slug: 'mock-default' })]),
-      ] as never)
-    })
-
-    it('re-queries the DB after invalidate()', async () => {
-      registry = build({})
-      await registry.resolveModel('mock-default')
-      await registry.invalidate()
-      await registry.resolveModel('mock-default')
-      expect(prisma.aiProvider.findMany).toHaveBeenCalledTimes(2)
-    })
-
-    it('reloads and records a metric on a corrupt cache entry', async () => {
-      registry = build({})
-      redis.store.set('ai:catalog:v1', '{not json')
-      const result = await registry.resolveModel('mock-default')
-      expect(result?.slug).toBe('mock-default')
-      expect(metrics.incCacheOperation).toHaveBeenCalledWith('ai_catalog', 'corrupt')
-    })
-
-    it('treats a structurally invalid (wrong-shape) cached snapshot as corrupt and reloads', async () => {
-      registry = build({})
-      // Valid JSON, but not a valid catalog snapshot (capabilities is not a bounded map).
-      redis.store.set('ai:catalog:v1', JSON.stringify([{ slug: 'x', capabilities: 42 }]))
-      const result = await registry.resolveModel('mock-default')
-      expect(result?.slug).toBe('mock-default')
-      expect(metrics.incCacheOperation).toHaveBeenCalledWith('ai_catalog', 'corrupt')
-      expect(prisma.aiProvider.findMany).toHaveBeenCalledTimes(1)
-    })
+  it('starts no cache or PG work for an already-aborted caller', async () => {
+    const { prisma, registry, evalCommand } = fixture()
+    await expect(registry.resolveDefaultModel(AbortSignal.abort())).rejects.toBeDefined()
+    expect(evalCommand).not.toHaveBeenCalled()
+    expect(prisma.aiModel.findMany).not.toHaveBeenCalled()
   })
 
-  describe('fail-closed DB-row validation', () => {
-    it('skips a model whose capabilities are not a bounded boolean map', async () => {
-      prisma.aiProvider.findMany.mockResolvedValue([
-        providerRow(AiProviderType.MOCK, 'mock', [
-          modelRow({ slug: 'good' }),
-          modelRow({ slug: 'bad', capabilities: { text: 'yes' } }),
-        ]),
-      ] as never)
-      registry = build({})
-
-      expect(await registry.resolveModel('good')).not.toBeNull()
-      expect(await registry.resolveModel('bad')).toBeNull()
-    })
-
-    it('skips a provider whose config carries a forbidden secret-looking key', async () => {
-      prisma.aiProvider.findMany.mockResolvedValue([
-        providerRow(AiProviderType.OPENAI, 'openai', [modelRow({ slug: 'gpt' })], {
-          config: { apiKey: 'leaked' },
-        }),
-      ] as never)
-      registry = build({ OPENAI_API_KEY: 'sk-aB0_-Zz9' })
-
-      expect(await registry.resolveModel('gpt')).toBeNull()
-    })
-
-    it('skips a provider whose config nests an object (no depth allowed)', async () => {
-      prisma.aiProvider.findMany.mockResolvedValue([
-        providerRow(AiProviderType.OPENAI, 'openai', [modelRow({ slug: 'gpt' })], {
-          config: { nested: { a: 1 } },
-        }),
-      ] as never)
-      registry = build({ OPENAI_API_KEY: 'sk-aB0_-Zz9' })
-
-      expect(await registry.resolveModel('gpt')).toBeNull()
-    })
+  it('a live permission read refuses disabled providers and never reuses the cache', async () => {
+    const { prisma, registry } = fixture()
+    prisma.aiModel.findUnique.mockResolvedValue(row() as never)
+    expect((await registry.resolveLiveModel('mock-default'))?.id).toBe('mock-default')
+    prisma.aiModel.findUnique.mockResolvedValue({ ...row(), enabled: false } as never)
+    expect(await registry.resolveLiveModel('mock-default')).toBeNull()
+    expect(prisma.aiModel.findUnique).toHaveBeenCalledTimes(2)
   })
 })

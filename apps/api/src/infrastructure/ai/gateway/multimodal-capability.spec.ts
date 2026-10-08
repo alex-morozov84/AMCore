@@ -12,6 +12,7 @@ import { AiProviderType } from '@/generated/prisma/client'
 
 function model(capabilities: Record<string, boolean>): ResolvedAiModel {
   return {
+    id: 'model-fixture',
     slug: 's',
     providerModelName: 'pm',
     capabilities,
@@ -19,6 +20,7 @@ function model(capabilities: Record<string, boolean>): ResolvedAiModel {
     maxOutputTokens: null,
     isDefault: false,
     provider: {
+      id: 'provider-fixture',
       slug: 'p',
       type: AiProviderType.ANTHROPIC,
       baseUrl: null,

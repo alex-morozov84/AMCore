@@ -55,8 +55,8 @@ export const AI_RUN_BACKOFF_CAP_MS = 15 * 60 * 1000 // 15 min
 export const AI_RUN_BACKOFF_JITTER = 0.2 // ±20% full jitter
 
 /**
- * Defensive max for a provider-requested retry **floor** (a provider may ask us to wait). Honored
- * as a floor over the normal backoff but clamped so a corrupt value can't park a run indefinitely.
+ * Automatic retry horizon. A provider floor beyond it is retained and terminally refused,
+ * never shortened to fit the horizon.
  */
 export const AI_RUN_RETRY_AFTER_MAX_MS = 24 * 60 * 60 * 1000 // 24 h
 

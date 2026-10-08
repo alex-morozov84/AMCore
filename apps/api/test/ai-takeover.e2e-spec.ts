@@ -10,6 +10,7 @@ import { AiApprovalService } from '../src/core/ai/approvals/ai-approval.service'
 import { AiConversationControlService } from '../src/core/ai/conversations/ai-conversation-control.service'
 import { AiConversationOperatorService } from '../src/core/ai/conversations/ai-conversation-operator.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import { AI_TOOLS } from '../src/infrastructure/ai/tools/ai-tool.types'
@@ -83,6 +84,7 @@ describe('AI human takeover lifecycle (e2e)', () => {
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     await seedSystemRoles(prisma)
     await seedAiCatalog(prisma)
+    await context.app.get(AiModelRegistry, { strict: false }).invalidate()
   })
 
   let seq = 0

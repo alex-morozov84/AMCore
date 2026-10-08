@@ -40,6 +40,7 @@ import {
   AiRunStatus,
   Prisma,
 } from '@/generated/prisma/client'
+import { freezeAiModel } from '@/infrastructure/ai/registry/ai-execution-descriptor'
 import { AiModelRegistry } from '@/infrastructure/ai/registry/ai-model-registry.service'
 import type { ResolvedAiModel } from '@/infrastructure/ai/registry/ai-registry.types'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
@@ -378,16 +379,9 @@ export class AiRunProducerService {
     return { model, allowedModalities: null }
   }
 
-  /** Freeze a **secret-free** snapshot of the resolved model (no credential slot, base URL, or config). */
+  /** Freeze a **secret-free** executable descriptor (logical slot + endpoint digest, never a secret or URL). */
   private toModelSnapshot(model: ResolvedAiModel): Prisma.InputJsonValue {
-    return {
-      modelSlug: model.slug,
-      providerType: model.provider.type,
-      providerModelName: model.providerModelName,
-      capabilities: model.capabilities,
-      contextLimit: model.contextLimit,
-      maxOutputTokens: model.maxOutputTokens,
-    }
+    return freezeAiModel(model)
   }
 
   /**

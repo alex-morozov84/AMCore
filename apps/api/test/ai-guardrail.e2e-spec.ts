@@ -3,6 +3,7 @@ import { SchedulerRegistry } from '@nestjs/schedule'
 
 import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AI_RUN_GUARDRAIL_REFUSAL_MESSAGE } from '../src/infrastructure/ai/runs/ai-run.constants'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
@@ -54,6 +55,7 @@ describe('AI guardrails (e2e)', () => {
   beforeEach(async () => {
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
     await seedAiCatalog(prisma)
+    await context.app.get(AiModelRegistry, { strict: false }).invalidate()
   })
 
   let seq = 0
@@ -130,7 +132,7 @@ describe('AI guardrails (e2e)', () => {
     const run = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })
     expect(run.status).toBe(AiRunStatus.FAILED)
     expect(run.terminalReasonCode).toBe('guardrail_output_blocked')
-    expect(await stepTypes(runId)).toEqual(['OUTPUT_VALIDATION', 'REFUSAL'])
+    expect(await stepTypes(runId)).toEqual(['PROVIDER_CALL', 'OUTPUT_VALIDATION', 'REFUSAL'])
 
     const assistant = await prisma.aiMessage.findFirstOrThrow({
       where: { runId, role: 'ASSISTANT' },

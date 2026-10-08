@@ -51,37 +51,38 @@ enum AiRunAttemptOutcome {
 /// Durable generation run. Lease/retry columns follow ADR-052 and are INERT until Arc C.
 /// `modelSnapshot`/`budgetSnapshot` freeze the resolved model/budget at creation.
 model AiRun {
-  id                      String      @id @default(cuid())
-  conversationId          String
-  status                  AiRunStatus @default(QUEUED)
+  id                       String      @id @default(cuid())
+  conversationId           String
+  status                   AiRunStatus @default(QUEUED)
   // Snapshot of the owning conversation's `ownershipGeneration` at run creation (ADR-049 fence,
   // activated Arc F). The worker refuses to write into the conversation once its generation moves
   // past this snapshot (a human took over) — a stale bot run can never write a human-owned turn.
-  ownershipGeneration     Int         @default(0)
-  modelSnapshot           Json
-  budgetSnapshot          Json?
-  idempotencyKey          String? // idempotent run creation (Arc C)
+  ownershipGeneration      Int         @default(0)
+  modelSnapshot            Json
+  budgetSnapshot           Json?
+  idempotencyKey           String? // idempotent run creation (Arc C)
   // `v1:` + sha256 of the canonical input parts: a replay with the same key but different input is a
   // conflict. NULL on runs created before the fingerprint existed (derived from the USER turn at replay).
-  inputFingerprint        String?
-  availableAt             DateTime    @default(now())
-  deadlineAt              DateTime?
-  cancellationRequestedAt DateTime?
+  inputFingerprint         String?
+  availableAt              DateTime    @default(now())
+  deadlineAt               DateTime?
+  cancellationRequestedAt  DateTime?
   // Consumed provider/transient retries (NOT claims): a fresh run still gets `maxAttempts` executions.
-  attemptCount            Int         @default(0)
-  maxAttempts             Int         @default(1)
-  nextAttemptAt           DateTime? // PG-owned retry schedule (Arc C)
-  leaseToken              String? // worker ownership/CAS token (Arc C)
-  leaseExpiresAt          DateTime?
+  attemptCount             Int         @default(0)
+  maxAttempts              Int         @default(1)
+  providerRetryRestriction Json? // durable provider floor; retained on terminal runs
+  nextAttemptAt            DateTime? // PG-owned retry schedule (Arc C)
+  leaseToken               String? // worker ownership/CAS token (Arc C)
+  leaseExpiresAt           DateTime?
   // Monotonic ownership epoch: +1 per claim. Identity of one execution attempt (history, tool
   // execution ownership); never reused, never decremented (approval resumes are new epochs).
-  leaseEpoch              Int         @default(0)
-  errorCode               String? // bounded/machine-readable
-  terminalReasonCode      String?
-  startedAt               DateTime?
-  finishedAt              DateTime?
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
+  leaseEpoch               Int         @default(0)
+  errorCode                String? // bounded/machine-readable
+  terminalReasonCode       String?
+  startedAt                DateTime?
+  finishedAt               DateTime?
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
 
   conversation    AiConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   steps           AiRunStep[]

@@ -81,7 +81,8 @@ provider output or tool data.
 
 Key behavior:
 
-- The selected model is frozen into the run snapshot at creation time.
+- The selected executable model is frozen into a versioned run descriptor at creation
+  time; identity and enabled state are checked live before each call (see [Providers](./providers.md#frozen-execution-and-live-permission)).
 - The worker owns provider calls, retries, lease recovery, the final transcript
   write and the usage ledger write.
 - A run executes in one or more **attempts** (see below). A parked run that is
@@ -230,3 +231,62 @@ resources return no-leak `404`.
 
 The lease length, worker capacity, retry backoff and attempt-history cap are
 starter defaults tuned by code, not environment variables.
+
+## Provider retry restrictions and diagnosis
+
+The SDK makes one request per admitted call (`maxRetries: 0`). A 429/503
+`Retry-After` is normalized at the adapter boundary and settled using fresh
+Postgres time after acquiring the run locks. Relative seconds start from that
+settlement, so lock delay and application clock skew cannot shorten the wait.
+HTTP dates use their absolute instant. Zero/past dates allow ordinary jittered
+backoff; malformed nonnumeric headers supply no floor. Numeric overflow is
+retained as `unknown_until`, never interpreted as permission to retry.
+
+`providerRetryRestriction` is internal durable JSON, separate from `nextAttemptAt`:
+the schedule is the later of backoff and the retained provider floor. Automatic
+retry supports at most 24 hours. A longer or unknown wait ends with
+`provider_retry_after_exceeds_horizon`, retaining evidence rather than clamping
+it downward. A floor at/after the deadline expires the run immediately. Restriction
+evidence survives retry exhaustion, cancellation, takeover and lease recovery;
+visible cancel, takeover and deadline retain their established precedence.
+
+Ordinary execution claims and the due metric share the PG-clock predicate:
+only unrestricted or valid due restrictions execute. Future restrictions wait.
+Malformed/unknown restrictions on `queued` rows have a separate worker diagnostic
+sweep, including rows with no deadline, future schedule or exhausted history.
+A pass selects at most 20 candidates, runs no more often than every 30 seconds,
+and starts no new diagnostic transaction after its 2 s pass budget. It locks the
+conversation then run with SKIP LOCKED, reclassifies under fresh PG time and
+terminalizes by CAS without granting a lease or consuming a retry. It preserves
+restriction/history, safely closes existing attempts/invocations and adds one
+content-free finalization step when the step-number space permits. It performs
+no provider/tool I/O and writes no usage or transcript. A malformed restriction
+ends with `provider_retry_restriction_invalid`. Pending approvals remain evidence;
+a terminal run cannot resume them. They are not promised automatic expiry.
+
+Diagnosis failure is isolated from ordinary main-client recovery: the bounded
+`ai.run.diagnosis_unavailable` log event contains no underlying error payload,
+and deadline/epoch sweeps and eligible-run drain continue while shutdown authority
+permits. An occupied or quarantined diagnosis capability retains its physical
+permit; anomalous rows remain ineligible. Unknown physical completion still
+requires process restart to restore that capability.
+
+## Usage after refusal
+
+An observed provider response has a private content-free receipt. Local output
+blocking and the SDK's `content-filter` finish reason settle one provider step,
+one usage row, a canned refusal and the terminal outcome in one guarded
+transaction. If a stop wins, spend remains recorded but no assistant turn is
+written. Stale/expired leases or a shutdown seal write nothing. A rollback rolls
+back the entire settlement; repeated/concurrent finalization cannot double-write.
+A response arriving after the local call bound remains the existing PR2 residual:
+no unobserved receipt or global exactly-once billing guarantee is invented.
+
+New usage rows use `usageVersion: 2`. Their `providerReportedUsage` has independent
+nullable input/output/total counts, `source` (`reported`, `estimated`, `unavailable`)
+and `availability` (`complete`, `partial`, `unavailable`). Valid reported zero is
+known; missing, negative, fractional, nonfinite or overflowing counts are unknown.
+A retained SDK-derived total is marked `totalDerived: true`. Compatibility integer
+columns use zero for unknown values, so consumers must read the versioned JSON
+before interpreting that zero. Old v1 rows are unchanged. MOCK usage is estimated.
+Token metrics increment only available counts, including observed refused responses.

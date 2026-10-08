@@ -6,6 +6,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { AiGatewayException } from '../gateway/ai-gateway.error'
 import type { AiGatewayTool, AiTextResult, AiToolCall } from '../gateway/ai-gateway.types'
 import { ModelGateway } from '../gateway/model-gateway.service'
+import { providerReceipt } from '../gateway/provider-receipt'
 import { GUARDRAIL_BOUNDARY_TAG_PREFIX } from '../guardrails/guardrail.constants'
 import { scanOutput } from '../guardrails/output-guard'
 import {
@@ -18,6 +19,7 @@ import { AiToolRegistry } from '../tools/ai-tool-registry.service'
 import { AiRunTerminalReason } from './ai-run.constants'
 import { AiRunApprovalParker } from './ai-run-approval-parker.service'
 import type { ClaimedRun } from './ai-run-dispatch.types'
+import { admitFinalProviderCall, FinalAdmissionDenied } from './ai-run-final-admission'
 import { AiRunGuard } from './ai-run-guard.service'
 import { AiRunLoopFinalizer } from './ai-run-loop-finalizer.service'
 import { countProviderCalls, reconstructRounds } from './ai-run-loop-reconstruct'
@@ -99,7 +101,7 @@ export class AiRunLoopExecutor {
 
     for (;;) {
       // Admission before EVERY provider call: lease (fresh clock), cancel, takeover, deadline, shutdown.
-      const admitted = await this.guard.admit(claim, async () => undefined, { markIoStarted: true })
+      const admitted = await this.guard.admit(claim, async () => undefined, {})
       if (admitted.kind === 'stopped') {
         await this.transitions.stop(claim, admitted.cause)
         return
@@ -118,6 +120,8 @@ export class AiRunLoopExecutor {
           this.gateway,
           {
             modelSlug: plan.modelSlug,
+            execution: plan.execution,
+            beforeDispatch: () => admitFinalProviderCall(this.guard, this.transitions, claim, plan),
             system: setup.system,
             messages,
             tools: setup.tools,
@@ -126,14 +130,17 @@ export class AiRunLoopExecutor {
           { claim, runtime, timeoutMs: this.env.get('AI_REQUEST_TIMEOUT_MS') }
         )
       } catch (error) {
-        await this.handleProviderError(claim, runtime, error)
+        await this.handleProviderError(claim, runtime, error, plan)
         return
       }
       providerCalls += 1
       const ordinal = providerCalls
       const durationMs = Math.round(performance.now() - startedAt)
 
-      if (await this.blockedOutput(claim, plan, setup.toolMarker, result, providerCalls)) return
+      if (
+        await this.blockedOutput(claim, plan, setup.toolMarker, result, providerCalls, durationMs)
+      )
+        return
 
       const decision = this.classify(result.toolCalls, plan.toolAllowlist)
       if (decision.kind === 'final') {
@@ -209,8 +216,14 @@ export class AiRunLoopExecutor {
   private async handleProviderError(
     claim: ClaimedRun,
     runtime: AttemptRuntime,
-    error: unknown
+    error: unknown,
+    plan: RunPlan
   ): Promise<void> {
+    if (error instanceof FinalAdmissionDenied) return
+    if (providerReceipt(error)) {
+      await this.finalizer.gatewayError(claim, error, plan)
+      return
+    }
     if (error instanceof AiGatewayException && error.code === 'aborted') {
       await this.finalizer.callerAborted(claim, abortCause(runtime))
       return
@@ -219,7 +232,7 @@ export class AiRunLoopExecutor {
       await this.transitions.retry(claim, 'provider_timeout')
       return
     }
-    await this.finalizer.gatewayError(claim, error)
+    await this.finalizer.gatewayError(claim, error, plan)
   }
 
   /**
@@ -254,13 +267,29 @@ export class AiRunLoopExecutor {
     plan: RunPlan,
     toolMarker: string | undefined,
     result: AiTextResult,
-    providerCalls: number
+    providerCalls: number,
+    durationMs: number
   ): Promise<boolean> {
     const markers = toolMarker ? [plan.marker, toolMarker] : [plan.marker]
     const verdict = scanOutput(result.text, { markers })
     this.metrics.incAiGuardrailCheck('output', verdict.verdict)
     if (verdict.verdict !== 'block') return false
-    await this.finalizer.outputBlocked(claim, verdict.categories, providerCalls)
+    await this.finalizer.outputBlocked(
+      claim,
+      verdict.categories,
+      providerCalls,
+      plan,
+      result.receipt ?? {
+        modelId: plan.execution.modelId,
+        providerId: plan.execution.providerId,
+        modelSlug: plan.modelSlug,
+        providerType: result.providerType,
+        finishReason: result.finishReason,
+        toolCallCount: result.toolCalls.length,
+        durationMs,
+        usage: result.usage,
+      }
+    )
     return true
   }
 

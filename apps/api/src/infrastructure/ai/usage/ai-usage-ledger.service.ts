@@ -3,7 +3,8 @@ import { PinoLogger } from 'nestjs-pino'
 
 import type { AiUsage, AiUsageContext } from '../gateway/ai-gateway.types'
 
-import { Prisma } from '@/generated/prisma/client'
+import { usageLedgerV2 } from './ai-usage-v2'
+
 import { PrismaService } from '@/prisma'
 
 /** What the gateway records after a successful generation. No prompt/response content, no secret. */
@@ -40,14 +41,7 @@ export class AiUsageLedgerService {
           userId: input.context?.userId ?? null,
           organizationId: input.context?.organizationId ?? null,
           apiKeyId: input.context?.apiKeyId ?? null,
-          inputTokens: input.usage.inputTokens,
-          outputTokens: input.usage.outputTokens,
-          providerReportedUsage: {
-            inputTokens: input.usage.inputTokens,
-            outputTokens: input.usage.outputTokens,
-            totalTokens: input.usage.totalTokens,
-          } satisfies Prisma.InputJsonValue,
-          usageVersion: 1,
+          ...usageLedgerV2(input.usage),
         },
       })
     } catch (error) {

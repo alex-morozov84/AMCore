@@ -1,7 +1,7 @@
-import { AI_RUN_MAX_EPOCHS } from './ai-run.constants'
 import { AiRunBacklogCollector } from './ai-run-backlog.collector'
+import { aiRunExecutionEligibility } from './ai-run-execution-eligibility'
 
-import { AiRunStatus } from '@/generated/prisma/client'
+import { AiRunStatus, Prisma } from '@/generated/prisma/client'
 import { METRIC_NAMES, MetricsService } from '@/infrastructure/observability'
 import type { PrismaService } from '@/prisma'
 
@@ -39,8 +39,8 @@ describe('AiRunBacklogCollector', () => {
       { status: AiRunStatus.QUEUED, _count: 4 },
       { status: AiRunStatus.WAITING_APPROVAL, _count: 1 },
     ])
-    const count = jest.fn().mockResolvedValue(0)
-    const prisma = { aiRun: { groupBy, count } } as unknown as PrismaService
+    const count = jest.fn().mockResolvedValue([{ count: 0n }])
+    const prisma = { aiRun: { groupBy }, $queryRaw: count } as unknown as PrismaService
 
     new AiRunBacklogCollector(metrics, prisma)
 
@@ -55,25 +55,18 @@ describe('AiRunBacklogCollector', () => {
   it("mirrors AiRunRepository.claimDueBatch()'s claim predicate exactly, INCLUDING deadlineAt (R1)", async () => {
     const metrics = makeMetrics()
     const groupBy = jest.fn().mockResolvedValue([])
-    const count = jest.fn().mockResolvedValue(2)
-    const prisma = { aiRun: { groupBy, count } } as unknown as PrismaService
+    const count = jest.fn().mockResolvedValue([{ count: 2n }])
+    const prisma = { aiRun: { groupBy }, $queryRaw: count } as unknown as PrismaService
 
     new AiRunBacklogCollector(metrics, prisma)
     await metrics.metrics()
 
     expect(count).toHaveBeenCalledTimes(1)
-    const { where } = count.mock.calls[0][0] as { where: Record<string, unknown> }
-    expect(where.status).toBe(AiRunStatus.QUEUED)
-    expect(where.availableAt).toEqual({ lte: expect.any(Date) })
-    // The deadlineAt clause is the one a run past deadline (unclaimable, but
-    // not yet swept by the recovery cron) would otherwise silently count as
-    // "due" without — the exact bug this test exists to pin.
-    expect(where.AND).toEqual([
-      { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: expect.any(Date) } }] },
-      { OR: [{ deadlineAt: null }, { deadlineAt: { gt: expect.any(Date) } }] },
-      // A run whose attempt history is full is never claimed (it is failed by the sweep), so not "due".
-      { leaseEpoch: { lt: AI_RUN_MAX_EPOCHS } },
-    ])
+    const query = count.mock.calls[0]![0] as Prisma.Sql
+    const predicate = aiRunExecutionEligibility(Prisma.sql`timing.at`)
+    expect(query.sql).toContain(predicate.sql)
+    expect(query.values).toEqual(predicate.values)
+    expect(query.sql).toContain('clock_timestamp()')
 
     const output = await metrics.metrics()
     expect(output).toMatch(new RegExp(`${METRIC_NAMES.aiRunDue}\\{[^}]*} 2`))
@@ -85,8 +78,8 @@ describe('AiRunBacklogCollector', () => {
     const groupBy = jest.fn(
       (): Promise<Array<{ status: AiRunStatus; _count: number }>> => new Promise(() => undefined)
     )
-    const count = jest.fn((): Promise<number> => new Promise(() => undefined))
-    const prisma = { aiRun: { groupBy, count } } as unknown as PrismaService
+    const count = jest.fn((): Promise<Array<{ count: bigint }>> => new Promise(() => undefined))
+    const prisma = { aiRun: { groupBy }, $queryRaw: count } as unknown as PrismaService
 
     new AiRunBacklogCollector(metrics, prisma)
 
@@ -106,7 +99,7 @@ describe('AiRunBacklogCollector', () => {
     // *next* scrape, matching queue-depth-metrics.collector.spec.ts's
     // established pattern. Let the next queries resolve so it doesn't stall.
     groupBy.mockResolvedValue([])
-    count.mockResolvedValue(0)
+    count.mockResolvedValue([{ count: 0n }])
     const nextScrape = await metrics.metrics()
     expect(nextScrape).toContain(
       `${METRIC_NAMES.metricsCollectorErrorsTotal}{collector="ai_run_backlog"`

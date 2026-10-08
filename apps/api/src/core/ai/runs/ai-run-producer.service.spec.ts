@@ -21,6 +21,7 @@ import type { QueueService } from '@/infrastructure/queue/queue.service'
 import type { PrismaService } from '@/prisma'
 
 const DEFAULT_MODEL: ResolvedAiModel = {
+  id: 'model-fixture',
   slug: 'claude-default',
   providerModelName: 'claude-opus-4-8',
   capabilities: { structured_output: true },
@@ -28,10 +29,11 @@ const DEFAULT_MODEL: ResolvedAiModel = {
   maxOutputTokens: 8192,
   isDefault: true,
   provider: {
+    id: 'provider-fixture',
     slug: 'anthropic',
     type: 'ANTHROPIC',
     baseUrl: null,
-    credentialSlot: 'anthropic',
+    credentialSlot: 'default',
     dataRetentionClass: 'standard',
     config: null,
   },
@@ -120,13 +122,19 @@ describe('AiRunProducerService', () => {
     )
   })
 
-  it('freezes a secret-free model snapshot (no credential slot, base URL, or config)', async () => {
+  it('freezes identity and logical slot without secrets, base URL, or config', async () => {
     await service.create('user-1', INPUT)
 
     const createArg = prisma.aiRun.create.mock.calls[0]?.[0]
     const snapshot = createArg?.data.modelSnapshot as Record<string, unknown>
     expect(snapshot).toMatchObject({ modelSlug: 'claude-default', providerType: 'ANTHROPIC' })
-    expect(JSON.stringify(snapshot)).not.toContain('credentialSlot')
+    expect(snapshot).toMatchObject({
+      version: 1,
+      modelId: 'model-fixture',
+      providerId: 'provider-fixture',
+      credentialSlot: 'default',
+    })
+    expect(JSON.stringify(snapshot)).not.toContain('ANTHROPIC_API_KEY')
     expect(JSON.stringify(snapshot)).not.toContain('baseUrl')
     expect(createArg?.data.maxAttempts).toBe(3)
   })

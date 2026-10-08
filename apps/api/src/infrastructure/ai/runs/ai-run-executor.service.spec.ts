@@ -1,5 +1,6 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
+import { executionDescriptor } from '../../../../test/fixtures/ai-execution-descriptor'
 import type { AiRunRealtimePublisher } from '../../../core/ai/realtime/ai-run-realtime.publisher'
 
 import type { ClaimedRun, StopCause } from './ai-run-dispatch.types'
@@ -29,7 +30,7 @@ function claim(overrides: Partial<ClaimedRun> = {}): ClaimedRun {
   return {
     id: 'run-1',
     conversationId: 'conv-1',
-    modelSnapshot: { modelSlug: 'claude-default' },
+    modelSnapshot: executionDescriptor(),
     epoch: 1,
     attemptNumber: 1,
     maxAttempts: 3,
@@ -169,6 +170,7 @@ describe('AiRunExecutorService', () => {
 
   describe('artifact resolution (Arc G)', () => {
     const MULTIMODAL_SNAPSHOT = {
+      ...executionDescriptor(),
       modelSlug: 'claude-default',
       capabilities: { vision: true, pdf: true },
     }
@@ -289,7 +291,7 @@ describe('AiRunExecutorService', () => {
 
       // No `vision`/`pdf` in the snapshot — this should never happen in practice (the producer
       // already gated it), but the worker must still fail closed, not call the provider.
-      await executor.execute(claim({ modelSnapshot: { modelSlug: 'claude-default' } }), runtime)
+      await executor.execute(claim({ modelSnapshot: executionDescriptor() }), runtime)
 
       expect(loop.run).not.toHaveBeenCalled()
       expect(storage.download).not.toHaveBeenCalled()
@@ -445,7 +447,10 @@ describe('AiRunExecutorService', () => {
     })
 
     it('permanently fails a run whose snapshot carries no model slug', async () => {
-      await executor.execute(claim({ modelSnapshot: { providerType: 'MOCK' } }), runtime)
+      await executor.execute(
+        claim({ modelSnapshot: { version: 1, providerType: 'MOCK' } }),
+        runtime
+      )
       expect(loop.run).not.toHaveBeenCalled()
       expect(transitions.failed).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'run-1' }),
@@ -545,7 +550,13 @@ describe('AiRunExecutorService', () => {
       storage.download.mockImplementation(() => new Promise((resolve) => (release = resolve)))
 
       const attempt = executor.execute(
-        claim({ modelSnapshot: { modelSlug: 'claude-default', capabilities: { vision: true } } }),
+        claim({
+          modelSnapshot: {
+            ...executionDescriptor(),
+            modelSlug: 'claude-default',
+            capabilities: { vision: true },
+          },
+        }),
         runtime
       )
       await new Promise((resolve) => setImmediate(resolve))

@@ -6,6 +6,7 @@ import { type AiRunGuard, RunLeaseLostError } from './ai-run-guard.service'
 import { AiRunTransitions } from './ai-run-transitions.service'
 
 import { AiRunStepType } from '@/generated/prisma/client'
+import type { PrismaService } from '@/prisma'
 
 /**
  * Self-contained run transitions (pre-flight, gateway errors, stop causes): each runs in ONE guarded
@@ -18,6 +19,7 @@ const REFUSAL = {
 }
 
 describe('AiRunTransitions', () => {
+  let tx: DeepMockProxy<PrismaService>
   let repository: DeepMockProxy<AiRunRepository>
   let guardKind: 'ok' | 'lease_lost' | 'cutoff'
   let stop: StopCause | null
@@ -42,12 +44,16 @@ describe('AiRunTransitions', () => {
       state: 'retry_scheduled',
       nextAttemptAt: new Date(),
     })
+    tx = mockDeep<PrismaService>()
+    tx.$queryRaw.mockResolvedValue([{ now: new Date(), anchor: new Date() }])
+    tx.aiRun.findUniqueOrThrow.mockResolvedValue({ providerRetryRestriction: null } as never)
+    tx.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 0 } } as never)
     const guard = {
       record: jest.fn(
         async (_c: ClaimedRun, fn: (tx: unknown, ctx: object) => Promise<unknown>) => {
           if (guardKind !== 'ok') return { kind: guardKind }
           try {
-            return { kind: 'ok', value: await fn({}, { stop, epoch: 2 }), stop }
+            return { kind: 'ok', value: await fn(tx, { stop, epoch: 2 }), stop }
           } catch (error) {
             if (error instanceof RunLeaseLostError) return { kind: 'lease_lost' }
             throw error
@@ -69,7 +75,7 @@ describe('AiRunTransitions', () => {
 
   it('failed() writes the failure when no stop cause is visible', async () => {
     expect(await transitions.failed(CLAIM, 'input_missing')).toBe('applied')
-    expect(repository.finalizeFailed).toHaveBeenCalledWith({}, CLAIM, 'input_missing', undefined)
+    expect(repository.finalizeFailed).toHaveBeenCalledWith(tx, CLAIM, 'input_missing', undefined)
   })
 
   it.each(['superseded', 'expired'] as const)(
@@ -109,14 +115,20 @@ describe('AiRunTransitions', () => {
 
   it('refusal() writes the canned refusal when no stop is visible', async () => {
     expect(await transitions.refusal(CLAIM, REFUSAL)).toBe('applied')
-    expect(repository.finalizeRefusal).toHaveBeenCalledWith({}, CLAIM, REFUSAL)
+    expect(repository.finalizeRefusal).toHaveBeenCalledWith(tx, CLAIM, REFUSAL)
   })
 
   it('retry() returns the scheduled outcome', async () => {
     expect(await transitions.retry(CLAIM, 'provider_timeout', 5000)).toMatchObject({
       state: 'retry_scheduled',
     })
-    expect(repository.finalizeRetry).toHaveBeenCalledWith({}, CLAIM, 'provider_timeout', 5000)
+    expect(repository.finalizeRetry).toHaveBeenCalledWith(
+      tx,
+      CLAIM,
+      'provider_timeout',
+      5000,
+      expect.objectContaining({ floor: expect.any(Date), refused: false })
+    )
   })
 
   it('a CAS that loses the lease rolls the transaction back and reports lease_lost', async () => {
