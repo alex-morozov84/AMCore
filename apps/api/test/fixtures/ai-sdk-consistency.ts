@@ -39,7 +39,7 @@ const fetchImpl: typeof fetch = async (input, init) => {
     body: JSON.parse(String(init?.body)),
     redirect: init?.redirect,
   })
-  const anthropic = String(input).includes('anthropic.com')
+  const anthropic = new URL(String(input)).hostname === 'api.anthropic.com'
   const body =
     sdkFixture.status !== 200
       ? { error: { type: 'overloaded_error', message: 'fixture unavailable' } }
