@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `useCapabilityCatalogue`, `useRoleDefinitions`, `useRoleDefinition` and
   `useCreateRoleDefinition` on the shared organization controller (structured
   committed/rejected/unknown/busy/retired outcomes, no automatic replay), plus an executable
-  custom-consumer fixture proven on the real stack. A ready role-editor screen follows separately.
+  custom-consumer fixture proven on the real stack.
 
 - Organization **role definitions API** (`/organizations/:orgId/role-definitions`): list roles with
   organization-local holder counts, read a role as one atomic snapshot, create an empty custom role,
@@ -33,7 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Legacy `/roles` routes keep their contracts but now serialize on the organization, raise the
   revision once, write the same audit events (`org.role_created/updated/deleted`), and removing a
   permission from a role detaches only that role's link. A role-leading index on
-  `member_roles(roleId, memberId)` speeds holder counts. A ready role-editor screen follows separately.
+  `member_roles(roleId, memberId)` speeds holder counts.
+
+- **Roles tab** for organization administrators: a fourth route-backed organization tab (with one shared
+  navigation widget) listing built-in roles apart from custom ones, with search, pages, create, and a role
+  page that edits capabilities by area, shows developer-set advanced rules read-only, lists who holds the
+  role and what pending invitations use it, and deletes with the affected counts. Edits are a draft fenced
+  by the role revision (conflicts never overwrite), full control and own-role changes need confirmation,
+  and leaving with unsaved changes asks first. `GET /members` accepts an optional `roleId` and the Members
+  tab can be narrowed to one role (`?role=`). Alerts now carry colour in their border and surface and a
+  `warning` variant exists. `pnpm stand preview --profile organization-roles` seeds a large reproducible
+  dataset for trying it.
 
 - Organization invitation management and explicit recipient consent, complete role
   intent, generation checks and durable operation recovery; replaceable ready UI.
