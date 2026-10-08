@@ -844,7 +844,9 @@
     "roleList": "Role choices",
     "roleFilter": "Showing people with the role {name}",
     "roleFilterUnknown": "Showing people with one role",
-    "roleFilterClear": "Show everyone"
+    "roleFilterClear": "Show everyone",
+    "roleDetails": "Details",
+    "roleDetailsFor": "Open the role {name} in a new tab"
   },
   "invitationRecipient": {
     "signInTitle": "Continue your invitation",
@@ -972,7 +974,9 @@
     "refreshFailed": "The request was processed, but the updated list or access could not be checked. Retry the check without resending.",
     "storageUnavailable": "Recovery is available while this page stays open. Browser storage is unavailable; after reopening, inspect the current state before taking another action.",
     "invalidQuery": "Invalid filters were replaced with the default view.",
-    "javascriptRequired": "Invitation management requires JavaScript. Enable it and reload this page."
+    "javascriptRequired": "Invitation management requires JavaScript. Enable it and reload this page.",
+    "roleDetails": "Details",
+    "roleDetailsFor": "Open the role {name} in a new tab"
   },
   "organizationNav": {
     "sections": "Organization sections",

@@ -2,13 +2,15 @@
 import { useTranslations } from 'next-intl'
 import type { RoleSummary } from '@amcore/shared'
 
+import { useRoleHref } from '@/shared/lib/role-links'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/ui/tooltip'
 
 const CLAMP_HINT_LENGTH = 80
 
 /** Name opens the role; the description is limited to two lines with the full text on hover or focus. */
-export function RoleNameCell({ role, href }: { role: RoleSummary; href: string }) {
+export function RoleNameCell({ role }: { role: RoleSummary }) {
+  const href = useRoleHref()?.(role.id)
   const t = useTranslations('organizationRoles')
   const description = role.description?.trim() || null
   const text = (
@@ -18,13 +20,17 @@ export function RoleNameCell({ role, href }: { role: RoleSummary; href: string }
   )
   return (
     <div className="space-y-1">
-      <RouteProgressLink
-        href={href}
-        aria-label={t('openRoleNamed', { name: role.name })}
-        className="break-words font-medium underline-offset-4 hover:underline"
-      >
-        {role.name}
-      </RouteProgressLink>
+      {href ? (
+        <RouteProgressLink
+          href={href}
+          aria-label={t('openRoleNamed', { name: role.name })}
+          className="break-words font-medium underline-offset-4 hover:underline"
+        >
+          {role.name}
+        </RouteProgressLink>
+      ) : (
+        <span className="break-words font-medium">{role.name}</span>
+      )}
       {description && description.length > CLAMP_HINT_LENGTH ? (
         <TooltipProvider>
           <Tooltip>

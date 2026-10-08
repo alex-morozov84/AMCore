@@ -12,9 +12,10 @@ The default pages are `/organizations` and `/organizations/[id]`, with `/en` or
 single membership automatically, and paginates multiple memberships in groups of 20. **All organizations** returns to `?view=list`, preserving list access even
 with one membership. The overview confirms organization, account and team-access
 capability. The “Your access” card reports only the verified team-access decision;
-it does not infer permissions for individual records. It does not provide organization editing or a ready role-definition editor screen; the
+it does not infer permissions for individual records. It does not provide organization editing. Custom roles are managed on the ready **Roles** tab
+(see [role definitions](role-definitions.md#ready-role-screens)), built on the
 [role definitions API](role-definitions.md) (atomic complete-definition save, holders and
-impact, confirmed delete) is available for a downstream editor. The
+impact, confirmed delete), which is also available for a downstream editor. The
 Invitations section provides creation, search, repeat/replace and revocation;
 recipients use a separate sign-in, verification and explicit-consent journey.
 See the [invitation API](../auth/invites.md) for contracts and upgrade requirements. See the

@@ -10,13 +10,7 @@ import { RoleFlags } from './role-flags'
 import { RoleNameCell } from './role-name-cell'
 
 /** The editable roles of the organization: essentials in columns, detail on the role page. */
-export function RoleTable({
-  rows,
-  roleHref,
-}: {
-  rows: RoleSummary[]
-  roleHref: (roleId: string) => string
-}) {
+export function RoleTable({ rows }: { rows: RoleSummary[] }) {
   const t = useTranslations('organizationRoles')
   const access = (row: RoleSummary) =>
     row.ruleCount > 0 ? t('rules', { count: row.ruleCount }) : t('noRules')
@@ -37,7 +31,7 @@ export function RoleTable({
             {rows.map((row) => (
               <TableRow key={row.id} className="border-line-soft">
                 <TableCell className="max-w-sm whitespace-normal">
-                  <RoleNameCell role={row} href={roleHref(row.id)} />
+                  <RoleNameCell role={row} />
                 </TableCell>
                 <TableCell>{access(row)}</TableCell>
                 <TableCell>{holders(row)}</TableCell>
@@ -53,7 +47,7 @@ export function RoleTable({
         {rows.map((row) => (
           <Card key={row.id}>
             <CardContent className="space-y-3">
-              <RoleNameCell role={row} href={roleHref(row.id)} />
+              <RoleNameCell role={row} />
               <p className="text-sm text-muted-foreground">
                 {access(row)} · {holders(row)}
               </p>

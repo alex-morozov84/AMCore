@@ -193,6 +193,8 @@ export function InvitationForm({
                 system: t('system'),
                 custom: t('custom'),
                 noDescription: t('noDescription'),
+                details: t('roleDetails'),
+                detailsFor: (name) => t('roleDetailsFor', { name }),
                 empty: t('emptyRoles'),
               }}
               regionLabels={{

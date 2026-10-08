@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import type { ProductAccessBootstrap } from '@amcore/shared'
 
 import { useOrganizationContext } from '@/entities/organization-context'
+import { roleHrefUnder, RoleLinkProvider } from '@/shared/lib/role-links'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { BackLink } from '@/shared/ui/back-link'
@@ -99,17 +100,19 @@ export function OrganizationInvitationsClient({
           </Button>
         </div>
       )}
-      <OrganizationInvitations
-        key={`${admission.binding}:${organizationId}`}
-        controller={access.controller}
-        authorityStatus={permissionDenied ? 'denied' : access.state.status}
-        query={query}
-        onQueryChange={(next, reason) => {
-          const href = invitationListHref(invitationsHref, next)
-          if (reason === 'page') router.push(href, { scroll: false })
-          else router.replace(href, { scroll: false })
-        }}
-      />
+      <RoleLinkProvider roleHref={roleHrefUnder(rolesHref)}>
+        <OrganizationInvitations
+          key={`${admission.binding}:${organizationId}`}
+          controller={access.controller}
+          authorityStatus={permissionDenied ? 'denied' : access.state.status}
+          query={query}
+          onQueryChange={(next, reason) => {
+            const href = invitationListHref(invitationsHref, next)
+            if (reason === 'page') router.push(href, { scroll: false })
+            else router.replace(href, { scroll: false })
+          }}
+        />
+      </RoleLinkProvider>
       <noscript>
         <p>{t('javascriptRequired')}</p>
       </noscript>

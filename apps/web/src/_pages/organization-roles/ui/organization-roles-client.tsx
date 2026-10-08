@@ -3,6 +3,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import type { ProductAccessBootstrap } from '@amcore/shared'
 
 import { useOrganizationContext } from '@/entities/organization-context'
+import { roleHrefUnder, RoleLinkProvider } from '@/shared/lib/role-links'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { BackLink } from '@/shared/ui/back-link'
@@ -30,7 +31,7 @@ export function OrganizationRolesClient({
 }) {
   const router = useRouteProgressRouter()
   // A role page is the child route of the roles tab; strings (not functions) cross the server boundary.
-  const roleHref = (roleId: string) => `${hrefs.roles}/${encodeURIComponent(roleId)}`
+  const roleHref = roleHrefUnder(hrefs.roles)!
   const locale = useLocale()
   const t = useTranslations('organizationRoles')
   const access = useOrganizationContext(admission.binding, {
@@ -55,18 +56,19 @@ export function OrganizationRolesClient({
       {access.state.status === 'ready' && !allowed ? (
         <p role="status">{t('denied')}</p>
       ) : (
-        <OrganizationRoles
-          key={`${admission.binding}:${organizationId}`}
-          controller={access.controller}
-          query={query}
-          roleHref={roleHref}
-          onOpenRole={(roleId) => router.push(roleHref(roleId))}
-          onQueryChange={(next, reason) => {
-            const href = roleListHref(hrefs.roles, next)
-            if (reason === 'page') router.push(href, { scroll: false })
-            else router.replace(href, { scroll: false })
-          }}
-        />
+        <RoleLinkProvider roleHref={roleHref}>
+          <OrganizationRoles
+            key={`${admission.binding}:${organizationId}`}
+            controller={access.controller}
+            query={query}
+            onOpenRole={(roleId) => router.push(roleHref(roleId))}
+            onQueryChange={(next, reason) => {
+              const href = roleListHref(hrefs.roles, next)
+              if (reason === 'page') router.push(href, { scroll: false })
+              else router.replace(href, { scroll: false })
+            }}
+          />
+        </RoleLinkProvider>
       )}
       {Boolean(access.state.error) && (
         <Button

@@ -28,13 +28,11 @@ export function OrganizationRoles({
   controller,
   query,
   onQueryChange,
-  roleHref,
   onOpenRole,
 }: {
   controller: OrganizationAccessController
   query: Query
   onQueryChange: (query: Query, reason: 'search' | 'page') => void
-  roleHref: (roleId: string) => string
   onOpenRole: (roleId: string) => void
 }) {
   const t = useTranslations('organizationRoles')
@@ -100,8 +98,8 @@ export function OrganizationRoles({
             <p aria-live="polite" className="text-sm text-foreground-muted">
               {t('count', { count: data.total })}
             </p>
-            <BuiltinRoles rows={builtin} roleHref={roleHref} />
-            <CustomRoles rows={custom} search={query.search} roleHref={roleHref} />
+            <BuiltinRoles rows={builtin} />
+            <CustomRoles rows={custom} search={query.search} />
           </div>
         )}
       </div>
@@ -131,11 +129,9 @@ export function OrganizationRoles({
 function CustomRoles({
   rows,
   search,
-  roleHref,
 }: {
   rows: React.ComponentProps<typeof RoleTable>['rows']
   search: string
-  roleHref: (roleId: string) => string
 }) {
   const t = useTranslations('organizationRoles')
   return (
@@ -144,7 +140,7 @@ function CustomRoles({
         {t('customTitle')}
       </h3>
       {rows.length > 0 ? (
-        <RoleTable rows={rows} roleHref={roleHref} />
+        <RoleTable rows={rows} />
       ) : (
         <p className="text-sm text-muted-foreground">
           {search ? t('emptySearch') : t('customEmpty')}

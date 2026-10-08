@@ -3,6 +3,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import type { ProductAccessBootstrap } from '@amcore/shared'
 
 import { useOrganizationContext } from '@/entities/organization-context'
+import { roleHrefUnder, RoleLinkProvider } from '@/shared/lib/role-links'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { BackLink } from '@/shared/ui/back-link'
@@ -61,22 +62,24 @@ export function OrganizationMembersClient({
         }}
       />
       <ApiErrorAlert error={access.state.error} />
-      <OrganizationMembers
-        key={`${admission.binding}:${organizationId}`}
-        controller={access.controller}
-        actorId={admission.actor.id}
-        authorityStatus={access.state.status}
-        query={query}
-        onQueryChange={
-          membersHref
-            ? (next, reason) => {
-                const href = memberListHref(membersHref, next)
-                if (reason === 'page') router.push(href, { scroll: false })
-                else router.replace(href, { scroll: false })
-              }
-            : undefined
-        }
-      />
+      <RoleLinkProvider roleHref={roleHrefUnder(rolesHref)}>
+        <OrganizationMembers
+          key={`${admission.binding}:${organizationId}`}
+          controller={access.controller}
+          actorId={admission.actor.id}
+          authorityStatus={access.state.status}
+          query={query}
+          onQueryChange={
+            membersHref
+              ? (next, reason) => {
+                  const href = memberListHref(membersHref, next)
+                  if (reason === 'page') router.push(href, { scroll: false })
+                  else router.replace(href, { scroll: false })
+                }
+              : undefined
+          }
+        />
+      </RoleLinkProvider>
       {access.state.status === 'ready' && !allowed && <p role="status">{t('denied')}</p>}
       {Boolean(access.state.error) && (
         <Button

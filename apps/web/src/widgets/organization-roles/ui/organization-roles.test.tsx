@@ -3,6 +3,8 @@ import { DEFAULT_LOCALE, type RoleSummary } from '@amcore/shared'
 import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { RoleLinkProvider } from '@/shared/lib/role-links'
+
 import messages from '../../../../messages/en.json'
 
 import { OrganizationRoles } from './organization-roles'
@@ -53,13 +55,14 @@ function available(data: RoleSummary[], total = data.length) {
 function view(query = { page: 1, search: '' }, change = vi.fn()) {
   return (
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
-      <OrganizationRoles
-        controller={controller}
-        query={query}
-        onQueryChange={change}
-        roleHref={(id) => `/roles/${id}`}
-        onOpenRole={vi.fn()}
-      />
+      <RoleLinkProvider roleHref={(id) => `/roles/${id}`}>
+        <OrganizationRoles
+          controller={controller}
+          query={query}
+          onQueryChange={change}
+          onOpenRole={vi.fn()}
+        />
+      </RoleLinkProvider>
     </NextIntlClientProvider>
   )
 }

@@ -2,10 +2,11 @@
 
 Organization administrators manage custom roles through **role definitions**: a role's
 metadata and its complete selection of catalogue presets, saved as one atomic command and
-fenced by the organization revision. This guide documents the API and headless contract. A
-ready role-editor screen is not part of this release; build your own presentation on these
-routes, and keep reading the [capability catalogue](../auth/capability-catalogue.md) to
-register the operations your product offers.
+fenced by the organization revision. This guide documents the API, the headless contract and
+the [ready Roles screens](#ready-role-screens) built on them. Use the ready screens as they are,
+replace their presentation, or build your own on the same entity hooks; keep reading the
+[capability catalogue](../auth/capability-catalogue.md) to register the operations your product
+offers.
 
 ## Who may use it
 
@@ -272,6 +273,59 @@ until the next successful read, delete, the absence of any bearer credential in 
 accessibility through the real BFF. The example gates cached rows, the editor and every command
 on `available`, and keeps its draft keyed to the session, organization, role and snapshot
 revision. No sample route is added to the starter.
+
+## Ready role screens
+
+Organization administrators with full team access get a fourth organization tab, **Roles**, next to
+Overview, Members and Invitations. The four tabs come from one navigation widget that shows a tab only
+when its destination is passed, so a downstream app can leave one out.
+
+- `/organizations/[id]/roles` lists the roles. Built-in roles (ADMIN, MEMBER, VIEWER) are a separate
+  read-only block. Custom roles are a table with name and a two-line description, rule count, holders
+  and notes (**Advanced rules**, **Full control**), with name search and pages of 20. **Create role**
+  asks for a name and an optional description and opens the new role.
+- `/organizations/[id]/roles/[roleId]` is one role: details, **Capabilities** grouped by area with
+  one checkbox per level the descriptor offers (own, assigned, all), the read-only **Advanced rules**,
+  the people who hold the role, and a separate delete card. People are a sample of at most 10, the
+  total, a **Show all** link to the Members tab narrowed to this role (`?role=<roleId>`, which uses
+  the optional `roleId` filter of `GET /members`) and a highlighted count of pending invitations that
+  use the role. Role assignment itself stays on the Members tab.
+- Built-in roles and roles too large to edit open read-only; the page says why.
+
+**Advanced rules** are stored rules the editor does not manage: field-limited reads, conditions,
+explicit denies, rules on subjects outside the catalogue. A developer sets them up in code, a
+migration or the legacy role-permission API. The editor shows them and leaves them unchanged on every
+save; it has no builder for them.
+
+Safe behavior built in, which a replacement screen should keep: edits stay in a draft that remembers
+the revision it started from, so a change made elsewhere shows as a conflict with **Review current
+version** and never overwrites; adding **Full control** and changing a role you hold need explicit
+confirmation; leaving with unsaved changes asks first; deleting names the people and invitations
+affected and asks for an acknowledgment only when something is affected; an unknown result is never
+replayed. A background reread or an authority recheck keeps the editor and its draft in place.
+
+**Wording for your capabilities.** Every descriptor `labelKey` needs
+`organizationRoles.capabilities.<labelKey>.label` and `.description` in every catalogue, its subject
+needs `organizationRoles.areas.<Subject>` and each preset `organizationRoles.levels.<preset>` and
+`levelHints.<preset>`. A unit test fails when a descriptor of the shipped catalogue lacks any of them;
+a downstream descriptor without wording still renders, by its id.
+
+**Own and all.** For the Organization subject the two levels behave the same today, because every
+operation is bound to the current organization. The difference becomes real for record types you add.
+Role names and descriptions are what the administrator typed and are not translated.
+
+**Linking to a role page.** Role badges (for example on the Members tab) and the role pickers of the
+member and invitation dialogs link to the role page when a page provides its address once with
+`RoleLinkProvider` (`@/shared/lib/role-links`); components below read it with `useRoleHref()`. Without a
+provider nothing links, so every ready component also works in a headless composition and a custom
+screen can supply another address or ignore the context. Picker links open a new tab so a selection in
+progress is not lost.
+
+**Routes in the app.** `app/[locale]/(organization-access)/organizations/[id]/roles/page.tsx` and
+`.../roles/[roleId]/page.tsx` render `OrganizationRolesMount` and `OrganizationRoleMount` from the
+composition layer's public server entry; placement provides `rolesHref(id)` and
+`roleHref(id, roleId)`. To try the screens with a large organization, run
+`pnpm stand preview --profile organization-roles` (see [local stands](../operations/local-stands.md)).
 
 ## Build your own editor
 

@@ -21,6 +21,8 @@ export function RoleChecklist(props: {
         custom: t('custom'),
         noDescription: t('noDescription'),
         empty: t('emptyRoles'),
+        details: t('roleDetails'),
+        detailsFor: (name) => t('roleDetailsFor', { name }),
       }}
     />
   )

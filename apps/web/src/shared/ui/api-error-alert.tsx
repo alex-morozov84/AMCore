@@ -34,9 +34,7 @@ export function ApiErrorAlert({ error, className }: ApiErrorAlertProps) {
       <AlertDescription>
         {message}
         {isUnknown && correlationId && (
-          <span className="mt-1 block text-xs opacity-80">
-            {t('correlationHint', { id: correlationId })}
-          </span>
+          <span className="mt-1 block text-xs">{t('correlationHint', { id: correlationId })}</span>
         )}
       </AlertDescription>
     </Alert>
