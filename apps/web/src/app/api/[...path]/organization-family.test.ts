@@ -27,6 +27,7 @@ describe('composed generic organization aliases close before authentication', ()
         ['organizations', 'org-a', 'role-definitions'],
         ['organizations', 'org-a', 'role-definitions', 'role-1', 'deletion'],
         ['organizations', 'org-a', 'capabilities'],
+        ['organizations', 'org-a', 'members', 'user-1', 'access'],
         ['product-access', 'bootstrap'],
         ['other', '..', 'organizations', 'org-a'],
       ]) {

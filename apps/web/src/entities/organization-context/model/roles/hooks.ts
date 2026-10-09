@@ -51,6 +51,18 @@ export function useCapabilityCatalogue(controller: OrganizationAccessController)
   )
 }
 
+/** One member's effective access in this organization, as the server explains it. */
+export function useMemberAccess(controller: OrganizationAccessController, userId: string) {
+  const identity = JSON.stringify([controller.binding, controller.organizationId, userId])
+  return useOrganizationRead(
+    controller,
+    identity,
+    (signal) =>
+      rolesClient.memberAccess(controller.binding, controller.organizationId, userId, signal),
+    { namespace: 'organization-member-access', ...READ }
+  )
+}
+
 export function useRoleDefinitions(
   controller: OrganizationAccessController,
   query: { page: number; search: string }

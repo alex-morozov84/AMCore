@@ -29,6 +29,7 @@ export { useMemberRoleAssignments, useOrganizationMembers } from './model/member
 export {
   useCapabilityCatalogue,
   useCreateRoleDefinition,
+  useMemberAccess,
   useRoleDefinition,
   useRoleDefinitions,
 } from './model/roles/hooks'
