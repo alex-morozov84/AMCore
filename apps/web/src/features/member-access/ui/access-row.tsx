@@ -49,7 +49,7 @@ export function AccessRow({
       <p className="text-sm text-muted-foreground">
         <Explanation item={item} nameOf={nameOf} />
       </p>
-      {!item.baseline && (
+      {!item.baseline && hasWhy(item) && (
         <details className="text-sm">
           <summary className="cursor-pointer font-medium">{t('whyTitle')}</summary>
           <Sources item={item} nameOf={nameOf} />
@@ -89,6 +89,12 @@ function describeText(
 ): string {
   const { names, more } = describeRoles(refs, nameOf, t('roleUnknown'))
   return more > 0 ? `${names.join(', ')} ${t('rolesMore', { count: more })}` : names.join(', ')
+}
+
+/** An item without rule-level sources (a capability added by a product) has no "why" to open. */
+function hasWhy(item: Item): boolean {
+  const why = explainWhy(item)
+  return why.allows.length + why.blocks.length + why.needs.length > 0 || item.sourcesTruncated
 }
 
 function Sources({ item, nameOf }: { item: Item; nameOf: (id: string) => string | undefined }) {

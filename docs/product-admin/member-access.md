@@ -102,11 +102,18 @@ block an item (a ban always beats an allow); prerequisites such as reading the o
 is missing. Rules outside the catalogue are one collapsed note, **Other permissions in roles**. It shows a loading state, hides the answer when a
 read fails (never stale facts) and keeps what it shows during a background reread.
 
-## Your own capabilities
+## Capabilities your product adds
 
-An item appears for every capability in the catalogue. The decision comes from the capability's
-`record` entry in the registry, and the hint from its `actor` entry, so a downstream capability that
-publishes those gets decisions and per-role attribution without more code. Rule-level `sources` are
-produced for the built-in organization and team-access capabilities; a downstream capability shows its
-decision and the roles that grant or block it, without the rule list. Wording for a capability comes
-from the same `organizationRoles.capabilities.<labelKey>` keys the role editor uses.
+The explanation is generic only in part. For a capability you add to `CAPABILITY_CATALOGUE`:
+
+- **The role editor** lists it automatically, under its subject's area, with its presets, once its label keys exist.
+- **This view** lists it too, but the decision comes from the registry: `CapabilityRegistry.record()` must return an
+  entry for it. Today `record()` evaluates the **organization row** of the current organization and returns fixed
+  entries for the four built-in operations; a capability about another subject (for example products) is shown as
+  not allowed until you extend `record()` for it, and a decision that depends on a particular record (own or
+  assigned products) cannot be answered for a person without choosing one. Do not rely on this view for such
+  operations until that extension exists.
+- Which roles allow it and which block it are worked out for any capability. The rule-level **Why** list exists only
+  for the built-in organization and team-access operations; for others the row names the roles and has no **Why**.
+
+Wording comes from the same `organizationRoles.capabilities.<labelKey>` keys the role editor uses.

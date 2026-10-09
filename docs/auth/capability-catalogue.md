@@ -95,11 +95,11 @@ explicitly registered the operation it belongs to** in `CAPABILITY_CATALOGUE` an
 (steps below). Nothing is discovered automatically: a rule that merely exists in a role keeps working, but it is
 not part of the screens' vocabulary.
 
-| The rule is…                                                                                    | Role editor                                           | Member **Access** view                                         |
-| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
-| A catalogued operation at a preset level (own, assigned, all)                                   | Editable checkbox with its label                      | Listed under its area with the roles that allow or block it    |
-| A catalogued operation's field limits, a condition, or an explicit deny                         | Read-only under **Advanced rules**, preserved on save | Explained exactly (allowed, blocked, who blocks); not editable |
-| On a subject or action with no catalogue entry (for example a member's own profile in `MEMBER`) | Read-only under **Advanced rules**, preserved on save | Not explained: counted once as **Other permissions in roles**  |
+| The rule is…                                                                                    | Role editor                                           | Member **Access** view                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A catalogued operation at a preset level (own, assigned, all)                                   | Editable checkbox with its label                      | Listed under its area when the registry's `record()' answers for it (see [capabilities your product adds](../product-admin/member-access.md#capabilities-your-product-adds)) |
+| A catalogued operation's field limits, a condition, or an explicit deny                         | Read-only under **Advanced rules**, preserved on save | Explained exactly (allowed, blocked, who blocks); not editable                                                                                                               |
+| On a subject or action with no catalogue entry (for example a member's own profile in `MEMBER`) | Read-only under **Advanced rules**, preserved on save | Not explained: counted once as **Other permissions in roles**                                                                                                                |
 
 The screens never hide such a rule from the server's decisions; they only do not describe it. To make a
 permission appear in both places with a human label, register it as described in the next section: it needs a real

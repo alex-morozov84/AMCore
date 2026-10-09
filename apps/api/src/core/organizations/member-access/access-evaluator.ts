@@ -158,10 +158,12 @@ function item(
       grantedBy: null,
       vetoedBy: null,
     }
-  // Blocked means: it would be granted without the blocking rules. This also covers an ability that
-  // needs several roles together (one gives delete, another gives team control) and is blocked.
+  // Blocked means: it would be granted without the blocking rules. A single role that would grant it
+  // alone proves that for any capability; the rule-level check also covers an ability that needs several
+  // roles together (one gives delete, another gives team control) and is blocked.
   const vetoed =
-    found.vetoRules.length > 0 && withoutRules(new Set(found.vetoRules))[spec.key] === true
+    alone.length > 0 ||
+    (found.vetoRules.length > 0 && withoutRules(new Set(found.vetoRules))[spec.key] === true)
   return {
     ...common,
     reason: vetoed ? 'vetoed' : found.directAllow ? 'missingPrerequisite' : 'noGrant',
