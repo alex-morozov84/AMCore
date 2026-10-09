@@ -31,6 +31,23 @@ git -C "$fixture_root" apply \
   "$source_root/scripts/fixtures/t024-capability-extension.patch"
 chmod +x "$fixture_root/fixture-bin/pnpm"
 
+# A product registers copy for its capabilities in every web catalogue it keeps. The fixture does the
+# same for whichever catalogues this checkout has (a fork may keep one locale, or others).
+node -e '
+  const fs = require("node:fs")
+  const dir = process.argv[1] + "/apps/web/messages"
+  const copy = {
+    fixtureOrderRead: { label: "View orders", description: "See the orders in this organization." },
+    fixtureOrderUpdate: { label: "Edit orders", description: "Change the status and the note of orders." },
+  }
+  for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".json"))) {
+    const json = JSON.parse(fs.readFileSync(dir + "/" + file, "utf8"))
+    Object.assign(json.organizationRoles.capabilities, copy)
+    json.organizationRoles.areas.FixtureOrder = "Orders"
+    fs.writeFileSync(dir + "/" + file, JSON.stringify(json, null, 2) + "\n")
+  }
+' "$fixture_root"
+
 (cd "$fixture_root/packages/shared" && ./node_modules/.bin/tsup)
 (cd "$fixture_root/apps/api" && ./node_modules/.bin/prisma generate)
 (cd "$fixture_root/apps/api" && ./node_modules/.bin/tsc --noEmit)
