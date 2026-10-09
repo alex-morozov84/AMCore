@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
 import {
@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@/shared/ui/dialog'
 import { RoleBadges } from '@/shared/ui/role-badges'
+import { SearchField } from '@/shared/ui/search-field'
 import { Skeleton } from '@/shared/ui/skeleton'
 
 import {
@@ -31,6 +32,11 @@ import {
 
 import { AccessNotes, OtherPermissions } from './access-notes'
 import { AccessRow, CompactAccessRow } from './access-row'
+
+/** Above this many listed items the list gets a search and collapsible areas. */
+const LARGE_LIST = 12
+/** An area with at most this many items stays open without a search. */
+const SMALL_AREA = 5
 
 /**
  * What one member can do in this organization and why, as the server works it out from the same
@@ -50,6 +56,8 @@ export function MemberAccessDialog({
   const t = useTranslations('memberAccess')
   const text = useCatalogueText()
   const heading = useRef<HTMLHeadingElement>(null)
+  const searchId = useId()
+  const [query, setQuery] = useState('')
   const read = useMemberAccess(controller, userId)
   const catalogue = useCapabilityCatalogue(controller)
   const access = read.error ? undefined : read.data
@@ -89,6 +97,11 @@ export function MemberAccessDialog({
         )
       : undefined
   const counts = summaryCounts(parts?.active ?? [])
+  const large = (parts?.active.length ?? 0) > LARGE_LIST
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const shown = (parts?.active ?? []).filter((item) =>
+    words.every((word) => labelOf(item.key).toLowerCase().includes(word))
+  )
   const hasConfigured = parts?.active.some((item) => item.evaluation === 'configured') ?? false
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -144,12 +157,42 @@ export function MemberAccessDialog({
                 {hasConfigured && (
                   <p className="text-sm text-muted-foreground">{t('configuredNote')}</p>
                 )}
-                {groupByArea(parts.active, capabilities).map(([area, items]) => (
-                  <div key={area} className="space-y-2">
-                    <h4 className="text-sm font-semibold">{text.area(area)}</h4>
-                    <ul className="space-y-2">{items.map(row)}</ul>
-                  </div>
-                ))}
+                {large && (
+                  <SearchField
+                    id={searchId}
+                    name="access-search"
+                    value={query}
+                    onValueChange={setQuery}
+                    onClear={() => setQuery('')}
+                    label={t('searchLabel')}
+                    placeholder={t('searchPlaceholder')}
+                    clearLabel={t('searchClear')}
+                  />
+                )}
+                {large && shown.length === 0 && (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {t('noMatches')}
+                  </p>
+                )}
+                {groupByArea(shown, capabilities).map(([area, items]) =>
+                  large ? (
+                    <details
+                      key={area}
+                      open={query.trim() !== '' || items.length <= SMALL_AREA}
+                      className="rounded-lg border border-border p-3"
+                    >
+                      <summary className="cursor-pointer text-sm font-semibold">
+                        {t('areaCount', { area: text.area(area), count: items.length })}
+                      </summary>
+                      <ul className="mt-2 space-y-2">{items.map(row)}</ul>
+                    </details>
+                  ) : (
+                    <div key={area} className="space-y-2">
+                      <h4 className="text-sm font-semibold">{text.area(area)}</h4>
+                      <ul className="space-y-2">{items.map(row)}</ul>
+                    </div>
+                  )
+                )}
                 {parts.inactive.length > 0 && (
                   <details className="rounded-lg border border-border p-3 text-sm">
                     <summary className="cursor-pointer font-medium">

@@ -1128,7 +1128,13 @@
     "conflictTitle": "Нужна проверка",
     "unsavedBarTitle": "Несохранённые изменения",
     "holdersViewAll": "Показать всех: {count, plural, one {# человек} few {# человека} many {# человек} other {# человека}}",
-    "javascriptRequired": "Для управления ролями нужен JavaScript. Включите его и перезагрузите страницу."
+    "javascriptRequired": "Для управления ролями нужен JavaScript. Включите его и перезагрузите страницу.",
+    "capabilitySearch": "Поиск по возможностям",
+    "capabilitySearchPlaceholder": "Поиск по названию или области",
+    "capabilitySearchClear": "Очистить поиск",
+    "onlyConfigured": "Только настроенные",
+    "areaConfigured": "Настроено: {configured} из {total}",
+    "noCapabilityMatches": "Ничего не найдено."
   },
   "memberAccess": {
     "title": "Доступ",
@@ -1225,6 +1231,10 @@
       "restricts": "Может исключать часть записей: {roles}",
       "blocks": "Блокирует: {roles}",
       "blocksVia": "Блокирует: {roles} ({via})"
-    }
+    },
+    "searchLabel": "Поиск по списку",
+    "searchPlaceholder": "Поиск по названию",
+    "searchClear": "Очистить поиск",
+    "noMatches": "Ничего не найдено."
   }
 }

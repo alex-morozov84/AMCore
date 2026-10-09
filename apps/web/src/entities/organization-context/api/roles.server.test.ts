@@ -82,19 +82,31 @@ const call = (fetch: ReturnType<typeof setup>['fetch']) => {
   const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
   return { url: new URL(url), init, headers: init.headers as Headers }
 }
-const access = (pad = 0) => ({
-  member: { memberId: 'm1', userId: 'u1', name: 'n'.repeat(pad), email: 'u1@example.test' },
+const access = (pad = 0, glyph = 'n') => ({
+  member: { memberId: 'm1', userId: 'u1', name: glyph.repeat(pad), email: 'u1@example.test' },
   aclVersion: 4,
   scope: 'organization-membership' as const,
   roles: { total: 0, items: [], truncated: false },
   unsafeLinkCount: 0,
   items: [],
-  widening: { status: 'computed' as const, breadth: false, synergy: false, vetoed: false },
+  widening: {
+    status: 'computed' as const,
+    scope: 'exactItems' as const,
+    excludedItems: 0,
+    breadth: false,
+    synergy: false,
+    vetoed: false,
+  },
   uncovered: { ruleCount: 0, roleSample: [] },
   qualifiers: [],
 })
-function accessOfSize(bytes: number) {
-  const value = access(bytes - serializedJsonBytes(access()))
+/** An answer of exactly this many UTF-8 bytes, padded with the given glyph and finished with ASCII. */
+function accessOfSize(bytes: number, glyph = 'n') {
+  const width = Buffer.byteLength(glyph)
+  const base = serializedJsonBytes(access())
+  const count = Math.floor((bytes - base) / width)
+  const value = access(count, glyph)
+  value.member.name += 'n'.repeat(bytes - serializedJsonBytes(value))
   expect(serializedJsonBytes(value)).toBe(bytes)
   return value
 }
@@ -246,6 +258,21 @@ describe('member access read', () => {
       data: { scope: 'organization-membership' },
     })
     const over = setup(() => Response.json(accessOfSize(ACCESS_RESPONSE_BYTES + 1)))
+    await expect(readMemberAccess('org-a', 'user-1', over.input)).rejects.toBeInstanceOf(
+      ContextRequestError
+    )
+  })
+
+  it.each([
+    ['ascii', 'n'],
+    ['two-byte', 'é'],
+    ['four-byte', '😀'],
+  ])('holds the same boundaries with %s text', async (_name, glyph) => {
+    for (const size of [ACCESS_API_RESPONSE_BYTES - 1, ACCESS_API_RESPONSE_BYTES]) {
+      const { input } = setup(() => Response.json(accessOfSize(size, glyph)))
+      await expect(readMemberAccess('org-a', 'user-1', input)).resolves.toBeDefined()
+    }
+    const over = setup(() => Response.json(accessOfSize(ACCESS_RESPONSE_BYTES + 1, glyph)))
     await expect(readMemberAccess('org-a', 'user-1', over.input)).rejects.toBeInstanceOf(
       ContextRequestError
     )

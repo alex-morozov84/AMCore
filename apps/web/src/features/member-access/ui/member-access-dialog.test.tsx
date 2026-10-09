@@ -392,3 +392,65 @@ describe('MemberAccessDialog: capabilities a product registers', () => {
     expect(screen.getByText(t.included)).toBeInTheDocument()
   })
 })
+
+describe('MemberAccessDialog: a long list', () => {
+  const entries = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      ...CAPABILITY_CATALOGUE[0],
+      id: `lot.op${index}`,
+      subject: `Lot${index % 3}`,
+      labelKey: `lotOp${index}`,
+      editableFields: [] as string[],
+    }))
+  const longItems = (count: number): MemberAccess['items'] =>
+    Array.from({ length: count }, (_, index) => ({
+      key: `lot.op${index}`,
+      evaluation: 'configured' as const,
+      baseline: false as const,
+      state: 'configured' as const,
+      areas: [
+        {
+          kind: 'own' as const,
+          roles: { roleIds: ['rA'], total: 1 },
+          fields: null,
+          prerequisite: 'met' as const,
+          masked: false,
+          absorbed: false,
+        },
+      ],
+      limits: [],
+      blockedBy: null,
+      sources: [],
+      sourcesTruncated: false,
+    }))
+  const show = (count: number) => {
+    state.catalogue = {
+      data: { capabilities: [...CAPABILITY_CATALOGUE, ...entries(count)] },
+      ready: true,
+      available: true,
+      pending: false,
+    }
+    state.access = {
+      data: access({ items: longItems(count), uncovered: { ruleCount: 0, roleSample: [] } }),
+      ready: true,
+      available: true,
+      pending: false,
+    }
+    view()
+  }
+
+  it('offers search and collapses big areas once the list is long', () => {
+    show(30)
+    const search = screen.getByRole('textbox', { name: t.searchLabel })
+    expect(document.querySelectorAll('details[open]')).toHaveLength(0)
+    fireEvent.change(search, { target: { value: 'lot.op7' } })
+    expect(document.querySelectorAll('details[open]')).toHaveLength(1)
+    fireEvent.change(search, { target: { value: 'nothing-here' } })
+    expect(screen.getByText(t.noMatches)).toBeInTheDocument()
+  })
+
+  it('keeps a short list as it was: no search, no collapsing', () => {
+    show(4)
+    expect(screen.queryByRole('textbox', { name: t.searchLabel })).toBeNull()
+  })
+})
