@@ -96,6 +96,8 @@ Allow sources name their area and their own prerequisite; deny sources are `veto
 `widening` compares roles and answers "who alone would grant" only for **exact items**; `excludedItems` says
 how many items it did not consider, so no claim is made about configured ones. Configured items name the
 roles that hold each rule, not who would "alone" grant them.
+Configured rule sources include up to five `roleIds` and their true `total`. When rules or role
+references are omitted, `sourcesTruncated` is `true`; the dialog tells the reader the list is incomplete.
 
 ## Limits and errors
 

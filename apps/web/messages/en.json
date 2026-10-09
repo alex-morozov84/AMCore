@@ -1165,7 +1165,7 @@
     "reasonUnknown": "Not allowed.",
     "whyTitle": "Which rules decide this",
     "whyNone": "No rule applies.",
-    "sourcesMore": "More rules apply than are listed.",
+    "sourcesMore": "Some rules or roles were left out of this list.",
     "via": {
       "direct": "this permission",
       "readPrerequisite": "reading the organization, which this needs",

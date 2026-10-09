@@ -99,7 +99,9 @@ export function evaluateConfigured(spec: ItemSpec, ctx: ConfiguredContext): Acce
   })
   const shown = {
     sources: sources.slice(0, ACCESS_CONFIGURED_SOURCES_PER_ITEM),
-    sourcesTruncated: sources.length > ACCESS_CONFIGURED_SOURCES_PER_ITEM,
+    sourcesTruncated:
+      sources.length > ACCESS_CONFIGURED_SOURCES_PER_ITEM ||
+      sources.some((source) => (source.total ?? source.roleIds.length) > source.roleIds.length),
   }
   const byPrerequisite = unmasked.length > 0 && unmasked.every((a) => a.prerequisite === 'blocked')
   const decision = decide(areas, unmasked, limits, masking, byPrerequisite)

@@ -44,7 +44,7 @@ export function collectSources(input: SourceInput): RuleSource[] {
       kind: 'rule',
       via,
       ...(spec.field !== undefined && via === 'direct' && { field: spec.field }),
-      roleIds: roleRefs(rolesByRule.get(rule.id) ?? []).roleIds,
+      ...roleRefs(rolesByRule.get(rule.id) ?? []),
       permissionId: rule.id,
       presetId: detail?.presetId ?? null,
       effect: rule.inverted ? 'deny' : 'allow',

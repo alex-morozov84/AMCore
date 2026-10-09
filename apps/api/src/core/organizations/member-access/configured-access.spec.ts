@@ -41,6 +41,20 @@ const FIELDS = ['name', 'description']
 const OWN = { organizationId: '${user.organizationId}' }
 
 describe('configured items: what the role settings configure', () => {
+  it('retains the true holder count when one permission belongs to more than five roles', () => {
+    const access = explain(
+      Array.from({ length: 6 }, (_, i) => ({
+        id: `R${i}`,
+        rules: [orders('read', 'all', 'rd'), orders('update', 'own', 'up')],
+      }))
+    )
+    const item = configured(access, 'fixtureOrder.update')
+    const source = item.sources.find(
+      (source) => source.kind === 'rule' && source.permissionId === 'up'
+    )
+    expect(source).toMatchObject({ total: 6, roleIds: ['R0', 'R1', 'R2', 'R3', 'R4'] })
+    expect(item.sourcesTruncated).toBe(true)
+  })
   it('keeps distinct normalized date conditions separate for masks and read prerequisites', () => {
     const capability = {
       ...ORDER_UPDATE,

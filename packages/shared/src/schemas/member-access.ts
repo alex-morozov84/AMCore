@@ -66,6 +66,8 @@ export const accessSourceSchema = z.discriminatedUnion('kind', [
     via: accessSourceViaSchema,
     field: z.string().optional(),
     roleIds: z.array(memberIdSchema).max(ACCESS_ROLE_REFS_LIMIT),
+    /** Configured sources include the true role count; record sources keep their existing shape. */
+    total: z.number().int().nonnegative().optional(),
     permissionId: memberIdSchema,
     presetId: z.string().nullable(),
     effect: z.enum(['allow', 'deny']),
@@ -137,6 +139,13 @@ export function configuredInvariants(item: ConfiguredShape): string | undefined 
   const unmasked = areas.filter((area) => !area.masked)
   if (!distinct(areas.map((area) => area.kind))) return 'areaKinds'
   if (!distinct(limits.map((limit) => limit.kind))) return 'limitKinds'
+  if (
+    sources.some(
+      (source) =>
+        source.kind === 'rule' && source.total !== undefined && source.total < source.roleIds.length
+    )
+  )
+    return 'sourceRoleTotal'
   for (const limit of limits) {
     const listed = limit.kind === 'fields' || limit.kind === 'denyFields'
     if (listed !== Boolean(limit.fields?.length)) return 'limitFields'

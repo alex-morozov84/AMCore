@@ -397,6 +397,11 @@ describe('OpenAPI success surface (e2e)', () => {
       'missingPrerequisite',
       'none',
     ])
+    const sources = variants[1]!.properties.sources as unknown as {
+      items: { oneOf: { properties: Record<string, { type?: string }> }[] }
+    }
+    const ruleSource = sources.items.oneOf.find((source) => 'permissionId' in source.properties)
+    expect(ruleSource?.properties.total?.type).toBe('integer')
   })
 
   it('documents invitation role intent, bounded errors and credential boundaries', () => {

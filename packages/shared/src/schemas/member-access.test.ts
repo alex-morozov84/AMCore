@@ -51,6 +51,10 @@ const limit = (kind: AccessLimit['kind'], fields?: string[]): AccessLimit => ({
 const parses = (item: unknown) => accessItemSchema.safeParse(item).success
 
 describe('configured item state matrix', () => {
+  it('rejects a source count smaller than the displayed roles and accepts a bounded sample', () => {
+    expect(parses(configured({ sources: [rule({ total: 0 })] }))).toBe(false)
+    expect(parses(configured({ sources: [rule({ total: 6 })] }))).toBe(true)
+  })
   it('rejects a met area contradicted by a contributing source prerequisite', () => {
     expect(parses(configured({ sources: [rule({ prerequisite: 'unproven' })] }))).toBe(false)
     expect(parses(configured({ sources: [rule({ prerequisite: 'missing' })] }))).toBe(false)
