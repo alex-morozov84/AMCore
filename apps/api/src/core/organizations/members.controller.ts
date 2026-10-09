@@ -160,6 +160,8 @@ export class MembersController {
   @ApiOperation({
     summary:
       "Explain a member's effective access in this organization; full TeamAccess and membership required",
+    description:
+      'Items are of three kinds: `record` (exact decision for the organization row, built-in operations), `configured` (what the role settings configure by independent areas for other registered capabilities, never a proof for one record) and `notEvaluated` (a capability that opted out).',
   })
   @ZodResponse({ type: MemberAccessResponseDto, status: 200 })
   access(

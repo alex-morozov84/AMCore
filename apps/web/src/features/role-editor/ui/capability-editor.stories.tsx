@@ -33,3 +33,26 @@ export const ReadOnly: Story = {
     await expect(checkbox).toHaveAttribute('aria-disabled', 'true')
   },
 }
+
+/** Ten areas of ten capabilities: areas collapse, the search finds across them. */
+export const LargeCatalogue: Story = {
+  args: {
+    capabilities: Array.from({ length: 100 }, (_, index) => ({
+      ...CAPABILITY_CATALOGUE[1],
+      id: `area${Math.floor(index / 10)}.op${index}`,
+      subject: `Area${Math.floor(index / 10)}`,
+      labelKey: `op${index}`,
+      editableFields: [],
+    })) as never,
+    keys: ['area2.op25:own'],
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await expect(canvasElement.querySelectorAll('details[open]')).toHaveLength(1)
+    await userEvent.type(canvas.getByRole('textbox', { name: 'Search capabilities' }), 'op77')
+    await expect(canvasElement.querySelectorAll('details[open]')).toHaveLength(1)
+    const group = canvas.getByRole('group', { name: /op77/ })
+    await userEvent.click(within(group).getByRole('checkbox', { name: 'All' }))
+    await expect(args.onToggle).toHaveBeenCalledWith('area7.op77', 'all')
+  },
+}

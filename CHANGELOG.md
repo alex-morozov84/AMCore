@@ -19,9 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Member access explanation**: `GET /organizations/:orgId/members/:userId/access` and an **Access** view on the
   Members tab explain what a member can do in the organization and why, from the same rules and decisions the API
-  uses to authorize: which roles grant each ability, where roles add up to more than any one of them, which deny
-  rule takes something away, and what the summary does not cover. It is bounded (roles, links, rules, bytes) and
-  fails closed with `ROLE_ACCESS_UNAVAILABLE` instead of answering from a partial policy.
+  uses to authorize. Built-in operations get an exact decision; every other registered capability is explained by
+  what the role settings configure, in independent areas (all, assigned, own, custom) with its limits and the
+  reading it needs, and is never presented as proof for one record. A capability can opt out and is then shown as
+  not evaluated, never as not allowed. A downstream domain is connected by the documented registration alone; the
+  role editor and the Access view list it with no UI code, and a long catalogue gains search, collapsible areas and
+  an "only configured" filter. The answer is bounded (roles, links, rules, 600 items, operations, bytes) and fails
+  closed with `ROLE_ACCESS_UNAVAILABLE` instead of answering from a partial policy.
 
 - Role-definition **browser transport and headless hooks**: typed same-origin routes for the
   capability catalogue, role list and snapshot, create, save and confirmed delete, with

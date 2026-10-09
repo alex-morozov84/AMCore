@@ -95,16 +95,22 @@ explicitly registered the operation it belongs to** in `CAPABILITY_CATALOGUE` an
 (steps below). Nothing is discovered automatically: a rule that merely exists in a role keeps working, but it is
 not part of the screens' vocabulary.
 
-| The rule is…                                                                                    | Role editor                                           | Member **Access** view                                                                                                                                                       |
-| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A catalogued operation at a preset level (own, assigned, all)                                   | Editable checkbox with its label                      | Listed under its area when the registry's `record()' answers for it (see [capabilities your product adds](../product-admin/member-access.md#capabilities-your-product-adds)) |
-| A catalogued operation's field limits, a condition, or an explicit deny                         | Read-only under **Advanced rules**, preserved on save | Explained exactly (allowed, blocked, who blocks); not editable                                                                                                               |
-| On a subject or action with no catalogue entry (for example a member's own profile in `MEMBER`) | Read-only under **Advanced rules**, preserved on save | Not explained: counted once as **Other permissions in roles**                                                                                                                |
+| The rule is…                                                                                    | Role editor                                           | Member **Access** view                                                                                                        |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| A catalogued operation at a preset level (own, assigned, all)                                   | Editable checkbox with its label                      | Listed under its area as **configured**: the areas the roles configure, each with its roles and the reading it needs          |
+| A catalogued operation's field limits, a condition, or an explicit deny                         | Read-only under **Advanced rules**, preserved on save | Explained by cause: a field limit, a custom condition, a deny that may exclude records, a deny that blocks fields or the item |
+| A catalogued operation whose adapter sets `access: 'none'`                                      | Editable, as any catalogued operation                 | Listed as **not evaluated**, never as "not allowed"                                                                           |
+| On a subject or action with no catalogue entry (for example a member's own profile in `MEMBER`) | Read-only under **Advanced rules**, preserved on save | Not explained: counted once as **Other permissions in roles**                                                                 |
 
 The screens never hide such a rule from the server's decisions; they only do not describe it. To make a
 permission appear in both places with a human label, register it as described in the next section: it needs a real
 operation (handler, method, path), a registry adapter and label keys. Registering a catalogue entry never grants
 an existing role anything.
+
+What the Access view says about a registered capability is **what the role settings configure**, by independent
+areas (all, assigned, own, custom): it never proves that a member can act on one particular record, and a read at
+another level does not prove the reading an operation needs. See the
+[member access explanation](../product-admin/member-access.md) for the states and limits.
 
 ## Extend a downstream product
 
@@ -133,13 +139,17 @@ an existing role anything.
    to a generic `/can` endpoint or call the server once per button.
 5. Add the label keys the screens read: `organizationRoles.capabilities.<labelKey>.label` and `.description` in every
    web catalogue (and `organizationRoles.areas.<Subject>` for a new subject). The role editor and the member **Access**
-   view then list the new operation with no further UI code.
+   view then list the new operation with no further UI code. Set `access: 'none'` on the adapter only to opt out of
+   the member access explanation (the capability is then shown as not evaluated).
 6. Compile shared, API and web consumers; exercise multiple roles, conditional
    own/assigned/all, DENY, wrong tenant, fields and API-key intersection on
    PostgreSQL. Run `pnpm test:capability-extension` from the repository root:
    it applies a disposable `FixtureOrder` source/migration/controller variant
    in an isolated temporary copy, compiles all three consumers and runs its
-   Testcontainers e2e. The command needs installed dependencies and local Docker.
+   Testcontainers e2e. It also runs, by name and with a floor on the reported counts, the member access journey
+   (register, configure a role through the editor routes, assign, explain, compare with the real handlers on own,
+   assigned and other records; 13 cases) and the catalogue copy parity test (every label key, area and level needs
+   copy in every web catalogue). The command needs installed dependencies and local Docker.
    No fixture model or route ships in the starter. Document the domain's actual
    screens separately.
 
