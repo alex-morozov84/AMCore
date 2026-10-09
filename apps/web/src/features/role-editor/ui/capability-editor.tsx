@@ -3,10 +3,10 @@ import { useId } from 'react'
 import { useTranslations } from 'next-intl'
 import type { CapabilityCatalogueResponse } from '@amcore/shared'
 
+import { useCatalogueText } from '@/entities/organization-context'
 import { Checkbox } from '@/shared/ui/checkbox'
 
 import { presetKey } from '../model/role-draft'
-import { useCatalogueText } from '../model/use-catalogue-text'
 
 type Capability = CapabilityCatalogueResponse['capabilities'][number]
 

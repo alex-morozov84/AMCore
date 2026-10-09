@@ -847,7 +847,9 @@
     "roleFilterUnknown": "Showing people with one role",
     "roleFilterClear": "Show everyone",
     "roleDetails": "Details",
-    "roleDetailsFor": "Open the role {name} in a new tab"
+    "roleDetailsFor": "Open the role {name} in a new tab",
+    "access": "Access",
+    "accessFor": "Show the access of {name}"
   },
   "invitationRecipient": {
     "signInTitle": "Continue your invitation",
@@ -1126,5 +1128,63 @@
     "unsavedBarTitle": "Unsaved changes",
     "holdersViewAll": "Show all {count, plural, one {# person} other {# people}}",
     "javascriptRequired": "Managing roles requires JavaScript. Enable it and reload this page."
+  },
+  "memberAccess": {
+    "title": "Access",
+    "description": "What this person can do in this organization, worked out from their roles.",
+    "loading": "Loading access",
+    "retry": "Try again",
+    "close": "Close",
+    "rolesTitle": "Roles",
+    "rolesNone": "No roles. Only the access that comes with membership applies.",
+    "rolesMore": "and {count} more",
+    "qualifierSuperAdmin": "This person is also a platform administrator. This summary covers only what organization membership gives; platform access is separate.",
+    "unsafeLinks": "{count, plural, one {# role link points} other {# role links point}} to roles of another organization. They are ignored.",
+    "uncovered": "{count, plural, one {# rule is} other {# rules are}} outside this summary, for example reading or editing the person's own profile.",
+    "uncoveredRoles": "Found in: {roles}",
+    "wideningUnavailable": "A breakdown by role is not available because this person has many roles or rules. What they can do is still exact.",
+    "breadth": "Together, these roles allow more than any single role does.",
+    "synergy": "Some access exists only because of the combination of roles.",
+    "vetoed": "A deny rule in one role takes away access that another role would give.",
+    "itemsTitle": "What this person can do",
+    "allowed": "Allowed",
+    "notAllowed": "Not allowed",
+    "blocked": "Blocked",
+    "included": "Included with membership",
+    "baselineNote": "Every member can view the organization.",
+    "originSingle": "Allowed by {roles}",
+    "originCombined": "Allowed only by the combination of roles.",
+    "reasonNoGrant": "No role allows this.",
+    "reasonVetoed": "Allowed by {granted}, but blocked by {blockers}.",
+    "reasonMissing": "A role allows this, but something it depends on is missing. For example, deleting also needs team control.",
+    "reasonUnknown": "Not allowed.",
+    "recordDependent": "Applies only to some records.",
+    "whyTitle": "Why?",
+    "whyNone": "No rule applies.",
+    "sourcesMore": "More rules apply than are listed.",
+    "effect": {
+      "allow": "Allows",
+      "deny": "Denies"
+    },
+    "status": {
+      "contributes": "gives access",
+      "vetoes": "blocks",
+      "overridden": "overruled"
+    },
+    "via": {
+      "direct": "Rule on this item",
+      "readPrerequisite": "Reading the organization",
+      "deletePrerequisite": "Delete rule",
+      "teamAccessGate": "Team control",
+      "teamAccessVeto": "Deny rule on team, roles, permissions or users"
+    },
+    "sourceRoles": "Roles: {roles}",
+    "roleUnknown": "another role",
+    "fieldOf": "{capability}: {field}",
+    "fields": {
+      "name": "Name",
+      "slug": "Address"
+    },
+    "unavailable": "Access could not be loaded. Nothing was changed."
   }
 }

@@ -14,11 +14,13 @@ export function MemberTable({
   actorId,
   disabled,
   onEdit,
+  onAccess,
 }: {
   rows: Row[]
   actorId: string
   disabled: boolean
   onEdit: (userId: string) => void
+  onAccess: (userId: string) => void
 }) {
   const t = useTranslations('organizationMembers')
   const format = useFormatter()
@@ -46,9 +48,19 @@ export function MemberTable({
     </div>
   )
   const edit = (row: Row) => (
-    <Button variant="outline" disabled={disabled} onClick={() => onEdit(row.user.id)}>
-      {t('edit')}
-    </Button>
+    <div className="flex flex-wrap gap-2">
+      <Button variant="outline" disabled={disabled} onClick={() => onEdit(row.user.id)}>
+        {t('edit')}
+      </Button>
+      <Button
+        variant="outline"
+        disabled={disabled}
+        aria-label={t('accessFor', { name: row.user.name ?? row.user.email })}
+        onClick={() => onAccess(row.user.id)}
+      >
+        {t('access')}
+      </Button>
+    </div>
   )
   return (
     <>

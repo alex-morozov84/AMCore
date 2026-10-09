@@ -34,4 +34,5 @@ export {
   useRoleDefinitions,
 } from './model/roles/hooks'
 export type { RoleCreateOutcome, RoleDeleteOutcome, RoleSaveOutcome } from './model/roles/outcomes'
+export { useCatalogueText } from './model/use-catalogue-text'
 export { useOrganizationContext } from './model/use-organization-context'
