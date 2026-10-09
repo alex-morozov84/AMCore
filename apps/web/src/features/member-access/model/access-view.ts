@@ -1,19 +1,26 @@
-import type { MemberAccess } from '@amcore/shared'
+import type { AccessConfiguredItem, AccessRecordItem, MemberAccess } from '@amcore/shared'
 
 type Item = MemberAccess['items'][number]
-type RoleRefs = NonNullable<Item['reachedBy']>
 
 /** How a row reads at a glance. */
-export type Tone = 'included' | 'allowed' | 'blocked' | 'denied'
+export type Tone =
+  'included' | 'allowed' | 'configured' | 'blocked' | 'ineffective' | 'denied' | 'unknown'
 
-export const toneOf = (item: Item): Tone =>
-  item.baseline
-    ? 'included'
-    : item.granted
-      ? 'allowed'
-      : item.reason === 'vetoed'
-        ? 'blocked'
-        : 'denied'
+const CONFIGURED_TONE: Record<AccessConfiguredItem['state'], Tone> = {
+  allowed: 'allowed',
+  configured: 'configured',
+  blocked: 'blocked',
+  missingPrerequisite: 'ineffective',
+  none: 'denied',
+}
+
+export function toneOf(item: Item): Tone {
+  if (item.evaluation === 'notEvaluated') return 'unknown'
+  if (item.evaluation === 'configured') return CONFIGURED_TONE[item.state]
+  if (item.baseline) return 'included'
+  if (item.granted) return 'allowed'
+  return item.reason === 'vetoed' ? 'blocked' : 'denied'
+}
 
 /**
  * Splits an item key into its capability and optional field. Capability ids contain dots
@@ -39,7 +46,7 @@ export function roleNamer(access: MemberAccess): (id: string) => string | undefi
 
 /** The visible names of a bounded role set, how many more exist, and whether any was unnamed. */
 export function describeRoles(
-  refs: RoleRefs | null,
+  refs: { roleIds: readonly string[]; total: number } | null,
   nameOf: (id: string) => string | undefined,
   unknown: string
 ): { names: string[]; more: number } {
@@ -61,28 +68,37 @@ export function wideningNotes(access: MemberAccess): ('breadth' | 'synergy' | 'v
 }
 
 /**
- * What a reader needs first: everything the person can do or is blocked from, and, apart, what no
- * role gives them. A per-field line is dropped when the whole operation and that field are both allowed (it would
- * only repeat it); a field that is blocked while the rest is allowed always stays, and per-field lines of an operation that is not allowed stay out of the "not allowed"
- * group, so the list does not grow with every field a downstream capability declares.
+ * What a reader needs first: everything the person can do, is configured for or is blocked from;
+ * apart, what no role gives them; and, in their own group, what the product did not evaluate (never
+ * "not allowed"). A per-field line of an exact item is dropped when the whole operation and that
+ * field are both allowed (it would only repeat it); the server already omits redundant lines of
+ * configured items. Per-field lines of an operation that is not allowed stay out of the "not
+ * allowed" group, so the list does not grow with every field a downstream capability declares.
  */
 export function splitItems(
   items: readonly Item[],
   ids: readonly string[]
-): { active: Item[]; inactive: Item[] } {
+): { active: Item[]; inactive: Item[]; notEvaluated: Item[] } {
   const parts = new Map(items.map((item) => [item.key, capabilityOf(item.key, ids)]))
   const allowedWhole = new Set(
-    items.filter((item) => item.granted && !parts.get(item.key)?.field).map((item) => item.key)
+    items
+      .filter((item) => item.evaluation === 'record' && item.granted && !parts.get(item.key)?.field)
+      .map((item) => item.key)
   )
   const active: Item[] = []
   const inactive: Item[] = []
+  const notEvaluated: Item[] = []
   for (const item of items) {
     const part = parts.get(item.key)
-    if (part?.field && item.granted && allowedWhole.has(part.id)) continue
-    if (item.baseline || item.granted || item.reason === 'vetoed') active.push(item)
+    if (item.evaluation === 'notEvaluated') notEvaluated.push(item)
+    else if (item.evaluation === 'configured') {
+      if (item.state !== 'none') active.push(item)
+      else if (!part?.field) inactive.push(item)
+    } else if (part?.field && item.granted && allowedWhole.has(part.id)) continue
+    else if (item.baseline || item.granted || item.reason === 'vetoed') active.push(item)
     else if (!part?.field) inactive.push(item)
   }
-  return { active, inactive }
+  return { active, inactive, notEvaluated }
 }
 
 /** Groups items by the area (subject) of their capability, keeping the catalogue order. */
@@ -111,7 +127,13 @@ export function mergeSources(sources: readonly Source[]): (RuleSource & { roleId
   const merged = new Map<string, RuleSource & { roleIds: string[] }>()
   for (const source of sources) {
     if (source.kind !== 'rule') continue
-    const key = [source.effect, source.status, source.via, source.field ?? ''].join('|')
+    const key = [
+      source.effect,
+      source.status,
+      source.via,
+      source.field ?? '',
+      source.area ?? '',
+    ].join('|')
     const found = merged.get(key)
     if (found) found.roleIds = [...new Set([...found.roleIds, ...source.roleIds])]
     else merged.set(key, { ...source, roleIds: [...source.roleIds] })
@@ -128,12 +150,16 @@ export interface WhyLine {
 }
 
 /**
- * The reasons for a decision in the words a reader needs: who allows it, who blocks it, and, only when
- * the decision fails for lack of a prerequisite, which prerequisites were looked at. Prerequisites that
- * are met (reading the organization, team control) are the same for nearly everyone and explain
- * nothing, so they are left out.
+ * The reasons for an exact decision in the words a reader needs: who allows it, who blocks it, and,
+ * only when the decision fails for lack of a prerequisite, which prerequisites were looked at.
+ * Prerequisites that are met (reading the organization, team control) are the same for nearly
+ * everyone and explain nothing, so they are left out.
  */
-export function explainWhy(item: Item): { allows: WhyLine[]; blocks: WhyLine[]; needs: WhyLine[] } {
+export function explainWhy(item: AccessRecordItem): {
+  allows: WhyLine[]
+  blocks: WhyLine[]
+  needs: WhyLine[]
+} {
   const allows: WhyLine[] = []
   const blocks: WhyLine[] = []
   const needs: WhyLine[] = []
@@ -147,4 +173,46 @@ export function explainWhy(item: Item): { allows: WhyLine[]; blocks: WhyLine[]; 
     else needs.push(line)
   }
   return { allows, blocks, needs: item.reason === 'missingPrerequisite' ? needs : [] }
+}
+
+/** What a configured row's rules say, per area and cause, ready to be worded. */
+export type ConfiguredWhyKind = 'allows' | 'overridden' | 'blocks' | 'restricts'
+export interface ConfiguredWhyLine extends WhyLine {
+  kind: ConfiguredWhyKind
+  area: 'all' | 'assigned' | 'own' | 'custom' | null
+}
+
+export function configuredWhy(item: AccessConfiguredItem): ConfiguredWhyLine[] {
+  return mergeSources(item.sources).map((source) => {
+    const kind: ConfiguredWhyKind =
+      source.effect === 'deny'
+        ? source.status === 'vetoes'
+          ? 'blocks'
+          : 'restricts'
+        : source.status === 'overridden'
+          ? 'overridden'
+          : 'allows'
+    return {
+      kind,
+      area: source.area ?? null,
+      roleIds: source.roleIds,
+      ...(source.via === 'direct' ? {} : { via: source.via }),
+    }
+  })
+}
+
+/** The counts a reader gets above the list: what is allowed, configured for some records, blocked. */
+export function summaryCounts(active: readonly Item[]): {
+  allowed: number
+  configured: number
+  blocked: number
+} {
+  const counts = { allowed: 0, configured: 0, blocked: 0 }
+  for (const item of active) {
+    const tone = toneOf(item)
+    if (tone === 'allowed' && !item.baseline) counts.allowed += 1
+    else if (tone === 'configured') counts.configured += 1
+    else if (tone === 'blocked' || tone === 'ineffective') counts.blocked += 1
+  }
+  return counts
 }

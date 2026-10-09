@@ -372,6 +372,33 @@ describe('OpenAPI success surface (e2e)', () => {
     return item?.[method!]?.security ?? []
   }
 
+  it('documents the member access explanation as three evaluations', () => {
+    const operation = document.paths['/organizations/{orgId}/members/{userId}/access']!.get!
+    const response = (operation.responses['200'] as { content: Record<string, { schema: object }> })
+      .content['application/json']!.schema
+    expect(response).toEqual({ $ref: '#/components/schemas/MemberAccessResponseDto_Output' })
+    const output = document.components!.schemas!.MemberAccessResponseDto_Output as {
+      properties: {
+        items: { items: { oneOf: { properties: Record<string, { enum?: string[] }> }[] } }
+      }
+    }
+    const variants = output.properties.items.items.oneOf
+    expect(variants.map((variant) => variant.properties.evaluation?.enum)).toEqual([
+      ['record'],
+      ['configured'],
+      ['notEvaluated'],
+    ])
+    // Only an exact item may claim a decision; a configured one names a state, not a boolean.
+    expect(variants.map((variant) => 'granted' in variant.properties)).toEqual([true, false, false])
+    expect(variants[1]!.properties.state?.enum).toEqual([
+      'allowed',
+      'configured',
+      'blocked',
+      'missingPrerequisite',
+      'none',
+    ])
+  })
+
   it('documents invitation role intent, bounded errors and credential boundaries', () => {
     const accept = document.paths['/auth/invites/accept']!.post!
     for (const status of ['200', '400', '401', '403', '409', '429', '503'])

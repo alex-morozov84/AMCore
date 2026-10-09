@@ -1,5 +1,11 @@
 import { createTranslator, NextIntlClientProvider } from 'next-intl'
-import { CAPABILITY_CATALOGUE, DEFAULT_LOCALE, type MemberAccess } from '@amcore/shared'
+import {
+  type AccessConfiguredItem,
+  type AccessRecordItem,
+  CAPABILITY_CATALOGUE,
+  DEFAULT_LOCALE,
+  type MemberAccess,
+} from '@amcore/shared'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -30,7 +36,8 @@ const t = messages.memberAccess
 const say = createTranslator({ locale: DEFAULT_LOCALE, messages, namespace: 'memberAccess' })
 const roles = messages.organizationRoles.capabilities
 
-const item = (over: Partial<MemberAccess['items'][number]>): MemberAccess['items'][number] => ({
+const item = (over: Partial<AccessRecordItem>): AccessRecordItem => ({
+  evaluation: 'record',
   key: 'teamAccess.manage',
   baseline: false,
   granted: false,
@@ -97,7 +104,14 @@ const access = (over: Partial<MemberAccess> = {}): MemberAccess => ({
     }),
     item({ key: 'organization.delete', reason: 'missingPrerequisite' }),
   ],
-  widening: { status: 'computed', breadth: true, synergy: false, vetoed: true },
+  widening: {
+    status: 'computed',
+    scope: 'exactItems',
+    excludedItems: 0,
+    breadth: true,
+    synergy: false,
+    vetoed: true,
+  },
   uncovered: { ruleCount: 2, roleSample: [{ id: 'rA', name: 'Support' }] },
   qualifiers: [],
   ...over,
@@ -159,6 +173,8 @@ describe('MemberAccessDialog', () => {
     state.access = {
       data: access({
         widening: {
+          scope: 'exactItems',
+          excludedItems: 0,
           status: 'unavailable',
           reason: 'roleLimit',
           breadth: null,
@@ -213,5 +229,166 @@ describe('MemberAccessDialog', () => {
     expect(screen.getByText(roles.teamAccessManagement.label)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: t.close }))
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('MemberAccessDialog: capabilities a product registers', () => {
+  const ORDER = {
+    ...CAPABILITY_CATALOGUE[0],
+    id: 'order.update',
+    subject: 'Order',
+    labelKey: 'orderUpdate',
+    editableFields: ['status'],
+  }
+  const refs = { roleIds: ['rA'], total: 1 }
+  const area = (kind: 'all' | 'assigned' | 'own' | 'custom', over = {}) => ({
+    kind,
+    roles: refs,
+    fields: null,
+    prerequisite: 'met' as const,
+    masked: false,
+    absorbed: false,
+    ...over,
+  })
+  const configured = (over: Partial<AccessConfiguredItem> = {}): AccessConfiguredItem => ({
+    key: 'order.update',
+    evaluation: 'configured',
+    baseline: false,
+    state: 'configured',
+    areas: [area('assigned')],
+    limits: [],
+    blockedBy: null,
+    sources: [
+      {
+        kind: 'rule',
+        via: 'direct',
+        roleIds: ['rA'],
+        permissionId: 'p1',
+        presetId: 'assigned',
+        effect: 'allow',
+        status: 'contributes',
+        area: 'assigned',
+        prerequisite: 'met',
+      },
+    ],
+    sourcesTruncated: false,
+    ...over,
+  })
+  const show = (items: MemberAccess['items']) => {
+    state.catalogue = {
+      data: { capabilities: [...CAPABILITY_CATALOGUE, ORDER] },
+      ready: true,
+      available: true,
+      pending: false,
+    }
+    state.access = {
+      data: access({ items, uncovered: { ruleCount: 0, roleSample: [] } }),
+      ready: true,
+      available: true,
+      pending: false,
+    }
+    view()
+  }
+
+  it('lists a configured right by area with its roles, and says it is not a record check', () => {
+    show([configured()])
+    const row = screen.getByText('order.update').closest('li')!
+    expect(within(row).getByText(t.configuredBadge)).toBeInTheDocument()
+    expect(
+      within(row).getByText(say('areaRoles', { area: t.area.assigned, roles: 'Support' }))
+    ).toBeInTheDocument()
+    expect(screen.getByText(t.configuredNote)).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(say('summaryConfigured', { count: 1 })))).toBeInTheDocument()
+  })
+
+  it('shows two independent areas and the prerequisite it cannot prove', () => {
+    show([
+      configured({
+        areas: [area('assigned', { prerequisite: 'unproven' }), area('own')],
+      }),
+    ])
+    const row = screen.getByText('order.update').closest('li')!
+    expect(within(row).getAllByText(new RegExp(t.area.assigned)).length).toBeGreaterThan(0)
+    expect(within(row).getAllByText(new RegExp(t.area.own)).length).toBeGreaterThan(0)
+    expect(within(row).getByText(t.prerequisite.unproven)).toBeInTheDocument()
+  })
+
+  it('words every limit by its own cause', () => {
+    show([
+      configured({
+        areas: [area('custom', { fields: ['status'] })],
+        limits: [
+          { kind: 'fields', fields: ['status'] },
+          { kind: 'condition' },
+          { kind: 'denyCondition' },
+          { kind: 'denyFields', fields: ['note'] },
+        ],
+      }),
+    ])
+    expect(screen.getByText(say('limit.fields', { fields: 'status' }))).toBeInTheDocument()
+    expect(screen.getByText(t.limit.condition)).toBeInTheDocument()
+    expect(screen.getByText(t.limit.denyCondition)).toBeInTheDocument()
+    expect(screen.getByText(say('limit.denyFields', { fields: 'note' }))).toBeInTheDocument()
+  })
+
+  it('names who blocks a blocked configured right and keeps the rules behind it', () => {
+    show([
+      configured({
+        state: 'blocked',
+        areas: [area('own', { masked: true })],
+        blockedBy: { roleIds: ['rC'], total: 1 },
+        sources: [
+          {
+            kind: 'rule',
+            via: 'direct',
+            roleIds: ['rC'],
+            permissionId: 'p2',
+            presetId: null,
+            effect: 'deny',
+            status: 'vetoes',
+            area: null,
+            prerequisite: null,
+          },
+        ],
+      }),
+    ])
+    const row = screen.getByText('order.update').closest('li')!
+    expect(within(row).getByText(say('stateBlocked', { blockers: 'Auditor' }))).toBeInTheDocument()
+    fireEvent.click(within(row).getByText(t.whyTitle))
+    expect(
+      within(row).getByText(say('whyConfigured.blocks', { roles: 'Auditor' }))
+    ).toBeInTheDocument()
+    expect(within(row).getByText(t.why.denyWins)).toBeInTheDocument()
+  })
+
+  it('puts "not evaluated" in its own group, never under "not allowed"', () => {
+    show([
+      configured({ key: 'order.update', state: 'none', areas: [], sources: [] }),
+      {
+        key: 'order.archive',
+        evaluation: 'notEvaluated',
+        baseline: false,
+        reason: 'optOut',
+        sources: [],
+        sourcesTruncated: false,
+      },
+    ])
+    expect(screen.getByText(say('notEvaluatedTitle', { count: 1 }))).toBeInTheDocument()
+    expect(screen.getByText(t.notEvaluatedHint, { selector: 'p' })).toBeInTheDocument()
+    expect(screen.getByText(say('notAllowedTitle', { count: 1 }))).toBeInTheDocument()
+    const notEvaluated = screen
+      .getByText(say('notEvaluatedTitle', { count: 1 }))
+      .closest('details')!
+    expect(within(notEvaluated).getByText('order.archive')).toBeInTheDocument()
+    expect(within(notEvaluated).queryByText('order.update')).toBeNull()
+  })
+
+  it('an exact item still reads as before next to configured ones', () => {
+    show([
+      item({ key: 'organization.read', baseline: true, granted: true, reason: 'granted' }),
+      configured(),
+    ])
+    expect(screen.getByText(t.baselineNote)).toBeInTheDocument()
+    expect(screen.getByText(t.included)).toBeInTheDocument()
   })
 })

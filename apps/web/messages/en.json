@@ -1142,9 +1142,9 @@
     "qualifierSuperAdmin": "This person is also a platform administrator. This summary covers only what organization membership gives; platform access is separate.",
     "unsafeLinks": "{count, plural, one {# role link points} other {# role links point}} to roles of another organization. They are ignored.",
     "wideningUnavailable": "A breakdown by role is not available because this person has many roles or rules. What they can do is still exact.",
-    "breadth": "Together, these roles allow more than any single role does.",
-    "synergy": "Some access exists only because of the combination of roles.",
-    "vetoed": "A deny rule in one role takes away access that another role would give.",
+    "breadth": "Together, these roles allow more than any single role does, among organization and team access.",
+    "synergy": "Some organization or team access exists only because of the combination of roles.",
+    "vetoed": "A deny rule in one role takes away organization or team access that another role would give.",
     "itemsTitle": "What this person can do in the organization and team",
     "allowed": "Allowed",
     "notAllowed": "Not allowed",
@@ -1188,6 +1188,43 @@
     "otherTitle": "Other permissions in roles ({count})",
     "otherBody": "These permissions are not in the capability catalogue, so this screen does not explain them and the role editor shows them read-only. For example, access to one's own profile. For a permission to be explained here and edited in the role editor, a developer has to register it in the catalogue explicitly.",
     "otherRoles": "In roles: {roles}",
-    "areaCount": "{area} ({count})"
+    "areaCount": "{area} ({count})",
+    "configuredNote": "This shows what the role settings configure. It does not check a specific record.",
+    "configuredBadge": "Configured",
+    "ineffectiveBadge": "Not effective",
+    "area": {
+      "all": "All records",
+      "assigned": "Only assigned records",
+      "own": "Only their own records",
+      "custom": "Records matching a custom condition"
+    },
+    "areaRoles": "{area}: {roles}",
+    "stateAllowed": "Allowed for all records by the role settings.",
+    "stateConfigured": "Configured for:",
+    "stateBlocked": "Blocked by {blockers}.",
+    "stateMissing": "Configured, but the reading this needs is not configured.",
+    "prerequisite": {
+      "unproven": "Reading is not proven for these records.",
+      "missing": "The reading this needs is not configured.",
+      "blocked": "The reading this needs is blocked."
+    },
+    "limit": {
+      "fields": "Only some fields: {fields}",
+      "condition": "Only where a custom condition holds",
+      "denyCondition": "A deny rule may exclude some records",
+      "denyFields": "A deny rule blocks some fields: {fields}"
+    },
+    "absorbedNote": "Also configured, already covered by the area above.",
+    "notEvaluatedTitle": "Not evaluated ({count})",
+    "notEvaluatedHint": "The product gave no evaluation for these. This does not mean they are not allowed.",
+    "notEvaluatedRow": "Not evaluated",
+    "summaryConfigured": "{count} configured for some records",
+    "whyConfigured": {
+      "allows": "Allows {area}: {roles}",
+      "overridden": "Allowed, but cancelled by a deny with the same condition: {roles}",
+      "restricts": "May exclude some records: {roles}",
+      "blocks": "Blocks: {roles}",
+      "blocksVia": "Blocks: {roles} ({via})"
+    }
   }
 }

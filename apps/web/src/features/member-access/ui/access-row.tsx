@@ -1,65 +1,99 @@
 'use client'
 import { useTranslations } from 'next-intl'
-import type { MemberAccess } from '@amcore/shared'
-import { Check, Minus, ShieldAlert } from 'lucide-react'
+import type { AccessRecordItem, MemberAccess } from '@amcore/shared'
+import { Check, CircleHelp, Minus, ShieldAlert, SlidersHorizontal } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'
 
-import { describeRoles, explainWhy, type Tone, toneOf, type WhyLine } from '../model/access-view'
+import { explainWhy, type Tone, toneOf, type WhyLine } from '../model/access-view'
+
+import { ConfiguredExplanation, ConfiguredSources, hasConfiguredWhy } from './configured-row'
+import { describeText } from './role-text'
 
 type Item = MemberAccess['items'][number]
 
 const TONE_STYLE: Record<Tone, string> = {
   included: 'border-border',
   allowed: 'border-success/60 bg-success-soft',
+  configured: 'border-border',
   blocked: 'border-warning/60 bg-warning-soft',
+  ineffective: 'border-warning/60 bg-warning-soft',
   denied: 'border-border',
+  unknown: 'border-dashed border-border',
 }
+
+const TONE_ICON = {
+  included: Check,
+  allowed: Check,
+  configured: SlidersHorizontal,
+  blocked: ShieldAlert,
+  ineffective: ShieldAlert,
+  denied: Minus,
+  unknown: CircleHelp,
+} as const
 
 export function AccessRow({
   item,
   label,
   nameOf,
+  fieldLabel,
 }: {
   item: Item
   label: string
   nameOf: (id: string) => string | undefined
+  fieldLabel: (field: string) => string
 }) {
   const t = useTranslations('memberAccess')
   const tone = toneOf(item)
-  const badge =
-    tone === 'included'
-      ? t('included')
-      : tone === 'allowed'
-        ? t('allowed')
-        : tone === 'blocked'
-          ? t('blocked')
-          : t('notAllowed')
-  const Icon =
-    tone === 'allowed' || tone === 'included' ? Check : tone === 'blocked' ? ShieldAlert : Minus
+  const badges: Record<Tone, string> = {
+    included: t('included'),
+    allowed: t('allowed'),
+    configured: t('configuredBadge'),
+    blocked: t('blocked'),
+    ineffective: t('ineffectiveBadge'),
+    denied: t('notAllowed'),
+    unknown: t('notEvaluatedRow'),
+  }
+  const Icon = TONE_ICON[tone]
   return (
     <li className={cn('space-y-2 rounded-lg border p-3', TONE_STYLE[tone])}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="min-w-0 break-words font-medium">{label}</p>
         <span className="inline-flex items-center gap-1 text-sm font-medium">
           <Icon aria-hidden="true" className="size-4" />
-          {badge}
+          {badges[tone]}
         </span>
       </div>
-      <p className="text-sm text-muted-foreground">
-        <Explanation item={item} nameOf={nameOf} />
-      </p>
-      {!item.baseline && hasWhy(item) && (
+      <div className="text-sm text-muted-foreground">
+        {item.evaluation === 'record' && <Explanation item={item} nameOf={nameOf} />}
+        {item.evaluation === 'configured' && (
+          <ConfiguredExplanation item={item} nameOf={nameOf} fieldLabel={fieldLabel} />
+        )}
+        {item.evaluation === 'notEvaluated' && <p>{t('notEvaluatedHint')}</p>}
+      </div>
+      {item.evaluation === 'record' && !item.baseline && hasWhy(item) && (
         <details className="text-sm">
           <summary className="cursor-pointer font-medium">{t('whyTitle')}</summary>
           <Sources item={item} nameOf={nameOf} />
+        </details>
+      )}
+      {item.evaluation === 'configured' && hasConfiguredWhy(item) && (
+        <details className="text-sm">
+          <summary className="cursor-pointer font-medium">{t('whyTitle')}</summary>
+          <ConfiguredSources item={item} nameOf={nameOf} />
         </details>
       )}
     </li>
   )
 }
 
-function Explanation({ item, nameOf }: { item: Item; nameOf: (id: string) => string | undefined }) {
+function Explanation({
+  item,
+  nameOf,
+}: {
+  item: AccessRecordItem
+  nameOf: (id: string) => string | undefined
+}) {
   const t = useTranslations('memberAccess')
   if (item.baseline) return <>{t('baselineNote')}</>
   if (item.granted) {
@@ -82,22 +116,19 @@ function Explanation({ item, nameOf }: { item: Item; nameOf: (id: string) => str
   return <>{t('reasonUnknown')}</>
 }
 
-function describeText(
-  refs: Item['reachedBy'],
-  nameOf: (id: string) => string | undefined,
-  t: ReturnType<typeof useTranslations<'memberAccess'>>
-): string {
-  const { names, more } = describeRoles(refs, nameOf, t('roleUnknown'))
-  return more > 0 ? `${names.join(', ')} ${t('rolesMore', { count: more })}` : names.join(', ')
-}
-
-/** An item without rule-level sources (a capability added by a product) has no "why" to open. */
-function hasWhy(item: Item): boolean {
+/** An item without rule-level sources has no "why" to open. */
+function hasWhy(item: AccessRecordItem): boolean {
   const why = explainWhy(item)
   return why.allows.length + why.blocks.length + why.needs.length > 0 || item.sourcesTruncated
 }
 
-function Sources({ item, nameOf }: { item: Item; nameOf: (id: string) => string | undefined }) {
+function Sources({
+  item,
+  nameOf,
+}: {
+  item: AccessRecordItem
+  nameOf: (id: string) => string | undefined
+}) {
   const t = useTranslations('memberAccess')
   const why = explainWhy(item)
   const roles = (line: WhyLine) =>
@@ -133,7 +164,7 @@ export function CompactAccessRow({ item, label }: { item: Item; label: string })
   return (
     <li className="text-sm">
       <span>{label}</span>
-      {item.reason === 'missingPrerequisite' && (
+      {item.evaluation === 'record' && item.reason === 'missingPrerequisite' && (
         <span className="block text-muted-foreground">{t('reasonMissing')}</span>
       )}
     </li>

@@ -1,20 +1,23 @@
-import type { MemberAccess } from '@amcore/shared'
+import type { AccessConfiguredItem, AccessRecordItem, MemberAccess } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
 
 import {
   capabilityOf,
+  configuredWhy,
   describeRoles,
   explainWhy,
   groupByArea,
   mergeSources,
   roleNamer,
   splitItems,
+  summaryCounts,
   toneOf,
   wideningNotes,
 } from './access-view'
 
-type Item = MemberAccess['items'][number]
+type Item = AccessRecordItem
 const item = (over: Partial<Item>): Item => ({
+  evaluation: 'record',
   key: 'organization.update',
   baseline: false,
   granted: false,
@@ -208,5 +211,103 @@ describe('explainWhy', () => {
       })
     )
     expect(why.needs).toEqual([{ roleIds: ['a'], via: 'teamAccessGate' }])
+  })
+})
+
+const refs = { roleIds: ['r1'], total: 1 }
+const configured = (over: Partial<AccessConfiguredItem> = {}): AccessConfiguredItem => ({
+  key: 'order.update',
+  evaluation: 'configured',
+  baseline: false,
+  state: 'configured',
+  areas: [
+    { kind: 'own', roles: refs, fields: null, prerequisite: 'met', masked: false, absorbed: false },
+  ],
+  limits: [],
+  blockedBy: null,
+  sources: [],
+  sourcesTruncated: false,
+  ...over,
+})
+const notEvaluated = (key: string) => ({
+  key,
+  evaluation: 'notEvaluated' as const,
+  baseline: false as const,
+  reason: 'optOut' as const,
+  sources: [],
+  sourcesTruncated: false as const,
+})
+const ORDER_IDS = ['order.update', 'order.read']
+
+describe('configured and not evaluated items', () => {
+  it('reads each state at a glance, and never calls "not evaluated" a refusal', () => {
+    expect(toneOf(configured({ state: 'allowed' }))).toBe('allowed')
+    expect(toneOf(configured())).toBe('configured')
+    expect(toneOf(configured({ state: 'blocked' }))).toBe('blocked')
+    expect(toneOf(configured({ state: 'missingPrerequisite' }))).toBe('ineffective')
+    expect(toneOf(configured({ state: 'none' }))).toBe('denied')
+    expect(toneOf(notEvaluated('order.archive'))).toBe('unknown')
+  })
+
+  it('lists what is configured or blocked, keeps what is not given apart and not evaluated alone', () => {
+    const parts = splitItems(
+      [
+        configured({ key: 'order.update' }),
+        configured({ key: 'order.read', state: 'none', areas: [] }),
+        configured({ key: 'order.update.note', state: 'none', areas: [] }),
+        notEvaluated('order.archive'),
+      ],
+      [...ORDER_IDS, 'order.archive']
+    )
+    expect(parts.active.map((entry) => entry.key)).toEqual(['order.update'])
+    expect(parts.inactive.map((entry) => entry.key)).toEqual(['order.read'])
+    expect(parts.notEvaluated.map((entry) => entry.key)).toEqual(['order.archive'])
+  })
+
+  it('counts allowed, configured and blocked separately', () => {
+    expect(
+      summaryCounts([
+        configured({ state: 'allowed' }),
+        configured(),
+        configured({ state: 'blocked' }),
+        configured({ state: 'missingPrerequisite' }),
+        item({ granted: true, reason: 'granted' }),
+        item({ reason: 'vetoed' }),
+        item({ baseline: true, granted: true, reason: 'granted' }),
+      ])
+    ).toEqual({ allowed: 2, configured: 1, blocked: 3 })
+  })
+
+  it('words the rules by area and cause without merging areas', () => {
+    const rule = (over: Record<string, unknown>) => ({
+      kind: 'rule' as const,
+      via: 'direct' as const,
+      roleIds: ['r1'],
+      permissionId: 'p',
+      presetId: null,
+      effect: 'allow' as const,
+      status: 'contributes' as const,
+      area: 'own' as const,
+      prerequisite: 'met' as const,
+      ...over,
+    })
+    const lines = configuredWhy(
+      configured({
+        sources: [
+          rule({ effect: 'deny', status: 'vetoes', area: null }),
+          rule({ effect: 'deny', status: 'restricts', area: null, roleIds: ['r2'] }),
+          rule({ status: 'overridden', roleIds: ['r3'] }),
+          rule({ area: 'assigned', roleIds: ['r4'] }),
+          rule({ area: 'own', roleIds: ['r5'] }),
+        ],
+      })
+    )
+    expect(lines.map((line) => [line.kind, line.area, line.roleIds])).toEqual([
+      ['blocks', null, ['r1']],
+      ['restricts', null, ['r2']],
+      ['overridden', 'own', ['r3']],
+      ['allows', 'assigned', ['r4']],
+      ['allows', 'own', ['r5']],
+    ])
   })
 })

@@ -21,7 +21,13 @@ import {
 import { RoleBadges } from '@/shared/ui/role-badges'
 import { Skeleton } from '@/shared/ui/skeleton'
 
-import { capabilityOf, groupByArea, roleNamer, splitItems } from '../model/access-view'
+import {
+  capabilityOf,
+  groupByArea,
+  roleNamer,
+  splitItems,
+  summaryCounts,
+} from '../model/access-view'
 
 import { AccessNotes, OtherPermissions } from './access-notes'
 import { AccessRow, CompactAccessRow } from './access-row'
@@ -67,7 +73,13 @@ export function MemberAccessDialog({
     return found?.field ? t('fieldOf', { capability: base, field: fieldLabel(found.field) }) : base
   }
   const row = (item: NonNullable<typeof access>['items'][number]) => (
-    <AccessRow key={item.key} item={item} label={labelOf(item.key)} nameOf={nameOf} />
+    <AccessRow
+      key={item.key}
+      item={item}
+      label={labelOf(item.key)}
+      nameOf={nameOf}
+      fieldLabel={fieldLabel}
+    />
   )
   const parts =
     access && capabilities
@@ -76,8 +88,8 @@ export function MemberAccessDialog({
           capabilities.map((entry) => entry.id)
         )
       : undefined
-  const allowed = parts?.active.filter((item) => item.granted && !item.baseline).length ?? 0
-  const blocked = parts?.active.filter((item) => !item.granted).length ?? 0
+  const counts = summaryCounts(parts?.active ?? [])
+  const hasConfigured = parts?.active.some((item) => item.evaluation === 'configured') ?? false
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -124,9 +136,14 @@ export function MemberAccessDialog({
                   {t('itemsTitle')}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {t('summaryAllowed', { count: allowed })}
-                  {blocked > 0 && `, ${t('summaryBlocked', { count: blocked })}`}
+                  {t('summaryAllowed', { count: counts.allowed })}
+                  {counts.configured > 0 &&
+                    `, ${t('summaryConfigured', { count: counts.configured })}`}
+                  {counts.blocked > 0 && `, ${t('summaryBlocked', { count: counts.blocked })}`}
                 </p>
+                {hasConfigured && (
+                  <p className="text-sm text-muted-foreground">{t('configuredNote')}</p>
+                )}
                 {groupByArea(parts.active, capabilities).map(([area, items]) => (
                   <div key={area} className="space-y-2">
                     <h4 className="text-sm font-semibold">{text.area(area)}</h4>
@@ -157,6 +174,19 @@ export function MemberAccessDialog({
                         </details>
                       ))}
                     </div>
+                  </details>
+                )}
+                {parts.notEvaluated.length > 0 && (
+                  <details className="rounded-lg border border-dashed border-border p-3 text-sm">
+                    <summary className="cursor-pointer font-medium">
+                      {t('notEvaluatedTitle', { count: parts.notEvaluated.length })}
+                    </summary>
+                    <p className="mt-2 text-muted-foreground">{t('notEvaluatedHint')}</p>
+                    <ul className="mt-2 space-y-1">
+                      {parts.notEvaluated.map((item) => (
+                        <CompactAccessRow key={item.key} item={item} label={labelOf(item.key)} />
+                      ))}
+                    </ul>
                   </details>
                 )}
               </section>
