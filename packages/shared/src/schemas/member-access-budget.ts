@@ -25,3 +25,19 @@ export const ACCESS_ROLES_SHOWN = 50
 export const ACCESS_ROLE_REFS_LIMIT = 5
 export const ACCESS_SOURCES_PER_ITEM = 10
 export const ACCESS_UNCOVERED_ROLE_SAMPLE = 10
+
+/**
+ * Capabilities a product registers are explained without a record (areas the role settings
+ * configure). The catalogue size therefore bounds both the response and the work, and is checked
+ * before anything is loaded.
+ */
+export const ACCESS_MAX_ITEMS = 600
+/** Editable fields of one capability that a limit or an area may list. */
+export const ACCESS_FIELDS_MAX = 32
+/** A configured item names at most one area per kind and one limit per cause. */
+export const ACCESS_AREAS_MAX = 4
+export const ACCESS_LIMITS_MAX = 4
+/** Displayed rule sources of a configured item; the calculation always uses every rule first. */
+export const ACCESS_CONFIGURED_SOURCES_PER_ITEM = 4
+/** Units of internal checks one request may spend; exceeding it fails the whole request. */
+export const ACCESS_MAX_OPERATIONS = 3_000_000
