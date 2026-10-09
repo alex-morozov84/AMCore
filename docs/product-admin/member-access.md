@@ -48,8 +48,8 @@ Three layers are kept apart in the response:
 
 An item carries:
 
-- `granted` and `reason`: `granted`, `noGrant` (no role allows it), `vetoed` (it would be allowed without the rules that block it, whether one role allows it alone or several roles do together; and
-  another role blocks it) or `missingPrerequisite` (a role allows it but something it depends on is
+- `granted` and `reason`: `granted`, `noGrant` (no role allows it), `vetoed` (it would be allowed without the deny rules that block it, whether one
+  role allows it alone or several roles do together) or `missingPrerequisite` (a role allows it but something it depends on is
   missing, for example deleting also needs team control).
 - `origin` for a granted item: `single` when at least one role would grant it alone, `combined` when
   it is granted only by the roles together. `reachedBy` lists the roles that grant it alone.
