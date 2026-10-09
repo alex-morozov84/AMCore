@@ -230,6 +230,25 @@ describe('MemberAccessDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: t.close }))
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('hides cached identity and access facts when authority is lost', () => {
+    const rendered = view()
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument()
+    state.access = { data: access(), ready: false, available: false, pending: false }
+    state.catalogue = { ...state.catalogue, ready: false, available: false }
+    rendered.rerender(
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
+        <MemberAccessDialog
+          controller={{ refresh: vi.fn() } as never}
+          userId="u1"
+          onClose={vi.fn()}
+        />
+      </NextIntlClientProvider>
+    )
+    expect(screen.queryByText('Ada Lovelace')).toBeNull()
+    expect(screen.queryByText('ada@example.test')).toBeNull()
+    expect(screen.queryByText(roles.teamAccessManagement.label)).toBeNull()
+  })
 })
 
 describe('MemberAccessDialog: capabilities a product registers', () => {

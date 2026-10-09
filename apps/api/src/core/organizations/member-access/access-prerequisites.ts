@@ -43,10 +43,11 @@ export function prerequisiteCheck(
   // A read needs no read prerequisite of its own.
   const fields = needsRead ? capability.requiredReadFields : []
   const base: Prerequisite = needsRead || capability.teamAccess ? 'met' : 'notRequired'
+  budget.spend(policy.length, 'prerequisite')
   const readRules = needsRead
     ? policy.filter((rule) => isRelevant(rule, capability.subject, 'read'))
     : []
-  budget.spend(policy.length + fields.length * (readRules.length + 1), 'prerequisite')
+  budget.spend(fields.length * (readRules.length + 1), 'prerequisite')
   const denies = readRules.filter((rule) => rule.inverted)
   const readDenies = denies.filter((rule) => fields.some((field) => coversField(rule, field)))
   const readBlockers = readDenies.filter(

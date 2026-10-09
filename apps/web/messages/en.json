@@ -1147,7 +1147,7 @@
     "rolesMore": "and {count} more",
     "qualifierSuperAdmin": "This person is also a platform administrator. This summary covers only what organization membership gives; platform access is separate.",
     "unsafeLinks": "{count, plural, one {# role link points} other {# role links point}} to roles of another organization. They are ignored.",
-    "wideningUnavailable": "A breakdown by role is not available because this person has many roles or rules. What they can do is still exact.",
+    "wideningUnavailable": "A breakdown by role is not available because this person has many roles or rules. Organization and team access decisions are still exact.",
     "breadth": "Together, these roles allow more than any single role does, among organization and team access.",
     "synergy": "Some organization or team access exists only because of the combination of roles.",
     "vetoed": "A deny rule in one role takes away organization or team access that another role would give.",
@@ -1227,7 +1227,7 @@
     "summaryConfigured": "{count} configured for some records",
     "whyConfigured": {
       "allows": "Allows {area}: {roles}",
-      "overridden": "Allowed, but cancelled by a deny with the same condition: {roles}",
+      "overridden": "Allowed, but cancelled by a deny: {roles}",
       "restricts": "May exclude some records: {roles}",
       "blocks": "Blocks: {roles}",
       "blocksVia": "Blocks: {roles} ({via})"

@@ -3,6 +3,7 @@ import type { AbilityPermission } from '../../auth/casl/permission-normalization
 import type { AccessOperationBudget } from './access-budget'
 import type { ItemSpec } from './access-capabilities'
 import { coversAnyField, coversField, isRelevant, isUnconditional } from './access-rule-utils'
+import { DenyIndex } from './configured-mask-index'
 
 /** The rules that can say something about one item, split by effect. */
 export interface Scan {
@@ -64,12 +65,6 @@ export function denyCovers(deny: AbilityPermission, wanted: Scan['itemFields']):
   return wanted === null ? coversAnyField(deny) : wanted.every((name) => coversField(deny, name))
 }
 
-/** Whether the union of the denies covers every wanted field. */
-function unionCovers(denies: readonly AbilityPermission[], wanted: Scan['itemFields']): boolean {
-  if (wanted === null) return denies.some(coversAnyField)
-  return wanted.every((name) => denies.some((deny) => coversField(deny, name)))
-}
-
 /**
  * A deny hides an allow it covers when it is unconditional or has the identical condition. Nothing
  * is solved: other conditional denies stay limits.
@@ -80,30 +75,42 @@ export function maskRules(
   budget: AccessOperationBudget
 ): Masking {
   budget.spend(scan.allows.length + scan.denies.length, 'mask')
-  const unconditionalDenies = scan.denies.filter(isUnconditional)
-  const conditionalByKey = new Map<string, AbilityPermission[]>()
-  for (const deny of scan.denies.filter((rule) => !isUnconditional(rule)))
-    conditionalByKey.set(key(deny), [...(conditionalByKey.get(key(deny)) ?? []), deny])
-  const masked = new Set<string>()
-  const maskers = new Set<string>()
-  const covers = (deny: AbilityPermission, rule: AbilityPermission): boolean => {
-    const covered = coveredBy(rule, scan.itemFields)
-    return covered === null
-      ? coversAnyField(deny)
-      : covered.every((name) => coversField(deny, name))
+  const unconditional = new DenyIndex()
+  const conditional = new Map<string, DenyIndex>()
+  for (const deny of scan.denies) {
+    if (isUnconditional(deny)) unconditional.add(deny)
+    else {
+      const condition = key(deny)
+      const index = conditional.get(condition) ?? new DenyIndex()
+      index.add(deny)
+      conditional.set(condition, index)
+    }
   }
-  for (const rule of scan.allows)
-    for (const deny of [...unconditionalDenies, ...(conditionalByKey.get(key(rule)) ?? [])])
-      if (covers(deny, rule)) {
-        masked.add(rule.id)
-        maskers.add(deny.id)
-      }
+  const masked = new Set<string>()
+  for (const rule of scan.allows) {
+    const matching = conditional.get(key(rule))
+    const covered = coveredBy(rule, scan.itemFields)
+    const cancelled =
+      covered === null
+        ? unconditional.all || matching?.all
+        : covered.every((name) => unconditional.covers(name) || matching?.covers(name))
+    if (cancelled) {
+      masked.add(rule.id)
+      unconditional.use(covered)
+      matching?.use(covered)
+    }
+  }
   return {
-    unconditionalDenies,
-    conditionalByKey,
+    unconditionalDenies: unconditional.rules,
+    conditionalByKey: new Map(
+      [...conditional].map(([condition, index]) => [condition, index.rules])
+    ),
     masked,
-    maskers,
-    globalBlock: unionCovers(unconditionalDenies, scan.itemFields),
+    maskers: new Set([unconditional, ...conditional.values()].flatMap((index) => index.maskers())),
+    globalBlock:
+      scan.itemFields === null
+        ? unconditional.all
+        : scan.itemFields.every((name) => unconditional.covers(name)),
     unmaskedRules: scan.allows.filter((rule) => !masked.has(rule.id)),
   }
 }

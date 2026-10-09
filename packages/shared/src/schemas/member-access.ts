@@ -143,11 +143,45 @@ export function configuredInvariants(item: ConfiguredShape): string | undefined 
   }
   if (areas.some((area) => area.masked && area.absorbed)) return 'maskedAbsorbed'
   if (state !== 'allowed' && areas.some((area) => area.absorbed)) return 'absorbedState'
+  if (
+    unmasked.some(
+      (area) =>
+        !area.absorbed &&
+        area.prerequisite === 'met' &&
+        sources.some(
+          (source) =>
+            source.kind === 'rule' &&
+            source.effect === 'allow' &&
+            source.status === 'contributes' &&
+            source.area === area.kind &&
+            source.prerequisite !== 'met'
+        )
+    )
+  )
+    return 'areaPrerequisite'
   switch (state) {
     case 'none':
       return areas.length || limits.length || blockedBy || sources.length ? 'none' : undefined
     case 'blocked':
-      return areas.length === 0 || !blockedBy || sources.length === 0 ? 'blocked' : undefined
+      return areas.length === 0 ||
+        !blockedBy ||
+        blockedBy.total === 0 ||
+        !(
+          sources.some(
+            (source) =>
+              source.kind === 'rule' && source.effect === 'deny' && source.status === 'vetoes'
+          ) ||
+          (areas.every((area) => area.masked) &&
+            sources.length > 0 &&
+            sources.every(
+              (source) =>
+                source.kind === 'rule' &&
+                source.effect === 'allow' &&
+                source.status === 'overridden'
+            ))
+        )
+        ? 'blocked'
+        : undefined
     case 'missingPrerequisite':
       return unmasked.length === 0 ||
         unmasked.some((area) => area.prerequisite !== 'missing') ||

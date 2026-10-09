@@ -41,6 +41,38 @@ const FIELDS = ['name', 'description']
 const OWN = { organizationId: '${user.organizationId}' }
 
 describe('configured items: what the role settings configure', () => {
+  it('keeps distinct normalized date conditions separate for masks and read prerequisites', () => {
+    const capability = {
+      ...ORDER_UPDATE,
+      id: 'archive.update',
+      subject: 'Organization',
+      editableFields: ['name'],
+    }
+    const access = explain(
+      [
+        {
+          id: 'R',
+          rules: [
+            rule('rd', 'read', 'Organization', { conditions: { createdAt: { lt: 1000 } } }),
+            rule('up', 'update', 'Organization', {
+              fields: ['name'],
+              conditions: { createdAt: { lt: 2000 } },
+            }),
+            rule('dn', 'update', 'Organization', {
+              fields: ['name'],
+              inverted: true,
+              conditions: { createdAt: { lt: 1000 } },
+            }),
+          ],
+        },
+      ],
+      [capability]
+    )
+    expect(configured(access, 'archive.update')).toMatchObject({
+      state: 'configured',
+      areas: [{ kind: 'custom', masked: false, prerequisite: 'unproven' }],
+    })
+  })
   it('own read + own update: one area, prerequisite proven by the identical condition', () => {
     const access = explain([
       { id: 'R', rules: [orders('read', 'own', 'rd'), orders('update', 'own', 'up')] },
@@ -102,10 +134,42 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    expect(configured(access, 'fixtureOrder.update')).toMatchObject({
+    const item = configured(access, 'fixtureOrder.update')
+    expect(item).toMatchObject({
       state: 'configured',
       areas: [{ kind: 'all', prerequisite: 'unproven' }],
     })
+    expect(
+      item.sources.find((source) => source.kind === 'rule' && source.permissionId === 'dn')
+    ).toMatchObject({
+      via: 'readPrerequisite',
+      effect: 'deny',
+      status: 'restricts',
+    })
+  })
+
+  it('keeps field lines when otherwise identical areas are granted by different roles', () => {
+    const access = explain([
+      {
+        id: 'Names',
+        rules: [
+          orders('read', 'all', 'rd'),
+          rule('upName', 'update', 'Role', { fields: ['name'], conditions: OWN }),
+        ],
+      },
+      {
+        id: 'Descriptions',
+        rules: [
+          rule('upDescription', 'update', 'Role', { fields: ['description'], conditions: OWN }),
+        ],
+      },
+    ])
+    expect(configured(access, 'fixtureOrder.update.name').areas[0]?.roles.roleIds).toEqual([
+      'Names',
+    ])
+    expect(configured(access, 'fixtureOrder.update.description').areas[0]?.roles.roleIds).toEqual([
+      'Descriptions',
+    ])
   })
 
   it('an allow and a deny with the identical condition mask the area', () => {

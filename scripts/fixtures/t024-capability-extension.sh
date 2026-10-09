@@ -14,7 +14,7 @@ cleanup() {
 trap cleanup EXIT
 
 rsync -a \
-  --exclude='/.git/' --exclude='/ai/' --exclude='/.amcore/' \
+  --exclude='/.git' --exclude='/ai/' --exclude='/.amcore/' \
   --exclude='/.worktrees/' --exclude='node_modules/' --exclude='dist/' \
   --exclude='.next/' --exclude='.env*' \
   --exclude='/apps/api/src/generated/prisma/' \

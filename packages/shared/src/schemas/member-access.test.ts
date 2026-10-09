@@ -51,6 +51,26 @@ const limit = (kind: AccessLimit['kind'], fields?: string[]): AccessLimit => ({
 const parses = (item: unknown) => accessItemSchema.safeParse(item).success
 
 describe('configured item state matrix', () => {
+  it('rejects a met area contradicted by a contributing source prerequisite', () => {
+    expect(parses(configured({ sources: [rule({ prerequisite: 'unproven' })] }))).toBe(false)
+    expect(parses(configured({ sources: [rule({ prerequisite: 'missing' })] }))).toBe(false)
+    expect(parses(configured())).toBe(true)
+  })
+
+  it('rejects blocked items without a blocking deny or with an empty blocker set', () => {
+    const blocked = configured({
+      state: 'blocked',
+      blockedBy: refs,
+      areas: [area({ masked: true })],
+    })
+    expect(parses(blocked)).toBe(false)
+    const source = rule({ effect: 'deny', status: 'vetoes', area: null, prerequisite: null })
+    expect(parses({ ...blocked, sources: [source] })).toBe(true)
+    expect(parses({ ...blocked, sources: [rule({ status: 'overridden' })] })).toBe(true)
+    expect(parses({ ...blocked, sources: [source], blockedBy: { roleIds: [], total: 0 } })).toBe(
+      false
+    )
+  })
   it.each([
     ['allowed: one unlimited area all, nothing else', configured()],
     [

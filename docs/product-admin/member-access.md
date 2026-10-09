@@ -136,8 +136,8 @@ its roles, the limits by cause and, when it cannot prove the reading it needs, s
 configured access is not a check of a specific record. "Why" names the roles that allow, restrict and block
 an item (a ban always beats an allow). A long list (more than 12 shown items) gains a search and collapsible
 areas; a short one keeps the flat layout. Rules outside the catalogue are one collapsed note, **Other
-permissions in roles**. It shows a loading state, hides the answer when a read fails (never stale facts) and
-keeps what it shows during a background reread.
+permissions in roles**. It shows a loading state and hides the answer when a read fails or the viewer
+loses authorization. A background reread keeps the answer while the viewer remains authorized.
 
 ## Capabilities your product adds
 

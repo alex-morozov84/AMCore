@@ -25,6 +25,7 @@ export interface ConfiguredContext {
   /** Rules as stored (uninterpolated), for preset recognition. */
   stored: ReadonlyMap<string, StoredPolicyRule>
   budget: AccessOperationBudget
+  conditionKey?: (rule: AbilityPermission) => string
 }
 
 const dedupe = (limits: AccessLimit[]): AccessLimit[] => [
@@ -71,7 +72,7 @@ function blockersOf(
 export function evaluateConfigured(spec: ItemSpec, ctx: ConfiguredContext): AccessConfiguredItem {
   const { capability } = spec
   const { policy, budget } = ctx
-  const key = conditionKeys(budget)
+  const key = ctx.conditionKey ?? conditionKeys(budget)
   const scan = scanRules(spec, policy, budget)
   if (scan.allows.length === 0) return itemOf(spec.key, {})
 
@@ -94,6 +95,7 @@ export function evaluateConfigured(spec: ItemSpec, ctx: ConfiguredContext): Acce
     prereqOf,
     prerequisite,
     rolesByRule: ctx.rolesByRule,
+    budget,
   })
   const shown = {
     sources: sources.slice(0, ACCESS_CONFIGURED_SOURCES_PER_ITEM),

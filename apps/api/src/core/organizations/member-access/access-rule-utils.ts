@@ -5,6 +5,7 @@ import type { AccessCapability } from './access-capabilities'
 
 /** Key-order independent JSON of a condition; `null` and `{}` both mean unconditional. */
 function canonicalJson(value: unknown): string {
+  if (value instanceof Date) return JSON.stringify(value.toISOString())
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
   if (value && typeof value === 'object') {
     return `{${Object.entries(value as Record<string, unknown>)

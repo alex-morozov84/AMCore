@@ -349,7 +349,7 @@ new file mode 100644
 index 0000000..f395187
 --- /dev/null
 +++ b/apps/api/test/fixture-order-access.e2e-spec.ts
-@@ -0,0 +1,429 @@
+@@ -0,0 +1,430 @@
 +import type { INestApplication } from '@nestjs/common'
 +import { JwtService } from '@nestjs/jwt'
 +import request from 'supertest'
@@ -703,6 +703,7 @@ index 0000000..f395187
 +        .patch(`/organizations/${w.org}/fixture-orders/${w.samples[name]}`)
 +        .set('Authorization', `Bearer ${w.member.token}`)
 +        .send(body)
++      expect([200, 403, 404]).toContain(response.status)
 +      if (response.status === 200) ok.push(w.samples[name])
 +    }
 +    return names(w, ok)

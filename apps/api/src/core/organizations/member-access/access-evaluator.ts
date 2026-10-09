@@ -22,6 +22,7 @@ import {
 } from './access-capabilities'
 import { isCovered } from './access-coverage'
 import { AccessPolicy, exactCapabilityIds, type StoredPolicyRule } from './access-facts'
+import { conditionKeys } from './access-rule-utils'
 import { roleRefs, sourcesFor } from './access-sources'
 import { evaluateConfigured } from './configured-access'
 
@@ -94,7 +95,13 @@ export function explainAccess(input: AccessInput): MemberAccess {
     for (const id of ids) rolesByRule.set(id, [...(rolesByRule.get(id) ?? []), roleId])
   const normalized = policy.normalized(allIds)
   const context = { policy: normalized, rolesByRule, stored: rules, organization }
-  const configuredContext = { policy: normalized, rolesByRule, stored: rules, budget }
+  const configuredContext = {
+    policy: normalized,
+    rolesByRule,
+    stored: rules,
+    budget,
+    conditionKey: conditionKeys(budget),
+  }
   const lastOperation = new Map<string, string>()
   const items = specs.flatMap((spec): Item[] => {
     if (spec.mode === 'notEvaluated') return [notEvaluatedItem(spec)]
@@ -140,8 +147,13 @@ export function explainAccess(input: AccessInput): MemberAccess {
 function signature(item: AccessConfiguredItem): string {
   return JSON.stringify([
     item.state,
-    item.areas.map((area) => [area.kind, area.masked, area.prerequisite, area.absorbed]),
-    item.limits.map((limit) => limit.kind),
+    item.areas,
+    item.limits,
+    item.blockedBy,
+    item.sources.map((source) =>
+      source.kind === 'rule' ? { ...source, field: undefined } : source
+    ),
+    item.sourcesTruncated,
   ])
 }
 

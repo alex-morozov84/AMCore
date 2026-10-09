@@ -15,7 +15,7 @@ import {
   countItemSpecs,
 } from './access-capabilities'
 import { explainAccess } from './access-evaluator'
-import { input, ORDER_UPDATE, orderCapabilities, orderPresetRule } from './access-fixtures'
+import { input, ORDER_UPDATE, orderCapabilities, orderPresetRule, rule } from './access-fixtures'
 import { assertResponseWithinCap } from './member-access.service'
 
 const capability = (id: string, fields = 0): AccessCapability => ({
@@ -162,6 +162,60 @@ describe('scenarios on a catalogue of one hundred capabilities', () => {
   const hundred = Array.from({ length: 100 }, (_, index) => capability(`c${index}`, 4))
   const id25 = (prefix: string, index: number): string =>
     `${prefix}${String(index).padStart(25 - prefix.length, '0')}`
+
+  it('evaluates a real synthetic policy on 100 capabilities within the response and work caps', () => {
+    const capabilities = Array.from({ length: 100 }, (_, index) => ({
+      ...ORDER_UPDATE,
+      id: `c${index}`,
+      subject: index < 30 ? 'Role' : 'User',
+      editableFields:
+        index < 30
+          ? ['id', 'name', 'description', 'organizationId']
+          : ['id', 'name', 'email', 'phone'],
+    }))
+    const budget = new AccessOperationBudget()
+    const answer = explainAccess(
+      input(
+        [
+          {
+            id: 'Manager',
+            rules: [
+              rule('rd', 'read', 'Role'),
+              rule('up', 'update', 'Role', { fields: ['name'], conditions: { name: 'draft' } }),
+            ],
+          },
+        ],
+        { capabilities, budget }
+      )
+    )
+    expect(memberAccessSchema.safeParse(answer).success).toBe(true)
+    expect(
+      answer.items.filter(
+        (item) =>
+          item.evaluation === 'configured' && item.state !== 'none' && !item.key.includes('.')
+      )
+    ).toHaveLength(30)
+    expect(serializedJsonBytes(answer)).toBeLessThanOrEqual(ACCESS_API_RESPONSE_BYTES / 2)
+    expect(budget.spent).toBeLessThan(budget.limit)
+  })
+
+  it('processes 600 specifications against 2000 validated rules within the real operation cap', () => {
+    const capabilities = Array.from({ length: 120 }, (_, index) => ({
+      ...ORDER_UPDATE,
+      id: `c${index}`,
+      editableFields: ['id', 'name', 'description', 'organizationId'],
+    }))
+    const budget = new AccessOperationBudget()
+    const rules = Array.from({ length: 2000 }, (_, index) =>
+      rule(`r${index}`, 'read', 'User', { fields: ['id'] })
+    )
+    const answer = explainAccess(input([{ id: 'R', rules }], { capabilities, budget }))
+    expect(countItemSpecs(capabilities)).toBe(600)
+    expect(memberAccessSchema.safeParse(answer).success).toBe(true)
+    // One full-policy validation plus one rule-vs-item scan per specification.
+    expect(budget.spentIn('relevance')).toBe((600 + 1) * 2000)
+    expect(budget.spent).toBeLessThan(budget.limit)
+  })
 
   it('S: a realistic person is answered within half of the cap', () => {
     // The member's roles configure about thirty of the hundred capabilities; the rest is "none".

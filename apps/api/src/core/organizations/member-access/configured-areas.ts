@@ -1,7 +1,8 @@
 import type { AccessArea, AccessLimit } from '@amcore/shared'
 
 import type { AbilityPermission } from '../../auth/casl/permission-normalization'
-import { ruleSignature } from '../role-definition-classifier'
+import { CAPABILITY_ADAPTERS } from '../capability-registry.service'
+import { classifyStoredRule, ruleSignature } from '../role-definition-classifier'
 
 import type { AccessCapability } from './access-capabilities'
 import type { StoredPolicyRule } from './access-facts'
@@ -51,7 +52,11 @@ export function classifier(
   const kinds = presetKinds(capability)
   return (rule) => {
     const original = stored.get(rule.id)
-    const preset = original ? kinds.get(ruleSignature(original)) : undefined
+    const recognized =
+      original && capability.id in CAPABILITY_ADAPTERS ? classifyStoredRule(original) : undefined
+    const matchesCapability =
+      !recognized || (recognized.kind === 'preset' && recognized.capabilityId === capability.id)
+    const preset = original && matchesCapability ? kinds.get(ruleSignature(original)) : undefined
     return preset ?? { kind: isUnconditional(rule) ? 'all' : 'custom', presetId: null }
   }
 }

@@ -44,8 +44,9 @@ export function MemberAccessDialog({
   const heading = useRef<HTMLHeadingElement>(null)
   const read = useMemberAccess(controller, userId)
   const catalogue = useCapabilityCatalogue(controller)
-  const access = read.error ? undefined : read.data
-  const capabilities = catalogue.error ? undefined : catalogue.data?.capabilities
+  const access = read.error || !read.ready ? undefined : read.data
+  const capabilities =
+    catalogue.error || !catalogue.ready ? undefined : catalogue.data?.capabilities
   const ready = Boolean(access && capabilities)
   useEffect(() => {
     if (ready) heading.current?.focus()

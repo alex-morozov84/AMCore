@@ -2,6 +2,7 @@ import type { AccessConfiguredItem } from '@amcore/shared'
 
 import type { AbilityPermission } from '../../auth/casl/permission-normalization'
 
+import type { AccessOperationBudget } from './access-budget'
 import type { ItemSpec } from './access-capabilities'
 import type { Prerequisite, PrerequisiteCheck } from './access-prerequisites'
 import { isUnconditional } from './access-rule-utils'
@@ -21,11 +22,16 @@ export interface SourceInput {
   prereqOf: ReadonlyMap<string, Prerequisite>
   prerequisite: PrerequisiteCheck
   rolesByRule: ReadonlyMap<string, readonly string[]>
+  budget: AccessOperationBudget
 }
 
 /** Every rule that decided or limited the item, most decisive first; the caller shows the first few. */
 export function collectSources(input: SourceInput): RuleSource[] {
-  const { spec, scan, masking, kindOf, prereqOf, prerequisite, rolesByRule } = input
+  const { spec, scan, masking, kindOf, prereqOf, prerequisite, rolesByRule, budget } = input
+  budget.spend(
+    scan.relevant.length + prerequisite.readDenies.length + prerequisite.teamVeto.length,
+    'aggregate'
+  )
   const statusOf = (rule: AbilityPermission): RuleSource['status'] => {
     if (!rule.inverted) return masking.masked.has(rule.id) ? 'overridden' : 'contributes'
     const decisive =
@@ -42,7 +48,12 @@ export function collectSources(input: SourceInput): RuleSource[] {
       permissionId: rule.id,
       presetId: detail?.presetId ?? null,
       effect: rule.inverted ? 'deny' : 'allow',
-      status: via === 'direct' ? statusOf(rule) : 'vetoes',
+      status:
+        via === 'direct'
+          ? statusOf(rule)
+          : via === 'teamAccessVeto' || isUnconditional(rule)
+            ? 'vetoes'
+            : 'restricts',
       area: detail?.kind ?? null,
       prerequisite: rule.inverted ? null : (prereqOf.get(rule.id) ?? null),
     }
@@ -51,10 +62,12 @@ export function collectSources(input: SourceInput): RuleSource[] {
     ...scan.relevant.map((rule) => build(rule, 'direct')),
     ...prerequisite.readDenies.map((rule) => build(rule, 'readPrerequisite')),
     ...prerequisite.teamVeto.map((rule) => build(rule, 'teamAccessVeto')),
-  ].sort(
-    (a, b) =>
+  ].sort((a, b) => {
+    budget.spend(1, 'aggregate')
+    return (
       STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
       KIND_ORDER.indexOf(a.area ?? 'custom') - KIND_ORDER.indexOf(b.area ?? 'custom') ||
       (a.permissionId < b.permissionId ? -1 : a.permissionId > b.permissionId ? 1 : 0)
-  )
+    )
+  })
 }
