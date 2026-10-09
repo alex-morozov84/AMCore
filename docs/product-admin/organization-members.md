@@ -31,6 +31,10 @@ does not retry the earlier write.
 
 ## Ready interface
 
+Each row has **Edit** (roles) and **Access**, which explains what the person can do in this
+organization and which roles give or block it; see the
+[member access explanation](member-access.md).
+
 The page uses shared FilterPanel, DataTableSurface, Table and SearchField primitives,
 with the same filter/table surfaces as the Console. The search panel precedes the
 result count and the separately framed table; no repeated visible Members heading. Desktop shows a table;

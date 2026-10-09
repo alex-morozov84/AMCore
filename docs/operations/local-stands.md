@@ -103,7 +103,9 @@ an organization owned by USER with its organization ADMIN membership.
 `--profile organization-roles` instead seeds a large reproducible dataset for the role editor: three
 organizations, 55 custom roles (presets, advanced and DENY rules, shared and duplicate rules, one role
 too large to edit), 220 fake members without passwords, and 14 invitations. USER administers all
-three and holds one custom role. Rows are written only through marker-locked fixture SQL and are
+three and holds one custom role. A few Acme members show the member access view: a veto on one field, a
+blocked delete, a holder of more roles than the per-role breakdown covers and a link to a role of another
+organization. Rows are written only through marker-locked fixture SQL and are
 skipped when already present; a repeat run verifies the recorded identity and never undoes edits.
 The command prints one roles page address per organization.
 <!-- AMCORE_CONSOLE_STAND_PROFILE_START -->

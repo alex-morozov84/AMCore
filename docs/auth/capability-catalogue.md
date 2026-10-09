@@ -90,6 +90,9 @@ rejected before a permission is saved.
 
 ## Extend a downstream product
 
+A capability you add also appears in the [member access explanation](../product-admin/member-access.md): its
+decision comes from the registry's `record` entry and its hint from `actor`.
+
 1. Add the domain Prisma model and a migration. Add its name to the shared
    `Subject` enum and model-permission schema. This also makes syntactically
    valid `action:NewSubject` API-key scopes issuable by the current low-level

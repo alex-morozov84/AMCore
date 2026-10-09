@@ -263,6 +263,31 @@ function invitationUnit(id) {
   ].join('\n')
 }
 
+/**
+ * Members built to show the access explanation: a field veto, a blocked delete, one holder of more
+ * roles than the per-role breakdown covers, and a persisted link to a role of another organization.
+ */
+function accessCaseUnit(id) {
+  const roleIndex = (name) => ROLES[1].findIndex(([n]) => n === name)
+  const link = (suffix, member, role) =>
+    missing(
+      'core.member_roles',
+      ['id', '"memberId"', '"roleId"'],
+      [`(${q(`${id.p}-mra${suffix}`)}, ${q(member)}, ${q(role)})`],
+      ['id']
+    )
+  const crowd = Array.from({ length: 30 }, (_, i) => link(`crowd${i}`, id.member(9), id.role(1, i)))
+  return [
+    link('v1', id.member(6), id.role(1, roleIndex('Content editor'))),
+    link('v2', id.member(6), id.role(1, roleIndex('Security reviewer'))),
+    link('d1', id.member(8), id.role(1, roleIndex('Broad delete'))),
+    link('d2', id.member(8), id.role(1, roleIndex('Team coordinator'))),
+    link('d3', id.member(8), id.role(1, roleIndex('Compliance reviewer'))),
+    ...crowd,
+    link('alien', id.member(12), id.role(2, 0)),
+  ].join('\n')
+}
+
 /** Ordered units; each runs as one marker-locked transaction and is safe to run again. */
 export function seedUnits(tag) {
   const id = ids(tag)
@@ -272,5 +297,6 @@ export function seedUnits(tag) {
     ['roles', roleUnit(id)],
     ['assignments', assignmentUnit(id)],
     ['invitations', invitationUnit(id)],
+    ['access-cases', accessCaseUnit(id)],
   ]
 }

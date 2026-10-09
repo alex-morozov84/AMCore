@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- **Member access explanation**: `GET /organizations/:orgId/members/:userId/access` and an **Access** view on the
+  Members tab explain what a member can do in the organization and why, from the same rules and decisions the API
+  uses to authorize: which roles grant each ability, where roles add up to more than any one of them, which deny
+  rule takes something away, and what the summary does not cover. It is bounded (roles, links, rules, bytes) and
+  fails closed with `ROLE_ACCESS_UNAVAILABLE` instead of answering from a partial policy.
+
 - Role-definition **browser transport and headless hooks**: typed same-origin routes for the
   capability catalogue, role list and snapshot, create, save and confirmed delete, with
   `useCapabilityCatalogue`, `useRoleDefinitions`, `useRoleDefinition` and

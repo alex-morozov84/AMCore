@@ -5,6 +5,8 @@ import { save } from './state.mjs'
 
 const TOTAL_CUSTOM_ROLES = 55
 const MARKER_VERSION = 1
+/** The units the first version of this profile seeded; a complete record without a list had these. */
+const ORIGINAL_UNITS = ['organizations', 'people', 'roles', 'assignments', 'invitations']
 
 /**
  * Large reproducible data for the role editor owner preview: 3 organizations, 55 custom roles,
@@ -19,12 +21,23 @@ export async function organizationRolesFixture(m, api) {
   const record = (m.rolesFixture ??= { version: MARKER_VERSION, tag, userId: account.id })
   if (record.userId !== account.id || record.tag !== tag || record.version !== MARKER_VERSION)
     throw new Error('Preview roles dataset belongs to a different identity; refusing silent reset')
-  if (record.complete) return
-  for (const [, query] of seedUnits(tag)) await sql(m, query, { user: account.id })
-  await verifyDataset(m, tag)
-  await verifyThroughApi(m, api, account, tag)
-  record.complete = true
-  await save(m)
+  // Units are recorded as they are applied, so a dataset seeded by an earlier version of this profile
+  // gets only the units it lacks and the owner's edits are never undone.
+  const applied = new Set(record.units ?? (record.complete ? ORIGINAL_UNITS : []))
+  const units = seedUnits(tag).filter(([label]) => !applied.has(label))
+  if (units.length === 0) return
+  for (const [label, query] of units) {
+    await sql(m, query, { user: account.id })
+    applied.add(label)
+    record.units = [...applied]
+    await save(m)
+  }
+  if (!record.complete) {
+    await verifyDataset(m, tag)
+    await verifyThroughApi(m, api, account, tag)
+    record.complete = true
+    await save(m)
+  }
 }
 
 async function verifyDataset(m, tag) {
