@@ -1,6 +1,7 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { z } from 'zod'
 
+import { fixtureToolContract } from '../../../../test/fixtures/extension-contracts/tool-registration'
 import { AiGatewayException } from '../gateway/ai-gateway.error'
 import type { AiTextResult, AiToolCall } from '../gateway/ai-gateway.types'
 import type { ModelGateway } from '../gateway/model-gateway.service'
@@ -110,6 +111,7 @@ const KNOWN_TOOLS: Record<string, AiTool> = {
     displayName: 'Current time',
     description: 'time',
     parameters: z.object({}).strict(),
+    ...fixtureToolContract(z.object({}).strict()),
     riskClass: AiToolRiskClass.SAFE,
     idempotency: 'read_only',
     execute: jest.fn(),
@@ -119,6 +121,7 @@ const KNOWN_TOOLS: Record<string, AiTool> = {
     displayName: 'Danger',
     description: 'danger',
     parameters: z.object({}).strict(),
+    ...fixtureToolContract(z.object({}).strict()),
     riskClass: AiToolRiskClass.SENSITIVE,
     idempotency: 'idempotent',
     execute: jest.fn(),

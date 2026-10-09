@@ -8,6 +8,7 @@ import type {
 } from './channel-target-resolver.types'
 
 import { redactEmail } from '@/common/utils'
+import type { Prisma } from '@/generated/prisma/client'
 
 /** Bounded terminal reason: the account email is not a usable notification target. */
 export const EMAIL_SKIP_UNVERIFIED = NotificationTerminalReason.DESTINATION_UNVERIFIED
@@ -24,7 +25,10 @@ export const EMAIL_SKIP_UNVERIFIED = NotificationTerminalReason.DESTINATION_UNVE
 export class EmailTargetResolver implements ChannelTargetResolver {
   readonly channel = NotificationChannel.EMAIL
 
-  resolveTargets(context: TargetResolutionContext): ResolvedDeliveryTarget[] {
+  async resolveTargets(
+    _tx: Prisma.TransactionClient,
+    context: TargetResolutionContext
+  ): Promise<ResolvedDeliveryTarget[]> {
     const { email, emailCanonical, emailVerified } = context.recipient
     const target: ResolvedDeliveryTarget = {
       // emailCanonical is unique-per-user and stable — the adapter-owned identity.

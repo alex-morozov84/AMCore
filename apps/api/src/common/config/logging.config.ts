@@ -89,6 +89,8 @@ function serializeRequestBody(
   maxBodyBytes: number
 ): unknown | TruncatedBody | '[REDACTED]' {
   if (url?.includes('/webhooks/')) return '[REDACTED]'
+  // Validation may reject arbitrary extra fields; they must not reach logs first.
+  if (url && /\/ai\/approvals(?:\/|\?|$)/.test(url)) return '[REDACTED]'
   return truncateBody(body, maxBodyBytes)
 }
 

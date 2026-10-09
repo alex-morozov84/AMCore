@@ -12,7 +12,7 @@ import { validateDefinition } from '../../notification-definition.validation'
 
 /**
  * A PUBLIC fixture that opts into **detailed** Telegram, exercising the
- * `projectExternal('telegram')` + `renderTelegram` seam (D.4). It proves the channel stays
+ * `projectExternal('telegram')` + `renderExternal.telegram` seam (D.4). It proves the channel stays
  * additive for a future PUBLIC/PERSONAL definition while the shipped SENSITIVE
  * `account.password_changed` still resolves to generic, plain text.
  */
@@ -30,10 +30,12 @@ const publicTelegramDefinition: NotificationDefinition<{ orderId: string; secret
   renderInApp: () => ({ title: 'in-app', body: 'in-app' }),
   // Allowlist: only orderId crosses to Telegram — secretField never does.
   projectExternal: (_channel, payload) => ({ orderId: payload.orderId }),
-  renderTelegram: (projection, locale) => ({
-    title: `Order ${String(projection.orderId)}`,
-    body: `(${locale})`,
-  }),
+  renderExternal: {
+    telegram: (projection, locale) => ({
+      title: `Order ${String(projection.orderId)}`,
+      body: `(${locale})`,
+    }),
+  },
 }
 
 describe('Telegram content seam (D.4)', () => {
@@ -58,7 +60,7 @@ describe('Telegram content seam (D.4)', () => {
     expect(projection).toEqual({ orderId: 'A-100' })
     expect(projection).not.toHaveProperty('secretField')
 
-    const content = publicTelegramDefinition.renderTelegram!(projection, 'en')
+    const content = publicTelegramDefinition.renderExternal!.telegram!(projection, 'en')
     expect(content).toEqual({ title: 'Order A-100', body: '(en)' })
   })
 

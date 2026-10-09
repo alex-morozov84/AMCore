@@ -33,7 +33,9 @@ model, the extension points, and the invariants OpenAPI does not express.
 - **Providers & models** — a seeded, capability-gated DB catalog; secrets stay in
   env vars. See [Providers](./providers.md).
 - **Tools & approvals** — code-owned worker-side tools; `SAFE` auto-runs,
-  `SENSITIVE`/`DESTRUCTIVE` park for owner approval. See [Tools and approvals](./tools-and-approvals.md).
+  `SENSITIVE`/`DESTRUCTIVE` park with a localized immutable preview and hash-bound
+  owner decision. Disclosure, approval and execution each check current domain
+  rights. See [Tools and approvals](./tools-and-approvals.md).
 - **Human takeover & operator review** — owner or cross-user SUPER_ADMIN takeover
   with a stale-bot-write fence. See [Operators](./operators.md).
 - **Multimodal artifacts** — private JPEG/PNG/WebP/PDF uploads referenced by id,

@@ -2,16 +2,26 @@ import type { AiApprovalResponse } from '@amcore/shared'
 
 import type { AiApproval, AiToolInvocation } from '@/generated/prisma/client'
 
-/** An approval with the one tool invocation it gates (v1 is one-per-approval) — id + risk only. */
+/** Private approval projection with its single gated invocation. */
 export type AiApprovalWithTool = AiApproval & {
-  toolInvocations: Pick<AiToolInvocation, 'toolId' | 'riskClass'>[]
+  toolInvocations: (Pick<AiToolInvocation, 'toolId' | 'riskClass'> &
+    Partial<
+      Pick<
+        AiToolInvocation,
+        | 'toolVersion'
+        | 'intentSnapshot'
+        | 'intentHash'
+        | 'argsSnapshot'
+        | 'id'
+        | 'originCall'
+        | 'inputSchemaHash'
+        | 'normalizedSchemaHash'
+        | 'idempotency'
+      >
+    >)[]
 }
 
-/**
- * Project a persisted approval to its content-free wire response (Track C — ADR-054, Arc E.5). The
- * owner sees WHAT they are gating — the tool id + risk class + a bounded requested reason — never the
- * tool arguments, prompt, or model output. Enum values are lowercased to the wire vocabulary.
- */
+/** Public metadata defaults to redacted; the service separately authorizes preview disclosure. */
 export function toAiApprovalResponse(approval: AiApprovalWithTool): AiApprovalResponse {
   const tool = approval.toolInvocations[0]
   return {
@@ -22,9 +32,28 @@ export function toAiApprovalResponse(approval: AiApprovalWithTool): AiApprovalRe
     state: approval.state.toLowerCase() as AiApprovalResponse['state'],
     toolId: tool?.toolId ?? null,
     riskClass: (tool?.riskClass.toLowerCase() as AiApprovalResponse['riskClass']) ?? null,
+    toolVersion: tool?.toolVersion ?? null,
+    intentHash: approval.intentHash,
+    preview: null,
+    disclosure: approval.intentHash ? 'unavailable' : 'legacy',
     requestedReason: approval.requestedReason,
     expiresAt: approval.expiresAt?.toISOString() ?? null,
     decidedAt: approval.decidedAt?.toISOString() ?? null,
     createdAt: approval.createdAt.toISOString(),
   }
 }
+
+/** Closed private select for authority checks; never spread this row into a DTO. */
+export const APPROVAL_TOOL_SELECT = {
+  id: true,
+  toolId: true,
+  riskClass: true,
+  toolVersion: true,
+  inputSchemaHash: true,
+  normalizedSchemaHash: true,
+  idempotency: true,
+  intentSnapshot: true,
+  intentHash: true,
+  argsSnapshot: true,
+  originCall: true,
+} as const

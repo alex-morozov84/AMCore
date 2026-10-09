@@ -36,7 +36,8 @@ export class UnresolvedConditionPlaceholderError extends Error {
 
 export function interpolateConditions(
   conditions: Record<string, unknown>,
-  principal: RequestPrincipal
+  principal: Pick<RequestPrincipal, 'sub' | 'organizationId'> &
+    Partial<Omit<RequestPrincipal, 'sub' | 'organizationId'>>
 ): Record<string, unknown> {
   // Convert to JSON string, replace all ${...} templates, parse back
   return JSON.parse(

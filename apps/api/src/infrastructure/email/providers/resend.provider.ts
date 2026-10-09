@@ -57,7 +57,7 @@ export class ResendEmailProvider implements EmailProvider {
       throw new Error('RESEND_API_KEY is required for Resend provider')
     }
 
-    this.resend = new Resend(apiKey)
+    this.resend = new Resend(apiKey, { baseUrl: 'https://api.resend.com' })
     // The SDK's private `logError` prints the RAW parsed provider error (message text and all)
     // to the console whenever NODE_ENV !== 'production'. Neutralize it on THIS instance — no
     // global console patch, no NODE_ENV mutation — so the no-raw-provider-text invariant
@@ -65,6 +65,40 @@ export class ResendEmailProvider implements EmailProvider {
     // real-SDK contract test that fails if a future SDK changes this surface.
     ;(this.resend as unknown as { logError: () => void }).logError = () => undefined
     this.logger.info('Resend provider initialized')
+  }
+
+  async sendPrepared(
+    body: string,
+    idempotencyKey: string,
+    signal: AbortSignal
+  ): Promise<SendEmailResult> {
+    try {
+      const { data, error, headers } = await this.resend.fetchRequest<{ id: string }>('/emails', {
+        method: 'POST',
+        body,
+        signal,
+        headers: {
+          Authorization: `Bearer ${this.env.get('RESEND_API_KEY')}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+      })
+      if (!error) return { id: data?.id ?? '', success: true }
+      const retryable = !DETERMINISTIC_RESEND_ERROR_CODES.has(error.name)
+      const known =
+        !retryable ||
+        ['rate_limit_exceeded', 'application_error', 'internal_server_error'].includes(error.name)
+      const retryAfterMs = retryable ? parseRetryAfterMs(headers?.['retry-after']) : undefined
+      return {
+        id: '',
+        success: false,
+        error: known ? error.name : 'provider_failure',
+        retryable,
+        ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
+      }
+    } catch {
+      return { id: '', success: false, error: 'provider_failure', retryable: true }
+    }
   }
 
   async send(params: SendEmailParams): Promise<SendEmailResult> {

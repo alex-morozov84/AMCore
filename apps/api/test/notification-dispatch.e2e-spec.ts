@@ -5,6 +5,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { ChannelDelivererRegistry } from '../src/core/notifications/channels/channel-deliverer.registry'
 import { EmailChannelDeliverer } from '../src/core/notifications/channels/email-channel.deliverer'
+import { NotificationChannelRegistry } from '../src/core/notifications/channels/notification-channel.registry'
 import { NotificationAttemptAdmission } from '../src/core/notifications/dispatch/notification-attempt-admission'
 import { NotificationDeliveryRepository } from '../src/core/notifications/dispatch/notification-delivery.repository'
 import { NotificationDispatchGate } from '../src/core/notifications/dispatch/notification-dispatch.gate'
@@ -13,6 +14,7 @@ import type {
   ClaimedDelivery,
   ReapResult,
 } from '../src/core/notifications/dispatch/notification-dispatch.types'
+import { NotificationPreparedRequestService } from '../src/core/notifications/dispatch/notification-prepared-request.service'
 import {
   CUTOFF,
   NotificationShutdownLatch,
@@ -117,6 +119,7 @@ describe('Notification dispatch (e2e)', () => {
     const row = await prisma.notificationDelivery.create({
       data: {
         notificationId,
+        requestContractVersion: 1,
         channel: NotificationChannel.EMAIL,
         targetKey: `dispatch-${Date.now()}-${seq}@example.com`,
         locale: 'en',
@@ -291,8 +294,13 @@ describe('Notification dispatch (e2e)', () => {
       logger
     )
     const email = new EmailService(provider, queue, env, logger, metrics)
-    const adapter = new EmailChannelDeliverer(app.get(NotificationDefinitionRegistry), email, env)
     const latch = new NotificationShutdownLatch(logger)
+    const adapter = new EmailChannelDeliverer(
+      app.get(NotificationDefinitionRegistry),
+      email,
+      env,
+      new NotificationPreparedRequestService(prisma, app.get(NotificationChannelRegistry), latch)
+    )
     const localRepository = new NotificationDeliveryRepository(prisma, latch)
     const service = new NotificationDispatchService(
       prisma,

@@ -7,6 +7,8 @@ import type {
 import { MockAiAdapter } from '../../src/infrastructure/ai/gateway/providers/mock.adapter'
 import type { AiTool, AiToolContext } from '../../src/infrastructure/ai/tools/ai-tool.types'
 
+import { fixtureToolContract } from './extension-contracts/tool-registration'
+
 import { AiToolRiskClass } from '@/generated/prisma/client'
 
 /**
@@ -62,6 +64,7 @@ export const archiveDocumentTool: AiTool<z.infer<typeof noArgs>> = {
   displayName: 'Archive document',
   description: 'Archives the current document (a side effect). Takes no arguments.',
   parameters: noArgs,
+  ...fixtureToolContract(noArgs),
   riskClass: AiToolRiskClass.SAFE,
   idempotency: 'idempotent',
   async execute(_args, ctx) {
@@ -79,6 +82,7 @@ export const lookupItemTool: AiTool<z.infer<typeof noArgs>> = {
   displayName: 'Lookup item',
   description: 'Reads an item (no side effect). Takes no arguments.',
   parameters: noArgs,
+  ...fixtureToolContract(noArgs),
   riskClass: AiToolRiskClass.SAFE,
   idempotency: 'read_only',
   async execute(_args, ctx) {

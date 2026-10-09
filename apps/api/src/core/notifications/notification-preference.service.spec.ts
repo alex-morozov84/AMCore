@@ -77,10 +77,12 @@ describe('NotificationPreferenceService', () => {
 
     it('keeps a mixed mandatory/optional category overridable', () => {
       const local = new NotificationPreferenceService(
-        new NotificationDefinitionRegistry([
-          definition('security.mandatory', [NotificationChannel.IN_APP]),
-          definition('security.optional', []),
-        ]),
+        new NotificationDefinitionRegistry(
+          [
+            definition('security.mandatory', [NotificationChannel.IN_APP]),
+            definition('security.optional', []),
+          ].map((definition) => ({ definition, current: true }))
+        ),
         preferences
       )
 
@@ -116,9 +118,12 @@ describe('NotificationPreferenceService', () => {
 
     it('rejects changing a mandatory channel', async () => {
       const local = new NotificationPreferenceService(
-        new NotificationDefinitionRegistry([
-          definition('security.mandatory', [NotificationChannel.IN_APP]),
-        ]),
+        new NotificationDefinitionRegistry(
+          [definition('security.mandatory', [NotificationChannel.IN_APP])].map((definition) => ({
+            definition,
+            current: true,
+          }))
+        ),
         preferences
       )
 
@@ -133,10 +138,12 @@ describe('NotificationPreferenceService', () => {
 
     it('allows an override when at least one definition in the category is optional', async () => {
       const local = new NotificationPreferenceService(
-        new NotificationDefinitionRegistry([
-          definition('security.mandatory', [NotificationChannel.IN_APP]),
-          definition('security.optional', []),
-        ]),
+        new NotificationDefinitionRegistry(
+          [
+            definition('security.mandatory', [NotificationChannel.IN_APP]),
+            definition('security.optional', []),
+          ].map((definition) => ({ definition, current: true }))
+        ),
         preferences
       )
 

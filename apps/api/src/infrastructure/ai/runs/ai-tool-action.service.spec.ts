@@ -1,8 +1,13 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { z } from 'zod'
 
+import {
+  FixtureToolAuthority,
+  fixtureToolContract,
+} from '../../../../test/fixtures/extension-contracts/tool-registration'
 import type { AiTextResult } from '../gateway/ai-gateway.types'
 import type { AiTool } from '../tools/ai-tool.types'
+import { AiToolContractRegistry } from '../tools/ai-tool-contract.registry'
 import { AiToolRejectedError, AiToolRetryableError } from '../tools/ai-tool-error'
 
 import type { AiRunRepository } from './ai-run.repository'
@@ -14,6 +19,7 @@ import type { AiRunTransitions } from './ai-run-transitions.service'
 import { AiToolActionService, type ToolRunContext } from './ai-tool-action.service'
 import type { InvocationRow } from './ai-tool-invocation.store'
 
+import { canonicalJsonHash } from '@/common/utils/canonical-json'
 import type { AuditLogService } from '@/core/audit'
 import type { EnvService } from '@/env/env.service'
 import { AiToolInvocationStatus, AiToolRiskClass } from '@/generated/prisma/client'
@@ -63,6 +69,7 @@ function makeTool(
     displayName: 'Archive',
     description: 'archive',
     parameters: z.object({ documentId: z.string() }).strict(),
+    ...fixtureToolContract(z.object({ documentId: z.string() }).strict()),
     riskClass: AiToolRiskClass.SAFE,
     idempotency: 'idempotent',
     execute,
@@ -71,7 +78,34 @@ function makeTool(
 }
 
 function row(over: Partial<InvocationRow> = {}): InvocationRow {
+  const tool = makeTool()
+  const registry = new AiToolContractRegistry([tool], [new FixtureToolAuthority()])
+  const contract = registry.get(tool.toolId)!
+  const intent = {
+    inputHash: canonicalJsonHash({ documentId: 'd1' }),
+    formatVersion: 1,
+    toolId: tool.toolId,
+    toolVersion: 1,
+    inputSchemaHash: contract.inputSchemaHash,
+    normalizedSchemaHash: contract.normalizedSchemaHash,
+    runId: CLAIM.id,
+    conversationId: CLAIM.conversationId,
+    invocationId: 'inv-1',
+    originCall: 1,
+    ownerUserId: 'u1',
+    organizationId: null,
+    args: { documentId: 'd1' },
+    target: { kind: 'fixture', id: 'fixture-target', revision: 1 },
+    preview: null,
+    riskClass: over.riskClass ?? 'SAFE',
+    idempotency: over.idempotency ?? 'idempotent',
+  }
   return {
+    intentSnapshot: intent as never,
+    intentHash: canonicalJsonHash(intent),
+    toolVersion: 1,
+    inputSchemaHash: contract.inputSchemaHash,
+    normalizedSchemaHash: contract.normalizedSchemaHash,
     id: 'inv-1',
     toolId: 'archive_document',
     riskClass: 'SAFE',
@@ -92,13 +126,14 @@ describe('AiToolActionService', () => {
   let admitKind: 'ok' | 'stopped' | 'lease_lost' | 'cutoff'
   let admitCause: StopCause
   let recordKind: 'ok' | 'lease_lost' | 'cutoff'
-  let guard: { admit: jest.Mock; record: jest.Mock }
+  let guard: { admit: jest.Mock; record: jest.Mock; revalidateAdmission: jest.Mock }
   let repository: DeepMockProxy<AiRunRepository>
   let transitions: { stop: jest.Mock }
   let metrics: { incAiToolInvocation: jest.Mock }
   let audit: { record: jest.Mock }
   let service: AiToolActionService
   let ctx: ToolRunContext
+  let contracts: AiToolContractRegistry
   const logger = { setContext: jest.fn(), warn: jest.fn(), error: jest.fn() }
 
   beforeEach(() => {
@@ -119,6 +154,7 @@ describe('AiToolActionService', () => {
     repository.finalizeSuperseded.mockResolvedValue(true)
     repository.finalizeExpired.mockResolvedValue(true)
     guard = {
+      revalidateAdmission: jest.fn().mockResolvedValue(undefined),
       admit: jest.fn(async (_c: ClaimedRun, fn: (t: unknown, g: object) => Promise<unknown>) => {
         if (admitKind === 'stopped') return { kind: 'stopped', cause: admitCause }
         if (admitKind !== 'ok') return { kind: admitKind }
@@ -138,6 +174,10 @@ describe('AiToolActionService', () => {
     metrics = { incAiToolInvocation: jest.fn() }
     audit = { record: jest.fn().mockResolvedValue(undefined) }
     const env = { get: jest.fn(() => 200) } as unknown as EnvService
+    contracts = new AiToolContractRegistry([makeTool()], [new FixtureToolAuthority()])
+    tx.aiConversation.findUnique.mockResolvedValue({
+      assistant: { toolAllowlist: ['archive_document'] },
+    } as never)
     service = new AiToolActionService(
       guard as unknown as AiRunGuard,
       repository,
@@ -146,7 +186,8 @@ describe('AiToolActionService', () => {
       metrics as unknown as MetricsService,
       audit as unknown as AuditLogService,
       new ShutdownLatch({ warn: jest.fn() }, 'ai.run'),
-      logger as never
+      logger as never,
+      contracts
     )
     ctx = {
       claim: CLAIM,
@@ -237,8 +278,14 @@ describe('AiToolActionService', () => {
   })
 
   describe('execute — start, run, record', () => {
-    const start = (action = row(), tool = makeTool(), args?: unknown) =>
-      service.execute(ctx, action, tool, 'call-1', args)
+    const start = (action = row(), tool = makeTool(), args?: unknown) => {
+      const configured = new AiToolContractRegistry([tool], [new FixtureToolAuthority()])
+      jest
+        .spyOn(contracts, 'compatible')
+        .mockImplementation((intent) => configured.compatible(intent))
+      jest.spyOn(contracts, 'get').mockImplementation((id) => configured.get(id))
+      return service.execute(ctx, action, tool, 'call-1', args)
+    }
 
     it('runs the tool once, applies the SUCCEEDED result, and returns the round to continue', async () => {
       const execute = jest.fn(async (..._args: unknown[]) => ({ output: 'archived' }))
@@ -258,7 +305,8 @@ describe('AiToolActionService', () => {
         invocationId: 'inv-1',
       })
       expect(ctx.runtime.onTransportStarted).toHaveBeenCalledTimes(1)
-      expect(guard.admit.mock.calls[0]![2]).toEqual({ markIoStarted: true })
+      expect(guard.revalidateAdmission).toHaveBeenCalled()
+      expect(tx.$executeRaw).toHaveBeenCalled() // ioStarted follows authority + fresh admission
       expect(metrics.incAiToolInvocation).toHaveBeenCalledWith(
         'archive_document',
         'safe',
@@ -458,7 +506,9 @@ describe('AiToolActionService', () => {
         const step = await start(row(), makeTool({}, execute))
 
         expect(step.status).toBe('succeeded')
-        expect(execute.mock.calls[0]![0]).toEqual({ documentId: 'd1' })
+        expect(execute.mock.calls[0]![0]).toEqual(
+          expect.objectContaining({ args: { documentId: 'd1' }, toolVersion: 1 })
+        )
       })
 
       it('fails CLOSED (tool_schema_incompatible) when the stored input no longer parses to itself — never executed', async () => {
@@ -518,7 +568,8 @@ describe('AiToolActionService', () => {
         metrics as unknown as MetricsService,
         audit as unknown as AuditLogService,
         latch,
-        logger as never
+        logger as never,
+        contracts
       )
       guard.admit.mockImplementationOnce(async () => {
         queueMicrotask(() => latch.seal())
@@ -543,7 +594,8 @@ describe('AiToolActionService', () => {
         metrics as unknown as MetricsService,
         audit as unknown as AuditLogService,
         sealed,
-        logger as never
+        logger as never,
+        contracts
       )
       // The seal lands while the tool runs; the guarded result commit has already been recorded.
       const tool = makeTool({}, async () => {

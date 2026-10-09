@@ -220,6 +220,24 @@ the **right** list — a misplaced processor runs in the wrong process:
   worker only).
 - **Genuinely shared infrastructure / producers** → `coreImports`.
 
+### Shared configured extension modules
+
+Notification and AI tool registrations each construct their configured core once.
+Import the static facade (`NotificationsModule` or `AiToolContractsModule`) from
+consumers; worker factories and optional channel web factories receive that same
+core identity. Register recipient readers and domain authority dependencies in the
+core graph, transport clients and effect executors only in worker modules. A web
+process can normalize, persist and authorize intent without gaining execution
+capability. A JavaScript file import alone does not prove a Nest provider exists
+in that role; verify the compiled module graph.
+
+For transaction-aware current domain checks, use `DomainAuthorizationModule` and
+`DomainAuthorizationService` with the caller's transaction. They do not require
+JWT guards, HTTP context or a fabricated privileged principal. Mutation must lock
+rights/revision state and check permission in the same transaction as the effect;
+preparation or approval is not a substitute. See [channel composition](../notifications/channels.md)
+and [tool registration and approvals](../ai/tools-and-approvals.md).
+
 ## Adding an environment variable
 
 Env is validated once at boot by a Zod schema. It is split into domain sections

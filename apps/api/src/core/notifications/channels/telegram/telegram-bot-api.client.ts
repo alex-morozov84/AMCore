@@ -73,6 +73,14 @@ export class TelegramBotApiClient {
     return classifySend(outcome.httpStatus, outcome.body)
   }
 
+  async sendPreparedMessage(body: string, signal: AbortSignal): Promise<TelegramSendResult> {
+    const outcome = await this.call('sendMessage', body, signal)
+    if (outcome === 'transport_error') {
+      return { status: 'transient', errorCode: TelegramDeliveryError.PROVIDER_TRANSIENT }
+    }
+    return classifySend(outcome.httpStatus, outcome.body)
+  }
+
   /**
    * Deploy-time `setWebhook` (used by the setup CLI). Returns whether Telegram accepted it (HTTP
    * 2xx + `ok:true`); never surfaces the token-bearing URL. `allowed_updates:['message']` narrows
@@ -95,7 +103,7 @@ export class TelegramBotApiClient {
    */
   private async call(
     method: string,
-    payload: object,
+    payload: object | string,
     externalSignal?: AbortSignal
   ): Promise<BotApiCall> {
     const token = this.env.get('TELEGRAM_BOT_TOKEN')
@@ -108,7 +116,7 @@ export class TelegramBotApiClient {
       const response = await fetch(`${baseUrl}/bot${token}/${method}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: typeof payload === 'string' ? payload : JSON.stringify(payload),
         signal: externalSignal
           ? AbortSignal.any([controller.signal, externalSignal])
           : controller.signal,

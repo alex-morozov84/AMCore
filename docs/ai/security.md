@@ -52,7 +52,12 @@ integration.
   nothing (see [Runs](./runs.md#ownership-only-the-current-worker-writes)).
 - A side-effecting tool is never replayed after an uncertain outcome; the run
   stops with `tool_effect_unknown` and the uncertain action stays visible
-  (see [Tools and approvals](./tools-and-approvals.md#side-effects-and-uncertain-outcomes)).
+  (see [Tools and approvals](./tools-and-approvals.md#replay-effects-and-uncertain-outcomes)).
+- Approval previews are immutable plain text bound to the action hash. Only the
+  owner with current domain read rights sees the preview; approval and execution
+  recheck current rights. SUPER_ADMIN cannot decide for another owner. Raw intent,
+  arguments and prepared notification requests remain private and outside Console
+  diagnostics and queue payloads.
 - Attempt history and terminal reasons carry bounded codes without prompt,
   output or tool arguments. History is keyed by run and epoch; the guard's
   admission metric has no run, conversation or user identifiers in its labels.

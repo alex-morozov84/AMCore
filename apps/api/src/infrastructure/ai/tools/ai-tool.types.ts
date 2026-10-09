@@ -1,5 +1,9 @@
+import type { DynamicModule, InjectionToken, Type } from '@nestjs/common'
 import type { ZodType } from 'zod'
 
+import type { AiApprovalPreview, SupportedLocale } from '@amcore/shared'
+
+import type { Prisma } from '@/generated/prisma/client'
 import type { AiToolRiskClass } from '@/generated/prisma/client'
 
 /**
@@ -52,15 +56,66 @@ export interface AiToolResult {
 }
 
 /** A code-owned tool definition. `TParams` is inferred from `parameters`. */
-export interface AiTool<TParams = unknown> {
+export interface AiToolContract<TInput = unknown, TArgs = TInput> {
+  readonly contractVersion: number
+  readonly normalizedSchema: ZodType<TArgs>
+  readonly authority: { module: Type<unknown>; token: InjectionToken }
   readonly toolId: string
   readonly displayName: string
   /** Provider-facing description — what the tool does and when to use it. No secrets. */
   readonly description: string
-  readonly parameters: ZodType<TParams>
+  readonly parameters: ZodType<TInput>
   readonly riskClass: AiToolRiskClass
   readonly idempotency: AiToolIdempotency
-  execute(args: TParams, ctx: AiToolContext): Promise<AiToolResult>
+}
+
+export interface AiToolPreparation<TParams = unknown> {
+  args: TParams
+  target: { kind: string; id: string; revision: number } | null
+  preview: Partial<Record<SupportedLocale, AiApprovalPreview>> | null
+}
+
+export interface AiToolIntent<TParams = unknown> extends AiToolPreparation<TParams> {
+  formatVersion: 1
+  toolId: string
+  toolVersion: number
+  inputSchemaHash: string
+  inputHash: string
+  normalizedSchemaHash: string
+  runId: string
+  conversationId: string
+  invocationId: string
+  originCall: number
+  ownerUserId: string
+  organizationId: string | null
+  riskClass: AiToolRiskClass
+  idempotency: AiToolIdempotency
+}
+
+export interface AiTool<TInput = unknown, TArgs = TInput> extends AiToolContract<TInput, TArgs> {
+  /** Resolve indirect input to the exact effect. No transport I/O or business mutation here. */
+  prepare(
+    input: TInput,
+    ctx: AiToolContext,
+    tx: Prisma.TransactionClient
+  ): Promise<AiToolPreparation<TArgs>>
+  execute(intent: AiToolIntent<TArgs>, ctx: AiToolContext): Promise<AiToolResult>
+}
+
+/** Headless read/execute authority; safe to instantiate in the web role. */
+export interface AiToolAuthority {
+  canDisclose(tx: Prisma.TransactionClient, intent: AiToolIntent): Promise<boolean>
+  authorize(
+    tx: Prisma.TransactionClient,
+    intent: AiToolIntent,
+    phase: 'prepare' | 'approve' | 'execute'
+  ): Promise<void>
+}
+
+export interface AiToolRegistration {
+  contract: AiToolContract
+  worker: (core: Type<unknown>) => DynamicModule
+  executorToken: InjectionToken
 }
 
 /**

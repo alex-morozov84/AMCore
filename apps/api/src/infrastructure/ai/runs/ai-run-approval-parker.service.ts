@@ -1,8 +1,12 @@
+import { randomUUID } from 'node:crypto'
+
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { AiTextResult } from '../gateway/ai-gateway.types'
 import type { AiTool } from '../tools/ai-tool.types'
+import { AiToolContractRegistry } from '../tools/ai-tool-contract.registry'
+import { prepareToolIntent, toolIntentData } from '../tools/ai-tool-intent'
 
 import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun } from './ai-run-dispatch.types'
@@ -47,7 +51,8 @@ export class AiRunApprovalParker {
     private readonly env: EnvService,
     private readonly audit: AuditLogService,
     private readonly metrics: MetricsService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly contracts: AiToolContractRegistry
   ) {
     this.logger.setContext(AiRunApprovalParker.name)
   }
@@ -66,7 +71,6 @@ export class AiRunApprovalParker {
     tool: AiTool,
     args: unknown
   ): Promise<ParkOutcome> {
-    const expiresAt = this.approvalExpiry(claim)
     const outcome = await this.guard.record(claim, async (tx, ctx): Promise<ParkOutcome> => {
       if ((await findByOrigin(tx, claim.id, ordinal)) !== null) return 'exit'
       if ((await providerCallCount(tx, claim.id)) >= ordinal) return 'exit'
@@ -76,6 +80,45 @@ export class AiRunApprovalParker {
         await applyStop(tx, this.repository, claim, ctx.stop)
         return 'terminal'
       }
+      let prepared
+      try {
+        if (!plan.attribution.userId) throw new Error('tool_owner_missing')
+        const invocationId = randomUUID().replaceAll('-', '')
+        prepared = await prepareToolIntent(
+          tool,
+          args,
+          {
+            runId: claim.id,
+            conversationId: claim.conversationId,
+            ownerUserId: plan.attribution.userId,
+            organizationId: plan.attribution.organizationId,
+            invocationId,
+            idempotencyKey: `ai-tool:${invocationId}`,
+            signal: AbortSignal.timeout(this.env.get('AI_TOOL_EXECUTION_TIMEOUT_MS')),
+          },
+          tx,
+          ordinal,
+          this.contracts
+        )
+      } catch {
+        if (
+          !(await this.repository.finalizeFailed(
+            tx,
+            claim,
+            'tool_loop_failed',
+            'tool_args_invalid'
+          ))
+        ) {
+          throw new RunLeaseLostError()
+        }
+        return 'terminal'
+      }
+      const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
+      if (claim.deadlineAt && claim.deadlineAt <= clock!.now) {
+        await applyStop(tx, this.repository, claim, 'expired')
+        return 'terminal'
+      }
+      const expiresAt = this.approvalExpiry(claim, clock!.now)
       const approval = await tx.aiApproval.create({
         data: {
           runId: claim.id,
@@ -83,6 +126,7 @@ export class AiRunApprovalParker {
           kind: AiApprovalKind.TOOL_INVOCATION,
           state: AiApprovalState.PENDING,
           expiresAt,
+          intentHash: prepared.hash,
         },
         select: { id: true },
       })
@@ -95,7 +139,7 @@ export class AiRunApprovalParker {
           idempotency: tool.idempotency,
           originCall: ordinal,
           approvalId: approval.id,
-          argsSnapshot: args as Prisma.InputJsonValue,
+          ...toolIntentData(prepared),
         },
         select: { id: true },
       })
@@ -117,8 +161,8 @@ export class AiRunApprovalParker {
   }
 
   /** Approval TTL from now, but never later than the run's own deadline (whichever is tighter). */
-  private approvalExpiry(claim: ClaimedRun): Date {
-    const ttlExpiry = new Date(Date.now() + this.env.get('AI_APPROVAL_TTL_MS'))
+  private approvalExpiry(claim: ClaimedRun, now: Date): Date {
+    const ttlExpiry = new Date(now.getTime() + this.env.get('AI_APPROVAL_TTL_MS'))
     if (claim.deadlineAt !== null && claim.deadlineAt < ttlExpiry) return claim.deadlineAt
     return ttlExpiry
   }

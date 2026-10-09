@@ -1,51 +1,68 @@
-import { Module } from '@nestjs/common'
+import { type DynamicModule, Module } from '@nestjs/common'
 
 import { PrismaModule } from '../../prisma'
 
 import { ChannelTargetResolverRegistry } from './channels/channel-target-resolver.registry'
+import type { ChannelTargetResolver } from './channels/channel-target-resolver.types'
+import { NotificationChannelRegistry } from './channels/notification-channel.registry'
+import type { NotificationChannelDescriptor } from './channels/notification-channel.types'
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
+import type { NotificationDefinitionRegistration } from './notification-definition.types'
 import { NotificationPreferenceRepository } from './notification-preference.repository'
 import { NotificationPreferenceResolver } from './notification-preference.resolver'
 import { NotificationsService } from './notifications.service'
 import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
+import { EnvService } from '@/env/env.service'
 import { QueueModule } from '@/infrastructure/queue'
 
-/**
- * Notifications core (ADR-052/053): the definition registry, preference resolver/repo,
- * produce-time channel target resolvers, the `NotificationsService` producer, and the
- * realtime `NotificationRealtimePublisher` (every role may publish a hint). No
- * controller, processor, cron, SSE route, or Pub/Sub subscriber — those belong to the
- * web/worker modules. Imported by every process role via `coreImports()`. `QueueModule`
- * supplies the `QueueService` the producer uses to best-effort wake the dispatcher.
- */
-@Module({
-  imports: [PrismaModule, QueueModule],
-  providers: [
-    // Default-construct via factory: the registry's `definitions` constructor param
-    // is an Array, which has no DI token — Nest would fail to resolve it. The
-    // factory keeps the shipped `NOTIFICATION_DEFINITIONS` as the implicit default
-    // while leaving tests free to construct with a custom set directly (`new
-    // NotificationDefinitionRegistry([...])`).
-    {
-      provide: NotificationDefinitionRegistry,
-      useFactory: (): NotificationDefinitionRegistry => new NotificationDefinitionRegistry(),
-    },
-    // Same factory pattern: the resolver-array constructor param has no DI token.
-    {
-      provide: ChannelTargetResolverRegistry,
-      useFactory: (): ChannelTargetResolverRegistry => new ChannelTargetResolverRegistry(),
-    },
-    NotificationPreferenceResolver,
-    NotificationPreferenceRepository,
-    NotificationRealtimePublisher,
-    NotificationsService,
-  ],
-  exports: [
-    NotificationsService,
-    NotificationDefinitionRegistry,
-    NotificationPreferenceRepository,
-    NotificationRealtimePublisher,
-  ],
-})
-export class NotificationsCoreModule {}
+export interface NotificationRegistration {
+  definitions: readonly NotificationDefinitionRegistration[]
+  channels: readonly NotificationChannelDescriptor[]
+}
+
+/** Construct once and re-export through a static application facade. */
+@Module({})
+export class NotificationsCoreModule {
+  static register({ definitions, channels }: NotificationRegistration): DynamicModule {
+    return {
+      module: NotificationsCoreModule,
+      imports: [PrismaModule, QueueModule, ...channels.map((channel) => channel.core.module)],
+      providers: [
+        {
+          provide: NotificationChannelRegistry,
+          useFactory: (env: EnvService) => new NotificationChannelRegistry(channels, env),
+          inject: [EnvService],
+        },
+        {
+          provide: NotificationDefinitionRegistry,
+          useFactory: (registry: NotificationChannelRegistry) =>
+            new NotificationDefinitionRegistry(definitions, registry),
+          inject: [NotificationChannelRegistry],
+        },
+        {
+          provide: ChannelTargetResolverRegistry,
+          useFactory: (...resolvers: ChannelTargetResolver[]) => {
+            for (const [index, resolver] of resolvers.entries()) {
+              if (resolver.channel !== channels[index]?.id)
+                throw new Error('Channel reader token mismatch')
+            }
+            return new ChannelTargetResolverRegistry(resolvers)
+          },
+          inject: channels.map((channel) => channel.core.token),
+        },
+        NotificationPreferenceResolver,
+        NotificationPreferenceRepository,
+        NotificationRealtimePublisher,
+        NotificationsService,
+      ],
+      exports: [
+        NotificationsService,
+        NotificationDefinitionRegistry,
+        NotificationChannelRegistry,
+        NotificationPreferenceRepository,
+        NotificationRealtimePublisher,
+      ],
+    }
+  }
+}

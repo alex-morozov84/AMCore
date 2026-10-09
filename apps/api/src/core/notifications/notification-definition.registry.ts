@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import type { SupportedLocale } from '@amcore/shared'
 
+import type { NotificationChannelRegistry } from './channels/notification-channel.registry'
 import { NOTIFICATION_DEFINITIONS } from './definitions'
 import type { NotificationExternalMode } from './notification.constants'
 import {
@@ -13,6 +14,7 @@ import type {
   CategoryCapability,
   NotificationCapabilities,
   NotificationDefinition,
+  NotificationDefinitionRegistration,
   RenderedNotificationContent,
 } from './notification-definition.types'
 import { validateDefinition } from './notification-definition.validation'
@@ -28,17 +30,42 @@ import { validateDefinition } from './notification-definition.validation'
 @Injectable()
 export class NotificationDefinitionRegistry {
   private readonly byType = new Map<string, NotificationDefinition>()
+  private readonly byVersion = new Map<string, NotificationDefinition>()
 
-  constructor(definitions: readonly NotificationDefinition[] = NOTIFICATION_DEFINITIONS) {
-    for (const definition of definitions) this.register(definition)
+  constructor(
+    definitions: readonly NotificationDefinitionRegistration[] = NOTIFICATION_DEFINITIONS,
+    private readonly channels?: NotificationChannelRegistry
+  ) {
+    for (const entry of definitions) {
+      this.register(entry)
+    }
+    for (const definition of this.byVersion.values()) {
+      if (!this.byType.has(definition.type)) {
+        throw new Error(`No current notification definition: ${definition.type}`)
+      }
+    }
   }
 
-  private register(definition: NotificationDefinition): void {
-    validateDefinition(definition)
-    if (this.byType.has(definition.type)) {
-      throw new DuplicateNotificationDefinitionError(definition.type)
+  private register({ definition, current }: NotificationDefinitionRegistration): void {
+    validateDefinition(definition, this.channels?.ids())
+    const key = `${definition.type}:${definition.schemaVersion}`
+    if (this.byVersion.has(key) || (current && this.byType.has(definition.type))) {
+      throw new DuplicateNotificationDefinitionError(key)
     }
-    this.byType.set(definition.type, definition)
+    this.byVersion.set(key, definition)
+    if (current) this.byType.set(definition.type, definition)
+  }
+
+  getCurrent(type: string): NotificationDefinition {
+    const definition = this.byType.get(type)
+    if (!definition) throw new UnknownNotificationTypeError(type)
+    return definition
+  }
+
+  getStored(type: string, schemaVersion: number): NotificationDefinition {
+    const definition = this.byVersion.get(`${type}:${schemaVersion}`)
+    if (!definition) throw new UnknownNotificationTypeError(`${type}:${schemaVersion}`)
+    return definition
   }
 
   has(type: string): boolean {
@@ -47,9 +74,7 @@ export class NotificationDefinitionRegistry {
 
   /** Resolve a definition or throw `UnknownNotificationTypeError`. */
   get(type: string): NotificationDefinition {
-    const definition = this.byType.get(type)
-    if (!definition) throw new UnknownNotificationTypeError(type)
-    return definition
+    return this.getCurrent(type)
   }
 
   list(): NotificationDefinition[] {
@@ -90,12 +115,15 @@ export class NotificationDefinitionRegistry {
       }
       const mandatory = new Set(definition.mandatoryChannels)
       for (const channel of definition.supportedChannels) {
+        if (this.channels && !this.channels.available(channel)) continue
         sets.supported.add(channel)
         all.add(channel)
         // Optional in THIS definition → a user override can affect it somewhere.
         if (!mandatory.has(channel)) sets.overridable.add(channel)
       }
-      for (const channel of definition.mandatoryChannels) sets.mandatory.add(channel)
+      for (const channel of definition.mandatoryChannels) {
+        if (!this.channels || this.channels.available(channel)) sets.mandatory.add(channel)
+      }
       byCategory.set(definition.category, sets)
     }
 
@@ -119,8 +147,9 @@ export class NotificationDefinitionRegistry {
    * back to a neutral item rather than failing the whole feed page.
    *
    * Extension rule: changing a definition's payload schema requires bumping
-   * `schemaVersion` and retaining a renderer/migrator for older versions within the
-   * retention window (a fork adds version-aware rendering here).
+   * `schemaVersion` and registering retained definitions for referenced stored versions.
+   * Retire a version only after primary inventory shows no dependent rows or an explicit
+   * reviewed migration removes those dependencies; age alone is insufficient.
    */
   renderStored(
     type: string,
@@ -129,8 +158,8 @@ export class NotificationDefinitionRegistry {
     locale: SupportedLocale
   ): RenderedNotificationContent {
     const fallback: RenderedNotificationContent = { title: type, body: '' }
-    const definition = this.byType.get(type)
-    if (!definition || definition.schemaVersion !== schemaVersion) return fallback
+    const definition = this.byVersion.get(`${type}:${schemaVersion}`)
+    if (!definition) return fallback
 
     const parsed = definition.payloadSchema.safeParse(payload)
     if (!parsed.success) return fallback

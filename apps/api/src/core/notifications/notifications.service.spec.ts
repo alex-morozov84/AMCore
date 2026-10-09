@@ -86,7 +86,9 @@ describe('NotificationsService', () => {
     logger = mockDeep<PinoLogger>()
     service = new NotificationsService(
       prisma,
-      new NotificationDefinitionRegistry([testDefinition]),
+      new NotificationDefinitionRegistry(
+        [testDefinition].map((definition) => ({ definition, current: true }))
+      ),
       new NotificationPreferenceResolver(),
       preferences,
       // In-app-only test definition → no external resolver is exercised; empty registry.
@@ -140,7 +142,9 @@ describe('NotificationsService', () => {
   it('materializes a PENDING email delivery and wakes the dispatcher (verified recipient)', async () => {
     const emailService = new NotificationsService(
       prisma,
-      new NotificationDefinitionRegistry([emailDefinition]),
+      new NotificationDefinitionRegistry(
+        [emailDefinition].map((definition) => ({ definition, current: true }))
+      ),
       new NotificationPreferenceResolver(),
       preferences,
       new ChannelTargetResolverRegistry(), // default registry → real EmailTargetResolver
@@ -174,7 +178,9 @@ describe('NotificationsService', () => {
   it('does not publish a realtime hint for an external-only notification', async () => {
     const externalOnlyService = new NotificationsService(
       prisma,
-      new NotificationDefinitionRegistry([emailOnlyDefinition]),
+      new NotificationDefinitionRegistry(
+        [emailOnlyDefinition].map((definition) => ({ definition, current: true }))
+      ),
       new NotificationPreferenceResolver(),
       preferences,
       new ChannelTargetResolverRegistry(),
@@ -210,7 +216,9 @@ describe('NotificationsService', () => {
   it('materializes a PENDING Telegram delivery for an ACTIVE linked connection', async () => {
     const telegramService = new NotificationsService(
       prisma,
-      new NotificationDefinitionRegistry([telegramDefinition]),
+      new NotificationDefinitionRegistry(
+        [telegramDefinition].map((definition) => ({ definition, current: true }))
+      ),
       new NotificationPreferenceResolver(),
       preferences,
       new ChannelTargetResolverRegistry(), // default registry → real TelegramTargetResolver
@@ -250,7 +258,9 @@ describe('NotificationsService', () => {
   it('writes a SKIPPED email delivery and does not wake for an unverified recipient', async () => {
     const emailService = new NotificationsService(
       prisma,
-      new NotificationDefinitionRegistry([emailDefinition]),
+      new NotificationDefinitionRegistry(
+        [emailDefinition].map((definition) => ({ definition, current: true }))
+      ),
       new NotificationPreferenceResolver(),
       preferences,
       new ChannelTargetResolverRegistry(),
@@ -299,6 +309,8 @@ describe('NotificationsService', () => {
     prisma.notification.createManyAndReturn.mockResolvedValue([] as never)
     prisma.notification.findUniqueOrThrow.mockResolvedValue({
       id: 'existing',
+      type: 'account.test',
+      schemaVersion: 1,
       idempotencyFingerprint: fingerprint,
     } as never)
     // Replay reports the channels actually persisted, queried from the deliveries.
@@ -317,10 +329,101 @@ describe('NotificationsService', () => {
     expect(realtime.publish).not.toHaveBeenCalled()
   })
 
+  it('replays an existing key using its stored version and delivery targets after a current-version change', async () => {
+    const v1 = { ...testDefinition, payloadSchema: z.object({ value: z.string().trim() }) }
+    const v2 = {
+      ...emailDefinition,
+      type: testDefinition.type,
+      schemaVersion: 2,
+      payloadSchema: z.object({ renamed: z.string() }),
+    }
+    const registry = new NotificationDefinitionRegistry([
+      { definition: v1, current: false },
+      { definition: v2, current: true },
+    ])
+    const producer = new NotificationsService(
+      prisma,
+      registry,
+      new NotificationPreferenceResolver(),
+      preferences,
+      new ChannelTargetResolverRegistry(),
+      queue,
+      realtime,
+      logger
+    )
+    prisma.notification.findUnique.mockResolvedValue({
+      id: 'historical',
+      type: v1.type,
+      schemaVersion: 1,
+      idempotencyFingerprint: notificationFingerprint({
+        type: v1.type,
+        category: v1.category,
+        schemaVersion: 1,
+        payload: { value: 'hello' },
+        action: null,
+        organizationId: null,
+        occurredAt: null,
+      }),
+    } as never)
+    prisma.notificationDelivery.findMany.mockResolvedValue([{ channel: 'in_app' }] as never)
+    expect(await producer.notify({ ...VALID_INPUT, payload: { value: ' hello ' } })).toEqual({
+      notificationId: 'historical',
+      created: false,
+      channels: ['in_app'],
+    })
+    expect(prisma.notification.createManyAndReturn).not.toHaveBeenCalled()
+    expect(prisma.user.findUnique).not.toHaveBeenCalled()
+    expect(preferences.findByUser).not.toHaveBeenCalled()
+    expect(queue.add).not.toHaveBeenCalled()
+  })
+
+  it('normalizes by the concurrent insert winner version before comparing fingerprints', async () => {
+    const v2 = {
+      ...testDefinition,
+      schemaVersion: 2,
+      payloadSchema: z.object({ value: z.string(), revision: z.number().default(2) }),
+    }
+    const registry = new NotificationDefinitionRegistry([
+      { definition: testDefinition, current: false },
+      { definition: v2, current: true },
+    ])
+    const producer = new NotificationsService(
+      prisma,
+      registry,
+      new NotificationPreferenceResolver(),
+      preferences,
+      new ChannelTargetResolverRegistry([]),
+      queue,
+      realtime,
+      logger
+    )
+    prisma.notification.createManyAndReturn.mockResolvedValue([] as never)
+    prisma.notification.findUniqueOrThrow.mockResolvedValue({
+      id: 'winner-v1',
+      type: testDefinition.type,
+      schemaVersion: 1,
+      idempotencyFingerprint: notificationFingerprint({
+        type: testDefinition.type,
+        category: testDefinition.category,
+        schemaVersion: 1,
+        payload: VALID_INPUT.payload,
+        action: null,
+        organizationId: null,
+        occurredAt: null,
+      }),
+    } as never)
+    prisma.notificationDelivery.findMany.mockResolvedValue([{ channel: 'in_app' }] as never)
+    expect((await producer.notify(VALID_INPUT)).created).toBe(false)
+    expect(prisma.notificationDelivery.createMany).not.toHaveBeenCalled()
+    expect(queue.add).not.toHaveBeenCalled()
+  })
+
   it('throws on idempotency-key reuse with a different fingerprint', async () => {
     prisma.notification.createManyAndReturn.mockResolvedValue([] as never)
     prisma.notification.findUniqueOrThrow.mockResolvedValue({
       id: 'existing',
+      type: 'account.test',
+      schemaVersion: 1,
       idempotencyFingerprint: 'different',
     } as never)
 
@@ -348,7 +451,9 @@ describe('NotificationsService', () => {
     }
     const localService = new NotificationsService(
       prisma,
-      new NotificationDefinitionRegistry([badActionDef]),
+      new NotificationDefinitionRegistry(
+        [badActionDef].map((definition) => ({ definition, current: true }))
+      ),
       new NotificationPreferenceResolver(),
       preferences,
       new ChannelTargetResolverRegistry([]),

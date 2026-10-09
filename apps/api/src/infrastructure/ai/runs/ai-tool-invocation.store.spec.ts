@@ -1,4 +1,13 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
+import { z } from 'zod'
+
+import { demoSensitiveTool } from '../../../../test/fixtures/demo-sensitive.tool'
+import {
+  FixtureToolAuthority,
+  fixtureToolContract,
+} from '../../../../test/fixtures/extension-contracts/tool-registration'
+import { AiToolContractRegistry } from '../tools/ai-tool-contract.registry'
+import { prepareToolIntent } from '../tools/ai-tool-intent'
 
 import type { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun } from './ai-run-dispatch.types'
@@ -287,8 +296,39 @@ describe('tool invocation store', () => {
   })
 
   describe('sameAction (one requested action = one invocation)', () => {
-    it('matches the same tool and the same normalized input regardless of key order', () => {
-      const existing = action({ argsSnapshot: { a: 1, b: { c: 2, d: 3 } } })
+    it('matches input independently of prepared arguments without repeating preparation', async () => {
+      const parameters = z.json()
+      const tool = {
+        ...demoSensitiveTool,
+        ...fixtureToolContract(parameters),
+        parameters,
+        toolId: 'archive_document',
+        async prepare() {
+          return {
+            ...(await fixtureToolContract(parameters).prepare({})),
+            args: { resolved: 'target' },
+          }
+        },
+      }
+      const prepared = await prepareToolIntent(
+        tool,
+        { a: 1, b: { c: 2, d: 3 } },
+        {
+          runId: CLAIM.id,
+          conversationId: CLAIM.conversationId,
+          ownerUserId: 'owner',
+          organizationId: null,
+          invocationId: 'inv-1',
+          idempotencyKey: 'ai-tool:inv-1',
+        },
+        {} as never,
+        1,
+        new AiToolContractRegistry([tool], [new FixtureToolAuthority()])
+      )
+      const existing = action({
+        intentHash: prepared.hash,
+        intentSnapshot: prepared.intent as unknown as InvocationRow['intentSnapshot'],
+      })
       expect(sameAction(existing, 'archive_document', { b: { d: 3, c: 2 }, a: 1 })).toBe(true)
     })
 

@@ -1,7 +1,12 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { z } from 'zod'
 
+import {
+  FixtureToolAuthority,
+  fixtureToolContract,
+} from '../../../../test/fixtures/extension-contracts/tool-registration'
 import type { AiTool } from '../tools/ai-tool.types'
+import { AiToolContractRegistry } from '../tools/ai-tool-contract.registry'
 
 import type { AiRunRepository } from './ai-run.repository'
 import { AiRunApprovalParker } from './ai-run-approval-parker.service'
@@ -59,6 +64,7 @@ const dangerTool: AiTool = {
   displayName: 'Danger',
   description: 'danger',
   parameters: z.object({}).strict(),
+  ...fixtureToolContract(z.object({}).strict()),
   riskClass: AiToolRiskClass.SENSITIVE,
   idempotency: 'idempotent',
   execute: jest.fn(),
@@ -81,6 +87,7 @@ describe('AiRunApprovalParker', () => {
     guardKind = 'ok'
     tx = mockDeep<PrismaService>()
     tx.aiRunStep.aggregate.mockResolvedValue({ _max: { stepNumber: 0 } } as never)
+    tx.$queryRaw.mockResolvedValue([{ now: new Date() }] as never)
     tx.aiRunStep.count.mockResolvedValue(0 as never) // no provider call recorded yet → ordinal 1 is free
     tx.aiToolInvocation.findFirst.mockResolvedValue(null as never)
     tx.aiApproval.create.mockResolvedValue({ id: 'appr-1' } as never)
@@ -109,7 +116,8 @@ describe('AiRunApprovalParker', () => {
       env,
       audit as unknown as AuditLogService,
       metrics as unknown as MetricsService,
-      logger as never
+      logger as never,
+      new AiToolContractRegistry([dangerTool], [new FixtureToolAuthority()])
     )
   })
 
@@ -217,6 +225,7 @@ describe('AiRunApprovalParker', () => {
     })
 
     it('is a no-op when the ordinal was already taken by a recorded provider call', async () => {
+      tx.$queryRaw.mockResolvedValue([{ now: new Date() }] as never)
       tx.aiRunStep.count.mockResolvedValue(1 as never)
 
       expect(await park()).toBe('exit')

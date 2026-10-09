@@ -436,6 +436,7 @@ export {
   type AdminQueuesResponse,
   adminQueuesResponseSchema,
 } from './admin-queues'
+export * from './ai-approval-intent'
 export { type SignupPolicyResponse, signupPolicyResponseSchema } from './auth'
 export {
   type BoardRenderContext,

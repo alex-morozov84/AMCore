@@ -21,6 +21,7 @@ import type {
 } from './email.types'
 import { EmailTemplate, QUEUEABLE_EMAIL_TEMPLATES } from './email.types'
 import type { Locale } from './messages'
+import { preparedEmailBodySchema } from './prepared-email'
 import { EmailVerificationEmail, getEmailVerificationSubject } from './templates/email-verification'
 import { NotificationEmail } from './templates/notification'
 import { getOrgInviteSubject, OrgInviteEmail } from './templates/org-invite'
@@ -100,6 +101,25 @@ export class EmailService {
       this.observe(context.template, 'send', context.mode, 'error', undefined, startedAt)
       throw error
     }
+  }
+
+  async sendPreparedNotification(
+    body: string,
+    idempotencyKey: string,
+    signal: AbortSignal
+  ): Promise<SendEmailResult> {
+    preparedEmailBodySchema.parse(JSON.parse(body))
+    const startedAt = performance.now()
+    const result = await this.emailProvider.sendPrepared(body, idempotencyKey, signal)
+    this.observe(
+      'notification',
+      'send',
+      'worker',
+      result.success ? 'success' : 'error',
+      result.retryable,
+      startedAt
+    )
+    return result
   }
 
   /**

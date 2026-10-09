@@ -20,6 +20,7 @@ import { AiRunLoopExecutor } from './ai-run-loop-executor.service'
 import type { RunPlan } from './ai-run-plan'
 import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
 import { AiRunTransitions } from './ai-run-transitions.service'
+import { AiToolActionService } from './ai-tool-action.service'
 
 import { EnvService } from '@/env/env.service'
 import { AiArtifactKind, AiMessageRole, AiRunStepType, Prisma } from '@/generated/prisma/client'
@@ -52,7 +53,8 @@ export class AiRunExecutorService {
     private readonly storage: StorageService,
     private readonly env: EnvService,
     private readonly metrics: MetricsService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly actions: AiToolActionService
   ) {
     this.logger.setContext(AiRunExecutorService.name)
   }
@@ -74,6 +76,7 @@ export class AiRunExecutorService {
   }
 
   private async runAttempt(claim: ClaimedRun, runtime: AttemptRuntime): Promise<void> {
+    if (await this.actions.resolvePendingUnknown(claim)) return
     const plan = await this.preflight(claim)
     // A null plan means pre-flight already reached a terminal/handled state (cancel, deadline, bad
     // snapshot, missing input, guardrail refusal) — nothing more to do this attempt.

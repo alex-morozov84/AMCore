@@ -1,17 +1,15 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
 
-import {
-  coerceSupportedLocale,
-  type NotificationAction,
-  notificationActionSchema,
-} from '@amcore/shared'
+import { coerceSupportedLocale, type NotificationAction } from '@amcore/shared'
 
 import { PrismaService } from '../../prisma'
 
 import { ChannelTargetResolverRegistry } from './channels/channel-target-resolver.registry'
 import type { TargetRecipient } from './channels/channel-target-resolver.types'
+import { NotificationChannelRegistry } from './channels/notification-channel.registry'
+import { validateNotificationTargets } from './channels/notification-target.validation'
 import { NotificationChannel } from './notification.constants'
 import { NotificationIdempotencyConflictError } from './notification.errors'
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
@@ -22,16 +20,12 @@ import {
   NOTIFICATION_WAKE_JOB_OPTIONS,
 } from './notification-dispatch.constants'
 import type { DispatchDueJob } from './notification-dispatch.schema'
-import { notificationFingerprint } from './notification-fingerprint'
+import { notificationIntent } from './notification-intent'
 import { NotificationPreferenceRepository } from './notification-preference.repository'
 import { NotificationPreferenceResolver } from './notification-preference.resolver'
 import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
 
-import {
-  NotificationDeliveryStatus,
-  Prisma,
-  type TelegramConnectionStatus,
-} from '@/generated/prisma/client'
+import { type Notification, NotificationDeliveryStatus, Prisma } from '@/generated/prisma/client'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '@/infrastructure/queue/queue.service'
 
@@ -83,7 +77,12 @@ interface InternalNotifyResult {
  */
 const CHANNEL_ORDER: readonly NotificationChannel[] = Object.values(NotificationChannel)
 function sortByChannelOrder(channels: NotificationChannel[]): NotificationChannel[] {
-  return [...channels].sort((a, b) => CHANNEL_ORDER.indexOf(a) - CHANNEL_ORDER.indexOf(b))
+  return [...channels].sort(
+    (a, b) =>
+      (CHANNEL_ORDER.indexOf(a) < 0 ? CHANNEL_ORDER.length : CHANNEL_ORDER.indexOf(a)) -
+        (CHANNEL_ORDER.indexOf(b) < 0 ? CHANNEL_ORDER.length : CHANNEL_ORDER.indexOf(b)) ||
+      a.localeCompare(b)
+  )
 }
 
 const NOTIFICATION_IDEMPOTENCY_KEY_MAX = 255
@@ -130,7 +129,8 @@ export class NotificationsService {
     private readonly targetResolvers: ChannelTargetResolverRegistry,
     private readonly queue: QueueService,
     private readonly realtime: NotificationRealtimePublisher,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    @Optional() private readonly channelRegistry?: NotificationChannelRegistry
   ) {
     this.logger.setContext(NotificationsService.name)
   }
@@ -167,8 +167,43 @@ export class NotificationsService {
     client: Prisma.TransactionClient,
     input: NotifyInput
   ): Promise<InternalNotifyResult> {
+    notifyContractSchema.parse(input)
+    const existing = await client.notification.findUnique({
+      where: {
+        recipientUserId_idempotencyKey: {
+          recipientUserId: input.recipientUserId,
+          idempotencyKey: input.idempotencyKey,
+        },
+      },
+    })
+    if (existing) return this.replay(client, input, existing)
     const plan = await this.buildPlan(client, input)
     return this.write(client, input, plan)
+  }
+
+  private async replay(
+    client: Prisma.TransactionClient,
+    input: NotifyInput,
+    existing: Notification
+  ): Promise<InternalNotifyResult> {
+    const definition = this.registry.getStored(existing.type, existing.schemaVersion)
+    let fingerprint: string
+    try {
+      fingerprint = notificationIntent(definition, input).fingerprint
+    } catch {
+      throw new NotificationIdempotencyConflictError(input.idempotencyKey)
+    }
+    if (existing.idempotencyFingerprint !== fingerprint) {
+      throw new NotificationIdempotencyConflictError(input.idempotencyKey)
+    }
+    return {
+      result: {
+        notificationId: existing.id,
+        created: false,
+        channels: await this.deliveredChannels(client, existing.id),
+      },
+      hasPendingExternal: false,
+    }
   }
 
   /** Best-effort dispatch wake. Swallows queue/Redis errors (the poller recovers). */
@@ -201,35 +236,10 @@ export class NotificationsService {
       idempotencyKey: input.idempotencyKey,
     })
 
-    const definition = this.registry.get(input.type)
-    const payload = definition.payloadSchema.parse(input.payload)
-    // Enforce the action contract on the durable boundary, not just by convention.
-    const rawAction = definition.action?.(payload) ?? null
-    const action = rawAction ? notificationActionSchema.parse(rawAction) : null
-    // Fingerprint the immutable dedupe intent: type/version/payload plus org + the
-    // EXPLICIT occurredAt (never the generated default — a retry that omits it must
-    // still match). Reusing a key with a different org/payload/event time is a conflict.
-    const fingerprint = notificationFingerprint({
-      type: input.type,
-      category: definition.category,
-      schemaVersion: definition.schemaVersion,
-      payload,
-      action,
-      organizationId: input.organizationId ?? null,
-      occurredAt: input.occurredAt?.toISOString() ?? null,
-    })
+    const definition = this.registry.getCurrent(input.type)
+    const { payload, action, fingerprint } = notificationIntent(definition, input)
 
-    // One extra indexed lookup, only when the definition can target Telegram — so an
-    // unrelated notification never queries the connection table (Arc D). It is a `FOR SHARE`
-    // read on the supplied client: the share lock lives until the caller's commit, covering
-    // read-through-delivery-insert, so a concurrent unlink/relink/block (which takes the row
-    // `FOR UPDATE` BEFORE cancelling deliveries) either waits and then cancels the committed
-    // delivery, or committed first and this read finds no row (→ `SKIPPED telegram_not_linked`).
-    // A locked read locks existing rows, not the absence of a generation: a relink committing
-    // microseconds later is ordered after this notification — safe, never a stale target.
-    // Assumes the default READ COMMITTED isolation for `notifyTx` callers.
-    const supportsTelegram = definition.supportedChannels.includes(NotificationChannel.TELEGRAM)
-    const [masterEnabled, userPreferences, user, telegram] = await Promise.all([
+    const [masterEnabled, userPreferences, user] = await Promise.all([
       this.preferences.getMasterToggle(input.recipientUserId, client),
       this.preferences.findByUser(input.recipientUserId, client),
       client.user.findUnique({
@@ -237,20 +247,16 @@ export class NotificationsService {
         // email/emailVerified feed external target resolution (e.g. email channel).
         select: { locale: true, email: true, emailCanonical: true, emailVerified: true },
       }),
-      supportsTelegram
-        ? client
-            .$queryRaw<{ id: string; chatId: string; status: TelegramConnectionStatus }[]>(
-              Prisma.sql`
-                SELECT id, "chatId", status FROM "notifications"."telegram_connections"
-                WHERE "userId" = ${input.recipientUserId}
-                FOR SHARE
-              `
-            )
-            .then((rows) => rows[0] ?? null)
-        : Promise.resolve(null),
     ])
 
-    const channels = this.resolver.resolve(definition, { masterEnabled, userPreferences })
+    const selected = this.resolver.resolve(definition, { masterEnabled, userPreferences })
+    const channels = selected.filter((channel) => {
+      if (!this.channelRegistry || this.channelRegistry.available(channel)) return true
+      if (definition.mandatoryChannels.includes(channel)) {
+        throw new Error(`Mandatory notification channel unavailable: ${channel}`)
+      }
+      return false
+    })
     const locale = coerceSupportedLocale(user?.locale)
     return {
       definition,
@@ -266,9 +272,6 @@ export class NotificationsService {
             emailCanonical: user.emailCanonical,
             emailVerified: user.emailVerified,
             locale,
-            telegram: telegram
-              ? { connectionId: telegram.id, chatId: telegram.chatId, status: telegram.status }
-              : null,
           }
         : null,
     }
@@ -310,20 +313,8 @@ export class NotificationsService {
           },
         },
       })
-      if (existing.idempotencyFingerprint !== plan.fingerprint) {
-        throw new NotificationIdempotencyConflictError(input.idempotencyKey)
-      }
-      // Replay: report the channels actually persisted then, not a fresh resolution.
-      // No wake — the original produce already enqueued one, and the poller recovers
-      // any still-pending external delivery regardless.
-      return {
-        result: {
-          notificationId: existing.id,
-          created: false,
-          channels: await this.deliveredChannels(client, existing.id),
-        },
-        hasPendingExternal: false,
-      }
+      // The insert winner may use a different producer version. Normalize against it.
+      return this.replay(client, input, existing)
     }
 
     // Materialize deliveries: in-app inserted DELIVERED (feed never depends on the
@@ -352,19 +343,22 @@ export class NotificationsService {
       const targetResolver = this.targetResolvers.get(channel)
       // No active adapter (or no recipient facts) → nothing is persisted for this
       // channel; it cannot be delivered and must not advertise a phantom delivery.
-      if (!targetResolver || !plan.recipient) continue
+      if (!targetResolver) throw new Error(`Missing notification target resolver: ${channel}`)
+      if (!plan.recipient) continue
 
-      const targets = targetResolver.resolveTargets({
+      const targets = await targetResolver.resolveTargets(client, {
         recipient: plan.recipient,
         definition: plan.definition,
         payload: plan.payload,
         locale: plan.locale,
       })
 
+      validateNotificationTargets(targets)
       for (const target of targets) {
         const skipped = target.skipReasonCode !== undefined
         deliveries.push({
           notificationId: created.id,
+          requestContractVersion: 1,
           channel,
           targetKey: target.targetKey,
           targetRef: target.targetRef ?? null,
