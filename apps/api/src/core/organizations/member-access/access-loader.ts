@@ -1,16 +1,14 @@
-import { HttpStatus } from '@nestjs/common'
-
 import {
   ACCESS_MAX_LINKS,
   ACCESS_MAX_POLICY_BYTES,
   ACCESS_MAX_ROLES,
   ACCESS_MAX_UNIQUE_RULES,
   OrganizationMemberErrorCode,
-  RoleDefinitionErrorCode,
 } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions'
 
+import { AccessUnavailableError } from './access-budget'
 import type { StoredPolicyRule } from './access-facts'
 
 import type { Organization } from '@/generated/prisma/client'
@@ -31,12 +29,7 @@ export interface LoadedAccess {
   unsafeLinkCount: number
 }
 
-const unavailable = (): AppException =>
-  new AppException(
-    'Member access cannot be explained',
-    HttpStatus.SERVICE_UNAVAILABLE,
-    RoleDefinitionErrorCode.ROLE_ACCESS_UNAVAILABLE
-  )
+const unavailable = (): AccessUnavailableError => new AccessUnavailableError('loadingLimit')
 
 interface Preflight {
   roles: number

@@ -3,17 +3,27 @@ import {
   ACCESS_COUNTERFACTUAL_MAX_RULES,
   ACCESS_ROLES_SHOWN,
   ACCESS_UNCOVERED_ROLE_SAMPLE,
-  Action,
+  type AccessConfiguredItem,
+  type AccessRecordItem,
   type MemberAccess,
   type RequestPrincipal,
-  Subject,
   type SystemRole,
 } from '@amcore/shared'
 
 import type { CapabilityRegistry } from '../capability-registry.service'
 
-import { AccessPolicy, type ItemSpec, itemSpecs, type StoredPolicyRule } from './access-facts'
+import { type AccessOperationBudget, AccessOperationBudget as Budget } from './access-budget'
+import {
+  type AccessCapability,
+  assertCatalogueWithinLimits,
+  defaultCapabilities,
+  type ItemSpec,
+  itemSpecs,
+} from './access-capabilities'
+import { isCovered } from './access-coverage'
+import { AccessPolicy, exactCapabilityIds, type StoredPolicyRule } from './access-facts'
 import { roleRefs, sourcesFor } from './access-sources'
+import { evaluateConfigured } from './configured-access'
 
 import type { Organization } from '@/generated/prisma/client'
 
@@ -34,26 +44,27 @@ export interface AccessInput {
   rules: ReadonlyMap<string, StoredPolicyRule>
   unsafeLinkCount: number
   registry: CapabilityRegistry
-}
-
-const ORG_ACTIONS = new Set<string>([Action.Read, Action.Update, Action.Delete, Action.Manage])
-
-/** Rules this summary does not explain: anything that is not an organization/team rule or a veto. */
-function isUncovered(rule: StoredPolicyRule): boolean {
-  if (rule.subject === Subject.TeamAccess) return false
-  if (rule.subject === Subject.Organization) return !ORG_ACTIONS.has(rule.action)
-  return !rule.inverted
+  /** The registered capabilities; defaults to the catalogue and its adapters. */
+  capabilities?: readonly AccessCapability[]
+  /** Counts every internal check; defaults to the per-request limit. */
+  budget?: AccessOperationBudget
 }
 
 const compareText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
 /**
- * Explains what the member can do in this organization, from the real policy. Exact decisions come
- * from the whole validated rule set; the single-role questions (who alone would grant, who widens)
- * are extra work and are skipped, reported as unknown, above the counterfactual caps.
+ * Explains what the member can do in this organization, from the real policy. Built-in operations
+ * get exact current-row decisions from the whole validated rule set; the single-role questions (who
+ * alone would grant, who widens) are extra work and are skipped, reported as unknown, above the
+ * counterfactual caps. Every other registered capability is explained as what the role settings
+ * configure (areas), and never as proof for one record.
  */
 export function explainAccess(input: AccessInput): MemberAccess {
   const { organization, member, roles, ruleIdsByRole, rules, registry } = input
+  const capabilities = input.capabilities ?? defaultCapabilities()
+  assertCatalogueWithinLimits(capabilities)
+  const budget = input.budget ?? new Budget()
+  const specs = itemSpecs(capabilities, exactCapabilityIds(registry, organization))
   const principal: RequestPrincipal = {
     type: 'jwt',
     sub: member.userId,
@@ -62,7 +73,14 @@ export function explainAccess(input: AccessInput): MemberAccess {
     organizationId: organization.id,
     aclVersion: organization.aclVersion,
   }
-  const policy = new AccessPolicy(rules, principal, organization, registry)
+  const policy = new AccessPolicy(
+    rules,
+    principal,
+    organization,
+    registry,
+    specs.filter((spec) => spec.mode === 'record'),
+    budget
+  )
   const allIds = [...new Set(roles.flatMap((role) => ruleIdsByRole.get(role.id) ?? []))].sort()
   const factsAll = policy.facts(allIds)
   const hints = policy.hints(allIds)
@@ -74,19 +92,27 @@ export function explainAccess(input: AccessInput): MemberAccess {
   const rolesByRule = new Map<string, string[]>()
   for (const [roleId, ids] of ruleIdsByRole)
     for (const id of ids) rolesByRule.set(id, [...(rolesByRule.get(id) ?? []), roleId])
-  const context = {
-    policy: policy.normalized(allIds),
-    rolesByRule,
-    stored: rules,
-    organization,
-  }
-  const items = itemSpecs().map((spec) =>
-    spec.baseline
-      ? baselineItem(spec, hints)
-      : item(spec, factsAll[spec.key] ?? false, hints, single, context, roles, (blocked) =>
-          policy.facts(allIds.filter((id) => !blocked.has(id)))
-        )
-  )
+  const normalized = policy.normalized(allIds)
+  const context = { policy: normalized, rolesByRule, stored: rules, organization }
+  const configuredContext = { policy: normalized, rolesByRule, stored: rules, budget }
+  const lastOperation = new Map<string, string>()
+  const items = specs.flatMap((spec): Item[] => {
+    if (spec.mode === 'notEvaluated') return [notEvaluatedItem(spec)]
+    if (spec.mode === 'configured') {
+      const configured = evaluateConfigured(spec, configuredContext)
+      // A per-field line is kept only when it says something the operation does not.
+      if (spec.field === undefined) lastOperation.set(spec.capability.id, signature(configured))
+      else if (lastOperation.get(spec.capability.id) === signature(configured)) return []
+      return [configured]
+    }
+    if (spec.baseline) return [baselineItem(spec, hints)]
+    budget.spend(normalized.length, 'relevance')
+    return [
+      recordItem(spec, factsAll[spec.key] ?? false, hints, single, context, roles, (blocked) =>
+        policy.facts(allIds.filter((id) => !blocked.has(id)))
+      ),
+    ]
+  })
   return {
     member: {
       memberId: member.memberId,
@@ -99,19 +125,45 @@ export function explainAccess(input: AccessInput): MemberAccess {
     roles: roleList(roles),
     unsafeLinkCount: input.unsafeLinkCount,
     items,
-    widening: widening(items, single, roles, rules.size),
-    uncovered: uncovered(rules, roles, ruleIdsByRole),
+    widening: widening(items, single, roles),
+    uncovered: uncovered(
+      rules,
+      roles,
+      ruleIdsByRole,
+      specs.filter((spec) => spec.mode === 'configured' && !spec.field).map((s) => s.capability)
+    ),
     qualifiers: member.systemRole === 'SUPER_ADMIN' ? ['platformSuperAdmin'] : [],
   }
 }
 
-function baselineItem(spec: ItemSpec, hints: Record<string, string>): Item {
+/** What makes a configured field line redundant: the same state, areas and limits as its operation. */
+function signature(item: AccessConfiguredItem): string {
+  return JSON.stringify([
+    item.state,
+    item.areas.map((area) => [area.kind, area.masked, area.prerequisite, area.absorbed]),
+    item.limits.map((limit) => limit.kind),
+  ])
+}
+
+function notEvaluatedItem(spec: ItemSpec): Item {
   return {
     key: spec.key,
+    evaluation: 'notEvaluated',
+    baseline: false,
+    reason: 'optOut',
+    sources: [],
+    sourcesTruncated: false,
+  }
+}
+
+function baselineItem(spec: ItemSpec, hints: Record<string, string>): AccessRecordItem {
+  return {
+    key: spec.key,
+    evaluation: 'record',
     baseline: true,
     granted: true,
     reason: 'granted',
-    actorHint: (hints[spec.capabilityId] as Item['actorHint']) ?? 'allowed',
+    actorHint: (hints[spec.capability.id] as AccessRecordItem['actorHint']) ?? 'allowed',
     origin: null,
     reachedBy: null,
     grantedBy: null,
@@ -121,7 +173,7 @@ function baselineItem(spec: ItemSpec, hints: Record<string, string>): Item {
   }
 }
 
-function item(
+function recordItem(
   spec: ItemSpec,
   granted: boolean,
   hints: Record<string, string>,
@@ -129,13 +181,16 @@ function item(
   context: Parameters<typeof sourcesFor>[2],
   roles: AccessInput['roles'],
   withoutRules: (blocked: ReadonlySet<string>) => Record<string, boolean>
-): Item {
+): AccessRecordItem {
   const found = sourcesFor(spec, granted, context)
   const common = {
     key: spec.key,
+    evaluation: 'record' as const,
     baseline: false,
     granted,
-    actorHint: spec.field ? null : ((hints[spec.capabilityId] as Item['actorHint']) ?? null),
+    actorHint: spec.field
+      ? null
+      : ((hints[spec.capability.id] as AccessRecordItem['actorHint']) ?? null),
     sources: found.sources,
     sourcesTruncated: found.truncated,
   }
@@ -159,8 +214,8 @@ function item(
       vetoedBy: null,
     }
   // Blocked means: it would be granted without the blocking rules. A single role that would grant it
-  // alone proves that for any capability; the rule-level check also covers an ability that needs several
-  // roles together (one gives delete, another gives team control) and is blocked.
+  // alone proves that for any capability; the rule-level check also covers an ability that needs
+  // several roles together (one gives delete, another gives team control) and is blocked.
   const vetoed =
     alone.length > 0 ||
     (found.vetoRules.length > 0 && withoutRules(new Set(found.vetoRules))[spec.key] === true)
@@ -177,31 +232,36 @@ function item(
 function widening(
   items: Item[],
   single: Map<string, Record<string, boolean>> | undefined,
-  roles: AccessInput['roles'],
-  ruleCount: number
+  roles: AccessInput['roles']
 ): MemberAccess['widening'] {
+  const exact = items.filter((entry): entry is AccessRecordItem => entry.evaluation === 'record')
+  const base = {
+    scope: 'exactItems' as const,
+    excludedItems: items.length - exact.length,
+  }
   if (!single)
     return {
+      ...base,
       status: 'unavailable',
       reason: roles.length > ACCESS_COUNTERFACTUAL_MAX_ROLES ? 'roleLimit' : 'ruleLimit',
       breadth: null,
       synergy: null,
       vetoed: null,
     }
-  void ruleCount
-  const keys = items.filter((entry) => !entry.baseline).map((entry) => entry.key)
+  const keys = exact.filter((entry) => !entry.baseline).map((entry) => entry.key)
   const granted = new Set(
-    items.filter((entry) => !entry.baseline && entry.granted).map((e) => e.key)
+    exact.filter((entry) => !entry.baseline && entry.granted).map((e) => e.key)
   )
   const exceeds = (facts: Record<string, boolean>): boolean => {
     const own = keys.filter((key) => facts[key])
     return own.every((key) => granted.has(key)) && granted.size > own.length
   }
   return {
+    ...base,
     status: 'computed',
     breadth: granted.size > 0 && roles.every((role) => exceeds(single.get(role.id) ?? {})),
-    synergy: items.some((entry) => entry.origin === 'combined'),
-    vetoed: items.some((entry) => entry.vetoedBy !== null),
+    synergy: exact.some((entry) => entry.origin === 'combined'),
+    vetoed: exact.some((entry) => entry.vetoedBy !== null),
   }
 }
 
@@ -222,9 +282,12 @@ function roleList(roles: AccessInput['roles']): MemberAccess['roles'] {
 function uncovered(
   rules: ReadonlyMap<string, StoredPolicyRule>,
   roles: AccessInput['roles'],
-  ruleIdsByRole: ReadonlyMap<string, readonly string[]>
+  ruleIdsByRole: ReadonlyMap<string, readonly string[]>,
+  configured: readonly AccessCapability[]
 ): MemberAccess['uncovered'] {
-  const outside = new Set([...rules.values()].filter(isUncovered).map((rule) => rule.id))
+  const outside = new Set(
+    [...rules.values()].filter((rule) => !isCovered(rule, configured)).map((rule) => rule.id)
+  )
   const holders = roles
     .filter((role) => (ruleIdsByRole.get(role.id) ?? []).some((id) => outside.has(id)))
     .sort((a, b) => compareText(a.name, b.name) || compareText(a.id, b.id))

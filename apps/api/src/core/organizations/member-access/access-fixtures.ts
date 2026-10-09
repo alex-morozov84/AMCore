@@ -3,6 +3,11 @@ import { Action, Subject } from '@amcore/shared'
 import { ORG_READ_FIELDS } from '../../auth/casl/org-role-defaults'
 import { CapabilityRegistry } from '../capability-registry.service'
 
+import {
+  type AccessCapability,
+  defaultCapabilities,
+  type PresetTemplate,
+} from './access-capabilities'
 import { type AccessInput } from './access-evaluator'
 import type { StoredPolicyRule } from './access-facts'
 
@@ -82,3 +87,66 @@ export function input(roles: RoleSpec[], over: Partial<AccessInput> = {}): Acces
     ...over,
   }
 }
+
+/**
+ * A downstream-like domain: records with own / assigned / all areas, as the extension fixture
+ * registers. The server only accepts rules on subjects it knows, so `Role` stands in for the
+ * downstream subject here (the real subject is proven by the extension fixture end to end).
+ */
+const ORDER_SUBJECT = 'Role'
+const AREA_CONDITIONS = {
+  own: { organizationId: '${user.organizationId}' },
+  // `${user.sub}` is only valid on fields a model has; a literal marks the assigned area here.
+  assigned: { description: 'assigned' },
+  all: null,
+} as const
+
+const orderPreset =
+  (action: string, fields: string[]) =>
+  (presetId: string): PresetTemplate => ({
+    action,
+    subject: ORDER_SUBJECT,
+    conditions: AREA_CONDITIONS[presetId as keyof typeof AREA_CONDITIONS],
+    fields,
+    inverted: false,
+  })
+
+export const ORDER_READ: AccessCapability = {
+  id: 'fixtureOrder.read',
+  subject: ORDER_SUBJECT,
+  action: 'read',
+  editableFields: [],
+  presets: ['own', 'assigned', 'all'],
+  requiredReadFields: ['id', 'name'],
+  teamAccess: false,
+  preset: orderPreset('read', []),
+}
+
+export const ORDER_UPDATE: AccessCapability = {
+  id: 'fixtureOrder.update',
+  subject: ORDER_SUBJECT,
+  action: 'update',
+  editableFields: ['name', 'description'],
+  presets: ['own', 'assigned', 'all'],
+  requiredReadFields: ['id', 'name'],
+  teamAccess: false,
+  preset: orderPreset('update', ['name', 'description']),
+}
+
+export const orderCapabilities = (...extra: AccessCapability[]): readonly AccessCapability[] => [
+  ...defaultCapabilities(),
+  ORDER_READ,
+  ORDER_UPDATE,
+  ...extra,
+]
+
+/** A rule exactly as the editor's preset stores it. */
+export const orderPresetRule = (
+  id: string,
+  kind: 'read' | 'update',
+  area: 'own' | 'assigned' | 'all'
+): StoredPolicyRule =>
+  rule(id, kind, ORDER_SUBJECT, {
+    conditions: AREA_CONDITIONS[area],
+    fields: kind === 'update' ? ['name', 'description'] : [],
+  })

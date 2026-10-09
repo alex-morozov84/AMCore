@@ -1,4 +1,4 @@
-import { CAPABILITY_CATALOGUE, type CapabilityId, type RequestPrincipal } from '@amcore/shared'
+import type { RequestPrincipal } from '@amcore/shared'
 
 import type { AppAbility, TeamAccessDecision } from '../../auth/casl/ability.factory'
 import {
@@ -9,45 +9,23 @@ import {
 import { createPrismaAbility } from '../../auth/casl/prisma-ability'
 import type { CapabilityRegistry } from '../capability-registry.service'
 
+import { type AccessOperationBudget, AccessUnavailableError } from './access-budget'
+import type { ItemSpec } from './access-capabilities'
+
 import type { Organization } from '@/generated/prisma/client'
 
 /** A stored rule as loaded; conditions stay the uninterpolated template. */
 export type StoredPolicyRule = AbilityPermission
-
-/** One thing a member may or may not do, as the explanation reports it. */
-export interface ItemSpec {
-  key: string
-  capabilityId: CapabilityId
-  /** Set for a per-field item of an editable capability. */
-  field?: string
-  /** Independent of any role: the registry hard-codes bearer membership for it. */
-  baseline: boolean
-}
-
-/** Capabilities whose bearer-membership decision does not depend on roles (registry `actor`/`record`). */
-const BASELINE_CAPABILITIES = new Set<string>(['organization.read'])
-
-export function itemSpecs(): ItemSpec[] {
-  return CAPABILITY_CATALOGUE.flatMap((entry) => {
-    const id = entry.id
-    return [
-      { key: id, capabilityId: id, baseline: BASELINE_CAPABILITIES.has(id) },
-      ...entry.editableFields.map((field) => ({
-        key: `${id}.${field}`,
-        capabilityId: id,
-        field,
-        baseline: false,
-      })),
-    ]
-  })
-}
 
 export type Facts = Record<string, boolean>
 
 /**
  * Evaluates the real policy for the member: the same normalization, ability and registry the API
  * uses to authorize, so an explanation can never describe a rule set the server would not apply.
- * Throws when a stored rule is invalid; the caller turns that into `ROLE_ACCESS_UNAVAILABLE`.
+ * Only items with an exact current-row decision (`record`) are evaluated here; configured items
+ * never enter these boolean facts, the single-role counterfactuals or widening.
+ * Throws `invalidPolicy` when a stored rule is invalid; the caller turns that into
+ * `ROLE_ACCESS_UNAVAILABLE`.
  */
 export class AccessPolicy {
   private readonly cache = new Map<string, Facts>()
@@ -56,12 +34,18 @@ export class AccessPolicy {
     private readonly rules: ReadonlyMap<string, StoredPolicyRule>,
     private readonly principal: RequestPrincipal,
     private readonly organization: Organization,
-    private readonly registry: CapabilityRegistry
+    private readonly registry: CapabilityRegistry,
+    private readonly exactSpecs: readonly ItemSpec[],
+    private readonly budget?: AccessOperationBudget
   ) {}
 
   private normalize(ruleIds: readonly string[]): AbilityPermission[] {
     const raw = ruleIds.map((id) => this.rules.get(id)!).filter(Boolean)
-    return normalizeOwnerPermissions(raw, this.principal)
+    try {
+      return normalizeOwnerPermissions(raw, this.principal)
+    } catch {
+      throw new AccessUnavailableError('invalidPolicy')
+    }
   }
 
   private context(ruleIds: readonly string[]): {
@@ -79,7 +63,12 @@ export class AccessPolicy {
       ...(conditions !== null && { conditions }),
       ...(fields.length > 0 && { fields }),
     }))
-    const ability = createPrismaAbility<AppAbility>(rules as never)
+    let ability: AppAbility
+    try {
+      ability = createPrismaAbility<AppAbility>(rules as never)
+    } catch {
+      throw new AccessUnavailableError('invalidPolicy')
+    }
     const access: TeamAccessDecision = {
       actorId: this.principal.sub,
       type: 'jwt',
@@ -96,16 +85,17 @@ export class AccessPolicy {
     const key = [...ruleIds].sort().join('|')
     const cached = this.cache.get(key)
     if (cached) return cached
+    this.budget?.spend(ruleIds.length + this.exactSpecs.length, 'relevance')
     const { team, ability, access } = this.context(ruleIds)
     const record = this.registry.record(ability, access, this.organization) as unknown as Record<
       string,
       { allowed: boolean; fields: Record<string, boolean> }
     >
     const facts: Facts = {}
-    for (const spec of itemSpecs()) {
-      const entry = record[spec.capabilityId]
+    for (const spec of this.exactSpecs) {
+      const entry = record[spec.capability.id]
       facts[spec.key] =
-        spec.capabilityId === 'teamAccess.manage'
+        spec.capability.id === 'teamAccess.manage'
           ? team
           : spec.field
             ? (entry?.fields[spec.field] ?? false)
@@ -128,4 +118,27 @@ export class AccessPolicy {
   normalized(ruleIds: readonly string[]): AbilityPermission[] {
     return this.normalize(ruleIds)
   }
+}
+
+/**
+ * Capabilities the registry answers exactly for the current organization row. It is read from
+ * `record()` itself, so a capability becomes exact only when a developer extends it deliberately.
+ */
+export function exactCapabilityIds(
+  registry: CapabilityRegistry,
+  organization: Organization
+): Set<string> {
+  const access: TeamAccessDecision = {
+    actorId: 'probe',
+    type: 'jwt',
+    organizationId: organization.id,
+    aclVersion: organization.aclVersion,
+    ownerTrusted: false,
+    credentialTrusted: false,
+  }
+  const probe = createPrismaAbility<AppAbility>([] as never)
+  return new Set([
+    'teamAccess.manage',
+    ...Object.keys(registry.record(probe, access, organization)),
+  ])
 }

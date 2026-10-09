@@ -7,7 +7,9 @@ import { input, ORG_ID, readAll, rule, USER_ID } from './access-fixtures'
 
 const item = (access: MemberAccess, key: string) => access.items.find((entry) => entry.key === key)!
 const granted = (access: MemberAccess) =>
-  access.items.filter((entry) => !entry.baseline && entry.granted).map((entry) => entry.key)
+  access.items
+    .filter((entry) => entry.evaluation === 'record' && !entry.baseline && entry.granted)
+    .map((entry) => entry.key)
 const updateName = (id: string) =>
   rule(id, Action.Update, Subject.Organization, { fields: ['name'] })
 const updateSlug = (id: string) =>
@@ -38,6 +40,8 @@ describe('member access explanation — truth table', () => {
     expect(item(access, 'organization.delete')).toMatchObject({ granted: false, reason: 'noGrant' })
     expect(item(access, 'teamAccess.manage')).toMatchObject({ granted: false, reason: 'noGrant' })
     expect(access.widening).toEqual({
+      scope: 'exactItems',
+      excludedItems: 0,
       status: 'computed',
       breadth: true,
       synergy: false,
@@ -72,6 +76,8 @@ describe('member access explanation — truth table', () => {
       actorHint: 'allowed',
     })
     expect(access.widening).toEqual({
+      scope: 'exactItems',
+      excludedItems: 0,
       status: 'computed',
       breadth: true,
       synergy: true,
@@ -118,6 +124,8 @@ describe('member access explanation — truth table', () => {
       ])
     )
     expect(access.widening).toEqual({
+      scope: 'exactItems',
+      excludedItems: 0,
       status: 'computed',
       breadth: false,
       synergy: false,
@@ -215,6 +223,8 @@ describe('member access explanation — truth table', () => {
       })
       expect(granted(access)).toEqual([])
       expect(access.widening).toEqual({
+        scope: 'exactItems',
+        excludedItems: 0,
         status: 'computed',
         breadth: false,
         synergy: false,
@@ -288,6 +298,8 @@ describe('member access explanation — truth table', () => {
     expect(item(away, 'organization.update')).toMatchObject({ actorHint: 'recordRequired' })
     expect(JSON.stringify(item(away, 'organization.update.name').sources)).not.toContain('dB')
     expect(away.widening).toEqual({
+      scope: 'exactItems',
+      excludedItems: 0,
       status: 'computed',
       breadth: false,
       synergy: false,
@@ -346,6 +358,8 @@ describe('member access explanation — truth table', () => {
     })
     expect(item(access, 'organization.update')).toMatchObject({ actorHint: 'denied' })
     expect(access.widening).toEqual({
+      scope: 'exactItems',
+      excludedItems: 0,
       status: 'computed',
       breadth: false,
       synergy: false,
@@ -439,6 +453,8 @@ describe('member access explanation — truth table', () => {
     }))
     const access = explainAccess(input(many))
     expect(access.widening).toEqual({
+      scope: 'exactItems',
+      excludedItems: 0,
       status: 'unavailable',
       reason: 'roleLimit',
       breadth: null,

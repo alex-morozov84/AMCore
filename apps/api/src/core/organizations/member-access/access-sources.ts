@@ -8,7 +8,8 @@ import type { AbilityPermission } from '../../auth/casl/permission-normalization
 import { createPrismaAbility } from '../../auth/casl/prisma-ability'
 import { classifyStoredRule } from '../role-definition-classifier'
 
-import type { ItemSpec, StoredPolicyRule } from './access-facts'
+import type { ItemSpec } from './access-capabilities'
+import type { StoredPolicyRule } from './access-facts'
 
 import type { Organization } from '@/generated/prisma/client'
 
@@ -24,7 +25,7 @@ const TEAM_VETO_SUBJECTS = new Set<string>([
   Subject.All,
 ])
 const ORG_SUBJECTS = new Set<string>([Subject.Organization, Subject.All])
-const STATUS_ORDER = { vetoes: 0, contributes: 1, overridden: 2 } as const
+const STATUS_ORDER = { vetoes: 0, restricts: 1, contributes: 2, overridden: 3 } as const
 const VIA_ORDER: Via[] = [
   'teamAccessVeto',
   'direct',
@@ -185,7 +186,7 @@ export function sourcesFor(
   vetoRules: string[]
 } {
   const collector = new Collector(context, granted)
-  switch (spec.capabilityId) {
+  switch (spec.capability.id) {
     case 'teamAccess.manage':
       teamGate(collector, context.policy)
       break

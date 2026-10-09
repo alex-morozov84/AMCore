@@ -21,7 +21,7 @@ import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults'
 
 import type { Organization } from '@/generated/prisma/client'
 
-interface CapabilityAdapter {
+export interface CapabilityAdapter {
   operation: string
   method: 'GET' | 'PATCH' | 'DELETE'
   path: `/${string}`
@@ -36,6 +36,11 @@ interface CapabilityAdapter {
   presets: readonly string[]
   editableFields: readonly string[]
   risk?: 'fullControl'
+  /**
+   * Opt out of the member access explanation. The capability is then listed as not evaluated: never
+   * as allowed or not allowed. Absent = explained from the role settings.
+   */
+  access?: 'none'
   preset: (id: string) => AssignPermissionInput
 }
 

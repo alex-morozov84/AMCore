@@ -43,6 +43,8 @@ function signature(
   ])
 }
 
+export { signature as ruleSignature }
+
 let candidates: Map<string, RoleDefinitionPreset[]> | undefined
 
 /** Signatures of every catalogue preset; a signature shared by two presets is ambiguous. */
