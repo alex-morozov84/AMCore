@@ -31,6 +31,7 @@ import { ZodResponse } from 'nestjs-zod'
 import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 import {
   AuthType,
+  type MemberAccess,
   type MemberRolesResponse,
   type OrganizationMembersResponse,
   type ReplaceMemberRolesResponse,
@@ -46,6 +47,7 @@ import {
 } from '../auth/organization-context/request-context-policy'
 
 import {
+  MemberAccessResponseDto,
   MemberRolesQueryDto,
   MemberRolesResponseDto,
   OrganizationMembersQueryDto,
@@ -54,6 +56,7 @@ import {
   ReplaceMemberRolesResponseDto,
 } from './dto/organization-members.dto'
 import { MemberService } from './member.service'
+import { MemberAccessService } from './member-access/member-access.service'
 import { MemberQueryService } from './member-query.service'
 import { MemberRoleSetService } from './member-role-set.service'
 
@@ -71,7 +74,8 @@ export class MembersController {
   constructor(
     private readonly memberService: MemberService,
     private readonly memberQuery: MemberQueryService,
-    private readonly memberRoleSet: MemberRoleSetService
+    private readonly memberRoleSet: MemberRoleSetService,
+    private readonly memberAccess: MemberAccessService
   ) {}
 
   @ApiParam({ name: 'orgId', description: 'Current organization membership selector' })
@@ -140,6 +144,32 @@ export class MembersController {
     @CurrentUser() principal: RequestPrincipal
   ): Promise<MemberRolesResponse> {
     return this.memberQuery.roles(orgId, userId, principal.organizationId, query)
+  }
+
+  @ApiParam({ name: 'orgId', description: 'Current organization membership selector' })
+  @ApiParam({ name: 'userId', description: 'Target member user ID' })
+  @ApiNotFoundResponse({ description: 'MEMBER_UNAVAILABLE' })
+  @ApiServiceUnavailableResponse({
+    description:
+      'ROLE_ACCESS_UNAVAILABLE: over a loading or size limit, or a stored rule is not valid; no partial answer',
+  })
+  @Get(':userId/access')
+  @Auth(AuthType.Bearer)
+  @RequireTeamAccess('orgId')
+  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
+  @ApiOperation({
+    summary:
+      "Explain a member's effective access in this organization; full TeamAccess and membership required",
+    description:
+      'Items are of three kinds: `record` (exact decision for the organization row, built-in operations), `configured` (what the role settings configure by independent areas for other registered capabilities, never a proof for one record) and `notEvaluated` (a capability that opted out).',
+  })
+  @ZodResponse({ type: MemberAccessResponseDto, status: 200 })
+  access(
+    @Param('orgId') orgId: string,
+    @Param('userId') userId: string,
+    @CurrentUser() principal: RequestPrincipal
+  ): Promise<MemberAccess> {
+    return this.memberAccess.explain(orgId, userId, principal.organizationId)
   }
 
   @ApiParam({ name: 'orgId', description: 'Current organization membership selector' })

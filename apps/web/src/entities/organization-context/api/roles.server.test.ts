@@ -1,5 +1,7 @@
 // @vitest-environment node
 import {
+  ACCESS_API_RESPONSE_BYTES,
+  ACCESS_RESPONSE_BYTES,
   ROLE_DETAIL_API_RESPONSE_BYTES,
   ROLE_LIST_API_RESPONSE_BYTES,
   serializedJsonBytes,
@@ -18,6 +20,7 @@ import {
   deleteRoleDefinition,
   listRoleDefinitions,
   readCapabilityCatalogue,
+  readMemberAccess,
   readRoleDefinition,
   saveRoleDefinition,
 } from './roles.server'
@@ -78,6 +81,34 @@ function setup(respond: () => Response) {
 const call = (fetch: ReturnType<typeof setup>['fetch']) => {
   const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
   return { url: new URL(url), init, headers: init.headers as Headers }
+}
+const access = (pad = 0, glyph = 'n') => ({
+  member: { memberId: 'm1', userId: 'u1', name: glyph.repeat(pad), email: 'u1@example.test' },
+  aclVersion: 4,
+  scope: 'organization-membership' as const,
+  roles: { total: 0, items: [], truncated: false },
+  unsafeLinkCount: 0,
+  items: [],
+  widening: {
+    status: 'computed' as const,
+    scope: 'exactItems' as const,
+    excludedItems: 0,
+    breadth: false,
+    synergy: false,
+    vetoed: false,
+  },
+  uncovered: { ruleCount: 0, roleSample: [] },
+  qualifiers: [],
+})
+/** An answer of exactly this many UTF-8 bytes, padded with the given glyph and finished with ASCII. */
+function accessOfSize(bytes: number, glyph = 'n') {
+  const width = Buffer.byteLength(glyph)
+  const base = serializedJsonBytes(access())
+  const count = Math.floor((bytes - base) / width)
+  const value = access(count, glyph)
+  value.member.name += 'n'.repeat(bytes - serializedJsonBytes(value))
+  expect(serializedJsonBytes(value)).toBe(bytes)
+  return value
 }
 beforeEach(() => vi.clearAllMocks())
 
@@ -205,5 +236,50 @@ describe('role-definition server operations', () => {
     await expect(listRoleDefinitions('org-a', {}, input)).resolves.toMatchObject({
       data: { total: 1 },
     })
+  })
+})
+
+describe('member access read', () => {
+  it('uses one fixed GET path, validates both ids and forwards no browser credentials', async () => {
+    const { fetch, input } = setup(() => Response.json(access()))
+    await readMemberAccess('org-a', 'user-1', input)
+    const sent = call(fetch)
+    expect(sent.url.pathname).toBe('/api/v1/organizations/org-a/members/user-1/access')
+    expect(sent.init.method).toBe('GET')
+    expect(sent.headers.get('authorization')).not.toBe('Bearer browser-token')
+    expect(sent.headers.get('cookie')).toBeNull()
+    await expect(readMemberAccess('org-a', '../x', input)).rejects.toMatchObject({ status: 400 })
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('fits the envelope at the API cap and rejects what the BFF cannot hold', async () => {
+    const fits = setup(() => Response.json(accessOfSize(ACCESS_API_RESPONSE_BYTES)))
+    await expect(readMemberAccess('org-a', 'user-1', fits.input)).resolves.toMatchObject({
+      data: { scope: 'organization-membership' },
+    })
+    const over = setup(() => Response.json(accessOfSize(ACCESS_RESPONSE_BYTES + 1)))
+    await expect(readMemberAccess('org-a', 'user-1', over.input)).rejects.toBeInstanceOf(
+      ContextRequestError
+    )
+  })
+
+  it.each([
+    ['ascii', 'n'],
+    ['two-byte', 'é'],
+    ['four-byte', '😀'],
+  ])('holds the same boundaries with %s text', async (_name, glyph) => {
+    for (const size of [ACCESS_API_RESPONSE_BYTES - 1, ACCESS_API_RESPONSE_BYTES]) {
+      const { input } = setup(() => Response.json(accessOfSize(size, glyph)))
+      await expect(readMemberAccess('org-a', 'user-1', input)).resolves.toBeDefined()
+    }
+    const over = setup(() => Response.json(accessOfSize(ACCESS_RESPONSE_BYTES + 1, glyph)))
+    await expect(readMemberAccess('org-a', 'user-1', over.input)).rejects.toBeInstanceOf(
+      ContextRequestError
+    )
+  })
+
+  it('rejects an upstream answer that does not match the contract', async () => {
+    const { input } = setup(() => Response.json({ ...access(), scope: 'elsewhere' }))
+    await expect(readMemberAccess('org-a', 'user-1', input)).rejects.toMatchObject({ status: 502 })
   })
 })

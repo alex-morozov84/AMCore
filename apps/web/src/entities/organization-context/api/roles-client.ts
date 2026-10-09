@@ -5,6 +5,7 @@ import {
   type DeleteRoleDefinition,
   deleteRoleDefinitionResponseSchema,
   deleteRoleDefinitionSchema,
+  memberAccessSchema,
   roleDefinitionDetailSchema,
   roleDefinitionListResponseSchema,
   type SaveRoleDefinition,
@@ -75,6 +76,19 @@ export const rolesClient = {
         headers: headers(binding),
         signal,
       })
+    )
+  },
+  async memberAccess(binding: string, orgId: string, userId: string, signal: AbortSignal) {
+    return parseContextResponse(
+      binding,
+      memberAccessSchema,
+      await apiClient.get(
+        `/product-access/organizations/${encodeURIComponent(orgId)}/members/${encodeURIComponent(userId)}/access`,
+        {
+          headers: headers(binding),
+          signal,
+        }
+      )
     )
   },
   async detail(binding: string, orgId: string, roleId: string, signal: AbortSignal) {

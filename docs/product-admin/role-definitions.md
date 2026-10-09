@@ -285,7 +285,9 @@ when its destination is passed, so a downstream app can leave one out.
   and notes (**Advanced rules**, **Full control**), with name search and pages of 20. **Create role**
   asks for a name and an optional description and opens the new role.
 - `/organizations/[id]/roles/[roleId]` is one role: details, **Capabilities** grouped by area with
-  one checkbox per level the descriptor offers (own, assigned, all), the read-only **Advanced rules**,
+  one checkbox per level the descriptor offers (own, assigned, all) (a catalogue of more than 12
+  capabilities gains a search, collapsible areas with an "N of M configured" count and an **Only
+  configured** filter; a small one keeps the flat list), the read-only **Advanced rules**,
   the people who hold the role, and a separate delete card. People are a sample of at most 10, the
   total, a **Show all** link to the Members tab narrowed to this role (`?role=<roleId>`, which uses
   the optional `roleId` filter of `GET /members`) and a highlighted count of pending invitations that

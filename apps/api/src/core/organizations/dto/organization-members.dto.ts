@@ -1,6 +1,7 @@
 import { createZodDto } from 'nestjs-zod'
 
 import {
+  memberAccessSchema,
   memberRolesQuerySchema,
   memberRolesResponseSchema,
   organizationMembersQuerySchema,
@@ -15,5 +16,6 @@ export class OrganizationMembersResponseDto extends createZodDto(
   organizationMembersResponseSchema
 ) {}
 export const MemberRolesResponseDto = createZodDto(memberRolesResponseSchema)
+export class MemberAccessResponseDto extends createZodDto(memberAccessSchema) {}
 export class ReplaceMemberRolesDto extends createZodDto(replaceMemberRolesSchema) {}
 export class ReplaceMemberRolesResponseDto extends createZodDto(replaceMemberRolesResponseSchema) {}

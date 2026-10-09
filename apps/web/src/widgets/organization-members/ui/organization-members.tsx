@@ -7,6 +7,7 @@ import {
   type OrganizationContextState,
   useOrganizationMembers,
 } from '@/entities/organization-context'
+import { MemberAccessDialog } from '@/features/member-access'
 import { MemberRoleDialog, MemberSearch } from '@/features/member-role-assignment'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
@@ -82,6 +83,7 @@ export function OrganizationMembers({
     setQuery,
   ])
   const [userId, setUserId] = useState<string>()
+  const [accessUserId, setAccessUserId] = useState<string>()
   return (
     <div className="space-y-4">
       <h2 className="sr-only" ref={heading} tabIndex={-1}>
@@ -141,6 +143,7 @@ export function OrganizationMembers({
             actorId={actorId}
             disabled={!members.ready || members.busy}
             onEdit={setUserId}
+            onAccess={setAccessUserId}
           />
         ) : members.data ? (
           <p>{t('empty')}</p>
@@ -183,6 +186,17 @@ export function OrganizationMembers({
           userId={userId}
           onClose={() => {
             setUserId(undefined)
+            heading.current?.focus()
+          }}
+        />
+      )}
+      {accessUserId && (
+        <MemberAccessDialog
+          key={accessUserId}
+          controller={controller}
+          userId={accessUserId}
+          onClose={() => {
+            setAccessUserId(undefined)
             heading.current?.focus()
           }}
         />

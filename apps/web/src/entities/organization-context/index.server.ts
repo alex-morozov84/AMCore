@@ -21,6 +21,7 @@ export {
   deleteRoleDefinition,
   listRoleDefinitions,
   readCapabilityCatalogue,
+  readMemberAccess,
   readRoleDefinition,
   saveRoleDefinition,
 } from './api/roles.server'

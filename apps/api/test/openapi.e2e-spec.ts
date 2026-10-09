@@ -118,6 +118,7 @@ const EXPECTED: Record<string, Expected> = {
   'post /organizations/{id}/switch': { status: '200', kind: 'json' },
   // members
   'get /organizations/{orgId}/members': { status: '200', kind: 'json' },
+  'get /organizations/{orgId}/members/{userId}/access': { status: '200', kind: 'json' },
   'get /organizations/{orgId}/members/{userId}/roles': { status: '200', kind: 'json' },
   'patch /organizations/{orgId}/members/{userId}/roles': { status: '200', kind: 'json' },
   'delete /organizations/{orgId}/members/{userId}': { status: '204', kind: 'none' },
@@ -411,6 +412,38 @@ describe('OpenAPI success surface (e2e)', () => {
       Record<string, { security?: Array<Record<string, string[]>> }> | undefined
     return item?.[method!]?.security ?? []
   }
+
+  it('documents the member access explanation as three evaluations', () => {
+    const operation = document.paths['/organizations/{orgId}/members/{userId}/access']!.get!
+    const response = (operation.responses['200'] as { content: Record<string, { schema: object }> })
+      .content['application/json']!.schema
+    expect(response).toEqual({ $ref: '#/components/schemas/MemberAccessResponseDto_Output' })
+    const output = document.components!.schemas!.MemberAccessResponseDto_Output as {
+      properties: {
+        items: { items: { oneOf: { properties: Record<string, { enum?: string[] }> }[] } }
+      }
+    }
+    const variants = output.properties.items.items.oneOf
+    expect(variants.map((variant) => variant.properties.evaluation?.enum)).toEqual([
+      ['record'],
+      ['configured'],
+      ['notEvaluated'],
+    ])
+    // Only an exact item may claim a decision; a configured one names a state, not a boolean.
+    expect(variants.map((variant) => 'granted' in variant.properties)).toEqual([true, false, false])
+    expect(variants[1]!.properties.state?.enum).toEqual([
+      'allowed',
+      'configured',
+      'blocked',
+      'missingPrerequisite',
+      'none',
+    ])
+    const sources = variants[1]!.properties.sources as unknown as {
+      items: { oneOf: { properties: Record<string, { type?: string }> }[] }
+    }
+    const ruleSource = sources.items.oneOf.find((source) => 'permissionId' in source.properties)
+    expect(ruleSource?.properties.total?.type).toBe('integer')
+  })
 
   it('documents invitation role intent, bounded errors and credential boundaries', () => {
     const accept = document.paths['/auth/invites/accept']!.post!

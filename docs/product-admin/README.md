@@ -15,7 +15,9 @@ capability. The “Your access” card reports only the verified team-access dec
 it does not infer permissions for individual records. It does not provide organization editing. Custom roles are managed on the ready **Roles** tab
 (see [role definitions](role-definitions.md#ready-role-screens)), built on the
 [role definitions API](role-definitions.md) (atomic complete-definition save, holders and
-impact, confirmed delete), which is also available for a downstream editor. The
+impact, confirmed delete), which is also available for a downstream editor. The Members tab adds an
+**Access** view that explains what a member can do and which roles give or block it
+([member access explanation](member-access.md)). The
 Invitations section provides creation, search, repeat/replace and revocation;
 recipients use a separate sign-in, verification and explicit-consent journey.
 See the [invitation API](../auth/invites.md) for contracts and upgrade requirements. See the

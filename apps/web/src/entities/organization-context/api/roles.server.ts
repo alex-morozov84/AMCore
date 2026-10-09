@@ -1,10 +1,12 @@
 import {
+  ACCESS_RESPONSE_BYTES,
   CAPABILITY_CATALOGUE_RESPONSE_BYTES,
   capabilityCatalogueResponseSchema,
   createRoleDefinitionSchema,
   deleteRoleDefinitionResponseSchema,
   deleteRoleDefinitionSchema,
   isOrganizationContextId,
+  memberAccessSchema,
   ROLE_DETAIL_RESPONSE_BYTES,
   ROLE_LIST_RESPONSE_BYTES,
   ROLE_REQUEST_BYTES,
@@ -56,6 +58,21 @@ export async function readCapabilityCatalogue(orgId: string, input: ContextExecu
       schema: capabilityCatalogueResponseSchema,
       successStatus: 200,
       responseBytes: CAPABILITY_CATALOGUE_RESPONSE_BYTES,
+    },
+    input,
+    deps(input)
+  )
+}
+/** The server-side explanation of what one member can do in this organization. */
+export async function readMemberAccess(orgId: string, userId: string, input: ContextExecutorInput) {
+  return executeContextOperation(
+    {
+      method: 'GET',
+      path: `${base(orgId, userId)}/members/${userId}/access`,
+      organizationId: orgId,
+      schema: memberAccessSchema,
+      successStatus: 200,
+      responseBytes: ACCESS_RESPONSE_BYTES,
     },
     input,
     deps(input)

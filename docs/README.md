@@ -136,7 +136,8 @@ provide an operator interface for admin session management.
   and the `ROUTE_PROGRESS_ENABLED` dev/agent flag.
 - **[Product administration foundation](product-admin/README.md)** — the
   organization selector and read-only overview, one-placement integration and
-  headless extension path, members/roles, the [role definitions API and ready Roles tab](product-admin/role-definitions.md)
+  headless extension path, members/roles, the [role definitions API and ready Roles tab](product-admin/role-definitions.md), the
+  [member access explanation](product-admin/member-access.md)
   and [invitations](product-admin/invitations.md);
   product-domain management UI remains downstream-owned.
 - **[Operations Console](operations-console/README.md)** — the optional

@@ -29,13 +29,29 @@ vi.mock('@/entities/organization-context', () => ({
     data: { total: state.total, page: q.page, data: q.page === 1 ? [{}] : [] },
   }),
 }))
+vi.mock('@/features/member-access', () => ({
+  MemberAccessDialog: ({ userId, onClose }: { userId: string; onClose: () => void }) => (
+    <div role="dialog" aria-label={`access ${userId}`}>
+      <button onClick={onClose}>Close access</button>
+    </div>
+  ),
+}))
 vi.mock('@/features/member-role-assignment', () => ({
   MemberSearch: () => null,
   MemberRoleDialog: () => <input aria-label="dirty draft" defaultValue="preserved" />,
 }))
 vi.mock('./member-table', () => ({
-  MemberTable: ({ onEdit }: { onEdit: (id: string) => void }) => (
-    <button onClick={() => onEdit('user')}>Edit fixture</button>
+  MemberTable: ({
+    onEdit,
+    onAccess,
+  }: {
+    onEdit: (id: string) => void
+    onAccess: (id: string) => void
+  }) => (
+    <>
+      <button onClick={() => onEdit('user')}>Edit fixture</button>
+      <button onClick={() => onAccess('user')}>Access fixture</button>
+    </>
   ),
 }))
 const controller = { binding: 'binding', organizationId: 'org' } as never
@@ -90,4 +106,14 @@ it('names the role filter and clearing it keeps the search and returns to page o
   expect(screen.getByText('Showing people with the role Support agent')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Show everyone' }))
   expect(change).toHaveBeenCalledWith({ page: 1, search: 'literal' }, 'search')
+})
+
+it('opens the access view for a member and closes it without touching the list query', () => {
+  const change = vi.fn()
+  render(view(1, change))
+  fireEvent.click(screen.getByRole('button', { name: 'Access fixture' }))
+  expect(screen.getByRole('dialog', { name: 'access user' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Close access' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(change).not.toHaveBeenCalled()
 })
