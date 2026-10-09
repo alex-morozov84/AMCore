@@ -47,6 +47,17 @@ test('member access: roles, decisions, a veto with its cause, a failed read and 
       link: id('l'),
     }
   )
+  const openAccess = async () => {
+    await page
+      .getByRole('button', {
+        name: catalogue.organizationMembers.actionFor.replace('{name}', email),
+      })
+      .filter({ visible: true })
+      .click()
+    await page
+      .getByRole('menuitem', { name: catalogue.organizationMembers.access, exact: true })
+      .click()
+  }
   const failures: string[] = []
   page.on('pageerror', (error) => failures.push(error.name))
   await page.goto(
@@ -58,7 +69,7 @@ test('member access: roles, decisions, a veto with its cause, a failed read and 
       )
     ).pathname
   )
-  await page.getByRole('button', { name: new RegExp(email.replace('.', '\\.')) }).click()
+  await openAccess()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: t.title })).toBeVisible()
   await expect(dialog.getByText('Auditor').first()).toBeVisible()
@@ -87,7 +98,7 @@ test('member access: roles, decisions, a veto with its cause, a failed read and 
       body: JSON.stringify({ statusCode: 503, errorCode: 'ROLE_ACCESS_UNAVAILABLE', message: 'x' }),
     })
   )
-  await page.getByRole('button', { name: new RegExp(email.replace('.', '\\.')) }).click()
+  await openAccess()
   await expect(page.getByText(t.unavailable)).toBeVisible()
   await expect(page.getByText(capabilities.teamAccessManagement.label)).toHaveCount(0)
   await page.unroute('**/api/product-access/organizations/*/members/*/access')

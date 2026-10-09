@@ -2,10 +2,11 @@
 import { useFormatter, useTranslations } from 'next-intl'
 import type { OrganizationMembersResponse } from '@amcore/shared'
 
-import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { DataTableSurface } from '@/shared/ui/data-table-surface'
+import { DropdownMenuItem } from '@/shared/ui/dropdown-menu'
 import { RoleBadges } from '@/shared/ui/role-badges'
+import { RowActionsMenu } from '@/shared/ui/row-actions-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 
 type Row = OrganizationMembersResponse['data'][number]
@@ -47,20 +48,14 @@ export function MemberTable({
       )}
     </div>
   )
-  const edit = (row: Row) => (
-    <div className="flex flex-wrap gap-2">
-      <Button variant="outline" disabled={disabled} onClick={() => onEdit(row.user.id)}>
-        {t('edit')}
-      </Button>
-      <Button
-        variant="outline"
-        disabled={disabled}
-        aria-label={t('accessFor', { name: row.user.name ?? row.user.email })}
-        onClick={() => onAccess(row.user.id)}
-      >
-        {t('access')}
-      </Button>
-    </div>
+  const actions = (row: Row) => (
+    <RowActionsMenu
+      disabled={disabled}
+      label={t('actionFor', { name: row.user.name ?? row.user.email })}
+    >
+      <DropdownMenuItem onClick={() => onEdit(row.user.id)}>{t('edit')}</DropdownMenuItem>
+      <DropdownMenuItem onClick={() => onAccess(row.user.id)}>{t('access')}</DropdownMenuItem>
+    </RowActionsMenu>
   )
   return (
     <>
@@ -72,7 +67,7 @@ export function MemberTable({
               <TableHead>{t('roles')}</TableHead>
               <TableHead>{t('joined')}</TableHead>
               <TableHead>
-                <span className="sr-only">{t('edit')}</span>
+                <span className="sr-only">{t('actions')}</span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -84,7 +79,7 @@ export function MemberTable({
                 <TableCell>
                   {format.dateTime(new Date(row.joinedAt), { dateStyle: 'medium' })}
                 </TableCell>
-                <TableCell>{edit(row)}</TableCell>
+                <TableCell>{actions(row)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -99,7 +94,7 @@ export function MemberTable({
               <p className="text-sm text-muted-foreground">
                 {t('joined')}: {format.dateTime(new Date(row.joinedAt), { dateStyle: 'medium' })}
               </p>
-              {edit(row)}
+              {actions(row)}
             </CardContent>
           </Card>
         ))}

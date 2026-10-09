@@ -848,8 +848,9 @@
     "roleFilterClear": "Show everyone",
     "roleDetails": "Details",
     "roleDetailsFor": "Open the role {name} in a new tab",
-    "access": "Access",
-    "accessFor": "Show the access of {name}"
+    "actions": "Actions",
+    "actionFor": "Actions for {name}",
+    "access": "Access"
   },
   "invitationRecipient": {
     "signInTitle": "Continue your invitation",

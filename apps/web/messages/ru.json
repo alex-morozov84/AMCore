@@ -848,8 +848,9 @@
     "roleFilterClear": "Показать всех",
     "roleDetails": "Подробнее",
     "roleDetailsFor": "Открыть роль {name} в новой вкладке",
-    "access": "Доступ",
-    "accessFor": "Показать доступ: {name}"
+    "actions": "Действия",
+    "actionFor": "Действия: {name}",
+    "access": "Доступ"
   },
   "invitationRecipient": {
     "signInTitle": "Продолжить приглашение",

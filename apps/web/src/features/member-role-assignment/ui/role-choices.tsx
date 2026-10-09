@@ -23,6 +23,8 @@ export function RoleChoices(props: Props) {
         custom: t('custom'),
         noDescription: t('noDescription'),
         empty: t('emptyRoles'),
+        details: t('roleDetails'),
+        detailsFor: (name) => t('roleDetailsFor', { name }),
       }}
       regionLabels={{
         roleList: t('roleList'),
