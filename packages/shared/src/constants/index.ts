@@ -173,6 +173,8 @@ export enum RoleDefinitionErrorCode {
   ROLE_DEFINITION_OVERSIZED = 'ROLE_DEFINITION_OVERSIZED',
   ROLE_DELETE_IMPACT_CHANGED = 'ROLE_DELETE_IMPACT_CHANGED',
   ROLE_READ_UNAVAILABLE = 'ROLE_READ_UNAVAILABLE',
+  /** The member's access could not be explained within the limits or from a valid policy. */
+  ROLE_ACCESS_UNAVAILABLE = 'ROLE_ACCESS_UNAVAILABLE',
   /** The write outcome is unconfirmed; read persisted state before another deliberate edit. */
   ROLE_SAVE_UNAVAILABLE = 'ROLE_SAVE_UNAVAILABLE',
 }

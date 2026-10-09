@@ -64,6 +64,7 @@
     "ROLE_DEFINITION_OVERSIZED": "This role has too many rules to edit here.",
     "ROLE_DELETE_IMPACT_CHANGED": "The people or invitations affected changed. Review the current impact before deleting.",
     "ROLE_READ_UNAVAILABLE": "Role data could not be loaded within the size limit.",
+    "ROLE_ACCESS_UNAVAILABLE": "Access could not be explained within the size limit or from a valid policy. Nothing was changed.",
     "ROLE_SAVE_UNAVAILABLE": "The role change could not be confirmed. Review the current role before trying again.",
     "SETTING_REVISION_CONFLICT": "The saved setting changed. Your draft is preserved; review the current revision before saving again.",
     "AI_RUN_IDEMPOTENCY_CONFLICT": "This idempotency key was already used for a different request. Use a new key, or repeat the original request unchanged.",
