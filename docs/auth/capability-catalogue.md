@@ -88,10 +88,25 @@ levels and 64 condition nodes; `in` and `notIn` accept at most 64 values. An
 empty nested branch, unknown field, relation path or unsupported operator is
 rejected before a permission is saved.
 
-## Extend a downstream product
+## What a person sees: catalogued or not
 
-A capability you add also appears in the [member access explanation](../product-admin/member-access.md): its
-decision comes from the registry's `record` entry and its hint from `actor`.
+A stored permission rule is shown, explained and edited by the product screens **only if a developer has
+explicitly registered the operation it belongs to** in `CAPABILITY_CATALOGUE` and `CapabilityRegistry`
+(steps below). Nothing is discovered automatically: a rule that merely exists in a role keeps working, but it is
+not part of the screens' vocabulary.
+
+| The rule is…                                                                                    | Role editor                                           | Member **Access** view                                         |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
+| A catalogued operation at a preset level (own, assigned, all)                                   | Editable checkbox with its label                      | Listed under its area with the roles that allow or block it    |
+| A catalogued operation's field limits, a condition, or an explicit deny                         | Read-only under **Advanced rules**, preserved on save | Explained exactly (allowed, blocked, who blocks); not editable |
+| On a subject or action with no catalogue entry (for example a member's own profile in `MEMBER`) | Read-only under **Advanced rules**, preserved on save | Not explained: counted once as **Other permissions in roles**  |
+
+The screens never hide such a rule from the server's decisions; they only do not describe it. To make a
+permission appear in both places with a human label, register it as described in the next section: it needs a real
+operation (handler, method, path), a registry adapter and label keys. Registering a catalogue entry never grants
+an existing role anything.
+
+## Extend a downstream product
 
 1. Add the domain Prisma model and a migration. Add its name to the shared
    `Subject` enum and model-permission schema. This also makes syntactically
@@ -116,7 +131,10 @@ decision comes from the registry's `record` entry and its hint from `actor`.
    and assignment columns immutable. An action
    hint is never the write authorization. Do not send client-provided records
    to a generic `/can` endpoint or call the server once per button.
-5. Compile shared, API and web consumers; exercise multiple roles, conditional
+5. Add the label keys the screens read: `organizationRoles.capabilities.<labelKey>.label` and `.description` in every
+   web catalogue (and `organizationRoles.areas.<Subject>` for a new subject). The role editor and the member **Access**
+   view then list the new operation with no further UI code.
+6. Compile shared, API and web consumers; exercise multiple roles, conditional
    own/assigned/all, DENY, wrong tenant, fields and API-key intersection on
    PostgreSQL. Run `pnpm test:capability-extension` from the repository root:
    it applies a disposable `FixtureOrder` source/migration/controller variant

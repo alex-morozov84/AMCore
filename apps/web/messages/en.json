@@ -1141,18 +1141,16 @@
     "rolesMore": "and {count} more",
     "qualifierSuperAdmin": "This person is also a platform administrator. This summary covers only what organization membership gives; platform access is separate.",
     "unsafeLinks": "{count, plural, one {# role link points} other {# role links point}} to roles of another organization. They are ignored.",
-    "uncovered": "Their roles also contain {count, plural, one {# other permission} other {# other permissions}} that are not shown here, such as viewing or editing their own profile. They do not change the list above.",
-    "uncoveredRoles": "In roles: {roles}",
     "wideningUnavailable": "A breakdown by role is not available because this person has many roles or rules. What they can do is still exact.",
     "breadth": "Together, these roles allow more than any single role does.",
     "synergy": "Some access exists only because of the combination of roles.",
     "vetoed": "A deny rule in one role takes away access that another role would give.",
-    "itemsTitle": "What this person can do",
+    "itemsTitle": "What this person can do in the organization and team",
     "allowed": "Allowed",
     "notAllowed": "Not allowed",
     "blocked": "Blocked",
-    "included": "Included with membership",
-    "baselineNote": "Every member can view the organization.",
+    "included": "Given to every member",
+    "baselineNote": "Every member can view the organization. This does not depend on roles.",
     "originSingle": "Allowed by {roles}",
     "originCombined": "Allowed only by the combination of roles.",
     "reasonNoGrant": "No role allows this.",
@@ -1162,19 +1160,13 @@
     "whyTitle": "Which rules decide this",
     "whyNone": "No rule applies.",
     "sourcesMore": "More rules apply than are listed.",
-    "status": {
-      "contributes": "Gives access",
-      "vetoes": "Blocks",
-      "overridden": "Overruled by another rule"
-    },
     "via": {
-      "direct": "This permission itself",
-      "readPrerequisite": "Reading the organization, which this needs first",
-      "deletePrerequisite": "Deleting every organization field, which deleting needs",
-      "teamAccessGate": "Team control, which this needs",
-      "teamAccessVeto": "A ban on team, roles, permissions or users, which blocks team control"
+      "direct": "this permission",
+      "readPrerequisite": "reading the organization, which this needs",
+      "deletePrerequisite": "deleting organization fields, which this needs",
+      "teamAccessGate": "team control, which this needs",
+      "teamAccessVeto": "a ban on team, roles, permissions or users"
     },
-    "sourceRoles": "Roles: {roles}",
     "roleUnknown": "another role",
     "fieldOf": "{capability}: {field}",
     "fields": {
@@ -1185,6 +1177,17 @@
     "summaryAllowed": "{count, plural, one {# thing allowed} other {# things allowed}}",
     "summaryBlocked": "{count} blocked by a deny rule",
     "notAllowedTitle": "Not allowed ({count})",
-    "notAllowedHint": "None of this person's roles give these."
+    "notAllowedHint": "None of this person's roles give these.",
+    "why": {
+      "allows": "Allows: {roles}",
+      "blocks": "Blocks: {roles}",
+      "blocksVia": "Blocks: {roles} ({via})",
+      "needs": "Also needed: {via}. {roles}",
+      "denyWins": "A ban always beats an allow."
+    },
+    "otherTitle": "Other permissions in roles ({count})",
+    "otherBody": "These permissions are not in the capability catalogue, so this screen does not explain them and the role editor shows them read-only. For example, access to one's own profile. For a permission to be explained here and edited in the role editor, a developer has to register it in the catalogue explicitly.",
+    "otherRoles": "In roles: {roles}",
+    "areaCount": "{area} ({count})"
   }
 }

@@ -118,3 +118,33 @@ export function mergeSources(sources: readonly Source[]): (RuleSource & { roleId
   }
   return [...merged.values()]
 }
+
+export type Via = RuleSource['via']
+
+/** One group of roles in the "why" of a row, with the step it concerns when that is not the item itself. */
+export interface WhyLine {
+  roleIds: string[]
+  via?: Via
+}
+
+/**
+ * The reasons for a decision in the words a reader needs: who allows it, who blocks it, and, only when
+ * the decision fails for lack of a prerequisite, which prerequisites were looked at. Prerequisites that
+ * are met (reading the organization, team control) are the same for nearly everyone and explain
+ * nothing, so they are left out.
+ */
+export function explainWhy(item: Item): { allows: WhyLine[]; blocks: WhyLine[]; needs: WhyLine[] } {
+  const allows: WhyLine[] = []
+  const blocks: WhyLine[] = []
+  const needs: WhyLine[] = []
+  for (const source of mergeSources(item.sources)) {
+    const line = {
+      roleIds: source.roleIds,
+      ...(source.via === 'direct' ? {} : { via: source.via }),
+    }
+    if (source.status === 'vetoes') blocks.push(line)
+    else if (source.via === 'direct') allows.push(line)
+    else needs.push(line)
+  }
+  return { allows, blocks, needs: item.reason === 'missingPrerequisite' ? needs : [] }
+}

@@ -38,15 +38,18 @@ export function AccessNotes({ access }: { access: MemberAccess }) {
   )
 }
 
-/** A footnote, not an alert: roles hold permissions this screen does not explain. */
-export function UncoveredNote({ access }: { access: MemberAccess }) {
+/** Permissions outside the capability catalogue: said once, collapsed, with who must act to change it. */
+export function OtherPermissions({ access }: { access: MemberAccess }) {
   const t = useTranslations('memberAccess')
   if (access.uncovered.ruleCount === 0) return null
   const roles = access.uncovered.roleSample.map((role) => role.name).join(', ')
   return (
-    <p className="text-xs text-muted-foreground">
-      {t('uncovered', { count: access.uncovered.ruleCount })}
-      {roles && ` ${t('uncoveredRoles', { roles })}`}
-    </p>
+    <details className="rounded-lg border border-border p-3 text-sm">
+      <summary className="cursor-pointer font-medium">
+        {t('otherTitle', { count: access.uncovered.ruleCount })}
+      </summary>
+      <p className="mt-2 text-muted-foreground">{t('otherBody')}</p>
+      {roles && <p className="mt-1 text-muted-foreground">{t('otherRoles', { roles })}</p>}
+    </details>
   )
 }

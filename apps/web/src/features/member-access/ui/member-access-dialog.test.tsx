@@ -77,6 +77,16 @@ const access = (over: Partial<MemberAccess> = {}): MemberAccess => ({
           kind: 'rule',
           via: 'direct',
           field: 'name',
+          roleIds: ['rA'],
+          permissionId: 'p0',
+          presetId: null,
+          effect: 'allow',
+          status: 'overridden',
+        },
+        {
+          kind: 'rule',
+          via: 'direct',
+          field: 'name',
           roleIds: ['rC'],
           permissionId: 'p1',
           presetId: null,
@@ -121,6 +131,7 @@ describe('MemberAccessDialog', () => {
     expect(screen.getAllByText('Support').length).toBeGreaterThan(0)
     expect(screen.getByText(roles.teamAccessManagement.label)).toBeInTheDocument()
     expect(screen.getByText(t.baselineNote)).toBeInTheDocument()
+    expect(screen.getByText(t.included)).toBeInTheDocument()
     expect(screen.getByText(say('originSingle', { roles: 'Support' }))).toBeInTheDocument()
     expect(
       screen.getByText(say('reasonVetoed', { granted: 'Support', blockers: 'Auditor' }))
@@ -133,7 +144,8 @@ describe('MemberAccessDialog', () => {
     expect(screen.getByText(t.breadth)).toBeInTheDocument()
     expect(screen.getByText(t.vetoed)).toBeInTheDocument()
     expect(screen.queryByText(t.synergy)).toBeNull()
-    expect(screen.getByText(say('uncovered', { count: 2 }), { exact: false })).toBeInTheDocument()
+    expect(screen.getByText(say('otherTitle', { count: 2 }))).toBeInTheDocument()
+    expect(screen.getByText(t.otherBody)).toBeInTheDocument()
     expect(screen.getByText(new RegExp(say('summaryAllowed', { count: 1 })))).toBeInTheDocument()
   })
 
@@ -171,8 +183,9 @@ describe('MemberAccessDialog', () => {
       )
       .closest('li')!
     fireEvent.click(within(row).getByText(t.whyTitle))
-    expect(within(row).getByText(t.status.vetoes)).toBeInTheDocument()
-    expect(within(row).getByText(say('sourceRoles', { roles: 'Auditor' }))).toBeInTheDocument()
+    expect(within(row).getByText(say('why.blocks', { roles: 'Auditor' }))).toBeInTheDocument()
+    expect(within(row).getByText(t.why.denyWins)).toBeInTheDocument()
+    expect(within(row).getByText(say('why.allows', { roles: 'Support' }))).toBeInTheDocument()
   })
 
   it('shows a loading state, and never stale facts after a failed read', () => {

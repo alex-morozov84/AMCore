@@ -23,8 +23,8 @@ import { Skeleton } from '@/shared/ui/skeleton'
 
 import { capabilityOf, groupByArea, roleNamer, splitItems } from '../model/access-view'
 
-import { AccessNotes, UncoveredNote } from './access-notes'
-import { AccessRow } from './access-row'
+import { AccessNotes, OtherPermissions } from './access-notes'
+import { AccessRow, CompactAccessRow } from './access-row'
 
 /**
  * What one member can do in this organization and why, as the server works it out from the same
@@ -67,13 +67,7 @@ export function MemberAccessDialog({
     return found?.field ? t('fieldOf', { capability: base, field: fieldLabel(found.field) }) : base
   }
   const row = (item: NonNullable<typeof access>['items'][number]) => (
-    <AccessRow
-      key={item.key}
-      item={item}
-      label={labelOf(item.key)}
-      nameOf={nameOf}
-      fieldLabel={fieldLabel}
-    />
+    <AccessRow key={item.key} item={item} label={labelOf(item.key)} nameOf={nameOf} />
   )
   const parts =
     access && capabilities
@@ -145,11 +139,28 @@ export function MemberAccessDialog({
                       {t('notAllowedTitle', { count: parts.inactive.length })}
                     </summary>
                     <p className="mt-2 text-muted-foreground">{t('notAllowedHint')}</p>
-                    <ul className="mt-2 space-y-2">{parts.inactive.map(row)}</ul>
+                    <div className="mt-2 space-y-2">
+                      {groupByArea(parts.inactive, capabilities).map(([area, items]) => (
+                        <details key={area} className="rounded-md border border-border p-2">
+                          <summary className="cursor-pointer font-medium">
+                            {t('areaCount', { area: text.area(area), count: items.length })}
+                          </summary>
+                          <ul className="mt-2 space-y-1">
+                            {items.map((item) => (
+                              <CompactAccessRow
+                                key={item.key}
+                                item={item}
+                                label={labelOf(item.key)}
+                              />
+                            ))}
+                          </ul>
+                        </details>
+                      ))}
+                    </div>
                   </details>
                 )}
               </section>
-              <UncoveredNote access={access} />
+              <OtherPermissions access={access} />
             </>
           ) : read.error || catalogue.error ? (
             <div className="space-y-2">

@@ -86,18 +86,20 @@ and the three `widening` flags become `null`, a denied item has `reason: null`, 
 `widening.status` is `unavailable` with `reason` `roleLimit` or `ruleLimit`.
 
 A policy that the editor would call oversized (more than 200 rules in one role) is still explained
-exactly while it stays within these limits. Rules that are not about the organization or team access
-(for example reading one's own profile) are counted in `uncovered`, not explained.
+exactly while it stays within these limits. Rules on anything outside the capability catalogue (for example a member's own profile) are counted in
+`uncovered`, not explained. A developer must register them in the catalogue for the screens to explain and edit
+them; see [what a person sees](../auth/capability-catalogue.md#what-a-person-sees-catalogued-or-not).
 
 ## Browser and headless use
 
 The ready screens call `GET /api/product-access/organizations/:id/members/:userId/access` and
 `useMemberAccess(controller, userId)` from the public entity API; the response is wrapped like the other
 organization reads (`{binding, data}`, `private, no-store`). A custom screen can use the same hook and
-render the response however it likes. The ready dialog keeps its header and footer in place while the body scrolls. It lists what the person can do
-and what is blocked, grouped by area; what no role gives is collapsed under "Not allowed", and a per-field
-line appears only when it differs from the whole operation, so the list does not grow with every capability a
-product adds. Rules that say the same thing are shown once with all their roles. It shows a loading state, hides the answer when a
+render the response however it likes. The ready dialog keeps its header and footer in place while the body scrolls. It lists what the person can do and what is blocked, grouped by area; what no role gives is collapsed under
+"Not allowed", grouped by area with compact rows, so the list stays short however many capabilities a product
+adds. A per-field line appears only when it differs from the whole operation. "Why" names the roles that allow and
+block an item (a ban always beats an allow); prerequisites such as reading the organization appear only when one
+is missing. Rules outside the catalogue are one collapsed note, **Other permissions in roles**. It shows a loading state, hides the answer when a
 read fails (never stale facts) and keeps what it shows during a background reread.
 
 ## Your own capabilities

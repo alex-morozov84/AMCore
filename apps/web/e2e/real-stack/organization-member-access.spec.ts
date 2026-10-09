@@ -84,7 +84,7 @@ test('member access: roles, decisions, a veto with its cause, a failed read and 
   await expect(nameRow).toContainText(t.blocked)
   await expect(nameRow).toContainText('Auditor')
   await nameRow.getByText(t.whyTitle).click()
-  await expect(nameRow).toContainText(t.status.vetoes)
+  await expect(nameRow).toContainText(t.why.denyWins)
   await expect(dialog.getByText(t.vetoed)).toBeVisible()
   await expectNoAxeViolations(page)
 

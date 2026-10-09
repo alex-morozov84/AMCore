@@ -5,7 +5,7 @@ import { Check, Minus, ShieldAlert } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'
 
-import { describeRoles, mergeSources, type Tone, toneOf } from '../model/access-view'
+import { describeRoles, explainWhy, type Tone, toneOf, type WhyLine } from '../model/access-view'
 
 type Item = MemberAccess['items'][number]
 
@@ -20,12 +20,10 @@ export function AccessRow({
   item,
   label,
   nameOf,
-  fieldLabel,
 }: {
   item: Item
   label: string
   nameOf: (id: string) => string | undefined
-  fieldLabel: (field: string) => string
 }) {
   const t = useTranslations('memberAccess')
   const tone = toneOf(item)
@@ -54,7 +52,7 @@ export function AccessRow({
       {!item.baseline && (
         <details className="text-sm">
           <summary className="cursor-pointer font-medium">{t('whyTitle')}</summary>
-          <Sources item={item} nameOf={nameOf} fieldLabel={fieldLabel} />
+          <Sources item={item} nameOf={nameOf} />
         </details>
       )}
     </li>
@@ -93,38 +91,45 @@ function describeText(
   return more > 0 ? `${names.join(', ')} ${t('rolesMore', { count: more })}` : names.join(', ')
 }
 
-function Sources({
-  item,
-  nameOf,
-  fieldLabel,
-}: {
-  item: Item
-  nameOf: (id: string) => string | undefined
-  fieldLabel: (field: string) => string
-}) {
+function Sources({ item, nameOf }: { item: Item; nameOf: (id: string) => string | undefined }) {
   const t = useTranslations('memberAccess')
-  if (item.sources.length === 0) return <p className="mt-1 text-muted-foreground">{t('whyNone')}</p>
+  const why = explainWhy(item)
+  const roles = (line: WhyLine) =>
+    describeText({ roleIds: line.roleIds, total: line.roleIds.length }, nameOf, t)
+  const none = why.allows.length + why.blocks.length + why.needs.length === 0
+  if (none) return <p className="mt-1 text-muted-foreground">{t('whyNone')}</p>
   return (
-    <ul className="mt-2 space-y-2">
-      {mergeSources(item.sources).map((source) => (
-        <li key={`${source.via}-${source.status}-${source.field ?? ''}`}>
-          <p className="font-medium">{t(`status.${source.status}`)}</p>
-          <p className="text-muted-foreground">
-            {t(`via.${source.via}`)}
-            {source.field ? ` (${fieldLabel(source.field)})` : ''}
-          </p>
-          <p className="text-muted-foreground">
-            {t('sourceRoles', {
-              roles: describeText(
-                { roleIds: source.roleIds, total: source.roleIds.length },
-                nameOf,
-                t
-              ),
-            })}
-          </p>
+    <ul className="mt-2 space-y-1">
+      {why.allows.map((line) => (
+        <li key={`allow-${line.roleIds.join()}`}>{t('why.allows', { roles: roles(line) })}</li>
+      ))}
+      {why.blocks.map((line) => (
+        <li key={`block-${line.via ?? ''}-${line.roleIds.join()}`} className="font-medium">
+          {line.via
+            ? t('why.blocksVia', { roles: roles(line), via: t(`via.${line.via}`) })
+            : t('why.blocks', { roles: roles(line) })}
         </li>
       ))}
+      {why.needs.map((line) => (
+        <li key={`need-${line.via}`} className="text-muted-foreground">
+          {t('why.needs', { via: t(`via.${line.via ?? 'direct'}`), roles: roles(line) })}
+        </li>
+      ))}
+      {why.blocks.length > 0 && <li className="text-muted-foreground">{t('why.denyWins')}</li>}
       {item.sourcesTruncated && <li className="text-muted-foreground">{t('sourcesMore')}</li>}
     </ul>
+  )
+}
+
+/** A one-line row for something no role gives: it has nothing to explain beyond a missing prerequisite. */
+export function CompactAccessRow({ item, label }: { item: Item; label: string }) {
+  const t = useTranslations('memberAccess')
+  return (
+    <li className="text-sm">
+      <span>{label}</span>
+      {item.reason === 'missingPrerequisite' && (
+        <span className="block text-muted-foreground">{t('reasonMissing')}</span>
+      )}
+    </li>
   )
 }

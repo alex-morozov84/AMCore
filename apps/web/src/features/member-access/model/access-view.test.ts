@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   capabilityOf,
   describeRoles,
+  explainWhy,
   groupByArea,
   mergeSources,
   roleNamer,
@@ -159,5 +160,53 @@ describe('mergeSources', () => {
   it('shows rules that say the same thing once, with all their roles', () => {
     const merged = mergeSources([rule(['a']), rule(['b', 'a']), rule(['c'], { status: 'vetoes' })])
     expect(merged.map((entry) => entry.roleIds)).toEqual([['a', 'b'], ['c']])
+  })
+})
+
+describe('explainWhy', () => {
+  const rule = (roleIds: string[], over = {}) => ({
+    kind: 'rule' as const,
+    via: 'direct' as const,
+    roleIds,
+    permissionId: 'p',
+    presetId: null,
+    effect: 'allow' as const,
+    status: 'contributes' as const,
+    ...over,
+  })
+  it('names who allows and who blocks, and leaves met prerequisites out', () => {
+    const why = explainWhy(
+      item({
+        granted: true,
+        reason: 'granted',
+        sources: [rule(['a']), rule(['a', 'b'], { via: 'readPrerequisite' })],
+      })
+    )
+    expect(why).toEqual({ allows: [{ roleIds: ['a'] }], blocks: [], needs: [] })
+  })
+
+  it('counts an overruled allow as an allow and a veto as a block', () => {
+    const why = explainWhy(
+      item({
+        reason: 'vetoed',
+        sources: [
+          rule(['c'], { status: 'overridden' }),
+          rule(['s'], { effect: 'deny', status: 'vetoes' }),
+          rule(['d'], { effect: 'deny', status: 'vetoes', via: 'teamAccessVeto' }),
+        ],
+      })
+    )
+    expect(why.allows).toEqual([{ roleIds: ['c'] }])
+    expect(why.blocks).toEqual([{ roleIds: ['s'] }, { roleIds: ['d'], via: 'teamAccessVeto' }])
+  })
+
+  it('shows the prerequisites only when one is missing', () => {
+    const why = explainWhy(
+      item({
+        reason: 'missingPrerequisite',
+        sources: [rule(['a']), rule(['a'], { via: 'teamAccessGate' })],
+      })
+    )
+    expect(why.needs).toEqual([{ roleIds: ['a'], via: 'teamAccessGate' }])
   })
 })
