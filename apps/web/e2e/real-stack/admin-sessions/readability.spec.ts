@@ -49,7 +49,7 @@ for (const theme of ['light', 'dark']) {
         await expect(rows).toHaveText(retained, { useInnerText: true })
         await expect(card.getByRole('heading', { name: 'Sessions (2 total)' })).toBeVisible()
         expect(held.released).toBe(false)
-        await expectNoAxeViolations(page)
+        await expectNoAxeViolations(page, { allowBusy: true })
         expect(held.released).toBe(false)
         held.release()
         await expect(rows).toHaveAttribute('aria-busy', 'false')

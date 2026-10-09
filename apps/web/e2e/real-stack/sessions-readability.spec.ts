@@ -34,7 +34,7 @@ for (const theme of ['light', 'dark']) {
         await expect(wrapper).toHaveText(retained, { useInnerText: true })
         await expect(page.locator('tbody').getByText('This device', { exact: true })).toBeVisible()
         expect(held.released).toBe(false)
-        await expectNoAxeViolations(page)
+        await expectNoAxeViolations(page, { allowBusy: true })
         expect(held.released).toBe(false)
         held.release()
         await expect(wrapper).toHaveAttribute('aria-busy', 'false')

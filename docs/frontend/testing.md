@@ -96,6 +96,12 @@ page before running axe once. Nested fades and theme colour transitions are
 included; infinite spinners continue and cannot block this wait. A finite paused
 or stuck transition fails within ten seconds rather than being silently cancelled.
 The helper changes no styles, theme, reduced-motion setting or axe rules.
+The scan also waits, for up to ten seconds, until no visible region is `aria-busy="true"`: a pending
+control can sit in a stable half-transparent state that animation settling cannot see, and scanning it
+reports a contrast failure the person never sees. A region that never finishes loading fails with a
+message saying so. A test whose subject is the busy state itself passes `{ allowBusy: true }`. The same
+rule applies to counting requests: take the baseline only once the previous step is idle, and compare
+request lists with `expect.poll` rather than sampling once.
 For a deliberately scoped scan use `scanAccessibility(page, { include, rules })`
 from the same module and retain assertions on both violations and scanned nodes.
 

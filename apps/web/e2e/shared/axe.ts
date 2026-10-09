@@ -2,7 +2,7 @@ import { AxeBuilder } from '@axe-core/playwright'
 import { expect, type Page } from '@playwright/test'
 import type { Result } from 'axe-core'
 
-import { waitForVisualStability } from './visual-stability'
+import { waitForIdleRegions, waitForVisualStability } from './visual-stability'
 
 /**
  * Automated a11y scan for one page/state (Track 7 FINAL PLAN §5,
@@ -20,8 +20,10 @@ import { waitForVisualStability } from './visual-stability'
 /** Scoped checks retain their rules and pass evidence while sharing readiness. */
 export async function scanAccessibility(
   page: Page,
-  options: { include?: string; rules?: string[]; tags?: string[] } = {}
+  options: { include?: string; rules?: string[]; tags?: string[]; allowBusy?: boolean } = {}
 ) {
+  // Scan the settled page, not one still loading; `allowBusy` is for tests whose subject is the busy state.
+  if (!options.allowBusy) await waitForIdleRegions(page)
   await waitForVisualStability(page)
   const builder = new AxeBuilder({ page })
   if (options.include) builder.include(options.include)
@@ -30,8 +32,12 @@ export async function scanAccessibility(
   return builder.analyze()
 }
 
-export async function expectNoAxeViolations(page: Page): Promise<void> {
+export async function expectNoAxeViolations(
+  page: Page,
+  options: { allowBusy?: boolean } = {}
+): Promise<void> {
   const results = await scanAccessibility(page, {
+    ...options,
     tags: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
   })
   expect(results.violations, formatViolations(results.violations)).toEqual([])
