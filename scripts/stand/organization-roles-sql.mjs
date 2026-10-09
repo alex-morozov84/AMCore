@@ -269,13 +269,13 @@ function invitationUnit(id) {
  */
 function accessCaseUnit(id) {
   const roleIndex = (name) => ROLES[1].findIndex(([n]) => n === name)
+  // A role or member the owner already removed is skipped, never recreated and never an error.
   const link = (suffix, member, role) =>
-    missing(
-      'core.member_roles',
-      ['id', '"memberId"', '"roleId"'],
-      [`(${q(`${id.p}-mra${suffix}`)}, ${q(member)}, ${q(role)})`],
-      ['id']
-    )
+    `INSERT INTO core.member_roles (id, "memberId", "roleId")
+SELECT ${q(`${id.p}-mra${suffix}`)}, ${q(member)}, r.id FROM core.roles r
+WHERE r.id = ${q(role)}
+  AND EXISTS (SELECT 1 FROM core.org_members m WHERE m.id = ${q(member)})
+  AND NOT EXISTS (SELECT 1 FROM core.member_roles t WHERE t."memberId" = ${q(member)} AND t."roleId" = r.id);`
   const crowd = Array.from({ length: 30 }, (_, i) => link(`crowd${i}`, id.member(9), id.role(1, i)))
   return [
     link('v1', id.member(6), id.role(1, roleIndex('Content editor'))),

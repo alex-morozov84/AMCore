@@ -80,6 +80,8 @@ class Collector {
   private readonly drafts = new Map<string, Draft>()
   directAllow = false
   vetoRoles = new Set<string>()
+  /** Stored rules that block this item; removing them is the question "would it be granted?". */
+  vetoRules = new Set<string>()
 
   constructor(
     private readonly context: SourceContext,
@@ -91,7 +93,10 @@ class Collector {
     const status = rule.inverted ? 'vetoes' : this.granted ? 'contributes' : 'overridden'
     const roles = this.context.rolesByRule.get(rule.id) ?? []
     if (via === 'direct' && effect === 'allow') this.directAllow = true
-    if (status === 'vetoes') roles.forEach((id) => this.vetoRoles.add(id))
+    if (status === 'vetoes') {
+      roles.forEach((id) => this.vetoRoles.add(id))
+      this.vetoRules.add(rule.id)
+    }
     const stored = this.context.stored.get(rule.id)
     const classified = stored ? classifyStoredRule(stored) : { kind: 'advanced' as const }
     const key = `${rule.id}|${via}|${field ?? ''}`
@@ -172,7 +177,13 @@ export function sourcesFor(
   spec: ItemSpec,
   granted: boolean,
   context: SourceContext
-): { sources: Source[]; truncated: boolean; directAllow: boolean; vetoRoles: string[] } {
+): {
+  sources: Source[]
+  truncated: boolean
+  directAllow: boolean
+  vetoRoles: string[]
+  vetoRules: string[]
+} {
   const collector = new Collector(context, granted)
   switch (spec.capabilityId) {
     case 'teamAccess.manage':
@@ -194,5 +205,6 @@ export function sourcesFor(
     ...collector.result(),
     directAllow: collector.directAllow,
     vetoRoles: [...collector.vetoRoles],
+    vetoRules: [...collector.vetoRules],
   }
 }

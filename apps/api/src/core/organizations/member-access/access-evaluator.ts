@@ -83,7 +83,9 @@ export function explainAccess(input: AccessInput): MemberAccess {
   const items = itemSpecs().map((spec) =>
     spec.baseline
       ? baselineItem(spec, hints)
-      : item(spec, factsAll[spec.key] ?? false, hints, single, context, roles)
+      : item(spec, factsAll[spec.key] ?? false, hints, single, context, roles, (blocked) =>
+          policy.facts(allIds.filter((id) => !blocked.has(id)))
+        )
   )
   return {
     member: {
@@ -125,7 +127,8 @@ function item(
   hints: Record<string, string>,
   single: Map<string, Record<string, boolean>> | undefined,
   context: Parameters<typeof sourcesFor>[2],
-  roles: AccessInput['roles']
+  roles: AccessInput['roles'],
+  withoutRules: (blocked: ReadonlySet<string>) => Record<string, boolean>
 ): Item {
   const found = sourcesFor(spec, granted, context)
   const common = {
@@ -155,7 +158,10 @@ function item(
       grantedBy: null,
       vetoedBy: null,
     }
-  const vetoed = alone.length > 0
+  // Blocked means: it would be granted without the blocking rules. This also covers an ability that
+  // needs several roles together (one gives delete, another gives team control) and is blocked.
+  const vetoed =
+    found.vetoRules.length > 0 && withoutRules(new Set(found.vetoRules))[spec.key] === true
   return {
     ...common,
     reason: vetoed ? 'vetoed' : found.directAllow ? 'missingPrerequisite' : 'noGrant',
