@@ -76,10 +76,10 @@ index d16a961..ea2e209 100644
  
  export const MODEL_SUBJECTS = Object.keys(MODEL_FIELDS) as ModelSubject[]
 diff --git a/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts b/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
-index 26f9d5a..0468022 100644
+index 93e3962..d53b176 100644
 --- a/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
 +++ b/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
-@@ -161,6 +161,19 @@ export const ADR_034_APIKEY_ALLOWLIST: readonly HandlerAllowlistEntry[] = [
+@@ -155,6 +155,19 @@ export const ADR_034_APIKEY_ALLOWLIST: readonly HandlerAllowlistEntry[] = [
      reason: 'removePermission — manage:Organization scope per ADR-033.',
    },
  
@@ -131,10 +131,10 @@ index 999a3bc..cda8311 100644
      }
    })
 diff --git a/apps/api/src/core/organizations/capability-registry.service.ts b/apps/api/src/core/organizations/capability-registry.service.ts
-index e5b49fd..57d0a5f 100644
+index 9f52640..d526a2d 100644
 --- a/apps/api/src/core/organizations/capability-registry.service.ts
 +++ b/apps/api/src/core/organizations/capability-registry.service.ts
-@@ -49,6 +49,20 @@ const organizationPreset = (
+@@ -56,6 +56,20 @@ const organizationPreset = (
    inverted: false,
  })
  
@@ -155,7 +155,7 @@ index e5b49fd..57d0a5f 100644
  export const CAPABILITY_ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
    'teamAccess.manage': {
      operation: 'roles.list',
-@@ -104,6 +118,25 @@ export const CAPABILITY_ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
+@@ -127,6 +141,25 @@ export const CAPABILITY_ADAPTERS: Record<CapabilityId, CapabilityAdapter> = {
      editableFields: [],
      preset: (id) => organizationPreset(Action.Delete, [], id),
    },
@@ -181,7 +181,7 @@ index e5b49fd..57d0a5f 100644
  }
  const error = (): never => {
    throw new AppException(
-@@ -116,17 +149,18 @@ const error = (): never => {
+@@ -139,17 +172,18 @@ const error = (): never => {
  type Rule = AppAbility['rules'][number]
  const unconditional = (rule: Rule): boolean =>
    !rule.conditions || Object.keys(rule.conditions).length === 0
@@ -204,7 +204,7 @@ index e5b49fd..57d0a5f 100644
    const allows = rules.filter((rule) => !rule.inverted)
    const denies = rules.filter((rule) => rule.inverted)
    return {
-@@ -138,9 +172,10 @@ function fieldPossibility(
+@@ -161,9 +195,10 @@ function fieldPossibility(
  function classify(
    ability: AppAbility,
    action: Action,
@@ -217,7 +217,7 @@ index e5b49fd..57d0a5f 100644
    if (checks.some((check) => !check.possible)) return 'denied'
    if (checks.every((check) => check.unconditional)) return 'allowed'
    return 'recordRequired'
-@@ -205,6 +240,10 @@ export class CapabilityRegistry {
+@@ -229,6 +264,10 @@ export class CapabilityRegistry {
        'organization.read': 'allowed', // verified membership on this bearer-only context
        'organization.update': update,
        'organization.delete': team ? classify(ability, Action.Delete, ORG_READ_FIELDS) : 'denied',
@@ -325,10 +325,10 @@ index 0000000..4c08cba
 +  }
 +}
 diff --git a/apps/api/src/core/organizations/organizations.module.ts b/apps/api/src/core/organizations/organizations.module.ts
-index f6b2d08..4700b15 100644
+index 48c5b9d..8d2b9bd 100644
 --- a/apps/api/src/core/organizations/organizations.module.ts
 +++ b/apps/api/src/core/organizations/organizations.module.ts
-@@ -17,6 +17,7 @@ import { MembersController } from './members.controller'
+@@ -29,6 +29,7 @@ import { MembersController } from './members.controller'
  import { OrganizationsController } from './organizations.controller'
  import { OrganizationsService } from './organizations.service'
  import { PresetPermissionsController } from './preset-permissions.controller'
@@ -336,7 +336,7 @@ index f6b2d08..4700b15 100644
  import { RoleService } from './role.service'
  import { RoleAssignabilityService } from './role-assignability.service'
  import { RoleDefinitionCommandService } from './role-definition-command.service'
-@@ -32,6 +33,7 @@ import { RolesController } from './roles.controller'
+@@ -48,6 +49,7 @@ import { RolesController } from './roles.controller'
      OrganizationsController,
      CapabilitiesController,
      PresetPermissionsController,
@@ -344,6 +344,441 @@ index f6b2d08..4700b15 100644
      MembersController,
      RoleDefinitionsController,
      RolesController,
+diff --git a/apps/api/test/fixture-order-access.e2e-spec.ts b/apps/api/test/fixture-order-access.e2e-spec.ts
+new file mode 100644
+index 0000000..f395187
+--- /dev/null
++++ b/apps/api/test/fixture-order-access.e2e-spec.ts
+@@ -0,0 +1,429 @@
++import type { INestApplication } from '@nestjs/common'
++import { JwtService } from '@nestjs/jwt'
++import request from 'supertest'
++
++import { type AccessConfiguredItem, type MemberAccess, memberAccessSchema } from '@amcore/shared'
++
++import { CAPABILITY_ADAPTERS } from '../src/core/organizations/capability-registry.service'
++import type { PrismaService } from '../src/prisma'
++
++import {
++  cleanDatabase,
++  cleanOrgData,
++  type E2ETestContext,
++  seedOrgMember,
++  seedSystemRoles,
++  setupE2ETest,
++  teardownE2ETest,
++} from './helpers'
++
++/**
++ * The downstream journey, end to end on PostgreSQL: a developer registers `FixtureOrder` operations
++ * (catalogue, adapter, model grammar: see the extension fixture), an administrator configures roles,
++ * assigns them to a member, and the member access explanation answers. Every answer is parsed with
++ * the shared schema and compared with what the real handlers decide on sample records.
++ *
++ * Authoring paths are named per case: `preset API` = role-definition save (the editor's route),
++ * `legacy API` = documented `POST /roles/:id/permissions` (advanced rules, DENY), `fixture rows` =
++ * direct insert, used only where the public routes refuse the rule.
++ */
++type Preset = [capability: 'fixtureOrder.read' | 'fixtureOrder.update', area: 'own' | 'assigned' | 'all']
++interface Rule {
++  action: 'read' | 'update'
++  conditions?: Record<string, unknown>
++  fields?: string[]
++}
++interface RoleSetup {
++  presets: Preset[]
++  /** DENY rules, authored through the legacy API. */
++  denies?: Rule[]
++  /** ALLOW rules a preset cannot express, authored through the legacy API. */
++  allows?: Rule[]
++}
++const NAMES = ['own', 'assigned', 'other', 'blocked', 'closed'] as const
++type Name = (typeof NAMES)[number]
++const ALL: Name[] = [...NAMES]
++
++interface Case {
++  title: string
++  authored: string
++  roles: RoleSetup[]
++  /** What the explanation says about `fixtureOrder.update`. */
++  explain: (item: AccessConfiguredItem, access: MemberAccess) => void
++  /** Records the real handler lets the member change, per field. */
++  status: Name[]
++  note: Name[]
++  /** Records the real list handler returns. */
++  listed: Name[]
++}
++
++const areaKinds = (item: AccessConfiguredItem) => item.areas.map((area) => area.kind)
++
++const CASES: Case[] = [
++  {
++    title: 'read own + update own: one area, prerequisite proven by the identical condition',
++    authored: 'preset API',
++    roles: [{ presets: [['fixtureOrder.read', 'own'], ['fixtureOrder.update', 'own']] }],
++    explain: (item) => {
++      expect(item.state).toBe('configured')
++      expect(areaKinds(item)).toEqual(['own'])
++      expect(item.areas[0]!.prerequisite).toBe('met')
++    },
++    status: ['own', 'closed'],
++    note: ['own', 'closed'],
++    listed: ['own', 'closed'],
++  },
++  {
++    title: 'read own + update assigned is not proven: the assigned record is not readable',
++    authored: 'preset API',
++    roles: [{ presets: [['fixtureOrder.read', 'own'], ['fixtureOrder.update', 'assigned']] }],
++    explain: (item) => {
++      expect(item.state).toBe('configured')
++      expect(item.areas).toMatchObject([{ kind: 'assigned', prerequisite: 'unproven' }])
++    },
++    status: [],
++    note: [],
++    listed: ['own', 'closed'],
++  },
++  {
++    title: 'update without any read is a missing prerequisite',
++    authored: 'preset API',
++    roles: [{ presets: [['fixtureOrder.update', 'all']] }],
++    explain: (item) => {
++      expect(item.state).toBe('missingPrerequisite')
++      expect(item.areas).toMatchObject([{ kind: 'all', prerequisite: 'missing' }])
++    },
++    status: [],
++    note: [],
++    listed: [],
++  },
++  {
++    title: 'an unconditional deny on a required read field blocks every update',
++    authored: 'preset API + legacy API (deny)',
++    roles: [
++      {
++        presets: [['fixtureOrder.read', 'all'], ['fixtureOrder.update', 'all']],
++        denies: [{ action: 'read', fields: ['status'] }],
++      },
++    ],
++    explain: (item) => {
++      expect(item.state).toBe('blocked')
++      expect(item.areas).toMatchObject([{ kind: 'all', prerequisite: 'blocked' }])
++      expect(item.blockedBy?.total).toBe(1)
++    },
++    status: [],
++    note: [],
++    listed: [],
++  },
++  {
++    title: 'a conditional read deny leaves the result dependent on the record',
++    authored: 'preset API + legacy API (deny)',
++    roles: [
++      {
++        presets: [['fixtureOrder.read', 'all'], ['fixtureOrder.update', 'all']],
++        denies: [{ action: 'read', conditions: { status: 'blocked' } }],
++      },
++    ],
++    explain: (item) => {
++      expect(item.state).toBe('configured')
++      expect(item.areas).toMatchObject([{ kind: 'all', prerequisite: 'unproven' }])
++    },
++    status: ['own', 'assigned', 'other', 'closed'],
++    note: ['own', 'assigned', 'other', 'closed'],
++    listed: ['own', 'assigned', 'other', 'closed'],
++  },
++  {
++    title: 'an allow and a deny with the identical condition mask the area',
++    authored: 'preset API + legacy API (deny)',
++    roles: [
++      {
++        presets: [['fixtureOrder.read', 'own'], ['fixtureOrder.update', 'own']],
++        denies: [
++          { action: 'update', conditions: { ownerId: '${user.sub}' }, fields: ['status', 'note'] },
++        ],
++      },
++    ],
++    explain: (item) => {
++      expect(item.state).toBe('blocked')
++      expect(item.areas).toMatchObject([{ kind: 'own', masked: true }])
++    },
++    status: [],
++    note: [],
++    listed: ['own', 'closed'],
++  },
++  {
++    title: 'a different conditional deny is a limit, nothing is guessed',
++    authored: 'preset API + legacy API (deny)',
++    roles: [
++      {
++        presets: [['fixtureOrder.read', 'own'], ['fixtureOrder.update', 'own']],
++        denies: [{ action: 'update', conditions: { status: 'closed' }, fields: ['status', 'note'] }],
++      },
++    ],
++    explain: (item) => {
++      expect(item.state).toBe('configured')
++      expect(item.limits).toEqual([{ kind: 'denyCondition' }])
++    },
++    status: ['own'],
++    note: ['own'],
++    listed: ['own', 'closed'],
++  },
++  {
++    title: 'an unconditional field deny blocks that field and limits the operation',
++    authored: 'preset API + legacy API (deny)',
++    roles: [
++      {
++        presets: [['fixtureOrder.read', 'all'], ['fixtureOrder.update', 'all']],
++        denies: [{ action: 'update', fields: ['note'] }],
++      },
++    ],
++    explain: (item, access) => {
++      expect(item.state).toBe('configured')
++      expect(item.limits).toEqual([{ kind: 'denyFields', fields: ['note'] }])
++      const field = (name: string) =>
++        access.items.find((entry) => entry.key === `fixtureOrder.update.${name}`)
++      expect(field('note')).toMatchObject({ state: 'blocked' })
++      expect(field('status')).toMatchObject({ state: 'allowed' })
++    },
++    status: ALL,
++    note: [],
++    listed: ALL,
++  },
++  {
++    title: 'own and assigned from two roles stay two independent areas',
++    authored: 'preset API',
++    roles: [
++      { presets: [['fixtureOrder.read', 'all'], ['fixtureOrder.update', 'own']] },
++      { presets: [['fixtureOrder.update', 'assigned']] },
++    ],
++    explain: (item) => {
++      expect(item.state).toBe('configured')
++      expect(areaKinds(item)).toEqual(['assigned', 'own'])
++      expect(item.areas.every((area) => area.prerequisite === 'met')).toBe(true)
++    },
++    status: ['own', 'assigned', 'closed'],
++    note: ['own', 'assigned', 'closed'],
++    listed: ALL,
++  },
++  {
++    title: 'an unlimited area all absorbs own',
++    authored: 'preset API',
++    roles: [
++      {
++        presets: [
++          ['fixtureOrder.read', 'all'],
++          ['fixtureOrder.update', 'all'],
++          ['fixtureOrder.update', 'own'],
++        ],
++      },
++    ],
++    explain: (item) => {
++      expect(item.state).toBe('allowed')
++      expect(item.limits).toEqual([])
++      expect(item.areas.find((area) => area.kind === 'own')?.absorbed).toBe(true)
++    },
++    status: ALL,
++    note: ALL,
++    listed: ALL,
++  },
++]
++
++describe('FixtureOrder: register, configure, assign, explain', () => {
++  let context: E2ETestContext
++  let app: INestApplication
++  let prisma: PrismaService
++  beforeAll(async () => {
++    context = await setupE2ETest()
++    app = context.app
++    prisma = context.prisma
++    await seedSystemRoles(prisma)
++  }, 120000)
++  afterAll(async () => {
++    await teardownE2ETest(context)
++  }, 120000)
++  beforeEach(async () => {
++    await cleanOrgData(prisma)
++    await cleanDatabase(prisma, context.cache, context.throttlerStorage)
++  })
++
++  const http = () => request(app.getHttpServer())
++  const register = async (email: string) => {
++    const response = await http()
++      .post('/auth/register')
++      .send({ email, password: 'StrongP@ss123' })
++      .expect(201)
++    const token = response.body.accessToken as string
++    return { token, userId: app.get(JwtService).verify(token).sub as string }
++  }
++
++  /** An organization, a member with no permissions and the five sample records. */
++  async function world() {
++    const owner = await register('owner@journey.test')
++    const member = await register('member@journey.test')
++    const org = (
++      await http()
++        .post('/organizations')
++        .set('Authorization', `Bearer ${owner.token}`)
++        .send({ name: 'Journey' })
++        .expect(201)
++    ).body.id as string
++    const base = await prisma.role.create({ data: { name: 'Base', organizationId: org } })
++    await seedOrgMember(prisma, { orgId: org, userId: member.userId, roleId: base.id })
++    const row = (data: { ownerId: string; assignedToId?: string; status: string }) =>
++      prisma.fixtureOrder.create({
++        data: { organizationId: org, note: 'n', assignedToId: null, ...data },
++      })
++    const samples: Record<Name, string> = {
++      own: (await row({ ownerId: member.userId, status: 'draft' })).id,
++      assigned: (
++        await row({ ownerId: owner.userId, assignedToId: member.userId, status: 'draft' })
++      ).id,
++      other: (await row({ ownerId: owner.userId, status: 'draft' })).id,
++      blocked: (await row({ ownerId: owner.userId, status: 'blocked' })).id,
++      closed: (await row({ ownerId: member.userId, status: 'closed' })).id,
++    }
++    return { owner, member, org, samples }
++  }
++  type World = Awaited<ReturnType<typeof world>>
++
++  const aclVersion = async (org: string) =>
++    (await prisma.organization.findUniqueOrThrow({ where: { id: org } })).aclVersion
++
++  async function configure(w: World, setups: RoleSetup[]): Promise<string[]> {
++    const bearer = `Bearer ${w.owner.token}`
++    const ids: string[] = []
++    for (const [index, setup] of setups.entries()) {
++      const created = await http()
++        .post(`/organizations/${w.org}/role-definitions`)
++        .set('Authorization', bearer)
++        .send({ name: `Journey role ${index}` })
++        .expect(201)
++      const roleId = created.body.role.id as string
++      ids.push(roleId)
++      await http()
++        .patch(`/organizations/${w.org}/role-definitions/${roleId}`)
++        .set('Authorization', bearer)
++        .send({
++          expectedAclVersion: await aclVersion(w.org),
++          name: `Journey role ${index}`,
++          description: null,
++          presets: setup.presets.map(([capabilityId, presetId]) => ({ capabilityId, presetId })),
++        })
++        .expect(200)
++      for (const [inverted, rules] of [
++        [true, setup.denies ?? []],
++        [false, setup.allows ?? []],
++      ] as const)
++        for (const rule of rules)
++          await http()
++            .post(`/organizations/${w.org}/roles/${roleId}/permissions`)
++            .set('Authorization', bearer)
++            .send({ subject: 'FixtureOrder', inverted, ...rule })
++            .expect(201)
++      await http()
++        .post(`/organizations/${w.org}/members/${w.member.userId}/roles/${roleId}`)
++        .set('Authorization', bearer)
++        .expect(204)
++    }
++    return ids
++  }
++
++  const explain = async (w: World): Promise<MemberAccess> => {
++    const response = await http()
++      .get(`/organizations/${w.org}/members/${w.member.userId}/access`)
++      .set('Authorization', `Bearer ${w.owner.token}`)
++      .expect(200)
++    // Shared schema is the contract: every answer must parse.
++    return memberAccessSchema.parse(response.body)
++  }
++  const configured = (access: MemberAccess, key: string): AccessConfiguredItem => {
++    const found = access.items.find((entry) => entry.key === key)
++    if (found?.evaluation !== 'configured') throw new Error(`${key} is not a configured item`)
++    return found
++  }
++
++  const names = (w: World, ids: string[]): Name[] =>
++    NAMES.filter((name) => ids.includes(w.samples[name]))
++  async function changeable(w: World, body: Record<string, string>): Promise<Name[]> {
++    const ok: string[] = []
++    for (const name of NAMES) {
++      const response = await http()
++        .patch(`/organizations/${w.org}/fixture-orders/${w.samples[name]}`)
++        .set('Authorization', `Bearer ${w.member.token}`)
++        .send(body)
++      if (response.status === 200) ok.push(w.samples[name])
++    }
++    return names(w, ok)
++  }
++  async function listed(w: World): Promise<Name[]> {
++    const response = await http()
++      .get(`/organizations/${w.org}/fixture-orders`)
++      .set('Authorization', `Bearer ${w.member.token}`)
++      .expect(200)
++    return names(w, response.body.data.map((row: { id: string }) => row.id))
++  }
++
++  it.each(CASES.map((entry) => [entry.title, entry] as const))(
++    '%s',
++    async (_title, entry) => {
++      const w = await world()
++      await configure(w, entry.roles)
++      const access = await explain(w)
++      entry.explain(configured(access, 'fixtureOrder.update'), access)
++      // The explanation never contradicts the real handlers on sample records:
++      expect(await listed(w)).toEqual(entry.listed)
++      expect(await changeable(w, { status: 'review' })).toEqual(entry.status)
++      expect(await changeable(w, { note: 'edited' })).toEqual(entry.note)
++    },
++    120000
++  )
++
++  it('a capability that opts out is not evaluated, never "not allowed"', async () => {
++    const adapter = CAPABILITY_ADAPTERS['fixtureOrder.read' as keyof typeof CAPABILITY_ADAPTERS]
++    const w = await world()
++    await configure(w, [{ presets: [['fixtureOrder.read', 'all']] }])
++    ;(adapter as { access?: 'none' }).access = 'none'
++    try {
++      const access = await explain(w)
++      expect(access.items.find((entry) => entry.key === 'fixtureOrder.read')).toMatchObject({
++        evaluation: 'notEvaluated',
++        reason: 'optOut',
++      })
++      // Opt-out explains nothing: its rule is reported as another permission.
++      expect(access.uncovered.ruleCount).toBe(1)
++    } finally {
++      delete (adapter as { access?: 'none' }).access
++    }
++  })
++
++  it('a rule on fields no capability knows is reported, not explained', async () => {
++    const w = await world()
++    await configure(w, [
++      {
++        presets: [['fixtureOrder.read', 'all'], ['fixtureOrder.update', 'own']],
++        allows: [{ action: 'update', fields: ['ownerId'] }],
++      },
++    ])
++    const access = await explain(w)
++    expect(access.uncovered.ruleCount).toBe(1)
++    expect(configured(access, 'fixtureOrder.update').areas).toMatchObject([{ kind: 'own' }])
++  })
++
++  it('an invalid stored rule fails the whole request (authored via fixture rows)', async () => {
++    const w = await world()
++    const [roleId] = await configure(w, [{ presets: [['fixtureOrder.read', 'all']] }])
++    const bad = await prisma.permission.create({
++      data: {
++        action: 'update',
++        subject: 'FixtureOrder',
++        organizationId: w.org,
++        conditions: { nope: 1 },
++      },
++    })
++    await prisma.rolePermission.create({ data: { roleId: roleId!, permissionId: bad.id } })
++    await http()
++      .get(`/organizations/${w.org}/members/${w.member.userId}/access`)
++      .set('Authorization', `Bearer ${w.owner.token}`)
++      .expect(503)
++  })
++})
 diff --git a/apps/api/test/fixture-order-extension.e2e-spec.ts b/apps/api/test/fixture-order-extension.e2e-spec.ts
 new file mode 100644
 index 0000000..5795deb
@@ -619,6 +1054,64 @@ index 0000000..5795deb
 +      .set('Authorization', `Bearer ${staff.token}`).expect(400)
 +  })
 +})
+diff --git a/apps/web/messages/en.json b/apps/web/messages/en.json
+index e72e70f..622a169 100644
+--- a/apps/web/messages/en.json
++++ b/apps/web/messages/en.json
+@@ -1047,7 +1047,8 @@
+     "capabilitiesHint": "Choose what people with this role can do. Changes apply to everyone who holds the role.",
+     "areas": {
+       "Organization": "Organization",
+-      "TeamAccess": "Team access"
++      "TeamAccess": "Team access",
++      "FixtureOrder": "Orders"
+     },
+     "capabilities": {
+       "teamAccessManagement": {
+@@ -1065,6 +1066,14 @@
+       "organizationDelete": {
+         "label": "Delete the organization",
+         "description": "Permanently remove the organization."
++      },
++      "fixtureOrderRead": {
++        "label": "View orders",
++        "description": "See the orders in this organization."
++      },
++      "fixtureOrderUpdate": {
++        "label": "Edit orders",
++        "description": "Change the status and the note of orders."
+       }
+     },
+     "capabilityUnknown": "Unknown capability {id}",
+diff --git a/apps/web/messages/ru.json b/apps/web/messages/ru.json
+index 3de7356..6d72087 100644
+--- a/apps/web/messages/ru.json
++++ b/apps/web/messages/ru.json
+@@ -1047,7 +1047,8 @@
+     "capabilitiesHint": "Выберите, что могут делать люди с этой ролью. Изменения касаются всех, у кого она есть.",
+     "areas": {
+       "Organization": "Организация",
+-      "TeamAccess": "Доступ команды"
++      "TeamAccess": "Доступ команды",
++      "FixtureOrder": "Заказы"
+     },
+     "capabilities": {
+       "teamAccessManagement": {
+@@ -1065,6 +1066,14 @@
+       "organizationDelete": {
+         "label": "Удаление организации",
+         "description": "Безвозвратно удалить организацию."
++      },
++      "fixtureOrderRead": {
++        "label": "Просмотр заказов",
++        "description": "Видеть заказы организации."
++      },
++      "fixtureOrderUpdate": {
++        "label": "Изменение заказов",
++        "description": "Менять статус и заметку заказов."
+       }
+     },
+     "capabilityUnknown": "Неизвестная возможность {id}",
 diff --git a/apps/web/src/entities/organization-context/model/context-fixture.ts b/apps/web/src/entities/organization-context/model/context-fixture.ts
 index 6e1fa06..681d9b4 100644
 --- a/apps/web/src/entities/organization-context/model/context-fixture.ts
@@ -659,10 +1152,10 @@ index 0000000..bac1316
 +echo 'Fixture only supports pnpm prisma' >&2
 +exit 2
 diff --git a/packages/shared/src/constants/capability-catalogue.ts b/packages/shared/src/constants/capability-catalogue.ts
-index dfdd29c..bfa518f 100644
+index e1d4d35..6e3761a 100644
 --- a/packages/shared/src/constants/capability-catalogue.ts
 +++ b/packages/shared/src/constants/capability-catalogue.ts
-@@ -63,6 +63,20 @@ export const CAPABILITY_CATALOGUE = [
+@@ -66,6 +66,20 @@ export const CAPABILITY_CATALOGUE = [
      presets: ['own', 'all'] as const,
      editableFields: [] as const,
    },
@@ -696,7 +1189,7 @@ index e71faa5..b22234d 100644
    All = 'all', // wildcard: all subjects
  }
 diff --git a/packages/shared/src/schemas/capability.ts b/packages/shared/src/schemas/capability.ts
-index 0f6a26e..ed3273c 100644
+index 751ec4d..772156e 100644
 --- a/packages/shared/src/schemas/capability.ts
 +++ b/packages/shared/src/schemas/capability.ts
 @@ -7,6 +7,8 @@ export const capabilityIdSchema = z.enum([
@@ -731,7 +1224,7 @@ index 0000000..fdbda7f
 +})
 +export type FixtureOrderUpdate = z.infer<typeof fixtureOrderUpdateSchema>
 diff --git a/packages/shared/src/schemas/index.ts b/packages/shared/src/schemas/index.ts
-index 3159801..0a795dd 100644
+index 679bfd5..e99598b 100644
 --- a/packages/shared/src/schemas/index.ts
 +++ b/packages/shared/src/schemas/index.ts
 @@ -55,6 +55,7 @@ export {

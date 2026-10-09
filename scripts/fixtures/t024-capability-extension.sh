@@ -43,4 +43,32 @@ chmod +x "$fixture_root/fixture-bin/pnpm"
   ./node_modules/.bin/jest --config jest-e2e.config.js --runInBand \
   --runTestsByPath test/fixture-order-extension.e2e-spec.ts --silent)
 cat "$fixture_root/apps/api/fixture-order-measurement.json"
+
+# The access journey: register -> configure a role -> assign -> explain, compared with the real
+# handlers. Run by name, with a floor on the reported counts so a skipped suite cannot pass silently.
+expect_passed() {
+  node -e '
+    const [file, minimum, label] = process.argv.slice(1)
+    const result = JSON.parse(require("node:fs").readFileSync(file, "utf8"))
+    const passed = result.numPassedTests ?? result.numPassed ?? 0
+    const failed = result.numFailedTests ?? result.numFailed ?? 0
+    if (failed !== 0 || passed < Number(minimum)) {
+      console.error(label + ": passed " + passed + " (need >= " + minimum + "), failed " + failed)
+      process.exit(1)
+    }
+    console.log(label + ": " + passed + " passed")
+  ' "$@"
+}
+(cd "$fixture_root/apps/api" && \
+  PATH="$fixture_root/fixture-bin:$PATH" NODE_OPTIONS=--experimental-vm-modules \
+  ./node_modules/.bin/jest --config jest-e2e.config.js --runInBand \
+  --runTestsByPath test/fixture-order-access.e2e-spec.ts --silent \
+  --json --outputFile="$fixture_root/access-journey.json")
+expect_passed "$fixture_root/access-journey.json" 13 "access journey (API e2e)"
+# Every catalogue entry must have copy in every web catalogue, so both screens can show it.
+(cd "$fixture_root/apps/web" && \
+  ./node_modules/.bin/vitest run --project=unit \
+  src/entities/organization-context/model/catalogue-copy.test.ts \
+  --reporter=json --outputFile="$fixture_root/catalogue-copy.json")
+expect_passed "$fixture_root/catalogue-copy.json" 1 "catalogue copy (web unit)"
 finished=true
