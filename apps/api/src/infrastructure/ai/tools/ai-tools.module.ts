@@ -1,28 +1,57 @@
-import { Module } from '@nestjs/common'
+import { type DynamicModule, Module, type Type } from '@nestjs/common'
+import { z } from 'zod'
 
-import { AI_TOOLS, type AiTool } from './ai-tool.types'
+import { AI_TOOLS, type AiTool, type AiToolRegistration } from './ai-tool.types'
+import { AI_TOOL_REGISTRATIONS } from './ai-tool-composition'
+import { AiToolContractRegistry } from './ai-tool-contract.registry'
+import { AiToolContractsModule } from './ai-tool-contracts.module'
 import { AiToolRegistry } from './ai-tool-registry.service'
-import { currentTimeTool } from './reference/current-time.tool'
 
-/**
- * AI tool registry slice (Track C — ADR-054, Arc E.1) — `worker`/`all` roles only. Provides the
- * code-owned tool set (`AI_TOOLS`) and the `AiToolRegistry` that validates and serves it. It is
- * **not** imported by `coreImports()`/web — tools execute where provider I/O already is (the
- * worker), so the model can never reach a tool from the web DI graph (ADR-041). Arc E.4 imports this
- * into the worker run slice and wires the registry into the bounded agent loop; E.1 ships the
- * registry standalone (no executor wiring yet).
- *
- * The shipped set is a single SAFE reference tool; any approval-gated demo tool stays test-module
- * only, and no enabled assistant allowlists a tool by default (Arc E §4).
- */
-@Module({
-  providers: [
-    {
-      provide: AI_TOOLS,
-      useFactory: (): AiTool[] => [currentTimeTool],
-    },
-    AiToolRegistry,
-  ],
-  exports: [AiToolRegistry, AI_TOOLS],
-})
+import { canonicalJsonHash } from '@/common/utils/canonical-json'
+
+@Module({})
+export class AiToolsWorkerModule {
+  static register(core: Type<unknown>, entries: readonly AiToolRegistration[]): DynamicModule {
+    return {
+      module: AiToolsWorkerModule,
+      imports: [core, ...entries.map((entry) => entry.worker(core))],
+      providers: [
+        {
+          provide: AI_TOOLS,
+          useFactory: (contracts: AiToolContractRegistry, ...tools: AiTool[]) => {
+            for (const [index, tool] of tools.entries()) {
+              const contract = entries[index]?.contract
+              if (
+                tool.toolId !== contract?.toolId ||
+                tool.contractVersion !== contract.contractVersion ||
+                !tool.prepare ||
+                !tool.execute ||
+                !contracts.get(tool.toolId)
+              )
+                throw new Error('Tool executor token mismatch')
+              const registered = contracts.get(tool.toolId)!
+              if (
+                tool.riskClass !== contract.riskClass ||
+                tool.idempotency !== contract.idempotency ||
+                canonicalJsonHash(z.toJSONSchema(tool.parameters, { io: 'input' })) !==
+                  registered.inputSchemaHash ||
+                canonicalJsonHash(z.toJSONSchema(tool.normalizedSchema, { io: 'input' })) !==
+                  registered.normalizedSchemaHash
+              ) {
+                throw new Error('Tool executor contract mismatch')
+              }
+            }
+            return tools
+          },
+          inject: [AiToolContractRegistry, ...entries.map((entry) => entry.executorToken)],
+        },
+        AiToolRegistry,
+      ],
+      exports: [core, AiToolRegistry, AI_TOOLS],
+    }
+  }
+}
+
+const configuredWorker = AiToolsWorkerModule.register(AiToolContractsModule, AI_TOOL_REGISTRATIONS)
+@Module({ imports: [configuredWorker], exports: [AiToolsWorkerModule] })
 export class AiToolsModule {}

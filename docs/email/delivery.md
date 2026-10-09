@@ -62,12 +62,17 @@ semantics.
 
 Notification email is not the email queue. The notifications subsystem stores
 the notification and delivery attempts in Postgres. Its worker claims a
-delivery, applies the definition's content policy, renders the generic
-`notification` email template, and calls `EmailService.send()` with:
+delivery, applies the stored definition version's content policy, renders the generic
+`notification` template, and freezes the complete provider request under its lease.
+It then calls `EmailService.sendPreparedNotification()` with the exact stored body,
+provider idempotency key `notification-delivery:<deliveryId>` and live abort signal.
 
-- a verified recipient email only;
-- safe title/body projection from the definition;
-- provider idempotency key `notification-delivery:<deliveryId>`.
+The body includes the verified recipient, sender, subject, HTML, plaintext and any
+reply-to value. Retries reuse those bytes and key even after a template or sender
+configuration changes. Credentials and abort signals remain live and are never
+stored. The private request can contain recipient addresses and rendered content;
+keep it out of logs, feed DTOs, Console projections and queue payloads. See
+[Versioning and replay](../notifications/versioning.md).
 
 `SECRET` notification content is rejected at definition registration. Secret
 token emails stay in direct email paths.
@@ -87,7 +92,36 @@ rate is limited, replicas multiply the cap.
 
 ## Provider Contract
 
-Providers implement `EmailProvider.send(params)` from `email.types.ts`.
+Providers implement both `EmailProvider.send(params)` and
+`EmailProvider.sendPrepared(body, idempotencyKey, signal)` from `email.types.ts`. Direct and queued email
+use `send`; durable notification deliveries use `sendPrepared`. The latter must send
+`body` unchanged with the required `idempotencyKey`, attach credentials at send
+time and propagate the live abort signal. Do not parse and re-render its content.
+The installed-SDK fake-fetch suite `resend.provider.contract.spec.ts` verifies the
+actual body, key, headers and signal; a new provider needs equivalent coverage.
+
+A byte-preserving provider adapter forwards all three prepared inputs to its transport:
+
+```ts
+import type { EmailProvider, SendEmailResult } from './email.types'
+
+type PreparedTransport = (
+  body: string,
+  idempotencyKey: string,
+  signal: AbortSignal
+) => Promise<SendEmailResult>
+
+function preparedPort(transport: PreparedTransport): Pick<EmailProvider, 'sendPrepared'> {
+  return {
+    sendPrepared(body, idempotencyKey, signal) {
+      return transport(body, idempotencyKey, signal)
+    },
+  }
+}
+```
+
+The transport supplies live credentials and maps its response to `SendEmailResult`;
+these prepared inputs are mandatory. The optional fields below apply to direct `send`.
 
 Provider responsibilities:
 

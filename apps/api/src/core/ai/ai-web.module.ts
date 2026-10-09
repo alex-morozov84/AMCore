@@ -22,13 +22,14 @@ import { AiRunsController } from './runs/ai-runs.controller'
 
 import { AuditModule } from '@/core/audit'
 import { AiCatalogModule } from '@/infrastructure/ai/ai-catalog.module'
+import { AiToolContractsModule } from '@/infrastructure/ai/tools/ai-tool-contracts.module'
 import { QueueModule } from '@/infrastructure/queue'
 import { PrismaModule } from '@/prisma'
 
 /**
  * AI HTTP surface (Track C — ADR-054, Arc C) — `web`/`all` roles only. The conversation + durable-
- * run producer/read endpoints. For AI infrastructure it imports **only** `AiCatalogModule` (the
- * secret-free `AiModelRegistry`, for the producer's model snapshot); it deliberately does **not**
+ * run producer/read endpoints. AI infrastructure provides `AiCatalogModule` for model snapshots
+ * and `AiToolContractsModule` for inert contracts and headless domain authorities. It does **not**
  * import `AiGatewayModule`, so neither `ModelGateway` nor the provider adapters are resolvable from
  * the web DI graph — provider I/O is worker-only (the Arc B carried boundary, completed when the
  * worker slice wires `AiGatewayModule` in C.4). `QueueModule` supplies the `QueueService` that
@@ -40,7 +41,7 @@ import { PrismaModule } from '@/prisma'
  * worker-side (`AiRealtimeModule` in `AiWorkerModule`); no provider-call capability is added here.
  */
 @Module({
-  imports: [PrismaModule, AiCatalogModule, QueueModule, AuditModule],
+  imports: [PrismaModule, AiCatalogModule, QueueModule, AuditModule, AiToolContractsModule],
   controllers: [
     AiConversationsController,
     AiConversationControlController,

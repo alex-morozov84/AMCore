@@ -22,7 +22,13 @@ export class ChannelDelivererRegistry {
   private readonly byChannel: Map<string, ChannelDeliverer>
 
   constructor(@Inject(CHANNEL_DELIVERERS) deliverers: readonly ChannelDeliverer[]) {
-    this.byChannel = new Map(deliverers.map((deliverer) => [deliverer.channel, deliverer]))
+    this.byChannel = new Map()
+    for (const deliverer of deliverers) {
+      if (this.byChannel.has(deliverer.channel)) {
+        throw new Error(`Duplicate notification channel: ${deliverer.channel}`)
+      }
+      this.byChannel.set(deliverer.channel, deliverer)
+    }
   }
 
   get(channel: NotificationChannel): ChannelDeliverer | undefined {

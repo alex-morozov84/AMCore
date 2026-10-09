@@ -9,6 +9,7 @@ import type { AiRunGuard } from './ai-run-guard.service'
 import type { AiRunLoopExecutor } from './ai-run-loop-executor.service'
 import type { RunPlan } from './ai-run-plan'
 import type { AiRunTransitions } from './ai-run-transitions.service'
+import type { AiToolActionService } from './ai-tool-action.service'
 
 import type { EnvService } from '@/env/env.service'
 import type { MetricsService } from '@/infrastructure/observability'
@@ -97,7 +98,10 @@ describe('AiRunExecutorService', () => {
       storage as never,
       env as unknown as EnvService,
       metrics as unknown as MetricsService,
-      logger as never
+      logger as never,
+      {
+        resolvePendingUnknown: jest.fn().mockResolvedValue(false),
+      } as unknown as AiToolActionService
     )
     envConfig()
 

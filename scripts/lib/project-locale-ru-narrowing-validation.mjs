@@ -41,8 +41,8 @@ const contracts = [
   },
   {
     path: `${ROOT}/notifications/channels/telegram/telegram-content.spec.ts`,
-    required: ["renderTelegram!(projection, 'ru')", "body: '(ru)'"],
-    forbidden: ["renderTelegram!(projection, 'en')", "body: '(en)'"],
+    required: ["renderExternal!.telegram!(projection, 'ru')", "body: '(ru)'"],
+    forbidden: ["renderExternal!.telegram!(projection, 'en')", "body: '(en)'"],
   },
   {
     path: `${ROOT}/notifications/notification-definition.registry.spec.ts`,

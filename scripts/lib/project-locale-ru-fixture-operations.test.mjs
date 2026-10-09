@@ -51,7 +51,7 @@ test('adapts all four typed fixture surfaces to concrete RU expectations', () =>
   assert.match(service, /uses the explicit body locale when supplied/)
   assert.doesNotMatch(service, /acceptedLocale: 'en'/)
   assert.doesNotMatch(service, /objectContaining\(\{ locale: 'en' \}\)/)
-  assert.match(telegram, /renderTelegram!\(projection, 'ru'\)/)
+  assert.match(telegram, /renderExternal!.telegram!\(projection, 'ru'\)/)
   assert.match(telegram, /body: '\(ru\)'/)
   assert.doesNotMatch(registry, /'en'/)
   assert.match(registry, /Профиль обновлён/)

@@ -1,4 +1,4 @@
-import type { NotificationDefinition } from '../notification-definition.types'
+import type { NotificationDefinitionRegistration } from '../notification-definition.types'
 
 import { accountPasswordChangedDefinition } from './account-password-changed.definition'
 import { accountProfileUpdatedDefinition } from './account-profile-updated.definition'
@@ -10,8 +10,8 @@ import { accountTelegramLinkedDefinition } from './account-telegram-linked.defin
  * first definition with an external (email) channel and mandatory deliveries — the
  * dispatcher (Arc B) drains its email delivery via the worker-only adapter.
  */
-export const NOTIFICATION_DEFINITIONS: readonly NotificationDefinition[] = [
-  accountProfileUpdatedDefinition,
-  accountPasswordChangedDefinition,
-  accountTelegramLinkedDefinition,
+export const NOTIFICATION_DEFINITIONS: readonly NotificationDefinitionRegistration[] = [
+  { definition: accountProfileUpdatedDefinition, current: true },
+  { definition: accountPasswordChangedDefinition, current: true },
+  { definition: accountTelegramLinkedDefinition, current: true },
 ]

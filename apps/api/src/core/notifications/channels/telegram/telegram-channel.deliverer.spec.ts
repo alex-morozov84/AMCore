@@ -2,6 +2,7 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
 
+import { preparationDouble } from '../../../../../test/fixtures/extension-contracts/preparation-double'
 import type { PrismaService } from '../../../../prisma'
 import type { ClaimedDelivery } from '../../dispatch/notification-dispatch.types'
 import { NotificationShutdownLatch } from '../../dispatch/notification-shutdown.latch'
@@ -38,7 +39,9 @@ const detailedDef: NotificationDefinition = {
   supportedChannels: [NotificationChannel.IN_APP, NotificationChannel.TELEGRAM],
   payloadSchema: z.object({ v: z.string(), secret: z.string().optional() }),
   projectExternal: (_channel, payload) => ({ v: (payload as { v: string }).v }),
-  renderTelegram: (projection) => ({ title: `Detailed ${String(projection.v)}`, body: 'tg body' }),
+  renderExternal: {
+    telegram: (projection) => ({ title: `Detailed ${String(projection.v)}`, body: 'tg body' }),
+  },
 }
 
 const genericDef: NotificationDefinition = {
@@ -64,13 +67,20 @@ const claim = (overrides: Partial<ClaimedDelivery> = {}): ClaimedDelivery => ({
 })
 
 const notification = (overrides: Partial<Notification> = {}): Notification =>
-  ({ id: 'n1', type: 'account.generic', payload: {}, action: null, ...overrides }) as Notification
+  ({
+    id: 'n1',
+    schemaVersion: 1,
+    type: 'account.generic',
+    payload: {},
+    action: null,
+    ...overrides,
+  }) as Notification
 
 const context = (overrides: Partial<ClaimedDelivery> = {}, note: Partial<Notification> = {}) =>
   ({ delivery: claim(overrides), notification: notification(note) }) as DeliveryContext
 
 describe('TelegramChannelDeliverer', () => {
-  let client: { sendMessage: jest.Mock<Promise<TelegramSendResult>> }
+  let client: { sendPreparedMessage: jest.Mock<Promise<TelegramSendResult>> }
   let prisma: DeepMockProxy<PrismaService>
   let env: { get: jest.Mock }
   let deliverer: TelegramChannelDeliverer
@@ -81,7 +91,7 @@ describe('TelegramChannelDeliverer', () => {
   const deliverNow = (ctx: DeliveryContext) => deliverer.deliver(ctx, admission)
 
   beforeEach(() => {
-    client = { sendMessage: jest.fn() }
+    client = { sendPreparedMessage: jest.fn() }
     prisma = mockDeep<PrismaService>()
     env = { get: jest.fn().mockReturnValue('https://app.example') }
     latch = new NotificationShutdownLatch(mockDeep<PinoLogger>())
@@ -89,11 +99,14 @@ describe('TelegramChannelDeliverer', () => {
       transport(new AbortController().signal)
     )
     deliverer = new TelegramChannelDeliverer(
-      new NotificationDefinitionRegistry([detailedDef, genericDef]),
+      new NotificationDefinitionRegistry(
+        [detailedDef, genericDef].map((definition) => ({ definition, current: true }))
+      ),
       client as unknown as TelegramBotApiClient,
       prisma as unknown as PrismaService,
       env as unknown as EnvService,
-      latch
+      latch,
+      preparationDouble()
     )
     // Run the fence transaction callback against the same mock client.
     prisma.$transaction.mockImplementation(((cb: (tx: PrismaService) => Promise<unknown>) =>
@@ -105,31 +118,33 @@ describe('TelegramChannelDeliverer', () => {
   })
 
   it('sends generic content to the chat and maps delivered', async () => {
-    client.sendMessage.mockResolvedValue({ status: 'delivered', providerMessageId: '42' })
+    client.sendPreparedMessage.mockResolvedValue({ status: 'delivered', providerMessageId: '42' })
     const result = await deliverNow(context())
     expect(result).toEqual({ status: 'delivered', providerMessageId: '42' })
-    const [arg] = client.sendMessage.mock.calls[0]!
-    expect(arg.chatId).toBe('999000')
-    expect(arg.text).toContain(telegramGenericMessages.ru.title)
+    const [arg] = client.sendPreparedMessage.mock.calls[0]!
+    expect(JSON.parse(arg).chat_id).toBe('999000')
+    expect(JSON.parse(arg).text).toContain(telegramGenericMessages.ru.title)
   })
 
   it('renders detailed content only from the allowlisted projection (no payload leak)', async () => {
-    client.sendMessage.mockResolvedValue({ status: 'delivered' })
+    client.sendPreparedMessage.mockResolvedValue({ status: 'delivered' })
     await deliverNow(context({}, { type: 'demo.detail', payload: { v: 'X', secret: 'topsecret' } }))
-    const text = client.sendMessage.mock.calls[0]![0].text
+    const text = JSON.parse(client.sendPreparedMessage.mock.calls[0]![0]).text
     expect(text).toContain('Detailed X')
     expect(text).not.toContain('topsecret')
   })
 
   it('appends the trusted app link when the notification has a first-party action', async () => {
-    client.sendMessage.mockResolvedValue({ status: 'delivered' })
+    client.sendPreparedMessage.mockResolvedValue({ status: 'delivered' })
     await deliverNow(context({}, { action: { route: 'account.security' } }))
     // Locale-prefixed; 'https://app.example' alone would match a bare URL too.
-    expect(client.sendMessage.mock.calls[0]![0].text).toContain('https://app.example/ru')
+    expect(JSON.parse(client.sendPreparedMessage.mock.calls[0]![0]).text).toContain(
+      'https://app.example/ru'
+    )
   })
 
   it('passes a transient result through with its retryAfterMs floor', async () => {
-    client.sendMessage.mockResolvedValue({
+    client.sendPreparedMessage.mockResolvedValue({
       status: 'transient',
       errorCode: 'telegram_rate_limited',
       retryAfterMs: 30_000,
@@ -144,7 +159,10 @@ describe('TelegramChannelDeliverer', () => {
   })
 
   it('fences the connection on a permanent destination error (block + cancel due deliveries)', async () => {
-    client.sendMessage.mockResolvedValue({ status: 'permanent', errorCode: 'telegram_blocked' })
+    client.sendPreparedMessage.mockResolvedValue({
+      status: 'permanent',
+      errorCode: 'telegram_blocked',
+    })
     prisma.telegramConnection.updateMany.mockResolvedValue({ count: 1 })
 
     const result = await deliverNow(context())
@@ -174,7 +192,10 @@ describe('TelegramChannelDeliverer', () => {
   })
 
   it('fence does nothing once the shutdown latch is sealed (late permanent result)', async () => {
-    client.sendMessage.mockResolvedValue({ status: 'permanent', errorCode: 'telegram_blocked' })
+    client.sendPreparedMessage.mockResolvedValue({
+      status: 'permanent',
+      errorCode: 'telegram_blocked',
+    })
     latch.seal()
     const result = await deliverNow(context())
     expect(result).toEqual({ status: 'permanent', errorCode: 'telegram_blocked' })
@@ -186,14 +207,15 @@ describe('TelegramChannelDeliverer', () => {
     admissionSend.mockResolvedValue({ status: 'not_started', reason: 'aborted' })
     const result = await deliverNow(context())
     expect(result).toEqual({ status: 'not_started', reason: 'aborted' })
-    expect(client.sendMessage).not.toHaveBeenCalled()
+    expect(client.sendPreparedMessage).not.toHaveBeenCalled()
   })
 
   it('forwards the attempt abort signal to the Bot API client', async () => {
-    client.sendMessage.mockResolvedValue({ status: 'delivered' })
+    client.sendPreparedMessage.mockResolvedValue({ status: 'delivered' })
     await deliverNow(context())
-    expect(client.sendMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    expect(client.sendPreparedMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(AbortSignal)
     )
   })
 
@@ -234,7 +256,7 @@ describe('TelegramChannelDeliverer', () => {
   })
 
   it('does NOT fence on a non-destination permanent (provider/config error)', async () => {
-    client.sendMessage.mockResolvedValue({
+    client.sendPreparedMessage.mockResolvedValue({
       status: 'permanent',
       errorCode: 'telegram_provider_permanent',
     })
@@ -244,7 +266,7 @@ describe('TelegramChannelDeliverer', () => {
   })
 
   it('does not cancel deliveries when the conditional block matches no row (generation fence)', async () => {
-    client.sendMessage.mockResolvedValue({
+    client.sendPreparedMessage.mockResolvedValue({
       status: 'permanent',
       errorCode: 'telegram_chat_not_found',
     })

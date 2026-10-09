@@ -63,6 +63,8 @@ export interface EmailProvider {
    * Send an email
    */
   send(params: SendEmailParams): Promise<SendEmailResult>
+  /** Notification-only private frozen body; never used for secret-link email. */
+  sendPrepared(body: string, idempotencyKey: string, signal: AbortSignal): Promise<SendEmailResult>
 }
 
 /**

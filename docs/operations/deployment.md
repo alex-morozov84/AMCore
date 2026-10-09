@@ -146,6 +146,40 @@ intent, generations and durable recovery. Restart only the matching application;
 explains legacy rows, removed routes and compatible rollback. Use a maintenance
 window rather than overlapping old/new invitation writers.
 
+#### Notification and AI extension-contract upgrade
+
+`20261008160000_notification_ai_extension_contracts` requires the same complete
+maintenance stop below: back up and verify recovery, stop every old API role and
+its restart policy, verify no old connections, deploy migrations once, then start
+only the new version. It rejects connected `amcore-web`, `amcore-worker` and
+`amcore-all` processes before changing rows. Other connection names are not a
+fence; operators must stop those writers too. A failed guard transaction rolls
+back; use the reported migration name with `prisma migrate resolve --rolled-back`
+only after the old writers are stopped. Rollback requires the verified backup.
+
+The upgrade does not reconstruct a request or approval from today's definitions:
+
+| Existing evidence                                                                                                  | Upgrade result                                                           | Evidence retained                                                               |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| External `PENDING`, attempt count zero, no attempt rows, lease, receipt, delivery/failure timestamp or retry floor | Mark request contract version 1; first claim may prepare                 | Original target and notification version                                        |
+| Any other active external `PENDING`, `PROCESSING` or `RETRY_SCHEDULED`                                             | `FAILED`, `legacy_request_unavailable`; open attempts become `ABANDONED` | Attempt count/history, target, provider receipt and retry floor; leases cleared |
+| Terminal notification delivery or in-app delivery                                                                  | Unchanged                                                                | Historical outcome and all prior evidence                                       |
+| Non-read-only `EXECUTING`, or active action with `startedAt` or `executionEpoch`                                   | `OUTCOME_UNKNOWN`; active run fails `tool_effect_unknown`                | Action identity and execution evidence; no automatic retry                      |
+| `SUCCEEDED` action without `appliedAt`                                                                             | Active run fails `tool_state_inconsistent`                               | Successful action remains; no invented result or transcript                     |
+| Other hashless active action, including read-only execution                                                        | `FAILED`, `tool_schema_incompatible`; active run fails                   | Legacy arguments and history; no compatibility inferred                         |
+| Hashless pending approval                                                                                          | `EXPIRED`, with mandatory system audit event                             | Original gate and reason                                                        |
+| Previous human approval/rejection or terminal history                                                              | Unchanged                                                                | Human decision and historical result                                            |
+
+Unknown effects take precedence over compatibility failures. Open run attempts for
+converted failed runs close as `EFFECT_UNKNOWN` or `FAILED` with the run's reason.
+A reaped `PENDING` delivery remains attempted if an attempt row exists, even when
+its current count is zero. Before restarting, inspect converted reason counts and
+retained provider/effect evidence. Reconcile uncertain effects with the provider or
+domain operator; never reset counters, erase receipts or automatically create a
+fresh action to bypass refusal. Publish a new domain event only after reconciliation.
+The executable upgrade matrix is
+`apps/api/test/notification-ai-legacy-migration.e2e-spec.ts`.
+
 #### AI run engine upgrade (maintenance stop)
 
 The migrations `20261005120000_ai_run_ownership_and_effect_identity`,

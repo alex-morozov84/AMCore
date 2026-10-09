@@ -3,11 +3,13 @@ import { z } from 'zod'
 import { AI_TOOL_REGISTRY_MAX_SIZE } from './ai-tool.constants'
 import type { AiTool } from './ai-tool.types'
 import { AiToolRegistry } from './ai-tool-registry.service'
+import { currentTimeTool } from './reference/current-time.tool'
 
 import { AiToolRiskClass } from '@/generated/prisma/client'
 
 function makeTool(overrides: Partial<AiTool> = {}): AiTool {
   return {
+    ...currentTimeTool,
     toolId: 'sample_tool',
     displayName: 'Sample',
     description: 'A sample tool.',

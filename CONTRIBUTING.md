@@ -33,6 +33,11 @@ Thanks for your interest in contributing. This document explains how to set up t
 | `pnpm test:scripts:exhaustive`                                    | Original eight install-bearing scaffolding recipes; weekly/manual backstop, not a required PR check                                                                                                                                                  |
 | `pnpm measure:scaffold`                                           | Opt-in measurement of the required scaffolding array (commands, wall time, disk, fingerprints); never a CI gate, see [`docs/operations/ci-security.md`](docs/operations/ci-security.md#current-gates)                                                |
 
+`pnpm test:extension-contracts` runs notification/channel/tool/provider registration
+and migration conformance in an isolated copy with PostgreSQL/Redis Testcontainers.
+Docker is required; ordinary `.env` and owner preview data are excluded. It is
+invoked by the CI Test job; see [channel conformance](docs/notifications/channels.md#run-the-conformance-lane).
+
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 ### Size review advisory

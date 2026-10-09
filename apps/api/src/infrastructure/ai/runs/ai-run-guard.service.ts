@@ -24,6 +24,8 @@ export class RunLeaseLostError extends Error {
  * stop cause visible under the locks (`cancelled` > `superseded` > `expired`), or `null`.
  */
 export interface RunGuardContext {
+  /** Fresh primary-clock budget available when this admission starts. */
+  deadlineRemainingMs?: number | null
   stop: StopCause | null
   epoch: number
 }
@@ -45,7 +47,14 @@ interface GuardOptions {
   markIoStarted?: boolean
 }
 
+class RunAdmissionStoppedError extends Error {
+  constructor(readonly cause: StopCause) {
+    super(cause)
+  }
+}
+
 interface LeaseRow {
+  deadlineRemainingMs: number | null
   cancellationRequestedAt: Date | null
   deadlinePassed: boolean
 }
@@ -93,6 +102,14 @@ export class AiRunGuard {
     return this.run('record', claim, fn, {})
   }
 
+  /** Recheck the same locked ownership after an awaited admission hook. */
+  async revalidateAdmission(tx: Prisma.TransactionClient, claim: ClaimedRun): Promise<void> {
+    const fence = await lockBotOwnership(tx, claim.conversationId)
+    const lease = await lockAndRenewLease(tx, claim)
+    const stop = pickStop(lease, isBotOwnershipStale(fence, claim.ownershipGeneration))
+    if (stop) throw new RunAdmissionStoppedError(stop)
+  }
+
   private async run<T>(
     mode: GuardMode,
     claim: ClaimedRun,
@@ -113,7 +130,11 @@ export class AiRunGuard {
         const stop = pickStop(lease, isBotOwnershipStale(fence, claim.ownershipGeneration))
         if (mode === 'admit' && stop !== null) return { kind: 'stopped', cause: stop } as const
         if (options.markIoStarted) await markIoStarted(tx, claim)
-        const value = await fn(tx, { stop, epoch: claim.epoch })
+        const value = await fn(tx, {
+          stop,
+          epoch: claim.epoch,
+          deadlineRemainingMs: lease.deadlineRemainingMs,
+        })
         return { kind: 'ok', value, stop } as const
       })
       if (outcome === CUTOFF) return { kind: 'cutoff' }
@@ -122,6 +143,10 @@ export class AiRunGuard {
       }
       return outcome
     } catch (error) {
+      if (error instanceof RunAdmissionStoppedError) {
+        this.metrics.incAiRunAdmission(error.cause)
+        return { kind: 'stopped', cause: error.cause }
+      }
       if (error instanceof RunLeaseLostError || isLockContention(error)) {
         this.metrics.incAiRunAdmission('lease_lost')
         return { kind: 'lease_lost' }
@@ -153,6 +178,7 @@ async function lockAndRenewLease(
         "updatedAt" = now()
     WHERE id = ${claim.id} AND "leaseExpiresAt" > clock_timestamp()
     RETURNING "cancellationRequestedAt",
+              EXTRACT(EPOCH FROM ("deadlineAt" - clock_timestamp())) * 1000 AS "deadlineRemainingMs",
               ("deadlineAt" IS NOT NULL AND "deadlineAt" <= clock_timestamp()) AS "deadlinePassed"
   `)
   const row = renewed[0]

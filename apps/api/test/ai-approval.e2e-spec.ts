@@ -10,11 +10,12 @@ import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-regi
 import { AiApprovalExpiryService } from '../src/infrastructure/ai/runs/ai-approval-expiry.service'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
-import { AI_TOOLS } from '../src/infrastructure/ai/tools/ai-tool.types'
 import { currentTimeTool } from '../src/infrastructure/ai/tools/reference/current-time.tool'
 import type { PrismaService } from '../src/prisma'
 
 import { demoSensitiveTool } from './fixtures/demo-sensitive.tool'
+import { approvalHash } from './fixtures/extension-contracts/approval-hash'
+import { registerFixtureTools } from './fixtures/extension-contracts/tool-registration'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 import {
@@ -46,7 +47,7 @@ describe('AI approval lifecycle (e2e)', () => {
 
   beforeAll(async () => {
     context = await setupE2ETest((builder) =>
-      builder.overrideProvider(AI_TOOLS).useValue([currentTimeTool, demoSensitiveTool])
+      registerFixtureTools(builder, [currentTimeTool, demoSensitiveTool])
     )
     app = context.app
     prisma = context.prisma
@@ -135,7 +136,10 @@ describe('AI approval lifecycle (e2e)', () => {
   it('park → approve → resume → COMPLETED, executing the approved tool once', async () => {
     const { userId, runId, approvalId, invocationId } = await park()
 
-    await approvals.decide(userId, approvalId, { decision: 'approve' })
+    await approvals.decide(userId, approvalId, {
+      decision: 'approve',
+      intentHash: await approvalHash(prisma, approvalId),
+    })
     const requeued = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })
     expect(requeued.status).toBe(AiRunStatus.QUEUED)
     expect((await prisma.aiApproval.findUniqueOrThrow({ where: { id: approvalId } })).state).toBe(
@@ -164,7 +168,10 @@ describe('AI approval lifecycle (e2e)', () => {
   it('park → reject → resume → COMPLETED, never executing the tool', async () => {
     const { userId, runId, approvalId, invocationId } = await park()
 
-    await approvals.decide(userId, approvalId, { decision: 'reject' })
+    await approvals.decide(userId, approvalId, {
+      decision: 'reject',
+      intentHash: await approvalHash(prisma, approvalId),
+    })
     expect((await prisma.aiApproval.findUniqueOrThrow({ where: { id: approvalId } })).state).toBe(
       AiApprovalState.REJECTED
     )
@@ -246,7 +253,10 @@ describe('AI approval lifecycle (e2e)', () => {
     await runService.cancel(userId, runId)
 
     await expect(
-      approvals.decide(userId, approvalId, { decision: 'approve' })
+      approvals.decide(userId, approvalId, {
+        decision: 'approve',
+        intentHash: await approvalHash(prisma, approvalId),
+      })
     ).rejects.toBeInstanceOf(ConflictException)
 
     // The run stays CANCELLED and never re-queues.

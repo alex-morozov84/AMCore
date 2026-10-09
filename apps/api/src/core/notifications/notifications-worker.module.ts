@@ -1,24 +1,21 @@
-import { Module } from '@nestjs/common'
+import { type DynamicModule, Module, type Type } from '@nestjs/common'
 
 import { PrismaModule } from '../../prisma'
 
 import { CHANNEL_DELIVERERS, ChannelDelivererRegistry } from './channels/channel-deliverer.registry'
 import type { ChannelDeliverer } from './channels/channel-deliverer.types'
-import { EmailChannelDeliverer } from './channels/email-channel.deliverer'
-import { TelegramBotApiClient } from './channels/telegram/telegram-bot-api.client'
-import { TelegramChannelDeliverer } from './channels/telegram/telegram-channel.deliverer'
+import type { NotificationChannelDescriptor } from './channels/notification-channel.types'
 import { NotificationAttemptAdmission } from './dispatch/notification-attempt-admission'
 import { NotificationDeliveryRepository } from './dispatch/notification-delivery.repository'
 import { NotificationDeliveryBacklogCollector } from './dispatch/notification-delivery-backlog.collector'
-import { NotificationDispatchGate } from './dispatch/notification-dispatch.gate'
 import { NotificationDispatchProcessor } from './dispatch/notification-dispatch.processor'
 import { NotificationDispatchService } from './dispatch/notification-dispatch.service'
+import { NotificationExecutionModule } from './dispatch/notification-execution.module'
 import { NotificationRecoveryService } from './dispatch/notification-recovery.service'
-import { NotificationShutdownLatch } from './dispatch/notification-shutdown.latch'
+import { NOTIFICATION_CHANNELS } from './notification-composition'
 import { NotificationRetentionService } from './notification-retention.service'
-import { NotificationsCoreModule } from './notifications-core.module'
+import { NotificationsModule } from './notifications.module'
 
-import { EmailModule } from '@/infrastructure/email'
 import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.runner'
 
 /**
@@ -36,38 +33,49 @@ import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.ru
  * depending on the auth `CleanupModule`. The recovery `@Cron` is deliberately NOT singleton-
  * locked (see `NotificationRecoveryService`); only retention uses the lock.
  */
-@Module({
-  imports: [PrismaModule, NotificationsCoreModule, EmailModule],
-  providers: [
-    // Process-wide dispatch capacity gate + shutdown latch: ONE instance shared by the BullMQ
-    // wake path and the recovery cron (a per-entry instance would defeat the cap).
-    NotificationShutdownLatch,
-    {
-      provide: NotificationDispatchGate,
-      useFactory: (latch: NotificationShutdownLatch): NotificationDispatchGate =>
-        new NotificationDispatchGate(latch),
-      inject: [NotificationShutdownLatch],
-    },
-    NotificationAttemptAdmission,
-    NotificationDeliveryRepository,
-    NotificationDeliveryBacklogCollector,
-    EmailChannelDeliverer,
-    TelegramBotApiClient,
-    TelegramChannelDeliverer,
-    {
-      provide: CHANNEL_DELIVERERS,
-      useFactory: (
-        email: EmailChannelDeliverer,
-        telegram: TelegramChannelDeliverer
-      ): ChannelDeliverer[] => [email, telegram],
-      inject: [EmailChannelDeliverer, TelegramChannelDeliverer],
-    },
-    ChannelDelivererRegistry,
-    NotificationDispatchService,
-    NotificationDispatchProcessor,
-    NotificationRecoveryService,
-    SingletonCronRunner,
-    NotificationRetentionService,
-  ],
-})
+@Module({})
+export class ConfiguredNotificationsWorkerModule {
+  static register(
+    core: Type<unknown>,
+    channels: readonly NotificationChannelDescriptor[]
+  ): DynamicModule {
+    return {
+      module: ConfiguredNotificationsWorkerModule,
+      imports: [
+        PrismaModule,
+        core,
+        NotificationExecutionModule,
+        ...channels.map((channel) => channel.worker(core)),
+      ],
+      providers: [
+        NotificationAttemptAdmission,
+        NotificationDeliveryRepository,
+        NotificationDeliveryBacklogCollector,
+        {
+          provide: CHANNEL_DELIVERERS,
+          useFactory: (...deliverers: ChannelDeliverer[]) => {
+            for (const [index, deliverer] of deliverers.entries()) {
+              if (deliverer.channel !== channels[index]?.id)
+                throw new Error('Channel deliverer token mismatch')
+            }
+            return deliverers
+          },
+          inject: channels.map((channel) => channel.delivererToken),
+        },
+        ChannelDelivererRegistry,
+        NotificationDispatchService,
+        NotificationDispatchProcessor,
+        NotificationRecoveryService,
+        SingletonCronRunner,
+        NotificationRetentionService,
+      ],
+    }
+  }
+}
+
+const configuredWorker = ConfiguredNotificationsWorkerModule.register(
+  NotificationsModule,
+  NOTIFICATION_CHANNELS
+)
+@Module({ imports: [configuredWorker] })
 export class NotificationsWorkerModule {}

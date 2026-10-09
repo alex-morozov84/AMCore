@@ -5,7 +5,7 @@ AMCore ships a reusable, per-user notification subsystem on its own
 with mandatory channels, a transaction-aware **producer**, durable worker-driven
 **email** and **Telegram** channels, and a realtime **SSE** fan-out. External
 channels and realtime are purely additive over the producer/feed/preferences
-contract — Web Push is future work.
+contract. See [versioning and replay](versioning.md) and [channel registration](channels.md).
 
 Endpoint shapes (paths, bodies, status codes) live in the Swagger/OpenAPI
 document at `/docs` in development — the source of truth. This guide covers the
@@ -17,7 +17,7 @@ Use `NotificationsService` when the event belongs in the notification feed, must
 respect user preferences / mandatory channels, or needs Postgres-owned retry and
 attempt history. Use [`EmailService`](../email/README.md) for transactional email
 infrastructure (secret-bearing links, queued non-secret mail). The notification
-**email channel** is built _on top of_ `EmailService.send()` — see
+**email channel** is built _on top of_ `EmailService.sendPreparedNotification()` — see
 [Delivery](#how-delivery-works).
 
 ## What it provides
@@ -36,7 +36,8 @@ infrastructure (secret-bearing links, queued non-secret mail). The notification
   hints, fanned out across replicas via Redis Pub/Sub.
 - **Language-neutral payloads** — the database stores a structured, bounded
   payload; `title` / `body` are rendered server-side in the recipient's
-  `User.locale` at read time, never stored as text.
+  `User.locale` at read time. External delivery request bodies are separately frozen
+  in private storage; they never enter the feed response or diagnostics.
 
 ```
 Trusted backend module (security event, profile change, …)
@@ -113,12 +114,13 @@ export const yourEventDefinition: NotificationDefinition<Payload> = {
 
 Register it in
 [`definitions/index.ts`](../../apps/api/src/core/notifications/definitions/index.ts).
-The registry rejects duplicate `type`s at bootstrap, so a misconfiguration fails
-fast on startup, not at send time.
+Add `{ definition: yourEventDefinition, current: true }` to the inventory.
+The registry requires one current definition per type and rejects duplicate
+`(type, schemaVersion)` registrations. See [versioning](versioning.md).
 
 **Payload migration rule.** Changing the durable payload shape requires **bumping
-`schemaVersion` and keeping a renderer for older versions** within the retention
-window — historical feed rows must still render. An unknown `type`, an
+`schemaVersion` and keeping a renderer for older versions** until no retained rows or active deliveries reference them — historical feed rows
+must still render, and active work can outlive ordinary retention. An unknown `type`, an
 unsupported `schemaVersion`, an invalid stored payload, or a throwing renderer
 falls back to a **neutral feed item for that row**, never failing the feed page.
 
@@ -163,8 +165,10 @@ intent (`type` + `schemaVersion` + `category` + `payload` + `action` +
 - **Same key + different fingerprint** → `NotificationIdempotencyConflictError`
   (a caller bug, not a safe replay).
 
-The check is atomic (`INSERT … ON CONFLICT DO NOTHING RETURNING`), so a conflict
-never aborts the caller's transaction under `notifyTx`. This is the producer's
+Insertion uses `INSERT … ON CONFLICT DO NOTHING RETURNING`. A producer
+conflict throws; let it escape the `notifyTx` caller callback to roll back the
+whole business transaction. Existing-key replay uses the stored version
+and preserves delivery targets; see [versioning and replay](versioning.md). This is the producer's
 own dedupe — separate from the HTTP
 [idempotency primitive](../operations/idempotency.md).
 
@@ -191,15 +195,14 @@ writes the rows but enqueues nothing (the caller owns commit timing). Contract:
 
 Channels:
 
-| Channel    | Status                  | Notes                                                       |
-| ---------- | ----------------------- | ----------------------------------------------------------- |
-| `in_app`   | shipped, in-transaction | Always available; feed never depends on the worker.         |
-| `email`    | shipped, durable        | Worker-only adapter over `EmailService.send()` (see below). |
-| `telegram` | shipped, durable        | Direct Bot API client + secret-header webhook (see below).  |
-| `web_push` | deferred                | Ships with the frontend phase (service worker + VAPID).     |
+| Channel    | Status                  | Notes                                                         |
+| ---------- | ----------------------- | ------------------------------------------------------------- |
+| `in_app`   | shipped, in-transaction | Always available; feed never depends on the worker.           |
+| `email`    | shipped, durable        | Worker-only adapter over prepared email requests (see below). |
+| `telegram` | shipped, durable        | Direct Bot API client + secret-header webhook (see below).    |
 
 **Email channel.** A worker-only adapter that calls
-[`EmailService.send()`](../../apps/api/src/infrastructure/email/) directly with a
+[`EmailService.sendPreparedNotification()`](../../apps/api/src/infrastructure/email/) directly with a
 stable provider idempotency key `notification-delivery:<deliveryId>` — it **never
 uses the email queue** (secret-bearing mail keeps its own direct path). Delivery
 is to a **verified destination only**: an unverified account email is recorded
@@ -349,8 +352,7 @@ completed Telegram link. None are demo-only.
   in the direct-email paths.
 - **External content uses a projection, not the raw payload.** When the content
   policy resolves an external channel to `detailed`, the adapter renders **only**
-  the definition's `projectExternal(channel, payload)` allowlist (via `renderEmail`
-  / the Telegram renderer). `PERSONAL` / `SENSITIVE` default to a neutral generic
+  the definition's `projectExternal(channel, payload)` allowlist (via `renderExternal[channelId]`). `PERSONAL` / `SENSITIVE` default to a neutral generic
   summary; a definition may opt a channel into `detailed` (as
   `account.password_changed` does for email, projecting only the non-secret change
   time).
@@ -390,18 +392,13 @@ feed is always correct without it.
 
 ## Add a channel
 
-The durable model already reserves the dispatcher's lease / retry / attempt
-columns, so a new worker-driven channel is **additive** — no state-machine or
-claim-mechanism migration. Register a target resolver and a deliverer in
-[`core/notifications/channels/`](../../apps/api/src/core/notifications/channels/)
-(email and Telegram are the reference implementations), add the channel to the
-relevant definitions' `supportedChannels`, and — for a `detailed` external
-channel — a `projectExternal` projection so raw payloads never cross the boundary.
+Follow [channel registration](channels.md) for the complete reader/module/worker/HTTP
+contract, availability, target limits, generation fences, prepared request schema
+and executable downstream registration fixture.
 
 ## What's not in the starter yet
 
-Intentional deferrals, additive over the contract above: **Web Push** (ships with
-the frontend phase), **organization recipients / fan-out / org-level preferences**,
+Intentional deferrals, additive over the contract above: **Web Push**, **organization recipients / fan-out / org-level preferences**,
 and **digests, quiet hours, timezone scheduling, and frequency caps**.
 
 ## See also

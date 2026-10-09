@@ -47,34 +47,43 @@ describe('NotificationDefinitionRegistry', () => {
     it('throws on a duplicate type', () => {
       const def = makeDefinition({ type: 'account.dup' })
 
-      expect(() => new NotificationDefinitionRegistry([def, def])).toThrow(
-        DuplicateNotificationDefinitionError
-      )
+      expect(
+        () =>
+          new NotificationDefinitionRegistry(
+            [def, def].map((definition) => ({ definition, current: true }))
+          )
+      ).toThrow(DuplicateNotificationDefinitionError)
     })
   })
 
   describe('get', () => {
     it('returns a registered definition', () => {
       const def = makeDefinition({ type: 'account.x' })
-      const registry = new NotificationDefinitionRegistry([def])
+      const registry = new NotificationDefinitionRegistry(
+        [def].map((definition) => ({ definition, current: true }))
+      )
 
       expect(registry.get('account.x')).toBe(def)
     })
 
     it('throws UnknownNotificationTypeError for an unknown type', () => {
-      const registry = new NotificationDefinitionRegistry([])
+      const registry = new NotificationDefinitionRegistry(
+        [].map((definition) => ({ definition, current: true }))
+      )
 
       expect(() => registry.get('does.not_exist')).toThrow(UnknownNotificationTypeError)
     })
   })
 
   describe('validatePayload', () => {
-    const registry = new NotificationDefinitionRegistry([
-      makeDefinition({
-        type: 'account.with_payload',
-        payloadSchema: z.object({ updatedFields: z.array(z.string().min(1)).min(1) }),
-      }),
-    ])
+    const registry = new NotificationDefinitionRegistry(
+      [
+        makeDefinition({
+          type: 'account.with_payload',
+          payloadSchema: z.object({ updatedFields: z.array(z.string().min(1)).min(1) }),
+        }),
+      ].map((definition) => ({ definition, current: true }))
+    )
 
     it('returns the parsed payload when valid', () => {
       expect(registry.validatePayload('account.with_payload', { updatedFields: ['name'] })).toEqual(
@@ -141,7 +150,9 @@ describe('NotificationDefinitionRegistry', () => {
           throw new Error('broken historical renderer')
         },
       })
-      const local = new NotificationDefinitionRegistry([throwing])
+      const local = new NotificationDefinitionRegistry(
+        [throwing].map((definition) => ({ definition, current: true }))
+      )
 
       expect(local.renderStored('account.throwing', 1, {}, 'en')).toEqual({
         title: 'account.throwing',
@@ -152,17 +163,21 @@ describe('NotificationDefinitionRegistry', () => {
 
   describe('externalMode (content policy)', () => {
     it('defaults a PUBLIC definition to detailed external exposure', () => {
-      const registry = new NotificationDefinitionRegistry([
-        makeDefinition({ type: 'p.public', contentClass: NotificationContentClass.PUBLIC }),
-      ])
+      const registry = new NotificationDefinitionRegistry(
+        [makeDefinition({ type: 'p.public', contentClass: NotificationContentClass.PUBLIC })].map(
+          (definition) => ({ definition, current: true })
+        )
+      )
 
       expect(registry.externalMode('p.public', 'email')).toBe('detailed')
     })
 
     it('defaults SENSITIVE to generic external exposure', () => {
-      const registry = new NotificationDefinitionRegistry([
-        makeDefinition({ type: 'p.sensitive', contentClass: NotificationContentClass.SENSITIVE }),
-      ])
+      const registry = new NotificationDefinitionRegistry(
+        [
+          makeDefinition({ type: 'p.sensitive', contentClass: NotificationContentClass.SENSITIVE }),
+        ].map((definition) => ({ definition, current: true }))
+      )
 
       expect(registry.externalMode('p.sensitive', 'email')).toBe('generic')
     })
@@ -177,13 +192,15 @@ describe('NotificationDefinitionRegistry', () => {
     })
 
     it('honors an explicit per-channel override', () => {
-      const registry = new NotificationDefinitionRegistry([
-        makeDefinition({
-          type: 'p.override',
-          contentClass: NotificationContentClass.SENSITIVE,
-          externalModeByChannel: { [NotificationChannel.EMAIL]: 'detailed' },
-        }),
-      ])
+      const registry = new NotificationDefinitionRegistry(
+        [
+          makeDefinition({
+            type: 'p.override',
+            contentClass: NotificationContentClass.SENSITIVE,
+            externalModeByChannel: { [NotificationChannel.EMAIL]: 'detailed' },
+          }),
+        ].map((definition) => ({ definition, current: true }))
+      )
 
       expect(registry.externalMode('p.override', NotificationChannel.EMAIL)).toBe('detailed')
     })
@@ -191,9 +208,12 @@ describe('NotificationDefinitionRegistry', () => {
 
   describe('definition invariants (registration)', () => {
     const expectInvalid = (overrides: Partial<NotificationDefinition> & { type: string }): void => {
-      expect(() => new NotificationDefinitionRegistry([makeDefinition(overrides)])).toThrow(
-        InvalidNotificationDefinitionError
-      )
+      expect(
+        () =>
+          new NotificationDefinitionRegistry(
+            [makeDefinition(overrides)].map((definition) => ({ definition, current: true }))
+          )
+      ).toThrow(InvalidNotificationDefinitionError)
     }
 
     it('rejects a malformed type identifier', () => {
@@ -232,13 +252,76 @@ describe('NotificationDefinitionRegistry', () => {
 
     it('accepts a detailed external channel when projectExternal is provided', () => {
       const def = makeDefinition({
+        renderExternal: { email: () => ({ title: 'safe', body: 'safe' }) },
         type: 'a.detailed_ok',
         contentClass: NotificationContentClass.PUBLIC,
         defaultChannels: [NotificationChannel.IN_APP, NotificationChannel.EMAIL],
         projectExternal: () => ({}),
       })
 
-      expect(() => new NotificationDefinitionRegistry([def])).not.toThrow()
+      expect(
+        () =>
+          new NotificationDefinitionRegistry(
+            [def].map((definition) => ({ definition, current: true }))
+          )
+      ).not.toThrow()
+    })
+
+    it.each([
+      { contentClass: 'invalid' },
+      { externalModeByChannel: { email: 'invalid' } },
+      { externalModeByChannel: null },
+      { externalModeByChannel: Object.create({ email: 'invalid' }) },
+      { externalModeByChannel: { missing: 'generic' } },
+      { projectExternal: {} },
+      { renderExternal: undefined },
+      { renderExternal: { email: {} } },
+    ])('rejects invalid classification/policy/detailed callable coverage: %j', (invalid) => {
+      expectInvalid({
+        type: 'a.invalid_detailed',
+        defaultChannels: ['in_app', 'email'],
+        projectExternal: () => ({}),
+        renderExternal: { email: () => ({ title: 'safe', body: 'safe' }) },
+        ...invalid,
+      } as unknown as NotificationDefinition)
+    })
+
+    it('rejects losing the mandatory password-change email renderer at bootstrap', () => {
+      const definition = new NotificationDefinitionRegistry().getCurrent('account.password_changed')
+      expect(
+        () =>
+          new NotificationDefinitionRegistry([
+            {
+              current: true,
+              definition: {
+                ...definition,
+                renderExternal: { ...definition.renderExternal, email: undefined },
+              },
+            },
+          ])
+      ).toThrow(InvalidNotificationDefinitionError)
+    })
+
+    it('keeps intentional generic and retained detailed versions independent', () => {
+      const generic = makeDefinition({
+        type: 'a.versioned',
+        contentClass: NotificationContentClass.PERSONAL,
+        defaultChannels: ['in_app', 'email'],
+        schemaVersion: 2,
+      })
+      const detailed = {
+        ...generic,
+        schemaVersion: 1,
+        externalModeByChannel: { email: 'detailed' as const },
+        projectExternal: () => ({}),
+        renderExternal: { email: () => ({ title: 'safe', body: 'safe' }) },
+      }
+      const registry = new NotificationDefinitionRegistry([
+        { definition: detailed, current: false },
+        { definition: generic, current: true },
+      ])
+      expect(resolveExternalMode(registry.getStored(generic.type, 1), 'email')).toBe('detailed')
+      expect(resolveExternalMode(registry.getCurrent(generic.type), 'email')).toBe('generic')
     })
 
     it('rejects a default channel not in supportedChannels', () => {

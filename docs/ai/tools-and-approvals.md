@@ -1,185 +1,204 @@
-# AI Tools and Approvals
+# AI tools and owner approval
 
-Tools are backend code, not prompt text and not database rows. The model can
-request only a registered tool that is also listed in the bound assistant's
-`toolAllowlist`. Execution happens host-side in the worker after arguments are
-Zod-validated and an `AiToolInvocation` is persisted.
+A model can request only a code-registered tool in the bound assistant's
+`toolAllowlist`. The worker validates input, prepares and persists one immutable
+action, then executes that action under the conversation owner's current rights.
+The starter's `current_time` tool is SAFE/read-only and is not allowlisted by
+default. It has no privileged domain target.
 
-## Built-in Tool
+## Register a tool
 
-The starter ships one SAFE reference tool: `current_time`. It returns the current
-UTC time, has no side effect, and is not on any assistant allowlist by default.
+Keep the contract and headless authority separate from the worker executor.
+Use the shipped
+[`current-time.contract.ts`](../../apps/api/src/infrastructure/ai/tools/reference/current-time.contract.ts)
+and [`current-time.tool.ts`](../../apps/api/src/infrastructure/ai/tools/reference/current-time.tool.ts)
+as the complete reference for a SAFE tool without domain access.
 
-## Add a Tool
-
-```ts
-// apps/api/src/infrastructure/ai/tools/reference/echo.tool.ts
-import { AiToolRiskClass } from '@/generated/prisma/client'
-import { z } from 'zod'
-
-import type { AiTool } from '../ai-tool.types'
-
-const parameters = z
-  .object({
-    text: z.string().min(1).max(200),
-  })
-  .strict()
-
-export const echoTool: AiTool<z.infer<typeof parameters>> = {
-  toolId: 'echo',
-  displayName: 'Echo',
-  description: 'Echoes short text back to the assistant. Use only for testing tool wiring.',
-  parameters,
-  riskClass: AiToolRiskClass.SAFE,
-  idempotency: 'read_only',
-  async execute(args) {
-    return { output: args.text }
-  },
-}
-```
-
-Register it in `AiToolsModule` by adding it to the `AI_TOOLS` provider array,
-then publish an assistant version whose `toolAllowlist` includes `"echo"`.
-
-## Tool Rules
-
-- Tool ids are bounded lowercase snake-case identifiers; duplicates fail startup.
-- `SAFE` runs automatically.
-- `SENSITIVE` and `DESTRUCTIVE` park the run for owner approval.
-- `unsafe` idempotency is rejected by the registry. Declare `read_only` for a tool
-  with no external effect and `idempotent` for a tool that changes something
-  outside AMCore.
-- A side-effecting tool must pass `ctx.idempotencyKey` downstream (see
-  [Side effects and uncertain outcomes](#side-effects-and-uncertain-outcomes)).
-- Tools must enforce their own domain authorization using `ctx.ownerUserId` /
-  `ctx.organizationId`.
-- Tool output is plain text and re-enters the model as untrusted data. Do not put
-  secrets or large payloads in it.
-
-## Side Effects and Uncertain Outcomes
-
-A model that requests a tool produces one **action**: the run records it durably
-_before_ anything happens (the requested tool, its validated arguments, its
-idempotency class, and which provider call asked for it). One requested action is
-exactly one record — it is never created twice, and it is never replaced by a
-fresh action when a worker crashes or times out. `ctx.idempotencyKey` is
-`ai-tool:<action id>` and stays the same for the action's whole life.
-
-A tool execution ends in one of four outcomes:
-
-| Outcome              | When                                                                                                    | What the run does                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| succeeded            | `execute` returned.                                                                                     | The result is applied to the transcript exactly once; the loop continues.                  |
-| rejected, no effect  | `execute` threw `AiToolRejectedError` (it refused the call and is **certain** nothing happened).        | The run fails `tool_execution_failed`.                                                     |
-| retryable, no effect | `execute` threw `AiToolRetryableError` (certain nothing happened; a later retry is reasonable).         | The run fails `tool_execution_failed`; the code is recorded as `tool_retryable_no_effect`. |
-| effect unknown       | Anything else from an `idempotent` tool: a timeout, a thrown error, a crash or lost lease while it ran. | The action becomes `outcome_unknown`; the run fails `tool_effect_unknown`.                 |
-
-An exception does **not** prove nothing happened (a request can be accepted and
-the connection reset afterwards), and a timeout says nothing about the remote
-side — so only an explicit no-effect error is trusted. After an unknown outcome
-the run **stops**: it does not call the tool again, does not ask the model for a
-replacement action, and keeps the uncertain action visible. A `read_only` tool
-has no effect to be unsure about: a failure is a plain failure, and a read-only
-call interrupted by a crash is safely repeated by the next attempt.
-
-An unknown outcome recorded **anywhere** on a run stops it before anything else
-continues, even if a newer approved or requested action exists. A run that holds
-more than one unresolved action cannot say which one took effect, so it also stops
-(`tool_state_inconsistent`) without executing any of them.
-
-A cancel, takeover or deadline that arrives while the tool runs never erases its
-outcome: the result (or the uncertainty) is recorded, nothing further starts, and
-the run ends as the stop cause without applying the tool's result to a transcript
-that will not continue.
-
-A side-effecting tool, with `documents` standing in for your own domain service
-(the no-effect errors live in
-`apps/api/src/infrastructure/ai/tools/ai-tool-error.ts`):
+A contract declares a stable lowercase `toolId`, positive `contractVersion`,
+display metadata, risk class, idempotency class, input `parameters`, stored
+`normalizedSchema`, and an authority module/token. The executor supplies:
 
 ```ts
-// apps/api/src/infrastructure/ai/tools/reference/archive-document.tool.ts
-import { AiToolRejectedError } from '../ai-tool-error'
-
-export const archiveDocumentTool: AiTool<z.infer<typeof parameters>> = {
-  toolId: 'archive_document',
-  displayName: 'Archive document',
-  description: 'Archives one document the user owns.',
-  parameters, // z.object({ documentId: z.string() }).strict()
-  riskClass: AiToolRiskClass.SENSITIVE,
-  idempotency: 'idempotent',
-  async execute(args, ctx) {
-    const doc = await documents.findOwned(ctx.ownerUserId, args.documentId)
-    if (!doc) throw new AiToolRejectedError() // certain: nothing happened
-    // The key makes a repeated call a no-op downstream. The tool author owns that guarantee.
-    await documents.archive(doc.id, { idempotencyKey: ctx.idempotencyKey, signal: ctx.signal })
-    return { output: 'archived' }
-  },
-}
+prepare(input, context, tx): Promise<{
+  args: NormalizedArguments
+  target: { kind: string; id: string; revision: number } | null
+  preview: Partial<Record<SupportedLocale, AiApprovalPreview>> | null
+}>
+execute(intent, context): Promise<{ output: string }>
 ```
 
-Requirements the tool author owns:
+Register its contract, exported executor token and `worker(core)` factory in
+[`AI_TOOL_REGISTRATIONS`](../../apps/api/src/infrastructure/ai/tools/ai-tool-composition.ts).
+The composition constructs `ConfiguredAiToolContractsModule.register(entries)`
+once. `AiToolContractsModule` imports/re-exports that configured core; authority
+modules export their own tokens and required reader dependencies.
+`AiToolsWorkerModule.register(core, entries)` imports the same facade and worker
+modules, derives executor providers and validates their IDs, versions, risk,
+idempotency and schema hashes against the core contracts. Each worker factory
+imports the facade and exports its executor token. `AiToolsModule` re-exports
+the configured worker and core. Web consumers import only `AiToolContractsModule`.
 
-- **Honour the key and the signal.** Pass `ctx.idempotencyKey` to the downstream
-  call and `ctx.signal` (aborted at `AI_TOOL_EXECUTION_TIMEOUT_MS`, the run's
-  lifetime or worker shutdown). Cancellation is cooperative; AMCore bounds how
-  long it waits, but a tool that ignores the signal keeps its worker slot until
-  it returns.
-- **Be re-parseable.** The stored arguments are the action. When an action is
-  resumed (after a crash or an approval) they are validated again and must parse
-  to _themselves_; if a schema transform makes `parse(parse(x))` differ from
-  `parse(x)`, or the schema changed incompatibly after a deploy, the action is
-  not executed and the run fails `tool_schema_incompatible`.
-- **Know your downstream's key retention.** Providers typically keep idempotency
-  keys for a bounded time (often about a day). AMCore does not replay a
-  side-effecting tool after an uncertain outcome, so retention only matters if you
-  add your own reconciliation.
+The web DI graph contains schemas, metadata and headless authorities, with no
+`prepare`/`execute` provider or tool transport. Composition can still statically
+import worker JavaScript. Add the ID to a published assistant version's allowlist
+to make it callable. Registration alone does not authorize model execution.
 
-## Approval Flow
+## Input normalization and stored validation
 
-When a model requests a non-SAFE allowlisted tool, the run moves to
-`waiting_approval` and `GET /ai/runs/:id` returns `pendingApprovalId`.
+The loop parses model input with `parameters`; it may normalize strings, defaults
+or indirect input. `prepare()` resolves the exact target/revision and significant
+arguments using the supplied transaction. It performs no business mutation or
+network I/O. It returns the final normalized `args` and, for a gated action, a
+code-owned preview in every supported locale.
+
+`normalizedSchema` validates durable arguments without changing them. Do not put
+transforms in it; a resumed value must parse to itself. The persisted envelope
+binds tool semantic version, both schema hashes, risk/idempotency, run,
+conversation, invocation, originating provider call, owner, organization,
+normalized arguments, target/revision and preview. A private hash of the original
+normalized provider input identifies a repeated origin without rerunning
+`prepare()`; that input hash is separate from the resolved effect arguments. The worker executes this
+stored, detached, deeply frozen envelope, never freshly resolved arguments or a
+new preview.
+
+Bump `contractVersion` when authorization, target meaning, preview semantics or
+execution effects change, even if the JSON schemas remain identical. JSON schema
+hashes cannot capture arbitrary function semantics. Only one executable version
+per tool ID is registered. Incompatible unstarted actions refuse execution; a
+new handler or same-shaped schema does not authorize replacing the original
+intent. Unknown effects take precedence over these compatibility failures.
+
+The complete strict JSON envelope is limited to 32 KiB UTF-8 and depth 20;
+preview data is limited to 8 KiB. Preview strings are bounded plain text, without
+HTML/control characters or HTTP links, and describe at most ten effects. The
+preview target ID must match the immutable target. Never store a credential,
+signed URL, prompt or secret in arguments or preview.
+
+## Current domain authorization
+
+An authority implements `canDisclose(tx, intent)` and
+`authorize(tx, intent, phase)` for preparation, owner approval and execution.
+Import the domain's headless reader/authorization module, not its HTTP/JWT module.
+For existing core RBAC, `DomainAuthorizationModule` exports the transaction-aware
+`DomainAuthorizationService`: it reads primary owner membership/permissions and
+uses the existing CASL normalization, field constraints and DENY rules. It does
+not synthesize a SUPER_ADMIN grant for the run owner.
+
+Preparation checks the intended operation. Approval checks current target read
+and execute rights. Execution checks current rights and the assistant's current
+allowlist again. These admission checks do not replace the domain mutation's own
+atomic authorization and revision check.
+
+The domain service performing the effect must, in one transaction:
+
+1. Acquire the existing user, organization/ACL and target locks in the same order
+   as membership/revocation and domain writers.
+2. Read current membership, scoped grants, field permissions and DENY rules.
+3. Verify the frozen target identity/revision and permitted fields.
+4. Apply its existing idempotency/effect identity and mutation atomically.
+
+A stale revision or revoked right refuses before mutation. Do not resolve a
+replacement target or silently update the preview. An external request cannot be
+recalled after admission; pass current credentials, the stable key and abort
+signal without persisting them. A race after external admission remains an
+explicit residual risk, not an atomic database guarantee.
+
+## Owner approval API
+
+`SENSITIVE` and `DESTRUCTIVE` tools require a target and meaningful immutable
+preview. `SAFE` tools run automatically but still require current domain rights.
+Only the conversation owner can decide. SUPER_ADMIN/operator access to a
+conversation does not let that operator approve somebody else's action. API keys
+cannot use this personal bearer surface.
+
+Read `GET /ai/approvals?status=pending` first. Each response includes
+`toolVersion`, `intentHash`, `preview` and `disclosure`. A current read denial
+returns `preview: null`, `disclosure: "unavailable"`; retained legacy approvals
+have `disclosure: "legacy"`. Stored preview evidence is preserved. Responses are
+`private, no-store` and never expose raw arguments or the private envelope.
+
+Submit the exact hash returned for the displayed action:
 
 ```bash
-curl /ai/approvals?status=pending -H 'Authorization: Bearer <owner-jwt>'
-
 curl -X POST /ai/approvals/<approval-id>/decision \
   -H 'Authorization: Bearer <owner-jwt>' \
   -H 'Content-Type: application/json' \
-  -d '{"decision":"approve","reason":"User confirmed this action"}'
+  -d '{"decision":"approve","intentHash":"<displayed-intent-hash>"}'
 ```
 
-Rejecting an approval resumes the run with a fixed “tool rejected” notice; the
-tool is not executed.
+`reject` also requires that hash; a bounded optional `reason` is supported. Missing
+hash or extra request fields return 400. A foreign/missing approval returns 404.
+A mismatched hash, incompatible action, expiry or opposite prior decision returns 409. First approval without current read/execute rights returns 403. The same
+decision with the same hash returns 200 without another effect, and its response
+is freshly redacted according to current disclosure rights. Rejection remains
+available after domain read rights are revoked.
 
-An approval that is not decided within `AI_APPROVAL_TTL_MS` expires and the run
-terminates; it also cannot outlive the run's own lifetime (`AI_RUN_DEADLINE_MS`).
-Cancelling a waiting run voids its pending approval, and an approved tool that
-has not started when the run is cancelled never runs.
+The decision transaction uses fresh PostgreSQL time after lock waits and again
+after authorization. Approval cannot outlive `AI_APPROVAL_TTL_MS` or the run
+deadline. Rejecting resumes the loop with a fixed rejection notice without
+executing the tool. Cancellation/takeover voids a pending approval and does not
+resurrect an approved action that has not started. OpenAPI `/docs` contains the
+strict request, response and error contracts.
 
-The `/ai/approvals` endpoint shapes (list, filterable by status; decision) are in
-the OpenAPI document at `/docs`. **Only the conversation owner can decide
-approvals** — cross-user operators can take over or review a conversation but
-never receive approval authority.
+## Replay, effects and uncertain outcomes
 
-## Configuration
+One originating provider call produces one durable invocation. Its
+`context.idempotencyKey` is `ai-tool:<invocationId>` throughout its lifetime.
+A crash, timeout, deployment or approval resume does not create a replacement
+action or key. The host applies a recorded result to the transcript once.
 
-| Env var                        | Purpose                                                  |
-| ------------------------------ | -------------------------------------------------------- |
-| `AI_TOOL_LOOP_MAX_STEPS`       | Max provider steps per run before `tool_loop_exhausted`. |
-| `AI_TOOL_EXECUTION_TIMEOUT_MS` | Per-tool host-side execution timeout.                    |
-| `AI_APPROVAL_TTL_MS`           | How long a run may wait for approval before expiry.      |
-| `AI_RUN_DEADLINE_MS`           | Absolute lifetime of a run, including approval waits.    |
+| Execution outcome                                     | Durable behavior                                                                                                            |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `execute` returns                                     | Record success and apply its result once when the run can continue.                                                         |
+| `AiToolRejectedError`                                 | Author proves no effect; fail `tool_execution_failed`.                                                                      |
+| `AiToolRetryableError`                                | Author proves no effect; record `tool_retryable_no_effect` and fail. The host does not automatically retry the side effect. |
+| Other side-effect error, timeout, crash or lost lease | Record `outcome_unknown`; stop with `tool_effect_unknown`.                                                                  |
+| Read-only failure                                     | Ordinary failure; abandoned read-only work is adopted only if the contract, current rights and allowlist still match.       |
 
-## Execution contract upgrades and anomalous queued runs
+Throw a no-effect error only when nothing happened with certainty. A connection
+reset after acceptance and an aborted request do not prove that. Pass the stable
+key to the domain/provider's real deduplication mechanism and honor
+`context.signal`. The author owns effect idempotency and the provider's key
+retention window; declaring `idempotent` is not proof of exactly-once execution.
+`unsafe` tools are refused at registration.
 
-Tool recovery and approval resumes keep the run's original versioned executable
-model descriptor. An unversioned/malformed snapshot fails before tool recovery or
-provider I/O; a matching slug cannot supply replacement identity. Existing terminal
-history is preserved. Use the [maintenance upgrade procedure](../operations/deployment.md#ai-run-engine-upgrade-maintenance-stop),
-not a rolling mix of old/new producers.
+An unknown or abandoned executing side effect stops recovery **before** checking
+assistant enabled state, executable preflight, missing handlers, versions, schemas,
+current rights or allowlists. It never
+causes re-execution or another model call for a replacement action. Multiple
+unresolved actions without uncertain-effect evidence and `SUCCEEDED` without `appliedAt` fail
+`tool_state_inconsistent`; no result is fabricated and no automatic recovery is
+added. Cancel/takeover/deadline during execution preserves success or uncertainty
+while honoring the stop cause.
 
-Queued restriction diagnosis never executes an action. It retains known/unknown
-outcomes, marks abandoned executing side effects unknown, fails abandoned read-only
-execution and skips requested/approved actions that never started. Pending approval
-evidence remains unchanged and cannot resume a terminal run. This diagnosis does
-not add reconciliation or operator management commands.
+## Verify an extension
+
+The executable registration seam is demonstrated by
+[`tool-registration.ts`](../../apps/api/test/fixtures/extension-contracts/tool-registration.ts).
+Its synthetic authority authorizes only isolated fixture targets; do not copy
+that authority for a real domain. A domain conformance fixture must prove actual
+primary permissions, revision/effect atomicity and revocation races. Keep tests
+for immutable preview/hash, strict decisions, owner isolation, post-revoke
+redaction, semantic/schema mismatch, allowlist removal and unknown-effect
+precedence in addition to a successful execution.
+
+Run `pnpm test:extension-contracts` with Docker to execute the registered fixtures
+in an isolated public-source copy. `ai-tool-extension-contracts.e2e-spec.ts` proves
+current domain permissions, deadline admission and mutation races;
+`ai-run-legacy-and-locks.e2e-spec.ts` proves unknown precedence over incompatible
+preflight and mixed pending origins. Both suites are part of the CI conformance lane.
+
+## Configuration and maintenance
+
+`AI_TOOL_LOOP_MAX_STEPS` bounds provider rounds;
+`AI_TOOL_EXECUTION_TIMEOUT_MS` bounds a tool/hook wait;
+`AI_APPROVAL_TTL_MS` bounds owner approval; `AI_RUN_DEADLINE_MS` bounds the entire
+run, including approval waits. Cooperative cancellation does not free a physical
+worker slot until the underlying call settles.
+
+Use the [maintenance upgrade procedure](../operations/deployment.md) for legacy
+hashless actions and prepared-request upgrades. Preserve terminal history and
+human decisions; expire hashless pending approvals, fail incompatible unstarted
+work, and retain unknown-effect evidence. Never synthesize an approval hash,
+assume an attempted row never ran because it is queued again, or clear uncertainty
+by generating a fresh invocation.

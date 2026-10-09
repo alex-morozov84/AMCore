@@ -5,6 +5,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { ChannelDelivererRegistry } from '../src/core/notifications/channels/channel-deliverer.registry'
 import type { ChannelDeliverer } from '../src/core/notifications/channels/channel-deliverer.types'
+import { NotificationChannelRegistry } from '../src/core/notifications/channels/notification-channel.registry'
 import { TelegramDeliveryError } from '../src/core/notifications/channels/telegram/telegram.constants'
 import type { TelegramBotApiClient } from '../src/core/notifications/channels/telegram/telegram-bot-api.client'
 import { TelegramChannelDeliverer } from '../src/core/notifications/channels/telegram/telegram-channel.deliverer'
@@ -13,11 +14,13 @@ import { NotificationDeliveryRepository } from '../src/core/notifications/dispat
 import { NotificationDispatchGate } from '../src/core/notifications/dispatch/notification-dispatch.gate'
 import { NotificationDispatchService } from '../src/core/notifications/dispatch/notification-dispatch.service'
 import type { ClaimedDelivery } from '../src/core/notifications/dispatch/notification-dispatch.types'
+import { NotificationPreparedRequestService } from '../src/core/notifications/dispatch/notification-prepared-request.service'
 import {
   CUTOFF,
   NotificationShutdownLatch,
 } from '../src/core/notifications/dispatch/notification-shutdown.latch'
 import { NotificationChannel } from '../src/core/notifications/notification.constants'
+import { NOTIFICATION_CHANNELS } from '../src/core/notifications/notification-composition'
 import { NotificationDefinitionRegistry } from '../src/core/notifications/notification-definition.registry'
 import { EnvService } from '../src/env/env.service'
 import type { PrismaService } from '../src/prisma'
@@ -148,6 +151,7 @@ describe('Notification shutdown atomicity (e2e, real Postgres)', () => {
     const delivery = await prisma.notificationDelivery.create({
       data: {
         notificationId: note.id,
+        requestContractVersion: 1,
         channel: NotificationChannel.EMAIL,
         targetKey: `shutdown-${Date.now()}-${seq}@example.com`,
         locale: 'en',
@@ -186,6 +190,7 @@ describe('Notification shutdown atomicity (e2e, real Postgres)', () => {
       await prisma.notificationDelivery.update({
         where: { id: deliveryId },
         data: {
+          requestContractVersion: 1,
           channel: NotificationChannel.TELEGRAM,
           targetRef: connection.id,
           targetKey: connection.chatId,
@@ -206,6 +211,7 @@ describe('Notification shutdown atomicity (e2e, real Postgres)', () => {
       const sibling = await prisma.notificationDelivery.create({
         data: {
           notificationId: siblingNotification.id,
+          requestContractVersion: 1,
           channel: NotificationChannel.TELEGRAM,
           targetKey: connection.chatId,
           targetRef: connection.id,
@@ -220,7 +226,7 @@ describe('Notification shutdown atomicity (e2e, real Postgres)', () => {
       const latch = newLatch()
       const hooked = hookedPrisma({ 'telegramConnection.updateMany': () => latch.seal() })
       const client = {
-        sendMessage: jest.fn(async () => ({
+        sendPreparedMessage: jest.fn(async () => ({
           status: 'permanent',
           errorCode: TelegramDeliveryError.BLOCKED,
         })),
@@ -230,7 +236,15 @@ describe('Notification shutdown atomicity (e2e, real Postgres)', () => {
         client,
         hooked,
         app.get(EnvService),
-        latch
+        latch,
+        new NotificationPreparedRequestService(
+          prisma,
+          new NotificationChannelRegistry(
+            NOTIFICATION_CHANNELS.map((entry) => ({ ...entry, available: () => true })),
+            app.get(EnvService)
+          ),
+          latch
+        )
       )
       const admission = new NotificationAttemptAdmission(hooked, latch).create(
         { delivery: claim!, notification },
@@ -246,7 +260,7 @@ describe('Notification shutdown atomicity (e2e, real Postgres)', () => {
       expect((await snapshot(sibling.id)).delivery.status).toBe(NotificationDeliveryStatus.PENDING)
       expect((await snapshot(deliveryId)).attempts[0]!.outcome).toBeNull()
       expect(latch.sealed).toBe(true)
-      expect(client.sendMessage).toHaveBeenCalledTimes(1)
+      expect(client.sendPreparedMessage).toHaveBeenCalledTimes(1)
     })
 
     it('finalize: delivery update then attempt close — nothing is committed', async () => {

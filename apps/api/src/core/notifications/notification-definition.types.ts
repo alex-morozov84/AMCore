@@ -64,32 +64,13 @@ export interface NotificationDefinition<TPayload = unknown> {
   safePayload(payload: TPayload): Record<string, unknown>
   /** In-app feed render in the recipient's locale. */
   renderInApp(payload: TPayload, locale: SupportedLocale): RenderedNotificationContent
-  /**
-   * Detailed email title/body in the recipient's locale, rendered ONLY from the
-   * `projectExternal('email', …)` allowlisted projection — never the full payload — so the
-   * external data boundary is enforced, not bypassed (ADR-052). Used only when the content
-   * policy resolves email to `detailed` (PUBLIC, or an explicit per-channel override) AND a
-   * `projectExternal` exists; otherwise the dispatcher sends a neutral generic email.
-   * Separate from `renderInApp` because email copy has different length/CTA/sensitivity
-   * constraints.
-   */
-  renderEmail?(
-    projection: Record<string, unknown>,
-    locale: SupportedLocale
-  ): RenderedNotificationContent
-  /**
-   * Detailed Telegram title/body in the recipient's locale, rendered ONLY from the
-   * `projectExternal('telegram', …)` allowlisted projection — never the full payload (Arc D, the
-   * same external-boundary rule as `renderEmail`). Used only when the content policy resolves
-   * Telegram to `detailed` AND a `projectExternal` exists; otherwise the deliverer sends a neutral
-   * generic, plain-text message (no `parse_mode`). No shipped definition opts into detailed Telegram
-   * today, so the SENSITIVE `account.password_changed` stays generic — this seam keeps the channel
-   * additive for a future PUBLIC/PERSONAL definition.
-   */
-  renderTelegram?(
-    projection: Record<string, unknown>,
-    locale: SupportedLocale
-  ): RenderedNotificationContent
+  /** Detailed renderers receive only the channel-specific allowlisted projection. */
+  readonly renderExternal?: Partial<
+    Record<
+      NotificationChannel,
+      (projection: Record<string, unknown>, locale: SupportedLocale) => RenderedNotificationContent
+    >
+  >
   /** Optional safe first-party action descriptor (never an arbitrary URL). */
   action?(payload: TPayload): NotificationAction | null
 
@@ -103,4 +84,10 @@ export interface NotificationDefinition<TPayload = unknown> {
    * makes the allowlist provable, instead of one global projection leaking everywhere.
    */
   projectExternal?(channel: NotificationChannel, payload: TPayload): Record<string, unknown>
+}
+
+/** Exactly one producer version per type; historical entries remain decodable. */
+export interface NotificationDefinitionRegistration {
+  readonly definition: NotificationDefinition
+  readonly current: boolean
 }

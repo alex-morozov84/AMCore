@@ -50,10 +50,16 @@ export function rewriteEmailDeliverer(model, locale, ctx) {
 
 export function rewriteInviteService(model, locale, ctx) {
   // Command tests capture recipient locale; link construction now belongs to dispatch.
-  findUniqueNode(model, (node) => ts.isCallExpression(node) &&
-    node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text ===
-    'acknowledges known=%s nonmembers uniformly and captures truthful email intent',
-    { ...ctx, describe: 'issuance snapshot parameterized test' })
+  findUniqueNode(
+    model,
+    (node) =>
+      ts.isCallExpression(node) &&
+      node.arguments[0] &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      node.arguments[0].text ===
+        'acknowledges known=%s nonmembers uniformly and captures truthful email intent',
+    { ...ctx, describe: 'issuance snapshot parameterized test' }
+  )
   normalizeRussianFixtureLiterals(model, locale, ctx)
 }
 
@@ -65,12 +71,12 @@ export function rewriteTelegramDeliverer(model, locale, ctx) {
     'appends the trusted app link when the notification has a first-party action',
     ctx
   )
-  const target = statement(model, test, "toContain('https://app.example/ru')", ctx)
+  const target = statement(model, test, "'https://app.example/ru'", ctx)
   model.replaceNode(
     target,
     `// Single-locale mode: no locale segment — anchor on the boundary so a
     // future regression back to a prefixed link would still be caught.
-    expect(client.sendMessage.mock.calls[0]![0].text).toMatch(/https:\\/\\/app\\.example(?![\\w/])/)`,
+    expect(JSON.parse(client.sendPreparedMessage.mock.calls[0]![0]).text).toMatch(/https:\\/\\/app\\.example(?![\\w/])/)`,
     { ...ctx, includeLeadingComments: true }
   )
 }

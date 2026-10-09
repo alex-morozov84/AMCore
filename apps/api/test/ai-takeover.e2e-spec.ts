@@ -13,12 +13,13 @@ import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.servic
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
-import { AI_TOOLS } from '../src/infrastructure/ai/tools/ai-tool.types'
 import { currentTimeTool } from '../src/infrastructure/ai/tools/reference/current-time.tool'
 import type { PrismaService } from '../src/prisma'
 
 import { demoFenceTool, setDemoFenceHook } from './fixtures/demo-fence.tool'
 import { demoSensitiveTool } from './fixtures/demo-sensitive.tool'
+import { approvalHash } from './fixtures/extension-contracts/approval-hash'
+import { registerFixtureTools } from './fixtures/extension-contracts/tool-registration'
 import {
   cleanDatabase,
   cleanOrgData,
@@ -57,9 +58,7 @@ describe('AI human takeover lifecycle (e2e)', () => {
 
   beforeAll(async () => {
     context = await setupE2ETest((builder) =>
-      builder
-        .overrideProvider(AI_TOOLS)
-        .useValue([currentTimeTool, demoSensitiveTool, demoFenceTool])
+      registerFixtureTools(builder, [currentTimeTool, demoSensitiveTool, demoFenceTool])
     )
     app = context.app
     prisma = context.prisma
@@ -219,7 +218,10 @@ describe('AI human takeover lifecycle (e2e)', () => {
     // A later owner approval decision on the voided approval is a 409 non-effect: the approval stays
     // EXPIRED, the run stays CANCELLED/superseded, and nothing re-queues or executes a tool.
     await expect(
-      approvals.decide(userId, approval.id, { decision: 'approve' })
+      approvals.decide(userId, approval.id, {
+        decision: 'approve',
+        intentHash: await approvalHash(prisma, approval.id),
+      })
     ).rejects.toBeInstanceOf(ConflictException)
     const afterDecision = await prisma.aiRun.findUniqueOrThrow({ where: { id: run.id } })
     expect(afterDecision.status).toBe(AiRunStatus.CANCELLED)

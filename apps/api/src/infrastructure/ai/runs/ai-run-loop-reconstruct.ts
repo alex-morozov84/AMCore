@@ -21,7 +21,7 @@ export type UnresolvedAction = InvocationRow | 'ambiguous' | null
  * The run's unresolved tool action, if any (E12 recovery). At the start of every epoch — BEFORE the model
  * is asked again — recovery evaluates what is still pending:
  *
- * 1. **Any** recorded `OUTCOME_UNKNOWN` has absolute precedence, whatever its age or what else is pending:
+ * 1. **Any** recorded `OUTCOME_UNKNOWN` or older-epoch side-effecting `EXECUTING` has precedence, whatever its age or what else is pending:
  *    an uncertain side effect must stop the run before anything executable continues (legacy data can hold
  *    several invocations, so "the newest one" is not enough).
  * 2. Otherwise the pending actions are `REQUESTED`/`APPROVED` (start it), `EXECUTING` (same epoch: exit;
@@ -32,18 +32,41 @@ export type UnresolvedAction = InvocationRow | 'ambiguous' | null
  * `null` means nothing is pending (the normal loop). `AWAITING_APPROVAL`/`SKIPPED`/applied rows are never
  * selected.
  */
-export async function findUnresolvedAction(
-  prisma: PrismaService,
+/** Recorded unknown and abandoned side effects dominate all ordinary preflight failures. */
+export function findUncertainAction(
+  prisma: Pick<PrismaService, 'aiToolInvocation'>,
   runId: string,
+  epoch: number,
   run: FencedRun
-): Promise<UnresolvedAction | Cutoff> {
-  const unknown = await run(() =>
+): Promise<InvocationRow | null | Cutoff> {
+  return run(() =>
     prisma.aiToolInvocation.findFirst({
-      where: { runId, status: AiToolInvocationStatus.OUTCOME_UNKNOWN },
+      where: {
+        runId,
+        OR: [
+          { status: AiToolInvocationStatus.OUTCOME_UNKNOWN },
+          {
+            status: AiToolInvocationStatus.EXECUTING,
+            AND: [
+              { OR: [{ executionEpoch: null }, { executionEpoch: { lt: epoch } }] },
+              { OR: [{ idempotency: null }, { idempotency: { not: 'read_only' } }] },
+            ],
+          },
+        ],
+      },
       orderBy: { createdAt: 'asc' },
       select: INVOCATION_SELECT,
     })
   )
+}
+
+export async function findUnresolvedAction(
+  prisma: PrismaService,
+  runId: string,
+  run: FencedRun,
+  epoch: number
+): Promise<UnresolvedAction | Cutoff> {
+  const unknown = await findUncertainAction(prisma, runId, epoch, run)
   if (unknown === CUTOFF || unknown !== null) return unknown
   const pending = await run(() =>
     prisma.aiToolInvocation.findMany({

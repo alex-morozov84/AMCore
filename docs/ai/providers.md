@@ -50,16 +50,59 @@ first enabled + credentialed candidate.
 
 ## Add a New Provider Family
 
-Use the built-in families where possible. Adding a genuinely new provider family
-requires:
+Use a built-in family for a new compatible endpoint/model whenever possible.
+A new family is a code-bound enum/adapter extension, not a runtime plugin. Complete
+all of these registrations together:
 
-1. a new provider enum value and schema support;
-2. a gateway adapter under `apps/api/src/infrastructure/ai/gateway/providers/`;
-3. credential-slot mapping;
-4. capability/error normalization tests.
+1. Add the Prisma `AiProviderType` member and migration; regenerate the client.
+   Add its lowercase wire value in shared `AI_PROVIDER_TYPES` and the corresponding
+   schema/inventory tests so catalogue DTOs and OpenAPI agree.
+2. Implement `AiProviderAdapter` under
+   [`gateway/providers/`](../../apps/api/src/infrastructure/ai/gateway/providers/).
+   Declare `supportedTypes`, normalize text/structured/tool requests and multimodal
+   support, and register the adapter in `AiGatewayModule`'s `AI_PROVIDER_ADAPTERS`
+   factory. Tool descriptors contain no executor: the SDK must never auto-execute.
+3. Extend the fixed `AI_CREDENTIAL_ALLOWLIST` in `credential-resolver.ts`. Add a
+   typed variable in `env/schema/ai.env.ts`, document it in `.env.example`, and
+   pass it to the worker/all service in `docker-compose.yml`. A database slot is
+   a logical identity, never an arbitrary environment-variable lookup. If adding
+   a slot beyond `default`, extend executable-descriptor validation explicitly.
+4. Define endpoint policy and executable binding in `ai-execution-descriptor.ts`
+   and the adapter. Built-in families use code-owned endpoints and ignore DB
+   `baseUrl`. A genuinely custom compatible endpoint uses canonical URL/hash
+   binding and redirect refusal. Test that no credential reaches a replacement
+   host, redirect or arbitrary DB URL. Deployment egress/DNS policy remains required.
+5. Seed provider/model rows through `seed-ai-catalog.ts`: truthful capabilities,
+   context/output limits, provider wire model, logical slot, and enabled/default
+   choices. Verify selection, frozen snapshot creation, live primary permission
+   checks and identity changes; do not replace a run's model by matching its slug.
+6. Map failures to bounded `AiGatewayException` codes, including retryability,
+   cancellation and provider retry delay. Forward timeout/abort without automatic
+   SDK retries that would duplicate unobserved calls. Never expose provider bodies,
+   credentials, prompts or SDK causes in logs or public exception details.
+7. Produce content-free `AiProviderReceipt` evidence before host output/structured
+   validation can fail. Normalize reported/partial/unavailable/estimated usage
+   without fabricating counters. Durable runs settle observed spend and their
+   guarded outcome atomically even when cancellation or output refusal wins.
+8. Extend bounded metric family labels in `MetricsService` and any family
+   mapping; do not label by catalogue slug, endpoint, user/run ID or content.
+   Update this guide's credential table, public feature discovery and OpenAPI
+   schemas when the family becomes available.
 
-Do not use a DB `baseUrl` to redirect credentials for built-in provider families.
-Only `OPENAI_COMPATIBLE` is designed for custom endpoints.
+The supported conformance entry point is
+[`ai-provider-extension-contracts.e2e-spec.ts`](../../apps/api/test/ai-provider-extension-contracts.e2e-spec.ts).
+It uses the actual provider list seam, primary PostgreSQL catalogue and installed
+SDK adapters with fake fetch; it verifies frozen wire identity, live secret
+rotation, revocation-before-fetch, slot refusal and bounded accounting. Extend it
+for a new family rather than only mocking an adapter's return value. Keep the
+PR3 receipt, endpoint, cache-degradation and shutdown tests as well:
+
+```bash
+pnpm --filter api test:e2e --runTestsByPath \
+  test/ai-provider-extension-contracts.e2e-spec.ts \
+  test/ai-provider-receipt.e2e-spec.ts \
+  test/ai-gateway-consistency.e2e-spec.ts
+```
 
 ## Runtime Behavior
 

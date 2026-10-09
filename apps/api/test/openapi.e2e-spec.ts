@@ -218,6 +218,47 @@ describe('OpenAPI success surface (e2e)', () => {
     }
   }, 120000)
 
+  it('documents strict hash-bound owner decisions and redacted preview metadata', () => {
+    const operation = document.paths['/ai/approvals/{id}/decision']?.post
+    expect(operation?.security).toEqual([{ bearer: [] }])
+    for (const status of ['400', '401', '403', '404', '409', '429'])
+      expect(operation?.responses?.[status]).toBeDefined()
+    const request = document.components?.schemas?.DecideAiApprovalDto
+    expect(request).toMatchObject({
+      required: expect.arrayContaining(['decision', 'intentHash']),
+      additionalProperties: false,
+    })
+    expect(JSON.stringify(request)).toContain('intentHash')
+    const success = operation?.responses?.['200'] as {
+      content?: { 'application/json'?: { schema?: { $ref?: string } } }
+    }
+    const responseRef = success?.content?.['application/json']?.schema?.$ref
+    expect(responseRef).toBeDefined()
+    const response = document.components?.schemas?.[responseRef!.split('/').at(-1)!]
+    expect(response).toMatchObject({
+      required: expect.arrayContaining(['toolVersion', 'intentHash', 'preview', 'disclosure']),
+    })
+    const serialized = JSON.stringify(response)
+    for (const privateField of ['intentSnapshot', 'argsSnapshot', 'inputHash'])
+      expect(serialized).not.toContain(privateField)
+    expect(document.paths['/ai/approvals']?.get?.security).toEqual([{ bearer: [] }])
+    for (const response of [
+      operation?.responses?.['200'],
+      document.paths['/ai/approvals']?.get?.responses?.['200'],
+    ]) {
+      expect(response).toMatchObject({
+        headers: {
+          'Cache-Control': {
+            schema: {
+              type: 'string',
+              enum: ['private, no-store'],
+            },
+          },
+        },
+      })
+    }
+  })
+
   it('documents TeamAccess/record-field failures and permission assignment branches', () => {
     const orgOperations = Object.entries(document.paths).filter(([path]) =>
       path.startsWith('/organizations')

@@ -138,7 +138,7 @@ amcore/
 │   ├── auth/           # Authentication & authorization documentation
 │   ├── ai/             # AI capability layer (assistants, runs, tools, artifacts, providers, security)
 │   ├── email/          # Email extension contract (templates, queueing, secret-bearing sends)
-│   ├── notifications/  # Notifications subsystem (in-app feed, durable email & Telegram dispatch, realtime SSE, preferences)
+│   ├── notifications/  # Versioned notifications, channel registration, durable dispatch, realtime SSE, preferences
 │   ├── media/          # Image derivative/media processing documentation
 │   ├── operations-console/ # SUPER_ADMIN console usage, configuration, deployment, and extension
 │   ├── operations/     # Deployment, observability, security, and production runbooks

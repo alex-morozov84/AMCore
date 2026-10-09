@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 import type { AiTool } from '../../src/infrastructure/ai/tools/ai-tool.types'
 
+import { fixtureToolContract } from './extension-contracts/tool-registration'
+
 import { AiToolRiskClass } from '@/generated/prisma/client'
 
 const parameters = z.object({}).strict()
@@ -17,6 +19,7 @@ export const demoSensitiveTool: AiTool<z.infer<typeof parameters>> = {
   displayName: 'Demo sensitive',
   description: 'A test-only approval-gated tool. Returns a fixed marker; takes no arguments.',
   parameters,
+  ...fixtureToolContract(parameters),
   riskClass: AiToolRiskClass.SENSITIVE,
   idempotency: 'idempotent',
   execute() {

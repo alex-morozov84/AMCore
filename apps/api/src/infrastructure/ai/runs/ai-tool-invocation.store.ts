@@ -1,11 +1,14 @@
-import type { AiTool } from '../tools/ai-tool.types'
+import type { AiTool, AiToolIntent } from '../tools/ai-tool.types'
+import { readToolIntent } from '../tools/ai-tool-intent'
+import { toolIntentData } from '../tools/ai-tool-intent'
 
 import { AiRunTerminalReason } from './ai-run.constants'
 import type { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun } from './ai-run-dispatch.types'
 import { RunLeaseLostError } from './ai-run-guard.service'
 
-import { canonicalJsonEqual } from '@/common/utils/canonical-json'
+import { canonicalJsonHash } from '@/common/utils/canonical-json'
+import { strictJson } from '@/common/utils/strict-json'
 import {
   AiRunStepType,
   AiToolInvocationStatus,
@@ -22,6 +25,11 @@ import {
 
 export const INVOCATION_SELECT = {
   id: true,
+  intentSnapshot: true,
+  intentHash: true,
+  toolVersion: true,
+  inputSchemaHash: true,
+  normalizedSchemaHash: true,
   toolId: true,
   riskClass: true,
   idempotency: true,
@@ -70,7 +78,8 @@ export function createRequested(
   claim: ClaimedRun,
   tool: AiTool,
   originCall: number,
-  args: unknown
+  args: unknown,
+  prepared: { intent: AiToolIntent; hash: string }
 ): Promise<InvocationRow> {
   return tx.aiToolInvocation.create({
     data: {
@@ -80,7 +89,7 @@ export function createRequested(
       riskClass: tool.riskClass,
       idempotency: tool.idempotency,
       originCall,
-      argsSnapshot: args as Prisma.InputJsonValue,
+      ...toolIntentData(prepared),
     },
     select: INVOCATION_SELECT,
   })
@@ -88,7 +97,13 @@ export function createRequested(
 
 /** A reused invocation must carry the SAME normalized input as the new request, else fail closed. */
 export function sameAction(existing: InvocationRow, toolId: string, args: unknown): boolean {
-  return existing.toolId === toolId && canonicalJsonEqual(existing.argsSnapshot, args)
+  if (existing.toolId !== toolId || !existing.intentHash) return false
+  try {
+    const intent = readToolIntent(existing.intentSnapshot, existing.intentHash)
+    return intent.inputHash === canonicalJsonHash(JSON.parse(strictJson(args, 32 * 1024)))
+  } catch {
+    return false
+  }
 }
 
 /**

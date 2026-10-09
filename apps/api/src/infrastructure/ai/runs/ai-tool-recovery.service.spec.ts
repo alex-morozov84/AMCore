@@ -1,6 +1,7 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { z } from 'zod'
 
+import { fixtureToolContract } from '../../../../test/fixtures/extension-contracts/tool-registration'
 import type { AiTool } from '../tools/ai-tool.types'
 import type { AiToolRegistry } from '../tools/ai-tool-registry.service'
 
@@ -32,6 +33,7 @@ const TOOL: AiTool = {
   displayName: 'Archive',
   description: 'archive',
   parameters: z.object({}).strict(),
+  ...fixtureToolContract(z.object({}).strict()),
   riskClass: AiToolRiskClass.SAFE,
   idempotency: 'idempotent',
   execute: jest.fn(),
@@ -56,7 +58,7 @@ function action(over: Partial<InvocationRow> = {}): InvocationRow {
 describe('AiToolRecoveryService', () => {
   let prisma: DeepMockProxy<PrismaService>
   let registry: { get: jest.Mock }
-  let actions: { execute: jest.Mock; applyRejected: jest.Mock }
+  let actions: { execute: jest.Mock; applyRejected: jest.Mock; resolveUnknown: jest.Mock }
   let transitions: { failed: jest.Mock }
   let recovery: AiToolRecoveryService
 
@@ -75,6 +77,7 @@ describe('AiToolRecoveryService', () => {
     registry = { get: jest.fn(() => TOOL) }
     actions = {
       execute: jest.fn().mockResolvedValue({ status: 'succeeded' }),
+      resolveUnknown: jest.fn().mockResolvedValue(undefined),
       applyRejected: jest.fn().mockResolvedValue({ status: 'succeeded' }),
     }
     transitions = { failed: jest.fn().mockResolvedValue('applied') }
@@ -112,10 +115,6 @@ describe('AiToolRecoveryService', () => {
   it.each([
     [AiToolInvocationStatus.REQUESTED, 'start it: it never ran'],
     [AiToolInvocationStatus.APPROVED, 'start the approved action'],
-    [
-      AiToolInvocationStatus.EXECUTING,
-      'adopt (read-only) or fail uncertain — decided by the one-shot start',
-    ],
   ])(
     '%s → drives the action through the one-shot start (%s), recovering with the SYNTHETIC call id, no stored args',
     async (status, _note) => {
@@ -131,6 +130,30 @@ describe('AiToolRecoveryService', () => {
       ) // exactly 4 args: the stored snapshot is re-validated by `execute`, never trusted blindly
     }
   )
+
+  it('refuses an executing side effect before looking up a removed handler', async () => {
+    pending(action({ status: AiToolInvocationStatus.EXECUTING }))
+    registry.get.mockReturnValue(undefined)
+    expect(await recovery.recover(CTX)).toBe('done')
+    expect(actions.resolveUnknown).toHaveBeenCalledWith(
+      CTX,
+      expect.objectContaining({ id: 'inv-1' })
+    )
+    expect(registry.get).not.toHaveBeenCalled()
+    expect(actions.execute).not.toHaveBeenCalled()
+  })
+
+  it('adopts read-only execution through the stored action contract', async () => {
+    pending(action({ status: AiToolInvocationStatus.EXECUTING, idempotency: 'read_only' }))
+    expect(await recovery.recover(CTX)).toBe('proceed')
+    expect(actions.execute).toHaveBeenCalledWith(
+      CTX,
+      expect.objectContaining({ id: 'inv-1' }),
+      TOOL,
+      'ai-tool-inv:inv-1'
+    )
+    expect(actions.resolveUnknown).not.toHaveBeenCalled()
+  })
 
   it.each(['terminal', 'exit'])('stops when the resumed action ends %s', async (status) => {
     pending(action())
@@ -161,7 +184,19 @@ describe('AiToolRecoveryService', () => {
       await recovery.recover(CTX)
 
       const first = prisma.aiToolInvocation.findFirst.mock.calls[0]![0]!
-      expect(first.where).toEqual({ runId: 'run-1', status: 'OUTCOME_UNKNOWN' })
+      expect(first.where).toMatchObject({
+        runId: 'run-1',
+        OR: [
+          { status: 'OUTCOME_UNKNOWN' },
+          {
+            status: 'EXECUTING',
+            AND: [
+              { OR: [{ executionEpoch: null }, { executionEpoch: { lt: CLAIM.epoch } }] },
+              { OR: [{ idempotency: null }, { idempotency: { not: 'read_only' } }] },
+            ],
+          },
+        ],
+      })
       expect(prisma.aiToolInvocation.findFirst.mock.invocationCallOrder[0]!).toBeLessThan(
         prisma.aiToolInvocation.findMany.mock.invocationCallOrder[0]!
       )

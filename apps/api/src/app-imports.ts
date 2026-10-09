@@ -19,7 +19,7 @@ import { anonymizeIp, getClientIp } from './common/utils'
 import { AdminModule } from './core/admin/admin.module'
 import { AiWebModule } from './core/ai/ai-web.module'
 import { AuthModule } from './core/auth/auth.module'
-import { NotificationsCoreModule } from './core/notifications/notifications-core.module'
+import { NotificationsModule } from './core/notifications/notifications.module'
 import { NotificationsWebModule } from './core/notifications/notifications-web.module'
 import { NotificationsWorkerModule } from './core/notifications/notifications-worker.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
@@ -158,7 +158,7 @@ export function coreImports(): Imports {
     // Notifications producer + definition registry/preferences (ADR-052). The
     // in-app producer is core; controllers (web) and dispatcher/realtime (worker)
     // are added in later arcs.
-    NotificationsCoreModule,
+    NotificationsModule,
 
     // AI catalog registry (Track C — ADR-054). The web-safe half of the AI engine:
     // the secret-free model registry only. The provider-call seam (ModelGateway +
@@ -177,7 +177,7 @@ export const webImports: Imports = [
   OrganizationsModule,
   // Core: Admin (SUPER_ADMIN only)
   AdminModule,
-  // Notifications HTTP feed (producer/registry come from NotificationsCoreModule).
+  // Notifications HTTP feed (producer/registry come from NotificationsModule).
   NotificationsWebModule,
   // AI conversation + durable-run producer/read HTTP surface (Track C — ADR-054).
   AiWebModule,
