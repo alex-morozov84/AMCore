@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { expectNoAxeViolations } from '../shared/axe'
+import { expectNoAxeViolations, scanAccessibility } from '../shared/axe'
 import { waitForVisualStability } from '../shared/visual-stability'
 
 test('axe waits for finite ancestor and nested opacity transitions without stopping spinners', async ({
@@ -53,4 +53,36 @@ test('settling does not cancel or finish finite application animations', async (
   expect(
     await page.locator('button').evaluate((element) => element.getAnimations()[0].playState)
   ).toBe('finished')
+})
+
+// A pending control can sit in a stable half-transparent state, so a scan that only waits for
+// animations would measure it. A region that declares itself busy is not scanned until it is idle.
+const busyFixture = `<html lang="en"><head><title>Busy fixture</title></head><body>
+  <main aria-busy="true"><h1>Loading state</h1><button style="color:#828282;background:#fafafa;font-size:14px">Checking</button></main>
+  </body></html>`
+
+test('a scan waits for a busy region to finish loading', async ({ page }) => {
+  await page.setContent(busyFixture)
+  await page.evaluate(() => {
+    setTimeout(() => {
+      const main = document.querySelector('main')!
+      main.setAttribute('aria-busy', 'false')
+      main.querySelector('button')!.style.color = '#171717'
+    }, 500)
+  })
+  await expectNoAxeViolations(page)
+  expect(await page.locator('main').getAttribute('aria-busy')).toBe('false')
+})
+
+test('a busy state is scanned only when the test says it is the subject', async ({ page }) => {
+  await page.setContent(busyFixture)
+  const results = await scanAccessibility(page, { allowBusy: true, rules: ['color-contrast'] })
+  expect(results.violations.map((violation) => violation.id)).toEqual(['color-contrast'])
+  expect(await page.locator('main').getAttribute('aria-busy')).toBe('true')
+})
+
+test('a region that never finishes loading fails with an actionable message', async ({ page }) => {
+  test.setTimeout(30_000)
+  await page.setContent(busyFixture)
+  await expect(expectNoAxeViolations(page)).rejects.toThrow(/still aria-busy[\s\S]*allowBusy/)
 })

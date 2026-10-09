@@ -264,8 +264,9 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   `docs/frontend/testing.md#observable-long-running-checks`.
 - **Browser accessibility scans:** use `expectNoAxeViolations()` from
   `apps/web/e2e/shared/axe.ts`; it waits for fonts and finite visual transitions.
-  Assert the intended loaded/open state first. Direct axe runtime imports outside
-  this helper fail web lint. Do not disable contrast checks or add fixed sleeps.
+  Assert the intended loaded/open state first; the helper also waits for
+  visible `aria-busy="true"` regions (opt out with `{ allowBusy: true }` only when the busy state
+  is the subject). Direct axe runtime imports outside this helper fail web lint. Do not disable contrast checks or add fixed sleeps.
   For full CI E2E reproduction use `node scripts/e2e-ci.mjs --all`; it runs the
   same applicable isolated lanes with CI settings (locally sequential).
 - **Frontend server/client boundary — two separate decisions.** Server

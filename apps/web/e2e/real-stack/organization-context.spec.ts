@@ -63,6 +63,10 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   await expect(page.getByRole('heading', { name: 'Company Alpha', exact: true })).toBeVisible()
   await other.close()
 
+  // Take the baseline only when the previous step's background reads have finished; otherwise a
+  // late context read of that step is counted as part of the resume.
+  await expect(page.locator('[aria-busy="false"]')).toBeVisible()
+  await expect(page.getByRole('button', { name: ui.text('refresh'), exact: true })).toBeEnabled()
   const beforeResume = calls.length
   await page.evaluate(() => {
     window.dispatchEvent(new Event('focus'))
@@ -71,20 +75,25 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   })
   await expect(page.locator('[aria-busy="true"]')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Company Alpha', exact: true })).toBeVisible()
-  expect(calls.slice(beforeResume)).toEqual([
-    '/api/product-access/bootstrap',
-    `/api/product-access/organizations/${first.id}/context`,
-  ])
+  // The reads start after the events are handled, so wait for them instead of sampling once.
+  await expect
+    .poll(() => calls.slice(beforeResume))
+    .toEqual([
+      '/api/product-access/bootstrap',
+      `/api/product-access/organizations/${first.id}/context`,
+    ])
 
   const cookie = (await context.cookies()).find((value) => value.name === 'amcore_session')!
   await proveOwnedRefresh(cookie.value, actor, async () => {
     const beforeRefresh = calls.length
     await page.getByRole('button', { name: ui.text('refresh'), exact: true }).click()
     await expect(page.locator('[aria-busy="false"]')).toBeVisible()
-    expect(calls.slice(beforeRefresh)).toEqual([
-      '/api/product-access/bootstrap',
-      `/api/product-access/organizations/${first.id}/context`,
-    ])
+    await expect
+      .poll(() => calls.slice(beforeRefresh))
+      .toEqual([
+        '/api/product-access/bootstrap',
+        `/api/product-access/organizations/${first.id}/context`,
+      ])
   })
 
   // Current authority changes without replacing this actor's session or selected URL.
@@ -111,6 +120,11 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
         await page.goto(organizationUi(locale).path(`/${second.id}`))
         await expect(page.getByRole('heading', { name: second.name, exact: true })).toBeVisible()
         await expect(page.locator('html')).toHaveClass(dark ? /dark/ : /^(?!.*\bdark\b).*$/)
+        // The heading is server-rendered; scan only once the client has finished loading, when the
+        // refresh button is no longer in its half-transparent "Checking access…" state.
+        await expect(
+          page.getByRole('button', { name: organizationUi(locale).text('refresh'), exact: true })
+        ).toBeEnabled()
         await expectNoAxeViolations(page)
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
