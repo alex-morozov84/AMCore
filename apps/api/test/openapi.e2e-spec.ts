@@ -118,6 +118,7 @@ const EXPECTED: Record<string, Expected> = {
   'post /organizations/{id}/switch': { status: '200', kind: 'json' },
   // members
   'get /organizations/{orgId}/members': { status: '200', kind: 'json' },
+  'get /organizations/{orgId}/members/{userId}/access': { status: '200', kind: 'json' },
   'get /organizations/{orgId}/members/{userId}/roles': { status: '200', kind: 'json' },
   'patch /organizations/{orgId}/members/{userId}/roles': { status: '200', kind: 'json' },
   'delete /organizations/{orgId}/members/{userId}': { status: '204', kind: 'none' },

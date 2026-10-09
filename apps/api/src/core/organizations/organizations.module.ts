@@ -22,6 +22,7 @@ import { InviteRateLimiterService } from './invite-rate-limiter.service'
 import { InviteRevokeService } from './invite-revoke.service'
 import { InvitesController } from './invites.controller'
 import { MemberService } from './member.service'
+import { MemberAccessService } from './member-access/member-access.service'
 import { MemberQueryService } from './member-query.service'
 import { MemberRoleSetService } from './member-role-set.service'
 import { MembersController } from './members.controller'
@@ -60,6 +61,7 @@ import { RolesController } from './roles.controller'
     CapabilityRegistry,
     MemberService,
     MemberQueryService,
+    MemberAccessService,
     MemberRoleSetService,
     RoleService,
     RoleDefinitionQueryService,
