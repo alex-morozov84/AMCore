@@ -1141,8 +1141,8 @@
     "rolesMore": "and {count} more",
     "qualifierSuperAdmin": "This person is also a platform administrator. This summary covers only what organization membership gives; platform access is separate.",
     "unsafeLinks": "{count, plural, one {# role link points} other {# role links point}} to roles of another organization. They are ignored.",
-    "uncovered": "{count, plural, one {# rule is} other {# rules are}} outside this summary, for example reading or editing the person's own profile.",
-    "uncoveredRoles": "Found in: {roles}",
+    "uncovered": "Their roles also contain {count, plural, one {# other permission} other {# other permissions}} that are not shown here, such as viewing or editing their own profile. They do not change the list above.",
+    "uncoveredRoles": "In roles: {roles}",
     "wideningUnavailable": "A breakdown by role is not available because this person has many roles or rules. What they can do is still exact.",
     "breadth": "Together, these roles allow more than any single role does.",
     "synergy": "Some access exists only because of the combination of roles.",
@@ -1159,25 +1159,20 @@
     "reasonVetoed": "Allowed by {granted}, but blocked by {blockers}.",
     "reasonMissing": "A role allows this, but something it depends on is missing. For example, deleting also needs team control.",
     "reasonUnknown": "Not allowed.",
-    "recordDependent": "Applies only to some records.",
-    "whyTitle": "Why?",
+    "whyTitle": "Which rules decide this",
     "whyNone": "No rule applies.",
     "sourcesMore": "More rules apply than are listed.",
-    "effect": {
-      "allow": "Allows",
-      "deny": "Denies"
-    },
     "status": {
-      "contributes": "gives access",
-      "vetoes": "blocks",
-      "overridden": "overruled"
+      "contributes": "Gives access",
+      "vetoes": "Blocks",
+      "overridden": "Overruled by another rule"
     },
     "via": {
-      "direct": "Rule on this item",
-      "readPrerequisite": "Reading the organization",
-      "deletePrerequisite": "Delete rule",
-      "teamAccessGate": "Team control",
-      "teamAccessVeto": "Deny rule on team, roles, permissions or users"
+      "direct": "This permission itself",
+      "readPrerequisite": "Reading the organization, which this needs first",
+      "deletePrerequisite": "Deleting every organization field, which deleting needs",
+      "teamAccessGate": "Team control, which this needs",
+      "teamAccessVeto": "A ban on team, roles, permissions or users, which blocks team control"
     },
     "sourceRoles": "Roles: {roles}",
     "roleUnknown": "another role",
@@ -1186,6 +1181,10 @@
       "name": "Name",
       "slug": "Address"
     },
-    "unavailable": "Access could not be loaded. Nothing was changed."
+    "unavailable": "Access could not be loaded. Nothing was changed.",
+    "summaryAllowed": "{count, plural, one {# thing allowed} other {# things allowed}}",
+    "summaryBlocked": "{count} blocked by a deny rule",
+    "notAllowedTitle": "Not allowed ({count})",
+    "notAllowedHint": "None of this person's roles give these."
   }
 }

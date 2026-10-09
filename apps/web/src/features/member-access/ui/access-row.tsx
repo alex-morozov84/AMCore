@@ -5,7 +5,7 @@ import { Check, Minus, ShieldAlert } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'
 
-import { describeRoles, type Tone, toneOf } from '../model/access-view'
+import { describeRoles, mergeSources, type Tone, toneOf } from '../model/access-view'
 
 type Item = MemberAccess['items'][number]
 
@@ -51,9 +51,6 @@ export function AccessRow({
       <p className="text-sm text-muted-foreground">
         <Explanation item={item} nameOf={nameOf} />
       </p>
-      {item.granted && item.actorHint === 'recordRequired' && (
-        <p className="text-xs text-muted-foreground">{t('recordDependent')}</p>
-      )}
       {!item.baseline && (
         <details className="text-sm">
           <summary className="cursor-pointer font-medium">{t('whyTitle')}</summary>
@@ -109,28 +106,24 @@ function Sources({
   if (item.sources.length === 0) return <p className="mt-1 text-muted-foreground">{t('whyNone')}</p>
   return (
     <ul className="mt-2 space-y-2">
-      {item.sources.map((source, index) =>
-        source.kind === 'rule' ? (
-          <li key={`${source.permissionId}-${source.via}-${source.field ?? ''}-${index}`}>
-            <p className="font-medium">
-              {t(`effect.${source.effect}`)}, {t(`status.${source.status}`)}
-            </p>
-            <p className="text-muted-foreground">
-              {t(`via.${source.via}`)}
-              {source.field ? ` (${fieldLabel(source.field)})` : ''}
-            </p>
-            <p className="text-muted-foreground">
-              {t('sourceRoles', {
-                roles: describeText(
-                  { roleIds: source.roleIds, total: source.roleIds.length },
-                  nameOf,
-                  t
-                ),
-              })}
-            </p>
-          </li>
-        ) : null
-      )}
+      {mergeSources(item.sources).map((source) => (
+        <li key={`${source.via}-${source.status}-${source.field ?? ''}`}>
+          <p className="font-medium">{t(`status.${source.status}`)}</p>
+          <p className="text-muted-foreground">
+            {t(`via.${source.via}`)}
+            {source.field ? ` (${fieldLabel(source.field)})` : ''}
+          </p>
+          <p className="text-muted-foreground">
+            {t('sourceRoles', {
+              roles: describeText(
+                { roleIds: source.roleIds, total: source.roleIds.length },
+                nameOf,
+                t
+              ),
+            })}
+          </p>
+        </li>
+      ))}
       {item.sourcesTruncated && <li className="text-muted-foreground">{t('sourcesMore')}</li>}
     </ul>
   )

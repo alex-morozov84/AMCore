@@ -21,15 +21,16 @@ import {
 import { RoleBadges } from '@/shared/ui/role-badges'
 import { Skeleton } from '@/shared/ui/skeleton'
 
-import { capabilityOf, roleNamer } from '../model/access-view'
+import { capabilityOf, groupByArea, roleNamer, splitItems } from '../model/access-view'
 
-import { AccessNotes } from './access-notes'
+import { AccessNotes, UncoveredNote } from './access-notes'
 import { AccessRow } from './access-row'
 
 /**
  * What one member can do in this organization and why, as the server works it out from the same
  * rules it uses to authorize. Read-only; a failed read hides the answer instead of showing stale
- * facts, and a background reread keeps what is already shown.
+ * facts, and a background reread keeps what is already shown. The header and footer stay in place
+ * while the body scrolls.
  */
 export function MemberAccessDialog({
   controller,
@@ -65,13 +66,31 @@ export function MemberAccessDialog({
     const base = (capability && text.capability(capability.labelKey)?.label) ?? found?.id ?? key
     return found?.field ? t('fieldOf', { capability: base, field: fieldLabel(found.field) }) : base
   }
+  const row = (item: NonNullable<typeof access>['items'][number]) => (
+    <AccessRow
+      key={item.key}
+      item={item}
+      label={labelOf(item.key)}
+      nameOf={nameOf}
+      fieldLabel={fieldLabel}
+    />
+  )
+  const parts =
+    access && capabilities
+      ? splitItems(
+          access.items,
+          capabilities.map((entry) => entry.id)
+        )
+      : undefined
+  const allowed = parts?.active.filter((item) => item.granted && !item.baseline).length ?? 0
+  const blocked = parts?.active.filter((item) => !item.granted).length ?? 0
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl"
+        className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-2xl"
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle ref={heading} tabIndex={-1}>
             {t('title')}
           </DialogTitle>
@@ -90,62 +109,69 @@ export function MemberAccessDialog({
             )}
           </DialogDescription>
         </DialogHeader>
-        <ApiErrorAlert error={read.error ?? catalogue.error} />
-        {access && capabilities ? (
-          <div className="space-y-4">
-            <AccessNotes access={access} />
-            <section aria-labelledby="member-access-roles" className="space-y-2">
-              <h3 id="member-access-roles" className="text-base font-semibold">
-                {t('rolesTitle')}
-              </h3>
-              {access.roles.items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t('rolesNone')}</p>
-              ) : (
+        <div className="-mx-4 min-h-0 flex-1 space-y-4 overflow-y-auto px-4">
+          <ApiErrorAlert error={read.error ?? catalogue.error} />
+          {access && capabilities && parts ? (
+            <>
+              <AccessNotes access={access} />
+              <section aria-labelledby="member-access-roles" className="space-y-2">
+                <h3 id="member-access-roles" className="text-base font-semibold">
+                  {t('rolesTitle')}
+                </h3>
                 <RoleBadges roles={access.roles.items} empty={t('rolesNone')} />
-              )}
-              {access.roles.truncated && (
+                {access.roles.truncated && (
+                  <p className="text-sm text-muted-foreground">
+                    {t('rolesMore', { count: access.roles.total - access.roles.items.length })}
+                  </p>
+                )}
+              </section>
+              <section aria-labelledby="member-access-items" className="space-y-3">
+                <h3 id="member-access-items" className="text-base font-semibold">
+                  {t('itemsTitle')}
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  {t('rolesMore', { count: access.roles.total - access.roles.items.length })}
+                  {t('summaryAllowed', { count: allowed })}
+                  {blocked > 0 && `, ${t('summaryBlocked', { count: blocked })}`}
                 </p>
-              )}
-            </section>
-            <section aria-labelledby="member-access-items" className="space-y-2">
-              <h3 id="member-access-items" className="text-base font-semibold">
-                {t('itemsTitle')}
-              </h3>
-              <ul className="space-y-2">
-                {access.items.map((item) => (
-                  <AccessRow
-                    key={item.key}
-                    item={item}
-                    label={labelOf(item.key)}
-                    nameOf={nameOf}
-                    fieldLabel={fieldLabel}
-                  />
+                {groupByArea(parts.active, capabilities).map(([area, items]) => (
+                  <div key={area} className="space-y-2">
+                    <h4 className="text-sm font-semibold">{text.area(area)}</h4>
+                    <ul className="space-y-2">{items.map(row)}</ul>
+                  </div>
                 ))}
-              </ul>
-            </section>
-          </div>
-        ) : read.error || catalogue.error ? (
-          <div className="space-y-2">
-            <p role="status">{t('unavailable')}</p>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!read.ready || read.retryAt !== undefined}
-              onClick={() => void controller.refresh().catch(() => undefined)}
-            >
-              {t('retry')}
-            </Button>
-          </div>
-        ) : (
-          <div role="status" aria-busy="true" className="space-y-3">
-            <span className="sr-only">{t('loading')}</span>
-            <Skeleton className="h-8 motion-reduce:animate-none" />
-            <Skeleton className="h-40 motion-reduce:animate-none" />
-          </div>
-        )}
-        <DialogFooter>
+                {parts.inactive.length > 0 && (
+                  <details className="rounded-lg border border-border p-3 text-sm">
+                    <summary className="cursor-pointer font-medium">
+                      {t('notAllowedTitle', { count: parts.inactive.length })}
+                    </summary>
+                    <p className="mt-2 text-muted-foreground">{t('notAllowedHint')}</p>
+                    <ul className="mt-2 space-y-2">{parts.inactive.map(row)}</ul>
+                  </details>
+                )}
+              </section>
+              <UncoveredNote access={access} />
+            </>
+          ) : read.error || catalogue.error ? (
+            <div className="space-y-2">
+              <p role="status">{t('unavailable')}</p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!read.ready || read.retryAt !== undefined}
+                onClick={() => void controller.refresh().catch(() => undefined)}
+              >
+                {t('retry')}
+              </Button>
+            </div>
+          ) : (
+            <div role="status" aria-busy="true" className="space-y-3">
+              <span className="sr-only">{t('loading')}</span>
+              <Skeleton className="h-8 motion-reduce:animate-none" />
+              <Skeleton className="h-40 motion-reduce:animate-none" />
+            </div>
+          )}
+        </div>
+        <DialogFooter className="shrink-0">
           <Button type="button" variant="outline" onClick={onClose}>
             {t('close')}
           </Button>

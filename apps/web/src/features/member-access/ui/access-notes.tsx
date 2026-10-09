@@ -10,7 +10,6 @@ import { wideningNotes } from '../model/access-view'
 export function AccessNotes({ access }: { access: MemberAccess }) {
   const t = useTranslations('memberAccess')
   const notes = wideningNotes(access)
-  const names = (ids: { id: string; name: string }[]) => ids.map((role) => role.name).join(', ')
   return (
     <div className="space-y-2">
       {access.qualifiers.includes('platformSuperAdmin') && (
@@ -35,16 +34,19 @@ export function AccessNotes({ access }: { access: MemberAccess }) {
           <AlertDescription>{t('unsafeLinks', { count: access.unsafeLinkCount })}</AlertDescription>
         </Alert>
       )}
-      {access.uncovered.ruleCount > 0 && (
-        <Alert>
-          <AlertDescription className="gap-1">
-            <p>{t('uncovered', { count: access.uncovered.ruleCount })}</p>
-            {access.uncovered.roleSample.length > 0 && (
-              <p>{t('uncoveredRoles', { roles: names(access.uncovered.roleSample) })}</p>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
     </div>
+  )
+}
+
+/** A footnote, not an alert: roles hold permissions this screen does not explain. */
+export function UncoveredNote({ access }: { access: MemberAccess }) {
+  const t = useTranslations('memberAccess')
+  if (access.uncovered.ruleCount === 0) return null
+  const roles = access.uncovered.roleSample.map((role) => role.name).join(', ')
+  return (
+    <p className="text-xs text-muted-foreground">
+      {t('uncovered', { count: access.uncovered.ruleCount })}
+      {roles && ` ${t('uncoveredRoles', { roles })}`}
+    </p>
   )
 }

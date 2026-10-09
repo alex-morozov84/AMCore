@@ -60,12 +60,13 @@ const access = (over: Partial<MemberAccess> = {}): MemberAccess => ({
   items: [
     item({ key: 'organization.read', baseline: true, granted: true, reason: 'granted' }),
     item({
-      key: 'organization.update',
+      key: 'teamAccess.manage',
       granted: true,
       reason: 'granted',
       origin: 'single',
       reachedBy: { roleIds: ['rA'], total: 1 },
     }),
+    item({ key: 'organization.update' }),
     item({
       key: 'organization.update.name',
       reason: 'vetoed',
@@ -118,13 +119,13 @@ describe('MemberAccessDialog', () => {
     view()
     expect(screen.getByText('Ada Lovelace')).toBeInTheDocument()
     expect(screen.getAllByText('Support').length).toBeGreaterThan(0)
-    expect(screen.getByText(roles.organizationUpdate.label)).toBeInTheDocument()
+    expect(screen.getByText(roles.teamAccessManagement.label)).toBeInTheDocument()
     expect(screen.getByText(t.baselineNote)).toBeInTheDocument()
     expect(screen.getByText(say('originSingle', { roles: 'Support' }))).toBeInTheDocument()
     expect(
       screen.getByText(say('reasonVetoed', { granted: 'Support', blockers: 'Auditor' }))
     ).toBeInTheDocument()
-    expect(screen.getByText(t.reasonMissing)).toBeInTheDocument()
+    expect(screen.queryByText(roles.organizationUpdate.label + ': ' + t.fields.name)).not.toBeNull()
   })
 
   it('explains the shape of the answer before the rows', () => {
@@ -132,7 +133,14 @@ describe('MemberAccessDialog', () => {
     expect(screen.getByText(t.breadth)).toBeInTheDocument()
     expect(screen.getByText(t.vetoed)).toBeInTheDocument()
     expect(screen.queryByText(t.synergy)).toBeNull()
-    expect(screen.getByText(say('uncovered', { count: 2 }))).toBeInTheDocument()
+    expect(screen.getByText(say('uncovered', { count: 2 }), { exact: false })).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(say('summaryAllowed', { count: 1 })))).toBeInTheDocument()
+  })
+
+  it('keeps what is not allowed apart and leaves per-field repeats out', () => {
+    view()
+    expect(screen.getByText(say('notAllowedTitle', { count: 2 }))).toBeInTheDocument()
+    expect(screen.getByText(t.reasonMissing)).toBeInTheDocument()
   })
 
   it('says a breakdown is unavailable instead of inventing one', () => {
@@ -163,7 +171,7 @@ describe('MemberAccessDialog', () => {
       )
       .closest('li')!
     fireEvent.click(within(row).getByText(t.whyTitle))
-    expect(within(row).getByText(`${t.effect.deny}, ${t.status.vetoes}`)).toBeInTheDocument()
+    expect(within(row).getByText(t.status.vetoes)).toBeInTheDocument()
     expect(within(row).getByText(say('sourceRoles', { roles: 'Auditor' }))).toBeInTheDocument()
   })
 
@@ -180,7 +188,7 @@ describe('MemberAccessDialog', () => {
       error: new Error('x'),
     }
     view()
-    expect(screen.queryByText(roles.organizationUpdate.label)).toBeNull()
+    expect(screen.queryByText(roles.teamAccessManagement.label)).toBeNull()
     expect(screen.getByText(t.unavailable)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: t.retry })).toBeEnabled()
   })
@@ -189,7 +197,7 @@ describe('MemberAccessDialog', () => {
     state.access = { data: access(), ready: true, available: false, pending: true }
     const onClose = vi.fn()
     view(onClose)
-    expect(screen.getByText(roles.organizationUpdate.label)).toBeInTheDocument()
+    expect(screen.getByText(roles.teamAccessManagement.label)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: t.close }))
     expect(onClose).toHaveBeenCalled()
   })

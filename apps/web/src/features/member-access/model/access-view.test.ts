@@ -1,7 +1,16 @@
 import type { MemberAccess } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
 
-import { capabilityOf, describeRoles, roleNamer, toneOf, wideningNotes } from './access-view'
+import {
+  capabilityOf,
+  describeRoles,
+  groupByArea,
+  mergeSources,
+  roleNamer,
+  splitItems,
+  toneOf,
+  wideningNotes,
+} from './access-view'
 
 type Item = MemberAccess['items'][number]
 const item = (over: Partial<Item>): Item => ({
@@ -56,5 +65,99 @@ describe('access view model', () => {
     expect(wideningNotes(widening(true, true, true))).toEqual(['breadth', 'synergy', 'vetoed'])
     expect(wideningNotes(widening(null, null, null))).toEqual([])
     expect(wideningNotes(widening(false, true, false))).toEqual(['synergy'])
+  })
+})
+
+const IDS = ['organization.read', 'organization.update', 'team.manage']
+const CAPS = [
+  { id: 'organization.read', subject: 'Organization' },
+  { id: 'organization.update', subject: 'Organization' },
+  { id: 'team.manage', subject: 'TeamAccess' },
+]
+
+describe('splitItems', () => {
+  it('hides per-field lines that repeat an allowed operation', () => {
+    const { active } = splitItems(
+      [
+        item({ key: 'organization.update', granted: true, reason: 'granted' }),
+        item({ key: 'organization.update.name', granted: true, reason: 'granted' }),
+      ],
+      IDS
+    )
+    expect(active.map((entry) => entry.key)).toEqual(['organization.update'])
+  })
+
+  it('keeps a blocked field even when the rest of the operation is allowed', () => {
+    const { active } = splitItems(
+      [
+        item({ key: 'organization.update', granted: true, reason: 'granted' }),
+        item({ key: 'organization.update.name', reason: 'vetoed' }),
+        item({ key: 'organization.update.slug', granted: true, reason: 'granted' }),
+      ],
+      IDS
+    )
+    expect(active.map((entry) => entry.key)).toEqual([
+      'organization.update',
+      'organization.update.name',
+    ])
+  })
+
+  it('keeps a field the person can edit when the whole operation is not allowed', () => {
+    const { active, inactive } = splitItems(
+      [
+        item({ key: 'organization.update' }),
+        item({ key: 'organization.update.name', granted: true, reason: 'granted' }),
+        item({ key: 'organization.update.slug' }),
+      ],
+      IDS
+    )
+    expect(active.map((entry) => entry.key)).toEqual(['organization.update.name'])
+    expect(inactive.map((entry) => entry.key)).toEqual(['organization.update'])
+  })
+
+  it('keeps blocked items visible and unallowed ones apart', () => {
+    const { active, inactive } = splitItems(
+      [
+        item({ key: 'organization.update', reason: 'vetoed' }),
+        item({ key: 'team.manage', reason: 'noGrant' }),
+      ],
+      IDS
+    )
+    expect(active.map((entry) => entry.key)).toEqual(['organization.update'])
+    expect(inactive.map((entry) => entry.key)).toEqual(['team.manage'])
+  })
+})
+
+describe('groupByArea', () => {
+  it('groups by the subject of the capability, fields included', () => {
+    const groups = groupByArea(
+      [
+        item({ key: 'organization.update.name' }),
+        item({ key: 'team.manage' }),
+        item({ key: 'organization.read' }),
+      ],
+      CAPS
+    )
+    expect(groups.map(([area, rows]) => [area, rows.length])).toEqual([
+      ['Organization', 2],
+      ['TeamAccess', 1],
+    ])
+  })
+})
+
+describe('mergeSources', () => {
+  const rule = (roleIds: string[], over = {}) => ({
+    kind: 'rule' as const,
+    via: 'readPrerequisite' as const,
+    roleIds,
+    permissionId: 'p',
+    presetId: null,
+    effect: 'allow' as const,
+    status: 'contributes' as const,
+    ...over,
+  })
+  it('shows rules that say the same thing once, with all their roles', () => {
+    const merged = mergeSources([rule(['a']), rule(['b', 'a']), rule(['c'], { status: 'vetoes' })])
+    expect(merged.map((entry) => entry.roleIds)).toEqual([['a', 'b'], ['c']])
   })
 })
