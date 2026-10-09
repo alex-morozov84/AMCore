@@ -15,6 +15,11 @@ export class MockEmailProvider implements EmailProvider {
     this.logger.setContext(MockEmailProvider.name)
   }
 
+  async sendPrepared(_body: string, _key: string, _signal: AbortSignal): Promise<SendEmailResult> {
+    this.logger.info({ template: 'notification' }, 'Prepared notification sent (MOCK)')
+    return { id: `mock-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, success: true }
+  }
+
   async send(params: SendEmailParams): Promise<SendEmailResult> {
     const { to, subject, html, text, from, replyTo } = params
 

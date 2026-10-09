@@ -1,14 +1,7 @@
 import type { NotificationChannel } from '../notification.constants'
 import type { NotificationDefinition } from '../notification-definition.types'
 
-import type { Prisma, TelegramConnectionStatus } from '@/generated/prisma/client'
-
-/** Telegram connection facts (Arc D), loaded only when a definition supports the channel. */
-export interface TargetRecipientTelegram {
-  connectionId: string
-  chatId: string
-  status: TelegramConnectionStatus
-}
+import type { Prisma } from '@/generated/prisma/client'
 
 /**
  * Recipient facts a target resolver may read. Loaded once by the producer inside its
@@ -20,8 +13,6 @@ export interface TargetRecipient {
   emailCanonical: string
   emailVerified: boolean
   locale: string
-  /** Present (or explicitly `null`) only when the definition supports the Telegram channel. */
-  telegram?: TargetRecipientTelegram | null
 }
 
 /** Inputs available when resolving an external channel's delivery targets. */
@@ -50,11 +41,14 @@ export interface ResolvedDeliveryTarget {
 
 /**
  * Produce-time target resolution for one external channel (ADR-052). This is the
- * **core-role** half of a channel — a pure projection over already-loaded recipient
- * facts, safe to run in the web role. The worker-role `ChannelDeliverer` (provider
+ * **core-role** half of a channel — a transaction-aware reader of recipient
+ * and subscription facts, safe to run in the web role. The worker-role `ChannelDeliverer` (provider
  * I/O) is registered separately so `EmailService`/Bot clients never leak into web.
  */
 export interface ChannelTargetResolver {
   readonly channel: NotificationChannel
-  resolveTargets(context: TargetResolutionContext): ResolvedDeliveryTarget[]
+  resolveTargets(
+    tx: Prisma.TransactionClient,
+    context: TargetResolutionContext
+  ): Promise<ResolvedDeliveryTarget[]>
 }

@@ -8,8 +8,8 @@ import { TelegramTargetResolver } from './telegram/telegram-target.resolver'
 
 /**
  * External channel target resolvers active in this build (in-app is excluded — it is
- * materialized `DELIVERED` inline by the producer and has no external target). Telegram
- * joins in Arc D, Web Push in the frontend phase — each is purely additive here.
+ * materialized `DELIVERED` inline by the producer and has no external target).
+ * Configured channel descriptors supply downstream readers through the core factory.
  */
 const DEFAULT_TARGET_RESOLVERS: readonly ChannelTargetResolver[] = [
   new EmailTargetResolver(),
@@ -26,7 +26,13 @@ export class ChannelTargetResolverRegistry {
   private readonly byChannel: Map<string, ChannelTargetResolver>
 
   constructor(resolvers: readonly ChannelTargetResolver[] = DEFAULT_TARGET_RESOLVERS) {
-    this.byChannel = new Map(resolvers.map((resolver) => [resolver.channel, resolver]))
+    this.byChannel = new Map()
+    for (const resolver of resolvers) {
+      if (this.byChannel.has(resolver.channel)) {
+        throw new Error(`Duplicate notification channel: ${resolver.channel}`)
+      }
+      this.byChannel.set(resolver.channel, resolver)
+    }
   }
 
   get(channel: NotificationChannel): ChannelTargetResolver | undefined {

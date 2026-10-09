@@ -12,11 +12,12 @@ import { AiApprovalExpiryService } from '../src/infrastructure/ai/runs/ai-approv
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
-import { AI_TOOLS } from '../src/infrastructure/ai/tools/ai-tool.types'
 import type { PrismaService } from '../src/prisma'
 
 import { ControllableAdapter, controls } from './fixtures/ai-run-controls'
 import { demoSensitiveTool } from './fixtures/demo-sensitive.tool'
+import { approvalHash } from './fixtures/extension-contracts/approval-hash'
+import { registerFixtureTools } from './fixtures/extension-contracts/tool-registration'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 import {
@@ -47,9 +48,7 @@ describe('AI run history, replay and lock order (e2e)', () => {
 
   beforeAll(async () => {
     context = await setupE2ETest((builder) =>
-      builder
-        .overrideProvider(AI_TOOLS)
-        .useValue([demoSensitiveTool])
+      registerFixtureTools(builder, [demoSensitiveTool])
         .overrideProvider(AI_PROVIDER_ADAPTERS)
         .useValue([new ControllableAdapter()])
     )
@@ -167,7 +166,10 @@ describe('AI run history, replay and lock order (e2e)', () => {
       expect(parked.attemptCount).toBe(0)
       const approval = await prisma.aiApproval.findFirstOrThrow({ where: { runId } })
 
-      await approvals.decide(userId, approval.id, { decision: 'approve' })
+      await approvals.decide(userId, approval.id, {
+        decision: 'approve',
+        intentHash: await approvalHash(prisma, approval.id),
+      })
       expect((await getRun(runId)).attemptCount).toBe(0) // a decision neither spends nor refunds budget
       await dispatch.drainDueBatches()
 
@@ -231,7 +233,10 @@ describe('AI run history, replay and lock order (e2e)', () => {
       const { userId, runId } = await queue('__mock_tool__:demo_sensitive', true)
       await dispatch.drainDueBatches()
       const approval = await prisma.aiApproval.findFirstOrThrow({ where: { runId } })
-      await approvals.decide(userId, approval.id, { decision: 'approve' }) // run is QUEUED, tool APPROVED
+      await approvals.decide(userId, approval.id, {
+        decision: 'approve',
+        intentHash: await approvalHash(prisma, approval.id),
+      }) // run is QUEUED, tool APPROVED
 
       await runService.cancel(userId, runId)
 
@@ -377,10 +382,16 @@ describe('AI run history, replay and lock order (e2e)', () => {
           (typeof parked)[number],
         ]
         const results = await Promise.allSettled([
-          approvals.decide(a.userId, a.approvalId, { decision: 'approve' }),
+          approvals.decide(a.userId, a.approvalId, {
+            decision: 'approve',
+            intentHash: await approvalHash(prisma, a.approvalId),
+          }),
           runService.cancel(a.userId, a.runId),
           runService.cancel(b.userId, b.runId),
-          approvals.decide(b.userId, b.approvalId, { decision: 'reject' }),
+          approvals.decide(b.userId, b.approvalId, {
+            decision: 'reject',
+            intentHash: await approvalHash(prisma, b.approvalId),
+          }),
           expiry.expireDue(),
           control.takeControl({ userId: c.userId, isSuperAdmin: false } as never, c.conversationId),
           dispatch.reap(),

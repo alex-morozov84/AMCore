@@ -1,19 +1,13 @@
-/**
- * Backend-owned active notification channels and categories (Track B — ADR-052).
- *
- * These are TypeScript enums for ergonomic backend use — NOT Postgres enums: the
- * DB columns stay `String` so a new channel/category is additive. The shared
- * package validates the string *grammar*; this is the active set, surfaced to
- * clients via the capabilities response. Add new channels here when their adapter
- * ships (Telegram in Arc D, Web Push in the frontend phase) so the capabilities
- * surface never advertises a dead channel.
- */
+/** Backend-owned identifiers; persisted channel/category columns remain open strings. */
 
-export enum NotificationChannel {
-  IN_APP = 'in_app',
-  EMAIL = 'email',
-  TELEGRAM = 'telegram',
-}
+/** Built-in identifiers; custom channel IDs are validated by registration. */
+export const NotificationChannel = {
+  IN_APP: 'in_app',
+  EMAIL: 'email',
+  TELEGRAM: 'telegram',
+} as const
+// eslint-disable-next-line @typescript-eslint/no-redeclare -- value identifiers and open type share the public name
+export type NotificationChannel = string
 
 export enum NotificationCategory {
   SECURITY = 'security',

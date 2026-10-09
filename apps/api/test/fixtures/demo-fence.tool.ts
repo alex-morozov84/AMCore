@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 import type { AiTool } from '../../src/infrastructure/ai/tools/ai-tool.types'
 
+import { fixtureToolContract } from './extension-contracts/tool-registration'
+
 import { AiToolRiskClass } from '@/generated/prisma/client'
 
 const parameters = z.object({}).strict()
@@ -24,6 +26,7 @@ export const demoFenceTool: AiTool<z.infer<typeof parameters>> = {
   description:
     'A test-only SAFE tool that runs a hook then returns a fixed marker; takes no arguments.',
   parameters,
+  ...fixtureToolContract(parameters),
   riskClass: AiToolRiskClass.SAFE,
   idempotency: 'read_only',
   async execute() {

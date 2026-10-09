@@ -1,22 +1,16 @@
 import { Module } from '@nestjs/common'
 
 import { PrismaModule } from '../../prisma'
-import { AuditModule } from '../audit/audit.module'
 
-import { TelegramController } from './channels/telegram/telegram.controller'
-import { TelegramLinkService } from './channels/telegram/telegram-link.service'
-import { TelegramWebhookController } from './channels/telegram/telegram-webhook.controller'
-import { TelegramWebhookService } from './channels/telegram/telegram-webhook.service'
+import { NOTIFICATION_CHANNELS } from './notification-composition'
 import { NotificationFeedService } from './notification-feed.service'
 import { NotificationPreferenceService } from './notification-preference.service'
 import { NotificationPreferencesController } from './notification-preferences.controller'
 import { NotificationStreamController } from './notification-stream.controller'
 import { NotificationsController } from './notifications.controller'
-import { NotificationsCoreModule } from './notifications-core.module'
+import { NotificationsModule } from './notifications.module'
 import { NotificationRealtimeHub } from './realtime/notification-realtime.hub'
 import { NotificationRealtimeSubscriber } from './realtime/notification-realtime.subscriber'
-
-import { WebhooksModule } from '@/infrastructure/webhooks'
 
 /**
  * Notifications HTTP surface (web/all only): the bearer-authenticated feed/read,
@@ -29,21 +23,23 @@ import { WebhooksModule } from '@/infrastructure/webhooks'
  * link/unlink audit events.
  */
 @Module({
-  imports: [PrismaModule, NotificationsCoreModule, AuditModule, WebhooksModule],
+  imports: [
+    PrismaModule,
+    NotificationsModule,
+    ...NOTIFICATION_CHANNELS.flatMap((channel) =>
+      channel.web ? [channel.web(NotificationsModule)] : []
+    ),
+  ],
   controllers: [
     NotificationsController,
     NotificationPreferencesController,
     NotificationStreamController,
-    TelegramController,
-    TelegramWebhookController,
   ],
   providers: [
     NotificationFeedService,
     NotificationPreferenceService,
     NotificationRealtimeHub,
     NotificationRealtimeSubscriber,
-    TelegramLinkService,
-    TelegramWebhookService,
   ],
 })
 export class NotificationsWebModule {}

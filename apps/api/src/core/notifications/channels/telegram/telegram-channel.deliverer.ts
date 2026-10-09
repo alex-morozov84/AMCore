@@ -5,6 +5,7 @@ import { coerceSupportedLocale, localizedFrontendUrl, type SupportedLocale } fro
 import { PrismaService } from '../../../../prisma'
 import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation'
 import type { ClaimedDelivery } from '../../dispatch/notification-dispatch.types'
+import { NotificationPreparedRequestService } from '../../dispatch/notification-prepared-request.service'
 import { NotificationShutdownLatch } from '../../dispatch/notification-shutdown.latch'
 import { NotificationChannel } from '../../notification.constants'
 import { resolveExternalMode } from '../../notification-content-policy'
@@ -19,6 +20,10 @@ import {
   type NotStarted,
   type TargetRefusal,
 } from '../channel-deliverer.types'
+import {
+  NotificationPreparationError,
+  preparedNotificationRequest,
+} from '../notification-prepared-request'
 
 import {
   TELEGRAM_FENCING_ERROR_CODES,
@@ -28,6 +33,7 @@ import {
 import { TelegramBotApiClient } from './telegram-bot-api.client'
 import { telegramGenericMessages } from './telegram-messages'
 
+import { canonicalJsonHash } from '@/common/utils/canonical-json'
 import { EnvService } from '@/env/env.service'
 import { Prisma, TelegramConnectionStatus } from '@/generated/prisma/client'
 
@@ -40,7 +46,7 @@ interface ConnectionRow {
 /**
  * Telegram channel deliverer (ADR-052 / Arc D, worker-only). Mirrors the email deliverer:
  * generic neutral content by default, detailed ONLY via the definition's
- * `projectExternal('telegram')` + `renderTelegram` allowlist (enforced external boundary), sent as
+ * `projectExternal('telegram')` + `renderExternal.telegram` allowlist (enforced external boundary), sent as
  * **plain text** (no `parse_mode`) by `TelegramBotApiClient`. On a permanent **destination** error
  * (blocked / chat-not-found / migrated) it fences the exact connection (conditional block + cancel
  * its other active deliveries); a non-destination permanent never disables a user's connection.
@@ -58,27 +64,60 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
     private readonly client: TelegramBotApiClient,
     private readonly prisma: PrismaService,
     private readonly env: EnvService,
-    private readonly latch: NotificationShutdownLatch
+    private readonly latch: NotificationShutdownLatch,
+    private readonly prepared: NotificationPreparedRequestService
   ) {}
 
   async deliver(
     context: DeliveryContext,
     admission: DeliveryAdmission
   ): Promise<DeliveryResult | NotStarted> {
-    const { delivery, notification } = context
-    const locale = coerceSupportedLocale(delivery.locale)
-
-    const content = this.resolveContent(notification.type, notification.payload, locale)
-    if (content === 'forbidden') {
-      return { status: 'permanent', errorCode: TelegramDeliveryError.CONTENT_FORBIDDEN }
+    try {
+      this.registry.getStored(context.notification.type, context.notification.schemaVersion)
+    } catch {
+      return { status: 'permanent', errorCode: 'notification_version_unavailable' }
     }
-    if (content === 'payload_invalid') {
-      return { status: 'permanent', errorCode: TelegramDeliveryError.PAYLOAD_INVALID }
-    }
+    const { delivery } = context
+    const binding = `telegram:TELEGRAM_BOT_TOKEN:${canonicalJsonHash(this.env.get('TELEGRAM_API_BASE_URL').replace(/\/+$/, ''))}`
+    const request = await this.prepared.obtain(
+      context,
+      this,
+      binding,
+      'sendMessage',
+      null,
+      async () => {
+        const { notification } = context
+        const locale = coerceSupportedLocale(delivery.locale)
 
-    const text = this.composeText(content, notification.action !== null, locale)
+        const content = this.resolveContent(
+          notification.type,
+          notification.schemaVersion,
+          notification.payload,
+          locale
+        )
+        if (content === 'version_unavailable') {
+          throw new NotificationPreparationError('notification_version_unavailable')
+        }
+        if (content === 'forbidden') {
+          throw new NotificationPreparationError(TelegramDeliveryError.CONTENT_FORBIDDEN)
+        }
+        if (content === 'payload_invalid') {
+          throw new NotificationPreparationError(TelegramDeliveryError.PAYLOAD_INVALID)
+        }
+
+        const text = this.composeText(content, notification.action !== null, locale)
+        return preparedNotificationRequest(
+          context,
+          binding,
+          'sendMessage',
+          JSON.stringify({ chat_id: delivery.targetKey, text }),
+          null
+        )
+      }
+    )
+    if ('status' in request) return request
     const result = await admission.send((signal) =>
-      this.client.sendMessage({ chatId: delivery.targetKey, text, signal })
+      this.client.sendPreparedMessage(request.body, signal)
     )
     if (isNotStarted(result)) return result
 
@@ -177,20 +216,26 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
   /** Localized content, or a terminal sentinel — detailed only from the allowlisted projection. */
   private resolveContent(
     type: string,
+    schemaVersion: number,
     payload: unknown,
     locale: SupportedLocale
-  ): RenderedNotificationContent | 'forbidden' | 'payload_invalid' {
-    if (!this.registry.has(type)) return this.genericContent(locale)
-
-    const definition = this.registry.get(type)
+  ): RenderedNotificationContent | 'forbidden' | 'payload_invalid' | 'version_unavailable' {
+    let definition
+    try {
+      definition = this.registry.getStored(type, schemaVersion)
+    } catch {
+      return 'version_unavailable'
+    }
+    const decoded = definition.payloadSchema.safeParse(payload)
+    if (!decoded.success) return 'payload_invalid'
     const mode = resolveExternalMode(definition, NotificationChannel.TELEGRAM)
     if (mode === 'forbidden') return 'forbidden'
 
-    if (mode === 'detailed' && definition.renderTelegram && definition.projectExternal) {
+    if (mode === 'detailed' && definition.renderExternal?.telegram && definition.projectExternal) {
       const parsed = definition.payloadSchema.safeParse(payload)
       if (!parsed.success) return 'payload_invalid'
       const projection = definition.projectExternal(NotificationChannel.TELEGRAM, parsed.data)
-      return definition.renderTelegram(projection, locale)
+      return definition.renderExternal?.telegram(projection, locale)
     }
     return this.genericContent(locale)
   }

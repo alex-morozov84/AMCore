@@ -9,7 +9,6 @@ import { AI_PROVIDER_ADAPTERS } from '../src/infrastructure/ai/gateway/ai-gatewa
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
-import { AI_TOOLS } from '../src/infrastructure/ai/tools/ai-tool.types'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -18,6 +17,7 @@ import {
   controls,
   deferred,
 } from './fixtures/ai-run-controls'
+import { registerFixtureTools } from './fixtures/extension-contracts/tool-registration'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 import {
@@ -53,9 +53,7 @@ describe('AI run legacy tool state and queued lock order (e2e)', () => {
 
   beforeAll(async () => {
     context = await setupE2ETest((builder) =>
-      builder
-        .overrideProvider(AI_TOOLS)
-        .useValue([archiveDocumentTool, sensitiveArchive])
+      registerFixtureTools(builder, [archiveDocumentTool, sensitiveArchive])
         .overrideProvider(AI_PROVIDER_ADAPTERS)
         .useValue([new ControllableAdapter()])
     )
@@ -170,6 +168,86 @@ describe('AI run legacy tool state and queued lock order (e2e)', () => {
         AiToolInvocationStatus.OUTCOME_UNKNOWN,
         AiToolInvocationStatus.SKIPPED,
       ])
+    })
+
+    it.each([
+      [AiToolInvocationStatus.OUTCOME_UNKNOWN, 'disabled'],
+      [AiToolInvocationStatus.OUTCOME_UNKNOWN, 'incompatible'],
+      [AiToolInvocationStatus.EXECUTING, 'disabled'],
+      [AiToolInvocationStatus.EXECUTING, 'incompatible'],
+    ] as const)(
+      '%s takes precedence over %s external preflight without new I/O',
+      async (status, refusal) => {
+        const { run, conversation } = await queue()
+        const uncertain = await prisma.aiToolInvocation.create({
+          data: {
+            runId: run.id,
+            toolId: 'archive_document',
+            riskClass: AiToolRiskClass.SAFE,
+            status,
+            executionEpoch: 0,
+            idempotency: 'idempotent',
+            argsSnapshot: {},
+          },
+        })
+        if (refusal === 'disabled')
+          await prisma.aiAssistant.update({
+            where: { id: conversation.assistantId! },
+            data: { enabled: false },
+          })
+        else await prisma.aiRun.update({ where: { id: run.id }, data: { modelSnapshot: {} } })
+        await dispatch.drainDueBatches()
+        expect(await prisma.aiRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({
+          status: AiRunStatus.FAILED,
+          terminalReasonCode: 'tool_effect_unknown',
+        })
+        expect(
+          await prisma.aiToolInvocation.findUniqueOrThrow({ where: { id: uncertain.id } })
+        ).toMatchObject({
+          status: AiToolInvocationStatus.OUTCOME_UNKNOWN,
+          resultSummary: null,
+          appliedAt: null,
+        })
+        expect(controls.toolCalls).toHaveLength(0)
+        expect(controls.providerCalls).toBe(0)
+        expect(
+          await prisma.aiRunStep.count({ where: { runId: run.id, type: 'TOOL_INVOCATION' } })
+        ).toBe(0)
+      }
+    )
+
+    it('older-epoch side-effecting EXECUTING wins over a new pending origin before ambiguity', async () => {
+      const { run, user, conversation } = await queue()
+      const uncertain = await prisma.aiToolInvocation.create({
+        data: {
+          runId: run.id,
+          toolId: 'archive_document',
+          riskClass: AiToolRiskClass.SAFE,
+          status: AiToolInvocationStatus.EXECUTING,
+          executionEpoch: 0,
+          idempotency: 'idempotent',
+          originCall: 1,
+          argsSnapshot: {},
+        },
+      })
+      const pending = await approvedSensitiveInvocation(run.id, conversation.id, user.id)
+      await prisma.aiToolInvocation.update({ where: { id: pending.id }, data: { originCall: 2 } })
+      await dispatch.drainDueBatches()
+      expect(await prisma.aiRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({
+        terminalReasonCode: 'tool_effect_unknown',
+      })
+      expect(
+        await prisma.aiToolInvocation.findUniqueOrThrow({ where: { id: uncertain.id } })
+      ).toMatchObject({
+        status: AiToolInvocationStatus.OUTCOME_UNKNOWN,
+        resultSummary: null,
+        appliedAt: null,
+      })
+      expect(
+        await prisma.aiToolInvocation.findUniqueOrThrow({ where: { id: pending.id } })
+      ).toMatchObject({ status: AiToolInvocationStatus.SKIPPED })
+      expect(controls.toolCalls).toHaveLength(0)
+      expect(controls.providerCalls).toBe(0)
     })
 
     it('several pending legacy actions are ambiguous: fail closed, nothing executes', async () => {

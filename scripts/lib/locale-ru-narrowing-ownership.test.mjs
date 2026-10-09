@@ -49,7 +49,10 @@ test('rejects a mutation that restores an impossible production EN branch', () =
 
 test('rejects a mutation that restores a typed EN notification fixture', () => {
   assertResidualMutation('telegram-content.spec.ts', (content) =>
-    content.replace("renderTelegram!(projection, 'ru')", "renderTelegram!(projection, 'en')")
+    content.replace(
+      "renderExternal!.telegram!(projection, 'ru')",
+      "renderExternal!.telegram!(projection, 'en')"
+    )
   )
 })
 

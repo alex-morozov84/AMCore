@@ -7,7 +7,7 @@ import type {
 
 import { TelegramTerminalReason } from './telegram.constants'
 
-import { TelegramConnectionStatus } from '@/generated/prisma/client'
+import { Prisma, TelegramConnectionStatus } from '@/generated/prisma/client'
 
 /**
  * Redact a chat id for the durable `destinationSnapshot` (no full id in the snapshot view):
@@ -20,8 +20,7 @@ function redactChatId(chatId: string): string {
 
 /**
  * Telegram target resolver (ADR-052 / Arc D, core role). One target per recipient — the linked
- * chat. Resolution is a pure projection over the connection facts the producer loaded in its
- * transaction:
+ * chat. Resolution reads the connection on the supplied transaction under FOR SHARE:
  * - no connection → `SKIPPED telegram_not_linked` (observable terminal, keyed by the user id so a
  *   row still exists; never a `PENDING` that would retry an identity absence);
  * - `BLOCKED` → `SKIPPED telegram_destination_unavailable` (a permanent error fenced it — distinct
@@ -31,8 +30,20 @@ function redactChatId(chatId: string): string {
 export class TelegramTargetResolver implements ChannelTargetResolver {
   readonly channel = NotificationChannel.TELEGRAM
 
-  resolveTargets(context: TargetResolutionContext): ResolvedDeliveryTarget[] {
-    const telegram = context.recipient.telegram
+  async resolveTargets(
+    tx: Prisma.TransactionClient,
+    context: TargetResolutionContext
+  ): Promise<ResolvedDeliveryTarget[]> {
+    const [telegram] = await tx.$queryRaw<
+      {
+        id: string
+        chatId: string
+        status: TelegramConnectionStatus
+      }[]
+    >(Prisma.sql`
+      SELECT id, "chatId", status FROM "notifications"."telegram_connections"
+      WHERE "userId" = ${context.recipient.id} FOR SHARE
+    `)
     if (!telegram) {
       return [
         { targetKey: context.recipient.id, skipReasonCode: TelegramTerminalReason.NOT_LINKED },
@@ -42,7 +53,7 @@ export class TelegramTargetResolver implements ChannelTargetResolver {
     const target: ResolvedDeliveryTarget = {
       targetKey: telegram.chatId,
       // The connection id is the D.5 generation fence: a fresh row per link/relink.
-      targetRef: telegram.connectionId,
+      targetRef: telegram.id,
       destinationSnapshot: { chatId: redactChatId(telegram.chatId) },
     }
     if (telegram.status === TelegramConnectionStatus.BLOCKED) {

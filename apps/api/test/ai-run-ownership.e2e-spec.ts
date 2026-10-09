@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
 
@@ -13,7 +15,8 @@ import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispa
 import { AiRunGuard } from '../src/infrastructure/ai/runs/ai-run-guard.service'
 import { AiRunTransitions } from '../src/infrastructure/ai/runs/ai-run-transitions.service'
 import { AiToolActionService } from '../src/infrastructure/ai/runs/ai-tool-action.service'
-import { AI_TOOLS } from '../src/infrastructure/ai/tools/ai-tool.types'
+import { AiToolContractRegistry } from '../src/infrastructure/ai/tools/ai-tool-contract.registry'
+import { prepareToolIntent, toolIntentData } from '../src/infrastructure/ai/tools/ai-tool-intent'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -24,6 +27,8 @@ import {
   lookupItemTool,
   until,
 } from './fixtures/ai-run-controls'
+import { approvalHash } from './fixtures/extension-contracts/approval-hash'
+import { registerFixtureTools } from './fixtures/extension-contracts/tool-registration'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 import {
@@ -59,9 +64,7 @@ describe('AI run ownership, cancel/deadline and tool effects (e2e)', () => {
 
   beforeAll(async () => {
     context = await setupE2ETest((builder) =>
-      builder
-        .overrideProvider(AI_TOOLS)
-        .useValue([archiveDocumentTool, lookupItemTool])
+      registerFixtureTools(builder, [archiveDocumentTool, lookupItemTool])
         .overrideProvider(AI_PROVIDER_ADAPTERS)
         .useValue([new ControllableAdapter()])
     )
@@ -501,8 +504,27 @@ describe('AI run ownership, cancel/deadline and tool effects (e2e)', () => {
           where: { id: created.id },
           data: { status: AiRunStatus.WAITING_APPROVAL, attemptCount: 0 },
         })
+        const invocationId = randomUUID().replaceAll('-', '')
+        const prepared = await prisma.$transaction((tx) =>
+          prepareToolIntent(
+            archiveDocumentTool,
+            {},
+            {
+              ownerUserId: userId,
+              organizationId: null,
+              runId: run.id,
+              conversationId,
+              invocationId,
+              idempotencyKey: `ai-tool:${invocationId}`,
+            },
+            tx,
+            1,
+            app.get(AiToolContractRegistry)
+          )
+        )
         const approval = await prisma.aiApproval.create({
           data: {
+            intentHash: prepared.hash,
             runId: run.id,
             conversationId,
             kind: 'TOOL_INVOCATION',
@@ -519,13 +541,16 @@ describe('AI run ownership, cancel/deadline and tool effects (e2e)', () => {
             idempotency: 'idempotent',
             originCall: 1,
             approvalId: approval.id,
-            argsSnapshot: {},
+            ...toolIntentData(prepared),
           },
         })
 
         const [cancelResult] = await Promise.allSettled([
           runService.cancel(userId, run.id),
-          approvals.decide(userId, approval.id, { decision: 'approve' }),
+          approvals.decide(userId, approval.id, {
+            decision: 'approve',
+            intentHash: await approvalHash(prisma, approval.id),
+          }),
         ])
         expect(cancelResult.status).toBe('fulfilled')
 

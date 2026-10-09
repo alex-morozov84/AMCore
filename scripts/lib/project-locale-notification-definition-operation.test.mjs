@@ -53,7 +53,7 @@ test('retains the exact former RU results in all production definitions', () => 
   assert.match(password, /title: 'Ваш пароль был изменён'/)
   assert.match(password, /formatChangedAt\(changedAt: string, _locale: SupportedLocale\)/)
   assert.match(password, /renderInApp: \(_payload, _locale\)/)
-  assert.match(password, /renderEmail: \(projection, locale\)/)
+  assert.match(password, /email: \(projection, locale\)/)
   assert.match(profile, /title: 'Профиль обновлён'/)
   assert.match(profile, /renderInApp: \(payload, _locale\)/)
   assert.match(telegram, /title: 'Telegram подключён'/)

@@ -7,15 +7,25 @@ import type {
   AiApprovalResponse,
   DecideAiApprovalInput,
 } from '@amcore/shared'
+import { coerceSupportedLocale, decideAiApprovalSchema } from '@amcore/shared'
 
-import { ConflictException, NotFoundException } from '../../../common/exceptions'
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '../../../common/exceptions'
 import { AI_APPROVAL_LIST_LIMIT, AI_RUN_WAKE_JOB_OPTIONS } from '../ai-run.constants'
 import { lockRun, runIdOfApproval } from '../ai-run-locks'
 import type { AiRunWakeJob } from '../runs/ai-run-producer.service'
 
-import { toAiApprovalResponse } from './ai-approval.mapper'
+import {
+  type AiApprovalWithTool,
+  APPROVAL_TOOL_SELECT,
+  toAiApprovalResponse,
+} from './ai-approval.mapper'
 import { ApprovalRaceError, expireApproval } from './ai-approval-expiry'
 
+import { canonicalJsonEqual } from '@/common/utils/canonical-json'
 import { AuditLogService } from '@/core/audit'
 import {
   AiApprovalState,
@@ -25,6 +35,8 @@ import {
   AuditTargetType,
   Prisma,
 } from '@/generated/prisma/client'
+import { AiToolContractRegistry } from '@/infrastructure/ai/tools/ai-tool-contract.registry'
+import { readToolIntent } from '@/infrastructure/ai/tools/ai-tool-intent'
 import { MetricsService } from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { QueueService } from '@/infrastructure/queue/queue.service'
@@ -39,6 +51,9 @@ interface ApprovalLockRow {
   runStatus: string
   deadlineAt: Date | null
   ownerUserId: string
+  intentHash: string | null
+  conversationId: string
+  organizationId: string | null
 }
 
 /** The committed outcome of a decision transaction, mapped to an HTTP result post-commit. */
@@ -65,23 +80,28 @@ export class AiApprovalService {
     private readonly audit: AuditLogService,
     private readonly metrics: MetricsService,
     private readonly queue: QueueService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly contracts: AiToolContractRegistry
   ) {
     this.logger.setContext(AiApprovalService.name)
   }
 
   /** The caller's approvals (newest first, bounded), optionally filtered by state. */
   async list(userId: string, query: AiApprovalListQuery): Promise<AiApprovalListResponse> {
-    const approvals = await this.prisma.aiApproval.findMany({
-      where: {
-        run: { conversation: { ownerUserId: userId } },
-        ...(query.status ? { state: query.status.toUpperCase() as AiApprovalState } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      include: { toolInvocations: { select: { toolId: true, riskClass: true }, take: 1 } },
-      take: AI_APPROVAL_LIST_LIMIT,
+    return this.prisma.$transaction(async (tx) => {
+      const approvals = await tx.aiApproval.findMany({
+        where: {
+          run: { conversation: { ownerUserId: userId } },
+          ...(query.status ? { state: query.status.toUpperCase() as AiApprovalState } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        include: { toolInvocations: { select: APPROVAL_TOOL_SELECT, take: 1 } },
+        take: AI_APPROVAL_LIST_LIMIT,
+      })
+      return {
+        data: await Promise.all(approvals.map((approval) => this.disclose(tx, approval, userId))),
+      }
     })
-    return { data: approvals.map(toAiApprovalResponse) }
   }
 
   /** Record an owner decision; re-queues the run on success, or 404/409 on a stale/raced/foreign one. */
@@ -90,6 +110,7 @@ export class AiApprovalService {
     approvalId: string,
     input: DecideAiApprovalInput
   ): Promise<AiApprovalResponse> {
+    input = decideAiApprovalSchema.parse(input)
     let outcome: DecisionOutcome
     try {
       outcome = await this.prisma.$transaction((tx) => this.decideTx(tx, userId, approvalId, input))
@@ -135,7 +156,7 @@ export class AiApprovalService {
     const rows = await tx.$queryRaw<ApprovalLockRow[]>(Prisma.sql`
       SELECT a.id, a.state::text AS state, a."expiresAt", a."runId",
              r.status::text AS "runStatus", r."deadlineAt",
-             c."ownerUserId"
+             c."ownerUserId", c."organizationId", r."conversationId", a."intentHash"
       FROM "ai"."ai_approvals" a
       JOIN "ai"."ai_runs" r ON r.id = a."runId"
       JOIN "ai"."ai_conversations" c ON c.id = r."conversationId"
@@ -145,11 +166,15 @@ export class AiApprovalService {
     const row = rows[0]
     if (row === undefined || row.ownerUserId !== userId) return { kind: 'not_found' }
 
-    const now = new Date()
+    if (!row.intentHash || input.intentHash !== row.intentHash) {
+      return { kind: 'conflict', message: 'This approval does not match the displayed action.' }
+    }
+    const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
+    const now = clock!.now
     const desired = input.decision === 'approve' ? 'APPROVED' : 'REJECTED'
     if (row.state !== 'PENDING') {
       return row.state === desired
-        ? { kind: 'idempotent', response: await this.project(tx, approvalId) }
+        ? { kind: 'idempotent', response: await this.project(tx, approvalId, userId) }
         : { kind: 'conflict', message: 'This approval has already been decided.' }
     }
 
@@ -169,12 +194,25 @@ export class AiApprovalService {
       return { kind: 'conflict', message: 'This run is no longer awaiting approval.' }
     }
 
-    await this.applyDecision(tx, row, input.decision, userId, now)
+    if (input.decision === 'approve') await this.authorizeDecision(tx, row)
+    const [decisionClock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
+    const decisionTime = decisionClock!.now
+    const deadlineExpired = row.deadlineAt !== null && row.deadlineAt <= decisionTime
+    if (deadlineExpired || (row.expiresAt !== null && row.expiresAt <= decisionTime)) {
+      await expireApproval(tx, this.audit, {
+        approvalId: row.id,
+        runId: row.runId,
+        deadlinePassed: deadlineExpired,
+        now: decisionTime,
+      })
+      return { kind: 'expired' }
+    }
+    await this.applyDecision(tx, row, input.decision, userId, decisionTime)
     return {
       kind: 'decided',
       decision: input.decision,
       runId: row.runId,
-      response: await this.project(tx, approvalId),
+      response: await this.project(tx, approvalId, userId),
     }
   }
 
@@ -225,16 +263,106 @@ export class AiApprovalService {
     )
   }
 
-  /** Read + project the approval (with its gated tool) to the content-free wire response. */
+  /** Project only the current-rights-authorized owner preview. */
   private async project(
     tx: Prisma.TransactionClient,
-    approvalId: string
+    approvalId: string,
+    userId: string
   ): Promise<AiApprovalResponse> {
     const approval = await tx.aiApproval.findUniqueOrThrow({
       where: { id: approvalId },
-      include: { toolInvocations: { select: { toolId: true, riskClass: true }, take: 1 } },
+      include: { toolInvocations: { select: APPROVAL_TOOL_SELECT, take: 1 } },
     })
-    return toAiApprovalResponse(approval)
+    return this.disclose(tx, approval, userId)
+  }
+
+  private async disclose(
+    tx: Prisma.TransactionClient,
+    approval: AiApprovalWithTool,
+    userId: string
+  ): Promise<AiApprovalResponse> {
+    const response = toAiApprovalResponse(approval)
+    const tool = approval.toolInvocations[0]
+    if (!tool?.intentHash || tool.intentHash !== approval.intentHash) return response
+    try {
+      const intent = readToolIntent(tool.intentSnapshot, tool.intentHash)
+      const entry = this.contracts.compatible(intent)
+      if (
+        !entry ||
+        intent.ownerUserId !== userId ||
+        intent.invocationId !== tool.id ||
+        intent.runId !== approval.runId ||
+        intent.conversationId !== approval.conversationId ||
+        intent.toolId !== tool.toolId ||
+        intent.toolVersion !== tool.toolVersion ||
+        intent.riskClass !== tool.riskClass ||
+        intent.idempotency !== tool.idempotency ||
+        intent.originCall !== tool.originCall ||
+        intent.inputSchemaHash !== tool.inputSchemaHash ||
+        intent.normalizedSchemaHash !== tool.normalizedSchemaHash ||
+        !canonicalJsonEqual(intent.args, tool.argsSnapshot) ||
+        !(await entry.authority.canDisclose(tx, intent))
+      )
+        return response
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { locale: true } })
+      const locale = coerceSupportedLocale(user?.locale)
+      return {
+        ...response,
+        preview: intent.preview?.[locale] ?? null,
+        disclosure: intent.preview ? 'available' : 'unavailable',
+      }
+    } catch {
+      return response
+    }
+  }
+
+  private async authorizeDecision(
+    tx: Prisma.TransactionClient,
+    row: ApprovalLockRow
+  ): Promise<void> {
+    const actions = await tx.aiToolInvocation.findMany({
+      where: { approvalId: row.id },
+      select: APPROVAL_TOOL_SELECT,
+      take: 2,
+    })
+    const action = actions[0]
+    if (actions.length !== 1 || !action?.intentHash || action.intentHash !== row.intentHash) {
+      throw new ConflictException('Approval action unavailable')
+    }
+    let intent
+    try {
+      intent = readToolIntent(action.intentSnapshot, action.intentHash)
+    } catch {
+      throw new ConflictException('Approval action incompatible')
+    }
+    const entry = this.contracts.compatible(intent)
+    if (
+      !entry ||
+      intent.ownerUserId !== row.ownerUserId ||
+      intent.organizationId !== row.organizationId ||
+      intent.runId !== row.runId ||
+      intent.conversationId !== row.conversationId ||
+      intent.invocationId !== action.id ||
+      intent.toolId !== action.toolId ||
+      intent.toolVersion !== action.toolVersion ||
+      intent.riskClass !== action.riskClass ||
+      intent.originCall !== action.originCall ||
+      intent.idempotency !== action.idempotency ||
+      intent.inputSchemaHash !== action.inputSchemaHash ||
+      intent.normalizedSchemaHash !== action.normalizedSchemaHash ||
+      !canonicalJsonEqual(intent.args, action.argsSnapshot)
+    )
+      throw new ConflictException('Approval action incompatible')
+    const conversation = await tx.aiConversation.findUnique({
+      where: { id: row.conversationId },
+      select: { assistant: { select: { toolAllowlist: true } } },
+    })
+    if (
+      !conversation?.assistant?.toolAllowlist.includes(intent.toolId) ||
+      !(await entry.authority.canDisclose(tx, intent))
+    )
+      throw new ForbiddenException()
+    await entry.authority.authorize(tx, intent, 'approve')
   }
 
   /** Best-effort post-commit wake — the recovery cron drains the re-queued run regardless. */

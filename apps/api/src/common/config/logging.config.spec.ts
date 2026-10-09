@@ -121,6 +121,28 @@ describe('createLoggingConfig', () => {
     expect(output).toContain('[REDACTED]')
   })
 
+  it('redacts the whole approval request before validation, including rejected extra arguments', () => {
+    const config = createLoggingConfig(clsServiceMock, 4096)
+    const serializer = (config.pinoHttp as { serializers?: { req?: (req: unknown) => unknown } })
+      .serializers?.req
+    for (const url of ['/api/v1/ai/approvals/gate/decision', '/ai/approvals/gate/decision']) {
+      const value = serializer?.({
+        id: 'request',
+        method: 'POST',
+        url,
+        headers: {},
+        socket: {},
+        body: {
+          decision: 'approve',
+          intentHash: 'a'.repeat(64),
+          args: { secret: 'rejected-argument-sentinel' },
+        },
+      })
+      expect(JSON.stringify(value)).not.toContain('rejected-argument-sentinel')
+      expect(value).toMatchObject({ body: '[REDACTED]' })
+    }
+  })
+
   it('redacts AI operator reason (body + header) and message content in log output (Arc F.3)', () => {
     const config = createLoggingConfig(clsServiceMock, 4096)
     const stream = new PassThrough()

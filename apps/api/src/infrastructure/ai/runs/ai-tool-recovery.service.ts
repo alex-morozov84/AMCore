@@ -8,7 +8,7 @@ import { findUnresolvedAction } from './ai-run-loop-reconstruct'
 import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
 import { AiRunTransitions } from './ai-run-transitions.service'
 import { AiToolActionService, type ToolRunContext } from './ai-tool-action.service'
-import type { InvocationRow } from './ai-tool-invocation.store'
+import { type InvocationRow, isReadOnly } from './ai-tool-invocation.store'
 
 import { AiToolInvocationStatus } from '@/generated/prisma/client'
 import { CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
@@ -45,7 +45,12 @@ export class AiToolRecoveryService {
   /** `proceed` = nothing pending (or it was applied cleanly); `done` = the run was terminalized / must exit. */
   async recover(ctx: ToolRunContext): Promise<'proceed' | 'done'> {
     const { claim } = ctx
-    const found = await findUnresolvedAction(this.prisma, claim.id, (op) => this.latch.run(op))
+    const found = await findUnresolvedAction(
+      this.prisma,
+      claim.id,
+      (op) => this.latch.run(op),
+      claim.epoch
+    )
     if (found === CUTOFF) return 'done' // sealed: nothing may start
     const action = found
     if (action === null) return 'proceed'
@@ -94,6 +99,10 @@ export class AiToolRecoveryService {
 
   /** Start/adopt a `REQUESTED`/`APPROVED`/`EXECUTING` action through the one-shot start CAS. */
   private async resume(ctx: ToolRunContext, action: InvocationRow): Promise<'proceed' | 'done'> {
+    if (action.status === AiToolInvocationStatus.EXECUTING && !isReadOnly(action)) {
+      await this.actions.resolveUnknown(ctx, action)
+      return 'done'
+    }
     const tool = this.registry.get(action.toolId)
     if (tool === undefined) {
       await this.transitions.failed(

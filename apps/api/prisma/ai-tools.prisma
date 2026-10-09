@@ -59,6 +59,11 @@ model AiToolInvocation {
   status         AiToolInvocationStatus @default(REQUESTED)
   riskClass      AiToolRiskClass        @default(SAFE)
   approvalId     String?
+  intentSnapshot Json?
+  intentHash String?
+  toolVersion Int?
+  inputSchemaHash String?
+  normalizedSchemaHash String?
   argsSnapshot   Json? // validated + redacted; the frozen normalized action input
   resultSummary  Json? // bounded; no secrets
   errorCode      String?
@@ -96,6 +101,7 @@ model AiApproval {
   runId           String?
   kind            AiApprovalKind
   state           AiApprovalState @default(PENDING)
+  intentHash String?
   requestedReason String? // bounded
   decidedById     String?
   decidedAt       DateTime?

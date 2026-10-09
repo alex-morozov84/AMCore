@@ -9,6 +9,7 @@ import type { NotificationDefinition } from './notification-definition.types'
 
 const TYPE_GRAMMAR = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/
 const KNOWN_CHANNELS = new Set<string>(Object.values(NotificationChannel))
+const KNOWN_CONTENT_CLASSES = new Set<string>(Object.values(NotificationContentClass))
 const KNOWN_CATEGORIES = new Set<string>(Object.values(NotificationCategory))
 
 /**
@@ -17,9 +18,12 @@ const KNOWN_CATEGORIES = new Set<string>(Object.values(NotificationCategory))
  * at bootstrap rather than fail at send time: bad identifiers, `schemaVersion < 1`,
  * unknown/duplicate channels, mandatory channels outside defaults, `SECRET` content
  * (forbidden in the subsystem), or a detailed external channel with no allowlisted
- * `projectExternal`.
+ * `projectExternal` and callable channel renderer.
  */
-export function validateDefinition(definition: NotificationDefinition): void {
+export function validateDefinition(
+  definition: NotificationDefinition,
+  channelIds: readonly string[] = [...KNOWN_CHANNELS]
+): void {
   const fail = (reason: string): never => {
     throw new InvalidNotificationDefinitionError(definition.type, reason)
   }
@@ -29,13 +33,25 @@ export function validateDefinition(definition: NotificationDefinition): void {
   if (!Number.isInteger(definition.schemaVersion) || definition.schemaVersion < 1) {
     fail('schemaVersion must be an integer >= 1')
   }
+  if (!KNOWN_CONTENT_CLASSES.has(definition.contentClass)) fail('unknown contentClass')
+  if (
+    !definition.externalModeByChannel ||
+    typeof definition.externalModeByChannel !== 'object' ||
+    Array.isArray(definition.externalModeByChannel)
+  )
+    fail('invalid external policy')
+  for (const [channel, mode] of Object.entries(definition.externalModeByChannel)) {
+    if (!channelIds.includes(channel) || channel === NotificationChannel.IN_APP)
+      fail('invalid external policy channel')
+    if (mode !== 'generic' && mode !== 'detailed') fail('invalid external exposure mode')
+  }
   if (definition.contentClass === NotificationContentClass.SECRET) {
     fail('SECRET content is forbidden in the notifications subsystem')
   }
 
-  assertChannelSet(definition.supportedChannels, 'supportedChannels', fail)
-  assertChannelSet(definition.defaultChannels, 'defaultChannels', fail)
-  assertChannelSet(definition.mandatoryChannels, 'mandatoryChannels', fail)
+  assertChannelSet(definition.supportedChannels, 'supportedChannels', fail, channelIds)
+  assertChannelSet(definition.defaultChannels, 'defaultChannels', fail, channelIds)
+  assertChannelSet(definition.mandatoryChannels, 'mandatoryChannels', fail, channelIds)
 
   // mandatory ⊆ default ⊆ supported.
   const supported = new Set<string>(definition.supportedChannels)
@@ -48,25 +64,29 @@ export function validateDefinition(definition: NotificationDefinition): void {
   }
 
   // Every supported external channel that resolves to detailed must have a
-  // projection — a user opt-in can enable any supported channel, not only defaults.
+  // projection and renderer — a user opt-in can enable any supported channel, not only defaults.
   for (const channel of supported) {
     if (channel === NotificationChannel.IN_APP) continue
-    if (resolveExternalMode(definition, channel) === 'detailed' && !definition.projectExternal) {
-      fail(
-        `channel "${channel}" resolves to detailed external exposure but defines no projectExternal`
-      )
-    }
+    const mode = resolveExternalMode(definition, channel)
+    if (mode !== 'generic' && mode !== 'detailed')
+      fail(`channel "${channel}" has invalid resolved policy`)
+    if (mode === 'generic') continue
+    if (typeof definition.projectExternal !== 'function')
+      fail(`channel "${channel}" defines no projectExternal`)
+    if (typeof definition.renderExternal?.[channel] !== 'function')
+      fail(`channel "${channel}" defines no detailed renderer`)
   }
 }
 
 function assertChannelSet(
   channels: readonly string[],
   field: string,
-  fail: (reason: string) => never
+  fail: (reason: string) => never,
+  channelIds: readonly string[]
 ): void {
   const seen = new Set<string>()
   for (const channel of channels) {
-    if (!KNOWN_CHANNELS.has(channel)) fail(`${field} contains unknown channel "${channel}"`)
+    if (!channelIds.includes(channel)) fail(`${field} contains unknown channel "${channel}"`)
     if (seen.has(channel)) fail(`${field} contains duplicate channel "${channel}"`)
     seen.add(channel)
   }

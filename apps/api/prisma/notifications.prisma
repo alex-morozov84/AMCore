@@ -78,6 +78,10 @@ model NotificationDelivery {
   targetRef           String? // durable connection/subscription aggregate ref
   destinationSnapshot Json? // adapter schema; redacted; no secrets
   locale              String
+  // Private prepare-before-I/O contract. NULL denotes unconverted legacy work.
+  requestContractVersion Int?
+  preparedRequest        Json?
+  preparedRequestHash    String?
   status              NotificationDeliveryStatus @default(PENDING)
   availableAt         DateTime                   @default(now()) // policy delay
   nextAttemptAt       DateTime? // earliest permitted next attempt: the retry schedule of a RETRY_SCHEDULED row (the later of backoff and a provider `Retry-After`/`retry_after` floor, clamped to 24 h); on a terminal FAILED row, the retained provider restriction (never makes the row claimable — status decides). Null otherwise.

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { performance } from 'node:perf_hooks'
 
 import { Inject, Injectable } from '@nestjs/common'
@@ -11,14 +12,18 @@ import {
   approvedToolCallId,
   toolIdempotencyKey,
 } from '../tools/ai-tool.constants'
-import type { AiTool, AiToolContext } from '../tools/ai-tool.types'
+import type { AiTool, AiToolContext, AiToolIntent } from '../tools/ai-tool.types'
+import { AiToolContractRegistry } from '../tools/ai-tool-contract.registry'
 import { AiToolNoEffectError } from '../tools/ai-tool-error'
+import { boundedToolHook } from '../tools/ai-tool-hook'
+import { prepareToolIntent, readToolIntent } from '../tools/ai-tool-intent'
 
 import { AiRunTerminalReason } from './ai-run.constants'
 import { AiRunRepository } from './ai-run.repository'
 import type { ClaimedRun } from './ai-run-dispatch.types'
-import { AiRunGuard, RunLeaseLostError } from './ai-run-guard.service'
+import { AiRunGuard, markIoStarted, RunLeaseLostError } from './ai-run-guard.service'
 import { providerCallStep, writeRunSteps, writeUsageLedger } from './ai-run-loop-persistence'
+import { findUncertainAction } from './ai-run-loop-reconstruct'
 import type { RunPlan } from './ai-run-plan'
 import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
 import { AiRunTransitions, applyStop } from './ai-run-transitions.service'
@@ -106,7 +111,8 @@ export class AiToolActionService {
     private readonly metrics: MetricsService,
     private readonly audit: AuditLogService,
     @Inject(AI_RUN_SHUTDOWN_LATCH) private readonly latch: ShutdownLatch,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly contracts: AiToolContractRegistry
   ) {
     this.logger.setContext(AiToolActionService.name)
   }
@@ -129,6 +135,14 @@ export class AiToolActionService {
     const outcome = await this.guard.record(claim, async (tx, ctx): Promise<IntentResult> => {
       const existing = await findByOrigin(tx, claim.id, ordinal)
       if (existing !== null) {
+        if (
+          existing.status === AiToolInvocationStatus.OUTCOME_UNKNOWN ||
+          (existing.status === AiToolInvocationStatus.EXECUTING &&
+            existing.idempotency !== 'read_only')
+        ) {
+          await startExecution(tx, this.repository, claim, existing)
+          return { kind: 'terminal' }
+        }
         if (sameAction(existing, tool.toolId, args)) return { kind: 'ready', action: existing }
         await this.failClosed(tx, claim, AiRunTerminalReason.ACTION_INPUT_CONFLICT)
         return { kind: 'terminal' }
@@ -140,7 +154,33 @@ export class AiToolActionService {
         await applyStop(tx, this.repository, claim, ctx.stop)
         return { kind: 'terminal' }
       }
-      return { kind: 'ready', action: await createRequested(tx, claim, tool, ordinal, args) }
+      try {
+        if (!plan.attribution.userId) throw new Error('tool_owner_missing')
+        const invocationId = randomUUID().replaceAll('-', '')
+        const prepared = await prepareToolIntent(
+          tool,
+          args,
+          {
+            runId: claim.id,
+            conversationId: claim.conversationId,
+            ownerUserId: plan.attribution.userId,
+            organizationId: plan.attribution.organizationId,
+            invocationId,
+            idempotencyKey: toolIdempotencyKey(invocationId),
+            signal: AbortSignal.timeout(this.env.get('AI_TOOL_EXECUTION_TIMEOUT_MS')),
+          },
+          tx,
+          ordinal,
+          this.contracts
+        )
+        return {
+          kind: 'ready',
+          action: await createRequested(tx, claim, tool, ordinal, prepared.intent.args, prepared),
+        }
+      } catch {
+        await this.failClosed(tx, claim, AiRunTerminalReason.TOOL_ARGS_INVALID)
+        return { kind: 'terminal' }
+      }
     })
     return outcome.kind === 'ok' ? outcome.value : { kind: 'exit' }
   }
@@ -159,39 +199,118 @@ export class AiToolActionService {
     args?: unknown
   ): Promise<ActionStep> {
     const { claim } = ctx
-    let frozenArgs = args
-    if (frozenArgs === undefined) {
-      const parsed = tool.parameters.safeParse(action.argsSnapshot)
-      const mayCheck = action.status !== AiToolInvocationStatus.EXECUTING || isReadOnly(action)
-      if (mayCheck) {
-        if (!parsed.success || !canonicalJsonEqual(parsed.data, action.argsSnapshot)) {
-          return this.rejectIncompatible(claim, action)
-        }
-        frozenArgs = parsed.data
-      }
+    void args // Execution always reads the durable intent, including the uninterrupted path.
+    if (
+      action.status === AiToolInvocationStatus.OUTCOME_UNKNOWN ||
+      (action.status === AiToolInvocationStatus.EXECUTING && !isReadOnly(action))
+    ) {
+      return this.resolveUnknown(ctx, action)
+    }
+    let intent: AiToolIntent
+    try {
+      if (!action.intentHash) throw new Error('tool_contract_incompatible')
+      intent = readToolIntent(action.intentSnapshot, action.intentHash)
+      if (
+        !this.contracts.compatible(intent) ||
+        intent.invocationId !== action.id ||
+        intent.runId !== claim.id ||
+        intent.conversationId !== claim.conversationId ||
+        intent.originCall !== action.originCall ||
+        intent.ownerUserId !== ctx.ownerUserId ||
+        intent.organizationId !== ctx.organizationId ||
+        intent.toolId !== action.toolId ||
+        intent.toolVersion !== action.toolVersion ||
+        intent.riskClass !== action.riskClass ||
+        intent.inputSchemaHash !== action.inputSchemaHash ||
+        intent.normalizedSchemaHash !== action.normalizedSchemaHash ||
+        intent.idempotency !== action.idempotency ||
+        !canonicalJsonEqual(intent.args, action.argsSnapshot)
+      )
+        throw new Error('tool_contract_incompatible')
+    } catch {
+      return this.rejectIncompatible(claim, action)
     }
 
-    const start = await this.guard.admit(
-      claim,
-      (tx) => startExecution(tx, this.repository, claim, action),
-      { markIoStarted: true }
-    )
+    let deadlineSignal: AbortSignal | undefined
+    const start = await this.guard.admit(claim, async (tx, admission) => {
+      const conversation = await tx.aiConversation.findUnique({
+        where: { id: claim.conversationId },
+        select: { assistant: { select: { toolAllowlist: true } } },
+      })
+      if (!conversation?.assistant?.toolAllowlist.includes(action.toolId))
+        return 'unauthorized' as const
+      const entry = this.contracts.compatible(intent)
+      if (!entry) return 'unauthorized' as const
+      const budget = Math.min(
+        this.env.get('AI_TOOL_EXECUTION_TIMEOUT_MS'),
+        admission.deadlineRemainingMs ?? Infinity
+      )
+      if (admission.deadlineRemainingMs != null) {
+        deadlineSignal = AbortSignal.timeout(Math.max(1, Math.ceil(admission.deadlineRemainingMs)))
+      }
+      let authorized = true
+      try {
+        await boundedToolHook(
+          () => entry.authority.authorize(tx, intent, 'execute'),
+          AbortSignal.any([
+            ctx.runtime.attempt.signal,
+            AbortSignal.timeout(Math.max(1, Math.ceil(budget))),
+          ])
+        )
+      } catch {
+        authorized = false
+      }
+      // The hook can wait across a deadline. Database authority must be fresh at actual start.
+      await this.guard.revalidateAdmission(tx, claim)
+      if (this.latch.closed || ctx.runtime.attempt.signal.aborted || deadlineSignal?.aborted)
+        return 'aborted' as const
+      if (!authorized) return 'unauthorized' as const
+      const started = await startExecution(tx, this.repository, claim, action)
+      if (started === 'started' || started === 'adopted') await markIoStarted(tx, claim)
+      return started
+    })
     if (start.kind === 'stopped') {
       return (await this.transitions.stop(claim, start.cause)) === 'applied'
         ? { status: 'terminal' }
         : { status: 'exit' }
     }
     if (start.kind !== 'ok') return { status: 'exit' }
+    if (start.value === 'unauthorized') return this.rejectIncompatible(claim, action)
     if (start.value === 'unknown') {
       this.metrics.incAiToolInvocation(action.toolId, riskOf(action), 'effect_unknown')
       return { status: 'terminal' }
     }
     if (start.value !== 'started' && start.value !== 'adopted') return { status: 'exit' }
     // The admission await may have completed just before seal; start no transport after cutoff.
-    if (this.latch.sealed) return { status: 'exit' }
+    if (this.latch.closed || ctx.runtime.attempt.signal.aborted || deadlineSignal?.aborted)
+      return { status: 'exit' }
 
-    const run = await this.runTool(ctx, action, tool, frozenArgs, toolCallId)
-    return this.record(ctx, action, tool, toolCallId, frozenArgs, run)
+    const run = await this.runTool(ctx, action, tool, intent, toolCallId, deadlineSignal)
+    return this.record(ctx, action, tool, toolCallId, intent.args, run)
+  }
+
+  /** Resolve uncertainty before model/assistant/content preflight, preserving stop precedence. */
+  async resolvePendingUnknown(claim: ClaimedRun): Promise<boolean> {
+    const outcome = await this.guard.admit(claim, async (tx) => {
+      const action = await findUncertainAction(tx, claim.id, claim.epoch, (operation) =>
+        operation()
+      )
+      if (action === null || typeof action === 'symbol') return false
+      await startExecution(tx, this.repository, claim, action)
+      return true
+    })
+    if (outcome.kind === 'stopped') await this.transitions.stop(claim, outcome.cause)
+    return outcome.kind !== 'ok' || outcome.value
+  }
+
+  /** Uncertain durable effects dominate handler compatibility and current permission errors. */
+  async resolveUnknown(ctx: ToolRunContext, action: InvocationRow): Promise<ActionStep> {
+    const outcome = await this.guard.record(ctx.claim, (tx) =>
+      startExecution(tx, this.repository, ctx.claim, action)
+    )
+    return outcome.kind === 'ok' && outcome.value === 'unknown'
+      ? { status: 'terminal' }
+      : { status: 'exit' }
   }
 
   /**
@@ -250,12 +369,14 @@ export class AiToolActionService {
     ctx: ToolRunContext,
     action: InvocationRow,
     tool: AiTool,
-    args: unknown,
-    toolCallId: string
+    args: AiToolIntent,
+    toolCallId: string,
+    deadlineSignal?: AbortSignal
   ): Promise<ToolRun> {
     void toolCallId
     const timeoutMs = this.env.get('AI_TOOL_EXECUTION_TIMEOUT_MS')
     const signals = [AbortSignal.timeout(timeoutMs), ctx.runtime.attempt.signal]
+    if (deadlineSignal) signals.push(deadlineSignal)
     if (ctx.claim.deadlineAt !== null) {
       signals.push(AbortSignal.timeout(Math.max(0, ctx.claim.deadlineAt.getTime() - Date.now())))
     }

@@ -39,11 +39,11 @@ describe('accountPasswordChangedDefinition', () => {
   })
 
   it('renders detailed email copy from the projection in both locales', () => {
-    const en = def.renderEmail!({ changedAt }, 'en')
+    const en = def.renderExternal!.email!({ changedAt }, 'en')
     expect(en.title).toBe('Your password was changed')
     expect(en.body).toContain('successfully changed')
 
-    const ru = def.renderEmail!({ changedAt }, 'ru')
+    const ru = def.renderExternal!.email!({ changedAt }, 'ru')
     expect(ru.title).toBe('Ваш пароль был изменён')
     expect(ru.body).toContain('успешно изменён')
   })

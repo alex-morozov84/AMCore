@@ -1,5 +1,7 @@
 import type { PinoLogger } from 'nestjs-pino'
 
+import { serializeNotificationEmail } from '../prepared-email'
+
 import { ResendEmailProvider } from './resend.provider'
 
 import type { EnvService } from '@/env/env.service'
@@ -152,4 +154,35 @@ describe('ResendEmailProvider against the real Resend SDK', () => {
       expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('SENTINEL')
     }
   )
+  it('sends the full prepared body byte-for-byte with the same key through the installed SDK', async () => {
+    respond(200, { id: 'em_prepared' })
+    const signal = new AbortController().signal
+    const params = {
+      from: 'Starter <noreply@example.com>',
+      to: 'recipient@example.com',
+      subject: 'Тест',
+      html: '<p>Body</p>',
+      text: 'Body',
+      replyTo: 'reply@example.com',
+    }
+    const key = 'notification-delivery:prepared-fixture'
+    await provider.send({ ...params, idempotencyKey: key, signal })
+    const sdkBody = calls[0]!.init.body
+    const prepared = serializeNotificationEmail(params)
+    expect(prepared).toBe(sdkBody)
+    await provider.sendPrepared(prepared, key, signal)
+    await provider.sendPrepared(prepared, key, signal)
+    expect(calls).toHaveLength(3)
+    for (const call of calls) {
+      expect(call.url).toBe('https://api.resend.com/emails')
+      expect(call.init.method).toBe('POST')
+      expect(call.init.body).toBe(prepared)
+      expect(call.init.signal).toBe(signal)
+      const headers = new Headers(call.init.headers)
+      expect(headers.get('idempotency-key')).toBe(key)
+      expect(headers.get('authorization')).toBe('Bearer re_test_fake')
+      expect(headers.get('content-type')).toBe('application/json')
+    }
+    expect(prepared).not.toContain('re_test_fake')
+  })
 })

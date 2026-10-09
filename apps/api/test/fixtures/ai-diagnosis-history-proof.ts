@@ -83,7 +83,10 @@ export function diagnosisHistoryProof(getContext: () => E2ETestContext): void {
         .providerRetryRestriction
     ).toEqual(restriction)
     await expect(
-      context.app.get(AiApprovalService).decide(user.id, approval.id, { decision: 'approve' })
+      context.app.get(AiApprovalService).decide(user.id, approval.id, {
+        decision: 'approve',
+        intentHash: approval.intentHash ?? '0'.repeat(64),
+      })
     ).rejects.toThrow()
     expect(
       (await context.prisma.aiApproval.findUniqueOrThrow({ where: { id: approval.id } })).state

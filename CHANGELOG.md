@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Versioned notification definitions and a single channel registration contract,
+  transaction-aware recipient readers, immutable delivery targets and frozen provider
+  request bodies across retries. Human-readable extension guides and executable
+  downstream registration fixtures cover notifications, AI tools and providers.
+- AI approvals show a localized immutable action preview, bind decisions to its
+  hash and recheck current domain permissions before disclosure, approval and execution.
+  The extension-contract upgrade requires a maintenance stop and preserves uncertain
+  effects instead of retrying or reconstructing legacy requests.
+
 - Role-definition **browser transport and headless hooks**: typed same-origin routes for the
   capability catalogue, role list and snapshot, create, save and confirmed delete, with
   `useCapabilityCatalogue`, `useRoleDefinitions`, `useRoleDefinition` and

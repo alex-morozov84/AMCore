@@ -68,17 +68,21 @@ export const accountPasswordChangedDefinition: NotificationDefinition<Payload> =
       : { title: 'Пароль изменён', body: 'Пароль вашего аккаунта был изменён.' },
   // The allowlisted projection: only the change time crosses to the email channel.
   projectExternal: (_channel, payload) => ({ changedAt: payload.changedAt }),
-  renderEmail: (projection, locale) => {
-    const changedAt =
-      typeof projection.changedAt === 'string' ? formatChangedAt(projection.changedAt, locale) : ''
-    return locale === 'en'
-      ? {
-          title: 'Your password was changed',
-          body: `Your account password was successfully changed on ${changedAt}. For your security, all active sessions were signed out. If you did not make this change, reset your password immediately and contact support.`,
-        }
-      : {
-          title: 'Ваш пароль был изменён',
-          body: `Пароль вашего аккаунта был успешно изменён ${changedAt}. В целях безопасности все активные сессии завершены. Если это были не вы, немедленно смените пароль и свяжитесь с поддержкой.`,
-        }
+  renderExternal: {
+    email: (projection, locale) => {
+      const changedAt =
+        typeof projection.changedAt === 'string'
+          ? formatChangedAt(projection.changedAt, locale)
+          : ''
+      return locale === 'en'
+        ? {
+            title: 'Your password was changed',
+            body: `Your account password was successfully changed on ${changedAt}. For your security, all active sessions were signed out. If you did not make this change, reset your password immediately and contact support.`,
+          }
+        : {
+            title: 'Ваш пароль был изменён',
+            body: `Пароль вашего аккаунта был успешно изменён ${changedAt}. В целях безопасности все активные сессии завершены. Если это были не вы, немедленно смените пароль и свяжитесь с поддержкой.`,
+          }
+    },
   },
 }

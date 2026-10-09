@@ -21,6 +21,10 @@ describe('aiApprovalResponseSchema', () => {
     state: 'pending',
     toolId: 'delete_thing',
     riskClass: 'destructive',
+    toolVersion: 1,
+    intentHash: 'a'.repeat(64),
+    preview: null,
+    disclosure: 'unavailable',
     requestedReason: 'needs owner sign-off',
     expiresAt: '2026-07-11T00:00:00.000Z',
     decidedAt: null,
@@ -55,10 +59,30 @@ describe('aiApprovalListQuerySchema', () => {
 
 describe('decideAiApprovalSchema', () => {
   it('accepts approve/reject with an optional reason', () => {
-    expect(decideAiApprovalSchema.safeParse({ decision: 'approve' }).success).toBe(true)
     expect(
-      decideAiApprovalSchema.safeParse({ decision: 'reject', reason: 'too risky' }).success
+      decideAiApprovalSchema.safeParse({ decision: 'approve', intentHash: 'a'.repeat(64) }).success
     ).toBe(true)
+    expect(
+      decideAiApprovalSchema.safeParse({
+        decision: 'reject',
+        intentHash: 'a'.repeat(64),
+        reason: 'too risky',
+      }).success
+    ).toBe(true)
+  })
+
+  it('requires the displayed hash and rejects additional action fields', () => {
+    expect(decideAiApprovalSchema.safeParse({ decision: 'approve' }).success).toBe(false)
+    expect(
+      decideAiApprovalSchema.safeParse({ decision: 'reject', intentHash: 'bad' }).success
+    ).toBe(false)
+    expect(
+      decideAiApprovalSchema.safeParse({
+        decision: 'approve',
+        intentHash: 'a'.repeat(64),
+        args: {},
+      }).success
+    ).toBe(false)
   })
 
   it('rejects a decision outside approve/reject', () => {
@@ -67,7 +91,11 @@ describe('decideAiApprovalSchema', () => {
 
   it('rejects an over-long reason', () => {
     expect(
-      decideAiApprovalSchema.safeParse({ decision: 'reject', reason: 'x'.repeat(501) }).success
+      decideAiApprovalSchema.safeParse({
+        decision: 'reject',
+        intentHash: 'a'.repeat(64),
+        reason: 'x'.repeat(501),
+      }).success
     ).toBe(false)
   })
 })

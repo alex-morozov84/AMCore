@@ -75,7 +75,8 @@ function validate(permission: AbilityPermission, synthetic: boolean): void {
 /** Validate and eagerly parse the entire owner payload before any narrowing. */
 export function normalizeOwnerPermissions(
   permissions: AbilityPermission[],
-  principal: RequestPrincipal,
+  principal: Pick<RequestPrincipal, 'sub' | 'organizationId'> &
+    Partial<Omit<RequestPrincipal, 'sub' | 'organizationId'>>,
   synthetic = false
 ): AbilityPermission[] {
   const identities = new Map<string, string>()

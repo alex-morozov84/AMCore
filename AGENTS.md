@@ -57,6 +57,7 @@ pnpm install            # install all
 pnpm dev                # run all apps (or: pnpm --filter api dev)
 pnpm lint               # lint        pnpm typecheck   # types
 pnpm test               # unit tests  pnpm build       # build all
+pnpm test:extension-contracts  # isolated notification/AI registration + upgrade conformance (Docker)
 pnpm init:brand         # downstream fork identity/brand/theme initializer
 pnpm init:project       # downstream project choices; run with flags
 pnpm --filter api test:e2e            # e2e (Jest + Testcontainers, needs Docker)

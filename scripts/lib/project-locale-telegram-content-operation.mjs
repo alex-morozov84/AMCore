@@ -9,7 +9,7 @@ function callIn(model, target, ctx) {
   return findUniqueNode(
     model,
     (node) => isRenderTelegramCall(node),
-    { ...ctx, describe: 'renderTelegram fixture call' },
+    { ...ctx, describe: 'renderExternal.telegram fixture call' },
     target
   )
 }
@@ -22,7 +22,10 @@ function isRenderTelegramCall(node) {
   const argument = node.arguments.at(-1)
   return (
     ts.isPropertyAccessExpression(called) &&
-    called.name.text === 'renderTelegram' &&
+    called.name.text === 'telegram' &&
+    ts.isNonNullExpression(called.expression) &&
+    ts.isPropertyAccessExpression(called.expression.expression) &&
+    called.expression.expression.name.text === 'renderExternal' &&
     argument &&
     ts.isStringLiteral(argument) &&
     ['en', 'ru'].includes(argument.text)
